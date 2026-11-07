@@ -6,6 +6,8 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
@@ -32,6 +34,24 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
 class FiniteNumericalCompanionsTest {
+    @Test
+    fun `directional application controls preserve automatic companion admission`() {
+        val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        for (enabled in listOf(false, true)) {
+            val plan = assertIs<PortfolioPlan.Execute>(FinitePipeline.planPortfolio(PortfolioPlanRequest(
+                FiniteEngine.MIXED, true, 1, listOf("lp-directional-advice=$enabled"), 17L,
+                PortfolioScenario.DEFAULT_ARMS, LpConfig.AGGRESSIVE,
+                LpZeroObjectivePricing.MIN_BOUND_SUPPORT, null, null)))
+
+            val eligibility = finiteNumericalCompanionEligibility(model, plan.scenario, objective, TheoryParams())
+
+            assertTrue(eligibility.admitted, eligibility.declines.toString())
+            assertTrue(eligibility.declines.isEmpty())
+        }
+    }
+
     @Test
     fun `opt in companion repair should publish a coupled three integer improvement`() {
         val model = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(

@@ -76,10 +76,14 @@ class PortfolioPlanRequest(
 /** A resolved finite portfolio route, before a problem is materialized into workers. */
 sealed class PortfolioPlan {
     /** Construct this scenario and execute it through the finite portfolio executor. */
-    class Execute(
+    class Execute internal constructor(
         /** Scenario to execute through the finite portfolio executor. */
         val scenario: PortfolioScenario,
-    ) : PortfolioPlan()
+        internal val lpDirectionalAdvice: Boolean?,
+    ) : PortfolioPlan() {
+        /** Construct an execution plan that preserves recipe advice settings. */
+        constructor(scenario: PortfolioScenario) : this(scenario, null)
+    }
 
     /** Render the resolved local-search recipes instead of executing them. */
     class LocalSearchDryRun(
@@ -189,6 +193,7 @@ fun FinitePipeline.planFixedBacktrack(request: FixedBacktrackPlanRequest): Fixed
 fun FinitePipeline.planPortfolio(request: PortfolioPlanRequest): PortfolioPlan {
     val mix = portfolioMix(request.engine)
     val params = request.executionOptions.reader()
+    val lpDirectionalAdvice = params[ExecutionOption.lpDirectionalAdvice]
     val lsResolution = if (mix != EngineMix.BACKTRACK) resolveLocalSearchRecipes(params) else LsResolution(null, false)
     if (lsResolution.dryRunSolver) return PortfolioPlan.LocalSearchDryRun(lsResolution.pool)
 
@@ -221,5 +226,6 @@ fun FinitePipeline.planPortfolio(request: PortfolioPlanRequest): PortfolioPlan {
                 zeroObjectivePricing = request.zeroObjectivePricing,
             ),
         ).copy(toleranceCheck = request.toleranceCheck),
+        lpDirectionalAdvice,
     )
 }

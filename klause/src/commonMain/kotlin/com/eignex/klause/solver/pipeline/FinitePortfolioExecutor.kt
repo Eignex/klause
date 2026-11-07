@@ -88,6 +88,7 @@ internal fun FinitePipeline.portfolioExecutor(
     waitForCompanionImprovement: Boolean = false,
     privateRebuildBudgetOnly: Boolean = false,
     adaptiveCompanionRepair: Boolean = false,
+    lpDirectionalAdvice: Boolean? = null,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
         "portfolio-work requires a finite Boolean/integer source without numerical companions"
@@ -162,6 +163,7 @@ internal fun FinitePipeline.portfolioExecutor(
     val finiteFactories = PortfolioBuilder.factories(
         problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
         profile, numericalCompletion, sourceHints, objectiveCoordinates, bufferedPublications,
+        lpDirectionalAdvice,
     ).map { factory ->
         PortfolioArmFactory(preparedPlan, factory.armId, factory.family, binding = { worker ->
             SourceWorkerBinding(

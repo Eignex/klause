@@ -173,7 +173,7 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "inprocessing-warmup-work", "inprocessing-probe-interval",
     "lp-objective-cone", "lp-auto-off-reprobe",
     "lp-knapsack-lagrangian", "lp-component-split", "lp-component-ownership", "lp-bound-max-pivots", "lp-adaptive-work",
-    "lp-branching", "lp-directional-gains", "lp-directional-advice", "lp-variable-shaving", "lp-prune-hulls", "lp-root-cuts",
+    "lp-branching", "lp-directional-gains", "lp-variable-shaving", "lp-prune-hulls", "lp-root-cuts",
     "pb-learning", "pb-objective-cutoff", "propagation-attribution", "historical-table-reasons",
     "objective-guided-values",
     "var-selector", "val-selector",
@@ -244,7 +244,6 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val lpAdaptiveWork = p[ExecutionOption.lpAdaptiveWork]
     val lpBranching = p[ExecutionOption.lpBranching]
     val lpDirectionalGains = p[ExecutionOption.lpDirectionalGains]
-    val lpDirectionalAdvice = p[ExecutionOption.lpDirectionalAdvice]
     val lpVariableShaving = p[ExecutionOption.lpVariableShaving]
     val lpPruneHulls = p[ExecutionOption.lpPruneHulls]
     val lpRootCuts = p[ExecutionOption.lpRootCuts]
@@ -273,7 +272,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         lpBranching, lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning,
         pbObjectiveCutoff, integerRowLearning, propagationAttribution, historicalTableReasons, costAwarePropagation,
         reasonPreflight,
-        objectiveGuidedValues, lpDirectionalGains, lpDirectionalAdvice,
+        objectiveGuidedValues, lpDirectionalGains,
     )
     if (scalars.all { it == null } && varKind == null && valKind == null) return null
     return { base ->
@@ -328,7 +327,6 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         lpAdaptiveWork?.let { out = out.copy(lpPlan = out.lpPlan.copy(boundAdaptiveWork = it)) }
         lpBranching?.let { out = out.copy(lpPlan = out.lpPlan.copy(branching = it)) }
         lpDirectionalGains?.let { out = out.copy(lpDirectionalGains = it) }
-        lpDirectionalAdvice?.let { out = out.copy(lpDirectionalAdvice = it) }
         lpVariableShaving?.let { out = out.copy(lpPlan = out.lpPlan.copy(variableShaving = it)) }
         lpPruneHulls?.let { out = out.copy(lpPlan = out.lpPlan.copy(pruneHulls = it)) }
         lpRootCuts?.let { out = out.copy(lpPlan = out.lpPlan.copy(rootCutHarvest = it)) }
@@ -367,9 +365,10 @@ internal fun applyFixedBacktrackParams(
 ): BacktrackParams {
     var out = base
     p[ExecutionOption.seed]?.let { out = out.copy(randomSeed = it) }
+    p[ExecutionOption.lpDirectionalAdvice]?.let { out = out.copy(lpDirectionalAdvice = it) }
     backtrackOverride(p, allowSelectors)?.let { out = it(out) }
     val accepted = if (allowSelectors) BACKTRACK_OVERRIDE_KEYS else BACKTRACK_OVERRIDE_KEYS - BACKTRACK_SELECTOR_KEYS
-    p.finish("fixed", "seed, ${accepted.joinToString()}")
+    p.finish("fixed", "seed, lp-directional-advice, ${accepted.joinToString()}")
     return out
 }
 
