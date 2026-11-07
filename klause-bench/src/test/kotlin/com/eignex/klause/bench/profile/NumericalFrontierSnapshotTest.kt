@@ -19,6 +19,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -50,6 +51,31 @@ class NumericalFrontierSnapshotTest {
         assertEquals("false", capture.getValue("limited").jsonPrimitive.content)
         assertEquals("0", capture.getValue("attempted").jsonPrimitive.content)
         assertEquals(0, capture.getValue("records").jsonArray.size)
+    }
+
+    @Test
+    fun `point producer inspection should resolve production limits without a retained point`() {
+        val journal = NumericalSelectionSnapshot(Cancellation.Never).journal()
+        val records = mutableListOf<JsonObject>()
+
+        NumericalPointProducerSnapshot(Cancellation.Never).inspect(journal, records::add)
+
+        val summary = records.single()
+        assertEquals("0", summary.getValue("examinedQueries").jsonPrimitive.content)
+        assertEquals("false", summary.getValue("stopped").jsonPrimitive.content)
+        assertEquals("0", summary.getValue("lpQueries").jsonPrimitive.content)
+    }
+
+    @Test
+    fun `cancelled point producer inspection should distinguish its stop from capture limits`() {
+        val journal = NumericalSelectionSnapshot(Cancellation.Never).journal()
+        val records = mutableListOf<JsonObject>()
+
+        NumericalPointProducerSnapshot(Cancellation { true }).inspect(journal, records::add)
+
+        val summary = records.single()
+        assertEquals("true", summary.getValue("stopped").jsonPrimitive.content)
+        assertEquals("false", summary.getValue("captureLimited").jsonPrimitive.content)
     }
 
     @Test
