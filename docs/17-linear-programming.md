@@ -845,15 +845,20 @@ following one opposite-sign continuous incidence path through
 at most four distinct original source rows. After retaining a separating proposal,
 at most one later nonseparating seed can continue under the remaining generation
 allowance. Cancellation or exhaustion preserves earlier completed proposals.
-A continued proposal equal to a retained inequality with the same source owners
-is redundant when both proofs use only source premises. Duplicate comparison and
-proof traversal debit the same allowance; scoped-assumption proofs remain distinct.
+A continued proposal equal to a retained inequality is redundant when the earlier
+proof uses a subset of its owners and both proofs use only source premises.
+Duplicate comparison and proof traversal debit the same allowance;
+scoped-assumption proofs remain distinct.
 For the next residual coordinate,
 continuation ranks unvisited rows by finite source slack divided by the absolute
 pivot coefficient at the current point. Ties retain source order. If no score is
 available, the first eligible row is the fallback. The full scoring scan and scalar
 projections debit the same generation allowance; a stopped scan publishes no
-choice. Ranking only chooses premises: exact positive rescaling preserves
+choice. A continuation skips an exact non-strict inverse of a selected source row
+when their required positive weights cancel that entire row. This avoids returning
+through the opposite side of an equality. Unequal weights and nonzero RHS sums
+remain eligible; the exact comparison shares the generation allowance.
+Ranking only chooses premises: exact positive rescaling preserves
 the earlier combination while cancelling the next coordinate. Singleton continuous bounds remain part of mixed
 rounding. Residual capture, continuation scans, term weights, failed derivations
 and projection share the generation's existing allowance. Each attempt retains
