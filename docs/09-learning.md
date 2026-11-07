@@ -632,11 +632,9 @@ and promotions take linear work without a copy buffer or retained cursor. Each
 examined posting debits its read and metadata lookup; promotion debits one read,
 two writes and any cleanup-cursor rewind before mutation. Retired tails release
 through the ordinary posting-removal debit before active relocation chooses its
-last live watcher. Funded cleanup preserves order for tails of at most 128 entries
-when its remaining allowance funds the complete copy, charging one read and write
-per copied entry. Larger or unfunded cleanup copies use swap-pop to preserve
-progress under small grants. Both paths retain stable handles and release empty
-posting pages through the same owner.
+last live watcher. Funded cleanup keeps its read and write cursors across slices.
+It checks the tail before filling retired holes and releases empty posting pages
+through the same owner.
 Capacity changes replace the disjoint metadata pool identity. A protected row retains
 its complete page allocation; sparse-index protection includes the union of its
 required branch paths. Primitive and reference pools report cumulative protected
