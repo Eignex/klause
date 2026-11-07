@@ -187,6 +187,7 @@ internal object LinearAuthorityAggregateCuts {
                         var cut = deriveWithCoefficients(terms, derivedStop, charge, attemptLimits,
                             allowMixed = true, continuousBounds = selectedBounds,
                             coefficientSnapshots = snapshots, capture = extension?.capture)
+                        var continuedAfterRetention = false
                         if (point != null) {
                             val initial = cut
                             val separating = if (initial == null) false else separates(initial, point, meter, observe)
@@ -198,6 +199,7 @@ internal object LinearAuthorityAggregateCuts {
                                 if (candidates.isNotEmpty()) {
                                     if (retainedContinuationUsed) continue
                                     retainedContinuationUsed = true
+                                    continuedAfterRetention = true
                                     observe("AggregateRetainedContinuation", 1L)
                                 }
                                 cut = extension?.extend(terms, snapshots)
@@ -205,6 +207,10 @@ internal object LinearAuthorityAggregateCuts {
                             }
                         }
                         val retained = cut ?: continue
+                        if (continuedAfterRetention && redundantContinuation(retained, candidates, meter, limits)) {
+                            observe("AggregateRetainedContinuationDuplicate", 1L)
+                            continue
+                        }
                         meter.reserve(1L, 128L + retained.inequality.supportSize * 64L)
                         candidates += retained
                     }
@@ -215,6 +221,44 @@ internal object LinearAuthorityAggregateCuts {
             observe("AggregatePair${stop.reason}", 1L)
         }
         return candidates.toList()
+    }
+
+    private fun redundantContinuation(
+        candidate: LinearAuthorityCut, retained: List<LinearAuthorityCut>,
+        meter: AggregateMeter, limits: LinearAuthorityAggregateLimits,
+    ): Boolean {
+        for (earlier in retained) {
+            meter.reserve(1L + candidate.owners.size + earlier.owners.size)
+            if (candidate.owners != earlier.owners) continue
+            val support = candidate.inequality.supportSize.toLong() + earlier.inequality.supportSize + 2L
+            meter.reserve(support * (1L + (limits.scalarBits + 63L) / 64L))
+            if (candidate.inequality != earlier.inequality) continue
+            if (sourcePremisesOnly(candidate.derivation, meter, limits) &&
+                sourcePremisesOnly(earlier.derivation, meter, limits)) return true
+        }
+        return false
+    }
+
+    private fun sourcePremisesOnly(
+        proof: SourceDerivation, meter: AggregateMeter, limits: LinearAuthorityAggregateLimits, depth: Int = 0,
+    ): Boolean {
+        meter.reserve(1L)
+        if (depth >= 8) return false
+        return when (proof) {
+            is SourceDerivation.Premise -> true
+            is SourceDerivation.IntegerRounding -> sourcePremisesOnly(proof.inequality, meter, limits, depth + 1)
+            is SourceDerivation.MixedIntegerRounding -> {
+                meter.reserve(limits.support.toLong() + 1L, 64L + limits.support * 16L)
+                sourcePremisesOnly(proof.inequality, meter, limits, depth + 1) &&
+                    proof.bounds.all { sourcePremisesOnly(it, meter, limits, depth + 1) }
+            }
+            is SourceDerivation.Combination -> {
+                val terms = limits.support.toLong() + limits.rows + 1L
+                meter.reserve(terms, 64L + terms * 16L)
+                proof.terms.all { sourcePremisesOnly(it.derivation, meter, limits, depth + 1) }
+            }
+            else -> false
+        }
     }
 
     private fun admitPointRowOrder(
