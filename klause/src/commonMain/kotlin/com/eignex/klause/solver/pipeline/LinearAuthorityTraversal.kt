@@ -133,6 +133,12 @@ internal class LinearAuthorityTraversal(
     private val observations = linkedMapOf(
         "numericalIncumbentDominatedSplits" to 0L,
         "numericalIncumbentBoundClosures" to 0L,
+        "numericalBoundsWithoutIncumbent" to 0L,
+        "numericalBoundsShortOfIncumbent" to 0L,
+        "numericalBoundsReachingIncumbent" to 0L,
+        "numericalCutBoundsWithoutIncumbent" to 0L,
+        "numericalCutBoundsShortOfIncumbent" to 0L,
+        "numericalCutBoundsReachingIncumbent" to 0L,
     )
     private var pending = 1L
     private var peakPending = 1L
@@ -483,14 +489,23 @@ internal class LinearAuthorityTraversal(
             val after = (bound.value as SourceValue.Rational).value
             val minimizes = source.scope.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE
             val standing = incumbent()?.second
-            if (result.evidence == null && standing != null &&
-                if (minimizes) after >= standing else after <= standing
-            ) {
-                if (result.split != null) observe("numericalIncumbentDominatedSplits")
-                current.coveredBound = result.bound
-                current.coveredCutFamilies = result.cutBoundFamilies
-                authority.observeCutConsumption(result.cutBoundFamilies, "BOUND_PRUNE")
-                observe("numericalIncumbentBoundClosures")
+            if (result.evidence == null) {
+                val reachesIncumbent = standing != null &&
+                    if (minimizes) after >= standing else after <= standing
+                val comparison = when {
+                    standing == null -> "WithoutIncumbent"
+                    reachesIncumbent -> "ReachingIncumbent"
+                    else -> "ShortOfIncumbent"
+                }
+                observe("numericalBounds$comparison")
+                if (result.cutBoundFamilies.isNotEmpty()) observe("numericalCutBounds$comparison")
+                if (reachesIncumbent) {
+                    if (result.split != null) observe("numericalIncumbentDominatedSplits")
+                    current.coveredBound = result.bound
+                    current.coveredCutFamilies = result.cutBoundFamilies
+                    authority.observeCutConsumption(result.cutBoundFamilies, "BOUND_PRUNE")
+                    observe("numericalIncumbentBoundClosures")
+                }
             }
             if (parent != null) {
                 val before = (parent.value as SourceValue.Rational).value
