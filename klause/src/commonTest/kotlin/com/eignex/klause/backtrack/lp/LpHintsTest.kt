@@ -375,7 +375,7 @@ class LpHintsTest {
                     BooleanArray(3), 0L, intArrayOf(0, 1, 2), IntArray(0))
                 hints.resetHistory()
                 hints.beginNode(1, 100.0)
-                hints.record(relaxation, doubleArrayOf(0.5, 0.25, 0.5), DoubleArray(0))
+                hints.record(relaxation, doubleArrayOf(0.5, 0.5, 0.5), DoubleArray(0))
                 hints.recordBound(relaxation, 10.0)
                 hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(3) { VarStatus.AT_LOWER }))
                 hints.compareBasisVariables(VarRef.IntVar(1), IntDomain(0, 3),
@@ -442,7 +442,7 @@ class LpHintsTest {
                         BooleanArray(3), 0L, intArrayOf(0, 1, 2), IntArray(0))
                     hints.resetHistory()
                     hints.beginNode(1, 100.0)
-                    hints.record(relaxation, doubleArrayOf(0.5, 0.25, 0.5), DoubleArray(0))
+                    hints.record(relaxation, doubleArrayOf(0.5, 0.5, 0.5), DoubleArray(0))
                     hints.recordBound(relaxation, 10.0)
                     hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(3) { VarStatus.AT_LOWER }))
                     hints.compareBasisVariables(VarRef.IntVar(1), IntDomain(0, 3),
