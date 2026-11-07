@@ -66,6 +66,7 @@ internal object LinearAuthorityAggregateCuts {
             allocation = minOf(limits.allocation, 1_048_576L))
         val candidates = ArrayList<LinearAuthorityCut>()
         var eligibilityKnown = true
+        var retainedContinuationUsed = false
         try {
             meter.reserve(source.premiseCount.toLong(), 512L)
             val rows = ArrayList<ProbeRow>()
@@ -194,7 +195,11 @@ internal object LinearAuthorityAggregateCuts {
                                 continue
                             }
                             if (!separating) {
-                                if (candidates.isNotEmpty()) continue
+                                if (candidates.isNotEmpty()) {
+                                    if (retainedContinuationUsed) continue
+                                    retainedContinuationUsed = true
+                                    observe("AggregateRetainedContinuation", 1L)
+                                }
                                 cut = extension?.extend(terms, snapshots)
                                 if (extension?.attempted == true) eligibilityKnown = false
                             }
