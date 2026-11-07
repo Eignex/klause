@@ -15612,6 +15612,35 @@ public final class com/eignex/klause/solver/result/SchedulingStats {
 public abstract interface class com/eignex/klause/solver/result/SearchEvent {
 }
 
+public final class com/eignex/klause/solver/result/SearchEvent$CompanionComparison : com/eignex/klause/solver/result/SearchEvent {
+	public fun <init> (JLjava/lang/String;JJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()J
+	public final fun component10 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()J
+	public final fun component4 ()J
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()Ljava/lang/String;
+	public final fun component9 ()Ljava/lang/String;
+	public final fun copy (JLjava/lang/String;JJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/eignex/klause/solver/result/SearchEvent$CompanionComparison;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SearchEvent$CompanionComparison;JLjava/lang/String;JJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SearchEvent$CompanionComparison;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCandidateObjective ()Ljava/lang/String;
+	public final fun getCompletedObjective ()Ljava/lang/String;
+	public final fun getCondition ()J
+	public final fun getCutoff ()Ljava/lang/String;
+	public final fun getDisposition ()Ljava/lang/String;
+	public final fun getPhase ()Ljava/lang/String;
+	public final fun getPoolObjective ()Ljava/lang/String;
+	public final fun getPoolVersion ()J
+	public final fun getRawObjective ()Ljava/lang/String;
+	public final fun getSeedVersion ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/solver/result/SearchEvent$Incumbent : com/eignex/klause/solver/result/SearchEvent {
 	public fun <init> (D)V
 	public final fun component1 ()D
