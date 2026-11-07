@@ -95,6 +95,32 @@ class LpHintsTest {
     }
 
     @Test
+    fun `disabled directional gains skip history bookkeeping`() {
+        val b = LpBuilder()
+        b.addVar(0, 10, cost = 1)
+        val trail = LpBoundTrail(assertNotNull(b.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+        val observations = ArrayList<String>()
+        var work = 0L
+        val hints = LpHints(1, 0, directionalGains = false, observe = observations::add, charge = { work += it })
+
+        hints.beginNode(0, 100.0)
+        hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+        hints.recordObjective(relaxation, 10.0)
+        hints.branch(VarRef.IntVar(0))
+        hints.commit(SearchDecision.IntAtMost(0, 2), 1)
+        hints.beginNode(1, 100.0)
+        hints.record(relaxation, doubleArrayOf(2.0), DoubleArray(0))
+        hints.recordObjective(relaxation, 11.0)
+        hints.finishNode()
+        hints.resetHistory()
+
+        assertEquals(0L, work)
+        assertTrue(observations.isEmpty())
+    }
+
+    @Test
     fun `cutoff row and objective changes reject pending directional gains`() {
         for (change in listOf("cutoff", "cut", "scale", "objective", "constant", "mapping")) {
             val b = LpBuilder()

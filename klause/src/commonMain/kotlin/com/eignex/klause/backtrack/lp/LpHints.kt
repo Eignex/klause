@@ -28,7 +28,7 @@ internal class LpHints(
     private val observe: (String) -> Unit = {},
     private val charge: (Long) -> Unit = {},
 ) : LpHintSink {
-    private val collect = numIntVars.toLong() + numBoolVars <= 8192L
+    private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
     private val history = LpDirectionalHistory(observe)
     private var freshRecord = false
     private var objectiveRecorded = false

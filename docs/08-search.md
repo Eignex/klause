@@ -297,6 +297,8 @@ The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
 in each direction permit a balanced gain score; otherwise reduced-cost/fractionality
 scoring and the configured selector keep their precedence. Directional scores compete
 with each other before fallback, so objective units are not mixed with reduced costs.
+Disabled directional gains collect no history or retained model scope and charge no
+history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
 
 Samples share one retained exact base model, active-row identity, objective mapping
 and incumbent cutoff. Changed rows or cuts, layout or objective rescaling invalidate
