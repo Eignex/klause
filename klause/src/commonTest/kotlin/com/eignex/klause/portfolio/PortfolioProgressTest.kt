@@ -1,10 +1,14 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -182,6 +186,61 @@ class PortfolioProgressTest {
                 }).use { it.minimize(Cancellation.Never) { accepted++ } }
 
             assertEquals(improves && !rejected, queries > 0)
+        }
+    }
+
+    @Test
+    fun `projected progress should defer queries while retaining exact improvements`() {
+        for ((visible, constant, retained) in listOf(
+            Triple(false, 0L, false), Triple(true, 0L, false),
+            Triple(false, Long.MAX_VALUE, false), Triple(true, Long.MAX_VALUE, false),
+            Triple(false, Long.MIN_VALUE, false), Triple(true, Long.MIN_VALUE, false),
+            Triple(false, 0L, true), Triple(true, 0L, true),
+        )) {
+            val objective = LinearObjective(constant = constant, realCoefficients = doubleArrayOf(1.0))
+            val incumbents = PortfolioIncumbents.exact(objective)
+            val first = if (constant < 0L) BigFraction.ONE.negated() else BigFraction.ONE
+            val tiny = first - BigFraction.of(bigIntOf(1), parseBigInt("100000000000000000000"))
+            val values = listOf(first, tiny) + if (visible) listOf(first - BigFraction.ofLong(2).reciprocal())
+                else emptyList()
+            if (retained) incumbents.exchange.offer(Sample(BooleanArray(0), LongArray(0)),
+                BigFraction.ofLong(constant) + BigFraction.ofLong(10))
+            var offers = 0
+            var accepted = 0
+            var queries = 0
+            var proofQueries = 0
+            val base = ScriptedSearch({ true }) { }
+            val finder = object : ResumableSearch by base {
+                override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? =
+                    base.runSlice(global, sliceMillis, sliceNodes) {
+                        val value = values[minOf(offers++, values.lastIndex)]
+                        val sample = it.sample.copy(
+                            reals = doubleArrayOf(value.toDouble()), exactReals = listOf(value))
+                        onIncumbent(MinimizeResult.BestFound(sample, objective.evaluate(sample),
+                            TerminationReason.BudgetExhausted))
+                    }
+            }
+            val workers = listOf(
+                trackingWorker("finder", 0, finder),
+                trackingWorker("proof", 1, ScriptedSearch({ false }) { proofQueries++ }),
+                trackingWorker("deferred", 2, ScriptedSearch({ false }) {
+                    assertEquals(3, accepted)
+                    queries++
+                }).also {
+                    it.startAfterAcceptedImprovement = true
+                    it.startAfterProjectedImprovement = true
+                },
+            )
+
+            Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
+                reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(24)).use {
+                it.minimize(Cancellation.Never, { accepted++ }, incumbents)
+            }
+
+            assertEquals(if (visible) 3 else 2, accepted)
+            assertEquals(visible, queries > 0)
+            assertTrue(proofQueries > 0)
         }
     }
 

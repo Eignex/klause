@@ -19,6 +19,7 @@ internal class PortfolioIncumbents<V>(
     val approximateValue: (V) -> Double,
     val gain: (V, V) -> Double,
     private val upperBound: (V) -> Double = approximateValue,
+    val progressValue: (V) -> Double = approximateValue,
 ) {
     val exchange = IncumbentExchange<Sample, V>(improves)
 
@@ -41,6 +42,7 @@ internal class PortfolioIncumbents<V>(
             approximateValue = { it.toDouble() },
             gain = { standing, candidate -> (standing - candidate).toDouble() },
             upperBound = ::roundedUpperBound,
+            progressValue = { (it - BigFraction.ofLong(objective.constant)).toDouble() },
         )
 
         fun algebraic(

@@ -71,7 +71,11 @@ class FiniteNumericalCompanionsTest {
 
     @Test
     fun `funded companions should avoid capture when cancellation precedes every query`() {
-        for ((afterImprovement, unavailable) in listOf(false to false, false to true, true to false, true to true)) {
+        for ((afterImprovement, unavailable, projected) in listOf(
+            Triple(false, false, false), Triple(false, true, false),
+            Triple(true, false, false), Triple(true, true, false),
+            Triple(true, false, true), Triple(true, true, true),
+        )) {
             val factors = if (unavailable) arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 0))
             else emptyArray()
             val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), factors, numRealVars = 1,
@@ -85,7 +89,8 @@ class FiniteNumericalCompanionsTest {
                 plan, Cancellation.until(clock.markNow() + 30.seconds), numericalCompletion = true,
                 numericalCompanions = TheoryParams(sourceIncumbentCompletion = afterImprovement),
                 fundedCompanions = true,
-                waitForCompanionImprovement = afterImprovement, adaptiveCompanionRepair = afterImprovement).use {
+                waitForCompanionImprovement = afterImprovement, adaptiveCompanionRepair = afterImprovement,
+                waitForProjectedCompanionImprovement = projected).use {
                 it.minimize(Cancellation { true }, null)
             }
 
