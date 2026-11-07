@@ -62,7 +62,8 @@ class JointLinearRepairTest {
                         val completed = assertIs<MinimizeResult.WithSample>(result)
                         assertEquals(1.0, completed.objective)
                         val point = completed.sample
-                        val proof = SourceEvidence(source.scope, SourceClaim.Witness(point), SourceDerivation.SourceWitness)
+                        val proof = SourceEvidence(source.scope, SourceClaim.Witness(point),
+                            SourceDerivation.SourceWitness)
                         assertEquals(SourceEvidenceCheck.Checked,
                             SourceEvidenceVerifier(source.withLinearAuthority()).verify(proof))
                     } else assertTrue(result !is MinimizeResult.WithSample)
@@ -95,7 +96,8 @@ class JointLinearRepairTest {
                         val completed = assertIs<MinimizeResult.WithSample>(result)
                         assertEquals(1.0, completed.objective)
                         val point = completed.sample
-                        val proof = SourceEvidence(source.scope, SourceClaim.Witness(point), SourceDerivation.SourceWitness)
+                        val proof = SourceEvidence(source.scope, SourceClaim.Witness(point),
+                            SourceDerivation.SourceWitness)
                         assertEquals(SourceEvidenceCheck.Checked,
                             SourceEvidenceVerifier(source.withLinearAuthority()).verify(proof))
                     } else assertTrue(result !is MinimizeResult.WithSample)
