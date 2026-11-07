@@ -1626,6 +1626,11 @@ A checked incumbent can close a numerical node whose scoped bound excludes a
 better objective. Coverage retains that bound without requiring a local optimum
 or another split; a global optimum still requires the checked root witness and
 the complete composed bound. Missing bounds and uncovered siblings remain unresolved.
+Completed nonterminal node queries classify their strongest checked bound against
+the standing incumbent as absent, short of it, or reaching it. Cut-supported
+classifications are subsets of these observations. Terminal claims and native
+bound pruning retain separate counters; comparison counts provide no bound value
+or gap magnitude.
 A checked partial bound retained during a paused numerical query can close that
 same node after the incumbent improves. The consumer invalidates unfinished guidance
 and retains the bound and its cut support without another numerical query. Caller
