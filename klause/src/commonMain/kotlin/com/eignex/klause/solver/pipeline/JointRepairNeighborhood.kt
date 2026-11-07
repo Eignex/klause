@@ -5,11 +5,11 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
+import com.eignex.util.numbers.magnitudeBitLength
 import kotlin.math.abs
 import kotlin.math.round
 
