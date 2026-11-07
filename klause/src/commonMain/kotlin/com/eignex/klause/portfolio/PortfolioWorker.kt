@@ -102,6 +102,7 @@ class PortfolioWorker private constructor(
     }
 
     internal var controlsObjectiveCutoff: Boolean = false
+    internal var canonicalIncumbentIsCutoff: Boolean = false
 
     private var configuredModel: ModelIdentity? = null
     private var provesSourceResults = true

@@ -894,12 +894,19 @@ single lane and seed do not make the schedule reproducible.
 ### Retained proof coverage
 
 With an accepted incumbent, retained non-restarting complete workers share half the
-active time since its last improvement. The least-funded free worker runs before
-ordinary reward selection; each accepted improvement resets the accounting. Coverage
-accrues from that improvement without a catch-up delay, so long competing segments
+active time since its last improvement. The free worker furthest below its floor runs before
+ordinary reward selection; accepted improvements renew the relevant accounting
+window. Coverage accrues without a catch-up delay, so long competing segments
 do not consume a short run's proof allocation before coverage begins. Initial sibling
 probes, explicit minimum shares and bounded auxiliary trials retain precedence.
 Segment overruns can delay coverage.
+
+Checked-completion companion portfolios distinguish canonical point updates from
+the finite upper cutoff supplied to built-in backtrack workers. An exact improvement
+with the same finite cutoff bits retains those workers' accounting window; their
+separate assignment exchange remains available. Full-point numerical consumers keep
+the exact-incumbent window. Changed or non-finite cutoffs renew both windows. Other
+portfolio routes and workers retain exact-incumbent accounting.
 
 `portfolio-proof-share=S` selects a share from 0.5 through 1 for curated single-core
 finite optimization through the solve facade. The default is 0.5. Source search
