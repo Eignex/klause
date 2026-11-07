@@ -133,6 +133,10 @@ use an approximate incumbent's Boolean and finite integer coordinates as advisor
 pins. Approximate real coordinates guide rational reconstruction without carrying
 authority. A reconstructed point must satisfy every active affine row exactly;
 otherwise connected continuous residuals use the existing exact recovery path.
+Residuals with nonzero objective coefficients use the source-column costs in the
+working objective direction, within the same sparse recovery allowance. Zero-cost
+components retain feasibility completion. Recovery supplies a checked point and
+no global bound; discrete pins and the complete reuse identity stay fixed.
 Original-source witness and exact objective checks precede incumbent admission,
 cutoff use or neighborhood centering. Supplied
 exact payloads retain their direct admission checks.

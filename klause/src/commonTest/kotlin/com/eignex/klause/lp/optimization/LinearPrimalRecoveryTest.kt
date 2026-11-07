@@ -120,7 +120,7 @@ class LinearPrimalRecoveryTest {
         val progress = LinearPrimalRecoveryProgress()
         val stages = mutableMapOf<String, Long>()
         var calls = 0
-        val complete: (List<ExactRationalInequality>, Int, Cancellation) -> List<BigFraction>? = { _, _, _ ->
+        val complete: (List<ExactRationalInequality>, List<Int>, Cancellation) -> List<BigFraction>? = { _, _, _ ->
             calls++
             if (calls == 2) null else listOf(BigFraction.ONE)
         }
@@ -147,7 +147,7 @@ class LinearPrimalRecoveryTest {
         }
 
         val point = recoverLinearPrimal(coordinates, List(3) { BigFraction.ZERO }, rows, emptySet(), Cancellation.Never,
-            complete = { _, columns, _ -> List(columns) { BigFraction.ONE } }, observe = { _, _ -> })
+            complete = { _, columns, _ -> List(columns.size) { BigFraction.ONE } }, observe = { _, _ -> })
 
         assertEquals(List(3) { BigFraction.ONE }, point)
     }

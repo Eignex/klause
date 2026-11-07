@@ -115,12 +115,16 @@ internal class LinearIncumbentCompletion(
         val query = requireNotNull(attempt.query)
         val values = recoverLinearPrimal(query.coordinates, requireNotNull(attempt.point), query.rows,
             query.inactive, token, complete = { rows, columns, active ->
+                budget.observe(preparation = columns.size.toLong())
+                budget.funding?.charge(0L, 32L * columns.size)
+                val costs = columns.map { query.costs[it] }
+                val objective = costs.takeIf { it.any { cost -> !cost.isZero } }
                 val residual = attempt.residual ?: LinearResidualCompletion(budget, SparseSourceLpPolicy())
                     .also { attempt.residual = it }
-                residual.complete(rows, columns, active, ::recoveryCost) {
-                    LinearAuthorityLp(budget).use { completion ->
-                        completion.solve(rows, List(columns) { BigFraction.ZERO }, BigFraction.ZERO, active,
-                            claim = LpClaim.FEASIBLE_COMPLETION)?.result?.exactPrimal?.take(columns)
+                residual.complete(rows, columns.size, active, ::recoveryCost, costs = objective) {
+                    if (objective != null) null else LinearAuthorityLp(budget).use { completion ->
+                        completion.solve(rows, costs, BigFraction.ZERO, active,
+                            claim = LpClaim.FEASIBLE_COMPLETION)?.result?.exactPrimal?.take(columns.size)
                     }
                 }.also { attempt.progress.pending = residual.paused }
             }, observe = ::recoveryCost, progress = attempt.progress)
