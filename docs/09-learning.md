@@ -600,7 +600,7 @@ page belongs directly to its owner; later pages use a bounded sparse index. Fixe
 startup ownership belongs to state preparation, and admissions fund subsequent
 growth and index insertion. Lookups debit the active maintenance or observation
 grant, or the containing propagation ledger. A fixed-size page cache avoids repeated
-lookups during ranking, with 128 reference slots for General metadata and 2048 for
+lookups during ranking, with 128 reference slots for General metadata and 4096 for
 Native metadata. Initialization work and reference ownership include the allocated
 cache length. Header unlinking clears its cache slot before releasing the page.
 Native learned payloads cache 2048 page lookups, including absent pages, with fixed
