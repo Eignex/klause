@@ -117,6 +117,8 @@ data class TheoryParams(
     val sourceIncumbentCompletion: Boolean = false,
     /** Schedule touched linear rows and deliver explained interval consequences before numerical checks. */
     val openLinearIncremental: Boolean = true,
+    /** Rank numerical frontier integer splits by installed checked cut supports without proof authority. */
+    val sourceCutBranching: Boolean = false,
 ) {
     init {
         require(sourceLpWorkLimit >= 0 && sourceLpAllocationLimit >= 0 && sourceLpOperations >= 0)

@@ -87,6 +87,7 @@ internal fun bindSourceExecutionControls(
             sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: defaults.sourceLpOperations,
             sourceCuts = reader[ExecutionOption.sourceCuts] ?: defaults.sourceCuts,
             sourcePointCuts = reader[ExecutionOption.sourcePointCuts] ?: defaults.sourcePointCuts,
+            sourceCutBranching = reader[ExecutionOption.sourceCutBranching] ?: defaults.sourceCutBranching,
             sourceAggregateCuts = reader[ExecutionOption.sourceAggregateCuts] ?: defaults.sourceAggregateCuts,
             sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
                 ?: defaults.sourceIncumbentCompletion,
@@ -141,6 +142,7 @@ internal fun bindSourceExecutionControls(
             sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: defaults.sourceLpOperations,
             sourceCuts = reader[ExecutionOption.sourceCuts] ?: defaults.sourceCuts,
             sourcePointCuts = reader[ExecutionOption.sourcePointCuts] ?: defaults.sourcePointCuts,
+            sourceCutBranching = reader[ExecutionOption.sourceCutBranching] ?: defaults.sourceCutBranching,
             sourceAggregateCuts = reader[ExecutionOption.sourceAggregateCuts] ?: defaults.sourceAggregateCuts,
             sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
                 ?: defaults.sourceIncumbentCompletion,
@@ -272,7 +274,7 @@ private fun FiniteSolveRequest.withSourceControls(
 
 private fun ExecutionOptions.withoutSourceCompanionControls(): ExecutionOptions = without(
     "source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations",
-    "source-cuts", "source-point-cuts", "source-aggregate-cuts",
+    "source-cuts", "source-point-cuts", "source-cut-branching", "source-aggregate-cuts",
     "source-refutation-reuse", "source-refutation-propagation", "source-refutation-resolution",
     "source-incumbent-completion",
 )
