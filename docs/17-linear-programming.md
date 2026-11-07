@@ -845,6 +845,9 @@ following one opposite-sign continuous incidence path through
 at most four distinct original source rows. After retaining a separating proposal,
 at most one later nonseparating seed can continue under the remaining generation
 allowance. Cancellation or exhaustion preserves earlier completed proposals.
+A continued proposal equal to a retained inequality with the same source owners
+is redundant when both proofs use only source premises. Duplicate comparison and
+proof traversal debit the same allowance; scoped-assumption proofs remain distinct.
 For the next residual coordinate,
 continuation ranks unvisited rows by finite source slack divided by the absolute
 pivot coefficient at the current point. Ties retain source order. If no score is
