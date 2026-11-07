@@ -182,7 +182,18 @@ internal class RawNativeSnapshot {
         if (!has(owner, "metadata")) return emptyList()
         val payloads = reference(owner, "learnedPayloads")
         val rows = reference(reference(owner, "metadata"), "rows")
-        val values = arrayListOf(value(payloads, "cachedIndex"), value(payloads, "cachedPage"))
+        val values = arrayListOf<Any?>()
+        if (has(payloads, "cachedIndices")) {
+            val indices = value(payloads, "cachedIndices") as IntArray
+            val pages = value(payloads, "cachedPages") as Array<*>
+            values.add(indices)
+            values.addAll(indices.toList())
+            values.add(pages)
+            values.addAll(pages)
+        } else {
+            values.add(value(payloads, "cachedIndex"))
+            values.add(value(payloads, "cachedPage"))
+        }
         for (store in listOf(payloads, rows)) {
             val directory = reference(store, "directory")
             values.add(value(directory, "root"))

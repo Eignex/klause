@@ -343,7 +343,7 @@ object BtRetirementCapture : BenchSuite {
     }
 
     private const val MAX_SOURCE_BYTES = 16 * 1024 * 1024
-    private const val MAX_TRACE_EVENTS = 131_072L
+    private const val MAX_TRACE_EVENTS = 262_144L
     private const val CHECKPOINT = 256L
     private const val LATE_SEMANTIC_ORDINAL = 46_194L
 }

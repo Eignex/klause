@@ -1611,3 +1611,6 @@ diagnostic records require separate original-source validation.
 
 Cleanup snapshots retain optional raw scan and epoch fields alongside legacy cursors.
 Absent fields remain null; no decoded state is read through production accessors.
+
+Trace output retains up to262,144 events and reports truncation. Snapshot reads
+compare scalar or array cache identities and contents before and after capture.
