@@ -849,3 +849,8 @@ on macOS arm64, JDK 25.0.4.1+1, with advisory one-CPU / 4,608 MiB resource recei
 The smaller magic-square source's AllDifferent-only conflicts, compressed-byte
 hash refusal, worker network failure, earlier truncated captures and preparation
 timeouts retain their costs and provenance in the external campaign ledger.
+
+`lab profile` with `klause-bench/lab/bt-retirement.json` accepts `source-path`,
+`sha256` and `seeds`. It records bounded raw native policy and watch snapshots
+beside unobserved and observed resumable controls. Native verdicts in these
+diagnostic records require separate original-source validation.
