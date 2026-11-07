@@ -92,10 +92,12 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
         if (index == 0) return primary
         val cacheSlot = index and CACHE_MASK
         if (cachedIndices[cacheSlot] == index) return cachedPages[cacheSlot]
-        return locate(index) { units ->
-            val active = budget
-            if (active != null) active.visit(units) else state?.let { it.work += units }
-        }
+        return lookupPage(index)
+    }
+
+    private fun lookupPage(index: Int): Page? = locate(index) { units ->
+        val active = budget
+        if (active != null) active.visit(units) else state?.let { it.work += units }
     }
 
     fun admissionWork(literals: Int, ownedLiterals: Boolean = false): Long {
