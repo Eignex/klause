@@ -229,7 +229,7 @@ internal object LinearAuthorityAggregateCuts {
     ): Boolean {
         for (earlier in retained) {
             meter.reserve(1L + candidate.owners.size + earlier.owners.size)
-            if (candidate.owners != earlier.owners) continue
+            if (!candidate.owners.containsAll(earlier.owners)) continue
             val support = candidate.inequality.supportSize.toLong() + earlier.inequality.supportSize + 2L
             meter.reserve(support * (1L + (limits.scalarBits + 63L) / 64L))
             if (candidate.inequality != earlier.inequality) continue
@@ -742,9 +742,14 @@ internal object LinearAuthorityAggregateCuts {
                 for (other in incidence[id to (value < BigFraction.ZERO)].orEmpty()) {
                     meter.reserve(1L + terms.size)
                     if (other.coefficients.size <= 1 || terms.any { it.owner == other.term.owner }) continue
-                    if (first == null) first = other
                     attempted = true
-                    val score = continuationScore(other, other.coefficients.getValue(id))
+                    val pivot = other.coefficients.getValue(id)
+                    if (cancelsTerm(other, terms, value, pivot)) {
+                        observe("AggregateContinuationInverseSkipped", 1L)
+                        continue
+                    }
+                    if (first == null) first = other
+                    val score = continuationScore(other, pivot)
                     if (score == null) {
                         observe("AggregateContinuationPointUnavailable", 1L)
                     } else {
@@ -761,6 +766,27 @@ internal object LinearAuthorityAggregateCuts {
                 return Continuation(row, value, row.coefficients.getValue(id))
             }
             return null
+        }
+
+        private fun cancelsTerm(
+            row: ProbeRow, terms: List<LinearAuthorityAggregateTerm>, residual: BigFraction, pivot: BigFraction,
+        ): Boolean {
+            if (row.term.inequality.strict) return false
+            for (term in terms) {
+                meter.reserve(1L)
+                if (term.inequality.strict || term.inequality.supportSize != row.coefficients.size) continue
+                val inverse = term.inequality.forEachCoefficient { coordinate, value ->
+                    meter.reserve(1L)
+                    val other = row.coefficients[coordinate] ?: return@forEachCoefficient false
+                    meter.number(value.negated()) == meter.number(other)
+                }
+                if (!inverse) continue
+                if (meter.number(term.inequality.rhs.negated()) != meter.number(row.term.inequality.rhs)) continue
+                val appended = meter.number(if (residual > BigFraction.ZERO) residual else residual.negated())
+                val scale = meter.number(if (pivot > BigFraction.ZERO) pivot else pivot.negated())
+                if (meter.multiply(term.weight, scale) == appended) return true
+            }
+            return false
         }
 
         private fun continuationScore(row: ProbeRow, pivot: BigFraction): Double? {
