@@ -7,10 +7,10 @@ import kotlin.time.ComparableTimeMark
  * deadline re-armed later stays current. It carries no work meter. An adapter that wraps a token in a predicate builds
  * it from this rather than a bare lambda, which [Cancellation.shorten] would read as having no time limit at all.
  */
-internal fun cancelledWhen(
-    deadlineOf: () -> ComparableTimeMark?,
-    workScheduledOf: () -> Boolean = { false },
-    cancelled: () -> Boolean,
+internal inline fun cancelledWhen(
+    crossinline deadlineOf: () -> ComparableTimeMark?,
+    crossinline workScheduledOf: () -> Boolean = { false },
+    crossinline cancelled: () -> Boolean,
 ): Cancellation =
     object : SchedulingCancellation {
         override fun isCancelled(): Boolean = cancelled()
