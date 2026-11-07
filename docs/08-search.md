@@ -65,7 +65,9 @@ It separates repeated entries by one worker, duplicate entries across workers an
 duplicate native refutations. Exact equality gives a lower bound on overlap; entries
 alone prove no completed coverage or saved work. `SearchBranchAttemptObserver` observes
 a tightening alternative before assertion, including immediate conflicts. Finite
-backtrack exposes it through `BacktrackParams.branchObserver`. Its Boolean adapter
+backtrack exposes it through `BacktrackParams.branchObserver`. Commit callbacks follow
+a consistent push and successful decision accounting; refuted or indeterminate
+assertions supply no commit callback. Its Boolean adapter
 captures all established Boolean values and the attempted literal; callers restrict it
 to pure Boolean models with identity source Boolean coordinates, the complete variable
 count and a matching context.

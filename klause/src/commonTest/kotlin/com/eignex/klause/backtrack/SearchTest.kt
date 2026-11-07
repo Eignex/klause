@@ -1,6 +1,8 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.Impact
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.selector.boundsMidpoint
 import com.eignex.klause.factor.global.AllDifferent
@@ -12,6 +14,10 @@ import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchBranchAttemptObserver
+import com.eignex.klause.solver.search.SearchComponent
+import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.VarRef
@@ -30,6 +36,78 @@ class SearchTest {
         intDomains = arrayOf(*domains),
         factors = arrayOf<Factor>(),
     )
+
+    @Test
+    fun `branch observers receive accepted decisions at their committed depth`() {
+        val attempts = ArrayList<SearchDecision>()
+        val commits = ArrayList<Pair<SearchDecision, Int>>()
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
+            componentFactory = { listOf(object : SearchComponent {}) },
+            branchObserver = object : SearchBranchAttemptObserver {
+                override fun onAttempt(decision: SearchDecision, context: SearchContext) {
+                    attempts.add(decision)
+                }
+                override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
+                    commits.add(decision to decisionLevel)
+                }
+            })
+
+        val result = BacktrackSolver(problemOf(IntDomain(0, 1), IntDomain(0, 1)).bake()).solve(params)
+
+        assertIs<SolveResult.Sat>(result)
+        assertEquals(listOf<SearchDecision>(SearchDecision.IntAtMost(0, 0), SearchDecision.IntAtMost(1, 0)), attempts)
+        assertEquals(attempts.mapIndexed { index, decision -> decision to index + 1 }, commits)
+    }
+
+    @Test
+    fun `refuted branch attempts supply no commit callback`() {
+        val attempts = ArrayList<SearchDecision>()
+        val commits = ArrayList<SearchDecision>()
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
+            componentFactory = { listOf(object : SearchComponent {
+                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+                    if (context.decisionLevel > 0) ComponentResult.Conflict() else ComponentResult.Consistent
+            }) },
+            branchObserver = object : SearchBranchAttemptObserver {
+                override fun onAttempt(decision: SearchDecision, context: SearchContext) {
+                    attempts.add(decision)
+                }
+                override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
+                    commits.add(decision)
+                }
+            })
+
+        val result = BacktrackSolver(problemOf(IntDomain(0, 1)).bake()).solve(params)
+
+        assertIs<SolveResult.Unsat>(result)
+        assertTrue(attempts.isNotEmpty())
+        assertTrue(commits.isEmpty())
+    }
+
+    @Test
+    fun `an interrupted branch assertion supplies no commit callback`() {
+        var cancelled = false
+        val commits = ArrayList<SearchDecision>()
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
+            componentFactory = { listOf(object : SearchComponent {
+                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+                    if (cancelled) ComponentResult.Indeterminate else ComponentResult.Consistent
+            }) },
+            cancellation = Cancellation { cancelled }, branchObserver = object : SearchBranchAttemptObserver {
+                override fun onAttempt(decision: SearchDecision, context: SearchContext) {
+                    cancelled = true
+                }
+                override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
+                    commits.add(decision)
+                }
+            })
+
+        val result = BacktrackSolver(problemOf(IntDomain(0, 1)).bake()).solve(params)
+
+        assertIs<SolveResult.Unknown>(result)
+        assertTrue(cancelled)
+        assertTrue(commits.isEmpty())
+    }
 
     @Test
     fun `a cooperative pause should observe sharing without ending the search`() {
