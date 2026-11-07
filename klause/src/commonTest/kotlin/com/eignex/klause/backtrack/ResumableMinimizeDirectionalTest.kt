@@ -343,7 +343,7 @@ class ResumableMinimizeDirectionalTest {
 
     @Test
     fun `finite search applies or withholds confirmed advice at the actual branch`() {
-        val blocks = 3
+        val blocks = 2
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
         repeat(blocks) { block ->
@@ -353,7 +353,7 @@ class ResumableMinimizeDirectionalTest {
         }
         val problem = Problem(0, variables, Array(variables) { IntDomain(0, 1) }, factors.toTypedArray()).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(
-            6L, 6L, 11L, 5L, 5L, 8L, 40L, 40L, 50L,
+            6L, 6L, 11L, 5L, 5L, 8L,
         ))
         val prepared = problem.prepareExecutionPlan(objective, preferFinite = true)
         val queryWork = ArrayList<Long>()

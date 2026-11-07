@@ -343,7 +343,7 @@ internal class ResumableMinimize(
                 basisVariableComparisons = basisVariableGuidance && !selectedChildGuidance,
                 verifyBasisVariables = basisVariableGuidance && verifyBasisVariableGuidance && !selectedChildGuidance,
                 probeChildOrder = probeChildGuidance &&
-                    (selectedChildGuidance || basisVariableGuidance && verifyBasisVariableGuidance),
+                    (selectedChildGuidance || (basisVariableGuidance && verifyBasisVariableGuidance)),
                 applyAdvice = params.lpDirectionalAdvice, selectedVariableProbeMode = selectedChildGuidance)
         } else null
 
