@@ -734,14 +734,21 @@ copying their map. Iterator and callback setup, row visits and retained indexing
 spend the generation's allowance. Each source row's coefficient snapshot is shared across its generation's pair
 attempts; each weighted combination owns a separate accumulator.
 Incidence indexing funds each lookup key and reference/list growth, reserving bucket
-storage when the bucket is created. Reused buckets retain their source-ordered lists.
+storage when the bucket is created. Ordinary aggregate-only buckets retain their source-ordered lists.
 An interrupted index publishes no proposals.
 Rows wider than the support cap are skipped with incomplete coverage. The cached family retains at most 64
 proposals under 500,000 preparation work and 8 MiB modeled allocation, with
 per-attempt limits shared with explicit aggregation. Stopped or limited
 preparation reports its decline and leaves only completed proposals available.
 Point selection queries the current recipe before preparing optional aggregate
-pairs. A checked current incumbent or terminal bypasses discovery. When a funded
+pairs. A checked current incumbent or terminal bypasses discovery.
+Point-directed mixed-row pairs
+visit rows and incidence partners by increasing normalized absolute slack at the
+relaxation point, with original source ordinals breaking ties. Unavailable or
+nonfinite projections follow scored rows in source order. Projection, sorting and
+temporary index storage debit the existing generation allowance. Source owners,
+exact derivations and ordinary aggregate-only source order stay fixed. Incomplete
+scoring withholds proposals and retains its charged work. When a funded
 exact comparison finds the same ordered cut families, owners and inequalities as
 the fully checked active current recipe, preparation keeps its query and proofs
 without another proof pass or scoring scan. Comparison work and allocation share
