@@ -353,6 +353,8 @@ data class BacktrackParams(
     val lpPlan: LpPlan = LpPlan(),
     /** Use reliable, recent directional LP gains for finite variable ordering; missing history keeps LP scoring. */
     val lpDirectionalGains: Boolean = false,
+    /** Directional advice application setting. */
+    val lpDirectionalAdvice: Boolean = true,
     /** Entering-column policy for exactly zero-objective LP solves. */
     val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     /**
