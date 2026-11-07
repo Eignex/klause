@@ -51,6 +51,11 @@ internal class NativeSatState(private val state: PropagationState) {
     private var capCalls = 0L
     private var capWork = 0L
     private var capVisits = 0L
+    internal val capWindowPending: Boolean get() = capRanking.hasPending
+    internal val capTraversalVisits: Long get() = capVisits
+    internal val capContinuationCursor: Long get() = capRanking.continuationCursor
+    internal val capContinuationHeap: Long get() = capRanking.continuationHeap
+    internal val capContinuationOperation: Long get() = capRanking.continuationOperation
     private var capBoundaryDefers = 0L
     private var capPreparationDefers = 0L
     private var capPendingReplayCalls = 0L
@@ -148,8 +153,11 @@ internal class NativeSatState(private val state: PropagationState) {
 
     private var watchCleanupLiteral = 0
     private var watchCleanupIndex = 0
-    private var sweptRetirements = 0
-    private var sweepingRetirements = -1
+    private var watchCleanupScan = 0
+    private val watchCleanupReadIndex: Int
+        get() = if (watchCleanupScan < 0) watchCleanupScan.inv() else watchCleanupScan
+    // An inactive epoch encodes the completed retirement count without retaining another cursor.
+    private var watchCleanupEpoch = -1
 
     private var retiredMetadataCount = 0
 
@@ -184,16 +192,49 @@ internal class NativeSatState(private val state: PropagationState) {
         watchSizes[lit] = entries.size
     }
 
-    private fun watchRemovalWork(lit: Int): Long = checkNotNull(watchEntries[lit]).removalWork + 4L
+    private fun cleanupScanAfterRemoval(lit: Int, index: Int, remaining: Int): Int {
+        if (lit != watchCleanupLiteral) return watchCleanupScan
+        return if (watchCleanupScan < 0 || (index < remaining && index < watchCleanupReadIndex)) {
+            minOf(watchCleanupIndex, index)
+        } else minOf(watchCleanupReadIndex, remaining)
+    }
 
-    /** Swap-pop the watcher at [idx] in literal [lit]'s lists. The caller funds the removal. */
+    private fun watchRemovalWork(lit: Int, index: Int): Long =
+        checkNotNull(watchEntries[lit]).removalWork + 4L +
+            if (cleanupScanAfterRemoval(lit, index, watchSizes[lit] - 1) != watchCleanupScan) 1L else 0L
+
     private fun removeWatchAt(lit: Int, idx: Int) {
         val entries = checkNotNull(watchEntries[lit])
+        val scan = cleanupScanAfterRemoval(lit, idx, entries.size - 1)
         entries[idx] = entries[entries.size - 1]
         entries.removeLast()
         watchSizes[lit] = entries.size
         if (entries.size == 0) watchEntries[lit] = null
         if (lit == watchCleanupLiteral && idx < watchCleanupIndex) watchCleanupIndex = idx
+        if (scan != watchCleanupScan) watchCleanupScan = scan
+    }
+
+    private fun nextLiveWatch(lit: Int, start: Int): Int {
+        val entries = checkNotNull(watchEntries[lit])
+        var index = start
+        while (index < watchSizes[lit]) {
+            state.work++
+            if (!isRetired(entries[index].toInt())) return index
+            index++
+        }
+        return index
+    }
+
+    private fun trimRetiredWatchTail(lit: Int, index: Int) {
+        if (retiredCount == 0 && retiredRootSources == null) return
+        val entries = checkNotNull(watchEntries[lit])
+        while (watchSizes[lit] - 1 > index) {
+            state.work++
+            val last = watchSizes[lit] - 1
+            if (!isRetired(entries[last].toInt())) return
+            state.work += watchRemovalWork(lit, last)
+            removeWatchAt(lit, last)
+        }
     }
 
     internal fun sweepRetiredWatches(budget: ReclamationPreparation) =
@@ -201,33 +242,84 @@ internal class NativeSatState(private val state: PropagationState) {
 
     private fun sweepWatches(budget: ReclamationPreparation) {
         if (retiredCount == 0) return
-        if (sweepingRetirements < 0) {
-            if (sweptRetirements == retiredCount) return
+        if (watchCleanupEpoch < 0) {
+            if (watchCleanupEpoch.inv() == retiredCount) return
             budget.visit(4L)
             budget.visit(0L)
-            sweepingRetirements = retiredCount
+            watchCleanupEpoch = retiredCount
         }
         while (watchCleanupLiteral < watchEntries.size) {
             budget.visit(4L)
             budget.visit(0L)
             val entries = watchEntries[watchCleanupLiteral]
             if (entries == null || watchCleanupIndex >= entries.size) {
+                budget.visit(if (watchCleanupScan == 0) 0L else 1L)
+                budget.visit(0L)
                 watchCleanupLiteral++
                 watchCleanupIndex = 0
+                watchCleanupScan = 0
+            } else if (watchCleanupReadIndex > watchCleanupIndex) {
+                advanceWatchCleanup(entries, budget)
             } else if (entries[watchCleanupIndex].toInt() >= baseCount &&
                 retiredOf(entries[watchCleanupIndex].toInt() - baseCount)) {
-                budget.visit(watchRemovalWork(watchCleanupLiteral))
+                budget.visit(1L)
                 budget.visit(0L)
-                removeWatchAt(watchCleanupLiteral, watchCleanupIndex)
+                watchCleanupScan = watchCleanupIndex + 1
             } else watchCleanupIndex++
             budget.advanced()
         }
         budget.visit(4L)
         budget.visit(0L)
-        sweptRetirements = sweepingRetirements
-        sweepingRetirements = -1
+        watchCleanupEpoch = watchCleanupEpoch.inv()
         watchCleanupLiteral = 0
         watchCleanupIndex = 0
+        watchCleanupScan = 0
+    }
+
+    private fun advanceWatchCleanup(entries: NativeWatchEntries, budget: ReclamationPreparation) {
+        val read = watchCleanupReadIndex
+        if (read >= entries.size) {
+            val last = entries.size - 1
+            budget.visit(watchRemovalWork(watchCleanupLiteral, last))
+            budget.visit(0L)
+            removeWatchAt(watchCleanupLiteral, last)
+            return
+        }
+        if (watchCleanupScan >= 0) {
+            checkWatchCleanupTail(entries, budget)
+            return
+        }
+        budget.visit(1L)
+        val entry = entries[read]
+        if (entry.toInt() >= baseCount && retiredOf(entry.toInt() - baseCount)) {
+            budget.visit(1L)
+            budget.visit(0L)
+            watchCleanupScan = if (read + 1 == entries.size) read + 1 else (read + 1).inv()
+        } else {
+            budget.visit(4L)
+            budget.visit(0L)
+            val retired = entries[watchCleanupIndex]
+            entries[watchCleanupIndex] = entry
+            entries[read] = retired
+            watchCleanupIndex++
+            watchCleanupScan = if (read + 1 == entries.size) read + 1 else (read + 1).inv()
+        }
+    }
+
+    private fun checkWatchCleanupTail(entries: NativeWatchEntries, budget: ReclamationPreparation) {
+        val last = entries.size - 1
+        budget.visit(1L)
+        val entry = entries[last]
+        if (entry.toInt() >= baseCount && retiredOf(entry.toInt() - baseCount)) {
+            budget.visit(watchRemovalWork(watchCleanupLiteral, last))
+            budget.visit(0L)
+            removeWatchAt(watchCleanupLiteral, last)
+        } else {
+            budget.visit(1L)
+            budget.visit(0L)
+            // A complemented scan retains the checked live tail while filling this hole.
+            watchCleanupScan = watchCleanupScan.inv()
+        }
     }
 
     /** The clause's literals as a fresh array (the seed reason for conflict analysis). */
@@ -410,7 +502,7 @@ internal class NativeSatState(private val state: PropagationState) {
         var watchBytes = 0L
         var watchPostings = 0L
         sample.ownedPool(this, 32L, (if (protectedRows) 12L else 0L) +
-            (if (sweepingRetirements >= 0) 16L else 0L) +
+            (if (watchCleanupEpoch >= 0) 16L else 0L) +
             (if (metadata.hasRetiredRows) 4L else 0L))
         for (entries in watchEntries) {
             sample.step()
@@ -443,6 +535,7 @@ internal class NativeSatState(private val state: PropagationState) {
             "retainedPeerImports" to peerImports.toLong(),
             "retainedConsumedPeerImports" to consumedPeerImports.toLong(),
             "retainedConsumed" to consumed.toLong(),
+            "learnedPayloadCacheReferenceCapacity" to learnedPayloads.cacheReferenceCapacity,
         ))
         retiredRootSources?.let { sample.owned(it, it.allocatedBytes, true) }
         sample.owned(importUses, importUses.allocatedBytes)
@@ -718,8 +811,8 @@ internal class NativeSatState(private val state: PropagationState) {
 
         watchCleanupLiteral = 0
         watchCleanupIndex = 0
-        sweptRetirements = 0
-        sweepingRetirements = -1
+        watchCleanupScan = 0
+        watchCleanupEpoch = -1
 
         // A survivor's destination precedes its source, so moving references cannot overwrite unread rows.
         permanentCount = 0
@@ -896,13 +989,30 @@ internal class NativeSatState(private val state: PropagationState) {
     private fun propagateFalse(falseLit: Int): Boolean {
         val entries = watchEntries[falseLit] ?: return true
         var wi = 0
+        var liveScan = 0
         while (wi < watchSizes[falseLit]) {
             state.work++
             val entry = entries[wi]
             val h = entry.toInt()
             if (isRetired(h)) {
-                state.work += watchRemovalWork(falseLit)
-                removeWatchAt(falseLit, wi)
+                // Unprocessed slots before the scan cursor contain only retired postings.
+                val next = nextLiveWatch(falseLit, maxOf(wi + 1, liveScan))
+                liveScan = next + 1
+                if (next < watchSizes[falseLit]) {
+                    val rewind = falseLit == watchCleanupLiteral && wi < watchCleanupIndex
+                    val cleanupIndex = if (rewind) wi else watchCleanupIndex
+                    val resetScan = falseLit == watchCleanupLiteral && watchCleanupReadIndex > cleanupIndex
+                    state.work += 3L + (if (rewind) 1L else 0L) + (if (resetScan) 1L else 0L)
+                    entries[wi] = entries[next]
+                    entries[next] = entry
+                    if (rewind) watchCleanupIndex = wi
+                    if (resetScan) watchCleanupScan = cleanupIndex
+                } else {
+                    while (watchSizes[falseLit] > wi) {
+                        state.work += watchRemovalWork(falseLit, watchSizes[falseLit] - 1)
+                        removeWatchAt(falseLit, watchSizes[falseLit] - 1)
+                    }
+                }
                 continue
             }
             val blocker = (entry ushr 32).toInt()
@@ -928,13 +1038,14 @@ internal class NativeSatState(private val state: PropagationState) {
             val scanStart = if (baseClause) 0 else metadata[h - baseCount, NativeLearnedMetadata.SCAN]
             val replacement = findNonFalse(lits, start, len, lIdx, otherIdx, scanStart)
             if (replacement >= 0) {
+                trimRetiredWatchTail(falseLit, wi)
                 if (!baseClause) {
                     metadata[h - baseCount, NativeLearnedMetadata.SCAN] =
                         if (replacement + 1 == len) 0 else replacement + 1
                 }
                 val newLit = lits[start + replacement]
                 setWatchPosition(h, if (slot0IsFalse) 0 else 1, replacement)
-                state.work += watchRemovalWork(falseLit)
+                state.work += watchRemovalWork(falseLit, wi)
                 removeWatchAt(falseLit, wi) // swap-pop; re-process wi without advancing
                 addWatch(newLit, h, otherLit)
                 continue
