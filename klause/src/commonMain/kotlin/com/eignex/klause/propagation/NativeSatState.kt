@@ -194,7 +194,7 @@ internal class NativeSatState(private val state: PropagationState) {
 
     private fun cleanupScanAfterRemoval(lit: Int, index: Int, remaining: Int): Int {
         if (lit != watchCleanupLiteral) return watchCleanupScan
-        return if (watchCleanupScan < 0 || index < remaining && index < watchCleanupReadIndex) {
+        return if (watchCleanupScan < 0 || (index < remaining && index < watchCleanupReadIndex)) {
             minOf(watchCleanupIndex, index)
         } else minOf(watchCleanupReadIndex, remaining)
     }
