@@ -61,6 +61,7 @@ internal class LinearAuthoritySession(
         build: () -> ExactLpModel?,
         authority: SourceScope? = null,
         allowance: LpFloatAllowance? = null,
+        appendRows: Boolean = false,
     ): LpScopedSolver? {
         currentToken = cancellation
         var current = owner
@@ -68,17 +69,28 @@ internal class LinearAuthoritySession(
         val changedObjective = objective?.let { !sameObjective(it, costs) } == true
         if (current == null || current.state.model.n != packed.columns.size || !sameRows(rows, packed.rows) ||
             (changedObjective && sparse != null)) {
-            if (current != null) close()
-            currentToken = cancellation
             val model = build() ?: return null
-            current = LpScopedSolver(LpExactState(model), token, context = budget.context,
-                iterationLimit = profile.iterations, workLimit = profile.work)
-            owner = current
+            val extended = current != null && appendRows && this.authority == authority && authority != null &&
+                LinearAuthorityRowAppend(budget, cancellation, onLifecycle).append(current, model)
+            if (extended) {
+                reuses++
+                onLifecycle("OwnerExtended", 1L)
+                sides = null
+            } else {
+                if (current != null) {
+                    if (appendRows) retireOwner() else close()
+                }
+                if (cancellation() || budget.funding?.paused == true) return null
+                currentToken = cancellation
+                current = LpScopedSolver(LpExactState(model), token, context = budget.context,
+                    iterationLimit = profile.iterations, workLimit = profile.work)
+                owner = current
+                preparations++
+                onLifecycle("OwnerPrepared", 1L)
+            }
             rows = packed.rows
             objective = costs
             effort = profile
-            preparations++
-            onLifecycle("OwnerPrepared", 1L)
         } else {
             reuses++
             onLifecycle("OwnerReused", 1L)
@@ -87,6 +99,7 @@ internal class LinearAuthoritySession(
                 objective = costs
             }
         }
+        val bound = checkNotNull(current)
         effort = profile
         if (sides != packed.columns || inactive != packed.inactiveRows || this.authority != authority) {
             var mappingWork = 0L
@@ -105,30 +118,30 @@ internal class LinearAuthoritySession(
                 close()
                 return null
             }
-            if (!current.pop(0, token) || !current.push(token)) return null
-            if (!current.suspend(suspended.mapTo(HashSet()) { it.toLong() }, token)) return null
+            if (!bound.pop(0, token) || !bound.push(token)) return null
+            if (!bound.suspend(suspended.mapTo(HashSet()) { it.toLong() }, token)) return null
             val assertions = ArrayList<LpBoundAssertion>()
             for ((id, column) in packed.columns.withIndex()) {
                 if (token()) return null
                 for ((upper, side) in listOf(false to column.bounds.lower, true to column.bounds.upper)) {
                     if (side != null) assertions += LpBoundAssertion(id, upper, side,
-                        assertions.size.toLong(), current.state.depth)
+                        assertions.size.toLong(), bound.state.depth)
                 }
             }
-            val batch = current.assertBounds(assertions, token)
+            val batch = bound.assertBounds(assertions, token)
             if (batch is LpBoundBatchResult.Declined) {
                 close()
                 return null
             }
             for (index in batch.count until assertions.size) {
                 val side = assertions[index]
-                if (!current.assertBound(side.column, side.upper, side.side, side.witness, token)) return null
+                if (!bound.assertBound(side.column, side.upper, side.side, side.witness, token)) return null
             }
             sides = packed.columns
             inactive = packed.inactiveRows
             this.authority = authority
         }
-        return current
+        return bound
     }
 
     fun <T> advance(
@@ -154,18 +167,33 @@ internal class LinearAuthoritySession(
             this.objective?.let { sameObjective(it, objective) } == true &&
             sameRows(rows, packed.rows)
         val query = Query(scope, packed.columns, packed.inactiveRows)
+        var appendRows = false
         if (!compatible) {
-            close()
+            appendRows = packed.rows.size > rows.size && packed.rows.size - rows.size <= 64 &&
+                owner != null && authority == scope && rowPolicy == policy.rowPolicy &&
+                owner?.floatPaused == false
+            if (appendRows) {
+                admission?.close()
+                admission = null
+                completed = null
+                completedPolicy = null
+                lifetime = null
+            } else close()
             admission = budget.admitSparse(cancellation) { active ->
                 SparseSourceLp.prepare(packed.rows, packed.columns.map { it.copy(bounds = ExactLpBounds()) },
                     costs, constant, policy, active)
-            } ?: return null
+            } ?: run {
+                close()
+                return null
+            }
             sparse = checkNotNull(admission).prepared
             rowPolicy = policy.rowPolicy
-            rows = packed.rows
-            this.objective = objective.takeIf { it.size == checkNotNull(sparse).model.numVars }
-                ?: ExactLpObjective(costs.map(ExactLpNumber::of) +
-                    List(checkNotNull(sparse).emittedRowCount) { zero }, ExactLpNumber.of(constant))
+            if (!appendRows) {
+                rows = packed.rows
+                this.objective = objective.takeIf { it.size == checkNotNull(sparse).model.numVars }
+                    ?: ExactLpObjective(costs.map(ExactLpNumber::of) +
+                        List(checkNotNull(sparse).emittedRowCount) { zero }, ExactLpNumber.of(constant))
+            }
         } else if (admission == null || this.query != query) {
             admission?.close()
             admission = budget.admitSparse(checkNotNull(sparse), cancellation) ?: return null
@@ -182,7 +210,7 @@ internal class LinearAuthoritySession(
                 .also { lifetime = it }
             val emittedObjective = objective.takeIf { it.size == prepared.model.numVars } ?: ExactLpObjective(
                 costs.map(ExactLpNumber::of) + List(prepared.emittedRowCount) { zero }, ExactLpNumber.of(constant))
-            val current = bind(packed, emittedObjective, active, { prepared.model }, scope, profile)
+            val current = bind(packed, emittedObjective, active, { prepared.model }, scope, profile, appendRows)
                 ?: return@resumeSparse null
             completed?.let {
                 val usable = it.primal != null || it.bound != null || it.conflict != null
@@ -240,9 +268,19 @@ internal class LinearAuthoritySession(
         return budget.resumeSparse(reservation, cancellation) { _, active -> block(active) }
     }
 
-    override fun close() {
+    private fun retireOwner() {
         val current = owner
         owner = null
+        sides = null
+        inactive = emptySet()
+        authority = null
+        effort = null
+        if (current != null) onLifecycle("OwnerClosed", 1L)
+        budget.closeOwner(current)
+    }
+
+    override fun close() {
+        retireOwner()
         rows = emptyList()
         objective = null
         sides = null
@@ -257,8 +295,6 @@ internal class LinearAuthoritySession(
         completed = null
         completedPolicy = null
         lifetime = null
-        if (current != null) onLifecycle("OwnerClosed", 1L)
-        budget.closeOwner(current)
     }
 }
 
