@@ -140,6 +140,203 @@ class NativeSatStateTest {
     }
 
     @Test
+    fun `retiring a watched clause should preserve the captured survivor phase`() {
+        val session = session(4, or(0, true, 2, true))
+        session.addLearnedClause(Clause(or(0, true, 3, true)), 9)
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9, permanent = true)
+        session.addLearnedClause(Clause(or(0, true, 1, false)), 9, permanent = true)
+        repeat(8) { session.maintainCapWindow(2, 64L, 64L, { false }) { false } }
+        assertEquals(2, session.activeLearnedClauseCount)
+        var phase: Boolean? = null
+        session.retractingListener = { if (it == 1) phase = session.boolValue(1) }
+
+        session.pinBool(0, false)
+
+        assertEquals(true, phase)
+    }
+
+    @Test
+    fun `cleaning retired watches should preserve the captured survivor phase`() {
+        val session = session(4, or(0, true, 2, true))
+        session.addLearnedClause(Clause(or(0, true, 3, true)), 9)
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9, permanent = true)
+        session.addLearnedClause(Clause(or(0, true, 1, false)), 9, permanent = true)
+        repeat(8) { session.maintainCapWindow(2, 64L, 64L, { false }) { false } }
+        assertEquals(2, session.activeLearnedClauseCount)
+        session.reclaimLearnedMemory(Long.MAX_VALUE, 65_536L, 1_048_576L)
+        var phase: Boolean? = null
+        session.retractingListener = { if (it == 1) phase = session.boolValue(1) }
+
+        session.pinBool(0, false)
+
+        assertEquals(true, phase)
+    }
+
+    @Test
+    fun `funded watch cleanup should preserve survivor phase across posting sizes`() {
+        for ((fillers, grant) in listOf(14 to 40L, 256 to 65_536L, 2560 to 65_536L)) {
+            val session = session(4, or(0, true, 2, true))
+            session.addLearnedClause(Clause(or(0, true, 3, true)), 9)
+            session.addLearnedClause(Clause(or(0, true, 1, true)), 9, permanent = true)
+            repeat(fillers) { session.addLearnedClause(Clause(or(0, true, 2, true)), 9, permanent = true) }
+            session.addLearnedClause(Clause(or(0, true, 1, false)), 9, permanent = true)
+            repeat(8) { session.maintainCapWindow(fillers + 2, 65_536L, 1_048_576L, { false }) { false } }
+            assertEquals(fillers + 2, session.activeLearnedClauseCount)
+            repeat(if (grant == 40L) 64 else 16) {
+                val start = session.work
+                session.reclaimLearnedMemory(Long.MAX_VALUE, grant, 1_048_576L)
+                assertTrue(session.work - start <= grant)
+            }
+            var phase: Boolean? = null
+            session.retractingListener = { if (it == 1) phase = session.boolValue(1) }
+
+            session.pinBool(0, false)
+
+            assertEquals(true, phase, "fillers=$fillers grant=$grant")
+        }
+    }
+
+    @Test
+    fun `propagation between cleanup slices should preserve live watch postings`() {
+        for (slices in listOf(0, 8, 16, 32, 64)) {
+            val session = session(5, intArrayOf(Lit.make(0, true), Lit.make(2, true), Lit.make(3, true)))
+            session.addLearnedClause(Clause(or(0, true, 1, true)), 9, permanent = true)
+            repeat(64) { session.addLearnedClause(Clause(or(0, true, 4, true)), 9) }
+            repeat(8) { session.maintainCapWindow(1, 65_536L, 1_048_576L, { false }) { false } }
+            assertEquals(1, session.activeLearnedClauseCount)
+            repeat(slices) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
+
+            session.pinBool(0, false)
+            repeat(256) {
+                val start = session.work
+                session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L)
+                assertTrue(session.work - start <= 40L)
+            }
+            val memory = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+            assertEquals(true, session.boolValue(1), "slices=$slices")
+            assertEquals(4L, memory.getValue("sessionWatchEntries"), "slices=$slices")
+        }
+    }
+
+    @Test
+    fun `retiring a long watched tail should preserve the captured survivor phase`() {
+        for (fillers in listOf(256, 2560)) {
+            val session = session(4, or(0, true, 2, true))
+            session.addLearnedClause(Clause(or(0, true, 3, true)), 9)
+            session.addLearnedClause(Clause(or(0, true, 1, true)), 9, permanent = true)
+            repeat(fillers) { session.addLearnedClause(Clause(or(0, true, 2, true)), 9, permanent = true) }
+            session.addLearnedClause(Clause(or(0, true, 1, false)), 9, permanent = true)
+            repeat(8) { session.maintainCapWindow(fillers + 2, 65_536L, 1_048_576L, { false }) { false } }
+            assertEquals(fillers + 2, session.activeLearnedClauseCount)
+            var phase: Boolean? = null
+            session.retractingListener = { if (it == 1) phase = session.boolValue(1) }
+
+            session.pinBool(0, false)
+
+            assertEquals(true, phase)
+        }
+    }
+
+    @Test
+    fun `moving an active watch past retired tail entries should preserve the survivor phase`() {
+        for (retired in listOf(1, 16, 256)) {
+            val session = session(4, intArrayOf(Lit.make(0, true), Lit.make(2, true), Lit.make(3, true)))
+            session.addLearnedClause(Clause(or(0, true, 1, true)), 9, permanent = true)
+            session.addLearnedClause(Clause(or(0, true, 1, false)), 9, permanent = true)
+            repeat(retired) { session.addLearnedClause(Clause(or(0, true, 2, true)), 9) }
+            repeat(8) { session.maintainCapWindow(2, 65_536L, 1_048_576L, { false }) { false } }
+            assertEquals(2, session.activeLearnedClauseCount)
+            var phase: Boolean? = null
+            session.retractingListener = { if (it == 1) phase = session.boolValue(1) }
+
+            session.pinBool(0, false)
+
+            assertEquals(false, phase, "retired=$retired")
+        }
+    }
+
+    @Test
+    fun `retiring a watched tail beyond four thousand entries should preserve the survivor phase`() {
+        val session = session(4, or(0, true, 2, true))
+        session.addLearnedClause(Clause(or(0, true, 3, true)), 9)
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9, permanent = true)
+        repeat(4096) { session.addLearnedClause(Clause(or(0, true, 2, true)), 9, permanent = true) }
+        session.addLearnedClause(Clause(or(0, true, 1, false)), 9, permanent = true)
+        repeat(64) {
+            val start = session.work
+            session.maintainCapWindow(4098, 65_536L, 1_048_576L, { false }) { false }
+            assertTrue(session.work - start <= 65_536L)
+        }
+        assertEquals(4098, session.activeLearnedClauseCount)
+        var phase: Boolean? = null
+        session.retractingListener = { if (it == 1) phase = session.boolValue(1) }
+
+        session.pinBool(0, false)
+
+        assertEquals(true, phase)
+    }
+
+    @Test
+    fun `a retired watch prefix should propagate within linear charged work`() {
+        for (count in listOf(128, 256, 512)) {
+            val session = session(5, or(3, true, 4, true))
+            repeat(count) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+            repeat(count) { session.addLearnedClause(Clause(or(0, true, 2, true)), 9, permanent = true) }
+            repeat(32) { session.maintainCapWindow(count, 65_536L, 1_048_576L, { false }) { false } }
+            assertEquals(count, session.activeLearnedClauseCount)
+            val start = session.work
+
+            session.pinBool(0, false)
+
+            assertNull(session.boolValue(1))
+            assertEquals(true, session.boolValue(2))
+            assertTrue(session.work - start <= 64L * (2L * count + 1L), "count=$count")
+        }
+    }
+
+    @Test
+    fun `successive active watch moves through retired holes should preserve the survivor phase`() {
+        val session = session(6, or(4, true, 5, true))
+        session.addLearnedClause(Clause(or(0, true, 4, true)), 9)
+        session.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true), Lit.make(3, true))),
+            9, permanent = true)
+        session.addLearnedClause(Clause(or(0, true, 5, true)), 9)
+        session.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), Lit.make(3, true), Lit.make(4, true))),
+            9, permanent = true)
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9, permanent = true)
+        session.addLearnedClause(Clause(or(0, true, 1, false)), 9, permanent = true)
+        repeat(8) { session.maintainCapWindow(4, 65_536L, 1_048_576L, { false }) { false } }
+        assertEquals(4, session.activeLearnedClauseCount)
+        var phase: Boolean? = null
+        session.retractingListener = { if (it == 1) phase = session.boolValue(1) }
+
+        session.pinBool(0, false)
+
+        assertEquals(false, phase)
+    }
+
+    @Test
+    fun `small cleanup grants should release watches when an ordered copy cannot fit`() {
+        for (grant in listOf(40L, 42L, 48L)) {
+            val session = session(3, or(0, true, 2, true))
+            session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+            repeat(15) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9, permanent = true) }
+            repeat(8) { session.maintainCapWindow(15, 64L, 64L, { false }) { false } }
+            val before = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+            repeat(64) {
+                val start = session.work
+                session.reclaimLearnedMemory(Long.MAX_VALUE, grant, 1_048_576L)
+                assertTrue(session.work - start <= grant)
+            }
+            val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+            assertTrue(after.getValue("sessionWatchCapacityBytes") < before.getValue("sessionWatchCapacityBytes"))
+        }
+    }
+
+    @Test
     fun `native cap retirement should protect a live root reason`() {
         val session = session(4, or(2, true, 3, true))
         session.addLearnedClause(Clause(or(0, true, 1, true)), 9)

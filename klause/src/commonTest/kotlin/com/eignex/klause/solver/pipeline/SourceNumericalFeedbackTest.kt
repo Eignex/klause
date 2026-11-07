@@ -6,6 +6,7 @@ import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.LinearAuthorityCapture
 import com.eignex.klause.lp.optimization.LinearAuthorityCapturedQuery
+import com.eignex.klause.lp.optimization.LinearAuthorityCutViolation
 import com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest
 import com.eignex.klause.lp.optimization.LinearAuthorityResult
 import com.eignex.klause.lp.optimization.LinearPinnedRefutation
@@ -405,5 +406,97 @@ class SourceNumericalFeedbackTest {
         assertNotNull(result.terminal)
         assertTrue(records.any { (it as? SourceNumericalFeedbackResult.Available)?.query?.refutation != null })
         assertTrue(assertNotNull(result.stats.smt.completeSearchStages).getValue("numericalSupportFallbacks") > 0L)
+    }
+
+    @Test
+    fun `owned latest feedback should project installed cuts from its first query`() {
+        val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
+        val feedback = SourceNumericalFeedback(funding, Cancellation.Never, request = LinearSupportBranching.REQUEST)
+        LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use { authority ->
+            val acquired = feedback.acquire(authority, source)
+
+            val available = assertIs<SourceNumericalFeedbackResult.Available>(acquired.feedback)
+            assertEquals(LinearSupportBranching.REQUEST, available.query.projection)
+            assertTrue(available.query.cited.isEmpty())
+            assertTrue(assertNotNull(authority.capture).records.isEmpty())
+            val cut = assertNotNull(available.query.cuts.firstOrNull())
+            assertTrue(cut.installed && cut.checked && cut.ownerActive)
+            assertNull(cut.violation)
+            assertEquals(0L, feedback.evaluatedCuts)
+
+            val violation = feedback.violation(available, cut)
+
+            assertEquals(BigFraction.ZERO, assertIs<LinearAuthorityCutViolation.Available>(violation).value)
+            assertEquals(1L, feedback.evaluatedCuts)
+        }
+    }
+
+    @Test
+    fun `owned requested delivery should allocate less than full prefix inspection`() {
+        fun acquire(archive: Boolean): Pair<SourceNumericalAcquisition, Long> {
+            val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
+            val feedback = SourceNumericalFeedback(funding, Cancellation.Never,
+                request = LinearSupportBranching.REQUEST)
+            val acquired = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use { authority ->
+                if (archive) authority.capture = LinearAuthorityCapture(64, 250_000L, 8L * 1024 * 1024,
+                    Cancellation.Never)
+                feedback.acquire(authority, source)
+            }
+            return acquired to funding.allocated
+        }
+
+        val full = acquire(archive = true)
+        val requested = acquire(archive = false)
+
+        val expected = assertIs<SourceClaim.Bound>(assertNotNull(full.first.result.bound).claim)
+        val actual = assertIs<SourceClaim.Bound>(assertNotNull(requested.first.result.bound).claim)
+        assertEquals(expected.value, actual.value)
+        assertEquals(assertIs<SourceNumericalFeedbackResult.Available>(full.first.feedback).query.point,
+            assertIs<SourceNumericalFeedbackResult.Available>(requested.first.feedback).query.point)
+        assertTrue(requested.second < full.second)
+        assertTrue(requested.second > 0L)
+    }
+
+    @Test
+    fun `owned latest feedback should remain available beyond the inspection prefix limit`() {
+        val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
+        val feedback = SourceNumericalFeedback(funding, Cancellation.Never, request = LinearSupportBranching.REQUEST)
+        LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use { authority ->
+            feedback.attach(authority)
+            val journal = assertNotNull(authority.capture)
+            var delivered: SourceNumericalFeedbackResult.Available? = null
+
+            repeat(65) {
+                journal.record(source, null, null, null, LinearAuthorityResult())
+                delivered = assertIs<SourceNumericalFeedbackResult.Available>(feedback.consume(source))
+            }
+
+            assertEquals(64, assertNotNull(delivered).query.id)
+            assertTrue(journal.records.isEmpty())
+            assertEquals(65L, feedback.collections)
+            assertEquals(65L, feedback.lateCollections)
+        }
+    }
+
+    @Test
+    fun `detach should release an owned latest query without refunding its allocation`() {
+        val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
+        val feedback = SourceNumericalFeedback(funding, Cancellation.Never, request = LinearSupportBranching.REQUEST)
+        LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use { authority ->
+            val available = assertIs<SourceNumericalFeedbackResult.Available>(
+                feedback.acquire(authority, source).feedback)
+            val journal = assertNotNull(authority.capture)
+            val cut = assertNotNull(available.query.cuts.firstOrNull())
+            val allocated = funding.allocated
+
+            feedback.detach(authority)
+
+            assertNull(authority.capture)
+            assertNull(journal.delivered)
+            assertTrue(journal.records.isEmpty())
+            assertEquals(allocated, funding.allocated)
+            assertEquals(LinearAuthorityCutViolation.Reason.Released,
+                assertIs<LinearAuthorityCutViolation.Unavailable>(feedback.violation(available, cut)).reason)
+        }
     }
 }

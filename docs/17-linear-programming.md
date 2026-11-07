@@ -1177,16 +1177,16 @@ Borrowers retain that authority's cumulative funding allowance.
 Floating source coordinates are guidance and supply no witness or proof authority.
 
 `solver.pipeline.SourceNumericalFeedback` delivers completed queries to decision
-consumers. The journal keeps two separately bounded channels: an inspection archive
-of the first queries, and a single latest-query slot that each completed query
-replaces. Archive retention therefore never withholds a later query; a prefix-only
-control reads the archive alone and reports later queries as retention-limited.
-Both channels share one record construction. Each archived record exposes exact-valued
+consumers. Latest-query consumers own a single bounded slot that each completed
+query replaces. Prefix-only consumers and attached inspection observers retain a
+separately bounded archive of the first queries. A prefix-only control reads the
+archive alone and reports later queries as retention-limited. An attached archive
+and latest delivery share one record construction. Each archived record exposes exact-valued
 relaxation coordinates, generating cut
 masks, active source rows and scoped checked bounds/refutations, with independent
 point availability. A consumer names the projection it reads: the point, installed
-cut activity or the refutation. A query delivered after the archive stops holds only
-the requested projection and records it, so a withheld field is explicit rather than
+cut activity or the refutation. Delivery without an archival copy holds only the
+requested projection and records it, so a withheld field is explicit rather than
 unavailable, and the query state still reports the actual point outcome. Installed
 cut activity keeps the installed, checked cuts with active owners; their violations
 are evaluated on demand while that query is still delivered, and a replaced,
@@ -1198,7 +1198,9 @@ requires its actual strict objective premise; an acquisition without that premis
 cannot claim a cutoff-conditioned conflict. Cancellation, pauses, missing queries,
 oversized queries, retention and funding exhaustion remain explicit unavailable
 outcomes. Detaching a consumer releases its latest slot and leaves an external
-observer's archive in place.
+observer's archive in place. The late-collection counter counts deliveries outside
+an inspection prefix, including every result from a latest-query consumer without
+an archive; it does not measure delayed execution.
 Acquisition returns the existing authority result alongside feedback, preserving
 recovered incumbents for separate source checking and acquisition credit. A funded
 cutoff helper constructs a query-local strict row in the captured context's
@@ -1218,12 +1220,12 @@ fractional candidate that could change the choice. Both complementary
 alternatives remain in coverage. Feedback never supplies pruning or parent proof
 authority. Construction, replacement, retention and scoring debit the containing
 source LP funding cumulatively; evicting a delivered query neither refunds that
-ledger nor issues another LP solve. The archive retains at most 64 records, 250,000
+ledger nor issues another LP solve. An explicit archive retains at most 64 records, 250,000
 entries and 8 MiB modeled storage, and a delivered query has the same entry and
 byte allowance on its own. The archive is a prefix: once a record or allowance fills
 it, every later query is constructed for delivery alone. Archived records are charged
-for copies of the source rows, cut definitions and cited derivations they reference. Once the archive stops, a
-delivered record keeps only references to those immutable structures, which the
+for copies of the source rows, cut definitions and cited derivations they reference.
+Delivery-only records keep references to those immutable structures, which the
 authority prepared and still holds. A full delivered record is charged per referenced
 row, coordinate and objective entry, for its scope, point, cut violations and checked
 evidence. A requested record is charged for what it allocates: its point once when
