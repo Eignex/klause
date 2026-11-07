@@ -119,6 +119,7 @@ internal object LinearAuthorityAggregateCuts {
                     }
                 }
             }
+            if (point != null) orderPointRows(rows, incidence, point, meter, observe)
             val charge: (String, Long) -> Unit = { name, count ->
                 when (name) {
                     "AggregateWork" -> meter.reserve(count)
@@ -209,6 +210,52 @@ internal object LinearAuthorityAggregateCuts {
             observe("AggregatePair${stop.reason}", 1L)
         }
         return candidates.toList()
+    }
+
+    private fun orderPointRows(
+        rows: MutableList<ProbeRow>, incidence: Map<Pair<SourceCoordinate, Boolean>, MutableList<ProbeRow>>,
+        point: Map<SourceCoordinate, Double>, meter: AggregateMeter, observe: (String, Long) -> Unit,
+    ) {
+        meter.reserve(rows.size.toLong(), 128L + rows.size * 64L)
+        val priorities = HashMap<Int, Double>()
+        for (row in rows) {
+            var activity = 0.0
+            var normSquared = 0.0
+            var complete = true
+            for ((id, value) in row.coefficients) {
+                meter.reserve(4L)
+                val coordinate = point[id]
+                if (coordinate == null || !coordinate.isFinite()) {
+                    complete = false
+                    break
+                }
+                val coefficient = meter.number(value).toDouble()
+                activity += coefficient * coordinate
+                normSquared += coefficient * coefficient
+            }
+            val rhs = row.term.inequality.rhs
+            meter.reserve(4L)
+            val projectedRhs = meter.number(rhs).toDouble()
+            val distance = if (complete) abs(projectedRhs - activity) / sqrt(normSquared) else Double.NaN
+            priorities[row.term.owner] = if (distance.isFinite()) {
+                observe("AggregatePointRowsScored", 1L)
+                distance
+            } else {
+                observe("AggregatePointRowUnavailable", 1L)
+                Double.POSITIVE_INFINITY
+            }
+        }
+        val comparator = Comparator<ProbeRow> { left, right ->
+            meter.reserve(1L)
+            val order = priorities.getValue(left.term.owner).compareTo(priorities.getValue(right.term.owner))
+            if (order == 0) left.term.owner.compareTo(right.term.owner) else order
+        }
+        fun order(values: MutableList<ProbeRow>) {
+            meter.reserve(values.size.toLong(), 64L + values.size * 16L)
+            values.sortWith(comparator)
+        }
+        order(rows)
+        for (bucket in incidence.values) order(bucket)
     }
 
     private fun pointBounds(
