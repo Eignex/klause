@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.pipeline.FiniteSolveCallbacks
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.LinearSourceConclusion
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
@@ -45,7 +46,16 @@ internal fun solveLinearSource(
     }
     val result = SourceSetup.execute(
         controls,
-        SourceExecutionCallbacks(onLinearSourceIncumbent = { publish(it) }),
+        SourceExecutionCallbacks(
+            onLinearSourceIncumbent = { publish(it) },
+            finite = FiniteSolveCallbacks({}, { improvement ->
+                // Source publication precedes this callback within the serialized incumbent install.
+                val value = lastPoint?.objective
+                if (common.statistics && lastAccepted && value != null) {
+                    output.onImprovement(improvement.workerLabel, value, improvement.elapsedMs)
+                }
+            }),
+        ),
     )
     if (result is SourceExecutionResult.Finite) {
         when (val outcome = result.result.outcome) {

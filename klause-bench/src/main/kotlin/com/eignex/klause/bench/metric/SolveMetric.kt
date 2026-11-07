@@ -48,7 +48,7 @@ internal data class SolveRecord(
     val stats: Map<String, String> = emptyMap(),
     /**
      * Per-arm portfolio improvement records in arrival order; empty for single-engine solves.
-     * Discrete objectives are exact decimal text, with a continuous objective when needed.
+     * Exact objectives are integer or rational text, with a legacy continuous objective when needed.
      */
     val attribution: List<Attribution> = emptyList(),
     val gitSha: String?,
@@ -369,12 +369,12 @@ internal object SolveMetric {
      *  Every entry in one run shares the same objective channel ([Attribution.continuousObjective] is a
      *  property of the whole model, not the arm), so once any entry carries one, every entry does —
      *  compare on it (the whole model-oriented value). Otherwise compare on [Attribution.exactObjective]
-     *  as a [Long], lossless past 2^53. */
+     *  as an exact rational, including original source units and values beyond [Long]. */
     internal fun best(attribution: List<Attribution>, maximize: Boolean): Attribution {
         val comparator = if (attribution.any { it.continuousObjective != null }) {
             compareBy<Attribution> { it.continuousObjective ?: 0.0 }
         } else {
-            compareBy<Attribution> { it.exactObjective?.toLongOrNull() ?: 0L }
+            compareBy<Attribution> { it.exactObjective?.let(ExactObjective::parse) }
         }
         return attribution.maxWithOrNull(if (maximize) comparator else comparator.reversed()) ?: attribution.last()
     }

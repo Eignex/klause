@@ -580,7 +580,7 @@ internal object SolverInvocation {
 
     internal fun parsePbObjective(text: String): Double? = ExactObjective.parse(text)?.approximate()
 
-    /** Parse a `%%%klause-arm:` body. `label`, `objective` (the exact discrete `Long` channel), and
+    /** Parse a `%%%klause-arm:` body. `label`, `objective` (an exact integer or rational value), and
      *  `time` are required — a line missing or malformed on any of those is unusable and the whole
      *  entry is dropped. `continuousObjective` is optional (the whole objective when a continuous
      *  column carries cost) and independent of the required fields: a malformed or non-finite value
@@ -590,7 +590,7 @@ internal object SolverInvocation {
             it.split('=', limit = 2).takeIf { p -> p.size == 2 }?.let { p -> p[0] to p[1] }
         }.toMap()
         val label = kv["label"] ?: return null
-        val exactObjective = kv["objective"]?.toLongOrNull() ?: return null
+        val exactObjective = kv["objective"]?.let(ExactObjective::parse) ?: return null
         val continuousObjective = kv["continuousObjective"]?.toDoubleOrNull()?.takeIf(Double::isFinite)
         return Attribution(
             label = label,
@@ -642,8 +642,8 @@ internal object SolverInvocation {
 
 /**
  * A portfolio incumbent record parsed from `%%%klause-arm:`. [exactObjective] stores
- * model-oriented discrete cost as decimal text; [continuousObjective] stores the whole
- * cost when a continuous column contributes.
+ * model-oriented discrete cost or the checked original source cost as exact rational text;
+ * [continuousObjective] stores the whole cost when a legacy continuous channel contributes.
  *
  * Arrival order may differ from improvement order because publication and emission
  * use separate critical sections. Find the best holder with [SolveMetric.best].

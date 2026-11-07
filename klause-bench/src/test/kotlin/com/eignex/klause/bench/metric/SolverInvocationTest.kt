@@ -690,7 +690,9 @@ class SolverInvocationTest {
                     "'%%%klause-arm: label=integer objective=9007199254740993 time=10' " +
                     "'%%%klause-arm: label=continuous objective=0 continuousObjective=60.0 time=20' " +
                     "'%%%klause-arm: label=mixed-min objective=-3 continuousObjective=-63.5 time=30' " +
-                    "'%%%klause-arm: label=mixed-max objective=3 continuousObjective=63.5 time=40'",
+                    "'%%%klause-arm: label=mixed-max objective=3 continuousObjective=63.5 time=40' " +
+                    "'%%%klause-arm: label=source objective=-27021597764222978/3 time=50' " +
+                    "'%%%klause-arm: label=invalid objective=1/0 time=60'",
             ),
             SolverInvocation.Dialect.PB_COMPETITION,
         )
@@ -701,6 +703,8 @@ class SolverInvocationTest {
         assertEquals(60.0, r.attribution[1].continuousObjective)
         assertEquals(-63.5, r.attribution[2].continuousObjective)
         assertEquals(63.5, r.attribution[3].continuousObjective)
+        assertEquals("-27021597764222978/3", r.attribution[4].exactObjective)
+        assertEquals(5, r.attribution.size)
     }
 
     @Test
