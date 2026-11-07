@@ -575,6 +575,13 @@ still complete advisory coordinates and admit the center. A declined center clea
 the preparation request, and a completed or declined trial returns to
 ordinary selection.
 
+While another eligible incumbent trial is pending, ordinary elapsed claims in a
+single lane use at most the existing probe time quantum. Owed complete-worker
+coverage retains its priority and elapsed share. Initial and auxiliary probes,
+fixed-work diagnostics and dedicated lanes retain their allowances. Clearing the
+pending request restores ordinary segment growth. The containing lifetime and
+atomic-work limits still apply.
+
 A numerical optimum or refutation can complete the finite
 invocation only after its typed terminal verifies against the same captured working
 model and objective; the finite pipeline retains original-source reconstruction and

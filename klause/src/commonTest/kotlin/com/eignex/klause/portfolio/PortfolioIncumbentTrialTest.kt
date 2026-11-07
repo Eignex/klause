@@ -18,6 +18,122 @@ import kotlin.time.TestTimeSource
 
 class PortfolioIncumbentTrialTest {
     @Test
+    fun `a pending trial should receive earlier elapsed service without displacing silent proof coverage`() {
+        for (pending in listOf(false, true)) {
+            val clock = TestTimeSource()
+            val started = clock.markNow()
+            val proofTime = LongArray(2)
+            val waitingQuanta = mutableListOf<Long>()
+            var trialSlices = 0
+            var resumedAt = 0L
+            var elapsedAtTrial = 0L
+            var proofAtTrial = LongArray(2)
+            var restoredQuantum: Long? = null
+            val proofs = List(2) { arm ->
+                var slices = 0
+                val source = ScriptedSearch({ false }) {}
+                object : ResumableSearch by source {
+                    override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                        onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                        val elapsed = if (slices++ == 0) 10L else sliceMillis.coerceAtLeast(1L)
+                        if (trialSlices == 1) waitingQuanta += sliceMillis
+                        if (trialSlices >= 2) restoredQuantum = sliceMillis
+                        proofTime[arm] += elapsed
+                        clock += elapsed.milliseconds
+                        return source.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+                    }
+                }
+            }
+            val trialBase = ScriptedSearch({ false }) {
+                trialSlices++
+                if (trialSlices == 1) clock += 1_000.milliseconds
+                else {
+                    if (trialSlices == 2) {
+                        resumedAt = started.elapsedNow().inWholeMilliseconds
+                        elapsedAtTrial = resumedAt - 10L
+                        proofAtTrial = proofTime.copyOf()
+                    }
+                    clock += 100.milliseconds
+                }
+            }
+            val trial = object : ResumableSearch by trialBase, ReseedGuard {
+                override val canReseed: Boolean get() = false
+                override val incumbentTrialPending: Boolean get() = pending && trialSlices == 1
+            }
+            val workers = listOf(
+                trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { clock += 10.milliseconds })
+                    .also { it.family = ArmFamily.LocalSearch },
+                trackingWorker("proof-one", 1, proofs[0]),
+                trackingWorker("proof-two", 2, proofs[1]),
+                trackingWorker("trial", 3, trial).also { it.family = ArmFamily.LocalSearch },
+            )
+
+            Portfolio(workers, fixedBandit(4, 3), baseSliceMillis = 1_000, maxSliceMillis = 1_000,
+                probeSliceMillis = 10, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
+                reseedStaleThreshold = 0).also { it.runTimeSource = clock }.use {
+                it.minimize(Cancellation { (!pending && trialSlices >= 2) || restoredQuantum != null ||
+                    started.elapsedNow().inWholeMilliseconds > 10_000L })
+            }
+
+            assertEquals(2, trialSlices)
+            assertTrue(if (pending) resumedAt <= 2_200L else resumedAt >= 2_800L)
+            assertTrue(waitingQuanta.isNotEmpty())
+            assertTrue(waitingQuanta.all { if (pending) it <= 10L else it > 10L })
+            if (pending) assertTrue(requireNotNull(restoredQuantum) > 10L)
+            for (elapsed in proofAtTrial) assertTrue(elapsed >= elapsedAtTrial / 4L - 10L)
+        }
+    }
+
+    @Test
+    fun `withdrawing a pending trial should restore ordinary elapsed claims`() {
+        val clock = TestTimeSource()
+        val started = clock.markNow()
+        var pending = false
+        var trialSlices = 0
+        var proofSlices = 0
+        var shortQuantum: Long? = null
+        var restoredQuantum: Long? = null
+        val proofBase = ScriptedSearch({ false }) {}
+        val proof = object : ResumableSearch by proofBase {
+            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                if (pending) {
+                    shortQuantum = sliceMillis
+                    pending = false
+                } else if (trialSlices > 0) restoredQuantum = sliceMillis
+                clock += (if (proofSlices++ == 0) 1L else sliceMillis.coerceAtLeast(1L)).milliseconds
+                return proofBase.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+            }
+        }
+        val trialBase = ScriptedSearch({ false }) {
+            trialSlices++
+            pending = true
+            clock += 1_000.milliseconds
+        }
+        val trial = object : ResumableSearch by trialBase, ReseedGuard {
+            override val canReseed: Boolean get() = false
+            override val incumbentTrialPending: Boolean get() = pending
+        }
+        val workers = listOf(
+            trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { clock += 1.milliseconds })
+                .also { it.family = ArmFamily.LocalSearch },
+            trackingWorker("proof", 1, proof),
+            trackingWorker("trial", 2, trial).also { it.family = ArmFamily.LocalSearch },
+        )
+
+        Portfolio(workers, fixedBandit(3, 2), baseSliceMillis = 1_000, maxSliceMillis = 1_000,
+            probeSliceMillis = 10, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
+            reseedStaleThreshold = 0).also { it.runTimeSource = clock }.use {
+            it.minimize(Cancellation { restoredQuantum != null ||
+                started.elapsedNow().inWholeMilliseconds > 10_000L })
+        }
+
+        assertEquals(1, trialSlices)
+        assertTrue(requireNotNull(shortQuantum) <= 10L)
+        assertTrue(requireNotNull(restoredQuantum) > 10L)
+    }
+
+    @Test
     fun `equal finite cutoffs should preserve proof funding while a pending trial continues`() {
         for (initial in listOf(1L, -1L)) {
             for (cutoffView in listOf(false, true)) for (sameCutoff in listOf(true, false)) {

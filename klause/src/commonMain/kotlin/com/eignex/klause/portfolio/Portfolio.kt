@@ -1191,7 +1191,12 @@ class Portfolio(
             val ordinaryAllowance = if (baseAllowance) baseSliceWork else sliceWork
             val allowance = if (diagnostics == null) ordinaryAllowance else
                 minOf(ordinaryAllowance, diagnostics.workLimit - chargedWork)
-            val time = if (baseAllowance) baseSliceMillis else slice
+            val pendingTrial = continuingPreparation.takeIf {
+                it != arm && it in eligible && !busy[it] && !retired[it]
+            }?.let { (handles[it] as? ReseedGuard)?.incumbentTrialPending } == true
+            val time = if (baseAllowance) baseSliceMillis else if (
+                diagnostics == null && lanes == 1 && improving && pendingTrial
+            ) minOf(slice, probeSliceMillis) else slice
             val remainingTime = if ((handles[arm] as? ResumableSearch)?.preparationPending != false) {
                 preparationTimeLimit - trialPreparationTime[arm]
             } else trialTimeLimit - trialSearchTime[arm]
