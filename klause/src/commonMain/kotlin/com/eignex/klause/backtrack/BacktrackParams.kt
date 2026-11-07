@@ -457,7 +457,8 @@ data class BacktrackParams(
      */
     val privateRebuildWork: Long = 0L,
     /**
-     * Inline diagnostic observer for attempted shared decisions, before propagation can refute them.
+     * Inline diagnostic observer for attempted shared decisions and accepted decision commits.
+     * Attempts precede propagation; commits follow a consistent push and successful decision accounting.
      * The caller owns its scope, bounds and retention; callbacks must not mutate the search context.
      */
     val branchObserver: SearchBranchAttemptObserver? = null,

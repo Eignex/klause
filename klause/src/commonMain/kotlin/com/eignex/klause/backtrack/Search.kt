@@ -794,6 +794,7 @@ internal class BacktrackBrancher(
 
     override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
         branching.onCommit(decision, decisionLevel)
+        branchObserver?.onCommit(decision, decisionLevel)
         val (variable, value) = decision.asSelectorDecision() ?: return
         variables.onCommit(variable)
         values.onCommit(variable, value)
