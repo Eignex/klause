@@ -16,6 +16,8 @@ import com.eignex.klause.solver.search.VarRef
  * both corresponding child bounds must be nondecreasing. Weaker bounds rank first, with stronger
  * bounds breaking weak ties. Unavailable
  * advice retains the score winner.
+ * Selected-child mode retains the reduced-cost winner without history or basis variable comparisons;
+ * the descent may query only that variable after constructing its complementary alternatives.
  * `O(unassigned)` per call, capped.
  *
  * Lives in the search layer (not [LpEngine]'s home) because it reads the backtrack [VarRef] selector type
@@ -24,8 +26,10 @@ import com.eignex.klause.solver.search.VarRef
 internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?): VarRef? {
     hints ?: return null
     if (problem.numBoolVars + problem.numIntVars > LP_BRANCH_SCAN_CAP) return null // too wide ⇒ delegate
-    val compareHistory = hints.prepareVariableComparison(problem.numBoolVars + problem.numIntVars)
-    val compareBasis = hints.prepareBasisVariableComparison(problem.numBoolVars + problem.numIntVars)
+    val compareHistory = !hints.selectedVariableProbeMode &&
+        hints.prepareVariableComparison(problem.numBoolVars + problem.numIntVars)
+    val compareBasis = !hints.selectedVariableProbeMode &&
+        hints.prepareBasisVariableComparison(problem.numBoolVars + problem.numIntVars)
     var best: VarRef? = null
     var bestScore = LP_BRANCH_MIN_SCORE
     var second: VarRef? = null
@@ -74,6 +78,7 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
             challenger = variable
         }
     }
+    if (hints.selectedVariableProbeMode) return best
     val candidate = challenger?.takeIf { it != best } ?: second ?: return best
     val historyProposal = if (compareHistory) {
         hints.compareVariables(best, (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) },

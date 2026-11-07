@@ -145,6 +145,7 @@ internal class ResumableMinimize(
     basisVariableGuidance: Boolean = true,
     verifyBasisVariableGuidance: Boolean = true,
     private val probeChildGuidance: Boolean = true,
+    private val selectedChildGuidance: Boolean = true,
 ) : ResumableSearch, ReseedGuard {
     private val hasPreparation = preparationBudget != null
     override val canReseed: Boolean
@@ -338,10 +339,12 @@ internal class ResumableMinimize(
         if (params.lpPlan.branching) {
             LpHints(problem.numIntVars, problem.numBoolVars, params.lpDirectionalGains,
                 sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) },
-                rootBasis = rootBasisGuidance, basisVariableComparisons = basisVariableGuidance,
-                verifyBasisVariables = basisVariableGuidance && verifyBasisVariableGuidance,
-                probeChildOrder = basisVariableGuidance && verifyBasisVariableGuidance && probeChildGuidance,
-                applyAdvice = params.lpDirectionalAdvice)
+                rootBasis = rootBasisGuidance,
+                basisVariableComparisons = basisVariableGuidance && !selectedChildGuidance,
+                verifyBasisVariables = basisVariableGuidance && verifyBasisVariableGuidance && !selectedChildGuidance,
+                probeChildOrder = probeChildGuidance &&
+                    (selectedChildGuidance || basisVariableGuidance && verifyBasisVariableGuidance),
+                applyAdvice = params.lpDirectionalAdvice, selectedVariableProbeMode = selectedChildGuidance)
         } else null
 
     private lateinit var cp: CpSearchComponent
@@ -634,6 +637,7 @@ internal class ResumableMinimize(
             problem = root,
             rootBasisGuidance = rootBasisGuidance,
             probeChildGuidance = probeChildGuidance,
+            selectedChildGuidance = selectedChildGuidance,
         )
         try {
             if (freshParams.cancellation()) throw CancellationException("objective replacement cancelled")
@@ -1380,7 +1384,17 @@ internal class ResumableMinimize(
         override fun orderAlternatives(variable: VarRef, alternatives: List<SearchDecision>): List<SearchDecision> {
             val hints = lpHints ?: return alternatives
             val allowBasis = rootBasisGuidance
-            if (!hints.rootChoiceReady) return hints.orderAlternatives(variable, alternatives, allowBasis)
+            if (!hints.rootChoiceReady) {
+                if (hints.selectedVariableProbeMode) {
+                    return hints.selectProbedAlternatives(variable,
+                        (variable as? VarRef.IntVar)?.let { session.intDomain(it.varId) }, alternatives,
+                        reserve = lpEngine::reserveProbeWork,
+                        estimate = { source, columns, splits ->
+                            lpEngine.directionalValues(source, columns, splits, hints.probeComparisonFollowupWork)
+                        })
+                }
+                return hints.orderAlternatives(variable, alternatives, allowBasis)
+            }
             return hints.selectRootAlternatives(variable,
                 (variable as? VarRef.IntVar)?.let { session.intDomain(it.varId) }, alternatives,
                 allowBasis = allowBasis, reserve = lpEngine::reserveDirectionalWork,

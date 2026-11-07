@@ -1015,15 +1015,12 @@ for three structures, skipped when LP is unavailable, the pool is explicit or
 annotated, or execution is parallel or single-engine. See
 [ordinary tableau admission](17-linear-programming.md).
 
-The `lp-default` and `lp-aggressive` optimization recipes consume scoped passive checked-bound gains.
-Two recent samples in each direction nominate a passive challenger across the bounded
-variable scan. Comparable baseline history permits a learned variable choice.
-Missing history permits a bounded below-root basis comparison, limited to eight
-attempts per search owner, within the existing LP allowance. Missing estimates
-retain current scoring. Ordinary finite workers leave numerical child solves
-disabled. Passive history and basis analysis spend the existing LP allowance;
-other recipes require an
-explicit directional setting. See
+The `lp-default` and `lp-aggressive` optimization recipes enable bounded selected-child
+guidance. The reduced-cost variable scorer remains unchanged. A fresh below-root point
+can query the selected variable's two existing complementary children once per search
+owner, within the existing LP allowance. A complete comparison visits the smaller
+minimized child value first; unavailable, tied or mismatched advice preserves the
+existing alternatives. Other recipes require an explicit directional setting. See
 [finite branching](08-search.md#finite-lp-directional-guidance).
 
 - **Binary packing.** For nonnegative integer capacity rows with an objective that

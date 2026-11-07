@@ -44,6 +44,7 @@ internal class LpHints(
     private val verifyBasisVariables: Boolean = false,
     private val probeChildOrder: Boolean = false,
     private val applyAdvice: Boolean = true,
+    val selectedVariableProbeMode: Boolean = false,
 ) : LpHintSink {
     private data class SideAdvice(
         val variable: VarRef,
@@ -475,7 +476,8 @@ internal class LpHints(
 
     override fun recordProbeBasis(relaxation: LpRelaxation, basis: Basis) {
         val basisComparison = basisVariableComparisons && basisVariableAttemptsAvailable
-        if (!collect || (!freshVariableProbes && !basisComparison) || history.isRootNode ||
+        val selectedSide = selectedVariableProbeMode && probeChildOrder && !basisVerificationAttempted
+        if (!collect || (!freshVariableProbes && !basisComparison && !selectedSide) || history.isRootNode ||
             !freshRecord || !boundRecorded ||
             pointRelaxation?.model !== relaxation.model
         ) return
@@ -483,6 +485,64 @@ internal class LpHints(
         pointBasis = basis
         if (freshVariableProbes) observe("VARIABLE_PROBE_SOURCE")
         if (basisComparison) observe("VARIABLE_BASIS_SOURCE")
+        if (selectedSide) observe("SELECTED_SIDE_PROBE_SOURCE")
+    }
+
+    fun selectProbedAlternatives(
+        variable: VarRef,
+        domain: IntDomain?,
+        alternatives: List<SearchDecision>,
+        reserve: (Long) -> Boolean,
+        estimate: (LpProbeSource, IntArray, LongArray) -> List<LpDirectionalValues>?,
+    ): List<SearchDecision> {
+        if (!selectedVariableProbeMode || !probeChildOrder || !collect || basisVerificationAttempted ||
+            history.isRootNode || !freshRecord || !boundRecorded || !canProbePoint || alternatives.size != 2
+        ) return alternatives
+        val relaxation = pointRelaxation ?: return alternatives
+        val basis = pointBasis ?: return alternatives
+        val point = value(variable, domain)
+        if (!fractional(variable, point)) return alternatives
+        val column = relaxation.column(variable)
+        if (column < 0) return alternatives
+        charge(6L)
+        val split = floor(point).toLong()
+        val firstUp = alternatives[0].matchesSide(variable, split, up = true)
+        val firstDown = alternatives[0].matchesSide(variable, split, up = false)
+        if (!(firstUp && alternatives[1].matchesSide(variable, split, up = false)) &&
+            !(firstDown && alternatives[1].matchesSide(variable, split, up = true))
+        ) return alternatives
+        basisVerificationAttempted = true
+        pointProbed = true
+        lastProbeState = relaxation.model.exactState
+        val primal = pointPrimal
+        observe("SELECTED_SIDE_PROBE_ATTEMPT")
+        if (!reserve(20L)) {
+            observe("SELECTED_SIDE_PROBE_UNFUNDED")
+            return alternatives
+        }
+        val values = estimate(LpProbeSource(relaxation.model, basis), intArrayOf(column), longArrayOf(split))
+        if (values == null || values.size != 1 || !freshRecord || !boundRecorded ||
+            pointRelaxation !== relaxation || pointBasis !== basis || pointPrimal !== primal ||
+            relaxation.model.exactState !== lastProbeState
+        ) {
+            observe("SELECTED_SIDE_PROBE_DECLINED")
+            return alternatives
+        }
+        charge(10L)
+        val pair = values[0]
+        if (!pair.down.isFinite() || !pair.up.isFinite()) {
+            observe("SELECTED_SIDE_PROBE_MISSING_DIRECTION")
+            return alternatives
+        }
+        charge(8L)
+        observe("SELECTED_SIDE_PROBE_COMPARED")
+        observe("PROBE_SIDES_PREPARED")
+        val advice = probeSide(variable, point, pair)
+        if (advice == null) {
+            observe("SELECTED_SIDE_PROBE_TIED")
+            return alternatives
+        }
+        return applySide(variable, alternatives, advice, allowBasis = false, allowProbe = true)
     }
 
     fun compareProbeVariables(
@@ -763,13 +823,16 @@ internal class LpHints(
         return if (changed) listOf(alternatives[1], alternatives[0]) else alternatives
     }
 
-    private fun SearchDecision.matchesSide(advice: SideAdvice, up: Boolean): Boolean = when (this) {
+    private fun SearchDecision.matchesSide(advice: SideAdvice, up: Boolean): Boolean =
+        matchesSide(advice.variable, advice.split, up)
+
+    private fun SearchDecision.matchesSide(chosen: VarRef, split: Long, up: Boolean): Boolean = when (this) {
         is SearchDecision.Bool ->
-            (advice.variable as? VarRef.Bool)?.varId == (literal ushr 1) && (literal and 1 == 0) == up
+            (chosen as? VarRef.Bool)?.varId == (literal ushr 1) && (literal and 1 == 0) == up
         is SearchDecision.IntAtMost ->
-            !up && (advice.variable as? VarRef.IntVar)?.varId == variable && upper == advice.split
+            !up && (chosen as? VarRef.IntVar)?.varId == variable && upper == split
         is SearchDecision.IntAtLeast ->
-            up && (advice.variable as? VarRef.IntVar)?.varId == variable && lower == advice.split + 1L
+            up && (chosen as? VarRef.IntVar)?.varId == variable && lower == split + 1L
         else -> false
     }
 

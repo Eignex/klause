@@ -726,6 +726,169 @@ class LpHintsTest {
     }
 
     @Test
+    fun `selected variable probes preserve the chosen variable and application work`() {
+        for (boolean in listOf(false, true)) for (sense in Sense.entries) {
+            val charged = ArrayList<Long>()
+            for (apply in listOf(false, true)) {
+                val builder = LpBuilder()
+                builder.addVar(0, if (boolean) 1L else 3L)
+                val trail = LpBoundTrail(assertNotNull(builder.build(sense).authoritativeModel()))
+                val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                    booleanArrayOf(boolean), 0L, if (boolean) IntArray(0) else intArrayOf(0),
+                    if (boolean) intArrayOf(0) else IntArray(0))
+                val events = ArrayList<String>()
+                var remaining = Long.MAX_VALUE
+                var work = 0L
+                val hints = LpHints(if (boolean) 0 else 1, if (boolean) 1 else 0, directionalGains = true,
+                    selectedVariableProbeMode = true, probeChildOrder = true, applyAdvice = apply,
+                    observe = events::add, charge = {
+                        assertTrue(it <= remaining)
+                        remaining -= it
+                        work += it
+                    })
+                val variable = if (boolean) VarRef.Bool(0) else VarRef.IntVar(0)
+                val domain = if (boolean) null else IntDomain(0, 3)
+                val alternatives = if (boolean) {
+                    listOf(SearchDecision.Bool(Lit.make(0, false)), SearchDecision.Bool(Lit.make(0, true)))
+                } else listOf(SearchDecision.IntAtMost(0, 0), SearchDecision.IntAtLeast(0, 1))
+                hints.beginNode(1, 100.0)
+                hints.record(relaxation, doubleArrayOf(0.5), DoubleArray(0))
+                hints.recordBound(relaxation, 10.0)
+                hints.recordProbeBasis(relaxation, Basis(IntArray(0), arrayOf(VarStatus.AT_LOWER)))
+                hints.branch(variable, domain)
+                var queries = 0
+
+                val ordered = hints.selectProbedAlternatives(variable, domain, alternatives, { hold ->
+                    assertEquals(20L, hold)
+                    work += hold
+                    remaining = hints.probeComparisonFollowupWork
+                    true
+                }) { _, columns, splits ->
+                    assertTrue(columns.contentEquals(intArrayOf(0)))
+                    assertTrue(splits.contentEquals(longArrayOf(0)))
+                    queries++
+                    val offset = if (sense == Sense.MINIMIZE) 0.0 else -10000.0
+                    listOf(LpDirectionalValues(offset + 14.0, offset + 11.0))
+                }
+
+                assertEquals(if (apply) alternatives.reversed() else alternatives, ordered)
+                assertEquals(1, queries)
+                assertEquals(1, events.count { it == "SELECTED_SIDE_PROBE_ATTEMPT" })
+                assertEquals(1, events.count { it == "PROBE_SIDES_PREPARED" })
+                assertEquals(if (apply) 1 else 0, events.count { it == "PROBE_SIDE_CONSUMED" })
+                assertEquals(if (apply) 0 else 1, events.count { it == "PROBE_SIDE_WITHHELD" })
+                assertEquals(0, events.count { it == "VARIABLE_CONSUMED" })
+                charged += work
+            }
+            assertEquals(charged[0], charged[1])
+        }
+    }
+
+    @Test
+    fun `selected variable probe attempts stay spent across history resets`() {
+        for (funded in listOf(false, true)) {
+            val builder = LpBuilder()
+            builder.addVar(0, 3)
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                BooleanArray(1), 0L, intArrayOf(0), IntArray(0))
+            val events = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = true, selectedVariableProbeMode = true,
+                probeChildOrder = true, observe = events::add)
+            val variable = VarRef.IntVar(0)
+            val alternatives = listOf(SearchDecision.IntAtMost(0, 0), SearchDecision.IntAtLeast(0, 1))
+            var reservations = 0
+            var queries = 0
+            repeat(2) {
+                hints.resetHistory()
+                hints.beginNode(1, 100.0)
+                hints.record(relaxation, doubleArrayOf(0.5), DoubleArray(0))
+                hints.recordBound(relaxation, 10.0)
+                hints.recordProbeBasis(relaxation, Basis(IntArray(0), arrayOf(VarStatus.AT_LOWER)))
+
+                val ordered = hints.selectProbedAlternatives(variable, IntDomain(0, 3), alternatives, {
+                    reservations++
+                    funded
+                }) { _, _, _ -> queries++; null }
+
+                assertEquals(alternatives, ordered)
+            }
+            assertEquals(1, reservations)
+            assertEquals(if (funded) 1 else 0, queries)
+            assertEquals(1, events.count { it == "SELECTED_SIDE_PROBE_ATTEMPT" })
+        }
+    }
+
+    @Test
+    fun `selected variable probes require a below root matching partition`() {
+        for ((depth, wrongPartition) in listOf(0 to false, 1 to true)) {
+            val builder = LpBuilder()
+            builder.addVar(0, 3)
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                BooleanArray(1), 0L, intArrayOf(0), IntArray(0))
+            val hints = LpHints(1, 0, directionalGains = true, selectedVariableProbeMode = true,
+                probeChildOrder = true)
+            val variable = VarRef.IntVar(0)
+            val domain = IntDomain(0, 3)
+            var queries = 0
+            var reservations = 0
+            for (eligible in listOf(false, true)) {
+                hints.beginNode(if (eligible) 1 else depth, 100.0)
+                hints.record(relaxation, doubleArrayOf(0.5), DoubleArray(0))
+                hints.recordBound(relaxation, 10.0)
+                hints.recordProbeBasis(relaxation, Basis(IntArray(0), arrayOf(VarStatus.AT_LOWER)))
+                val split = if (!eligible && wrongPartition) 1L else 0L
+                val alternatives = listOf(SearchDecision.IntAtMost(0, split), SearchDecision.IntAtLeast(0, split + 1))
+
+                val ordered = hints.selectProbedAlternatives(variable, domain, alternatives, {
+                    reservations++
+                    true
+                }) { _, _, _ -> queries++; listOf(LpDirectionalValues(14.0, 11.0)) }
+
+                assertEquals(if (eligible) alternatives.reversed() else alternatives, ordered)
+                assertEquals(if (eligible) 1 else 0, queries)
+                assertEquals(if (eligible) 1 else 0, reservations)
+            }
+        }
+    }
+
+    @Test
+    fun `selected variable probes require two finite unequal values from a fresh source`() {
+        val cases: List<Pair<List<LpDirectionalValues>?, Boolean>> = listOf(
+            null to false, emptyList<LpDirectionalValues>() to false,
+            listOf(LpDirectionalValues(Double.NaN, 11.0)) to false,
+            listOf(LpDirectionalValues(14.0, Double.POSITIVE_INFINITY)) to false,
+            listOf(LpDirectionalValues(11.0, 11.0)) to false,
+            listOf(LpDirectionalValues(14.0, 11.0)) to true,
+        )
+        for ((values, stale) in cases) {
+            val builder = LpBuilder()
+            builder.addVar(0, 3)
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                BooleanArray(1), 0L, intArrayOf(0), IntArray(0))
+            val events = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = true, selectedVariableProbeMode = true,
+                probeChildOrder = true, observe = events::add)
+            val variable = VarRef.IntVar(0)
+            val alternatives = listOf(SearchDecision.IntAtMost(0, 0), SearchDecision.IntAtLeast(0, 1))
+            hints.beginNode(1, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5), DoubleArray(0))
+            hints.recordBound(relaxation, 10.0)
+            hints.recordProbeBasis(relaxation, Basis(IntArray(0), arrayOf(VarStatus.AT_LOWER)))
+
+            val ordered = hints.selectProbedAlternatives(variable, IntDomain(0, 3), alternatives, { true }) { _, _, _ ->
+                if (stale) hints.record(relaxation, doubleArrayOf(0.75), DoubleArray(0))
+                values
+            }
+
+            assertEquals(alternatives, ordered)
+            assertEquals(0, events.count { it == "PROBE_SIDE_CONSUMED" })
+        }
+    }
+
+    @Test
     fun `runtime withholding preserves complete query and application work`() {
         for (boolean in listOf(false, true)) {
             val charged = ArrayList<Long>()

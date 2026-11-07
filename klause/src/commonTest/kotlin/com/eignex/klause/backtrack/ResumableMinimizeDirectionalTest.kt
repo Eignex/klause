@@ -49,7 +49,7 @@ class ResumableMinimizeDirectionalTest {
             lpDirectionalGains = true,
             lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
                 boundMaxOpsPerNode = 0L))
-        ResumableMinimize(BacktrackSolver(problem), objective, params,
+        ResumableMinimize(BacktrackSolver(problem), objective, params, selectedChildGuidance = false,
             rootBasisGuidance = false).use { search ->
             var slices = 0
             while (slices++ < 8 && !search.isDone) search.runSlice(Cancellation.Never, 1000L, 8L) {}
@@ -73,8 +73,9 @@ class ResumableMinimizeDirectionalTest {
                 lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
                     boundMaxOpsPerNode = 0L))
             val search = if (basis) {
-                ResumableMinimize(BacktrackSolver(problem), objective, params, rootBasisGuidance = true)
-            } else ResumableMinimize(BacktrackSolver(problem), objective, params)
+                ResumableMinimize(BacktrackSolver(problem), objective, params,
+                    selectedChildGuidance = false, rootBasisGuidance = true)
+            } else ResumableMinimize(BacktrackSolver(problem), objective, params, selectedChildGuidance = false)
             search.use {
                 var slices = 0
                 while (slices++ < 8 && !search.isDone) search.runSlice(Cancellation.Never, 1000L, 8L) {}
@@ -102,7 +103,7 @@ class ResumableMinimizeDirectionalTest {
             lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
                 boundMaxOpsPerNode = 0L))
         val objective = LinearObjective(intCoefficients = longArrayOf(3L, 2L, 4L))
-        ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
+        ResumableMinimize(BacktrackSolver(problem), objective, params, selectedChildGuidance = false).use { search ->
             search.runSlice(Cancellation { attempted }, 1000L, 8L) {}
 
             val observations = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
@@ -165,7 +166,7 @@ class ResumableMinimizeDirectionalTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(
             6L, 6L, 11L, 5L, 5L, 9L, 4L, 4L, 5L,
         ))
-        ResumableMinimize(BacktrackSolver(problem), objective, params,
+        ResumableMinimize(BacktrackSolver(problem), objective, params, selectedChildGuidance = false,
             rootBasisGuidance = false, basisVariableGuidance = false, sink = sink).use { search ->
             val stopAfterConsumption = Cancellation { consumed }
             var slices = 0
@@ -241,7 +242,7 @@ class ResumableMinimizeDirectionalTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(
             6L, 6L, 11L, 5L, 5L, 9L, 40L, 40L, 50L,
         ))
-        ResumableMinimize(BacktrackSolver(problem), objective, params,
+        ResumableMinimize(BacktrackSolver(problem), objective, params, selectedChildGuidance = false,
             rootBasisGuidance = false, verifyBasisVariableGuidance = false).use { search ->
             val consumed = Cancellation {
                 (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
@@ -316,7 +317,7 @@ class ResumableMinimizeDirectionalTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(
             6L, 6L, 11L, 5L, 5L, 9L, 40L, 40L, 50L,
         ))
-        ResumableMinimize(BacktrackSolver(problem), objective, params,
+        ResumableMinimize(BacktrackSolver(problem), objective, params, selectedChildGuidance = false,
             rootBasisGuidance = false, probeChildGuidance = false, sink = sink).use { search ->
             val stopAfterConsumption = Cancellation { consumed }
             var slices = 0
@@ -352,7 +353,7 @@ class ResumableMinimizeDirectionalTest {
         }
         val problem = Problem(0, variables, Array(variables) { IntDomain(0, 1) }, factors.toTypedArray()).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(
-            6L, 6L, 11L, 5L, 5L, 9L, 40L, 40L, 50L,
+            6L, 6L, 11L, 5L, 5L, 8L, 40L, 40L, 50L,
         ))
         val prepared = problem.prepareExecutionPlan(objective, preferFinite = true)
         val queryWork = ArrayList<Long>()
@@ -401,21 +402,22 @@ class ResumableMinimizeDirectionalTest {
                 val stats = result.stats.lp
                 val observations = stats.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
                 val diagnostic = "$observations; probes=${stats.phases["DIRECTIONAL_PROBES_NODE"]}"
-                val second = if (applyAdvice) SearchDecision.IntAtLeast(7, 1) else SearchDecision.IntAtMost(5, 0)
+                val second = if (applyAdvice) SearchDecision.IntAtLeast(5, 1) else SearchDecision.IntAtMost(5, 0)
                 assertEquals(listOf(SearchDecision.IntAtMost(2, 0), second), attempted.take(2), diagnostic)
-                assertEquals(1L, observations["VARIABLE_BASIS_VERIFICATION_ATTEMPT"], diagnostic)
-                assertEquals(1L, observations["VARIABLE_PROBE_ATTEMPT"], diagnostic)
+                assertEquals(1L, observations["SELECTED_SIDE_PROBE_ATTEMPT"], diagnostic)
+                assertEquals(1L, observations["SELECTED_SIDE_PROBE_COMPARED"], diagnostic)
                 assertEquals(1L, observations["PROBE_SIDES_PREPARED"], diagnostic)
                 assertEquals(if (applyAdvice) 1L else 0L, observations["PROBE_SIDE_CONSUMED"] ?: 0L, diagnostic)
                 assertEquals(if (applyAdvice) 0L else 1L, observations["PROBE_SIDE_WITHHELD"] ?: 0L, diagnostic)
                 assertEquals(if (applyAdvice) 1L else 0L, observations["PROBE_SIDE_BASELINE_CHANGED"] ?: 0L, diagnostic)
-                assertEquals(if (applyAdvice) 1L else 0L, observations["VARIABLE_PROBE_CONSUMED"] ?: 0L, diagnostic)
-                assertEquals(if (applyAdvice) 0L else 1L, observations["VARIABLE_PROBE_WITHHELD"] ?: 0L, diagnostic)
+                assertEquals(0L, observations["VARIABLE_PROBE_CONSUMED"] ?: 0L, diagnostic)
+                assertEquals(0L, observations["VARIABLE_PROBE_WITHHELD"] ?: 0L, diagnostic)
+                assertEquals(0L, observations["VARIABLE_BASELINE_CHANGED"] ?: 0L, diagnostic)
                 assertEquals(0L, observations["HISTORY_SIDE_CONSUMED"] ?: 0L, diagnostic)
                 assertEquals(0L, observations["BASIS_SIDE_CONSUMED"] ?: 0L, diagnostic)
                 val probes = stats.phases.getValue("DIRECTIONAL_PROBES_NODE")
                 assertEquals(1L, probes.calls, diagnostic)
-                assertEquals(4L, probes.outcomes["CHILDREN_COMPLETED"], diagnostic)
+                assertEquals(2L, probes.outcomes["CHILDREN_COMPLETED"], diagnostic)
                 queryWork += probes.work
             }
         }
@@ -430,7 +432,7 @@ class ResumableMinimizeDirectionalTest {
         val params = BacktrackParams(randomSeed = 3L, lpDirectionalGains = true,
             lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false))
         val objective = LinearObjective(boolWeights = longArrayOf(1L, 1L))
-        ResumableMinimize(BacktrackSolver(problem), objective, params, rebindable = true,
+        ResumableMinimize(BacktrackSolver(problem), objective, params, selectedChildGuidance = false, rebindable = true,
             rootBasisGuidance = false).use { search ->
             assertNotNull(search.runSlice(Cancellation.Never, 1000L, 1000L) {})
             val before = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes["RESET"] ?: 0L

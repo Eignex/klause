@@ -311,13 +311,31 @@ floating conversion. This completion supplies no fresh LP point or new parent
 observation. Objective-bound pruning can supply progress; pure infeasibility cannot.
 Unsupported or overflowing bounds retain the missing-observation fallback.
 
-The `lp-default` and `lp-aggressive` optimization recipes enable the passive finite consumer; direct
+The `lp-default` and `lp-aggressive` optimization recipes enable finite directional guidance; direct
 `BacktrackParams` and other recipes opt in through `lpDirectionalGains` or
 `lp-directional-gains=true`. The execution setting can also disable it. LP bounding
 and branching must be enabled. Disabled directional gains collect no history or
 retained model scope and charge no history bookkeeping. Ordinary LP value preferences
-and reduced-cost scores remain available. The reduced-cost/fractionality scorer supplies its
-winning variable. A bounded scan also nominates the largest reliable passive score
+and reduced-cost scores remain available. Ordinary finite optimization retains the
+reduced-cost/fractionality scorer's selected variable. After value guidance has
+constructed its two complementary alternatives, a fresh below-root LP point can
+request the selected column's two private optimal child values. Only the current
+floor/ceiling partition is eligible; a different variable or partition, a root,
+missing basis, stale point or unavailable bound retains the existing order without
+querying. The smaller minimized child objective is visited first. Both alternatives
+remain unchanged, including their cuts. A tie within `1e-9`, nonfinite value,
+unfinished comparison or changed source retains the original order.
+
+One selected-column attempt belongs to each search owner. The opportunity is spent
+before its 20-unit reservation, including an unfunded or cancelled attempt; history
+resets, restarts and slices do not replenish it. The query uses the existing private
+probe and containing LP allowance, holding 80 units for completion and application.
+The two finite child values are used immediately and are not retained as history or
+proof authority. `SELECTED_SIDE_PROBE_ATTEMPT` and `SELECTED_SIDE_PROBE_COMPARED`
+separate admission from complete comparisons. Selected-child mode performs no
+passive or basis variable nominations.
+
+Explicit variable-guidance construction can instead nominate the largest reliable passive score
 among unassigned variables, including variables outside the reduced-cost leaders.
 When both candidates have reliable predictions, comparable gains select the winner;
 tied predictions retain the original winner. The scan charges its work to the existing
@@ -349,14 +367,14 @@ suspension, and `VARIABLE_BASIS_REOPENED` records progress that reopens admissio
 The bounded runner-up scan charges its work before visiting candidates.
 Preparation reserves 20 work units before allocating the column request. A direct
 basis consumer leaves 48 units for comparison, directional checks and selection.
-Ordinary finite construction requires a fresh child-value confirmation before a basis
+Confirmed variable-guidance construction requires a fresh child-value confirmation before a basis
 nomination can replace current scoring. It leaves 64 units for the basis comparison
 and confirmation admission, including coordinate reads and the lifetime-attempt charge.
 Unused basis-analysis work, excluding that held follow-up allowance, can fund the
 confirmation under the same node and cumulative limits. Basis predictions train no
 checked-bound history and confer no pruning authority; passive predictions require no consultation.
 
-One confirmation batch belongs to a search owner, covering at most two variables and
+In that mode, one confirmation batch belongs to a search owner, covering at most two variables and
 four child solves. The attempt is spent before its reservation, including an unfunded
 or cancelled request, and history resets do not replenish it. Further basis consultations
 stop after that attempt; passive comparisons remain available. An unavailable,
@@ -385,7 +403,7 @@ keeps current scoring. The
 four finite values share minimized source units. Common objective offsets and an
 unknown parent optimum cancel in this comparison; signed values are valid.
 Numerical values never train passive checked-bound history or carry between points.
-Ordinary finite construction also retains their immediate child preference for both
+Two-variable construction also retains their immediate child preference for both
 compared variables, including the baseline when variable selection declines a challenger.
 The smaller minimized child objective is visited first. A difference within `1e-9`
 keeps the existing order. The preference applies once, only to the selected variable
