@@ -20,6 +20,23 @@ costs and report repeated infrastructure losses separately.
 Each requested selection must match at least one source. A selection with no matches
 fails preparation instead of publishing a reduced comparison plan.
 
+`lab/native-page-demand.json` accepts one hash-pinned 250-variable, 1,065-clause
+DIMACS source and one or two seeds. Each case runs the native backtracker twice,
+first with prefix timing and a bounded decision/conflict/restart trace, then with
+the same observations plus raw page-demand snapshots. Each invocation has a
+120-second limit inside a 300-second, one-CPU case. Prefix records at restarts
+50/100/200/400/500 and semantic event 46,194 retain elapsed/current-thread CPU,
+propagation work and cumulative observation cost. Plain-first/warm-second order
+does not support a speedup claim. Compare full untruncated traces and completed
+counters before using the second run's structural observations.
+
+The raw reader bounds slots, directory nodes and watch entries. It reads fields
+without invoking store accessors, retaining physical page presence, row masks,
+cache keys, ranking cursors and potential candidate/watch demand at each boundary.
+Unchanged cache contents, directory work and propagation work guard the observer.
+These snapshots do not measure dynamic access frequencies, cache misses or isolated
+CPU costs. Native verdicts remain separate from independent source validation.
+
 Planning stages every selected source before sealing include-directory identities.
 Execution verifies the planned file and directory identities before each solve.
 
