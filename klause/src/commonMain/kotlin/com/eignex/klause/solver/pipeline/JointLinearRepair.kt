@@ -62,6 +62,7 @@ internal class JointLinearRepair(
     sharedCompletions: LinearIncumbentSharing? = null,
     private val incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
     private val onComparison: ((JointRepairComparison) -> Unit)? = null,
+    private val repairGuidance: LinearRepairGuidance? = null,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private class CheckedCenter(val sample: Sample, val value: BigFraction?)
 
@@ -95,6 +96,7 @@ internal class JointLinearRepair(
     private var query: LinearAuthorityInvocation? = null
     private var anchor: Sample? = null
     private var pending: ExactNeighborhoodCondition? = null
+    private var guidedProposal: ExactNeighborhoodCondition? = null
     private var queryFreedIntegers = 0
     private var checkedTrialWidth = 0
     private var checkedTrialCenter: Sample? = null
@@ -291,8 +293,11 @@ internal class JointLinearRepair(
                     round.coerceAtMost(Long.MAX_VALUE - 1) + 1 else round
                 val size = if (enlargedTrialPending && width > checkedTrialWidth)
                     minOf(width, checkedTrialWidth + 1) else width
+                val hint = if (pooled != null && completion != null) repairGuidance?.find(source) else null
+                val guided = requireNotNull(selection).guide(hint, from, budget, stop)
                 requireNotNull(selection).propose(from, pooled?.bools ?: bools, size, proposalRound, radius, limit)
                     .also { condition ->
+                        guidedProposal = condition.takeIf { guided }
                         if (checkedStart) {
                             checkedTrialCenter = pooled
                             checkedTrialWidth = (sourceIntegers?.size ?: model.numIntVars) - condition.lower.size
@@ -469,6 +474,7 @@ internal class JointLinearRepair(
                 boundOrdered = boundOrdered, guidance = true, funding = funding)
             val freed = (sourceIntegers?.size ?: model.numIntVars) - pinnedIntegers
             queryFreedIntegers = freed
+            if (condition === guidedProposal) observe("jointRepairSharedGuidanceQueries")
             stages["jointRepairMaxFreedIntegers"] = maxOf(stages["jointRepairMaxFreedIntegers"] ?: 0L, freed.toLong())
             if (condition === enlargedTrialProposal) observe("jointRepairEnlargedTrialStarts")
             observe("jointRepairCandidates")
@@ -577,6 +583,7 @@ internal class JointLinearRepair(
         enlargedTrialAfterWitness = false
         enlargedTrialProposal = null
         checkedTrialCenter = null
+        guidedProposal = null
         queryFreedIntegers = 0
         val resources = SearchInvocationResources()
         resources.own(authority)
