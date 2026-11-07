@@ -481,6 +481,7 @@ class Portfolio(
             run.incumbentAvailable(incumbent.current()?.version ?: 0)
         }
         val pending = MutableList<Candidate<MinimizeResult.WithSample, V>?>(workers.size) { null }
+        val finiteCutoffConsumers = workers.any { it.canonicalIncumbentIsCutoff }
         val start = TimeSource.Monotonic.markNow()
         val observedCutoffs = arrayOfNulls<Double>(workers.size)
         val staleCredits = DoubleArray(workers.size)
@@ -501,7 +502,13 @@ class Portfolio(
             if (incumbent.offer(r.sample, candidate.objective) !is Publication.Installed) return
             claim.acceptedIncumbents++
             run.endFeasibilityCoverage()
-            run.incumbentImproved()
+            val cutoffChanged = if (finiteCutoffConsumers && before != null) {
+                val previousCutoff = incumbents.bound(before)
+                val installedCutoff = incumbents.bound()
+                !previousCutoff.isFinite() || !installedCutoff.isFinite() ||
+                    previousCutoff.toBits() != installedCutoff.toBits()
+            } else true
+            run.incumbentImproved(cutoffChanged)
             run.incumbentAvailable(incumbent.current()?.version ?: 0)
             try {
                 acceptedVersion++
@@ -999,6 +1006,7 @@ class Portfolio(
         private var feasibilityComplete = false
         private var hasAcceptedImprovement = false
         private var incumbentElapsed: DoubleArray? = null
+        private var cutoffElapsed: DoubleArray? = null
 
         fun recordAcceptedImprovement() {
             hasAcceptedImprovement = true
@@ -1008,8 +1016,10 @@ class Portfolio(
             feasibilityComplete = true
         }
 
-        fun incumbentImproved() {
-            incumbentElapsed = DoubleArray(workers.size) { elapsedNanos(it) }
+        fun incumbentImproved(cutoffChanged: Boolean = true) {
+            val elapsed = DoubleArray(workers.size) { elapsedNanos(it) }
+            incumbentElapsed = elapsed
+            if (cutoffChanged || cutoffElapsed == null) cutoffElapsed = elapsed
         }
 
         private fun elapsedNanos(arm: Int): Double =
@@ -1283,10 +1293,24 @@ class Portfolio(
             if (free.isEmpty()) return null
             val elapsed = active.associateWith { (elapsedNanos(it) - baseline[it]).coerceAtLeast(0.0) }
             val total = elapsed.values.sum()
+            val cutoffBaseline = cutoffElapsed ?: baseline
+            if (cutoffBaseline === baseline) {
+                val owed = total * improvementProofShare / complete.size
+                return free.minBy { elapsed.getValue(it) }.takeIf { elapsed.getValue(it) < owed }
+            }
+            val cutoffTime = active.associateWith {
+                (elapsedNanos(it) - cutoffBaseline[it]).coerceAtLeast(0.0)
+            }
+            val cutoffTotal = cutoffTime.values.sum()
             // Retained exhaustive traversal can close a proof without earning a progress signal.
             // Fund it throughout the incumbent epoch so a long competing segment cannot consume its catch-up time.
-            val owed = total * improvementProofShare / complete.size
-            return free.minBy { elapsed.getValue(it) }.takeIf { elapsed.getValue(it) < owed }
+            val debt = free.associateWith { arm ->
+                val boundOnly = workers[arm].canonicalIncumbentIsCutoff
+                val available = if (boundOnly) cutoffTotal else total
+                val spent = (if (boundOnly) cutoffTime else elapsed).getValue(arm)
+                available * improvementProofShare / complete.size - spent
+            }
+            return free.maxBy { debt.getValue(it) }.takeIf { debt.getValue(it) > 0.0 }
         }
 
         private fun owedCompleteArm(eligibleArms: List<Int>): Int? {

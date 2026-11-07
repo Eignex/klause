@@ -223,6 +223,9 @@ internal fun FinitePipeline.portfolioExecutor(
         }.orEmpty(),
         livePreparationStages = companionAdmission?.let { it::stages },
     ) { workers ->
+        if (companions != null && numericalCompanions?.sourceIncumbentCompletion == true) {
+            for (worker in workers) if (worker.controlsObjectiveCutoff) worker.canonicalIncumbentIsCutoff = true
+        }
         val proofShares = clausalProofShares(scenario, profile, workers.map { it.label }, privateRebuildBudgetOnly)
         val shares = if (proofShares.isEmpty()) {
             continuousLpShares(
