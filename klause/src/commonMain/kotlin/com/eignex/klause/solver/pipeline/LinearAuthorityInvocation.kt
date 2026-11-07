@@ -55,7 +55,7 @@ internal class LinearAuthorityInvocation(
         ?: SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit),
     cuts: Boolean = boundOrdered && params.sourceCuts,
     activeRows: Boolean = false,
-    supportBranching: Boolean = false,
+    supportBranching: Boolean = boundOrdered && params.sourceCutBranching,
     onNumericalFeedback: ((SourceNumericalFeedbackResult) -> Unit)? = null,
     latestFeedback: Boolean = true,
     feedbackRequest: LinearAuthorityFeedbackRequest? = null,

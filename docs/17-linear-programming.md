@@ -1169,7 +1169,8 @@ references and retains the complete Boolean substitution and query cutoff. An
 unsupported projection declines; it performs neither proof replay nor scope
 reduction. Its coordinate set supplies ranking only.
 
-An internal research consumer orders integer splits by near-tight,
+The opt-in `source-cut-branching=true` consumer orders numerical frontier integer
+splits by near-tight,
 installed checked cut supports, preferring smaller supports and greater fractional
 distance from an integer, with source-order ties and fallback. It requests the point
 and installed cut activity, and evaluates a cut only when its support holds a
@@ -1670,8 +1671,8 @@ cumulative work, allocation, operation and cancellation allowances; it rechecks
 source derivations and cannot publish deductions into the original traversal.
 
 `source-point-cuts=true` opts the retained frontier into point-based separation.
-Ordinary linear-source execution binds the same source-cut controls to its admitted
-numerical companions. The containing source request owns these settings and removes
+Ordinary linear-source execution binds cut separation, selection and advisory
+branching controls to its admitted numerical companions. The containing source request owns these settings and removes
 them from finite worker recipe options; they change neither companion admission
 nor lifetime.
 A new template first runs the ordinary checked cut recipe; a completed point can
