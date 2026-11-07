@@ -85,7 +85,7 @@ internal object MpsProofFrontier {
         val supported = setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier", "cuts",
             "selection", "replay", "operations", "activeRows", "supportBranching", "pointCuts", "aggregate-probe",
             "aggregate-mixed", "aggregate-replay", "aggregateCuts", "refutationReuse", "feedbackDelivery",
-            "feedbackRequest", "solveSeconds", "certificateState")
+            "feedbackRequest", "solveSeconds", "certificateState", "point-producer")
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
             (options.keys - supported).isEmpty())
         val probe = options["probe"]?.toBooleanStrict() ?: false
@@ -97,6 +97,7 @@ internal object MpsProofFrontier {
         val aggregateProbe = options["aggregate-probe"]?.toBooleanStrict() ?: false
         val aggregateMixed = options["aggregate-mixed"]?.toBooleanStrict() ?: false
         val aggregateReplay = options["aggregate-replay"]?.toBooleanStrict() ?: false
+        val pointProducer = options["point-producer"]?.toBooleanStrict() ?: false
         require(!aggregateMixed || aggregateProbe)
         require(!aggregateReplay || aggregateProbe)
         val exact = options.getValue("exact").toBooleanStrict()
@@ -164,7 +165,7 @@ internal object MpsProofFrontier {
         val invocation = NumericalFrontierSnapshot.open(context, params, historyEnabled, frontierEnabled, activeRows,
             supportBranching, feedbackDelivery == "latest", feedbackRequest == "full")
         val selection = NumericalSelectionSnapshot(Cancellation.after(30.seconds))
-        val journal = if (options["selection"]?.toBooleanStrict() == true || aggregateProbe) {
+        val journal = if (options["selection"]?.toBooleanStrict() == true || aggregateProbe || pointProducer) {
             selection.attach(invocation)
         } else null
         val history = ArrayList<JsonObject>()
@@ -231,6 +232,12 @@ internal object MpsProofFrontier {
             runCatching { Reports.writeJson(out.resolve("cuts.json").path, snapshot.cuts(invocation)) }
             if (journal != null) {
                 Reports.writeJson(out.resolve("selection.json").path, selection.capture(journal))
+                if (pointProducer) {
+                    out.resolve("point-producer.jsonl").writeText("")
+                    NumericalPointProducerSnapshot(Cancellation.after(20.seconds)).inspect(journal) {
+                        out.resolve("point-producer.jsonl").appendText(it.toString() + "\n")
+                    }
+                }
                 if (options["replay"]?.toBooleanStrict() == true) {
                     out.resolve("selection-replays.jsonl").writeText("")
                     NumericalSelectionSnapshot(Cancellation.after(10.seconds)).replay(journal) {
@@ -292,6 +299,7 @@ internal object MpsProofFrontier {
                 put("aggregateProbe", aggregateProbe)
                 put("aggregateMixed", aggregateMixed)
                 put("aggregateReplay", aggregateReplay)
+                put("pointProducer", pointProducer)
                 put("sourceLpOperationAllowance", params.sourceLpOperations)
                 put("activeRows", activeRows)
                 put("wholeCliTimingClaim", false)

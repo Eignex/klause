@@ -1111,6 +1111,15 @@ endpoint independently from the point. Its generation shares the original
 and any resulting owner replacement retain their containing source/recipe costs.
 `PointPreparationUnavailable` does not establish complete ineligibility.
 
+`MpsProofFrontier point-producer=true` invokes the production point-directed
+aggregate producer at every retained completed point, including branch points.
+Each generation retains its 65,536-work and 1 MiB modeled allocation limits;
+projection and fresh native consequence checks have separate reported costs.
+The inspection shares a 20-second, 20,000,000-work and 64 MiB containing cap.
+`point-producer.jsonl` retains candidates, scopes, limits and native checks.
+It installs no rows and performs no LP query; accepted consequences alone do not
+establish strict separation, bound strengthening, later pruning or independent proof.
+
 The generated-aggregate replay includes the ordinary opt-in producer's bounded
 source-pair indexing and discovery. Keep this cost separate from replaying supplied
 diagnostic proposals. `AggregatePair*` reports coverage, attempts and limiting

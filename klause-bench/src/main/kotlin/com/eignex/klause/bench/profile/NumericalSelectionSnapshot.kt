@@ -207,7 +207,7 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
             .verify(evidence, stop).toString())
     }
 
-    private fun proof(value: SourceDerivation, depth: Int = 0): JsonObject {
+    fun proof(value: SourceDerivation, depth: Int = 0): JsonObject {
         if (depth >= 64 || stop()) return buildJsonObject {
             put("kind", "Unavailable")
             put("reason", "inspection allowance")
