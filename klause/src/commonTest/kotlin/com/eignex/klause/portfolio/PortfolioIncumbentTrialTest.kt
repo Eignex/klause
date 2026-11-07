@@ -1,15 +1,109 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TestTimeSource
 
 class PortfolioIncumbentTrialTest {
+    @Test
+    fun `exact improvements should retain repeated proof turns with equal finite cutoffs`() {
+        for (sameCutoff in listOf(true, false)) {
+            val clock = TestTimeSource()
+            val started = clock.markNow()
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+            val incumbents = PortfolioIncumbents.exact(objective)
+            val assignments = IncumbentExchange.minimizing<Sample>()
+            val first = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0),
+                exactReals = listOf(BigFraction.ONE))
+            val step = BigFraction.ofLong(if (sameCutoff) 1_000_000_000_000_000_000L else 100L).reciprocal()
+            var numericalSlices = 0
+            var finiteSlices = 0
+            var trialSlices = 0
+            var numericalAtTrial = 0
+            var finiteAtTrial = 0
+            var readBound: () -> Double = { Double.POSITIVE_INFINITY }
+            val finiteBounds = mutableListOf<Double>()
+            val exactReads = mutableListOf<BigFraction>()
+            val accepted = mutableListOf<BigFraction>()
+            val finder = TrackingResumableSearch(null,
+                incumbent = MinimizeResult.BestFound(first, 1.0, TerminationReason.BudgetExhausted), onRun = {
+                    clock += 100.milliseconds
+                    assignments.offer(first, 1.0)
+                })
+            val numericalBase = TrackingResumableSearch(null)
+            val numerical = object : ResumableSearch by numericalBase {
+                override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                    numericalSlices++
+                    exactReads += requireNotNull(incumbents.exchange.current()).objective
+                    clock += 100.milliseconds
+                    if (numericalSlices <= 4) {
+                        val value = BigFraction.ONE - BigFraction.ofLong(numericalSlices.toLong()) * step
+                        onIncumbent(MinimizeResult.BestFound(first.copy(reals = doubleArrayOf(value.toDouble()),
+                            exactReals = listOf(value)), value.toDouble(), TerminationReason.BudgetExhausted))
+                    }
+                    clock += 1.milliseconds
+                    return null
+                }
+            }
+            val finite = ScriptedSearch({ false }) {
+                finiteSlices++
+                finiteBounds += readBound()
+                assertEquals(1L, requireNotNull(assignments.current()).version)
+                clock += 100.milliseconds
+            }
+            val trialBase = ScriptedSearch({ false }) {
+                trialSlices++
+                if (trialSlices == 2) {
+                    numericalAtTrial = numericalSlices
+                    finiteAtTrial = finiteSlices
+                }
+                clock += 10.milliseconds
+            }
+            val trial = object : ResumableSearch by trialBase, ReseedGuard {
+                override val canReseed: Boolean get() = false
+                override val incumbentTrialPending: Boolean get() = trialSlices == 1
+            }
+            val workers = listOf(
+                trackingWorker("finder", 0, finder).also { it.family = ArmFamily.LocalSearch },
+                trackingWorker("numerical", 1, numerical),
+                PortfolioWorker.of("finite", 2, TrackingResumableOptimizer(finite).session(), BacktrackParams(),
+                    objective, withBound = { params, supplier ->
+                        readBound = supplier
+                        params
+                    }),
+                trackingWorker("trial", 3, trial).also { it.family = ArmFamily.LocalSearch },
+            )
+
+            Portfolio(workers, fixedBandit(4, 0), reseedStaleThreshold = 0).also {
+                it.runTimeSource = clock
+            }.use {
+                it.minimize(Cancellation { (numericalSlices >= 5 && trialSlices >= 2) ||
+                    started.elapsedNow().inWholeMilliseconds > 12_000L }, null, incumbents,
+                    onAccepted = { point -> accepted += point.objective })
+            }
+
+            assertEquals(4, finiteAtTrial, "sameCutoff=$sameCutoff")
+            assertEquals(5, numericalAtTrial, "sameCutoff=$sameCutoff")
+            assertEquals(5, accepted.size)
+            assertEquals(accepted, exactReads)
+            assertTrue(accepted.zipWithNext().all { (standing, candidate) -> candidate < standing })
+            assertEquals(sameCutoff, finiteBounds.distinct().size == 1)
+        }
+    }
+
     @Test
     fun `a pending incumbent trial should continue without displacing silent proof coverage`() {
         var proofSlices = 0
