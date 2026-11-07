@@ -73,7 +73,8 @@ internal class JointLinearRepair(
         if (!shape.admitted) observe("jointRepairLpDeclinedAttempts")
         stages["jointRepairLpMaxRows"] = maxOf(stages["jointRepairLpMaxRows"] ?: 0, shape.rows.toLong())
         stages["jointRepairLpMaxColumns"] = maxOf(stages["jointRepairLpMaxColumns"] ?: 0, shape.columns.toLong())
-    }, retainLp = true, guidancePolicy = guidancePolicy)
+    }, retainLp = true, guidancePolicy = guidancePolicy,
+        aggregateCuts = boundOrdered && params.sourceAggregateCuts)
     private var selection: JointRepairNeighborhood? = null
     private var rootPoint: Map<SourceCoordinate, Double>? = null
     private var rootStarted = false
@@ -274,7 +275,9 @@ internal class JointLinearRepair(
                 rootStarted = true
                 observe("jointRepairRootQueries")
             }
-            val result = authority.advance(source, stop, cuts = boundOrdered)
+            val result = if (boundOrdered && params.sourceCuts && params.sourcePointCuts)
+                authority.advanceWithPointCuts(source, stop)
+            else authority.advance(source, stop, cuts = boundOrdered && params.sourceCuts)
             for ((stage, count) in result.primalStages) {
                 val key = "jointRepairRoot$stage"
                 stages[key] = combine(key, stages[key] ?: 0L, count)
