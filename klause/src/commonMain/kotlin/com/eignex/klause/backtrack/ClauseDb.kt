@@ -21,7 +21,9 @@ internal fun forgetIfOverCap(
     if (protectedPublication) return
     val cap = params.maxLearnedClauses ?: return
     val startWork = session.work
-    if (session.activeLearnedClauseCount > cap) forgetWindow(session, params, cap, startWork)
+    if (session.activeLearnedClauseCount > cap || session.nativeCapWindowPending) {
+        forgetWindow(session, params, cap, startWork)
+    }
     if (session.learnedClauseCount > session.activeLearnedClauseCount) {
         session.compactLearnedClauses(
             (params.learnedMemoryWork - (session.work - startWork)).coerceAtLeast(0L),
