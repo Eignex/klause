@@ -42,8 +42,15 @@ internal class LpHints(
     private val freshVariableProbes: Boolean = false,
     private val basisVariableComparisons: Boolean = false,
     private val verifyBasisVariables: Boolean = false,
+    private val probeChildOrder: Boolean = false,
 ) : LpHintSink {
-    private data class SideAdvice(val variable: VarRef, val split: Long, val up: Boolean, val basis: Boolean)
+    private data class SideAdvice(
+        val variable: VarRef,
+        val split: Long,
+        val up: Boolean,
+        val basis: Boolean,
+        val probe: Boolean = false,
+    )
 
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
     private val history = LpDirectionalHistory(observe, charge = charge)
@@ -52,6 +59,7 @@ internal class LpHints(
     private var pointPrimal: DoubleArray? = null
     private var pointBasis: Basis? = null
     private var pendingSide: SideAdvice? = null
+    private var pendingProbeSide: SideAdvice? = null
     private var activeSide: SideAdvice? = null
     private var rootBasisAttempted = false
     private var pointProbed = false
@@ -88,6 +96,7 @@ internal class LpHints(
         pointPrimal = null
         pointBasis = null
         pendingSide = null
+        pendingProbeSide = null
         activeSide = null
         boundRecorded = false
         variableProbeProposal = false
@@ -123,6 +132,7 @@ internal class LpHints(
         val changedContext = scopeModel !== state.baseModel || scopeRows !== state.rows || scopeCutoff != cutoff ||
             scopeIncumbentVersion != incumbentVersion || scopeExternalExact != externalExact
         if (incompatibleModel || changedContext) {
+            clearProbeSides()
             pointBasis = null
             lastProbeState = null
             lastVariableBasisState = null
@@ -210,6 +220,7 @@ internal class LpHints(
 
     override fun recordUnavailable(reason: LpHintUnavailable) {
         if (!collect) return
+        clearProbeSides()
         if (scopeModel != null) charge(1L)
         unavailable = reason
         pointBasis = null
@@ -281,6 +292,7 @@ internal class LpHints(
                 pointPrimal = null
                 pointBasis = null
                 pendingSide = null
+                pendingProbeSide = null
                 activeSide = null
                 boundRecorded = false
             }
@@ -288,11 +300,13 @@ internal class LpHints(
     }
 
     fun branch(variable: VarRef, domain: IntDomain? = null) {
-        activeSide = pendingSide?.takeIf {
+        val side = pendingSide?.takeIf { it.variable == variable } ?: pendingProbeSide
+        activeSide = side?.takeIf {
             val point = if (it.variable == variable) value(variable, domain) else Double.NaN
             point.isFinite() && floor(point) == it.split.toDouble()
         }
         pendingSide = null
+        pendingProbeSide = null
         if (collect && scopeModel != null) {
             history.branch(variable, if (boundRecorded) value(variable, domain) else Double.NaN)
         }
@@ -305,6 +319,7 @@ internal class LpHints(
     }
 
     fun prepareVariableComparison(variables: Int): Boolean {
+        clearProbeSides()
         if (!collect || !freshRecord || variables !in 1..8192 ||
             !boundRecorded || !history.mayHaveScores
         ) return false
@@ -376,6 +391,8 @@ internal class LpHints(
     val basisVerificationRequired: Boolean get() = verifyBasisVariables
 
     val basisComparisonFollowupWork: Long get() = if (verifyBasisVariables) 64L else 48L
+
+    val probeComparisonFollowupWork: Long get() = if (probeChildOrder) 80L else 48L
 
     fun compareBasisVariables(
         first: VarRef?,
@@ -469,6 +486,7 @@ internal class LpHints(
         estimate: (LpProbeSource, IntArray, LongArray) -> List<LpDirectionalValues>?,
     ): VarRef? {
         val ready = probeVariableChoiceReady
+        clearProbeSides()
         variableBasisProposal = false
         variableProbeProposal = false
         if (!ready || first == null || second == null) return null
@@ -514,6 +532,12 @@ internal class LpHints(
             observe("VARIABLE_PROBE_MISSING_DIRECTION")
             return null
         }
+        if (probeChildOrder) {
+            charge(16L)
+            pendingProbeSide = probeSide(first, firstValue, firstValues)
+            pendingSide = probeSide(second, secondValue, secondValues)
+            observe("PROBE_SIDES_PREPARED")
+        }
         observe("VARIABLE_PROBE_COMPARED")
         val strongerTie = improvement in 0.0..1e-9 && strongImprovement > 1e-9
         if (improvement <= 1e-9 && !strongerTie) {
@@ -528,6 +552,16 @@ internal class LpHints(
         variableProbeProposal = true
         observe("VARIABLE_PROBE_ESTIMATED")
         return second
+    }
+
+    private fun probeSide(variable: VarRef, point: Double, values: LpDirectionalValues): SideAdvice? =
+        if (abs(values.down - values.up) <= 1e-9) null
+        else SideAdvice(variable, floor(point).toLong(), values.up < values.down, basis = false, probe = true)
+
+    private fun clearProbeSides() {
+        pendingProbeSide = null
+        if (pendingSide?.probe == true) pendingSide = null
+        if (activeSide?.probe == true) activeSide = null
     }
 
     private fun basisScore(cost: LpDirectionalCost, value: Double): Double {
@@ -624,6 +658,7 @@ internal class LpHints(
         estimate: (LpModel, IntArray) -> List<LpDirectionalCost?>?,
     ): Boolean {
         pendingSide = null
+        pendingProbeSide = null
         activeSide = null
         if (!collect || !directionalGains || !freshRecord || variable == null) return false
         val value = value(variable, domain)
@@ -670,10 +705,11 @@ internal class LpHints(
         variable: VarRef,
         alternatives: List<SearchDecision>,
         allowBasis: Boolean = true,
+        allowProbe: Boolean = false,
     ): List<SearchDecision> {
         val advice = activeSide ?: return alternatives
         activeSide = null
-        return applySide(variable, alternatives, advice, allowBasis)
+        return applySide(variable, alternatives, advice, allowBasis, allowProbe)
     }
 
     private fun applySide(
@@ -681,16 +717,18 @@ internal class LpHints(
         alternatives: List<SearchDecision>,
         advice: SideAdvice,
         allowBasis: Boolean,
+        allowProbe: Boolean,
     ): List<SearchDecision> {
         charge(12L)
+        val source = if (advice.probe) "PROBE" else if (advice.basis) "BASIS" else "HISTORY"
         if (advice.variable != variable) {
             observe("SIDE_FALLBACK")
-            observe(if (advice.basis) "BASIS_SIDE_FALLBACK_VARIABLE" else "HISTORY_SIDE_FALLBACK_VARIABLE")
+            observe("${source}_SIDE_FALLBACK_VARIABLE")
             return alternatives
         }
         if (alternatives.size != 2) {
             observe("SIDE_FALLBACK")
-            observe(if (advice.basis) "BASIS_SIDE_FALLBACK_ARITY" else "HISTORY_SIDE_FALLBACK_ARITY")
+            observe("${source}_SIDE_FALLBACK_ARITY")
             return alternatives
         }
         val firstUp = alternatives[0].matchesSide(advice, up = true)
@@ -699,17 +737,23 @@ internal class LpHints(
             !(firstDown && alternatives[1].matchesSide(advice, up = true))
         ) {
             observe("SIDE_FALLBACK")
-            observe(if (advice.basis) "BASIS_SIDE_FALLBACK_PARTITION" else "HISTORY_SIDE_FALLBACK_PARTITION")
+            observe("${source}_SIDE_FALLBACK_PARTITION")
             return alternatives
         }
         if (advice.basis && !allowBasis) {
             observe("BASIS_SIDE_WITHHELD")
             return alternatives
         }
-        observe(if (advice.basis) "BASIS_SIDE_CONSUMED" else "HISTORY_SIDE_CONSUMED")
-        observe("SIDE_CONSUMED")
         val changed = firstUp != advice.up
+        if (advice.probe && !allowProbe) {
+            observe("PROBE_SIDE_WITHHELD")
+            observe(if (changed) "PROBE_SIDE_PROPOSAL_CHANGED" else "PROBE_SIDE_PROPOSAL_AGREED")
+            return alternatives
+        }
+        observe("${source}_SIDE_CONSUMED")
+        observe("SIDE_CONSUMED")
         observe(if (changed) "SIDE_BASELINE_CHANGED" else "SIDE_BASELINE_AGREED")
+        if (advice.probe) observe(if (changed) "PROBE_SIDE_BASELINE_CHANGED" else "PROBE_SIDE_BASELINE_AGREED")
         return if (changed) listOf(alternatives[1], alternatives[0]) else alternatives
     }
 
@@ -798,6 +842,7 @@ internal class LpHints(
         pointPrimal = null
         pointBasis = null
         pendingSide = null
+        pendingProbeSide = null
         activeSide = null
         boundRecorded = false
         unavailable = LpHintUnavailable.UNOBSERVED
@@ -827,6 +872,7 @@ internal class LpHints(
         pointPrimal = null
         pointBasis = null
         pendingSide = null
+        pendingProbeSide = null
         activeSide = null
         pointRelaxation = null
         freshRecord = false
@@ -856,6 +902,7 @@ internal class LpHints(
         pointPrimal = null
         pointBasis = null
         pendingSide = null
+        pendingProbeSide = null
         activeSide = null
         boundRecorded = false
         unavailable = LpHintUnavailable.NO_BOUND

@@ -144,6 +144,7 @@ internal class ResumableMinimize(
     private val rootBasisGuidance: Boolean = false,
     basisVariableGuidance: Boolean = true,
     verifyBasisVariableGuidance: Boolean = true,
+    private val probeChildGuidance: Boolean = true,
 ) : ResumableSearch, ReseedGuard {
     private val hasPreparation = preparationBudget != null
     override val canReseed: Boolean
@@ -338,7 +339,8 @@ internal class ResumableMinimize(
             LpHints(problem.numIntVars, problem.numBoolVars, params.lpDirectionalGains,
                 sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) },
                 rootBasis = rootBasisGuidance, basisVariableComparisons = basisVariableGuidance,
-                verifyBasisVariables = basisVariableGuidance && verifyBasisVariableGuidance)
+                verifyBasisVariables = basisVariableGuidance && verifyBasisVariableGuidance,
+                probeChildOrder = basisVariableGuidance && verifyBasisVariableGuidance && probeChildGuidance)
         } else null
 
     private lateinit var cp: CpSearchComponent
@@ -630,6 +632,7 @@ internal class ResumableMinimize(
             initialCandidate = sample,
             problem = root,
             rootBasisGuidance = rootBasisGuidance,
+            probeChildGuidance = probeChildGuidance,
         )
         try {
             if (freshParams.cancellation()) throw CancellationException("objective replacement cancelled")

@@ -270,7 +270,10 @@ the large exact-cutoff path and overflow
 supply no retained scalar. The callback performs no extra domain scan, numerical
 query or certification, and publishes neither a point nor a new pruning bound.
 [Finite guidance](08-search.md#finite-lp-directional-guidance) owns selection and
-history lifetime. Missing reliable passive observations can request complete child
+history lifetime. Complete child objectives can also order the immediate matching
+complementary alternatives without another numerical request. Their preferences
+carry no bound authority and expire with the current source point.
+Missing reliable passive observations can request complete child
 LP gains for up to two shortlisted columns. The floating owner stays unchanged;
 scratch solvers spend a positive grant after reserving the caller's normalization
 and history work. Numerical estimates train a separate advisory history, with two
