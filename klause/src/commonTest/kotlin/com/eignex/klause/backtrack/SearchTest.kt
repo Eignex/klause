@@ -42,6 +42,7 @@ class SearchTest {
         val attempts = ArrayList<SearchDecision>()
         val commits = ArrayList<Pair<SearchDecision, Int>>()
         val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
+            componentFactory = { listOf(object : SearchComponent {}) },
             branchObserver = object : SearchBranchAttemptObserver {
                 override fun onAttempt(decision: SearchDecision, context: SearchContext) {
                     attempts.add(decision)
@@ -87,6 +88,7 @@ class SearchTest {
         var cancelled = false
         val commits = ArrayList<SearchDecision>()
         val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
+            componentFactory = { listOf(object : SearchComponent {}) },
             cancellation = Cancellation { cancelled }, branchObserver = object : SearchBranchAttemptObserver {
                 override fun onAttempt(decision: SearchDecision, context: SearchContext) {
                     cancelled = true
