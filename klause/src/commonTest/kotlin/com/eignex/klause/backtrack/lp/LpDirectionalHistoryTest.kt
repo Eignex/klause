@@ -9,6 +9,30 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `unusable observations do not satisfy two sided sample availability`() {
+        for (value in listOf(9.0, Double.NaN, Double.POSITIVE_INFINITY)) {
+            val history = LpDirectionalHistory({})
+            for (up in listOf(false, false, true)) {
+                history.beginNode(0)
+                history.record(10.0)
+                history.branch(VarRef.IntVar(0), 2.25)
+                history.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                history.beginNode(1)
+                history.record(if (up) 13.0 else 11.0)
+            }
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(VarRef.IntVar(0), 2.25)
+            history.commit(SearchDecision.IntAtLeast(0, 3), 1)
+            history.beginNode(1)
+
+            history.record(value)
+
+            assertFalse(history.hasTwoSidedSamples)
+        }
+    }
+
+    @Test
     fun `two sided availability does not establish variable reliability`() {
         val history = LpDirectionalHistory({})
         for (up in listOf(false, true)) repeat(2) {
