@@ -1192,7 +1192,8 @@ class Portfolio(
             val allowance = if (diagnostics == null) ordinaryAllowance else
                 minOf(ordinaryAllowance, diagnostics.workLimit - chargedWork)
             val pendingTrial = continuingPreparation.takeIf {
-                it != arm && it in eligible && !busy[it] && !retired[it]
+                it != arm && it in eligible && !busy[it] && !retired[it] &&
+                    workers[it].incumbentTrialUsesProbeQuantum
             }?.let { (handles[it] as? ReseedGuard)?.incumbentTrialPending } == true
             val time = if (baseAllowance) baseSliceMillis else if (
                 diagnostics == null && lanes == 1 && improving && pendingTrial

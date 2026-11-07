@@ -575,7 +575,8 @@ still complete advisory coordinates and admit the center. A declined center clea
 the preparation request, and a completed or declined trial returns to
 ordinary selection.
 
-While another eligible incumbent trial is pending, ordinary elapsed claims in a
+Enabled checked completion marks its joint companion for bounded trial service.
+While that companion has an eligible pending trial, ordinary elapsed claims in a
 single lane use at most the existing probe time quantum. Owed complete-worker
 coverage retains its priority and elapsed share. Initial and auxiliary probes,
 fixed-work diagnostics and dedicated lanes retain their allowances. Clearing the

@@ -153,6 +153,7 @@ internal class FiniteNumericalCompanions private constructor(
                 companion.also {
                     it.startAfterIncumbent = afterIncumbent
                     it.startAfterAcceptedImprovement = afterImprovement
+                    it.incumbentTrialUsesProbeQuantum = limits.sourceIncumbentCompletion
                 }
             },
         )

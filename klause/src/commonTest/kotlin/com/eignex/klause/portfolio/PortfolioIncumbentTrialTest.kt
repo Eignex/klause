@@ -19,7 +19,7 @@ import kotlin.time.TestTimeSource
 class PortfolioIncumbentTrialTest {
     @Test
     fun `a pending trial should receive earlier elapsed service without displacing silent proof coverage`() {
-        for (pending in listOf(false, true)) {
+        for (bounded in listOf(false, true)) {
             val clock = TestTimeSource()
             val started = clock.markNow()
             val proofTime = LongArray(2)
@@ -58,28 +58,31 @@ class PortfolioIncumbentTrialTest {
             }
             val trial = object : ResumableSearch by trialBase, ReseedGuard {
                 override val canReseed: Boolean get() = false
-                override val incumbentTrialPending: Boolean get() = pending && trialSlices == 1
+                override val incumbentTrialPending: Boolean get() = trialSlices == 1
             }
             val workers = listOf(
                 trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { clock += 10.milliseconds })
                     .also { it.family = ArmFamily.LocalSearch },
                 trackingWorker("proof-one", 1, proofs[0]),
                 trackingWorker("proof-two", 2, proofs[1]),
-                trackingWorker("trial", 3, trial).also { it.family = ArmFamily.LocalSearch },
+                trackingWorker("trial", 3, trial).also {
+                    it.family = ArmFamily.LocalSearch
+                    it.incumbentTrialUsesProbeQuantum = bounded
+                },
             )
 
             Portfolio(workers, fixedBandit(4, 3), baseSliceMillis = 1_000, maxSliceMillis = 1_000,
                 probeSliceMillis = 10, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
                 reseedStaleThreshold = 0).also { it.runTimeSource = clock }.use {
-                it.minimize(Cancellation { (!pending && trialSlices >= 2) || restoredQuantum != null ||
+                it.minimize(Cancellation { (!bounded && trialSlices >= 2) || restoredQuantum != null ||
                     started.elapsedNow().inWholeMilliseconds > 10_000L })
             }
 
             assertEquals(2, trialSlices)
-            assertTrue(if (pending) resumedAt <= 2_200L else resumedAt >= 2_800L)
+            assertTrue(if (bounded) resumedAt <= 2_200L else resumedAt >= 2_800L)
             assertTrue(waitingQuanta.isNotEmpty())
-            assertTrue(waitingQuanta.all { if (pending) it <= 10L else it > 10L })
-            if (pending) assertTrue(requireNotNull(restoredQuantum) > 10L)
+            assertTrue(waitingQuanta.all { if (bounded) it <= 10L else it > 10L })
+            if (bounded) assertTrue(requireNotNull(restoredQuantum) > 10L)
             for (elapsed in proofAtTrial) assertTrue(elapsed >= elapsedAtTrial / 4L - 10L)
         }
     }
@@ -118,7 +121,10 @@ class PortfolioIncumbentTrialTest {
             trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { clock += 1.milliseconds })
                 .also { it.family = ArmFamily.LocalSearch },
             trackingWorker("proof", 1, proof),
-            trackingWorker("trial", 2, trial).also { it.family = ArmFamily.LocalSearch },
+            trackingWorker("trial", 2, trial).also {
+                it.family = ArmFamily.LocalSearch
+                it.incumbentTrialUsesProbeQuantum = true
+            },
         )
 
         Portfolio(workers, fixedBandit(3, 2), baseSliceMillis = 1_000, maxSliceMillis = 1_000,
