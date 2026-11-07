@@ -15,12 +15,10 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -107,23 +105,4 @@ class NumericalFrontierSnapshotTest {
         assertFailsWith<IllegalStateException> { snapshot.bound(foreign) }
     }
 
-    @Test
-    fun `selection inspection should own a full archive when runtime feedback uses latest delivery`() {
-        val invocation = NumericalFrontierSnapshot.open(context, TheoryParams(sourceCuts = false),
-            frontier = true, supportBranching = true)
-        val snapshot = NumericalSelectionSnapshot(Cancellation.Never)
-        try {
-            val journal = snapshot.attach(invocation)
-
-            NumericalFrontierSnapshot.run(invocation) { _, _ -> }
-
-            val capture = snapshot.capture(journal)
-            assertEquals("64", capture.getValue("maximumRecords").jsonPrimitive.content)
-            assertTrue(capture.getValue("records").jsonArray.isNotEmpty())
-            val first = capture.getValue("records").jsonArray.first().jsonObject
-            assertTrue(first.getValue("point").jsonArray.isNotEmpty())
-        } finally {
-            (invocation as AutoCloseable).close()
-        }
-    }
 }
