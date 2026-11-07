@@ -1674,7 +1674,8 @@ source derivations and cannot publish deductions into the original traversal.
 Ordinary linear-source execution binds cut separation, selection and advisory
 branching controls to its admitted numerical companions. The containing source request owns these settings and removes
 them from finite worker recipe options; they change neither companion admission
-nor lifetime.
+nor lifetime. Joint repair binds separation, point selection and aggregation to its
+shared numerical owner for both root preparation and retained neighborhood queries.
 A new template first runs the ordinary checked cut recipe; a completed point can
 add one selection round at that node. A trial that admits no candidate retains
 the ordinary template, checked query and numerical owner for later queries of that
