@@ -436,7 +436,8 @@ class LinearAuthorityAggregateCutsTest {
     @Test
     fun `point ordering should retain its charge and withhold proposals on cancellation`() {
         val source = SourceProofContext(scope, setOf(x, y, real),
-            linkedMapOf("left" to SourcePremise(left), "right" to SourcePremise(right)))
+            linkedMapOf("left" to SourcePremise(left), "right" to SourcePremise(right),
+                "loose" to SourcePremise(SourceInequality(left.coefficients, BigFraction.ofLong(100)))))
         var stopped = false
         var work = 0L
         val events = mutableMapOf<String, Long>()

@@ -212,10 +212,35 @@ internal object LinearAuthorityAggregateCuts {
         return candidates.toList()
     }
 
+    private fun admitPointRowOrder(
+        rows: List<ProbeRow>, incidence: Map<Pair<SourceCoordinate, Boolean>, List<ProbeRow>>,
+        meter: AggregateMeter, observe: (String, Long) -> Unit,
+    ): Boolean {
+        if (rows.size < 3) return false
+        meter.reserve(rows.size.toLong() + incidence.size * 2L, 128L)
+        val entries = rows.sumOf { it.coefficients.size.toLong() }
+        val references = incidence.values.sumOf { it.size.toLong() }
+        fun sortingWork(size: Int): Long {
+            val levels = if (size < 2) 0 else Int.SIZE_BITS - (size - 1).countLeadingZeroBits()
+            return size.toLong() * (1L + levels)
+        }
+        val projectionWork = 9L * (entries + rows.size)
+        val comparisonWork = sortingWork(rows.size) + incidence.values.sumOf { sortingWork(it.size) }
+        val allocation = 192L + rows.size * 80L + (entries + rows.size) * 96L +
+            references * 16L + incidence.size * 64L
+        if (projectionWork + comparisonWork > meter.remainingWork / 2L ||
+            allocation > meter.remainingAllocation / 2L) {
+            observe("AggregatePointRowOrderDeclined", 1L)
+            return false
+        }
+        return true
+    }
+
     private fun orderPointRows(
         rows: MutableList<ProbeRow>, incidence: Map<Pair<SourceCoordinate, Boolean>, MutableList<ProbeRow>>,
         point: Map<SourceCoordinate, Double>, meter: AggregateMeter, observe: (String, Long) -> Unit,
     ) {
+        if (!admitPointRowOrder(rows, incidence, meter, observe)) return
         meter.reserve(rows.size.toLong(), 128L + rows.size * 64L)
         val priorities = HashMap<Int, Double>()
         for (row in rows) {
