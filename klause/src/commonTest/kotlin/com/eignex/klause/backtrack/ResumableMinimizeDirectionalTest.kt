@@ -342,17 +342,21 @@ class ResumableMinimizeDirectionalTest {
 
     @Test
     fun `finite search applies or withholds confirmed advice at the actual branch`() {
+        val blocks = 3
+        val variables = blocks * 3
+        val factors = ArrayList<Factor>()
+        repeat(blocks) { block ->
+            val first = block * 3
+            factors.add(Linear(longArrayOf(2L, 3L, 4L),
+                intArrayOf(first, first + 1, first + 2), LinearOp.GE, 5L))
+        }
+        val problem = Problem(0, variables, Array(variables) { IntDomain(0, 1) }, factors.toTypedArray()).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(
+            6L, 6L, 11L, 5L, 5L, 9L, 40L, 40L, 50L,
+        ))
+        val prepared = problem.prepareExecutionPlan(objective, preferFinite = true)
         val queryWork = ArrayList<Long>()
         for ((requested, applyAdvice) in listOf(null to false, false to false, true to true)) {
-            val blocks = 3
-            val variables = blocks * 3
-            val factors = ArrayList<Factor>()
-            repeat(blocks) { block ->
-                val first = block * 3
-                factors.add(Linear(longArrayOf(2L, 3L, 4L),
-                    intArrayOf(first, first + 1, first + 2), LinearOp.GE, 5L))
-            }
-            val problem = Problem(0, variables, Array(variables) { IntDomain(0, 1) }, factors.toTypedArray()).bake()
             var completionAttempt = false
             val attempted = ArrayList<SearchDecision>()
             val params = BacktrackParams(
@@ -385,12 +389,8 @@ class ResumableMinimizeDirectionalTest {
                     override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Infeasible()
                 }) },
             )
-            val objective = LinearObjective(intCoefficients = longArrayOf(
-                6L, 6L, 11L, 5L, 5L, 9L, 40L, 40L, 50L,
-            ))
             val scenario = PortfolioScenario(1, 1, Kind.COP, EngineMix.BACKTRACK, seed = 3L,
                 btPool = listOf { BacktrackRecipe("probe-child-order") { _, _ -> params } })
-            val prepared = problem.prepareExecutionPlan(objective, preferFinite = true)
             val cancellation = Cancellation { attempted.size >= 2 }
             FinitePipeline.portfolioExecutor(
                 problem, scenario, objective, null, null, null, null,
