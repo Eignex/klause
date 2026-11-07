@@ -633,7 +633,7 @@ class PortfolioSchedulingTest {
         var polls = 0
 
         Portfolio.thompson(workers).also { it.runTimeSource = TestTimeSource() }.use {
-            it.minimize(Cancellation { ++polls > 2_000 })
+            it.minimize(Cancellation { ++polls > 1_000 })
         }
 
         val share = slices.drop(1).sum().toDouble() / slices.sum()

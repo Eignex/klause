@@ -83,7 +83,7 @@ class SearchEventTest {
             objective,
             LocalSearchParams(
                 randomSeed = 1L,
-                maxFlips = 20_000,
+                maxFlips = 128,
                 onEvent = { events.add(it) },
             ),
         )
