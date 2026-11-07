@@ -1,0 +1,36 @@
+{
+  "main": "com.eignex.klause.bench.profile.BtRetirementCapture",
+  "classpath": [
+    "klause-bench/build/install/klause-bench/lib/*"
+  ],
+  "buildTasks": [
+    ":klause-cli:installJvmDist",
+    ":klause-bench:installDist"
+  ],
+  "jvmArgs": [
+    "-Xmx2560m",
+    "-XX:ActiveProcessorCount=1",
+    "--add-modules=jdk.incubator.vector"
+  ],
+  "runtime": {
+    "java": 25,
+    "tools": [
+      "time",
+      "git"
+    ],
+    "environment": {}
+  },
+  "sourceHistory": "snapshot",
+  "planInputs": [
+    "klause-bench",
+    "build.gradle.kts",
+    "settings.gradle.kts",
+    "gradle.properties",
+    "gradle"
+  ],
+  "workspaceInputs": [
+    ".git",
+    "klause-bench/build/install",
+    "klause-cli/build/install"
+  ]
+}
