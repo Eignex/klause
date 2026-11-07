@@ -66,6 +66,12 @@ MPS witnesses use original units, exact decimals and their exact-source or toler
 qualification. The adapter performs no solver work or admission:
 [portfolio admission](12-portfolio.md) owns acceptance.
 
+With statistics enabled, finite linear-source portfolios emit worker attribution only
+after a checked source witness is accepted for rendering. Its objective is the exact
+rational value in original source units and direction. The worker timestamp starts
+at portfolio minimization; subprocess observation time also includes preparation.
+Attribution grants no additional witness or proof authority.
+
 Every prepared MPS invocation emits `c numericalSemantics=` with a versioned JSON
 declaration of the captured declared and effective policy, including rational
 tolerance components, numeric authority, default bounds and exact integrality and
