@@ -146,9 +146,7 @@ internal class LinearAuthorityTraversal(
 
     fun observations(): Map<String, Long> = observations + activeRows?.observations.orEmpty() +
         authority.cutObservations().mapValues { (key, value) ->
-        if (key.endsWith("Work") || key.startsWith("numericalCutSelection") ||
-            key.startsWith("numericalCutLifecycle"))
-            value - (initialCutObservations[key] ?: 0L) else value
+        if ("Max" in key || "Peak" in key) value else value - (initialCutObservations[key] ?: 0L)
     } + mapOf(
         "numericalPendingLeaves" to pending,
         "numericalPeakPendingLeaves" to peakPending,

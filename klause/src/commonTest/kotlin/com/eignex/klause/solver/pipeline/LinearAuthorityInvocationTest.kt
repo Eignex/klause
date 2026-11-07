@@ -380,6 +380,31 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
+    fun `borrowing a prepared aggregate family should report no repeated eligibility work`() {
+        val source = SourceProofContext(scope, setOf(integer, real), mapOf(
+            "sum" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE,
+                real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+            "difference" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE,
+                real to BigFraction.ONE), BigFraction.ZERO)),
+        ), mapOf(integer to BigFraction.ONE))
+
+        LinearAuthority(SourceLpBudget(maxOperations = 1), retainLp = true, aggregateCuts = true).use { authority ->
+            val first = LinearAuthorityInvocation(source, TheoryParams(), borrowedAuthority = authority,
+                boundOrdered = true).use { it.run { _, _ -> } }
+            val second = LinearAuthorityInvocation(source, TheoryParams(), borrowedAuthority = authority,
+                boundOrdered = true).use { it.run { _, _ -> } }
+
+            val initial = assertNotNull(first.stats.smt.completeSearchStages)
+            val reused = assertNotNull(second.stats.smt.completeSearchStages)
+            assertTrue(initial.getValue("numericalCutAggregatePairAttempts") > 0L)
+            assertEquals(0L, reused["numericalCutAggregatePairAttempts"])
+            assertEquals(0L, reused["numericalCutAggregateCandidates"])
+            assertTrue(initial.getValue("numericalMaxRetainedCuts") > 0L)
+            assertEquals(initial["numericalMaxRetainedCuts"], reused["numericalMaxRetainedCuts"])
+        }
+    }
+
+    @Test
     fun `empty cumulative funding should keep an external witness without claiming completion`() {
         val source = SourceProofContext(scope, setOf(real), emptyMap(), mapOf(real to BigFraction.ONE))
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))

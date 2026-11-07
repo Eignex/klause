@@ -241,6 +241,65 @@ class JointLinearRepairTest {
     }
 
     @Test
+    fun `joint cut statistics should include root preparation and final owner retirement`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(2, 2), null, null),
+            factors = arrayOf(Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.GE, 1)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val repair = JointLinearRepair(model, source, objective, TheoryParams(), boundOrdered = true)
+        val root = repair.search(adaptive = false).use { search ->
+            search.advance(Cancellation.Never, 1)
+
+            val stages = assertNotNull(repair.stats.smt.completeSearchStages)
+            assertEquals(1L, stages["jointRepairRootQueries"])
+            assertEquals(0L, stages["jointRepairCandidates"] ?: 0L)
+            assertTrue(stages.getValue("jointRepairCutPreparationWork") > 0L)
+            stages
+        }
+
+        val retired = assertNotNull(repair.stats.smt.completeSearchStages)
+        assertEquals(root["jointRepairCutPreparationWork"], retired["jointRepairCutPreparationWork"])
+        assertEquals(1L, retired["jointRepairCutLifecycleSOURCE_ROUNDING_OwnerClosed"])
+    }
+
+    @Test
+    fun `retired repair queries should not multiply shared aggregate eligibility`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
+            ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
+        JointLinearRepair(model, source, objective, TheoryParams(sourceAggregateCuts = true),
+            boundOrdered = true).use { repair ->
+            var first: Map<String, Long>? = null
+            repeat(3) { index ->
+                var result = repair.check(condition, Cancellation.Never)
+                repeat(32) {
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                }
+
+                assertIs<ExactNeighborhoodResult.Witness>(result)
+                val stages = assertNotNull(repair.stats.smt.completeSearchStages)
+                assertEquals(index.toLong() + 1L, stages["jointRepairCandidates"])
+                assertNotNull(stages["jointRepairCutBoundsWithoutIncumbent"])
+                val previous = first
+                if (previous == null) {
+                    assertTrue(stages.getValue("jointRepairCutAggregatePairAttempts") > 0L)
+                    first = stages
+                } else {
+                    assertEquals(previous["jointRepairCutAggregatePairAttempts"],
+                        stages["jointRepairCutAggregatePairAttempts"])
+                    assertEquals(previous["jointRepairMaxRetainedCuts"], stages["jointRepairMaxRetainedCuts"])
+                }
+            }
+        }
+    }
+
+    @Test
     fun `adaptive checked repair should change coupled integer groups together`() {
         for (size in listOf(3, 7)) {
             val model = Problem(0,
