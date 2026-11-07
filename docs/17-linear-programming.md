@@ -623,6 +623,10 @@ without retaining cut histories or granting additional numerical allowances.
 Terminal finite results and standalone linear results take their final lifecycle
 snapshot after releasing numerical owners. Rebindable handles remain live until
 their caller retires them; portfolios read the final handle snapshot after close.
+Borrowed numerical traversals report changes in authority-owned cut counters from
+their initial snapshot; maximum and peak fields retain their lifetime values.
+Joint repair reports its shared authority's cut counters once, including root
+preparation and owner retirement, and accumulates query-local consumption separately.
 
 Explicit bound-ordered sparse frontiers consume single-row Chvatal–Gomory rounding
 and bounded mixed-integer residual rounding.
