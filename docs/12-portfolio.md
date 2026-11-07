@@ -155,6 +155,16 @@ coverage until the proposal finishes or the companion's existing allowance retir
 it. This trial grants no incumbent reward and does not renew work, allocation or
 active time. Later proposals use ordinary selection.
 
+With portfolio progress reporting, joint repair streams at most sixty-four
+comparison events per worker. Query sequence numbers preserve a paused query's
+identity; zero denotes center preparation outside a query. Events distinguish
+offered, completed and local discovery objectives, the captured cutoff, and the
+current pool version and objective. Values use exact working-objective arithmetic;
+an offered point's real coordinates may still be advisory. A discovery's improving,
+tied or dominated comparison describes the observation site before pool admission.
+Diagnostic objective evaluation spends the existing LP funding, and reporting time
+stays inside the worker's active lifetime. Disabled reporting does no extra scoring.
+
 Each companion owns at most sixteen source/point attempts without eviction. Identity
 includes the full source restrictions, rows, coordinates, objective, interpretation
 and checker, plus the seed values and coordinate frame. Failed unchanged attempts

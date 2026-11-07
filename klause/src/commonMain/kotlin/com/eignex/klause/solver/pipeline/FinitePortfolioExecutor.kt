@@ -135,16 +135,20 @@ internal fun FinitePipeline.portfolioExecutor(
             cancellation or requireNotNull(numericalCompanions).cancellation or numericalCompanions.timeout,
             companionEligibility.requirements.construction)
     } else null
+    val companionComparison: ((SearchEvent.CompanionComparison) -> Unit)? =
+        if (scenario.reportPortfolioProgress && onEvent != null) { event ->
+            onEvent("ls/finite-joint-companion", event)
+        } else null
     val companionPreparation = if (!fundedCompanions && companionEligibility?.admitted == true) {
         FiniteNumericalCompanions.prepare(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
             cancellation, companionEligibility.requirements.construction, scenario.companionAfterIncumbent,
-            incumbentCompletionCheck, adaptiveRepair = adaptiveCompanionRepair)
+            incumbentCompletionCheck, adaptiveRepair = adaptiveCompanionRepair, onComparison = companionComparison)
     } else null
     val companions = if (companionAdmission?.initiallyFunded == true) {
         FiniteNumericalCompanions.deferred(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
             cancellation, requireNotNull(companionEligibility).requirements.construction, companionAdmission,
             incumbentCompletionCheck, afterImprovement = waitForCompanionImprovement,
-            adaptiveRepair = adaptiveCompanionRepair)
+            adaptiveRepair = adaptiveCompanionRepair, onComparison = companionComparison)
     } else companionPreparation?.companions
     companionEligibility?.let { eligibility ->
         val declines = if (companionAdmission?.initiallyFunded == false) listOf("companion-lifetime-unfunded")

@@ -31,6 +31,30 @@ sealed interface SearchEvent {
         val selected: Boolean = false,
     ) : SearchEvent
 
+    /** Bounded companion comparisons in exact working-objective units; values confer no source authority. */
+    data class CompanionComparison(
+        /** Query sequence within this worker, zero for center preparation outside a query. */
+        val condition: Long,
+        /** External completion, center admission, query opening or checked discovery. */
+        val phase: String,
+        /** Version captured by the external read, zero for other phases. */
+        val seedVersion: Long,
+        /** Current pool version at observation, zero when empty. */
+        val poolVersion: Long,
+        /** Exact canonical pool objective, or null when empty. */
+        val poolObjective: String?,
+        /** Offered objective before completion; advisory coordinates can be approximate. */
+        val rawObjective: String?,
+        /** Completed exact objective, or null when completion is unavailable. */
+        val completedObjective: String?,
+        /** Captured query cutoff, or null when absent. */
+        val cutoff: String?,
+        /** Source-checked local discovery objective, or null for other phases. */
+        val candidateObjective: String?,
+        /** Observation-site disposition; a discovery comparison is not pool admission. */
+        val disposition: String,
+    ) : SearchEvent
+
     /** An opt-in logical work-schedule event or physical phase/lifecycle observation. */
     data class PortfolioDiagnostic(
         /** Logical schedule event. */

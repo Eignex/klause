@@ -31,6 +31,7 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration.Companion.milliseconds
@@ -92,6 +93,7 @@ internal class FiniteNumericalCompanions private constructor(
     private val admission: FiniteCompanionAdmission? = null,
     private val afterImprovement: Boolean = false,
     private val adaptiveRepair: Boolean = false,
+    private val onComparison: ((SearchEvent.CompanionComparison) -> Unit)? = null,
 ) {
     class Preparation(val companions: FiniteNumericalCompanions?, val elapsedNanos: Long)
 
@@ -170,7 +172,23 @@ internal class FiniteNumericalCompanions private constructor(
                 companion().observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
             }, publicationLifetime = limits.cancellation or limits.timeout, observeExternalIncumbents = true,
             sharedCompletions = completionSharing,
-            incumbentCompletionCheck = incumbentCompletionCheck))
+            incumbentCompletionCheck = incumbentCompletionCheck,
+            onComparison = onComparison?.let { report -> { comparison ->
+                val pool = incumbents.exchange.current()
+                val candidate = comparison.candidateValue
+                val standing = pool?.objective
+                val disposition = if (comparison.phase != "discovery" || candidate == null)
+                    comparison.disposition else when {
+                    standing == null -> "pool-empty"
+                    candidate < standing -> "improving"
+                    candidate == standing -> "tied"
+                    else -> "dominated"
+                }
+                report(SearchEvent.CompanionComparison(comparison.condition, comparison.phase,
+                    if (comparison.phase == "external") readVersion else 0L, pool?.version ?: 0L,
+                    standing?.toString(), comparison.rawValue?.toString(), comparison.completedValue?.toString(),
+                    comparison.cutoff?.toString(), candidate?.toString(), disposition))
+            } }))
         return exactNeighborhoodWorker("ls/finite-joint-companion", arm, objective,
             limits.cancellation, limits.timeout, { repair.exhausted },
             pendingIncumbentTrial = { repair.incumbentTrialPending },
@@ -226,9 +244,10 @@ internal class FiniteNumericalCompanions private constructor(
         fun deferred(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
             cancellation: Cancellation, cost: WorkerConstructionCost, admission: FiniteCompanionAdmission,
             incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)?,
-            afterImprovement: Boolean = false, adaptiveRepair: Boolean = false): FiniteNumericalCompanions =
+            afterImprovement: Boolean = false, adaptiveRepair: Boolean = false,
+            onComparison: ((SearchEvent.CompanionComparison) -> Unit)? = null): FiniteNumericalCompanions =
             FiniteNumericalCompanions(model, objective, null, params, cancellation, cost, true,
-                incumbentCompletionCheck, admission, afterImprovement, adaptiveRepair)
+                incumbentCompletionCheck, admission, afterImprovement, adaptiveRepair, onComparison)
 
         fun prepare(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
             cancellation: Cancellation, cost: WorkerConstructionCost,
@@ -236,12 +255,13 @@ internal class FiniteNumericalCompanions private constructor(
             incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
             clock: TimeSource = TimeSource.Monotonic,
             adaptiveRepair: Boolean = false,
+            onComparison: ((SearchEvent.CompanionComparison) -> Unit)? = null,
         ): Preparation {
             val started = clock.markNow()
             val context = captureContext(model, objective, cancellation)
             val companions = context?.let {
                 FiniteNumericalCompanions(model, objective, it, params, cancellation, cost, afterIncumbent,
-                    incumbentCompletionCheck, adaptiveRepair = adaptiveRepair)
+                    incumbentCompletionCheck, adaptiveRepair = adaptiveRepair, onComparison = onComparison)
             }
             return Preparation(companions, started.elapsedNow().inWholeNanoseconds)
         }

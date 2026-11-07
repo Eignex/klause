@@ -36,6 +36,16 @@ internal data class JointRepairAttempt(
     val bound: SourceEvidence? = null,
 )
 
+internal data class JointRepairComparison(
+    val condition: Long,
+    val phase: String,
+    val rawValue: BigFraction? = null,
+    val completedValue: BigFraction? = null,
+    val cutoff: BigFraction? = null,
+    val candidateValue: BigFraction? = null,
+    val disposition: String,
+)
+
 internal class JointLinearRepair(
     private val model: Problem,
     private val source: SourceProofContext,
@@ -51,6 +61,7 @@ internal class JointLinearRepair(
     private val observeExternalIncumbents: Boolean = false,
     sharedCompletions: LinearIncumbentSharing? = null,
     private val incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
+    private val onComparison: ((JointRepairComparison) -> Unit)? = null,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private class CheckedCenter(val sample: Sample, val value: BigFraction?)
 
@@ -66,6 +77,8 @@ internal class JointLinearRepair(
             val key = "jointRepairExternalCompletion$stage"
             stages[key] = combine(key, stages[key] ?: 0L, count)
         } else null
+    private var comparisonCount = 0
+    private var conditionSequence = 0L
     private var importedCenter: Sample? = null
     private var preparedCenter: CheckedCenter? = null
     private val authority = LinearAuthority(budget, onLpShape = { shape ->
@@ -115,12 +128,38 @@ internal class JointLinearRepair(
         if (observeExternalIncumbents) observe("jointRepairExternal$stage")
     }
 
-    private fun externalIncumbent(): Sample? = external()?.let { sample ->
-        if (sample.exactReals == null && completion != null) completion.complete(source, sample, stop) else sample
+    private fun comparisonValue(sample: Sample): BigFraction? {
+        if (onComparison == null || comparisonCount >= 64 || stop()) return null
+        if (sample.numBoolVars != model.numBoolVars || sample.numIntVars != model.numIntVars ||
+            sample.numRealVars != model.numRealVars || sample.algebraicReals != null || sample.symbolicReals != null ||
+            sample.exactReals?.let { it.size != model.numRealVars } == true ||
+            (sample.exactReals == null && (0 until model.numRealVars).any { !sample.approximateRealValue(it).isFinite() })
+        ) return null
+        budget.observe(boundCertification = 1L + model.numBoolVars + model.numIntVars + model.numRealVars)
+        if (funding.exhausted || completion?.checking(stop)?.invoke() == true) return null
+        return objective?.evaluateExact(sample)
+    }
+
+    private fun compare(phase: String, disposition: String, raw: BigFraction? = null,
+        completed: BigFraction? = null, cutoff: BigFraction? = null, candidate: BigFraction? = null) {
+        if (onComparison == null || comparisonCount >= 64 || stop() || funding.exhausted) return
+        comparisonCount++
+        onComparison.invoke(JointRepairComparison(if (pending == null) 0L else conditionSequence,
+            phase, raw, completed, cutoff, candidate, disposition))
+    }
+
+    private fun externalIncumbent(cutoff: BigFraction? = pending?.cutoff): Sample? {
+        val offered = external() ?: return null
+        val raw = comparisonValue(offered)
+        val completed = if (offered.exactReals == null && completion != null)
+            completion.complete(source, offered, stop) else offered
+        compare("external", if (completed == null) "completion-unavailable" else "available",
+            raw = raw, completed = completed?.let(::comparisonValue), cutoff = cutoff)
+        return completed
     }
 
     private fun checkedExternalCenter(cutoff: BigFraction? = null): CheckedCenter? {
-        val sample = externalIncumbent() ?: return null
+        val sample = externalIncumbent(cutoff) ?: return null
         if (completion != null) {
             budget.observe(boundCertification = 1L + model.numBoolVars + model.numIntVars + model.numRealVars)
             if (completion.checking(stop)()) return null
@@ -132,6 +171,7 @@ internal class JointLinearRepair(
         }
         if (cutoff != null && (value == null || value >= cutoff)) {
             observeExternal("NotImproving")
+            compare("center", "not-improving", completed = value, cutoff = cutoff)
             return null
         }
         val checking = completion?.checking(stop) ?: stop
@@ -141,6 +181,7 @@ internal class JointLinearRepair(
             observeExternal(if (checked is SourceEvidenceCheck.Rejected) "PointRejected" else "PointUnavailable")
             return null
         }
+        compare("center", "checked", completed = value, cutoff = cutoff)
         return CheckedCenter(sample, value)
     }
 
@@ -385,6 +426,8 @@ internal class JointLinearRepair(
                 }
             }
             pending = condition
+            if (onComparison != null) conditionSequence++
+            compare("query", "opened", cutoff = condition.cutoff)
             query = LinearAuthorityInvocation(source.atScope(source.scope.copy(condition = bounds)),
                 params.copy(sourceIncumbentCompletion = false),
                 external = { externalIncumbent() ?: anchor }, state = state, borrowedAuthority = authority,
@@ -430,6 +473,9 @@ internal class JointLinearRepair(
                 observe("jointRepairPublicationPauses")
                 return JointRepairAttempt(ExactNeighborhoodResult.Paused, feasiblePoint = sample,
                     bound = snapshot.bound)
+            }
+            if (checked == SourceEvidenceCheck.Checked && originalChecked) {
+                compare("discovery", "checked", cutoff = condition.cutoff, candidate = comparisonValue(sample))
             }
             retire()
             if (checked == SourceEvidenceCheck.Checked && originalChecked) {
