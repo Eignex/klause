@@ -364,6 +364,12 @@ unfinished or nonimproving confirmation retains current scoring rather than cons
 the basis nomination. `VARIABLE_BASIS_VERIFICATION_ATTEMPT` records this admission;
 confirmed choices use the numerical comparison and consumption diagnostics.
 
+`lp-directional-advice=false` withholds variable and child-order applications while
+retaining collection, comparison admission, numerical queries and their work charges.
+It preserves the original selected variable and complementary alternatives. Withheld
+variable proposals and child preferences have separate observations from consumption.
+The application setting defaults to enabled and does not enable directional collection.
+
 The hint owner supports a fresh child-value comparison below the root for confirmation.
 An explicit numerical mode can also request it for a reliable challenger with missing
 baseline history.

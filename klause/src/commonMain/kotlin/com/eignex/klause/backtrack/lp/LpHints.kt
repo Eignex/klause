@@ -43,6 +43,7 @@ internal class LpHints(
     private val basisVariableComparisons: Boolean = false,
     private val verifyBasisVariables: Boolean = false,
     private val probeChildOrder: Boolean = false,
+    private val applyAdvice: Boolean = true,
 ) : LpHintSink {
     private data class SideAdvice(
         val variable: VarRef,
@@ -364,6 +365,13 @@ internal class LpHints(
         proposal ?: return baseline
         if (basis && verifyBasisVariables) return baseline
         charge(2L)
+        if (!applyAdvice) {
+            observe("VARIABLE_WITHHELD")
+            if (probed) observe("VARIABLE_PROBE_WITHHELD")
+            if (basis) observe("VARIABLE_BASIS_WITHHELD")
+            observe(if (proposal == baseline) "VARIABLE_PROPOSAL_AGREED" else "VARIABLE_PROPOSAL_CHANGED")
+            return baseline
+        }
         observe("VARIABLE_CONSUMED")
         if (probed) observe("VARIABLE_PROBE_CONSUMED")
         if (basis) observe("VARIABLE_BASIS_CONSUMED")
@@ -740,14 +748,12 @@ internal class LpHints(
             observe("${source}_SIDE_FALLBACK_PARTITION")
             return alternatives
         }
-        if (advice.basis && !allowBasis) {
-            observe("BASIS_SIDE_WITHHELD")
-            return alternatives
-        }
         val changed = firstUp != advice.up
-        if (advice.probe && !allowProbe) {
-            observe("PROBE_SIDE_WITHHELD")
-            observe(if (changed) "PROBE_SIDE_PROPOSAL_CHANGED" else "PROBE_SIDE_PROPOSAL_AGREED")
+        if (!applyAdvice || (advice.basis && !allowBasis) || (advice.probe && !allowProbe)) {
+            observe("${source}_SIDE_WITHHELD")
+            if (advice.probe) {
+                observe(if (changed) "PROBE_SIDE_PROPOSAL_CHANGED" else "PROBE_SIDE_PROPOSAL_AGREED")
+            }
             return alternatives
         }
         observe("${source}_SIDE_CONSUMED")

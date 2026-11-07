@@ -340,7 +340,8 @@ internal class ResumableMinimize(
                 sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) },
                 rootBasis = rootBasisGuidance, basisVariableComparisons = basisVariableGuidance,
                 verifyBasisVariables = basisVariableGuidance && verifyBasisVariableGuidance,
-                probeChildOrder = basisVariableGuidance && verifyBasisVariableGuidance && probeChildGuidance)
+                probeChildOrder = basisVariableGuidance && verifyBasisVariableGuidance && probeChildGuidance,
+                applyAdvice = params.lpDirectionalAdvice)
         } else null
 
     private lateinit var cp: CpSearchComponent

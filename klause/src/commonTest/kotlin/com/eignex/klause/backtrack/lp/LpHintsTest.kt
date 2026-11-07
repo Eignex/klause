@@ -726,6 +726,86 @@ class LpHintsTest {
     }
 
     @Test
+    fun `runtime withholding preserves complete query and application work`() {
+        for (boolean in listOf(false, true)) {
+            val charged = ArrayList<Long>()
+            for (applyAdvice in listOf(false, true)) {
+                val builder = LpBuilder()
+                repeat(2) { builder.addVar(0, if (boolean) 1L else 3L) }
+                val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+                val columns = intArrayOf(0, 1)
+                val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), columns,
+                    BooleanArray(2) { boolean }, 0L, if (boolean) IntArray(0) else columns,
+                    if (boolean) columns else IntArray(0))
+                val events = ArrayList<String>()
+                var remaining = Long.MAX_VALUE
+                val hints = LpHints(if (boolean) 0 else 2, if (boolean) 2 else 0,
+                    directionalGains = true, basisVariableComparisons = true, verifyBasisVariables = true,
+                    probeChildOrder = true, applyAdvice = applyAdvice, observe = events::add, charge = { work ->
+                        assertTrue(work <= remaining)
+                        remaining -= work
+                    })
+                val first = if (boolean) VarRef.Bool(0) else VarRef.IntVar(0)
+                val second = if (boolean) VarRef.Bool(1) else VarRef.IntVar(1)
+                val domain = if (boolean) null else IntDomain(0, 3)
+                hints.beginNode(1, 100.0)
+                hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+                hints.recordBound(relaxation, 10.0)
+                hints.branch(first, domain)
+                hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(2) { VarStatus.AT_LOWER }))
+                val nomination = hints.compareBasisVariables(first, domain, second, domain, { true }) { _, _ ->
+                    listOf(LpDirectionalCost(1.0, 4.0), LpDirectionalCost(4.0, 9.0))
+                }
+                var queries = 0
+                val proposal = hints.compareProbeVariables(first, domain, nomination, domain, { true }) { _, _, _ ->
+                    remaining = hints.probeComparisonFollowupWork
+                    queries++
+                    listOf(LpDirectionalValues(14.0, 11.0), LpDirectionalValues(16.0, 15.0))
+                }
+                val selected = assertNotNull(hints.applyVariableChoice(proposal, first))
+                hints.branch(selected, domain)
+                val variable = if (applyAdvice) 1 else 0
+                val alternatives = if (boolean) {
+                    listOf(SearchDecision.Bool(Lit.make(variable, false)), SearchDecision.Bool(Lit.make(variable, true)))
+                } else listOf(SearchDecision.IntAtMost(variable, 0), SearchDecision.IntAtLeast(variable, 1))
+
+                val ordered = hints.orderAlternatives(selected, alternatives, allowProbe = true)
+
+                assertEquals(if (applyAdvice) second else first, selected)
+                assertEquals(if (applyAdvice) alternatives.reversed() else alternatives, ordered)
+                assertEquals(1, queries)
+                assertEquals(if (applyAdvice) 1 else 0, events.count { it == "VARIABLE_PROBE_CONSUMED" })
+                assertEquals(if (applyAdvice) 0 else 1, events.count { it == "VARIABLE_PROBE_WITHHELD" })
+                assertEquals(if (applyAdvice) 1 else 0, events.count { it == "PROBE_SIDE_CONSUMED" })
+                assertEquals(if (applyAdvice) 0 else 1, events.count { it == "PROBE_SIDE_WITHHELD" })
+                assertEquals(alternatives, hints.orderAlternatives(selected, alternatives))
+                charged += hints.probeComparisonFollowupWork - remaining
+            }
+            assertEquals(charged[0], charged[1])
+        }
+    }
+
+    @Test
+    fun `runtime withholding retains passive baseline and charges selection`() {
+        for (agreed in listOf(false, true)) {
+            val events = ArrayList<String>()
+            var work = 0L
+            val hints = LpHints(2, 0, directionalGains = true, applyAdvice = false,
+                observe = events::add, charge = { work += it })
+            val baseline = VarRef.IntVar(0)
+            val proposal = if (agreed) baseline else VarRef.IntVar(1)
+
+            val selected = hints.applyVariableChoice(proposal, baseline)
+
+            assertEquals(baseline, selected)
+            assertEquals(2L, work)
+            assertEquals(1, events.count { it == "VARIABLE_WITHHELD" })
+            assertEquals(0, events.count { it == "VARIABLE_CONSUMED" })
+            assertTrue((if (agreed) "VARIABLE_PROPOSAL_AGREED" else "VARIABLE_PROPOSAL_CHANGED") in events)
+        }
+    }
+
+    @Test
     fun `basis confirmation spends its lifetime attempt across history resets`() {
         for (outcome in listOf("unfunded", "declined", "accepted")) {
             val observations = ArrayList<String>()

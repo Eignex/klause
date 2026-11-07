@@ -353,6 +353,8 @@ data class BacktrackParams(
     val lpPlan: LpPlan = LpPlan(),
     /** Finite LP variable guidance from reliable scoped gains and bounded fresh child comparisons. */
     val lpDirectionalGains: Boolean = false,
+    /** Apply collected finite LP directional variable and child-order advice. */
+    val lpDirectionalAdvice: Boolean = true,
     /** Entering-column policy for exactly zero-objective LP solves. */
     val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     /**
