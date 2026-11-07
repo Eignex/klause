@@ -35,7 +35,8 @@ internal class ReclamationPreparation(
 
     fun supports(units: Long, scratchBytes: Long): Boolean = units <= maxWork && scratchBytes <= maxScratchBytes
 
-    fun visit(units: Long = 1L, scratchBytes: Long = 0L) {
+    @Suppress("NOTHING_TO_INLINE")
+    inline fun visit(units: Long = 1L, scratchBytes: Long = 0L) {
         if (cancelled() || units > maxWork - work || scratchBytes > maxScratchBytes - scratch) throw Deferred()
         charge(units)
         work += units
