@@ -9,6 +9,23 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `child observations return only accepted objective gains`() {
+        for (value in listOf(9.0, 10.0, 11.0, Double.NaN, Double.POSITIVE_INFINITY)) {
+            val history = LpDirectionalHistory({})
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(VarRef.IntVar(0), 0.25)
+            history.commit(SearchDecision.IntAtMost(0, 0), 1)
+            history.beginNode(1)
+
+            val gain = history.observeChild(value)
+
+            if (value.isFinite() && value >= 10.0) assertEquals(value - 10.0, gain)
+            else assertTrue(gain.isNaN())
+        }
+    }
+
+    @Test
     fun `a child observation does not create another parent bound`() {
         val observations = ArrayList<String>()
         val history = LpDirectionalHistory(observations::add)
@@ -18,7 +35,7 @@ class LpDirectionalHistoryTest {
         history.commit(SearchDecision.IntAtMost(0, 2), 1)
         history.beginNode(1)
 
-        assertTrue(history.observeChild(11.0))
+        assertEquals(1.0, history.observeChild(11.0))
         history.branch(VarRef.IntVar(1), 0.5)
         history.commit(SearchDecision.IntAtMost(1, 0), 2)
         history.beginNode(2)

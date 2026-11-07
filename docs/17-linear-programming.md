@@ -263,7 +263,10 @@ collects no gains and retains no directional model scope or refreshed point snap
 The ordinary finite linear-bound check can retain its already computed integer
 lower bound for a pending child observation, including a node it prunes. Capture
 and delivery require remaining containing and cumulative LP work; actual work is
-charged at each step. Infinite cutoffs, the large exact-cutoff path and overflow
+charged at each step, including search-owned admission bookkeeping after positive
+child progress. This progress can reopen advisory basis admission within its owner
+lifetime cap; it grants no numerical work or pruning authority. Infinite cutoffs,
+the large exact-cutoff path and overflow
 supply no retained scalar. The callback performs no extra domain scan, numerical
 query or certification, and publishes neither a point nor a new pruning bound.
 [Finite guidance](08-search.md#finite-lp-directional-guidance) owns selection and

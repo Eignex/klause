@@ -360,6 +360,131 @@ class LpHintsTest {
     }
 
     @Test
+    fun `basis admission reopens only on compatible LP child progress`() {
+        val same = LpDirectionalCost(1.0, 4.0)
+        for (progress in listOf("positive", "floating", "equal", "weaker", "kind", "cutoff")) {
+            val observations = ArrayList<String>()
+            val hints = LpHints(3, 0, directionalGains = true, basisVariableComparisons = true,
+                observe = observations::add)
+            var queries = 0
+            repeat(2) {
+                val builder = LpBuilder()
+                repeat(3) { builder.addVar(0, 3) }
+                val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+                val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1, 2),
+                    BooleanArray(3), 0L, intArrayOf(0, 1, 2), IntArray(0))
+                hints.resetHistory()
+                hints.beginNode(1, 100.0)
+                hints.record(relaxation, doubleArrayOf(0.5, 0.25, 0.5), DoubleArray(0))
+                hints.recordBound(relaxation, 10.0)
+                hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(3) { VarStatus.AT_LOWER }))
+                hints.compareBasisVariables(VarRef.IntVar(1), IntDomain(0, 3),
+                    VarRef.IntVar(2), IntDomain(0, 3), { true }) { _, _ ->
+                    queries++
+                    listOf(same, same)
+                }
+            }
+            val builder = LpBuilder()
+            repeat(3) { builder.addVar(0, 3) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1, 2),
+                BooleanArray(3), 0L, intArrayOf(0, 1, 2), IntArray(0))
+            hints.resetHistory()
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5, 0.25, 0.5), DoubleArray(0))
+            if (progress == "floating") hints.recordObjective(relaxation, 10.0)
+            else hints.recordBound(relaxation, 10.0)
+            hints.branch(VarRef.IntVar(0), IntDomain(0, 3))
+            hints.commit(SearchDecision.IntAtMost(0, 0), 1)
+
+            hints.beginNode(1, if (progress == "cutoff") 99.0 else 100.0)
+            hints.record(relaxation, doubleArrayOf(0.0, 0.25, 0.5), DoubleArray(0))
+            val bound = when (progress) {
+                "equal" -> 10.0
+                "weaker" -> 9.0
+                else -> 11.0
+            }
+            if (progress == "floating" || progress == "kind") hints.recordObjective(relaxation, bound)
+            else hints.recordBound(relaxation, bound)
+            hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(3) { VarStatus.AT_LOWER }))
+            val proposal = hints.compareBasisVariables(VarRef.IntVar(1), IntDomain(0, 3),
+                VarRef.IntVar(2), IntDomain(0, 3), { true }) { _, _ ->
+                queries++
+                listOf(same, LpDirectionalCost(4.0, 9.0))
+            }
+
+            val reopened = progress == "positive" || progress == "floating"
+            assertEquals(if (reopened) VarRef.IntVar(2) else null, proposal, progress)
+            assertEquals(if (reopened) 3 else 2, queries, progress)
+            assertEquals(if (reopened) 1 else 0,
+                observations.count { it == "VARIABLE_BASIS_REOPENED" }, progress)
+        }
+    }
+
+    @Test
+    fun `finite child progress respects its reservation and owner attempt cap`() {
+        val same = LpDirectionalCost(1.0, 4.0)
+        for (gain in listOf(-1L, 0L, 1L)) {
+            val observations = ArrayList<String>()
+            var remaining = Long.MAX_VALUE
+            val hints = LpHints(3, 0, directionalGains = true, basisVariableComparisons = true,
+                observe = observations::add, charge = { work ->
+                    assertTrue(work <= remaining, "unfunded work=$work remaining=$remaining")
+                    remaining -= work
+                })
+            var queries = 0
+            repeat(if (gain > 0L) 5 else 1) {
+                repeat(2) {
+                    val builder = LpBuilder()
+                    repeat(3) { builder.addVar(0, 3) }
+                    val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+                    val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1, 2),
+                        BooleanArray(3), 0L, intArrayOf(0, 1, 2), IntArray(0))
+                    hints.resetHistory()
+                    hints.beginNode(1, 100.0)
+                    hints.record(relaxation, doubleArrayOf(0.5, 0.25, 0.5), DoubleArray(0))
+                    hints.recordBound(relaxation, 10.0)
+                    hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(3) { VarStatus.AT_LOWER }))
+                    hints.compareBasisVariables(VarRef.IntVar(1), IntDomain(0, 3),
+                        VarRef.IntVar(2), IntDomain(0, 3), { true }) { _, _ ->
+                        queries++
+                        listOf(same, same)
+                    }
+                }
+                val builder = LpBuilder()
+                repeat(3) { builder.addVar(0, 3) }
+                val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+                val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1, 2),
+                    BooleanArray(3), 0L, intArrayOf(0, 1, 2), IntArray(0))
+                hints.resetHistory()
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(0.5, 0.25, 0.5), DoubleArray(0))
+                hints.recordBound(relaxation, 10.0)
+                hints.branch(VarRef.IntVar(0), IntDomain(0, 3))
+                hints.commit(SearchDecision.IntAtMost(0, 0), 1)
+                hints.beginNode(1, 100.0)
+                remaining = hints.finiteBoundWork
+
+                hints.recordFiniteBound(trail.state, 10L + gain)
+
+                remaining = Long.MAX_VALUE
+                hints.record(relaxation, doubleArrayOf(0.0, 0.25, 0.5), DoubleArray(0))
+                hints.recordBound(relaxation, 10.0 + gain)
+                hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(3) { VarStatus.AT_LOWER }))
+                hints.compareBasisVariables(VarRef.IntVar(1), IntDomain(0, 3),
+                    VarRef.IntVar(2), IntDomain(0, 3), { true }) { _, _ ->
+                    queries++
+                    listOf(same, LpDirectionalCost(4.0, 9.0))
+                }
+            }
+
+            assertEquals(if (gain > 0L) 8 else 2, queries, "gain=$gain")
+            assertEquals(if (gain > 0L) 2 else 0,
+                observations.count { it == "VARIABLE_BASIS_REOPENED" }, "gain=$gain")
+        }
+    }
+
+    @Test
     fun `computed basis proposals renew admission without consumption`() {
         val valid = listOf(LpDirectionalCost(1.0, 4.0), LpDirectionalCost(4.0, 9.0))
         val results = listOf(null, valid, null, null, valid)

@@ -142,7 +142,7 @@ internal class LpHints(
         // The scoped constant cancels in every gain; adding it can round away a small difference.
         boundRecorded = bound.isFinite()
         if (boundRecorded) observe(if (checked) "BOUND_RECORDED" else "OPTIMUM_RECORDED")
-        history.record(bound)
+        recordBasisProgress(history.record(bound))
     }
 
     private fun rowExtension(model: ExactLpModel): Boolean {
@@ -215,7 +215,22 @@ internal class LpHints(
 
     override val finiteBoundWork: Long get() = if (collect && directionalGains && scopeChecked &&
         !boundRecorded && history.hasPendingChild
-    ) 15L + cutoffComparisonWork() else 0L
+    ) 15L + cutoffComparisonWork() + basisProgressWork else 0L
+
+    private val basisProgressWork: Long get() = if (basisVariableComparisons &&
+        unproductiveVariableBasisAttempts > 0 && variableBasisAttempts < MAX_VARIABLE_BASIS_ATTEMPTS
+    ) 2L else 0L
+
+    private fun recordBasisProgress(gain: Double) {
+        if (!(gain > 0.0)) return
+        val work = basisProgressWork
+        if (work == 0L) return
+        charge(work)
+        if (unproductiveVariableBasisAttempts >= MAX_UNPRODUCTIVE_VARIABLE_BASIS_ATTEMPTS) {
+            observe("VARIABLE_BASIS_REOPENED")
+        }
+        unproductiveVariableBasisAttempts = 0
+    }
 
     override fun recordFiniteBound(state: LpExactState?, sourceBound: Long) {
         if (!finiteBoundCompatible(state)) return
@@ -231,8 +246,9 @@ internal class LpHints(
             return
         }
         observe("FINITE_BOUND_PREPARED")
-        val accepted = history.observeChild(value.toDouble())
-        if (accepted) {
+        val gain = history.observeChild(value.toDouble())
+        if (gain.isFinite()) {
+            recordBasisProgress(gain)
             charge(1L)
             observe("FINITE_BOUND_RECORDED")
         }

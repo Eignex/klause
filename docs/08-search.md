@@ -331,12 +331,16 @@ reduced-cost scores or passive predictions. Missing directions, ties, changed po
 unfinished solves and unfunded analysis retain current scoring. At most eight
 attempts belong to one search owner, including failed reservations and across history
 resets. Consecutive entries on the same retained state cannot repeat an attempt.
-Two consecutive unfunded, declined, incomplete or baseline-preserving attempts stop
-basis consultations for that owner. A computed improving proposal clears that streak,
-including when an advice-withheld consumer retains its baseline. History resets do
-not reopen the attempt budget or the unproductive streak. Passive comparisons remain
-available when basis consultations stop. `VARIABLE_BASIS_STOPPED` records that owner's
-admission stop once.
+Two consecutive unfunded, declined, incomplete or baseline-preserving attempts suspend
+basis consultations for that owner. A computed improving proposal clears that streak
+before consumption. An already accepted, compatible child observation with strictly
+positive objective gain also clears it; zero gain, missing observations and incompatible
+estimate contexts do not. Checked finite-domain bounds can supply that progress through
+the same pending-child and scope checks. Progress bookkeeping is charged to the existing
+allowance and included in its finite-bound reservation. History resets do not reopen
+admission, and progress does not replenish the eight-attempt lifetime cap. Passive
+comparisons remain available during suspension. `VARIABLE_BASIS_STOPPED` records each
+suspension, and `VARIABLE_BASIS_REOPENED` records progress that reopens admission.
 The bounded runner-up scan charges its work before visiting candidates.
 Preparation reserves 20 work units before allocating the column request; analysis
 leaves 32 units for comparison and selection in the containing allowance. Basis

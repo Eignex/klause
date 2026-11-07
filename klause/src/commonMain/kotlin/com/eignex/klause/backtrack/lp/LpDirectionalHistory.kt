@@ -73,13 +73,13 @@ internal class LpDirectionalHistory(
         objective = Double.NaN
     }
 
-    fun record(value: Double) {
+    fun record(value: Double): Double {
         objective = value
-        observeChild(value)
+        return observeChild(value)
     }
 
-    fun observeChild(value: Double): Boolean {
-        val child = pending ?: return false
+    fun observeChild(value: Double): Double {
+        val child = pending ?: return Double.NaN
         charge(7L)
         pending = null
         val gain = value - child.parent.objective
@@ -87,13 +87,13 @@ internal class LpDirectionalHistory(
         if (!gain.isFinite() || gain < 0.0 || !normalized.isFinite()) {
             observe("UNUSABLE")
             observeDirection("UNUSABLE", child)
-            return false
+            return Double.NaN
         }
         val history = gains.getOrPut(child.parent.variable, ::Gains)
         update(if (child.up) history.up else history.down, normalized)
         if (recent(history)) reliableStamp = stamp
         observe(if (child.up) "UP" else "DOWN")
-        return true
+        return gain
     }
 
     fun branch(variable: VarRef, value: Double) {
