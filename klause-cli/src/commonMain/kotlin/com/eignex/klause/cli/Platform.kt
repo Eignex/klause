@@ -3,16 +3,13 @@ package com.eignex.klause.cli
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.util.platform.compilationTimeMillis
 import com.eignex.util.process.processProperty
-import kotlin.time.TimeSource
 
 internal fun platformDebugStats(): CliDebugStats = CliDebugStats(::compilationTimeMillis)
 
 internal fun installCliConfig(): KlauseConfig =
     KlauseConfig.fromProps(lookup = ::processProperty).also { KlauseConfig.current = it }
 
-private val timeOrigin = TimeSource.Monotonic.markNow()
-
-internal fun nowMillis(): Long = timeOrigin.elapsedNow().inWholeMilliseconds
+internal expect fun nowMillis(): Long
 
 internal fun fileName(path: String): String = path.substringAfterLast('/').substringAfterLast('\\')
 
