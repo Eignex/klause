@@ -100,6 +100,7 @@ internal class FiniteNumericalCompanions private constructor(
     val incumbents = PortfolioIncumbents.exact(objective)
     private val completionSharing = if (params.sourceIncumbentCompletion && incumbentCompletionCheck != null)
         LinearIncumbentSharing() else null
+    private val repairGuidance = if (completionSharing != null) LinearRepairGuidance() else null
 
     fun factories(plan: PreparedSourcePlan, firstArm: Int): List<PortfolioArmFactory> {
         val identity = ModelIdentity.of(model, objective)
@@ -133,6 +134,7 @@ internal class FiniteNumericalCompanions private constructor(
                 }
             },
             factory(firstArm + 1, ArmFamily.LocalSearch) { slot ->
+                repairGuidance?.let(slot::own)
                 lateinit var companion: PortfolioWorker
                 val limits = local(slot)
                 val worker = context?.let { repairWorker(slot, firstArm + 1, limits, it) { companion } }
@@ -172,6 +174,7 @@ internal class FiniteNumericalCompanions private constructor(
                 companion().observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
             }, publicationLifetime = limits.cancellation or limits.timeout, observeExternalIncumbents = true,
             sharedCompletions = completionSharing,
+            repairGuidance = repairGuidance,
             incumbentCompletionCheck = incumbentCompletionCheck,
             onComparison = onComparison?.let { report -> { comparison ->
                 val pool = incumbents.exchange.current()
@@ -213,7 +216,7 @@ internal class FiniteNumericalCompanions private constructor(
                 }, onIncumbentUse = {
                     worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
                 }, observeExternalIncumbents = true, sharedCompletions = completionSharing,
-                incumbentCompletionCheck = incumbentCompletionCheck)
+                incumbentCompletionCheck = incumbentCompletionCheck, repairGuidance = repairGuidance)
             private var result: MinimizeResult? = null
             override val isDone: Boolean get() = result != null
             override val stats get() = search.stats

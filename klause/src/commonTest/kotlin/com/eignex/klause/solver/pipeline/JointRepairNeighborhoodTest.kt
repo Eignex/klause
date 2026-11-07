@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceInequality
@@ -10,10 +12,89 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class JointRepairNeighborhoodTest {
+    @Test
+    fun `paid guidance should select a connected pair while retaining unrelated pins and cutoff`() {
+        val columns = (0..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val source = SourceProofContext(SourceScope(SourceRevision("shared-connected", "exact")), columns.toSet(),
+            mapOf("left" to SourcePremise(SourceInequality(mapOf(columns[0] to BigFraction.ONE,
+                columns[2] to BigFraction.ONE), BigFraction.ONE)),
+                "right" to SourcePremise(SourceInequality(mapOf(columns[3] to BigFraction.ONE,
+                    columns[4] to BigFraction.ONE), BigFraction.ONE))))
+        val funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) }
+        val budget = SourceLpBudget(funding = funding)
+        val guidance = LinearRepairGuidance()
+        guidance.remember(source, mapOf(columns[1] to 100.0, columns[2] to 3.0, columns[3] to 5.0),
+            budget, Cancellation.Never)
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 5, 0, Cancellation.Never,
+            sourceIntegers = intArrayOf(0, 2, 3, 4)))
+        val centers = listOf(BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO,
+            BigFraction.ONE, BigFraction.ONE)
+        assertTrue(repair.guide(guidance.find(source), centers, budget, Cancellation.Never))
+
+        val condition = repair.propose(centers, booleanArrayOf(true), 2, 1, BigFraction.ONE, BigFraction.ONE)
+
+        assertEquals(mapOf(0 to BigFraction.ZERO, 2 to BigFraction.ZERO), condition.lower)
+        assertEquals(condition.lower, condition.upper)
+        assertEquals(mapOf(0 to true), condition.bools)
+        assertEquals(BigFraction.ONE, condition.cutoff)
+        assertEquals(2L, repair.selectedIntegers)
+    }
+
+    @Test
+    fun `declined guidance should restore the ordinary proposal after a ranked proposal`() {
+        val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val source = SourceProofContext(SourceScope(SourceRevision("shared-fallback", "exact")), columns.toSet(),
+            mapOf("edge" to SourcePremise(SourceInequality(mapOf(columns[0] to BigFraction.ONE,
+                columns[1] to BigFraction.ONE), BigFraction.ONE))))
+        val retained = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) }
+        val guidance = LinearRepairGuidance()
+        guidance.remember(source, mapOf(columns[2] to 2.0), SourceLpBudget(funding = retained), Cancellation.Never)
+        val centers = List(3) { BigFraction.ZERO }
+
+        for (variant in listOf("missing", "work", "allocation", "cancelled", "mid-ranking")) {
+            val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, Cancellation.Never))
+            val ordinary = repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null)
+            assertTrue(repair.guide(guidance.find(source), centers, SourceLpBudget(funding = retained),
+                Cancellation.Never))
+            assertEquals(mapOf(0 to BigFraction.ZERO, 1 to BigFraction.ZERO),
+                repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null).lower)
+            val funding = SourceLpFunding(if (variant == "work") 0 else 100_000,
+                if (variant == "allocation") 0 else 100_000).also { it.grant(100_000) }
+            var checks = 0
+
+            assertFalse(repair.guide(if (variant == "missing") null else guidance.find(source), centers,
+                SourceLpBudget(funding = funding), Cancellation {
+                    variant == "cancelled" || (variant == "mid-ranking" && ++checks == 3)
+                }))
+
+            assertEquals(ordinary, repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null))
+        }
+    }
+
+    @Test
+    fun `ranking should debit the consuming workers work and allocation`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val source = SourceProofContext(SourceScope(SourceRevision("shared-cost", "exact")), setOf(integer),
+            emptyMap())
+        val producer = SourceLpFunding(1000, 1000).also { it.grant(1000) }
+        val guidance = LinearRepairGuidance()
+        guidance.remember(source, mapOf(integer to 2.0), SourceLpBudget(funding = producer), Cancellation.Never)
+        val consumer = SourceLpFunding(1000, 1000).also { it.grant(1000) }
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 1, 0, Cancellation.Never))
+
+        assertTrue(repair.guide(guidance.find(source), listOf(BigFraction.ZERO),
+            SourceLpBudget(funding = consumer), Cancellation.Never))
+
+        assertTrue(consumer.spent > 0)
+        assertTrue(consumer.allocated > 0)
+    }
+
     @Test
     fun `initial repair should leave integer backed real columns outside the source complement`() {
         val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }

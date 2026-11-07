@@ -1,9 +1,11 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
@@ -21,24 +23,61 @@ internal class JointRepairNeighborhood private constructor(
         BooleanArray(integers).also { mask -> indices.forEach { mask[it] = true } }
     }
     private var seeds = inputs?.toList() ?: (0 until integers).toList()
+    private var rankedSeeds: List<Int>? = null
     var selectedIntegers: Long = 0
         private set
     var visitedEntries: Long = 0
         private set
 
     fun guide(point: Map<SourceCoordinate, Double>) {
+        rankedSeeds = null
         seeds = seeds.sortedByDescending { id ->
             val value = point[SourceCoordinate(SourceCoordinate.Kind.Integer, id)]
             if (value == null || !value.isFinite()) 0.0 else abs(value - round(value))
         }
     }
 
+    fun guide(hint: LinearRepairGuidance.Hint?, centers: List<BigFraction>,
+        budget: SourceLpBudget, token: Cancellation): Boolean {
+        rankedSeeds = null
+        if (hint == null || token() || seeds.isEmpty() || centers.size < integers ||
+            centers.size > LinearRepairGuidance.MAX_COLUMNS) return false
+        val funding = budget.funding ?: return false
+        val work = 1L + 16L * seeds.size
+        val bytes = 256L + 128L * seeds.size
+        if (funding.availableWork <= work || funding.remainingAllocation <= bytes) return false
+        budget.observe(preparation = work)
+        funding.charge(0L, bytes)
+        val distances = DoubleArray(seeds.size)
+        for (index in seeds.indices) {
+            if (token()) return false
+            val center = centers[seeds[index]]
+            val bits = center.num.magnitudeBitLength().toLong() + center.den.magnitudeBitLength()
+            if (bits > MAX_GUIDANCE_SCALAR_BITS) return false
+            val conversion = 1L + bits * bits / 64L
+            if (funding.availableWork <= conversion || funding.remainingAllocation <= 8L * bits) return false
+            budget.observe(preparation = conversion)
+            funding.charge(0L, 8L * bits)
+            val value = center.toDouble()
+            if (!value.isFinite()) return false
+            val distance = hint.integer(seeds[index])?.let { abs(it - value) } ?: 0.0
+            if (!distance.isFinite()) return false
+            distances[index] = distance
+        }
+        if (token() || distances.none { it > 0.0 }) return false
+        val ranked = seeds.indices.sortedByDescending { distances[it] }.map { seeds[it] }
+        if (token()) return false
+        rankedSeeds = ranked
+        return true
+    }
+
     override fun propose(
         centers: List<BigFraction>, bools: BooleanArray, count: Int, round: Long,
         radius: BigFraction, cutoff: BigFraction?,
     ): ExactNeighborhoodCondition {
-        val freed = if (round == 0L || seeds.isEmpty()) emptySet() else {
-            val seed = seeds[((round - 1) % seeds.size).toInt()]
+        val order = rankedSeeds ?: seeds
+        val freed = if (round == 0L || order.isEmpty()) emptySet() else {
+            val seed = order[((round - 1) % order.size).toInt()]
             connected(seed, minOf(inputs?.size ?: integers, maxOf(2, count), MAX_FREE_INTEGERS))
         }
         selectedIntegers += freed.size
@@ -124,3 +163,4 @@ internal class JointRepairNeighborhood private constructor(
 private const val MAX_FREE_INTEGERS = 32
 private const val MAX_SELECTION_VISITS = 8192
 private const val MAX_INDEX_ENTRIES = 1_048_576
+private const val MAX_GUIDANCE_SCALAR_BITS = 4096

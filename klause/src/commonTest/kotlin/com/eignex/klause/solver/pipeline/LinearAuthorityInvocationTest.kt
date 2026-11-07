@@ -38,6 +38,22 @@ class LinearAuthorityInvocationTest {
     )
 
     @Test
+    fun `a paid root relaxation should supply advisory guidance to its captured context`() {
+        val source = SourceProofContext(scope, setOf(integer), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2)),
+                BigFraction.MINUS_ONE)),
+            "upper" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ONE)),
+        ), mapOf(integer to BigFraction.ONE))
+        val guidance = LinearRepairGuidance()
+
+        val result = LinearAuthorityInvocation(source, TheoryParams(sourceCuts = false), boundOrdered = true,
+            repairGuidance = guidance).use { it.run { _, _ -> } }
+
+        assertEquals(0.5, assertNotNull(guidance.find(source)).integer(0))
+        assertEquals(1L, result.stats.smt.completeSearchStages?.get("numericalRepairGuidancePublished"))
+    }
+
+    @Test
     fun `an advisory discrete seed should reach the retained bound consumer after checked completion`() {
         val third = BigFraction.ofLong(3).reciprocal()
         val source = SourceProofContext(scope, setOf(integer, real), mapOf(

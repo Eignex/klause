@@ -150,6 +150,13 @@ authorize this exact handoff.
 With completion enabled, a checked pooled center starts joint repair in a small
 connected integer neighborhood without a root relaxation. The all-pinned
 rounded-root bootstrap is reserved for a center without that checked handoff.
+The pair can retain one advisory point from a numerical companion's paid root
+relaxation. A matching capture ranks connected-neighborhood seeds by disagreement
+with the checked center; widths, pins and exact cutoffs retain their ordinary rules.
+Snapshot retention and ranking debit the producing and consuming workers' existing
+work and allocation. A missing, closed or unaffordable hint uses ordinary seed order
+without delaying a start or requesting a relaxation. The repair owner releases the
+snapshot on retirement; guidance carries no witness, bound or proof authority.
 Continuous columns stay free, source
 cutoff checks remain exact, and later proposals retain their captured conditions.
 Imported points remain query incumbents and centers; only a point produced by the
