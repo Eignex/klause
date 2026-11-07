@@ -749,7 +749,14 @@ retains source order. Admitted discovery visits rows and incidence partners by i
 relaxation point, with original source ordinals breaking ties. Unavailable or
 nonfinite projections follow scored rows in source order. Projection, sorting and
 temporary index storage debit the existing generation allowance. Source owners,
-exact derivations and ordinary aggregate-only source order stay fixed. Incomplete
+exact derivations and ordinary aggregate-only source order stay fixed. With numeric
+invocation bounds, a funded linear partition places finite seed rows containing a
+scoped integer coordinate before other seed rows. Each group and the partner buckets
+retain their slack and source ordering. Scope incidence supplies
+only an ordering preference. Endpoint authority still comes from checked derivations.
+Incidence lookup, partition storage and copy-back share the containing generation
+allowance. The partition's estimate admits at most half the remaining work and
+allocation after slack ordering; a declined partition retains that order. Incomplete
 scoring withholds proposals and retains its charged work. When a funded
 exact comparison finds the same ordered cut families, owners and inequalities as
 the fully checked active current recipe, preparation keeps its query and proofs
@@ -811,18 +818,19 @@ can retry the same aggregate with the ordinary stated sides that retain negative
 residuals. Identical side choices require no additional derivation. Each attempt
 replays its exact source-bound premises and shares the generation's work,
 allocation, cancellation and proof limits. A completed pure-integer aggregate can
-also try half scaling. Each odd coefficient cites a stated singleton integer lower
-bound to round down, or a stated upper bound to round up when no lower bound is
-available. Even coefficients require no bound. A positive combination of those
-premises gives integral activity, and integer rounding supplies the conclusion.
+also try half scaling. Each odd coefficient cites an established singleton integer lower
+bound to round down, or an established upper bound to round up when no lower bound is
+available. An endpoint uses its stated premise or a typed invocation-bound assumption;
+even coefficients require no bound. A positive combination of that authority gives
+integral activity, and integer rounding supplies the conclusion.
 The proposal retains every supporting owner and uses the aggregation-MIR family.
-Missing stated sides decline the attempt; scoped domains do not supply premises.
-An unproductive half-scaled aggregate can score single substitutions to a stated
+Missing established sides decline the attempt; scoped domains do not fabricate source premises.
+An unproductive half-scaled aggregate can score single substitutions to an established
 upper side on odd integer coordinates. Exact RHS changes and supporting strictness
 determine each rounded endpoint; finite normalized violation chooses at most one
 additional proof. That proof rebuilds its positive combination with the selected
 source side and is checked before admission. If that substitution supplies no
-separating cut, a funded scan can select several stated upper sides together when
+separating cut, a funded scan can select several established upper sides together when
 the point is nearer those endpoints. Lower sides retain ties and unavailable
 finite distances. At least two selected upper sides permit one additional exact
 half-rounding proof; an interrupted scan publishes no choice. Each rounded odd
