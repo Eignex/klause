@@ -850,7 +850,10 @@ proof uses a subset of its owners and both proofs use only source premises.
 Duplicate comparison and proof traversal debit the same allowance;
 scoped-assumption proofs remain distinct.
 For the next residual coordinate,
-continuation ranks unvisited rows by finite source slack divided by the absolute
+continuation excludes rows whose union with the selected original source-coordinate
+keys exceeds the assembly support limit, including keys cancelled in the current
+residual. The funded union and each candidate scan share the generation allowance.
+It ranks eligible unvisited rows by finite source slack divided by the absolute
 pivot coefficient at the current point. Ties retain source order. If no score is
 available, the first eligible row is the fallback. The full scoring scan and scalar
 projections debit the same generation allowance; a stopped scan publishes no

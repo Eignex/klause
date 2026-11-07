@@ -2315,6 +2315,129 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `an oversized continuation should leave room for a compatible source row`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val bridge = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 2)
+        val firstReal = SourceCoordinate(SourceCoordinate.Kind.Real, 3)
+        val extra = SourceCoordinate(SourceCoordinate.Kind.Real, 4)
+        val otherExtra = SourceCoordinate(SourceCoordinate.Kind.Real, 5)
+        val source = SourceProofContext(scope, setOf(x, y, z, real, bridge, otherReal, firstReal, extra, otherExtra),
+            linkedMapOf(
+                "first" to SourcePremise(SourceInequality(mapOf(firstReal to BigFraction.ONE,
+                    z to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+                "first demand" to SourcePremise(SourceInequality(mapOf(firstReal to BigFraction.MINUS_ONE),
+                    BigFraction.MINUS_ONE)),
+                "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+                    x to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+                "bridge" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                    bridge to BigFraction.ONE), BigFraction.ZERO)),
+                "oversized" to SourcePremise(SourceInequality(mapOf(bridge to BigFraction.MINUS_ONE,
+                    otherReal to BigFraction.MINUS_ONE, extra to BigFraction.ONE, otherExtra to BigFraction.ONE),
+                    BigFraction.ofLong(-3))),
+                "right" to SourcePremise(SourceInequality(mapOf(otherReal to BigFraction.ONE,
+                    y to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+                "demand" to SourcePremise(SourceInequality(mapOf(bridge to BigFraction.MINUS_ONE,
+                    otherReal to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+            ))
+        val observations = mutableMapOf<String, Long>()
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(support = 5)
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count }, limits = limits,
+            point = mapOf(x to 0.75, y to 0.75, z to 0.5, real to 1.5, bridge to 1.5,
+                otherReal to 1.5, firstReal to 1.0, extra to 0.0, otherExtra to 0.0))
+
+        assertEquals(listOf(
+            SourceInequality(mapOf(z to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+            SourceInequality(mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE), BigFraction.ofLong(-2)),
+        ), cuts.map { it.inequality })
+        assertEquals(listOf(setOf(0, 1), setOf(2, 3, 5, 6)), cuts.map { it.owners })
+        assertTrue((observations["AggregateContinuationSupportSkipped"] ?: 0L) > 0L)
+        assertNull(observations["AggregateSupportLimit"])
+        assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
+        assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
+        for (cut in cuts) assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `continuation support should include cancelled source coordinates`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val bridge = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 2)
+        val firstReal = SourceCoordinate(SourceCoordinate.Kind.Real, 3)
+        val source = SourceProofContext(scope, setOf(x, y, z, real, bridge, otherReal, firstReal), linkedMapOf(
+            "first" to SourcePremise(SourceInequality(mapOf(firstReal to BigFraction.ONE,
+                z to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "first demand" to SourcePremise(SourceInequality(mapOf(firstReal to BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE)),
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+                x to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "bridge" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                bridge to BigFraction.ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(otherReal to BigFraction.ONE,
+                y to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "demand" to SourcePremise(SourceInequality(mapOf(bridge to BigFraction.MINUS_ONE,
+                otherReal to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+        ))
+        val observations = mutableMapOf<String, Long>()
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(support = 4)
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count }, limits = limits,
+            point = mapOf(x to 0.75, y to 0.75, z to 0.5, real to 1.5, bridge to 1.5,
+                otherReal to 1.5, firstReal to 1.0)).single()
+
+        assertEquals(SourceInequality(mapOf(z to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE), cut.inequality)
+        assertEquals(setOf(0, 1), cut.owners)
+        assertTrue((observations["AggregateContinuationSupportSkipped"] ?: 0L) > 0L)
+        assertNull(observations["AggregateSupportLimit"])
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `cancelling support screening should retain the completed source cut`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val bridge = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 2)
+        val firstReal = SourceCoordinate(SourceCoordinate.Kind.Real, 3)
+        val source = SourceProofContext(scope, setOf(x, y, z, real, bridge, otherReal, firstReal), linkedMapOf(
+            "first" to SourcePremise(SourceInequality(mapOf(firstReal to BigFraction.ONE,
+                z to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "first demand" to SourcePremise(SourceInequality(mapOf(firstReal to BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE)),
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+                x to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "bridge" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                bridge to BigFraction.ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(otherReal to BigFraction.ONE,
+                y to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "demand" to SourcePremise(SourceInequality(mapOf(bridge to BigFraction.MINUS_ONE,
+                otherReal to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+        ))
+        val observations = mutableMapOf<String, Long>()
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(support = 4)
+        var stopped = false
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+            observe = { name, count ->
+                observations[name] = (observations[name] ?: 0L) + count
+                if (name == "AggregateContinuationSupportSkipped") stopped = true
+            }, limits = limits, point = mapOf(x to 0.75, y to 0.75, z to 0.5, real to 1.5,
+                bridge to 1.5, otherReal to 1.5, firstReal to 1.0)).single()
+
+        assertTrue(stopped)
+        assertEquals(SourceInequality(mapOf(z to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE), cut.inequality)
+        assertEquals(setOf(0, 1), cut.owners)
+        assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
+        assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
     fun `opposite source rows should remain eligible when their required weights differ`() {
         val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
         val bridge = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
