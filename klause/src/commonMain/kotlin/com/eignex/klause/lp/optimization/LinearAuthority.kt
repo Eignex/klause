@@ -204,6 +204,15 @@ internal class LinearAuthority(
                     preparePointFamily(source, family, prepared, observed.second, cancellation)
                 }
                 if (refined != null) {
+                    if (refined.first === baselineFamily && refined.second === baselineQuery) {
+                        pointFallback = baselineFamily
+                        directedFamily = null
+                        policy.releaseCandidates()
+                        policy.observe("UnchangedPreparations")
+                        policy.observe("CurrentFallback")
+                        cutLifecycle.families = baselineQuery.cutFamilies.values.toSet()
+                        return base.copy(paused = base.paused || budget.funding?.paused == true)
+                    }
                     family = refined.first
                     prepared = refined.second
                     directedFamily = family
@@ -297,6 +306,8 @@ internal class LinearAuthority(
         val directed = family.atPoint(point, funded, { cutCost(it, 0L) }, ::cutCost) ?: return null
         val refined = withAdditionalCuts(directed, funded, point) ?: return null
         if (funded()) return null
+        if (sameCurrentCuts(family, prepared, refined, funded, 65_536L - work)) return family to prepared
+        if (funded()) return null
         val previous = template
         adoptTemplate(refined)
         query = null
@@ -307,6 +318,48 @@ internal class LinearAuthority(
         }
         query = checked
         return refined to checked
+    }
+
+    private fun sameCurrentCuts(
+        original: LinearAuthorityTemplate, query: LinearAuthorityQuery, refined: LinearAuthorityTemplate,
+        cancellation: Cancellation, maximumWork: Long,
+    ): Boolean {
+        val before = original.cuts?.rows ?: return false
+        val after = refined.cuts?.rows ?: return false
+        if (before.size > 64 || before.size != after.size || query.activeCuts != before.size ||
+            query.checkedCuts.size != before.size || cancellation()) return false
+        pointPolicy?.observe("PreparationReuseChecks")
+        var work = 0L
+        fun charge(amount: Long, allocation: Long = 0L): Boolean {
+            if (cancellation() || amount > maximumWork - work ||
+                budget.funding?.availableWork?.let { amount > it } == true ||
+                budget.funding?.remainingAllocation?.let { allocation > it } == true) return false
+            cutCost(amount, allocation)
+            work += amount
+            return !cancellation()
+        }
+        fun same(left: BigFraction, right: BigFraction): Boolean {
+            val bits = left.num.magnitudeBitLength().toLong() + left.den.magnitudeBitLength() +
+                right.num.magnitudeBitLength() + right.den.magnitudeBitLength()
+            return charge(1L + (bits + 63L) / 64L) && left == right
+        }
+        if (!charge(1L, 128L)) return false
+        for (index in before.indices) {
+            val left = before[index]
+            val right = after[index]
+            if (!charge(1L + left.owners.size + right.owners.size + left.inequality.supportSize, 64L)) return false
+            if (index !in query.checkedCuts || left.owner != right.owner || left.owners != right.owners ||
+                left.family != right.family || left.mixed != right.mixed ||
+                left.inequality.strict != right.inequality.strict) return false
+            val first = left.inequality.coefficients
+            val second = right.inequality.coefficients
+            if (first.size != second.size || !same(left.inequality.rhs, right.inequality.rhs)) return false
+            for ((coordinate, value) in first) {
+                val other = second[coordinate] ?: return false
+                if (!same(value, other)) return false
+            }
+        }
+        return !cancellation()
     }
 
     private fun adoptTemplate(prepared: LinearAuthorityTemplate) {
