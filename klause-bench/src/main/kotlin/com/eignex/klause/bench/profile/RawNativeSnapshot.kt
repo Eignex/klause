@@ -65,7 +65,8 @@ internal class RawNativeSnapshot {
             (value(state(session), "boolReason") as IntArray).copyOf(),
             intArrayOf(integer(owner, "bcpHead"), integer(owner, "recheckHead"),
                 if (value(owner, "unitsPending") as Boolean) 1 else 0),
-            listOf("watchCleanupLiteral", "watchCleanupIndex", "sweptRetirements", "sweepingRetirements")
+            listOf("watchCleanupLiteral", "watchCleanupIndex", "sweptRetirements", "sweepingRetirements",
+                "watchCleanupScan", "watchCleanupEpoch")
                 .map { if (has(owner, it)) integer(owner, it) else null })
         check(header.truth.size == 250 && header.reasons.size == 250 && base == 1065)
         val watches = watches(owner)

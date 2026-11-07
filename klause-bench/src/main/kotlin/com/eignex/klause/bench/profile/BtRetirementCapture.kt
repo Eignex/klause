@@ -252,6 +252,8 @@ object BtRetirementCapture : BenchSuite {
                 put("watchCleanupIndex", image.header.cleanupCursors[1])
                 put("sweptRetirements", image.header.cleanupCursors[2])
                 put("sweepingRetirements", image.header.cleanupCursors[3])
+                put("watchCleanupScan", image.header.cleanupCursors[4])
+                put("watchCleanupEpoch", image.header.cleanupCursors[5])
                 put("watchEntries", JsonArray(image.watches.map { entries ->
                     JsonArray(entries.map { JsonPrimitive(it.toString()) })
                 }))
