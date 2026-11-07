@@ -41,6 +41,7 @@ internal class LpHints(
     private val rootBasis: Boolean = false,
     private val freshVariableProbes: Boolean = false,
     private val basisVariableComparisons: Boolean = false,
+    private val verifyBasisVariables: Boolean = false,
 ) : LpHintSink {
     private data class SideAdvice(val variable: VarRef, val split: Long, val up: Boolean, val basis: Boolean)
 
@@ -58,6 +59,7 @@ internal class LpHints(
     private var variableProbeProposal = false
     private var variableBasisProposal = false
     private var variableBasisAttempts = 0
+    private var basisVerificationAttempted = false
     private var unproductiveVariableBasisAttempts = 0
     private var lastVariableBasisState: LpExactState? = null
     private var boundRecorded = false
@@ -345,6 +347,7 @@ internal class LpHints(
         variableProbeProposal = false
         variableBasisProposal = false
         proposal ?: return baseline
+        if (basis && verifyBasisVariables) return baseline
         charge(2L)
         observe("VARIABLE_WITHHELD")
         if (probed) observe("VARIABLE_PROBE_WITHHELD")
@@ -367,7 +370,12 @@ internal class LpHints(
 
     private val basisVariableAttemptsAvailable: Boolean get() =
         variableBasisAttempts < MAX_VARIABLE_BASIS_ATTEMPTS &&
-            unproductiveVariableBasisAttempts < MAX_UNPRODUCTIVE_VARIABLE_BASIS_ATTEMPTS
+            unproductiveVariableBasisAttempts < MAX_UNPRODUCTIVE_VARIABLE_BASIS_ATTEMPTS &&
+            (!verifyBasisVariables || !basisVerificationAttempted)
+
+    val basisVerificationRequired: Boolean get() = verifyBasisVariables
+
+    val basisComparisonFollowupWork: Long get() = if (verifyBasisVariables) 64L else 48L
 
     fun compareBasisVariables(
         first: VarRef?,
@@ -432,7 +440,9 @@ internal class LpHints(
         return null
     }
 
-    val probeVariableChoiceReady: Boolean get() = collect && freshVariableProbes && !history.isRootNode &&
+    val probeVariableChoiceReady: Boolean get() = collect &&
+        (if (verifyBasisVariables) variableBasisProposal && !basisVerificationAttempted else freshVariableProbes) &&
+        !history.isRootNode &&
         freshRecord && boundRecorded && pointBasis != null && canProbePoint
 
     private val canProbePoint: Boolean get() = !pointProbed &&
@@ -458,8 +468,10 @@ internal class LpHints(
         reserve: (Long) -> Boolean,
         estimate: (LpProbeSource, IntArray, LongArray) -> List<LpDirectionalValues>?,
     ): VarRef? {
+        val ready = probeVariableChoiceReady
         variableBasisProposal = false
-        if (!probeVariableChoiceReady || first == null || second == null) return null
+        variableProbeProposal = false
+        if (!ready || first == null || second == null) return null
         val relaxation = pointRelaxation ?: return null
         val basis = pointBasis ?: return null
         val firstValue = value(first, firstDomain)
@@ -468,6 +480,11 @@ internal class LpHints(
         val firstColumn = relaxation.column(first)
         val secondColumn = relaxation.column(second)
         if (firstColumn < 0 || secondColumn < 0 || firstColumn == secondColumn) return null
+        if (verifyBasisVariables) {
+            charge(1L)
+            basisVerificationAttempted = true
+            observe("VARIABLE_BASIS_VERIFICATION_ATTEMPT")
+        }
         pointProbed = true
         lastProbeState = relaxation.model.exactState
         observe("VARIABLE_PROBE_ATTEMPT")

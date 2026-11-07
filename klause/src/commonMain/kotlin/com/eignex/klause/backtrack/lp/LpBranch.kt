@@ -79,13 +79,23 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
         hints.compareVariables(best, (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
             candidate, (candidate as? VarRef.IntVar)?.let { session.intDomain(it.varId) })
     } else null
-    val basisProposal = historyProposal ?: if (compareBasis) {
+    val basisCandidate = if (historyProposal == null && compareBasis) {
         hints.compareBasisVariables(best, (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
             candidate, (candidate as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
             reserve = ::reserveProbeWork,
-            estimate = { model, columns -> directionalCosts(model, columns, followupWork = 48L) })
+            estimate = { model, columns ->
+                directionalCosts(model, columns,
+                    followupWork = hints.basisComparisonFollowupWork,
+                    retainUnusedWork = hints.basisVerificationRequired)
+            })
     } else null
-    val proposal = basisProposal ?: if (compareHistory && challenger != null && challenger != best &&
+    val basisProposal = if (basisCandidate != null && hints.basisVerificationRequired) {
+        hints.compareProbeVariables(best, (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
+            basisCandidate, (basisCandidate as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
+            reserve = ::reserveProbeWork, estimate = ::directionalValues)
+    } else basisCandidate
+    val proposal = historyProposal ?: basisProposal ?: if (!hints.basisVerificationRequired &&
+        compareHistory && challenger != null && challenger != best &&
         hints.probeVariableChoiceReady
     ) {
         hints.compareProbeVariables(best, (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
