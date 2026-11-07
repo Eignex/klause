@@ -159,6 +159,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Point-based selection of checked numerical source rows. */
         val sourcePointCuts: ExecutionOption<Boolean> = ExecutionOption("source-point-cuts", ValueKind.BOOLEAN)
 
+        /** Advisory integer branching from installed checked numerical cut supports. */
+        val sourceCutBranching: ExecutionOption<Boolean> = ExecutionOption("source-cut-branching", ValueKind.BOOLEAN)
+
         /** Bounded numerical source-bound aggregation control. */
         val sourceAggregateCuts: ExecutionOption<Boolean> = ExecutionOption("source-aggregate-cuts", ValueKind.BOOLEAN)
 
@@ -599,7 +602,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 presolveAbortFraction, presolveMaxRounds,
                 presolveProbePerVar, presolveProbeTotal,
                 nodeLimit, openWorkLimit, sourceLpWorkLimit, sourceLpAllocationLimit, sourceLpOperations, sourceCuts,
-                sourcePointCuts, sourceAggregateCuts, sourceIncumbentCompletion, sourceRefutationReuse,
+                sourcePointCuts, sourceCutBranching, sourceAggregateCuts, sourceIncumbentCompletion,
+                sourceRefutationReuse,
                 sourceRefutationPropagation,
                 sourceRefutationResolution,
                 nraWorkLimit, nraDenseCoefficients, nraMatrixCells, niaCandidates, niaMoves,
