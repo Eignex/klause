@@ -537,7 +537,14 @@ diagnostic invocation; an incomplete trace cannot establish exhaustive applicabi
 
 ## Learned-clause retention
 
-Native forgetting runs at restart boundaries only with a configured cap. Permanent
+Native forgetting starts at restart boundaries with a configured cap. A resumable
+root continues a pending window before branching while its row, heap or cleanup
+state advances. Each attempt keeps the same bounded work and scratch allowance and
+debits the containing slice. A completed pass waits for the next restart before
+aging tiers again; an unfunded attempt permits search to proceed. Continuation
+reads existing ranking state without adding retained storage. Reaching the active
+quota still completes the pending pass; it does not start another tier epoch.
+Permanent
 and glue clauses (default LBD at most 2) survive; remaining space favors lower LBD.
 Cap eligibility and survivor quotas use active constraints; stable retired slots do not
 consume the quota or count as newly retired in a sweep event. Below the active cap,
@@ -606,6 +613,17 @@ another learned retirement requires a scan. Metadata release precedes watch scan
 so permanent postings cannot delay its progress. Appended retirements extend the page
 queue. Candidate-array trimming receives a separate funded copy transaction and
 retains spare capacity when its work or scratch does not fit.
+Propagation preserves live watcher order by promoting the next live posting into a
+retired hole. A local cursor skips already examined retired postings, so the scan
+and promotions take linear work without a copy buffer or retained cursor. Each
+examined posting debits its read and metadata lookup; promotion debits one read,
+two writes and any cleanup-cursor rewind before mutation. Retired tails release
+through the ordinary posting-removal debit before active relocation chooses its
+last live watcher. Funded cleanup preserves order for tails of at most 128 entries
+when its remaining allowance funds the complete copy, charging one read and write
+per copied entry. Larger or unfunded cleanup copies use swap-pop to preserve
+progress under small grants. Both paths retain stable handles and release empty
+posting pages through the same owner.
 Capacity changes replace the disjoint metadata pool identity. A protected row retains
 its complete page allocation; sparse-index protection includes the union of its
 required branch paths. Primitive and reference pools report cumulative protected
