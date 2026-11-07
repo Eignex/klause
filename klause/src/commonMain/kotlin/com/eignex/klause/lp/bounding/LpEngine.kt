@@ -1250,9 +1250,16 @@ internal class LpEngine(
         source: LpProbeSource,
         columns: IntArray,
         splits: LongArray,
+    ): List<LpDirectionalValues>? = directionalValues(source, columns, splits, 24L * columns.size)
+
+    internal fun directionalValues(
+        source: LpProbeSource,
+        columns: IntArray,
+        splits: LongArray,
+        followupWork: Long,
     ): List<LpDirectionalValues>? {
-        // Leave room for comparison and the consuming selection.
-        val allowance = remainingDirectionalWork() - 24L * columns.size
+        if (followupWork < 0L) return null
+        val allowance = remainingDirectionalWork() - followupWork
         branchWorkAllowance = 0L
         if (allowance <= 0L) return null
         val started = TimeSource.Monotonic.markNow()

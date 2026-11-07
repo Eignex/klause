@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpHintUnavailable
 import com.eignex.klause.lp.engine.Basis
@@ -453,6 +454,275 @@ class LpHintsTest {
             assertEquals(if (name == "improving") 1 else 0,
                 observations.count { it == "VARIABLE_PROBE_CONSUMED" }, name)
         }
+    }
+
+    @Test
+    fun `complete probe values order both variable kinds in minimized units`() {
+        for (boolean in listOf(false, true)) {
+            for ((sense, offset) in listOf(Sense.MINIMIZE to 0.0, Sense.MAXIMIZE to -10000.0)) {
+                val builder = LpBuilder()
+                repeat(2) { builder.addVar(0, if (boolean) 1L else 3L) }
+                val trail = LpBoundTrail(assertNotNull(builder.build(sense).authoritativeModel()))
+                val columns = intArrayOf(0, 1)
+                val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), columns,
+                    BooleanArray(2) { boolean }, 0L, if (boolean) IntArray(0) else columns,
+                    if (boolean) columns else IntArray(0))
+                val events = ArrayList<String>()
+                val hints = LpHints(if (boolean) 0 else 2, if (boolean) 2 else 0,
+                    directionalGains = true, basisVariableComparisons = true, verifyBasisVariables = true,
+                    probeChildOrder = true, observe = events::add)
+                val first = if (boolean) VarRef.Bool(0) else VarRef.IntVar(0)
+                val second = if (boolean) VarRef.Bool(1) else VarRef.IntVar(1)
+                val domain = if (boolean) null else IntDomain(0, 3)
+                hints.beginNode(1, 100.0)
+                hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+                hints.recordBound(relaxation, 10.0)
+                hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(2) { VarStatus.AT_LOWER }))
+                val nomination = hints.compareBasisVariables(first, domain, second, domain, { true }) { _, _ ->
+                    listOf(LpDirectionalCost(1.0, 4.0), LpDirectionalCost(4.0, 9.0))
+                }
+                var queries = 0
+                val scale = if (boolean) 2.0 else 0.5
+                val proposal = hints.compareProbeVariables(first, domain, nomination, domain, { true }) { _, _, _ ->
+                    queries++
+                    listOf(LpDirectionalValues(offset + scale * 11, offset + scale * 14),
+                        LpDirectionalValues(offset + scale * 16, offset + scale * 15))
+                }
+                val selected = hints.applyVariableChoice(proposal, first)
+                val alternatives = if (boolean) {
+                    listOf(SearchDecision.Bool(Lit.make(1, false)), SearchDecision.Bool(Lit.make(1, true)))
+                } else listOf(SearchDecision.IntAtMost(1, 0), SearchDecision.IntAtLeast(1, 1))
+                assertEquals(second, selected)
+                hints.branch(second, domain)
+
+                val ordered = hints.orderAlternatives(second, alternatives, allowBasis = false)
+
+                assertEquals(alternatives.reversed(), ordered)
+                assertEquals(1, queries)
+                assertEquals(1, events.count { it == "PROBE_SIDES_PREPARED" })
+                assertEquals(1, events.count { it == "PROBE_SIDE_CONSUMED" })
+                assertEquals(1, events.count { it == "SIDE_BASELINE_CHANGED" })
+                assertEquals(0, events.count { it == "HISTORY_SIDE_CONSUMED" || it == "BASIS_SIDE_CONSUMED" })
+            }
+        }
+    }
+
+    @Test
+    fun `a declined challenger preserves the baseline child preference`() {
+        val builder = LpBuilder()
+        repeat(2) { builder.addVar(0, 3) }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+            BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+        val events = ArrayList<String>()
+        val hints = LpHints(2, 0, directionalGains = true, basisVariableComparisons = true,
+            verifyBasisVariables = true, probeChildOrder = true, observe = events::add)
+        val first = VarRef.IntVar(0)
+        val second = VarRef.IntVar(1)
+        val domain = IntDomain(0, 3)
+        hints.beginNode(1, 100.0)
+        hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+        hints.recordBound(relaxation, 10.0)
+        hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(2) { VarStatus.AT_LOWER }))
+        val nomination = hints.compareBasisVariables(first, domain, second, domain, { true }) { _, _ ->
+            listOf(LpDirectionalCost(1.0, 4.0), LpDirectionalCost(4.0, 9.0))
+        }
+        val proposal = hints.compareProbeVariables(first, domain, nomination, domain, { true }) { _, _, _ ->
+            listOf(LpDirectionalValues(11.0, 14.0), LpDirectionalValues(11.0, 14.0))
+        }
+        val selected = hints.applyVariableChoice(proposal, first)
+        assertEquals(first, selected)
+        hints.branch(first, domain)
+        val alternatives = listOf(SearchDecision.IntAtLeast(0, 1), SearchDecision.IntAtMost(0, 0))
+
+        val ordered = hints.orderAlternatives(first, alternatives, allowBasis = false)
+
+        assertEquals(alternatives.reversed(), ordered)
+        assertEquals(0, events.count { it == "VARIABLE_CONSUMED" })
+        assertEquals(1, events.count { it == "PROBE_SIDE_CONSUMED" })
+    }
+
+    @Test
+    fun `incomplete nonfinite or tied child values preserve visit order`() {
+        val results: List<List<LpDirectionalValues>?> = listOf(
+            null,
+            listOf(LpDirectionalValues(11.0, 14.0)),
+            listOf(LpDirectionalValues(11.0, 14.0), LpDirectionalValues(Double.NaN, 15.0)),
+            listOf(LpDirectionalValues(11.0, Double.POSITIVE_INFINITY), LpDirectionalValues(16.0, 15.0)),
+            listOf(LpDirectionalValues(11.0, 11.0), LpDirectionalValues(12.0, 12.0)),
+        )
+        for (values in results) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, 3) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+                BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+            val events = ArrayList<String>()
+            val hints = LpHints(2, 0, directionalGains = true, basisVariableComparisons = true,
+                verifyBasisVariables = true, probeChildOrder = true, observe = events::add)
+            val first = VarRef.IntVar(0)
+            val second = VarRef.IntVar(1)
+            val domain = IntDomain(0, 3)
+            hints.beginNode(1, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+            hints.recordBound(relaxation, 10.0)
+            hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(2) { VarStatus.AT_LOWER }))
+            val nomination = hints.compareBasisVariables(first, domain, second, domain, { true }) { _, _ ->
+                listOf(LpDirectionalCost(1.0, 4.0), LpDirectionalCost(4.0, 9.0))
+            }
+            val proposal = hints.compareProbeVariables(first, domain, nomination, domain, { true }) { _, _, _ ->
+                values
+            }
+            val selected = assertNotNull(hints.applyVariableChoice(proposal, first))
+            val id = (selected as VarRef.IntVar).varId
+            hints.branch(selected, domain)
+            val alternatives = listOf(SearchDecision.IntAtMost(id, 0), SearchDecision.IntAtLeast(id, 1))
+
+            val ordered = hints.orderAlternatives(selected, alternatives)
+
+            assertEquals(alternatives, ordered, values.toString())
+            assertEquals(0, events.count { it == "PROBE_SIDE_CONSUMED" }, values.toString())
+        }
+    }
+
+    @Test
+    fun `probe child preferences expire with source and node changes`() {
+        val changes = listOf("node", "point", "record", "history", "clear", "unavailable", "context", "selection")
+        for (active in listOf(false, true)) {
+            for (change in changes) {
+                val builder = LpBuilder()
+                repeat(2) { builder.addVar(0, 3) }
+                val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+                val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+                    BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+                val events = ArrayList<String>()
+                val hints = LpHints(2, 0, directionalGains = true, basisVariableComparisons = true,
+                    verifyBasisVariables = true, probeChildOrder = true, observe = events::add)
+                val first = VarRef.IntVar(0)
+                val second = VarRef.IntVar(1)
+                val domain = IntDomain(0, 3)
+                hints.beginNode(1, 100.0)
+                hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+                hints.recordBound(relaxation, 10.0)
+                hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(2) { VarStatus.AT_LOWER }))
+                val nomination = hints.compareBasisVariables(first, domain, second, domain, { true }) { _, _ ->
+                    listOf(LpDirectionalCost(1.0, 4.0), LpDirectionalCost(4.0, 9.0))
+                }
+                val proposal = hints.compareProbeVariables(first, domain, nomination, domain, { true }) { _, _, _ ->
+                    listOf(LpDirectionalValues(11.0, 14.0), LpDirectionalValues(16.0, 15.0))
+                }
+                assertEquals(second, hints.applyVariableChoice(proposal, first))
+                if (active) hints.branch(second, domain)
+                when (change) {
+                    "node" -> hints.beginNode(2, 100.0)
+                    "point" -> hints.recordPoint(relaxation, doubleArrayOf(0.75, 0.75), DoubleArray(0))
+                    "record" -> hints.record(relaxation, doubleArrayOf(0.75, 0.75), DoubleArray(0))
+                    "history" -> hints.resetHistory()
+                    "clear" -> hints.clear()
+                    "unavailable" -> hints.recordUnavailable(LpHintUnavailable.NO_BOUND)
+                    "context" -> hints.recordObjective(relaxation, 10.0)
+                    else -> hints.prepareVariableComparison(2)
+                }
+                if (!active) hints.branch(second, domain)
+                val alternatives = listOf(SearchDecision.IntAtMost(1, 0), SearchDecision.IntAtLeast(1, 1))
+
+                val ordered = hints.orderAlternatives(second, alternatives)
+
+                assertEquals(alternatives, ordered, "$change active=$active")
+                assertEquals(0, events.count { it == "PROBE_SIDE_CONSUMED" }, "$change active=$active")
+            }
+        }
+    }
+
+    @Test
+    fun `probe child preferences preserve incompatible alternative pairs`() {
+        for (mismatch in listOf("variable", "arity", "partition", "domain")) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, 3) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+                BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+            val events = ArrayList<String>()
+            val hints = LpHints(2, 0, directionalGains = true, basisVariableComparisons = true,
+                verifyBasisVariables = true, probeChildOrder = true, observe = events::add)
+            val first = VarRef.IntVar(0)
+            val second = VarRef.IntVar(1)
+            val domain = IntDomain(0, 3)
+            hints.beginNode(1, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+            hints.recordBound(relaxation, 10.0)
+            hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(2) { VarStatus.AT_LOWER }))
+            val nomination = hints.compareBasisVariables(first, domain, second, domain, { true }) { _, _ ->
+                listOf(LpDirectionalCost(1.0, 4.0), LpDirectionalCost(4.0, 9.0))
+            }
+            val proposal = hints.compareProbeVariables(first, domain, nomination, domain, { true }) { _, _, _ ->
+                listOf(LpDirectionalValues(11.0, 14.0), LpDirectionalValues(16.0, 15.0))
+            }
+            assertEquals(second, hints.applyVariableChoice(proposal, first))
+            hints.branch(second, if (mismatch == "domain") IntDomain(1, 3) else domain)
+            val target = if (mismatch == "variable") first else second
+            val alternatives: List<SearchDecision> = when (mismatch) {
+                "variable" -> listOf(SearchDecision.IntAtMost(0, 0), SearchDecision.IntAtLeast(0, 1))
+                "arity" -> listOf(SearchDecision.IntAtMost(1, 0))
+                "partition" -> listOf(SearchDecision.IntAtMost(1, 1), SearchDecision.IntAtLeast(1, 2))
+                else -> listOf(SearchDecision.IntAtMost(1, 0), SearchDecision.IntAtLeast(1, 1))
+            }
+
+            val ordered = hints.orderAlternatives(target, alternatives)
+
+            assertEquals(alternatives, ordered, mismatch)
+            assertEquals(0, events.count { it == "PROBE_SIDE_CONSUMED" }, mismatch)
+        }
+    }
+
+    @Test
+    fun `probe child preference fits its hold and is spent once when withheld`() {
+        val charged = ArrayList<Long>()
+        for (allowProbe in listOf(false, true)) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, 3) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+                BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+            val events = ArrayList<String>()
+            var remaining = Long.MAX_VALUE
+            val hints = LpHints(2, 0, directionalGains = true, basisVariableComparisons = true,
+                verifyBasisVariables = true, probeChildOrder = true, observe = events::add, charge = { work ->
+                    assertTrue(work <= remaining, "unfunded work=$work remaining=$remaining")
+                    remaining -= work
+                })
+            val first = VarRef.IntVar(0)
+            val second = VarRef.IntVar(1)
+            val domain = IntDomain(0, 3)
+            hints.beginNode(1, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+            hints.recordBound(relaxation, 10.0)
+            hints.branch(first, domain)
+            hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(2) { VarStatus.AT_LOWER }))
+            val nomination = hints.compareBasisVariables(first, domain, second, domain, { true }) { _, _ ->
+                listOf(LpDirectionalCost(1.0, 4.0), LpDirectionalCost(4.0, 9.0))
+            }
+            var queries = 0
+            val proposal = hints.compareProbeVariables(first, domain, nomination, domain, { true }) { _, _, _ ->
+                remaining = hints.probeComparisonFollowupWork
+                queries++
+                listOf(LpDirectionalValues(11.0, 14.0), LpDirectionalValues(16.0, 15.0))
+            }
+            assertEquals(second, hints.applyVariableChoice(proposal, first))
+            hints.branch(second, domain)
+            val alternatives = listOf(SearchDecision.IntAtMost(1, 0), SearchDecision.IntAtLeast(1, 1))
+
+            val ordered = hints.orderAlternatives(second, alternatives, allowProbe = allowProbe)
+            val repeated = hints.orderAlternatives(second, alternatives)
+
+            assertEquals(if (allowProbe) alternatives.reversed() else alternatives, ordered)
+            assertEquals(alternatives, repeated)
+            assertEquals(1, queries)
+            assertEquals(if (allowProbe) 1 else 0, events.count { it == "PROBE_SIDE_CONSUMED" })
+            assertEquals(if (allowProbe) 0 else 1, events.count { it == "PROBE_SIDE_WITHHELD" })
+            charged += hints.probeComparisonFollowupWork - remaining
+        }
+        assertEquals(charged[0], charged[1])
     }
 
     @Test

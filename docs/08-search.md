@@ -375,6 +375,15 @@ keeps current scoring. The
 four finite values share minimized source units. Common objective offsets and an
 unknown parent optimum cancel in this comparison; signed values are valid.
 Numerical values never train passive checked-bound history or carry between points.
+Ordinary finite construction also retains their immediate child preference for both
+compared variables, including the baseline when variable selection declines a challenger.
+The smaller minimized child objective is visited first. A difference within `1e-9`
+keeps the existing order. The preference applies once, only to the selected variable
+and the exact complementary partition queried at that fresh point. It swaps the two
+existing alternatives without replacing their cuts or dropping either child.
+Node, point, model and history changes withdraw it. Incomplete comparisons publish
+no child preference. `PROBE_SIDES_PREPARED` records funded preparation;
+`PROBE_SIDE_CONSUMED` and `PROBE_SIDE_WITHHELD` distinguish application from controls.
 
 Each retained point permits at most one numerical attempt. The hint owner retains
 one current basis alias and one previously probed immutable state. A replaced point,
@@ -384,6 +393,9 @@ incomplete or tied comparisons keep the original winner.
 
 Preparation reserves 20 work units before allocating the column and split requests.
 The numerical grant retains 24 work units per candidate for comparison and selection.
+An immediate numerical child preference instead holds 80 units for comparison,
+selection, preparation of both preferences and matching the actual alternatives.
+This hold reduces the offered numerical work within the same containing grant.
 Projection, scratch construction, scaling, solving,
 objective scans and retirement share the containing and cumulative allowances.
 Warm parent solves and private comparisons use separate bounded admission budgets.
@@ -393,7 +405,8 @@ stale points and unusable values supply no growth feedback; ratio demotion keeps
 the remaining warm-node grant. Every admitted attempt charges the same LP ledger.
 Numerical estimates supply no bound or pruning
 authority. Missing, tied or unusable advice retains the original winner.
-Ordinary finite workers use value and incumbent guidance to order their children.
+Without a usable immediate numerical preference, ordinary finite workers use value
+and incumbent guidance to order their children.
 
 Finite-run construction can explicitly enable a root child-order fallback.
 In that mode the selected root variable can request
