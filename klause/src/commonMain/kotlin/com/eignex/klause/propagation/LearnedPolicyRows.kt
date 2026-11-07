@@ -411,7 +411,7 @@ internal class LearnedPolicyRows(
         const val STAGES = 4
         const val ORIGIN = 5
         const val GENERAL_CACHE_SIZE = 128
-        const val NATIVE_CACHE_SIZE = 512
+        const val NATIVE_CACHE_SIZE = 2048
         const val INITIAL_CAPACITY = 8
         const val PAGE_SHIFT = 4
         const val PAGE_SIZE = 1 shl PAGE_SHIFT
