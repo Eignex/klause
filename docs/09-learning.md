@@ -330,8 +330,14 @@ eviction; units, pending rechecks and current root reasons survive.
 Retired rows stop propagation and export and release their owned literal array.
 Admission, reference-array growth and release debit the containing work ledger.
 A short retirement slice suspends before publication and resumes with its stable handle.
-Policy columns and watch postings retain their separately funded cleanup. Payload
-page directories keep their first page directly and use a bounded compressed index
+Policy columns and watch postings retain their separately funded cleanup. Native
+watch cleanup preserves live posting order with resumable read and write cursors.
+Retired tails release through the posting pages' funded removal path; filling a
+retired hole moves the next live posting without copying the remaining tail.
+Propagation rewinds an affected scan before its next cleanup step. Cursor updates,
+posting swaps and removals are charged and cancellable before mutation, and the
+scan reuses the fixed cleanup state.
+Payload page directories keep their first page directly and use a bounded compressed index
 for later pages. Fixed directory state belongs to propagation preparation.
 Index lookups debit the active
 maintenance grant or the containing propagation ledger. A cached page avoids
