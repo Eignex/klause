@@ -766,7 +766,8 @@ class LpHintsTest {
                 hints.branch(selected, domain)
                 val variable = if (applyAdvice) 1 else 0
                 val alternatives = if (boolean) {
-                    listOf(SearchDecision.Bool(Lit.make(variable, false)), SearchDecision.Bool(Lit.make(variable, true)))
+                    listOf(SearchDecision.Bool(Lit.make(variable, false)),
+                        SearchDecision.Bool(Lit.make(variable, true)))
                 } else listOf(SearchDecision.IntAtMost(variable, 0), SearchDecision.IntAtLeast(variable, 1))
 
                 val ordered = hints.orderAlternatives(selected, alternatives, allowProbe = true)
