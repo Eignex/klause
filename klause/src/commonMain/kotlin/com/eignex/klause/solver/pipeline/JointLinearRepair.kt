@@ -133,7 +133,8 @@ internal class JointLinearRepair(
         if (sample.numBoolVars != model.numBoolVars || sample.numIntVars != model.numIntVars ||
             sample.numRealVars != model.numRealVars || sample.algebraicReals != null || sample.symbolicReals != null ||
             sample.exactReals?.let { it.size != model.numRealVars } == true ||
-            (sample.exactReals == null && (0 until model.numRealVars).any { !sample.approximateRealValue(it).isFinite() })
+            (sample.exactReals == null &&
+                (0 until model.numRealVars).any { !sample.approximateRealValue(it).isFinite() })
         ) return null
         budget.observe(boundCertification = 1L + model.numBoolVars + model.numIntVars + model.numRealVars)
         if (funding.exhausted || completion?.checking(stop)?.invoke() == true) return null
