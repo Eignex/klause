@@ -731,7 +731,19 @@ internal object LinearAuthorityAggregateCuts {
 
         private fun continuation(
             terms: List<LinearAuthorityAggregateTerm>, aggregate: Map<SourceCoordinate, BigFraction>,
+            snapshots: List<Map<SourceCoordinate, BigFraction>>,
         ): Continuation? {
+            meter.reserve(snapshots.size.toLong(), 128L + snapshots.size * 32L)
+            val support = HashSet<SourceCoordinate>()
+            for (row in snapshots) {
+                for (id in row.keys) {
+                    meter.reserve(1L)
+                    if (id in support) continue
+                    if (support.size >= limits.support) stopAggregate("SupportLimit")
+                    meter.reserve(1L, 64L)
+                    support.add(id)
+                }
+            }
             for ((id, value) in aggregate) {
                 meter.reserve(1L)
                 if (id.kind != SourceCoordinate.Kind.Real) continue
@@ -743,6 +755,10 @@ internal object LinearAuthorityAggregateCuts {
                     meter.reserve(1L + terms.size)
                     if (other.coefficients.size <= 1 || terms.any { it.owner == other.term.owner }) continue
                     attempted = true
+                    if (!fitsSupport(other, support)) {
+                        observe("AggregateContinuationSupportSkipped", 1L)
+                        continue
+                    }
                     val pivot = other.coefficients.getValue(id)
                     if (cancelsTerm(other, terms, value, pivot)) {
                         observe("AggregateContinuationInverseSkipped", 1L)
@@ -766,6 +782,16 @@ internal object LinearAuthorityAggregateCuts {
                 return Continuation(row, value, row.coefficients.getValue(id))
             }
             return null
+        }
+
+        private fun fitsSupport(row: ProbeRow, support: Set<SourceCoordinate>): Boolean {
+            meter.reserve(1L, 32L)
+            var size = support.size
+            for (id in row.coefficients.keys) {
+                meter.reserve(1L)
+                if (id !in support && ++size > limits.support) return false
+            }
+            return true
         }
 
         private fun cancelsTerm(
@@ -1033,7 +1059,7 @@ internal object LinearAuthorityAggregateCuts {
                 if (preferred != null) return preferred
                 if (terms.size >= minOf(4, limits.rows)) return null
                 val aggregate = capture.coefficients ?: return null
-                val next = continuation(terms, aggregate) ?: return null
+                val next = continuation(terms, aggregate, snapshots) ?: return null
                 val existingScale = meter.number(if (next.pivot > BigFraction.ZERO) next.pivot
                     else next.pivot.negated())
                 val appendedScale = meter.number(if (next.residual > BigFraction.ZERO) next.residual
