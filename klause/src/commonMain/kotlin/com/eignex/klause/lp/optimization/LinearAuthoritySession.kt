@@ -43,6 +43,7 @@ internal class LinearAuthoritySession(
     private var completed: LpRootGuidance? = null
     private var completedPolicy: SparseSourceLpPolicy? = null
     private var lifetime: LpFloatAllowance? = null
+    private var appendPending = false
     private var currentToken: Cancellation = Cancellation.Never
     private val token = object : Cancellation {
         override fun isCancelled(): Boolean = currentToken()
@@ -67,8 +68,8 @@ internal class LinearAuthoritySession(
         var current = owner
         val profile = allowance ?: effort ?: LpFloatAllowance(2_000_000L, 1024)
         val changedObjective = objective?.let { !sameObjective(it, costs) } == true
-        if (current == null || current.state.model.n != packed.columns.size || !sameRows(rows, packed.rows) ||
-            (changedObjective && sparse != null)) {
+        if (current == null || appendPending || current.state.model.n != packed.columns.size ||
+            !sameRows(rows, packed.rows) || (changedObjective && sparse != null)) {
             val model = build() ?: return null
             val extended = current != null && appendRows && this.authority == authority && authority != null &&
                 LinearAuthorityRowAppend(budget, cancellation, onLifecycle).append(current, model)
@@ -77,6 +78,7 @@ internal class LinearAuthoritySession(
                 onLifecycle("OwnerExtended", 1L)
                 sides = null
             } else {
+                if (appendRows && !cancellation() && budget.funding?.paused == true) return null
                 if (current != null) {
                     if (appendRows) retireOwner() else close()
                 }
@@ -91,6 +93,7 @@ internal class LinearAuthoritySession(
             rows = packed.rows
             objective = costs
             effort = profile
+            appendPending = false
         } else {
             reuses++
             onLifecycle("OwnerReused", 1L)
@@ -101,6 +104,7 @@ internal class LinearAuthoritySession(
         }
         val bound = checkNotNull(current)
         effort = profile
+        if (budget.funding?.paused == true) return null
         if (sides != packed.columns || inactive != packed.inactiveRows || this.authority != authority) {
             var mappingWork = 0L
             var mappingAllocation = 0L
@@ -167,7 +171,7 @@ internal class LinearAuthoritySession(
             this.objective?.let { sameObjective(it, objective) } == true &&
             sameRows(rows, packed.rows)
         val query = Query(scope, packed.columns, packed.inactiveRows)
-        var appendRows = false
+        var appendRows = appendPending
         if (!compatible) {
             appendRows = packed.rows.size > rows.size && packed.rows.size - rows.size <= 64 &&
                 owner != null && authority == scope && rowPolicy == policy.rowPolicy &&
@@ -188,12 +192,11 @@ internal class LinearAuthoritySession(
             }
             sparse = checkNotNull(admission).prepared
             rowPolicy = policy.rowPolicy
-            if (!appendRows) {
-                rows = packed.rows
-                this.objective = objective.takeIf { it.size == checkNotNull(sparse).model.numVars }
-                    ?: ExactLpObjective(costs.map(ExactLpNumber::of) +
-                        List(checkNotNull(sparse).emittedRowCount) { zero }, ExactLpNumber.of(constant))
-            }
+            rows = packed.rows
+            this.objective = objective.takeIf { it.size == checkNotNull(sparse).model.numVars }
+                ?: ExactLpObjective(costs.map(ExactLpNumber::of) +
+                    List(checkNotNull(sparse).emittedRowCount) { zero }, ExactLpNumber.of(constant))
+            appendPending = appendRows
         } else if (admission == null || this.query != query) {
             admission?.close()
             admission = budget.admitSparse(checkNotNull(sparse), cancellation) ?: return null
@@ -275,6 +278,7 @@ internal class LinearAuthoritySession(
         inactive = emptySet()
         authority = null
         effort = null
+        appendPending = false
         if (current != null) onLifecycle("OwnerClosed", 1L)
         budget.closeOwner(current)
     }

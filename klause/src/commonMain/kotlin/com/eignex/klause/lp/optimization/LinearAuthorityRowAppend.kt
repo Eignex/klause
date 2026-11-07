@@ -103,6 +103,6 @@ internal class LinearAuthorityRowAppend(
             observe("OwnerAppendBasisWork", append)
             observe("OwnerAppendUnknownWork", metrics.appendUnknownWork - previous.appendUnknownWork)
         }
-        return accepted && !cancellation() && budget.funding?.paused != true
+        return accepted && !cancellation()
     }
 }

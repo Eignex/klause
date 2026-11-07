@@ -37,6 +37,44 @@ class LinearAuthoritySessionTest {
     private val scope = SourceScope(SourceRevision("session-fixture", "exact-affine"))
 
 
+
+    @Test
+    fun `a grant pause during append inspection should resume within the admitted operation budget`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+        )
+        val root = assertNotNull(LinearAuthorityModel.prepare(rows, 2, Cancellation.Never))
+        val extended = assertNotNull(LinearAuthorityModel.prepare(rows + ExactRationalInequality(
+            intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE }, BigFraction.ofLong(-2)), 2, Cancellation.Never))
+        val costs = List(2) { BigFraction.ONE }
+        val funding = SourceLpFunding(100_000_000L, 100_000_000L)
+        val budget = SourceLpBudget(maxOperations = 2, funding = funding)
+        funding.grant(100_000_000L)
+        var pause = false
+        LinearAuthoritySession(budget, { name, _ ->
+            if (pause && name == "OwnerAppendInspectionWork") funding.grant(0L)
+        }).use { session ->
+            session.advance(root, costs, BigFraction.ZERO, scope, Cancellation.Never,
+                SparseSourceLpPolicy(), observer) { guidance, _, _ -> guidance }
+            pause = true
+
+            val stopped = session.advance(extended, costs, BigFraction.ZERO, scope, Cancellation.Never,
+                SparseSourceLpPolicy(), observer) { guidance, _, _ -> guidance }
+
+            assertNull(stopped)
+            assertEquals(2, budget.operations)
+            pause = false
+            funding.grant(100_000_000L)
+            val resumed = assertNotNull(session.advance(extended, costs, BigFraction.ZERO, scope,
+                Cancellation.Never, SparseSourceLpPolicy(), observer) { guidance, _, _ -> guidance })
+            assertEquals(BigFraction.ofLong(2), assertNotNull(resumed.bound).value)
+            assertEquals(2, budget.operations)
+            assertEquals(1L, session.preparations)
+        }
+    }
+
     @Test
     fun `appending a checked source row should strengthen the bound without replacing the owner`() {
         val rows = listOf(
