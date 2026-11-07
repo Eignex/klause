@@ -4,9 +4,49 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
+    @Test
+    fun `two sided availability does not establish variable reliability`() {
+        val history = LpDirectionalHistory({})
+        for (up in listOf(false, true)) repeat(2) {
+            val variable = if (up) 1 else 0
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(VarRef.IntVar(variable), 2.25)
+            history.commit(if (up) SearchDecision.IntAtLeast(variable, 3)
+                else SearchDecision.IntAtMost(variable, 2), 1)
+            history.beginNode(1)
+            history.record(if (up) 13.0 else 11.0)
+        }
+
+        assertTrue(history.hasTwoSidedSamples)
+        assertTrue(history.score(VarRef.IntVar(0), 2.25).isNaN())
+        assertTrue(history.score(VarRef.IntVar(1), 2.25).isNaN())
+    }
+
+    @Test
+    fun `clearing history removes two sided availability`() {
+        val history = LpDirectionalHistory({})
+        repeat(2) {
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(VarRef.IntVar(0), 2.25)
+            for (up in listOf(false, true)) {
+                history.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                history.beginNode(1)
+                history.record(if (up) 13.0 else 11.0)
+            }
+        }
+        assertTrue(history.hasTwoSidedSamples)
+
+        history.clear()
+
+        assertFalse(history.hasTwoSidedSamples)
+    }
+
     @Test
     fun `both directions need two observations before scoring`() {
         val history = LpDirectionalHistory({})

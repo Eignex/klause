@@ -297,6 +297,9 @@ The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
 in each direction permit a balanced gain score; otherwise reduced-cost/fractionality
 scoring and the configured selector keep their precedence. Directional scores compete
 with each other before fallback, so objective units are not mixed with reduced costs.
+Saturated scope-wide sample counts skip history lookups while two-sided reliability
+is impossible. Passing that prerequisite still requires the variable's own recent
+samples; it grants no score or authority. History reset clears the prerequisite.
 Disabled directional gains collect no history or retained model scope and charge no
 history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
 
