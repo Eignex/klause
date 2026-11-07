@@ -119,7 +119,7 @@ internal object LinearAuthorityAggregateCuts {
                     }
                 }
             }
-            if (point != null) orderPointRows(rows, incidence, point, meter, observe)
+            if (point != null) orderPointRows(rows, incidence, point, meter, observe, source)
             val charge: (String, Long) -> Unit = { name, count ->
                 when (name) {
                     "AggregateWork" -> meter.reserve(count)
@@ -239,6 +239,7 @@ internal object LinearAuthorityAggregateCuts {
     private fun orderPointRows(
         rows: MutableList<ProbeRow>, incidence: Map<Pair<SourceCoordinate, Boolean>, MutableList<ProbeRow>>,
         point: Map<SourceCoordinate, Double>, meter: AggregateMeter, observe: (String, Long) -> Unit,
+        source: SourceProofContext,
     ) {
         if (!admitPointRowOrder(rows, incidence, meter, observe)) return
         meter.reserve(rows.size.toLong(), 128L + rows.size * 64L)
@@ -281,6 +282,44 @@ internal object LinearAuthorityAggregateCuts {
         }
         order(rows)
         for (bucket in incidence.values) order(bucket)
+        prioritizeScopedRows(rows, priorities, source, meter, observe)
+    }
+
+    private fun prioritizeScopedRows(
+        rows: MutableList<ProbeRow>, priorities: Map<Int, Double>, source: SourceProofContext,
+        meter: AggregateMeter, observe: (String, Long) -> Unit,
+    ) {
+        val condition = source.scope.condition
+        if (!condition.hasNumericBounds) return
+        meter.reserve(rows.size.toLong(), 128L)
+        val work = rows.size * 5L + rows.sumOf { it.coefficients.size.toLong() } * 3L
+        val allocation = 256L + rows.size * 128L
+        if (work > meter.remainingWork / 2L || allocation > meter.remainingAllocation / 2L) {
+            observe("AggregatePointScopedOrderDeclined", 1L)
+            return
+        }
+        meter.reserve(rows.size.toLong(), allocation)
+        val scoped = ArrayList<ProbeRow>()
+        val other = ArrayList<ProbeRow>()
+        for (row in rows) {
+            meter.reserve(1L)
+            var relevant = false
+            if (priorities.getValue(row.term.owner).isFinite()) for (id in row.coefficients.keys) {
+                meter.reserve(3L)
+                if (id.kind == SourceCoordinate.Kind.Integer &&
+                    (condition.boundValue(id, false) != null || condition.boundValue(id, true) != null)) relevant = true
+            }
+            if (relevant) {
+                scoped += row
+                observe("AggregatePointScopedRows", 1L)
+            } else other += row
+        }
+        var index = 0
+        for (group in listOf(scoped, other)) for (row in group) {
+            meter.reserve(1L)
+            rows[index++] = row
+        }
+        observe("AggregatePointScopedOrderComplete", 1L)
     }
 
     private fun pointBounds(

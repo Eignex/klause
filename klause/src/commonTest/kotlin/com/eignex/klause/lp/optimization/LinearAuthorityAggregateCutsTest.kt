@@ -434,6 +434,88 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `point ordering should reach scoped half rounding before an unrelated separating pair`() {
+        for (upper in listOf(false, true)) {
+            val a = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+            val b = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
+            val continuous = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+            val sign = if (upper) BigFraction.MINUS_ONE else BigFraction.ONE
+            val condition = if (upper) SourceCondition(upper = mapOf(x to sign))
+                else SourceCondition(lower = mapOf(x to sign))
+            val source = SourceProofContext(scope.copy(condition = condition),
+                setOf(x, y, real, a, b, continuous), linkedMapOf(
+                "unrelated left" to SourcePremise(SourceInequality(
+                    mapOf(a to BigFraction.ofLong(2), continuous to BigFraction.ONE), BigFraction.ofLong(3))),
+                "unrelated right" to SourcePremise(SourceInequality(
+                    mapOf(b to BigFraction.ofLong(2), continuous to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "scoped left" to SourcePremise(SourceInequality(
+                    mapOf(x to BigFraction.ofLong(3) * sign, real to BigFraction.ONE), BigFraction.ofLong(4))),
+                "scoped right" to SourcePremise(SourceInequality(
+                    mapOf(y to BigFraction.ofLong(2), real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "endpoint" to SourcePremise(SourceInequality(mapOf(x to sign.negated()), BigFraction.ZERO)),
+            ))
+            val point = mapOf(a to 0.75, b to 0.75, continuous to 1.5,
+                x to sign.toDouble(), y to 0.5, real to 1.0)
+
+            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+                maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
+                point = point).single()
+
+            assertEquals(SourceInequality(mapOf(x to sign, y to BigFraction.ONE), BigFraction.ONE), cut.inequality)
+            assertEquals(setOf(2, 3), cut.owners)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(source.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+            assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source.atScope(scope)).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
+    }
+
+    @Test
+    fun `point ordering should preserve the first separating pair without an integer scope`() {
+        val a = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val b = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
+        val continuous = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(x, y, real, a, b, continuous), linkedMapOf(
+            "first left" to SourcePremise(SourceInequality(
+                mapOf(a to BigFraction.ofLong(2), continuous to BigFraction.ONE), BigFraction.ofLong(3))),
+            "first right" to SourcePremise(SourceInequality(
+                mapOf(b to BigFraction.ofLong(2), continuous to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "left" to SourcePremise(left), "right" to SourcePremise(right)))
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
+            point = mapOf(a to 0.75, b to 0.75, continuous to 1.5, x to 0.75, y to 0.75, real to 1.5)).single()
+
+        assertEquals(SourceInequality(mapOf(a to BigFraction.ONE, b to BigFraction.ONE), BigFraction.ONE),
+            cut.inequality)
+        assertEquals(setOf(0, 1), cut.owners)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `cancelled scoped point ordering should withhold proposals and retain its charge`() {
+        val source = SourceProofContext(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ZERO))),
+            setOf(x, y, real), linkedMapOf("left" to SourcePremise(left), "right" to SourcePremise(right),
+                "loose" to SourcePremise(SourceInequality(left.coefficients, BigFraction.ofLong(100)))))
+        val events = mutableMapOf<String, Long>()
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
+        var stopped = false
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+            observe = { name, count ->
+                events[name] = (events[name] ?: 0L) + count
+                if (name == "AggregatePointScopedRows") stopped = true
+            }, limits = limits, point = mapOf(x to 0.75, y to 0.75, real to 1.5))
+
+        assertTrue(cuts.isEmpty())
+        assertTrue(assertNotNull(events["AggregateWork"]) in 1L..limits.work)
+        assertTrue(assertNotNull(events["AggregateAllocation"]) in 1L..limits.allocation)
+        assertNull(events["AggregatePairAttempts"])
+        assertEquals(1L, events["AggregatePairStopped"])
+    }
+
+    @Test
     fun `point ordering should retain its charge and withhold proposals on cancellation`() {
         val source = SourceProofContext(scope, setOf(x, y, real),
             linkedMapOf("left" to SourcePremise(left), "right" to SourcePremise(right),
