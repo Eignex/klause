@@ -29,7 +29,7 @@ internal fun recoverLinearPrimal(
     rows: List<ExactRationalInequality>,
     inactive: Set<Int>,
     cancellation: Cancellation,
-    complete: (List<ExactRationalInequality>, Int, Cancellation) -> List<BigFraction>?,
+    complete: (List<ExactRationalInequality>, List<Int>, Cancellation) -> List<BigFraction>?,
     observe: (String, Long) -> Unit,
     limits: LinearPrimalRecoveryLimits = LinearPrimalRecoveryLimits(),
     progress: LinearPrimalRecoveryProgress = LinearPrimalRecoveryProgress(),
@@ -156,7 +156,7 @@ internal fun recoverLinearPrimal(
             if (meter.satisfies(members.map { recovered[it] }, localRows)) continue
             observe("PrimalRecoveryComponents", 1L)
             val values = progress.completed[root]?.also { observe("PrimalRecoveryComponentReused", 1L) }
-                ?: complete(localRows, members.size, cancellation)
+                ?: complete(localRows, members, cancellation)
             meter.reserve(1L)
             if (values == null || values.size != members.size) {
                 observe("PrimalRecoveryComponentUnavailable", 1L)

@@ -42,6 +42,38 @@ class LinearIncumbentCompletionTest {
     private val seed = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(0.333))
 
     @Test
+    fun `residual completion should optimize disconnected real components in the source direction`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val premises = mapOf(
+            "first-lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE)),
+            "first-upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(3))),
+            "second-lower" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE),
+                BigFraction.ofLong(-4))),
+            "second-upper" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ONE), BigFraction.ofLong(6))),
+        )
+
+        for (sense in listOf(ObjectiveSense.MINIMIZE, ObjectiveSense.MAXIMIZE)) {
+            val context = SourceProofContext(scope.copy(objective = SourceObjective("cost", sense)),
+                setOf(integer, real, other), premises,
+                mapOf(real to BigFraction.ONE, other to BigFraction.MINUS_ONE), objectiveConstant = BigFraction.ONE)
+            val offered = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(0.0, 0.0))
+            var checkedValue: BigFraction? = null
+
+            val point = LinearIncumbentCompletion(SourceLpBudget(), originalCheck = { _, value, _ ->
+                checkedValue = value
+                true
+            }) { _, _ -> }.use { assertNotNull(it.complete(context, offered, Cancellation.Never)) }
+
+            val expected = if (sense == ObjectiveSense.MINIMIZE) listOf(BigFraction.ONE, BigFraction.ofLong(6))
+                else listOf(BigFraction.ofLong(3), BigFraction.ofLong(4))
+            assertEquals(expected, point.exactReals)
+            assertEquals(1L, point.intValue(0))
+            assertEquals(BigFraction.ONE + expected[0] - expected[1], checkedValue)
+        }
+    }
+
+    @Test
     fun `companions should reuse an original checked completion of the same full point`() {
         val shared = LinearIncumbentSharing()
         var checks = 0
@@ -257,19 +289,21 @@ class LinearIncumbentCompletionTest {
     }
 
     @Test
-    fun `a reconstructed continuous point should still require its original source check`() {
-        val offered = seed.copy(reals = doubleArrayOf(third.toDouble()))
-        var originalChecks = 0
+    fun `a completed continuous point should still require its original source check`() {
+        for (value in listOf(third.toDouble(), 0.333)) {
+            val offered = seed.copy(reals = doubleArrayOf(value))
+            var originalChecks = 0
 
-        LinearIncumbentCompletion(SourceLpBudget(maxOperations = 0), originalCheck = { _, _, _ ->
-            originalChecks++
-            false
-        }) { _, _ -> }.use {
-            assertNull(it.complete(source, offered, Cancellation.Never))
-            assertNull(it.complete(source, offered.copy(), Cancellation.Never))
+            LinearIncumbentCompletion(SourceLpBudget(), originalCheck = { _, _, _ ->
+                originalChecks++
+                false
+            }) { _, _ -> }.use {
+                assertNull(it.complete(source, offered, Cancellation.Never))
+                assertNull(it.complete(source, offered.copy(), Cancellation.Never))
+            }
+
+            assertEquals(1, originalChecks)
         }
-
-        assertEquals(1, originalChecks)
     }
 
     @Test

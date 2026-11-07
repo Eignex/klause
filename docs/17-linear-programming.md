@@ -1252,6 +1252,10 @@ unchanged residual retains its completed point or hard decline across proposals;
 changed exact rows, endpoints, strictness or column count retire that result.
 Small-input admission, sparse preparation, floating termination and primal
 verification report separate decline reasons and costs.
+Advisory incumbent completion maps source-column objective coefficients into each
+connected residual. Nonconstant components use the existing bounded sparse
+objective solve directly; zero-cost components retain small feasibility completion.
+Only the checked point leaves this recovery request, with no global bound or refutation.
 Small unresolved queries can use bounded exact completion; recovery declines supply
 neither a conflict nor exhaustion authority.
 Source reconstruction restores exact fixed coordinates and matching projected

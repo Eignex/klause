@@ -255,7 +255,7 @@ internal class LinearAuthorityLp(
             val retained = residualCompletion ?: LinearResidualCompletion(budget, guidancePolicy).also {
                 residualCompletion = it
             }
-            retained.complete(residual, columns, active, observe) {
+            retained.complete(residual, columns.size, active, observe) {
                 LinearAuthorityLp(budget, { shape ->
                     onShape(shape)
                     if (shape.prepared) {
@@ -264,10 +264,10 @@ internal class LinearAuthorityLp(
                         if (!shape.admitted) observe("PrimalRecoveryComponentDimension", 1L)
                     }
                 }).use { completion ->
-                    completion.solve(residual, List(columns) { BigFraction.ZERO }, BigFraction.ZERO, active,
+                    completion.solve(residual, List(columns.size) { BigFraction.ZERO }, BigFraction.ZERO, active,
                         onDecline = { observe("PrimalRecoveryExactAdmission$it", 1L) },
                         claim = LpClaim.FEASIBLE_COMPLETION)
-                        ?.result?.exactPrimal?.take(columns)
+                        ?.result?.exactPrimal?.take(columns.size)
                 }
             }.also { progress.pending = retained.paused }
         }, observe = { stage, count ->
