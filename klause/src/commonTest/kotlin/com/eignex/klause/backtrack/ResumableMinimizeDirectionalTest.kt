@@ -344,16 +344,15 @@ class ResumableMinimizeDirectionalTest {
     @Test
     fun `finite search applies or withholds confirmed advice at the actual branch`() {
         val blocks = 2
-        val variables = blocks * 3
+        val variables = blocks * 2
         val factors = ArrayList<Factor>()
         repeat(blocks) { block ->
-            val first = block * 3
-            factors.add(Linear(longArrayOf(2L, 3L, 4L),
-                intArrayOf(first, first + 1, first + 2), LinearOp.GE, 5L))
+            val first = block * 2
+            factors.add(Linear(longArrayOf(2L, 3L), intArrayOf(first, first + 1), LinearOp.GE, 1L))
         }
         val problem = Problem(0, variables, Array(variables) { IntDomain(0, 1) }, factors.toTypedArray()).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(
-            6L, 6L, 11L, 5L, 5L, 8L,
+            6L, 30L, 1L, 4L,
         ))
         val prepared = problem.prepareExecutionPlan(objective, preferFinite = true)
         val queryWork = ArrayList<Long>()
@@ -402,8 +401,8 @@ class ResumableMinimizeDirectionalTest {
                 val stats = result.stats.lp
                 val observations = stats.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
                 val diagnostic = "$observations; probes=${stats.phases["DIRECTIONAL_PROBES_NODE"]}"
-                val second = if (applyAdvice) SearchDecision.IntAtLeast(5, 1) else SearchDecision.IntAtMost(5, 0)
-                assertEquals(listOf(SearchDecision.IntAtMost(2, 0), second), attempted.take(2), diagnostic)
+                val second = if (applyAdvice) SearchDecision.IntAtLeast(2, 1) else SearchDecision.IntAtMost(2, 0)
+                assertEquals(listOf(SearchDecision.IntAtMost(0, 0), second), attempted.take(2), diagnostic)
                 assertEquals(1L, observations["SELECTED_SIDE_PROBE_ATTEMPT"], diagnostic)
                 assertEquals(1L, observations["SELECTED_SIDE_PROBE_COMPARED"], diagnostic)
                 assertEquals(1L, observations["PROBE_SIDES_PREPARED"], diagnostic)
