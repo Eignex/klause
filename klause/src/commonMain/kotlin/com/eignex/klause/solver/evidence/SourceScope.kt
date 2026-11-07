@@ -51,6 +51,10 @@ class SourceCondition(
     /** Inclusive numeric upper bounds, including exact pins. */
     val upper: Map<SourceCoordinate, BigFraction> get() = capturedUpper.toMap()
 
+    internal val hasNumericBounds: Boolean get() = capturedLower.isNotEmpty() || capturedUpper.isNotEmpty()
+    internal fun boundValue(coordinate: SourceCoordinate, upper: Boolean): BigFraction? =
+        if (upper) capturedUpper[coordinate] else capturedLower[coordinate]
+
     init {
         require(capturedBools.keys.all { it >= 0 })
         require((capturedLower.keys + capturedUpper.keys).none { it.kind == SourceCoordinate.Kind.Boolean })
