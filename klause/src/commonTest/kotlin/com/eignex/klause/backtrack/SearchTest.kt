@@ -55,7 +55,7 @@ class SearchTest {
         val result = BacktrackSolver(problemOf(IntDomain(0, 1), IntDomain(0, 1)).bake()).solve(params)
 
         assertIs<SolveResult.Sat>(result)
-        assertEquals(listOf(SearchDecision.IntAtMost(0, 0), SearchDecision.IntAtMost(1, 0)), attempts)
+        assertEquals(listOf<SearchDecision>(SearchDecision.IntAtMost(0, 0), SearchDecision.IntAtMost(1, 0)), attempts)
         assertEquals(attempts.mapIndexed { index, decision -> decision to index + 1 }, commits)
     }
 
