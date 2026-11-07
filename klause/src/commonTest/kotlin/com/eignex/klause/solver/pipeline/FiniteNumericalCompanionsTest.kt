@@ -13,6 +13,7 @@ import com.eignex.klause.portfolio.PortfolioProgress
 import com.eignex.klause.portfolio.PortfolioRewardPolicy
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
@@ -32,6 +33,43 @@ import kotlin.time.TestTimeSource
 
 class FiniteNumericalCompanionsTest {
     @Test
+    fun `opt in companion repair should publish a coupled three integer improvement`() {
+        val model = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+        val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 3)
+        val cost = finiteNumericalCompanionEligibility(model, PortfolioScenario.sequential(Kind.COP),
+            objective, params).requirements.construction
+        for (adaptive in listOf(false, true)) {
+            val companions = assertNotNull(FiniteNumericalCompanions.prepare(model, objective, params,
+                Cancellation.Never, cost, incumbentCompletionCheck = { _, _, _ -> true },
+                adaptiveRepair = adaptive).companions)
+            val center = Sample(BooleanArray(0), longArrayOf(1, 1, 1), doubleArrayOf(0.0),
+                exactReals = listOf(BigFraction.ZERO))
+            companions.incumbents.exchange.offer(center, BigFraction.ofLong(3))
+            var result: MinimizeResult? = null
+
+            PortfolioInvocationResources(2, 1, 0, Cancellation.Never, null).use { resources ->
+                companions.factories(plan, 0).last().materialize(plan, resources.slots[1]).use { worker ->
+                    assertNotNull(worker.newResumableSearch { 3.0 }).use { search ->
+                        repeat(32) {
+                            if (!search.isDone) result = search.runSlice(Cancellation.Never, 1_000, 5_000) { }
+                        }
+                        assertEquals(if (adaptive) 3L else 2L,
+                            search.stats.smt.completeSearchStages?.get("jointRepairMaxFreedIntegers"))
+                    }
+                }
+            }
+
+            if (adaptive) assertEquals(0.0, assertIs<MinimizeResult.WithSample>(result).objective)
+            else assertTrue(result !is MinimizeResult.WithSample)
+        }
+    }
+
+    @Test
     fun `funded companions should avoid capture when cancellation precedes every query`() {
         for ((afterImprovement, unavailable) in listOf(false to false, false to true, true to false, true to true)) {
             val factors = if (unavailable) arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 0))
@@ -45,8 +83,9 @@ class FiniteNumericalCompanionsTest {
 
             val result = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
                 plan, Cancellation.until(clock.markNow() + 30.seconds), numericalCompletion = true,
-                numericalCompanions = TheoryParams(), fundedCompanions = true,
-                waitForCompanionImprovement = afterImprovement).use {
+                numericalCompanions = TheoryParams(sourceIncumbentCompletion = afterImprovement),
+                fundedCompanions = true,
+                waitForCompanionImprovement = afterImprovement, adaptiveCompanionRepair = afterImprovement).use {
                 it.minimize(Cancellation { true }, null)
             }
 
@@ -73,8 +112,9 @@ class FiniteNumericalCompanionsTest {
             plan, lifetime, numericalCompletion = true)
         val candidate = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null,
             { _, event -> if (event is SearchEvent.WorkerAdmission) events += event }, null,
-            plan, lifetime, numericalCompletion = true, numericalCompanions = TheoryParams(),
-            fundedCompanions = true, waitForCompanionImprovement = true)
+            plan, lifetime, numericalCompletion = true,
+            numericalCompanions = TheoryParams(sourceIncumbentCompletion = true),
+            fundedCompanions = true, waitForCompanionImprovement = true, adaptiveCompanionRepair = true)
 
         baseline.use { before -> candidate.use { after ->
             assertEquals(before.resources.slots.map { it.seed }, after.resources.slots.map { it.seed })
@@ -101,8 +141,9 @@ class FiniteNumericalCompanionsTest {
             val baseline = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
                 plan, lifetime, numericalCompletion = true)
             val candidate = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
-                plan, lifetime, numericalCompletion = true, numericalCompanions = TheoryParams(),
-                fundedCompanions = true, waitForCompanionImprovement = true)
+                plan, lifetime, numericalCompletion = true,
+                numericalCompanions = TheoryParams(sourceIncumbentCompletion = true),
+                fundedCompanions = true, waitForCompanionImprovement = true, adaptiveCompanionRepair = true)
 
             baseline.use { before -> candidate.use { after ->
                 assertEquals(before.resources.slots.map { it.seed }, after.resources.slots.map { it.seed })

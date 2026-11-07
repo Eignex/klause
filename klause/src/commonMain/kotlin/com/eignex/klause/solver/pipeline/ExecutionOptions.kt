@@ -547,6 +547,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         internal val companionAdmission: ExecutionOption<String> =
             ExecutionOption("companion-admission", ValueKind.STRING)
 
+        internal val companionRepair: ExecutionOption<String> = ExecutionOption("companion-repair", ValueKind.STRING)
+
         /** Stream physical phase and lifecycle progress independently of deterministic work diagnostics. */
         val portfolioProgress: ExecutionOption<Boolean> = ExecutionOption("portfolio-progress", ValueKind.BOOLEAN)
 
@@ -627,7 +629,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 lambda, arms, localSearchArms, backtrackArms, clauseShareLbd,
                 clauseShareLen, sliceWork, sliceMaxWork, sliceGrowth, portfolioWork, coreEarly, companionIntegers,
                 rootMaintenance, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
-                coreRefinement, companionAfterIncumbent, companionActiveMillis, companionAdmission, portfolioProgress,
+                coreRefinement, companionAfterIncumbent, companionActiveMillis, companionAdmission, companionRepair,
+                portfolioProgress,
                 phaseRetention, portfolioReward, portfolioProofShare, portfolioProofWorkers, portfolioLpStart,
                 booleanProofTasks,
                 portfolioProbes, portfolioPublications, reseedStaleThreshold,

@@ -87,6 +87,7 @@ internal fun FinitePipeline.portfolioExecutor(
     fundedCompanions: Boolean = false,
     waitForCompanionImprovement: Boolean = false,
     privateRebuildBudgetOnly: Boolean = false,
+    adaptiveCompanionRepair: Boolean = false,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
         "portfolio-work requires a finite Boolean/integer source without numerical companions"
@@ -120,6 +121,9 @@ internal fun FinitePipeline.portfolioExecutor(
     val companionEligibility = numericalCompanions?.let {
         finiteNumericalCompanionEligibility(problem, scenario, objective, it)
     }
+    if (adaptiveCompanionRepair && numericalCompanions?.sourceIncumbentCompletion != true) {
+        pipelineConfigError("companion-repair=adaptive requires source-incumbent-completion for numerical companions")
+    }
     if (waitForCompanionImprovement && !fundedCompanions) {
         pipelineConfigError("progress-funded companion admission requires funded construction")
     }
@@ -134,12 +138,13 @@ internal fun FinitePipeline.portfolioExecutor(
     val companionPreparation = if (!fundedCompanions && companionEligibility?.admitted == true) {
         FiniteNumericalCompanions.prepare(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
             cancellation, companionEligibility.requirements.construction, scenario.companionAfterIncumbent,
-            incumbentCompletionCheck)
+            incumbentCompletionCheck, adaptiveRepair = adaptiveCompanionRepair)
     } else null
     val companions = if (companionAdmission?.initiallyFunded == true) {
         FiniteNumericalCompanions.deferred(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
             cancellation, requireNotNull(companionEligibility).requirements.construction, companionAdmission,
-            incumbentCompletionCheck, afterImprovement = waitForCompanionImprovement)
+            incumbentCompletionCheck, afterImprovement = waitForCompanionImprovement,
+            adaptiveRepair = adaptiveCompanionRepair)
     } else companionPreparation?.companions
     companionEligibility?.let { eligibility ->
         val declines = if (companionAdmission?.initiallyFunded == false) listOf("companion-lifetime-unfunded")
