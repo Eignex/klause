@@ -104,7 +104,7 @@ internal class LpHints(
     }
 
     fun directionalScore(variable: VarRef): Double {
-        if (!collect || !directionalGains || !objectiveRecorded) return Double.NaN
+        if (!collect || !directionalGains || !objectiveRecorded || !history.hasTwoSidedSamples) return Double.NaN
         charge(1L)
         return history.score(variable, value(variable))
     }

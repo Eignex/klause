@@ -24,6 +24,8 @@ internal class LpDirectionalHistory(
     private var stamp = 0L
     private var depth = 0
     private var objective = Double.NaN
+    private var upSamples = 0
+    private var downSamples = 0
 
     fun beginNode(level: Int) {
         stamp++
@@ -34,11 +36,15 @@ internal class LpDirectionalHistory(
 
     val retainedEntries: Int get() = gains.size + parents.size
 
+    val hasTwoSidedSamples: Boolean get() = upSamples >= RELIABILITY && downSamples >= RELIABILITY
+
     fun clear(report: Boolean = true) {
         gains.clear()
         parents.clear()
         pending = null
         objective = Double.NaN
+        upSamples = 0
+        downSamples = 0
         if (report) observe("RESET")
     }
 
@@ -58,6 +64,8 @@ internal class LpDirectionalHistory(
         direction.count = minOf(direction.count + 1, 8)
         direction.mean += (normalized - direction.mean) / direction.count
         direction.stamp = stamp
+        if (child.up) upSamples = minOf(upSamples + 1, RELIABILITY)
+        else downSamples = minOf(downSamples + 1, RELIABILITY)
         observe(if (child.up) "UP" else "DOWN")
     }
 

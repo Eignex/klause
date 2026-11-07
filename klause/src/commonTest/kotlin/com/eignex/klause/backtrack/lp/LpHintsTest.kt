@@ -28,6 +28,46 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpHintsTest {
+    @Test
+    fun `directional scoring skips lookup work until both directions have enough samples`() {
+        for (prefix in listOf(listOf(false, false), listOf(false, true))) {
+            val builder = LpBuilder()
+            builder.addVar(0, 10, cost = 1)
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+            var work = 0L
+            val hints = LpHints(1, 0, directionalGains = true, charge = { work += it })
+            val variable = VarRef.IntVar(0)
+            for ((phase, directions) in listOf(prefix, listOf(false, false, true, true)).withIndex()) {
+                for (up in directions) {
+                    hints.beginNode(0, 100.0)
+                    hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+                    hints.recordObjective(relaxation, 10.0)
+                    hints.branch(variable)
+                    hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                    hints.beginNode(1, 100.0)
+                    hints.record(relaxation, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(0))
+                    hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+                }
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+                hints.recordObjective(relaxation, 10.0)
+                val before = work
+
+                val score = hints.directionalScore(variable)
+
+                if (phase == 0) {
+                    assertTrue(score.isNaN())
+                    assertEquals(before, work)
+                } else {
+                    assertEquals(1.5, score, 1e-9)
+                    assertEquals(before + 1L, work)
+                }
+            }
+        }
+    }
+
 
     private fun recordedHints(lpValue: Double): LpHints {
         val p = Problem(
