@@ -127,6 +127,7 @@ class LinearAuthorityPointCutsTest {
                 (assertNotNull(restored.bound).claim as SourceClaim.Bound).value)
             assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(mixedMaximum.withLinearAuthority())
                 .verify(assertNotNull(candidate.bound)))
+            assertEquals(0L, authority.cutObservations()["numericalCutSelectionUnchangedPreparations"] ?: 0L)
         }
     }
 
@@ -139,12 +140,35 @@ class LinearAuthorityPointCutsTest {
             authority.advanceWithPointCuts(nonseparating, Cancellation.Never)
             val preparations = authority.preparations
             val scoring = authority.cutObservations()["numericalCutSelectionWork"]
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionUnchangedPreparations"])
+            assertNull(scoring)
 
             val result = authority.advanceWithPointCuts(nonseparating, Cancellation.Never)
 
             assertEquals(listOf(true, true), capture.records.map { it.cuts.single().installed })
             assertEquals(preparations, authority.preparations)
             assertEquals(scoring, authority.cutObservations()["numericalCutSelectionWork"])
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(nonseparating.withLinearAuthority())
+                .verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
+    fun `an interrupted unchanged comparison should keep its checked base bound`() {
+        var cancelled = false
+        var observed: LinearAuthority? = null
+        val budget = SourceLpBudget(onWork = {
+            if ((observed?.cutObservations()?.get("numericalCutSelectionPreparationReuseChecks") ?: 0L) > 0L) {
+                cancelled = true
+            }
+        })
+        LinearAuthority(budget, retainLp = true).use { authority ->
+            observed = authority
+
+            val result = authority.advanceWithPointCuts(nonseparating, Cancellation { cancelled })
+
+            assertTrue(cancelled)
+            assertEquals(0L, authority.cutObservations()["numericalCutSelectionUnchangedPreparations"] ?: 0L)
             assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(nonseparating.withLinearAuthority())
                 .verify(assertNotNull(result.bound)))
         }
