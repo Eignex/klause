@@ -53,8 +53,8 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
     private val directory = MutableIntObjectIndex<Page>()
     private var directoryIdentity = Any()
     private var primary: Page? = null
-    private var cachedIndex = -1
-    private var cachedPage: Page? = null
+    private val cachedIndices = IntArray(CACHE_SIZE)
+    private val cachedPages = arrayOfNulls<Page>(CACHE_SIZE)
     private var emptyHead: Page? = null
     private var emptyTail: Page? = null
     private var budget: ReclamationPreparation? = null
@@ -63,11 +63,14 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
     private var words = 0L
     private var pageCount = 0
     private var referenceSlots = 0L
-    val preparationWork: Long get() = 46L
+    val preparationWork: Long get() = 46L + cachedIndices.size * 2L + cachedPages.size * 2L
     val capacityBytes: Long get() = words * Int.SIZE_BYTES
     val referenceCapacity: Long get() = referenceSlots
+    // The index-array owner reference accompanies the cache's reference slots.
+    val cacheReferenceCapacity: Long get() = cachedPages.size + 1L
     val directoryCapacity: Long get() = directory.referenceCapacity
-    val primitiveBytes: Long get() = 28L + pageCount * 16L + directory.primitiveCapacityBytes
+    val primitiveBytes: Long get() = 24L + cachedIndices.size.toLong() * Int.SIZE_BYTES +
+        pageCount * 16L + directory.primitiveCapacityBytes
 
     fun <T> usingBudget(active: ReclamationPreparation, operation: () -> T): T {
         val previous = budget
@@ -77,16 +80,18 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
 
     private inline fun locate(index: Int, visit: (Long) -> Unit): Page? {
         if (index == 0) return primary
-        if (cachedIndex == index) return cachedPage
+        val cacheSlot = index and CACHE_MASK
+        if (cachedIndices[cacheSlot] == index) return cachedPages[cacheSlot]
         val page = directory.lookup(index, visit)
-        cachedIndex = index
-        cachedPage = page
+        cachedIndices[cacheSlot] = index
+        cachedPages[cacheSlot] = page
         return page
     }
 
     private fun pageAt(index: Int): Page? {
         if (index == 0) return primary
-        if (cachedIndex == index) return cachedPage
+        val cacheSlot = index and CACHE_MASK
+        if (cachedIndices[cacheSlot] == index) return cachedPages[cacheSlot]
         return locate(index) { units ->
             val active = budget
             if (active != null) active.visit(units) else state?.let { it.work += units }
@@ -125,8 +130,9 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
             page.slot = directory.getOrPutSlot(index) { page }
             insertionWork(directory.lastWork)
             directoryIdentity = Any()
-            cachedIndex = index
-            cachedPage = page
+            val cacheSlot = index and CACHE_MASK
+            cachedIndices[cacheSlot] = index
+            cachedPages[cacheSlot] = page
         }
         pageCount++
         referenceSlots += page.rows.size
@@ -181,12 +187,16 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
         page.queued = 0
         if (page.live != 0) return
         val slot = page.slot
+        val cacheSlot = slot?.let { it.key and CACHE_MASK } ?: -1
         if (slot == null) { check(primary === page); primary = null } else {
             check(directory.remove(slot, {}, {}))
             directoryIdentity = Any()
         }
         pageCount--
-        if (cachedPage === page) { cachedPage = null; cachedIndex = -1 }
+        if (cacheSlot >= 0 && cachedPages[cacheSlot] === page) {
+            cachedIndices[cacheSlot] = 0
+            cachedPages[cacheSlot] = null
+        }
     }
 
     fun move(source: Int, target: Int): Long {
@@ -257,8 +267,10 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
         val retained = directory.protectedCapacity({ units -> repeat(units.toInt()) { sample.step() } }) {
             index, page -> page.sharingMemory(sample, index shl PAGE_SHIFT, protectedRows, allPermanent, protected)
         }
-        sample.owned(this, 28L, protectedRows)
-        sample.ownedReferences(this, 8L, protectedRows)
+        sample.owned(this, 24L, protectedRows)
+        sample.owned(cachedIndices, cachedIndices.size.toLong() * Int.SIZE_BYTES, protectedRows)
+        sample.ownedReferences(this, 9L, protectedRows)
+        sample.ownedReferences(cachedPages, cachedPages.size.toLong(), protectedRows)
         sample.ownedPool(directoryIdentity, directory.primitiveCapacityBytes,
             retained.first + if (protectedRows) 12L else 0L)
         sample.ownedReferencesPool(directoryIdentity, directory.referenceCapacity,
@@ -266,6 +278,8 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
     }
 
     private companion object {
+        const val CACHE_SIZE = 2048
+        const val CACHE_MASK = CACHE_SIZE - 1
         const val PAGE_SHIFT = 6
         const val PAGE_SIZE = 1 shl PAGE_SHIFT
         const val PAGE_MASK = PAGE_SIZE - 1

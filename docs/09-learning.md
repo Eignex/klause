@@ -603,6 +603,12 @@ grant, or the containing propagation ledger. A fixed-size page cache avoids repe
 lookups during ranking, with 128 reference slots for General metadata and 2048 for
 Native metadata. Initialization work and reference ownership include the allocated
 cache length. Header unlinking clears its cache slot before releasing the page.
+Native learned payloads cache 2048 page lookups, including absent pages, with fixed
+primitive index tags. Both arrays and their owner references belong to state
+preparation and ownership accounting, separately from payload-row reference capacity.
+A cold lookup funds each visited index node
+before publishing its cached result. Page installation replaces a cached absence;
+funded header unlinking clears its cached page reference before returning.
 A page queue and per-page retirement masks resume row release without scanning
 permanent rows or looking up another page. Retained import/use counters survive
 released metadata. Empty arrays release within their row transaction; empty headers
