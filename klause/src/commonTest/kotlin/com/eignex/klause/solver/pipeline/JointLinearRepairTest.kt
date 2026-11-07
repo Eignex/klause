@@ -43,6 +43,83 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `a delayed prepared center should use a newer checked cutoff without changing its neighborhood`() {
+        for (sign in listOf(1L, -1L)) {
+            val model = Problem(0,
+                intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+                factors = arrayOf(
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                    Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+                ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+            val objective = LinearObjective(intCoefficients = LongArray(3) { sign },
+                realCoefficients = doubleArrayOf(sign.toDouble()))
+            val source = assertNotNull(model.linearAuthorityContext(
+                objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+            val oldValue = if (sign > 0) 1L else 0L
+            var offered = Sample(BooleanArray(0), LongArray(3) { oldValue }, doubleArrayOf(oldValue.toDouble()),
+                exactReals = listOf(BigFraction.ofLong(oldValue)))
+            val events = mutableListOf<JointRepairComparison>()
+
+            JointLinearRepair(model, source, objective,
+                TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1), external = { offered },
+                incumbentCompletionCheck = { _, _, _ -> true }, onComparison = { events += it }).use { repair ->
+                repair.search(adaptive = false).use { search ->
+                    search.advance(Cancellation.Never, 1)
+                    assertEquals(BigFraction.ofLong(4 * sign * oldValue),
+                        events.first { it.phase == "center" }.completedValue)
+                    offered = Sample(BooleanArray(0), LongArray(3) { 1 - oldValue },
+                        doubleArrayOf(oldValue.toDouble()), exactReals = listOf(BigFraction.ofLong(oldValue)))
+                    var done = false
+                    repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+
+                    assertEquals(listOf(BigFraction.ofLong(sign * (3 - 2 * oldValue))),
+                        events.filter { it.phase == "query" }.map { it.cutoff })
+                    assertIs<MinimizeResult.Unknown>(search.minimizeResult(TerminationReason.BudgetExhausted))
+                    assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairCutoffClosures"))
+                    assertTrue(done)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `unqualified fresh points should preserve the prepared cutoff without advisory completion`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+            factors = emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(1.0))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        for ((exact, real, originalAccepted) in listOf(Triple(false, 1L, true), Triple(true, 2L, true),
+                Triple(true, 1L, false))) {
+            var offered = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(1.0),
+                exactReals = listOf(BigFraction.ONE))
+            var halted = false
+            val events = mutableListOf<JointRepairComparison>()
+            val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1,
+                cancellation = Cancellation { halted })
+            JointLinearRepair(model, source, objective, params, external = { offered },
+                incumbentCompletionCheck = { _, _, _ -> originalAccepted }, onComparison = {
+                    events += it
+                    if (it.phase == "query") halted = true
+                }).use { repair ->
+                repair.search(adaptive = false).use { search ->
+                    search.advance(Cancellation.Never, 1)
+                    assertEquals(BigFraction.ofLong(3), events.first { it.phase == "center" }.completedValue)
+                    offered = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(real.toDouble()),
+                        exactReals = if (exact) listOf(BigFraction.ofLong(real)) else null)
+                    repeat(32) { if (!halted) search.advance(Cancellation.Never, 5_000) }
+
+                    assertEquals(listOf(BigFraction.ofLong(3)),
+                        events.filter { it.phase == "query" }.map { it.cutoff })
+                    assertEquals(0L,
+                        repair.stats.smt.completeSearchStages?.get("jointRepairExternalCompletionAttempts") ?: 0L)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `completion comparisons should distinguish advisory and exact real objectives`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
             factors = arrayOf(Linear(intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), doubleArrayOf(3.0),

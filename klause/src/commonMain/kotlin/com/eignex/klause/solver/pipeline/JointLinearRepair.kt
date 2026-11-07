@@ -186,6 +186,27 @@ internal class JointLinearRepair(
         return CheckedCenter(sample, value)
     }
 
+    private fun refreshedCutoff(cutoff: BigFraction?): BigFraction? {
+        if (cutoff == null || completion == null || stop()) return cutoff
+        val sample = external() ?: return cutoff
+        if (sample.algebraicReals != null || sample.symbolicReals != null ||
+            (model.numRealVars != 0 && sample.exactReals?.size != model.numRealVars)
+        ) return cutoff
+        budget.observe(boundCertification = 1L + model.numBoolVars + model.numIntVars + model.numRealVars)
+        val checking = completion.checking(stop)
+        if (checking()) return cutoff
+        val evidence = SourceEvidence(source.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)
+        if (SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence, checking) !=
+            SourceEvidenceCheck.Checked
+        ) return cutoff
+        val value = objective?.evaluateExact(sample) ?: return cutoff
+        if (value >= cutoff) return cutoff
+        if (incumbentCompletionCheck?.invoke(sample, value, checking) == false || checking()) return cutoff
+        observe("jointRepairCheckedCutoffRefreshes")
+        compare("cutoff", "refreshed", completed = value, cutoff = cutoff)
+        return value
+    }
+
     private fun queryObservations(): Map<String, Long> =
         query?.stats?.smt?.completeSearchStages.orEmpty().mapKeys { (key, _) ->
             when (key) {
@@ -235,7 +256,9 @@ internal class JointLinearRepair(
                     List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) } +
                         sample.exactReals.orEmpty()
                 } ?: centers
-                val limit = checked?.value ?: cutoff
+                val priorLimit = checked?.value ?: cutoff
+                val limit = if (round == 0L && checked != null && checked === preparedCenter)
+                    refreshedCutoff(priorLimit) else priorLimit
                 if (sourceInputPass && !adaptive && limit != null && limit != focusedCutoff) {
                     focusedCutoff = limit
                     focusedRemaining = sourceIntegers?.size ?: model.numIntVars
