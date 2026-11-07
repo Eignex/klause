@@ -15,6 +15,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -40,6 +41,17 @@ class NumericalFrontierSnapshotTest {
         SourceClaim.Bound(SourceValue.Rational(half)),
         SourceDerivation.Combination(listOf(SourceDerivation.Combination.Term(half, SourceDerivation.Premise("half")))),
     )
+
+    @Test
+    fun `frontier invocation should open without shared repair guidance`() {
+        val invocation = NumericalFrontierSnapshot.open(context, TheoryParams())
+
+        try {
+            assertEquals(0L, NumericalFrontierSnapshot.stats(invocation).smt.sourceLp.operations.toLong())
+        } finally {
+            (invocation as AutoCloseable).close()
+        }
+    }
 
     @Test
     fun `selection capture should expose empty journal limits`() {
