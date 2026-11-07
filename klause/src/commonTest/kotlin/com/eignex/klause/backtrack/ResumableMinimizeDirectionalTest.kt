@@ -392,8 +392,10 @@ class ResumableMinimizeDirectionalTest {
                 btPool = listOf { BacktrackRecipe("probe-child-order") { _, _ -> params } })
             val prepared = problem.prepareExecutionPlan(objective, preferFinite = true)
             val cancellation = Cancellation { attempted.size >= 2 }
-            FinitePipeline.portfolioExecutor(problem, scenario, objective, null, null, null, null,
-                prepared, cancellation, numericalCompletion = false, lpDirectionalAdvice = requested).use { invocation ->
+            FinitePipeline.portfolioExecutor(
+                problem, scenario, objective, null, null, null, null,
+                prepared, cancellation, numericalCompletion = false, lpDirectionalAdvice = requested,
+            ).use { invocation ->
                 val result = invocation.minimize(cancellation, null)
 
                 val stats = result.stats.lp
