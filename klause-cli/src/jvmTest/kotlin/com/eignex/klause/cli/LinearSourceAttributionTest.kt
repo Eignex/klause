@@ -81,8 +81,8 @@ class LinearSourceAttributionTest(
             }
 
             override fun onLinearSourceResult(result: SourceExecutionResult) { retained = result }
-            override fun onComplete(verdict: Verdict) {}
-            override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {}
+            override fun onComplete(verdict: Verdict) = Unit
+            override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) = Unit
         }
 
         SolveCore.solve(solvable, common, output)
