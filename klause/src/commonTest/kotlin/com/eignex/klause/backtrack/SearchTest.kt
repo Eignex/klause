@@ -65,7 +65,8 @@ class SearchTest {
         val commits = ArrayList<SearchDecision>()
         val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
             componentFactory = { listOf(object : SearchComponent {
-                override fun assert(decision: SearchDecision, context: SearchContext) = ComponentResult.Conflict()
+                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+                    if (context.decisionLevel > 0) ComponentResult.Conflict() else ComponentResult.Consistent
             }) },
             branchObserver = object : SearchBranchAttemptObserver {
                 override fun onAttempt(decision: SearchDecision, context: SearchContext) {
@@ -84,11 +85,14 @@ class SearchTest {
     }
 
     @Test
-    fun `cancellation during an attempted branch supplies no commit callback`() {
+    fun `an interrupted branch assertion supplies no commit callback`() {
         var cancelled = false
         val commits = ArrayList<SearchDecision>()
         val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
-            componentFactory = { listOf(object : SearchComponent {}) },
+            componentFactory = { listOf(object : SearchComponent {
+                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+                    if (cancelled) ComponentResult.Indeterminate else ComponentResult.Consistent
+            }) },
             cancellation = Cancellation { cancelled }, branchObserver = object : SearchBranchAttemptObserver {
                 override fun onAttempt(decision: SearchDecision, context: SearchContext) {
                     cancelled = true
