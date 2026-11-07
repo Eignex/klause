@@ -392,7 +392,7 @@ class ResumableMinimizeDirectionalTest {
             )
             val scenario = PortfolioScenario(1, 1, Kind.COP, EngineMix.BACKTRACK, seed = 3L,
                 btPool = listOf { BacktrackRecipe("probe-child-order") { _, _ -> params } })
-            val cancellation = Cancellation { attempted.size >= 2 }
+            val cancellation = Cancellation { attempted.size >= 3 }
             FinitePipeline.portfolioExecutor(
                 problem, scenario, objective, null, null, null, null,
                 prepared, cancellation, numericalCompletion = false, lpDirectionalAdvice = requested,
@@ -410,6 +410,8 @@ class ResumableMinimizeDirectionalTest {
                 assertEquals(if (applyAdvice) 1L else 0L, observations["PROBE_SIDE_CONSUMED"] ?: 0L, diagnostic)
                 assertEquals(if (applyAdvice) 0L else 1L, observations["PROBE_SIDE_WITHHELD"] ?: 0L, diagnostic)
                 assertEquals(if (applyAdvice) 1L else 0L, observations["PROBE_SIDE_BASELINE_CHANGED"] ?: 0L, diagnostic)
+                assertEquals(if (applyAdvice) 1L else 0L,
+                    observations["SELECTED_SIDE_PROBE_COMMIT_CHANGED"] ?: 0L, diagnostic)
                 assertEquals(0L, observations["VARIABLE_PROBE_CONSUMED"] ?: 0L, diagnostic)
                 assertEquals(0L, observations["VARIABLE_PROBE_WITHHELD"] ?: 0L, diagnostic)
                 assertEquals(0L, observations["VARIABLE_BASELINE_CHANGED"] ?: 0L, diagnostic)

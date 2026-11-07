@@ -333,7 +333,12 @@ probe and containing LP allowance, holding 80 units for completion and applicati
 The two finite child values are used immediately and are not retained as history or
 proof authority. `SELECTED_SIDE_PROBE_ATTEMPT` and `SELECTED_SIDE_PROBE_COMPARED`
 separate admission from complete comparisons. Selected-child mode performs no
-passive or basis variable nominations.
+passive or basis variable nominations. Application and commitment are distinct:
+`SELECTED_SIDE_PROBE_COMMITTED` records the preferred first child after a consistent
+push creates its decision level; `SELECTED_SIDE_PROBE_COMMIT_CHANGED` identifies a
+committed change from the original order. A cancelled or withdrawn proposal earns
+no commitment observation. The owner retains one pending first-child reference
+until that first commitment or a node, point or scope change.
 
 Explicit variable-guidance construction can instead nominate the largest reliable passive score
 among unassigned variables, including variables outside the reduced-cost leaders.

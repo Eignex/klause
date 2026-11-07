@@ -778,6 +778,12 @@ class LpHintsTest {
                 assertEquals(if (apply) 1 else 0, events.count { it == "PROBE_SIDE_CONSUMED" })
                 assertEquals(if (apply) 0 else 1, events.count { it == "PROBE_SIDE_WITHHELD" })
                 assertEquals(0, events.count { it == "VARIABLE_CONSUMED" })
+                assertEquals(0, events.count { it == "SELECTED_SIDE_PROBE_COMMITTED" })
+                hints.commit(ordered[0], 2)
+                hints.commit(ordered[1], 2)
+                assertEquals(if (apply) 1 else 0, events.count { it == "SELECTED_SIDE_PROBE_COMMITTED" })
+                assertEquals(if (apply) 1 else 0, events.count { it == "SELECTED_SIDE_PROBE_COMMIT_CHANGED" })
+                assertEquals(if (apply) 0 else 1, events.count { it == "SELECTED_SIDE_PROBE_COMMIT_WITHHELD" })
                 charged += work
             }
             assertEquals(charged[0], charged[1])

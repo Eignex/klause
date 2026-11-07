@@ -63,6 +63,8 @@ internal class LpHints(
     private var pendingSide: SideAdvice? = null
     private var pendingProbeSide: SideAdvice? = null
     private var activeSide: SideAdvice? = null
+    private var selectedFirst: SearchDecision? = null
+    private var selectedFirstChanged = false
     private var rootBasisAttempted = false
     private var pointProbed = false
     private var lastProbeState: LpExactState? = null
@@ -100,6 +102,7 @@ internal class LpHints(
         pendingSide = null
         pendingProbeSide = null
         activeSide = null
+        selectedFirst = null
         boundRecorded = false
         variableProbeProposal = false
         variableBasisProposal = false
@@ -296,12 +299,14 @@ internal class LpHints(
                 pendingSide = null
                 pendingProbeSide = null
                 activeSide = null
+                selectedFirst = null
                 boundRecorded = false
             }
         }
     }
 
     fun branch(variable: VarRef, domain: IntDomain? = null) {
+        selectedFirst = null
         val side = pendingSide?.takeIf { it.variable == variable } ?: pendingProbeSide
         activeSide = side?.takeIf {
             val point = if (it.variable == variable) value(variable, domain) else Double.NaN
@@ -315,6 +320,12 @@ internal class LpHints(
     }
 
     fun commit(decision: SearchDecision, depth: Int) {
+        val preferred = selectedFirst
+        selectedFirst = null
+        if (preferred == decision) {
+            observe(if (applyAdvice) "SELECTED_SIDE_PROBE_COMMITTED" else "SELECTED_SIDE_PROBE_COMMIT_WITHHELD")
+            if (applyAdvice && selectedFirstChanged) observe("SELECTED_SIDE_PROBE_COMMIT_CHANGED")
+        }
         if (collect && scopeModel != null) {
             history.commit(decision, depth)
         }
@@ -542,7 +553,11 @@ internal class LpHints(
             observe("SELECTED_SIDE_PROBE_TIED")
             return alternatives
         }
-        return applySide(variable, alternatives, advice, allowBasis = false, allowProbe = true)
+        charge(2L)
+        val ordered = applySide(variable, alternatives, advice, allowBasis = false, allowProbe = true)
+        selectedFirst = ordered[0]
+        selectedFirstChanged = ordered[0] != alternatives[0]
+        return ordered
     }
 
     fun compareProbeVariables(
@@ -627,6 +642,7 @@ internal class LpHints(
         else SideAdvice(variable, floor(point).toLong(), values.up < values.down, basis = false, probe = true)
 
     private fun clearProbeSides() {
+        selectedFirst = null
         pendingProbeSide = null
         if (pendingSide?.probe == true) pendingSide = null
         if (activeSide?.probe == true) activeSide = null
@@ -728,6 +744,7 @@ internal class LpHints(
         pendingSide = null
         pendingProbeSide = null
         activeSide = null
+        selectedFirst = null
         if (!collect || !directionalGains || !freshRecord || variable == null) return false
         val value = value(variable, domain)
         if (!fractional(variable, value)) return false
@@ -777,6 +794,7 @@ internal class LpHints(
     ): List<SearchDecision> {
         val advice = activeSide ?: return alternatives
         activeSide = null
+        selectedFirst = null
         return applySide(variable, alternatives, advice, allowBasis, allowProbe)
     }
 
@@ -913,6 +931,7 @@ internal class LpHints(
         pendingSide = null
         pendingProbeSide = null
         activeSide = null
+        selectedFirst = null
         boundRecorded = false
         unavailable = LpHintUnavailable.UNOBSERVED
         variableProbeProposal = false
@@ -943,6 +962,7 @@ internal class LpHints(
         pendingSide = null
         pendingProbeSide = null
         activeSide = null
+        selectedFirst = null
         pointRelaxation = null
         freshRecord = false
         boundRecorded = false
@@ -973,6 +993,7 @@ internal class LpHints(
         pendingSide = null
         pendingProbeSide = null
         activeSide = null
+        selectedFirst = null
         boundRecorded = false
         unavailable = LpHintUnavailable.NO_BOUND
         val model = relaxation.model
