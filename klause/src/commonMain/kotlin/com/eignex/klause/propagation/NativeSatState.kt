@@ -189,9 +189,9 @@ internal class NativeSatState(private val state: PropagationState) {
         watchSizes[lit] = entries.size
     }
 
-    private fun orderedWatchCopies(lit: Int, index: Int, limit: Int = MAX_ORDERED_CLEANUP_COPIES): Int {
+    private fun orderedWatchCopies(lit: Int, index: Int): Int {
         val count = watchSizes[lit] - index - 1
-        return if (count <= limit) count else -1
+        return if (count <= MAX_ORDERED_CLEANUP_COPIES) count else -1
     }
 
     private fun watchRemovalWork(lit: Int, copies: Int = -1): Long =
@@ -206,6 +206,17 @@ internal class NativeSatState(private val state: PropagationState) {
         watchSizes[lit] = entries.size
         if (entries.size == 0) watchEntries[lit] = null
         if (lit == watchCleanupLiteral && idx < watchCleanupIndex) watchCleanupIndex = idx
+    }
+
+    private fun nextLiveWatch(lit: Int, start: Int): Int {
+        val entries = checkNotNull(watchEntries[lit])
+        var index = start
+        while (index < watchSizes[lit]) {
+            state.work++
+            if (!isRetired(entries[index].toInt())) return index
+            index++
+        }
+        return index
     }
 
     private fun trimRetiredWatchTail(lit: Int, index: Int) {
@@ -922,14 +933,27 @@ internal class NativeSatState(private val state: PropagationState) {
     private fun propagateFalse(falseLit: Int): Boolean {
         val entries = watchEntries[falseLit] ?: return true
         var wi = 0
+        var liveScan = 0
         while (wi < watchSizes[falseLit]) {
             state.work++
             val entry = entries[wi]
             val h = entry.toInt()
             if (isRetired(h)) {
-                val copies = orderedWatchCopies(falseLit, wi, MAX_ORDERED_PROPAGATION_COPIES)
-                state.work += watchRemovalWork(falseLit, copies)
-                removeWatchAt(falseLit, wi, copies)
+                // Unprocessed slots before the scan cursor contain only retired postings.
+                val next = nextLiveWatch(falseLit, maxOf(wi + 1, liveScan))
+                liveScan = next + 1
+                if (next < watchSizes[falseLit]) {
+                    val rewind = falseLit == watchCleanupLiteral && wi < watchCleanupIndex
+                    state.work += if (rewind) 4L else 3L
+                    entries[wi] = entries[next]
+                    entries[next] = entry
+                    if (rewind) watchCleanupIndex = wi
+                } else {
+                    while (watchSizes[falseLit] > wi) {
+                        state.work += watchRemovalWork(falseLit)
+                        removeWatchAt(falseLit, watchSizes[falseLit] - 1)
+                    }
+                }
                 continue
             }
             val blocker = (entry ushr 32).toInt()
@@ -1000,7 +1024,6 @@ internal class NativeSatState(private val state: PropagationState) {
         const val RETIRED = 4
         const val RECENT_USED = 8
         const val MAX_ORDERED_CLEANUP_COPIES = 128
-        const val MAX_ORDERED_PROPAGATION_COPIES = 4096
         // Poll the deadline every 4096 propagated literals.
         const val CANCEL_POLL_MASK = 0xFFF
     }
