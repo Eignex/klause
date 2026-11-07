@@ -43,6 +43,63 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `completion comparisons should distinguish advisory and exact real objectives`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = arrayOf(Linear(intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), doubleArrayOf(3.0),
+                LinearOp.EQ, 0.0)), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val offered = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(0.333))
+        val events = mutableListOf<JointRepairComparison>()
+
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1), external = { offered },
+            onComparison = { events += it }).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+            }
+        }
+
+        val completed = events.first { it.phase == "external" && it.completedValue != null }
+        assertEquals(BigFraction.ofDouble(0.333), completed.rawValue)
+        assertEquals(BigFraction.ofLong(3).reciprocal(), completed.completedValue)
+        assertEquals(0L, completed.condition)
+    }
+
+    @Test
+    fun `comparison query identity should survive a cancelled slice before checked discovery`() {
+        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), BigFraction.ZERO)
+
+        for (accepted in listOf(false, true)) {
+            val events = mutableListOf<JointRepairComparison>()
+            JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true),
+                incumbentCompletionCheck = { _, _, _ -> accepted }, onComparison = { events += it }).use { repair ->
+                assertEquals(ExactNeighborhoodResult.Paused, repair.check(condition, Cancellation { true }))
+                assertTrue(events.isEmpty())
+                var result = repair.check(condition, Cancellation.Never)
+                repeat(32) {
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                }
+
+                assertEquals(listOf(1L), events.filter { it.phase == "query" }.map { it.condition })
+                val discoveries = events.filter { it.phase == "discovery" }
+                if (accepted) {
+                    assertIs<ExactNeighborhoodResult.Witness>(result)
+                    assertEquals(listOf(BigFraction.MINUS_ONE), discoveries.map { it.candidateValue })
+                    assertEquals(listOf(BigFraction.ZERO), discoveries.map { it.cutoff })
+                    assertEquals(listOf(1L), discoveries.map { it.condition })
+                } else assertTrue(discoveries.isEmpty())
+            }
+        }
+    }
+
+    @Test
     fun `disabled source cuts should preserve the uncut root bootstrap`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(2, 2), null, null),
             factors = arrayOf(Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.GE, 1)))
