@@ -15,6 +15,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBranchAttemptObserver
@@ -109,6 +110,8 @@ class ResumableMinimizeDirectionalTest {
 
     @Test
     fun `finite search consumes passive advice without child solves`() {
+        val sink = SolveStatsSink("directional-passive-consumer")
+        var consumed = false
         val blocks = 3
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
@@ -130,6 +133,15 @@ class ResumableMinimizeDirectionalTest {
             valueSelector = IndomainMin,
             randomSeed = 3L,
             maxDecisions = 1000L,
+            branchObserver = object : SearchBranchAttemptObserver {
+                override fun onAttempt(decision: SearchDecision, context: SearchContext) {
+                    val outcomes = sink.lp.snapshot().phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
+                    consumed = (outcomes?.get("DOWN") ?: 0L) >= 2L &&
+                        (outcomes?.get("UP") ?: 0L) >= 2L &&
+                        (outcomes?.get("VARIABLE_ESTIMATED") ?: 0L) > 0L &&
+                        (outcomes?.get("VARIABLE_CONSUMED") ?: 0L) > 0L
+                }
+            },
             lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
                 boundMaxOpsPerNode = 0L, componentSplit = false),
             lpDirectionalGains = true,
@@ -148,25 +160,18 @@ class ResumableMinimizeDirectionalTest {
             6L, 6L, 11L, 5L, 5L, 9L, 4L, 4L, 5L,
         ))
         ResumableMinimize(BacktrackSolver(problem), objective, params,
-            rootBasisGuidance = false, basisVariableGuidance = false).use { search ->
-            val consumed = Cancellation {
-                val outcomes = search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
-                (outcomes?.get("VARIABLE_ESTIMATED") ?: 0L) > 0L &&
-                    (outcomes?.get("VARIABLE_CONSUMED") ?: 0L) > 0L
-            }
+            rootBasisGuidance = false, basisVariableGuidance = false, sink = sink).use { search ->
+            val stopAfterConsumption = Cancellation { consumed }
             var slices = 0
-            while (slices++ < 128 && !search.isDone) {
-                val outcomes = search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
-                if ((outcomes?.get("DOWN") ?: 0L) >= 2L && (outcomes?.get("UP") ?: 0L) >= 2L &&
-                    (outcomes?.get("VARIABLE_ESTIMATED") ?: 0L) > 0L &&
-                    (outcomes?.get("VARIABLE_CONSUMED") ?: 0L) > 0L
-                ) break
-                search.runSlice(consumed, 1000L, 128L) {}
+            while (slices++ < 128 && !search.isDone && !consumed) {
+                search.runSlice(stopAfterConsumption, 1000L, 128L) {}
             }
 
-            val observations = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
-            val diagnostic = "$observations; solves=${search.stats.lp.solves.sum}; " +
-                "probes=${search.stats.lp.phases["DIRECTIONAL_PROBES_NODE"]}"
+            val stats = search.stats
+            val observations = stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
+            val diagnostic = "$observations; solves=${stats.lp.solves.sum}; " +
+                "probes=${stats.lp.phases["DIRECTIONAL_PROBES_NODE"]}"
+            assertTrue(consumed, diagnostic)
             assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
             assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
             assertTrue((observations["VARIABLE_CONSUMED"] ?: 0L) > 0L, diagnostic)
