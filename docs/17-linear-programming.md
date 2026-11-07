@@ -1312,6 +1312,9 @@ retain unavailability. This read preserves the retained optimum and carries no
 bound, infeasibility or certificate authority. A consumer can withhold follow-up
 comparison work from the analysis grant; analysis and that follow-up share the
 containing node and cumulative allowances.
+An ordinary finite consumer can retain unused analysis work for one child-value
+confirmation. The retained grant excludes the held follow-up allowance and all spent
+analysis work; it does not replenish the containing node or cumulative allowance.
 
 Explicit directional probes compare the actual floating LP objective increase at
 the two adjacent integer bounds of at most two structural columns. Each child

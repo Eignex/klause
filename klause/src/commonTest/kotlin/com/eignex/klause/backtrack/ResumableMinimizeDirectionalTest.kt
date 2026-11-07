@@ -236,7 +236,7 @@ class ResumableMinimizeDirectionalTest {
             6L, 6L, 11L, 5L, 5L, 9L, 40L, 40L, 50L,
         ))
         ResumableMinimize(BacktrackSolver(problem), objective, params,
-            rootBasisGuidance = false).use { search ->
+            rootBasisGuidance = false, verifyBasisVariableGuidance = false).use { search ->
             val consumed = Cancellation {
                 (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
                     ?.get("VARIABLE_BASIS_CONSUMED") ?: 0L) > 0L && 7 in attempted
@@ -253,6 +253,84 @@ class ResumableMinimizeDirectionalTest {
             assertEquals(0L, observations["SIDE_CONSUMED"] ?: 0L, observations.toString())
             assertEquals(0L, observations["BASIS_ATTEMPT"] ?: 0L, observations.toString())
             assertEquals(null, search.stats.lp.phases["DIRECTIONAL_PROBES_NODE"])
+        }
+    }
+
+    @Test
+    fun `finite search confirms basis advice with one child comparison`() {
+        val sink = SolveStatsSink("confirmed-basis-consumer")
+        var consumed = false
+        val blocks = 3
+        val variables = blocks * 3
+        val factors = ArrayList<Factor>()
+        repeat(blocks) { block ->
+            val first = block * 3
+            factors.add(Linear(longArrayOf(2L, 3L, 4L),
+                intArrayOf(first, first + 1, first + 2), LinearOp.GE, 5L))
+        }
+        val problem = Problem(0, variables, Array(variables) { IntDomain(0, 1) }, factors.toTypedArray()).bake()
+        var completionAttempt = false
+        val attempted = ArrayList<Int>()
+        val params = BacktrackParams(
+            variableSelector = object : VariableSelector {
+                override fun fresh() = this
+                override fun pick(session: PropagationSession, rng: Random): VarRef? {
+                    completionAttempt = true
+                    return InputOrder.pick(session, rng)
+                }
+            },
+            valueSelector = IndomainMin,
+            randomSeed = 3L,
+            maxDecisions = 64L,
+            branchObserver = object : SearchBranchAttemptObserver {
+                override fun onAttempt(decision: SearchDecision, context: SearchContext) {
+                    val variable = when (decision) {
+                        is SearchDecision.IntAtMost -> decision.variable
+                        is SearchDecision.IntAtLeast -> decision.variable
+                        else -> null
+                    }
+                    if (variable != null) attempted.add(variable)
+                    val outcomes = sink.lp.snapshot().phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
+                    consumed = (outcomes?.get("VARIABLE_PROBE_CONSUMED") ?: 0L) > 0L && 7 in attempted
+                }
+            },
+            lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
+                boundMaxOpsPerNode = 0L, componentSplit = false),
+            lpDirectionalGains = true,
+            componentFactory = { listOf(object : SearchComponent {
+                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                    if (!completionAttempt) return ComponentResult.Consistent
+                    completionAttempt = false
+                    return ComponentResult.Conflict()
+                }
+                override fun retract(decisionLevel: Int) { completionAttempt = false }
+                override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Infeasible()
+            }) },
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(
+            6L, 6L, 11L, 5L, 5L, 9L, 40L, 40L, 50L,
+        ))
+        ResumableMinimize(BacktrackSolver(problem), objective, params,
+            rootBasisGuidance = false, sink = sink).use { search ->
+            val stopAfterConsumption = Cancellation { consumed }
+            var slices = 0
+            while (slices++ < 16 && !search.isDone && !consumed) {
+                search.runSlice(stopAfterConsumption, 1000L, 128L) {}
+            }
+
+            val stats = search.stats.lp
+            val observations = stats.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
+            val diagnostic = "$observations; probes=${stats.phases["DIRECTIONAL_PROBES_NODE"]}"
+            assertTrue(consumed, diagnostic)
+            assertEquals(listOf(2, 7), attempted.take(2), diagnostic)
+            assertEquals(1L, observations["VARIABLE_BASIS_VERIFICATION_ATTEMPT"], diagnostic)
+            assertEquals(1L, observations["VARIABLE_PROBE_ATTEMPT"], diagnostic)
+            assertEquals(0L, observations["VARIABLE_BASIS_CONSUMED"] ?: 0L, diagnostic)
+            assertEquals(0L, observations["SIDE_CONSUMED"] ?: 0L, diagnostic)
+            assertEquals(0L, observations["BASIS_ATTEMPT"] ?: 0L, diagnostic)
+            val probes = stats.phases.getValue("DIRECTIONAL_PROBES_NODE")
+            assertEquals(1L, probes.calls, diagnostic)
+            assertEquals(4L, probes.outcomes["CHILDREN_COMPLETED"], diagnostic)
         }
     }
 

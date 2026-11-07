@@ -383,6 +383,160 @@ class LpHintsTest {
     }
 
     @Test
+    fun `unconfirmed basis advice retains current scoring`() {
+        val builder = LpBuilder()
+        repeat(2) { builder.addVar(0, 3) }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+            BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+        val observations = ArrayList<String>()
+        val hints = LpHints(2, 0, directionalGains = true, basisVariableComparisons = true,
+            verifyBasisVariables = true, observe = observations::add)
+        val first = VarRef.IntVar(0)
+        val second = VarRef.IntVar(1)
+        hints.beginNode(1, 100.0)
+        hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+        hints.recordBound(relaxation, 10.0)
+        hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(2) { VarStatus.AT_LOWER }))
+
+        val proposal = hints.compareBasisVariables(first, IntDomain(0, 3), second, IntDomain(0, 3),
+            { true }) { _, _ -> listOf(LpDirectionalCost(1.0, 4.0), LpDirectionalCost(4.0, 9.0)) }
+
+        assertEquals(second, proposal)
+        assertEquals(first, hints.applyVariableChoice(proposal, first))
+        assertEquals(0, observations.count { it == "VARIABLE_CONSUMED" })
+    }
+
+    @Test
+    fun `basis confirmation requires complete improving child values`() {
+        val baseline = LpDirectionalValues(11.0, 14.0)
+        val cases: List<Pair<String, List<LpDirectionalValues>?>> = listOf(
+            "improving" to listOf(baseline, LpDirectionalValues(12.0, 16.0)),
+            "tied" to listOf(baseline, baseline),
+            "weaker" to listOf(baseline, LpDirectionalValues(10.0, 16.0)),
+            "tradeoff" to listOf(baseline, LpDirectionalValues(12.0, 13.0)),
+            "missing" to listOf(baseline, LpDirectionalValues(Double.NaN, 16.0)),
+            "incomplete" to listOf(baseline),
+            "declined" to null,
+        )
+        for ((name, values) in cases) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, 3) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+                BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+            val observations = ArrayList<String>()
+            val hints = LpHints(2, 0, directionalGains = true, basisVariableComparisons = true,
+                verifyBasisVariables = true, observe = observations::add)
+            val first = VarRef.IntVar(0)
+            val second = VarRef.IntVar(1)
+            hints.beginNode(1, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+            hints.recordBound(relaxation, 10.0)
+            hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(2) { VarStatus.AT_LOWER }))
+            val nomination = hints.compareBasisVariables(first, IntDomain(0, 3), second, IntDomain(0, 3),
+                { true }) { _, _ -> listOf(LpDirectionalCost(1.0, 4.0), LpDirectionalCost(4.0, 9.0)) }
+            assertEquals(second, nomination, name)
+
+            val proposal = hints.compareProbeVariables(first, IntDomain(0, 3), nomination, IntDomain(0, 3),
+                { true }) { source, columns, splits ->
+                assertTrue(source.model === relaxation.model)
+                assertEquals(listOf(0, 1), columns.toList())
+                assertEquals(listOf(0L, 0L), splits.toList())
+                values
+            }
+
+            assertEquals(if (name == "improving") second else first,
+                hints.applyVariableChoice(proposal, first), name)
+            assertEquals(1, observations.count { it == "VARIABLE_BASIS_VERIFICATION_ATTEMPT" }, name)
+            assertEquals(0, observations.count { it == "VARIABLE_BASIS_CONSUMED" }, name)
+            assertEquals(if (name == "improving") 1 else 0,
+                observations.count { it == "VARIABLE_PROBE_CONSUMED" }, name)
+        }
+    }
+
+    @Test
+    fun `basis confirmation spends its lifetime attempt across history resets`() {
+        for (outcome in listOf("unfunded", "declined", "accepted")) {
+            val observations = ArrayList<String>()
+            val hints = LpHints(2, 0, directionalGains = true, basisVariableComparisons = true,
+                verifyBasisVariables = true, observe = observations::add)
+            var basisQueries = 0
+            var reservations = 0
+            var childQueries = 0
+            repeat(3) { iteration ->
+                val builder = LpBuilder()
+                repeat(2) { builder.addVar(0, 3) }
+                val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+                val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+                    BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+                val first = VarRef.IntVar(0)
+                val second = VarRef.IntVar(1)
+                hints.resetHistory()
+                hints.beginNode(1, 100.0)
+                hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+                hints.recordBound(relaxation, 10.0)
+                hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(2) { VarStatus.AT_LOWER }))
+                val nomination = hints.compareBasisVariables(first, IntDomain(0, 3), second, IntDomain(0, 3),
+                    { true }) { _, _ ->
+                    basisQueries++
+                    listOf(LpDirectionalCost(1.0, 4.0), LpDirectionalCost(4.0, 9.0))
+                }
+
+                val proposal = hints.compareProbeVariables(first, IntDomain(0, 3), nomination, IntDomain(0, 3), {
+                    reservations++
+                    outcome != "unfunded"
+                }) { _, _, _ ->
+                    childQueries++
+                    if (outcome == "declined") null
+                    else listOf(LpDirectionalValues(11.0, 14.0), LpDirectionalValues(12.0, 16.0))
+                }
+
+                assertEquals(if (iteration == 0 && outcome == "accepted") second else first,
+                    hints.applyVariableChoice(proposal, first), outcome)
+            }
+            assertEquals(1, basisQueries, outcome)
+            assertEquals(1, reservations, outcome)
+            assertEquals(if (outcome == "unfunded") 0 else 1, childQueries, outcome)
+            assertEquals(1, observations.count { it == "VARIABLE_BASIS_VERIFICATION_ATTEMPT" }, outcome)
+        }
+    }
+
+    @Test
+    fun `unfunded basis confirmation stays within its advertised followup work`() {
+        val builder = LpBuilder()
+        repeat(2) { builder.addVar(0, 3) }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+            BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+        var remaining = Long.MAX_VALUE
+        val hints = LpHints(2, 0, directionalGains = true, basisVariableComparisons = true,
+            verifyBasisVariables = true, charge = { work ->
+                assertTrue(work <= remaining, "unfunded work=$work remaining=$remaining")
+                remaining -= work
+            })
+        val first = VarRef.IntVar(0)
+        val second = VarRef.IntVar(1)
+        hints.beginNode(1, 100.0)
+        hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+        hints.recordPoint(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+        hints.recordBound(relaxation, 10.0)
+        hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(2) { VarStatus.AT_LOWER }))
+        val nomination = hints.compareBasisVariables(first, IntDomain(0, 3), second, IntDomain(0, 3),
+            { true }) { _, _ ->
+            remaining = hints.basisComparisonFollowupWork
+            listOf(LpDirectionalCost(1.0, 4.0), LpDirectionalCost(4.0, 9.0))
+        }
+        var queries = 0
+
+        val proposal = hints.compareProbeVariables(first, IntDomain(0, 3), nomination, IntDomain(0, 3),
+            { work -> work <= remaining }) { _, _, _ -> queries++; null }
+
+        assertEquals(first, hints.applyVariableChoice(proposal, first))
+        assertEquals(0, queries)
+    }
+
+    @Test
     fun `unavailable or nonimproving basis advice retains current scoring`() {
         val valid = LpDirectionalCost(1.0, 4.0)
         val unavailable: List<List<LpDirectionalCost?>?> = listOf(null, emptyList(), listOf(valid),

@@ -327,8 +327,8 @@ When passive history cannot compare the candidates, a below-root basis consultat
 can compare the same two variables, or the reduced-cost runner-up when no distinct
 reliable challenger exists. Both predictions use current normalized directional
 basis costs and the same fractional-distance score; they are never mixed with
-reduced-cost scores or passive predictions. An aggregate improvement can replace the
-baseline only when neither normalized directional gain decreases. A directional
+reduced-cost scores or passive predictions. An aggregate improvement can nominate a
+challenger only when neither normalized directional gain decreases. A directional
 tradeoff retains current scoring and counts as an unproductive attempt.
 `VARIABLE_BASIS_DIRECTION_TRADEOFF` distinguishes this decline. Missing directions,
 ties, changed points, unfinished solves and unfunded analysis retain current scoring. At most eight
@@ -345,14 +345,26 @@ admission, and progress does not replenish the eight-attempt lifetime cap. Passi
 comparisons remain available during suspension. `VARIABLE_BASIS_STOPPED` records each
 suspension, and `VARIABLE_BASIS_REOPENED` records progress that reopens admission.
 The bounded runner-up scan charges its work before visiting candidates.
-Preparation reserves 20 work units before allocating the column request; analysis
-leaves 48 units for comparison, directional checks and selection in the containing
-allowance. Basis predictions never train checked-bound history, start a child solve or confer pruning
-authority. Ordinary finite construction leaves numerical child-value comparisons
-disabled; passive predictions require no consultation.
+Preparation reserves 20 work units before allocating the column request. A direct
+basis consumer leaves 48 units for comparison, directional checks and selection.
+Ordinary finite construction requires a fresh child-value confirmation before a basis
+nomination can replace current scoring. It leaves 64 units for the basis comparison
+and confirmation admission, including coordinate reads and the lifetime-attempt charge.
+Unused basis-analysis work, excluding that held follow-up allowance, can fund the
+confirmation under the same node and cumulative limits. Basis predictions train no
+checked-bound history and confer no pruning authority; passive predictions require no consultation.
 
-The hint owner supports an optional fresh child-value comparison below the root.
-When enabled, a reliable challenger with missing baseline history can request it.
+One confirmation batch belongs to a search owner, covering at most two variables and
+four child solves. The attempt is spent before its reservation, including an unfunded
+or cancelled request, and history resets do not replenish it. Further basis consultations
+stop after that attempt; passive comparisons remain available. An unavailable,
+unfinished or nonimproving confirmation retains current scoring rather than consuming
+the basis nomination. `VARIABLE_BASIS_VERIFICATION_ATTEMPT` records this admission;
+confirmed choices use the numerical comparison and consumption diagnostics.
+
+The hint owner supports a fresh child-value comparison below the root for confirmation.
+An explicit numerical mode can also request it for a reliable challenger with missing
+baseline history.
 Both candidates require complete optimal child
 solves at their current floor and ceiling. The larger weaker-child objective ranks first. A tie within the comparison
 tolerance can instead select a strictly larger stronger-child value, provided the

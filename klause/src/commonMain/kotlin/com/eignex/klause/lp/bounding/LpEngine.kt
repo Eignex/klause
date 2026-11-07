@@ -1290,6 +1290,7 @@ internal class LpEngine(
         model: LpModel,
         columns: IntArray,
         followupWork: Long,
+        retainUnusedWork: Boolean = false,
     ): List<LpDirectionalCost?>? {
         if (followupWork < 0L) return null
         val allowance = remainingDirectionalWork() - followupWork
@@ -1309,6 +1310,7 @@ internal class LpEngine(
             )
         }
         sink.lp.observeDirectionalBasis(started.elapsedNow().inWholeNanoseconds, work, costs != null)
+        if (retainUnusedWork) branchWorkAllowance = (allowance - minOf(allowance, work)).coerceAtLeast(0L)
         return costs
     }
 
