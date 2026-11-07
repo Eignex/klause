@@ -83,7 +83,7 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
         hints.compareBasisVariables(best, (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
             candidate, (candidate as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
             reserve = ::reserveProbeWork,
-            estimate = { model, columns -> directionalCosts(model, columns, followupWork = 32L) })
+            estimate = { model, columns -> directionalCosts(model, columns, followupWork = 48L) })
     } else null
     val proposal = basisProposal ?: if (compareHistory && challenger != null && challenger != best &&
         hints.probeVariableChoiceReady

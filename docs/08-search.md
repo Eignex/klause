@@ -327,8 +327,11 @@ When passive history cannot compare the candidates, a below-root basis consultat
 can compare the same two variables, or the reduced-cost runner-up when no distinct
 reliable challenger exists. Both predictions use current normalized directional
 basis costs and the same fractional-distance score; they are never mixed with
-reduced-cost scores or passive predictions. Missing directions, ties, changed points,
-unfinished solves and unfunded analysis retain current scoring. At most eight
+reduced-cost scores or passive predictions. An aggregate improvement can replace the
+baseline only when neither normalized directional gain decreases. A directional
+tradeoff retains current scoring and counts as an unproductive attempt.
+`VARIABLE_BASIS_DIRECTION_TRADEOFF` distinguishes this decline. Missing directions,
+ties, changed points, unfinished solves and unfunded analysis retain current scoring. At most eight
 attempts belong to one search owner, including failed reservations and across history
 resets. Consecutive entries on the same retained state cannot repeat an attempt.
 Two consecutive unfunded, declined, incomplete or baseline-preserving attempts suspend
@@ -343,8 +346,8 @@ comparisons remain available during suspension. `VARIABLE_BASIS_STOPPED` records
 suspension, and `VARIABLE_BASIS_REOPENED` records progress that reopens admission.
 The bounded runner-up scan charges its work before visiting candidates.
 Preparation reserves 20 work units before allocating the column request; analysis
-leaves 32 units for comparison and selection in the containing allowance. Basis
-predictions never train checked-bound history, start a child solve or confer pruning
+leaves 48 units for comparison, directional checks and selection in the containing
+allowance. Basis predictions never train checked-bound history, start a child solve or confer pruning
 authority. Ordinary finite construction leaves numerical child-value comparisons
 disabled; passive predictions require no consultation.
 
