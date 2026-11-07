@@ -291,6 +291,98 @@ class LpHintsTest {
     }
 
     @Test
+    fun `basis advice rejects a normalized directional tradeoff`() {
+        val cases = listOf(
+            doubleArrayOf(0.5, 0.5) to LpDirectionalCost(1.0, 30.0),
+            doubleArrayOf(0.5, 0.5) to LpDirectionalCost(30.0, 1.0),
+            doubleArrayOf(0.25, 0.75) to LpDirectionalCost(8.0, 8.0),
+        )
+        for ((point, cost) in cases) for (bools in 0..2) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, if (it < bools) 1 else 3) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()),
+                IntArray(2) { if (it < bools) it else it - bools }, BooleanArray(2) { it < bools },
+                0L, IntArray(2 - bools) { it + bools }, IntArray(bools) { it })
+            val observations = ArrayList<String>()
+            val hints = LpHints(2 - bools, bools, directionalGains = true,
+                basisVariableComparisons = true, observe = observations::add)
+            val first = if (bools > 0) VarRef.Bool(0) else VarRef.IntVar(0)
+            val second = if (bools > 1) VarRef.Bool(1) else VarRef.IntVar(1 - bools)
+            hints.beginNode(1, 100.0)
+            hints.record(relaxation, point, DoubleArray(0))
+            hints.recordBound(relaxation, 10.0)
+            hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(2) { VarStatus.AT_LOWER }))
+
+            val proposal = hints.compareBasisVariables(first, IntDomain(0, 3), second, IntDomain(0, 3),
+                { true }) { _, _ -> listOf(LpDirectionalCost(4.0, 4.0), cost) }
+
+            assertEquals(null, proposal)
+            assertEquals(first, hints.applyVariableChoice(proposal, first))
+            assertEquals(1, observations.count { it == "VARIABLE_BASIS_DIRECTION_TRADEOFF" })
+            assertEquals(0, observations.count { it == "VARIABLE_BASIS_CONSUMED" })
+        }
+    }
+
+    @Test
+    fun `basis advice accepts nondegrading normalized gains with one equal direction`() {
+        for (cost in listOf(LpDirectionalCost(2.0, 8.0), LpDirectionalCost(4.0, 6.0))) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, 3) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+                BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+            val hints = LpHints(2, 0, directionalGains = true, basisVariableComparisons = true)
+            val first = VarRef.IntVar(0)
+            val second = VarRef.IntVar(1)
+            hints.beginNode(1, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.25, 0.5), DoubleArray(0))
+            hints.recordBound(relaxation, 10.0)
+            hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(2) { VarStatus.AT_LOWER }))
+
+            val proposal = hints.compareBasisVariables(first, IntDomain(0, 3), second, IntDomain(0, 3),
+                { true }) { _, _ -> listOf(LpDirectionalCost(4.0, 4.0), cost) }
+
+            assertEquals(second, proposal)
+            assertEquals(second, hints.applyVariableChoice(proposal, first))
+        }
+    }
+
+    @Test
+    fun `basis comparison stays within its funded followup allowance`() {
+        for (tradeoff in listOf(false, true)) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, 3) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+                BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+            var remaining = Long.MAX_VALUE
+            val hints = LpHints(2, 0, directionalGains = true, basisVariableComparisons = true,
+                charge = { work ->
+                    assertTrue(work <= remaining, "unfunded work=$work remaining=$remaining")
+                    remaining -= work
+                })
+            val first = VarRef.IntVar(0)
+            val second = VarRef.IntVar(1)
+            hints.beginNode(1, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+            hints.recordBound(relaxation, 10.0)
+            hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(2) { VarStatus.AT_LOWER }))
+
+            val proposal = hints.compareBasisVariables(first, IntDomain(0, 3), second, IntDomain(0, 3), {
+                assertEquals(20L, it)
+                true
+            }) { _, _ ->
+                remaining = 48L
+                listOf(LpDirectionalCost(4.0, 4.0),
+                    if (tradeoff) LpDirectionalCost(1.0, 30.0) else LpDirectionalCost(8.0, 8.0))
+            }
+
+            assertEquals(if (tradeoff) first else second, hints.applyVariableChoice(proposal, first))
+        }
+    }
+
+    @Test
     fun `unavailable or nonimproving basis advice retains current scoring`() {
         val valid = LpDirectionalCost(1.0, 4.0)
         val unavailable: List<List<LpDirectionalCost?>?> = listOf(null, emptyList(), listOf(valid),
@@ -323,7 +415,7 @@ class LpHintsTest {
     @Test
     fun `unproductive basis attempts stop across history resets`() {
         val valid = LpDirectionalCost(1.0, 4.0)
-        for (failure in listOf("unfunded", "declined", "missing", "nonimproving")) {
+        for (failure in listOf("unfunded", "declined", "missing", "nonimproving", "tradeoff")) {
             val observations = ArrayList<String>()
             val hints = LpHints(2, 0, directionalGains = true, basisVariableComparisons = true,
                 observe = observations::add)
@@ -347,6 +439,7 @@ class LpHintsTest {
                     when (failure) {
                         "declined" -> null
                         "missing" -> listOf(null, valid)
+                        "tradeoff" -> listOf(valid, LpDirectionalCost(0.0, 30.0))
                         else -> listOf(valid, valid)
                     }
                 }

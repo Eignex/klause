@@ -399,14 +399,24 @@ internal class LpHints(
             return declineBasisVariableChoice("VARIABLE_BASIS_DECLINED")
         }
         charge(26L)
-        val firstScore = basisScore(costs[0], firstValue)
-        val secondScore = basisScore(costs[1], secondValue)
+        val firstCost = costs[0] ?: return declineBasisVariableChoice("VARIABLE_BASIS_MISSING_DIRECTION")
+        val secondCost = costs[1] ?: return declineBasisVariableChoice("VARIABLE_BASIS_MISSING_DIRECTION")
+        val firstScore = basisScore(firstCost, firstValue)
+        val secondScore = basisScore(secondCost, secondValue)
         if (!firstScore.isFinite() || !secondScore.isFinite()) {
             return declineBasisVariableChoice("VARIABLE_BASIS_MISSING_DIRECTION")
         }
         observe("VARIABLE_BASIS_COMPARED")
         if (secondScore <= 1e-9 || secondScore <= firstScore) {
             return declineBasisVariableChoice("VARIABLE_BASIS_BASELINE")
+        }
+        charge(16L)
+        val firstFraction = firstValue - floor(firstValue)
+        val secondFraction = secondValue - floor(secondValue)
+        if (secondCost.down * secondFraction < firstCost.down * firstFraction ||
+            secondCost.up * (1.0 - secondFraction) < firstCost.up * (1.0 - firstFraction)
+        ) {
+            return declineBasisVariableChoice("VARIABLE_BASIS_DIRECTION_TRADEOFF")
         }
         unproductiveVariableBasisAttempts = 0
         variableBasisProposal = true
@@ -503,8 +513,7 @@ internal class LpHints(
         return second
     }
 
-    private fun basisScore(cost: LpDirectionalCost?, value: Double): Double {
-        cost ?: return Double.NaN
+    private fun basisScore(cost: LpDirectionalCost, value: Double): Double {
         if (!cost.down.isFinite() || !cost.up.isFinite() || cost.down < 0.0 || cost.up < 0.0) return Double.NaN
         val fraction = value - floor(value)
         val down = cost.down * fraction
