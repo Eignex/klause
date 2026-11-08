@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.ClauseTier
+import com.eignex.klause.propagation.NativeCapConfiguration
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
@@ -38,7 +39,9 @@ private fun forgetWindow(session: PropagationSession, params: BacktrackParams, c
             !session.learnedClausePermanent(index) && session.learnedClauseLbd(index) > params.lbdGlueThreshold &&
                 (!params.tieredLearnedDb || (session.learnedClauseTier(index) == ClauseTier.LOCAL &&
                     !session.learnedClauseUsedSinceReduction(index)))
-        }) { index ->
+        }, nativePolicy = if (session.usesNativeSat) NativeCapConfiguration(
+            params.tieredLearnedDb, params.lbdGlueThreshold, params.midLbdThreshold,
+        ) else null) { index ->
         val lbd = session.learnedClauseLbd(index)
         if (!params.tieredLearnedDb) {
             lbd <= params.lbdGlueThreshold

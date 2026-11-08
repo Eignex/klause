@@ -6,12 +6,76 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class NativeSatStateTest {
+    @Test
+    fun `custom cap policy should abort a pending native index without retiring its handles`() {
+        val session = session(4, or(2, true, 3, true))
+        repeat(16) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+        val configuration = NativeCapConfiguration(false, 2, 6)
+        session.maintainCapWindow(1, 65_536L, 1_048_576L,
+            { session.nativeCapTraversalVisits >= 2L }, nativePolicy = configuration) { false }
+        assertEquals(16, session.activeLearnedClauseCount)
+        assertTrue(session.nativeCapWindowPending)
+
+        repeat(64) {
+            val before = session.work
+            session.maintainCapWindow(1, 256L, 64L, { false }, canDrop = { false }) { true }
+            assertTrue(session.work - before <= 256L)
+        }
+
+        assertEquals(16, session.activeLearnedClauseCount)
+        assertFalse(session.nativeCapWindowPending)
+        repeat(16) { assertTrue(session.isLearnedClause(it)) }
+    }
+
+    @Test
+    fun `tiny grants should preserve and resume an initialized native index`() {
+        val session = session(4, or(2, true, 3, true))
+        repeat(16) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+        val configuration = NativeCapConfiguration(false, 2, 6)
+        session.maintainCapWindow(8, 65_536L, 1_048_576L, { false }, nativePolicy = configuration) { false }
+        assertEquals(8, session.activeLearnedClauseCount)
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 10)
+
+        repeat(64) {
+            val before = session.work
+            session.maintainCapWindow(4, 64L, 64L, { false }, nativePolicy = configuration) { false }
+            assertTrue(session.work - before <= 64L)
+        }
+
+        assertEquals(4, session.activeLearnedClauseCount)
+        assertFalse(session.nativeCapWindowPending)
+        repeat(4) { assertTrue(session.isLearnedClause(it)) }
+    }
+
+    @Test
+    fun `native remapping should discard private cap markers and queue ownership`() {
+        val session = session(4, or(2, true, 3, true))
+        repeat(16) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+        val configuration = NativeCapConfiguration(false, 2, 6)
+        session.maintainCapWindow(1, 65_536L, 1_048_576L,
+            { session.nativeCapTraversalVisits >= 2L }, nativePolicy = configuration) { false }
+        val before = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        assertTrue(session.explanationState.forgetLearnedClauses(10_000_000L, 1_048_576L) { id, _ -> id == 15 })
+        val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 10)
+        repeat(8) {
+            session.maintainCapWindow(1, 65_536L, 1_048_576L, { false }, nativePolicy = configuration) { false }
+        }
+
+        assertTrue(after.getValue("learnedCapIndexStateBytes") < before.getValue("learnedCapIndexStateBytes"))
+        assertEquals(1, session.activeLearnedClauseCount)
+        assertTrue(session.isLearnedClause(0))
+        assertFalse(session.isLearnedClause(1))
+    }
+
     private fun session(numVars: Int, vararg clauses: IntArray): PropagationSession = PropagationSession(
         Problem(
             numBoolVars = numVars,

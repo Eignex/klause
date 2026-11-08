@@ -59,6 +59,10 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
 
     fun invalidateRetiredHandles() { retirementRevision++ }
 
+    fun completedIndexedPass() {
+        passes++
+    }
+
     fun sharingMemory(sample: SharingMemoryObservation, protected: Boolean) {
         sample.owned(this, 68L, protected)
         sample.ownedReferences(this, 4L, protected)

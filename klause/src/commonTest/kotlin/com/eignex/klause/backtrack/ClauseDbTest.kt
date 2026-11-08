@@ -20,6 +20,73 @@ import kotlin.test.assertTrue
 class ClauseDbTest {
 
     @Test
+    fun `native retained windows should classify only new local admissions`() {
+        val session = PropagationSession(chainProblem().bake(), nativeSat = true)
+        repeat(64) { session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 9) }
+        val params = BacktrackParams(maxLearnedClauses = 32, tieredLearnedDb = true,
+            learnedMemoryWork = 65_536L)
+        repeat(128) {
+            val before = session.work
+            forgetIfOverCap(session, params)
+            assertTrue(session.work - before <= 65_536L)
+        }
+        assertEquals(32, session.activeLearnedClauseCount)
+        val visits = session.nativeCapTraversalVisits
+        session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 10)
+
+        repeat(32) { forgetIfOverCap(session, params) }
+
+        assertEquals(32, session.activeLearnedClauseCount)
+        assertEquals(visits + 1L, session.nativeCapTraversalVisits)
+        assertTrue((0 until 32).all { session.isLearnedClause(it) })
+    }
+
+    @Test
+    fun `native first use should promote a retained local in the next window`() {
+        val session = PropagationSession(chainProblem().bake(), nativeSat = true)
+        repeat(64) { session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 9) }
+        val params = BacktrackParams(maxLearnedClauses = 32, tieredLearnedDb = true,
+            learnedMemoryWork = 65_536L)
+        repeat(128) { forgetIfOverCap(session, params) }
+        assertEquals(ClauseTier.LOCAL, session.learnedClauseTier(0))
+        assertNotNull(session.explanationState.nativeEngine).markUsed(session.problem.numFactors)
+        session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 10)
+
+        repeat(32) { forgetIfOverCap(session, params) }
+
+        assertEquals(ClauseTier.MID, session.learnedClauseTier(0))
+        assertFalse(session.learnedClauseUsedSinceReduction(0))
+        assertEquals(32, session.activeLearnedClauseCount)
+    }
+
+    @Test
+    fun `selected retirement during reservation should finish only the pending tier epoch`() {
+        val session = PropagationSession(chainProblem().bake(), nativeSat = true)
+        repeat(200) { session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 6) }
+        val params = BacktrackParams(maxLearnedClauses = 32, tieredLearnedDb = true,
+            learnedMemoryWork = 4096L)
+        forgetIfOverCap(session, params)
+        assertTrue(session.nativeCapWindowPending)
+        assertEquals(200, session.activeLearnedClauseCount)
+        val capture = session.queueLearnedRetirement(199, session.learnedRetirementGeneration,
+            256L, 256L, 1024L) { false }
+        session.authorizeLearnedRetirement(assertNotNull(capture.handle), true, 256L, 256L) { false }
+        session.advanceLearnedRetirements(256L, 256L, { false }, publicationPending = false)
+
+        repeat(64) {
+            if (session.nativeCapWindowPending) {
+                val before = session.work
+                forgetIfOverCap(session, params)
+                assertTrue(session.work - before <= 4096L)
+            }
+        }
+
+        assertFalse(session.nativeCapWindowPending)
+        assertEquals(199, session.activeLearnedClauseCount)
+        assertTrue((0 until 199).all { session.learnedClauseTier(it) == ClauseTier.LOCAL })
+    }
+
+    @Test
     fun `cap selection and physical cleanup should share one work grant`() {
         for (native in listOf(false, true)) for (tiered in listOf(false, true)) {
             val session = PropagationSession(chainProblem().bake(), nativeSat = native)
