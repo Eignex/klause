@@ -37,6 +37,8 @@ internal class LpDirectionalHistory(
 
     val retainedEntries: Int get() = gains.size + parents.size
 
+    val retainedObservations: Int get() = parents.size
+
     val hasTwoSidedSamples: Boolean get() = upSamples >= RELIABILITY && downSamples >= RELIABILITY
 
     fun clear(report: Boolean = true) {
@@ -47,6 +49,13 @@ internal class LpDirectionalHistory(
         upSamples = 0
         downSamples = 0
         if (report) observe("RESET")
+    }
+
+    fun discardObservations() {
+        parents.clear()
+        pending = null
+        objective = Double.NaN
+        observe("PASSIVE_SOURCE_OBSERVATIONS_DISCARDED")
     }
 
     fun record(value: Double) {

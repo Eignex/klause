@@ -41,6 +41,8 @@ internal class LpHints(
     private var directionalChoice: VarRef? = null
     private var scopeModel: ExactLpModel? = null
     private var scopeRows: LpScopedRows? = null
+    private var sourceScope: LpDirectionalSourceScope? = null
+    private var sourceRevalidationPending = false
     private var scopeVariables = IntArray(0)
     private var scopeBooleans = BooleanArray(0)
     private var scopeConstant = 0L
@@ -68,19 +70,35 @@ internal class LpHints(
         if (!collect || relaxation.colVarId.size > 8192) return
         val state = relaxation.model.exactState ?: return
         charge(2L * relaxation.colVarId.size + 1L)
-        if (scopeModel !== state.baseModel || scopeRows !== state.rows ||
-            !scopeVariables.contentEquals(relaxation.colVarId) || !scopeBooleans.contentEquals(relaxation.colIsBool) ||
-            scopeConstant != relaxation.objectiveConstant || scopeCutoff != cutoff
+        val sourceMatches = sourceScope?.let {
+            observe("PASSIVE_SOURCE_SCOPE_CHECK")
+            it.matches(relaxation, charge)
+        } == true
+        val contextMatches = scopeVariables.contentEquals(relaxation.colVarId) &&
+            scopeBooleans.contentEquals(relaxation.colIsBool) &&
+            scopeConstant == relaxation.objectiveConstant && scopeCutoff == cutoff
+        if (scopeModel !== state.baseModel || scopeRows !== state.rows || !contextMatches ||
+            sourceRevalidationPending || (sourceScope != null && !sourceMatches)
         ) {
             if (scopeModel != null) observe("INCOMPATIBLE")
-            charge(history.retainedEntries.toLong() + 2L * relaxation.colVarId.size)
-            history.clear(report = scopeModel != null)
+            if (scopeModel != null && contextMatches && sourceMatches) {
+                charge(history.retainedObservations.toLong() + 2L * relaxation.colVarId.size + 1L)
+                history.discardObservations()
+                observe("PASSIVE_SOURCE_HISTORY_RETAINED")
+            } else {
+                charge(history.retainedEntries.toLong() + 2L * relaxation.colVarId.size)
+                history.clear(report = scopeModel != null)
+                observe("PASSIVE_SOURCE_SCOPE_CAPTURE")
+                sourceScope = LpDirectionalSourceScope.capture(relaxation, charge)
+                if (sourceScope != null) observe("PASSIVE_SOURCE_SCOPE_CAPTURED")
+            }
             scopeModel = state.baseModel
             scopeRows = state.rows
             scopeVariables = relaxation.colVarId.copyOf()
             scopeBooleans = relaxation.colIsBool.copyOf()
             scopeConstant = relaxation.objectiveConstant
             scopeCutoff = cutoff
+            sourceRevalidationPending = false
         }
         // The scoped constant cancels in every gain; adding it can round away a small difference.
         objectiveRecorded = objective.isFinite()
@@ -97,11 +115,19 @@ internal class LpHints(
         passiveChoice?.clear()
         passiveDirection?.clear()
         history.finishNode()
-        if (scopeModel != null && state != null &&
+        if (!sourceRevalidationPending && scopeModel != null && state != null &&
             (scopeModel !== state.baseModel || scopeRows !== state.rows)
         ) {
             observe("INCOMPATIBLE")
-            resetHistory()
+            if (sourceScope == null) resetHistory() else {
+                charge(history.retainedObservations.toLong() + 1L)
+                history.discardObservations()
+                clearPassivePoint()
+                objectiveRecorded = false
+                directionalChoice = null
+                sourceRevalidationPending = true
+                observe("PASSIVE_SOURCE_SCOPE_SUSPENDED")
+            }
         }
     }
 
@@ -279,6 +305,8 @@ internal class LpHints(
         }
         scopeModel = null
         scopeRows = null
+        sourceScope = null
+        sourceRevalidationPending = false
         scopeVariables = IntArray(0)
         scopeBooleans = BooleanArray(0)
         freshRecord = false

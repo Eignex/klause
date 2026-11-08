@@ -9,6 +9,64 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `discarded observations preserve completed gains without borrowing pending or ancestor objectives`() {
+        for (unfinished in listOf("pending", "ancestor")) {
+            val history = LpDirectionalHistory({})
+            val variable = VarRef.IntVar(0)
+            repeat(2) {
+                history.beginNode(0)
+                history.record(10.0)
+                history.branch(variable, 2.25)
+                for (up in listOf(false, true)) {
+                    history.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                    history.beginNode(1)
+                    history.record(if (up) 13.0 else 11.0)
+                }
+            }
+            val score = history.balancedScore(variable, 2.25)
+            assertTrue(score.isFinite())
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 2.25)
+            if (unfinished == "pending") {
+                history.commit(SearchDecision.IntAtMost(0, 2), 1)
+                history.beginNode(1)
+            }
+
+            history.discardObservations()
+            if (unfinished == "ancestor") {
+                history.commit(SearchDecision.IntAtLeast(0, 3), 1)
+                history.beginNode(1)
+            }
+            history.record(10000.0)
+
+            assertEquals(score, history.balancedScore(variable, 2.25), unfinished)
+        }
+    }
+
+    @Test
+    fun `retained completed gains still expire by node age`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.IntVar(0)
+        repeat(2) {
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 2.25)
+            for (up in listOf(false, true)) {
+                history.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                history.beginNode(1)
+                history.record(if (up) 13.0 else 11.0)
+            }
+        }
+        assertTrue(history.balancedScore(variable, 2.25).isFinite())
+
+        history.discardObservations()
+        repeat(257) { history.beginNode(0) }
+
+        assertTrue(history.balancedScore(variable, 2.25).isNaN())
+    }
+
+    @Test
     fun `incumbent ordering favors the smaller gain at the current fractional movement`() {
         for (scale in listOf(1.0, 8.0, 1e150, 1e-150)) {
             val history = LpDirectionalHistory({})

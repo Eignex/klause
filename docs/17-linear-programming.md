@@ -246,8 +246,11 @@ The model-facing bounding callback supplies the final returned node relaxation's
 primal and dual point to finite search hints after cut re-solves. Only an optimal
 result supplies a matching objective sample. An unfinished cut solve retains the
 preceding immutable point; cancellation withholds publication. Checked cut
-infeasibility supplies no numeric gain. Directional history accepts only compatible
-retained model and row scopes; it adds no certification request.
+infeasibility supplies no numeric gain. Pending directional observations require the
+same retained model and row scope. Completed advisory estimates may retain one
+unchanged source, structural-coordinate and objective scope across row edits; a new
+matching optimum is required before reuse. These estimates carry no certificate,
+bound or pruning authority and add no certification request.
 [Finite guidance](08-search.md#finite-lp-directional-guidance) owns selection and
 history lifetime.
 

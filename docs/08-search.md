@@ -325,9 +325,20 @@ ordinary order. Reordering preserves the adjacent thresholds and exhaustive chil
 set. A fresh nomination credits only its matching first commitment, separately from
 variable-choice attribution. Direction checks spend the existing overhead allowance.
 
-Samples share one retained exact base model, active-row identity, objective mapping
-and incumbent cutoff. Changed rows or cuts, layout or objective rescaling invalidate
-history and pending comparisons. Restart and assumption reseeding clear history.
+Pending parent/child observations share one exact base model and active-row identity.
+Every row or model edit discards the pending measurement and ancestor split records;
+an objective from a different relaxation cannot complete it. Current nominations still
+require a fresh matching point and optimum after the edit.
+
+Completed normalized gains can survive row edits under one original source and
+unchanged immutable structural columns, source coordinates and objective coefficients,
+sense, scale and constants. The CP variable mapping and incumbent cutoff must also
+match. A changed bound-premise epoch alone does not change those units. This retained
+scope admits no assumptions and inspects at most 8,192 columns and 8,192 rows, all with
+zero logical-column costs. Unsupported metadata keeps exact-model history clearing.
+Changed source, coordinates or objective context, restarts and assumption reseeding
+clear completed gains. Compatibility checks and snapshots spend existing LP overhead;
+the private snapshot retains immutable references and no predecessor matrix chain.
 Ordinary sibling retraction preserves compatible observations and the immediate
 parent split; a skipped child cannot borrow a deeper descendant's objective.
 Directions expire after 256 node visits without a sample. At most 8,192 variable

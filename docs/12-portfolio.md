@@ -801,6 +801,13 @@ These counters do not establish independent checking or confer proof authority.
 
 ### Slice accounting and coverage
 
+When every worker has a dedicated lane and none is configured to start after an
+incumbent or accepted improvement, ordinary execution gives each worker a whole-run
+claim under the containing cancellation.
+Counted slice settings then describe configured policy without imposing segment
+boundaries. Charged-work diagnostics use counted claims instead. Per-worker segment
+counts and work describe the actual execution.
+
 The counted schedule starts at 5000 node equivalents, grows by 1.5 after an ordinary
 scheduled segment, and caps at 150000. Growth belongs to the shared schedule, rather
 than to each arm. Initial probes and private-preparation revisits use the base
