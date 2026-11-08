@@ -333,9 +333,24 @@ internal class LpScopedSolver(
             observe(LpProbeMetrics(0L, 0L, 0, reason))
             return null
         }
-        return (solver as LpDirectionalProbeSolver).directionalGains(
+        val current = solver as LpDirectionalProbeSolver
+        val values = current.directionalGains(
             pointModel, columns, splits, allowance, token, observe,
         )
+        if (values != null) {
+            val changed = when {
+                token() -> LpProbeDecline.CANCELLED
+                closed || solver !== current -> LpProbeDecline.OWNER
+                state !== pointModel.exactState -> LpProbeDecline.STALE_POINT
+                workingActive || pendingFloat != null -> LpProbeDecline.BUSY
+                else -> null
+            }
+            if (changed != null) {
+                observe(LpProbeMetrics(0L, 0L, 0, changed))
+                return null
+            }
+        }
+        return values
     }
 
     fun directionalValues(

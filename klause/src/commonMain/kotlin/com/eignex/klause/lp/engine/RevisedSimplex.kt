@@ -128,6 +128,8 @@ internal class RevisedSimplex(
     private val phaseOneLongSteps: Boolean = true,
     private val phaseOneIncrementalValues: Boolean = true,
     private val singletonStart: Boolean = true,
+    initialScaling: LpScalingView? = null,
+    initialColumns: SparseMatrix? = null,
 ) : TableauCutSolver,
     PersistentLpSolver,
     ResumableLpSolver,
@@ -237,7 +239,9 @@ internal class RevisedSimplex(
     private val n = model.n
     private val numVars = model.numVars
     private val constructionState = model.exactState
-    private var numerical = LpScalingView.create(model, scalingOptions)
+    private var numerical = initialScaling?.also {
+        require(it.source === model && !it.applied)
+    } ?: LpScalingView.create(model, scalingOptions)
     private var continuationAvailable = false
     private var stoppedContinuationBasis: Basis? = null
 
@@ -274,7 +278,9 @@ internal class RevisedSimplex(
      * factorizes, so a refactorization hands over the choice of columns rather than a square matrix
      * assembled for the occasion.
      */
-    private var columns: SparseMatrix = lpColumns(numerical)
+    private var columns: SparseMatrix = initialColumns?.also {
+        require(initialScaling != null && it.rows == m && it.cols == numVars)
+    } ?: lpColumns(numerical)
 
     // The CSC of `columns` as flat arrays — the same structure the seam holds, read here for pricing rather
     // than copied into a second representation. Column j occupies colPtr(j) until colPtr(j+1).
@@ -1190,6 +1196,27 @@ internal class RevisedSimplex(
             return
         }
         installUnscaledFallback(next)
+    }
+
+    internal fun adoptProbe(next: LpModel, token: Cancellation): Boolean {
+        val current = model.exactState ?: return false
+        val state = next.exactState ?: return false
+        if (activeSolve != null || numerical.applied || !current.sameMatrix(state) || token()) return false
+        val refreshed = numerical.refresh(next) ?: return false
+        if (token()) return false
+        continuationAvailable = false
+        stoppedContinuationBasis = null
+        model = next
+        numerical = refreshed
+        pendingNumericalWork.add(refreshed.metrics.work)
+        stopToken = token
+        solvedExactState = null
+        optimalBasis = null
+        optimalPrimal = null
+        infeasibleBasis = null
+        infeasibleRow = -1
+        infeasibleRay = null
+        return true
     }
 
     private fun installUnscaledFallback(next: LpModel) {
@@ -2863,12 +2890,14 @@ internal class RevisedSimplex(
         val parentObjective = probeObjective(token) ?: return decline(
             if (token()) LpProbeDecline.CANCELLED else LpProbeDecline.NO_OPTIMUM,
         )
-        return LpDirectionalProbes(state, basis, parentObjective) { child, work, entries ->
+        val probeColumns = this.columns
+        return LpDirectionalProbes(state, basis, parentObjective,
+            sourceView = numerical.takeUnless { it.applied }) { child, work, entries, view ->
             RevisedSimplex(child, token, refactorUpdateLimit, iterationLimit, work, trackDegeneracy,
                 basisSolverFactory, pricing.copy(basisEntryLimit = minOf(pricing.basisEntryLimit, entries),
                     basisWorkLimit = minOf(pricing.basisWorkLimit, work)), reuseRationalOrder, scalingOptions,
                 primalPricingTolerance, syntheticWorkEnabled, phaseOneLongSteps, phaseOneIncrementalValues,
-                singletonStart)
+                singletonStart, initialScaling = view, initialColumns = probeColumns.takeIf { view != null })
         }.run(columns, splits, allowance - scan, token, observe)
     }
 
@@ -2902,12 +2931,14 @@ internal class RevisedSimplex(
         observe(LpProbeMetrics(scan, 0L, 0))
         if (token()) return decline(LpProbeDecline.CANCELLED)
         probeBasisDecline(source, token)?.let { return decline(it) }
-        return LpDirectionalProbes(state, pointBasis, factory = { child, work, entries ->
+        val probeColumns = this.columns
+        return LpDirectionalProbes(state, pointBasis, sourceView = numerical.takeUnless { it.applied },
+            factory = { child, work, entries, view ->
             RevisedSimplex(child, token, refactorUpdateLimit, iterationLimit, work, trackDegeneracy,
                 basisSolverFactory, pricing.copy(basisEntryLimit = minOf(pricing.basisEntryLimit, entries),
                     basisWorkLimit = minOf(pricing.basisWorkLimit, work)), reuseRationalOrder, scalingOptions,
                 primalPricingTolerance, syntheticWorkEnabled, phaseOneLongSteps, phaseOneIncrementalValues,
-                singletonStart)
+                singletonStart, initialScaling = view, initialColumns = probeColumns.takeIf { view != null })
         }).runValues(columns, splits, allowance - scan, token, observe)
     }
 

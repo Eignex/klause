@@ -12,6 +12,82 @@ import kotlin.test.assertTrue
 
 class LpDirectionalProbesTest {
     @Test
+    fun `pooled child values match independent queries with less work`() {
+        for (columns in listOf(intArrayOf(0, 1), intArrayOf(1, 0))) {
+            val builder = LpBuilder()
+            repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
+            repeat(3) { builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1), Relation.GE, 1L) }
+            val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+                .ownerWorkingModel())
+            RevisedSimplex(model).use { owner ->
+                val point = assertNotNull(owner.solve())
+                val source = LpProbeSource(model, point.basis)
+                var independentWork = 0L
+                val independent = columns.map { column ->
+                    assertNotNull(owner.directionalValues(source, intArrayOf(column), longArrayOf(0),
+                        1_000_000L, Cancellation.Never) { independentWork += it.work }).single()
+                }
+                var pooledWork = 0L
+
+                val pooled = assertNotNull(owner.directionalValues(source, columns, longArrayOf(0, 0),
+                    independentWork - 1L, Cancellation.Never) { pooledWork += it.work })
+
+                assertEquals(independent.size, pooled.size)
+                for (index in pooled.indices) {
+                    assertEquals(independent[index].down, pooled[index].down, 1e-7)
+                    assertEquals(independent[index].up, pooled[index].up, 1e-7)
+                }
+                assertTrue(pooledWork in 1L until independentWork)
+            }
+        }
+    }
+
+    @Test
+    fun `cancellation after a pooled child retires private factors`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
+        repeat(3) { builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1), Relation.GE, 1L) }
+        val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            .ownerWorkingModel())
+        var created = 0
+        var closed = 0
+        RevisedSimplex(model, basisSolverFactory = { matrix ->
+            created++
+            val backend = KotlinBasisSolver(matrix)
+            object : BasisSolver by backend {
+                private var retired = false
+                override fun close() {
+                    if (!retired) { retired = true; closed++ }
+                    backend.close()
+                }
+            }
+        }).use { owner ->
+            assertNotNull(owner.solve())
+            val parentLive = created - closed
+            var cancelled = false
+            var completed = 0
+            var work = 0L
+            var decline: LpProbeDecline? = null
+
+            val gains = owner.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
+                1_000_000L, Cancellation { cancelled }) {
+                work += it.work
+                completed += it.completed
+                decline = it.decline
+                if (it.completed > 0) cancelled = true
+            }
+
+            assertNull(gains)
+            assertEquals(1, completed)
+            assertEquals(LpProbeDecline.CANCELLED, decline)
+            assertEquals(parentLive, created - closed)
+            assertTrue(work in 1L..1_000_000L)
+            assertEquals(4.5, assertNotNull(owner.resolveBounds()).objective, 1e-7)
+        }
+        assertEquals(created, closed)
+    }
+
+    @Test
     fun `child values preserve normalized source units without a common objective constant`() {
         for (sense in listOf(Sense.MINIMIZE, Sense.MAXIMIZE)) for (scale in listOf(1L, 4L)) {
             for (origin in listOf(0L, 7L, -3L)) for (negative in listOf(false, true)) {
@@ -152,9 +228,9 @@ class LpDirectionalProbesTest {
                 var work = 0L
                 var completed = 0
                 val token = Cancellation { children == 2 }
-                val probes = LpDirectionalProbes(state, optimum.basis, 4.5) { child, grant, _ ->
+                val probes = LpDirectionalProbes(state, optimum.basis, 4.5) { child, grant, _, view ->
                     children++
-                    RevisedSimplex(child, cancellation = token, workLimit = grant)
+                    RevisedSimplex(child, cancellation = token, workLimit = grant, initialScaling = view)
                 }
 
                 val observe: (LpProbeMetrics) -> Unit = { work += it.work; completed += it.completed }

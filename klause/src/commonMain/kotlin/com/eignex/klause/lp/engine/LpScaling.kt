@@ -302,6 +302,9 @@ internal class LpScalingView private constructor(
                 equilibration + 2L * vectorWork(model)
         }
 
+        // Identity refreshes visit and copy only scalar vectors; they do not rebuild the matrix.
+        fun identityRefreshWorkBound(model: LpModel): Long = 2L * model.m + 8L * model.numVars + 32L
+
         fun identityAfterFallback(model: LpModel, previous: LpScalingMetrics): LpScalingView {
             val conditioning = lpConditioning(model)
             return identity(model, conditioning, LpScalingDecline.UPDATE_UNSAFE, eligible = previous.eligible).let {
