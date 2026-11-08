@@ -48,6 +48,18 @@ internal class LinearAuthorityLpGuidance(
     val coordinateConflictWeights: List<BigFraction>? = null,
 )
 
+internal fun ExactLpBounds.projectGuidance(value: Double): BigFraction? {
+    if (!value.isFinite()) return null
+    val lower = this.lower?.number?.value
+    val upper = this.upper?.number?.value
+    return when {
+        fixed -> checkNotNull(lower)
+        lower != null && value <= lower.toDouble() -> lower
+        upper != null && value >= upper.toDouble() -> upper
+        else -> BigFraction.ofDouble(value)
+    }
+}
+
 internal class LinearAuthorityLp(
     private val budget: SourceLpBudget,
     private val onShape: (LinearAuthorityLpShape) -> Unit = {},
@@ -217,15 +229,7 @@ internal class LinearAuthorityLp(
             val raw = guide.primal
             val point = raw?.indices?.map { column ->
                 if (token()) return@guideResult null
-                val bounds = packed.columns[column].bounds
-                val lower = bounds.lower?.number?.value
-                val upper = bounds.upper?.number?.value
-                when {
-                    bounds.fixed -> checkNotNull(lower)
-                    lower?.toDouble() == raw[column] -> checkNotNull(lower)
-                    upper?.toDouble() == raw[column] -> checkNotNull(upper)
-                    else -> BigFraction.ofDouble(raw[column]) ?: return@guideResult null
-                }
+                packed.columns[column].bounds.projectGuidance(raw[column]) ?: return@guideResult null
             }
             LinearAuthorityLpGuidance(LinearAuthorityLpResult(result, weights, conflictWeights), point,
                 workingRows, guide.paused)

@@ -1672,6 +1672,12 @@ Admission applies the existing dimension, entry and scalar limits to the working
 matrix, objective and selected sides; every published claim still checks against
 the complete source context.
 
+Finite floating guidance is projected onto the closure of its prepared exact column
+sides before conversion to source coordinates. Interior values retain their floating
+representation, absent sides stay open, and nonfinite advice declines. This projection
+supplies no feasibility or proof authority; witnesses and certificates still require
+their complete source checks.
+
 The internal active-row consultation uses a zero objective and a separately
 checked partial-scope refutation. Source scanning admits at most 100,000 visits
 within the remaining funded work, with 4,096-bit input and Boolean-substitution
