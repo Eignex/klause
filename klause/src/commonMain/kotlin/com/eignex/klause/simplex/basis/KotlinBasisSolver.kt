@@ -595,8 +595,8 @@ internal class KotlinBasisSolver private constructor(
         override val entries: Long = observed.factors.lower.nnz.toLong() +
             observed.ft.upperEntries + observed.ft.transformEntries
         override val additionalWork: Long = 56L * n +
-            6L * (observed.factors.lower.nnz.toLong() + observed.factors.upper.nnz) +
-            4L * observed.ft.upperEntries + 2L * observed.ft.transformEntries + 4L * observed.ft.updateCount + 64L
+            2L * (observed.factors.lower.nnz.toLong() + observed.factors.upper.nnz) +
+            4L * observed.ft.updateCount + 64L
 
         override fun create(
             columns: IntArray,
@@ -619,8 +619,8 @@ internal class KotlinBasisSolver private constructor(
                 retainedBuilder = builder.fork())
             var published = false
             try {
-                val factors = observed.factors.copyOwned { !valid() } ?: return null
-                val ft = observed.ft.copyOwned { !valid() } ?: return null
+                val factors = observed.factors
+                val ft = observed.ft.fork { !valid() } ?: return null
                 copied.cache = BasisSolveCache(factors, densityThreshold, ft)
                 copied.columns = this@KotlinBasisSolver.columns.copyOf()
                 copied.unitRows = this@KotlinBasisSolver.unitRows.copyOf()

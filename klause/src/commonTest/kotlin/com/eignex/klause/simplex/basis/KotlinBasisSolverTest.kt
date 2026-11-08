@@ -15,6 +15,55 @@ import kotlin.test.assertTrue
 
 class KotlinBasisSolverTest {
     @Test
+    fun `updated factor forks preserve independent sibling bases and lifetimes`() {
+        val source = ftSource("dense", 8)
+        val parentBasis = IntArray(8) { it }
+        val parent = KotlinBasisSolver(source, fillFactor = 100.0)
+        assertTrue(parent.refactorize(parentBasis))
+        val entering = IndexedVector(8).also { it.scatterColumn(source, 9) }
+        parent.ftran(entering)
+        assertEquals(BasisUpdate.APPLIED, parent.update(1, 9, entering))
+        parentBasis[1] = 9
+        val offer = assertNotNull(parent.factorCopy)
+        val first = assertNotNull(offer.create(parentBasis, IntArray(8) { -1 }, LuPivotPolicy(), offer.additionalWork))
+        val second = assertNotNull(offer.create(parentBasis, IntArray(8) { -1 }, LuPivotPolicy(), offer.additionalWork))
+        val firstBasis = parentBasis.copyOf()
+        val secondBasis = parentBasis.copyOf()
+        try {
+            for ((owner, headings, slot) in listOf(
+                Triple(parent, parentBasis, 2), Triple(first, firstBasis, 0), Triple(second, secondBasis, 3),
+            )) {
+                val spike = IndexedVector(8).also { it.scatterColumn(source, slot + 8) }
+                owner.ftran(spike)
+                assertEquals(BasisUpdate.APPLIED, owner.update(slot, slot + 8, spike))
+                headings[slot] = slot + 8
+            }
+            for ((owner, headings) in listOf(parent to parentBasis, first to firstBasis, second to secondBasis)) {
+                for (transpose in listOf(false, true)) {
+                    val rhs = DoubleArray(8) { it + 1.0 }
+                    val solved = IndexedVector(8).also { it.scatter(rhs) }
+                    if (transpose) owner.btran(solved) else owner.ftran(solved)
+                    assertTrue(ftResidual(source, headings, rhs, solved, transpose) <= 1e-10)
+                }
+            }
+            assertTrue(first.refactorize(IntArray(8) { it }))
+            first.close()
+            assertTrue(parent.refactorize(IntArray(8) { it }))
+            parent.close()
+            for (transpose in listOf(false, true)) {
+                val rhs = DoubleArray(8) { it + 1.0 }
+                val solved = IndexedVector(8).also { it.scatter(rhs) }
+                if (transpose) second.btran(solved) else second.ftran(solved)
+                assertTrue(ftResidual(source, secondBasis, rhs, solved, transpose) <= 1e-10)
+            }
+        } finally {
+            first.close()
+            second.close()
+            parent.close()
+        }
+    }
+
+    @Test
     fun `copied owners rebuild different bases after input mutation and producer retirement`() {
         val source = ftSource("dense", 3)
         val original = ftSource("dense", 3)
@@ -217,17 +266,21 @@ class KotlinBasisSolverTest {
 
     @Test
     fun `cancellation during factor copying publishes no child and leaves the parent usable`() {
-        for (stopAt in listOf(1, 3, 7, 11)) {
-            val source = ftSource("dense", 3)
-            KotlinBasisSolver(source).use { parent ->
-                val headings = intArrayOf(0, 1, 2)
-                assertTrue(parent.refactorize(headings))
+        val source = ftSource("dense", 3)
+        KotlinBasisSolver(source).use { parent ->
+            val headings = intArrayOf(0, 1, 2)
+            val units = IntArray(3) { -1 }
+            assertTrue(parent.refactorize(headings))
+            val offer = assertNotNull(parent.factorCopy)
+            var totalPolls = 0
+            assertNotNull(offer.create(headings, units,
+                LuPivotPolicy(cancelled = { totalPolls++; false }), offer.additionalWork)).close()
+            for (stopAt in listOf(1, maxOf(1, totalPolls / 2), totalPolls).distinct()) {
                 val before = parent.basisOperationWork
-                val offer = assertNotNull(parent.factorCopy)
                 var polls = 0
                 val policy = LuPivotPolicy(cancelled = { ++polls >= stopAt })
 
-                assertNull(offer.create(headings, IntArray(3) { -1 }, policy, offer.additionalWork))
+                assertNull(offer.create(headings, units, policy, offer.additionalWork))
 
                 assertEquals(before, parent.basisOperationWork)
                 val rhs = doubleArrayOf(1.0, 2.0, 3.0)

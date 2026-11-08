@@ -1384,6 +1384,10 @@ Projection, bound-state construction, numerical scaling, workspace setup,
 objective scans and native retirement share one positive caller work allowance
 with the floating solves. Each next child receives a share of the remaining
 work; an exhausted grant is never passed as the floating API's unbounded zero.
+Private numerical owners admit each charged kernel before execution within that
+positive grant. An unfunded kernel retires partial numerical state and withholds
+the comparison while retaining the funded prefix's charge. Basis repair whose
+cost cannot be reserved declines in these owners.
 Construction reserves its scaling bound before allocation and retains actual
 preparation work when the query completes. Scratch factors use bounded entry
 and construction work limits, and every scratch owner closes on all exits.
@@ -1461,11 +1465,13 @@ permutations; replay checks every numerical pivot and retains failed proposal an
 fallback work. Proposals carry no numerical factors or exact-order authority.
 
 The default backend also offers bounded owned copies of its current numerical
-basis. Each copy owns its LU matrices, permutations and live Forrest-Tomlin
-columns and row transforms, with fresh scratch and meters. Update counts and
+basis. Each private owner retains immutable LU matrices, permutations and published
+Forrest-Tomlin coefficient slices. Adjacency containers, orders, transform lists,
+row arithmetic status, scratch and meters stay private. Updates replace published
+buffers; refactoring or retiring one owner preserves its siblings. Update counts and
 fill/stability limits remain intact. Source keys and a producer generation check
 reject stale, singular, repairing, closed or cancelled offers. The caller funds
-ordinary source/workspace construction separately from the additional copy work
+ordinary source/workspace construction separately from private structural-copy work
 and reserves entries before allocation. Partial copies publish no owner. Exact
 ordering offers retain their ordinary freshness checks; numerical copies supply
 no certificate authority.

@@ -1,6 +1,8 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.BasisArithmeticException
+import com.eignex.klause.simplex.basis.BasisRepair
+import com.eignex.klause.simplex.basis.BasisRepairControl
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
@@ -13,6 +15,118 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpDirectionalProbesTest {
+    @Test
+    fun `strict private probes decline repair with the failed work retained`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
+        repeat(3) { builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1), Relation.GE, 1L) }
+        val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            .ownerWorkingModel())
+        var closed = 0
+        RevisedSimplex(model, basisSolverFactory = { matrix ->
+            val backend = KotlinBasisSolver(matrix)
+            object : BasisSolver by backend {
+                override fun refactorize(basicIndex: IntArray): Boolean = false
+                override fun refactorizeRepairing(basicIndex: IntArray, control: BasisRepairControl): BasisRepair? =
+                    error("unfunded repair")
+                override fun close() { closed++; backend.close() }
+            }
+        }).use { privateSolver ->
+            privateSolver.boundProbeWork(1_000L)
+
+            assertNull(privateSolver.solve())
+
+            assertEquals(LpFloatTermination.WORK, privateSolver.lastTermination)
+            assertTrue(privateSolver.lastMetrics.workOps in 1L..1_000L)
+            assertEquals(1, closed)
+            assertNull(privateSolver.continuationBasis(model))
+        }
+    }
+
+    @Test
+    fun `an unfunded private basis solve retires without executing`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
+        repeat(3) { builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1), Relation.GE, 1L) }
+        val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            .ownerWorkingModel())
+        RevisedSimplex(model).use { parent ->
+            val point = assertNotNull(parent.solve())
+            val entries = point.basis.basicVars.sumOf {
+                if (it < model.n) model.csc.colPtr[it + 1] - model.csc.colPtr[it] else 1
+            }.toLong()
+            var created = 0
+            var closed = 0
+            RevisedSimplex(model, basisSolverFactory = { matrix ->
+                created++
+                val backend = KotlinBasisSolver(matrix)
+                object : BasisSolver by backend {
+                    override fun ftran(x: IndexedVector, expectedDensity: Double) = error("unfunded FTRAN")
+                    override fun btran(x: IndexedVector, expectedDensity: Double) = error("unfunded BTRAN")
+                    override fun close() { closed++; backend.close() }
+                }
+            }).use { privateSolver ->
+                privateSolver.boundProbeWork(entries)
+
+                assertNull(privateSolver.solve(point.basis))
+
+                assertEquals(LpFloatTermination.WORK, privateSolver.lastTermination)
+                assertEquals(entries, privateSolver.lastMetrics.workOps)
+                assertEquals(1, created)
+                assertEquals(created, closed)
+                assertNull(privateSolver.continuationBasis(model))
+            }
+            assertEquals(4.5, assertNotNull(parent.resolveBounds()).objective, 1e-7)
+        }
+    }
+
+    @Test
+    fun `private query work stays within each positive grant`() {
+        for (rowScale in listOf(1L, 1_000_000L)) {
+            val builder = LpBuilder()
+            repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
+            repeat(3) {
+                builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(rowScale, rowScale), Relation.GE, rowScale)
+            }
+            val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+                .ownerWorkingModel())
+            RevisedSimplex(model).use { parent ->
+                val point = assertNotNull(parent.solve())
+                val source = LpProbeSource(model, point.basis)
+                val before = parent.lastMetrics
+                var observedSolve = false
+                var observedCompletion = false
+                for (grant in listOf(1L, 128L, 256L, 512L, 768L, 1_024L, 1_536L, 2_048L, 4_096L, 16_384L)) {
+                    var charged = 0L
+                    var completed = 0
+
+                    val values = parent.directionalValues(source, intArrayOf(0, 1), longArrayOf(0, 0),
+                        grant, Cancellation.Never) {
+                        charged += it.work
+                        completed += it.completed
+                        assertTrue(charged <= grant, "grant=$grant charged=$charged")
+                        if (it.solveWork > 0L) observedSolve = true
+                    }
+
+                    if (values != null) {
+                        observedCompletion = true
+                        assertEquals(4, completed)
+                        assertEquals(6.0, values[0].down, 1e-7)
+                        assertEquals(5.0, values[0].up, 1e-7)
+                        assertEquals(7.0, values[1].down, 1e-7)
+                        assertEquals(5.0, values[1].up, 1e-7)
+                    } else {
+                        assertTrue(completed < 4)
+                    }
+                    assertEquals(before, parent.lastMetrics)
+                }
+                assertTrue(observedSolve)
+                assertTrue(observedCompletion)
+                assertEquals(4.5, assertNotNull(parent.resolveBounds()).objective, 1e-7)
+            }
+        }
+    }
+
     @Test
     fun `pooled child values match independent queries with less work`() {
         for (rowScale in listOf(1L, 1_000_000L)) for (columns in listOf(intArrayOf(0, 1), intArrayOf(1, 0))) {

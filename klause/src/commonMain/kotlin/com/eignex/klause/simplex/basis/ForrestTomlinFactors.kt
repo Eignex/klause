@@ -41,14 +41,14 @@ internal class ForrestTomlinFactors private constructor(
     var lastSolveEntries = 0L
         private set
 
-    fun copyOwned(cancelled: () -> Boolean): ForrestTomlinFactors? {
+    fun fork(cancelled: () -> Boolean): ForrestTomlinFactors? {
         if (cancelled()) return null
         val copiedOrder = upper.order.copyOf()
         if (!copiedOrder.contentEquals(transpose.order)) return null
         return try {
             fun copy(columns: Array<BasisSlice>): Array<BasisSlice> = Array(columns.size) { i ->
                 if (i % 128 == 0 && cancelled()) throw CopyStopped()
-                columns[i].copyOwned()
+                columns[i]
             }
             val copiedUpper = BasisTriangularMatrix(copy(upper.columns), copiedOrder)
             val copiedTranspose = BasisTriangularMatrix(copy(transpose.columns), copiedOrder)
@@ -56,7 +56,7 @@ internal class ForrestTomlinFactors private constructor(
             for (i in transforms.indices) {
                 if (i % 128 == 0 && cancelled()) return null
                 val transform = transforms[i]
-                copiedTransforms.add(ForrestTomlinRow(transform.pivot, transform.entries.copyOwned()))
+                copiedTransforms.add(ForrestTomlinRow(transform.pivot, transform.entries))
             }
             if (cancelled()) return null
             ForrestTomlinFactors(copiedUpper, copiedTranspose, initialEntries,
@@ -154,7 +154,7 @@ internal class ForrestTomlinFactors private constructor(
             entries,
             transformEntries + transform.entries.count,
         )
-        // Publish the two adjacency views and their shared order only after all checked arithmetic succeeds.
+        // Forks retain published slices, so updates replace buffers after all checked arithmetic succeeds.
         transforms.add(transform)
         upper.columns = columns
         transpose.columns = rows
