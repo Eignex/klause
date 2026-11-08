@@ -1331,6 +1331,10 @@ scales. The caller funds the complete bounded analysis before allocation or basi
 access. Changed models, unfinished solves, missing directions and cancellation
 retain unavailability. This read preserves the retained optimum and carries no
 bound, infeasibility or certificate authority.
+Matrix-scan funding counts nonbasic-column entries, matching the traversed columns.
+A paired read shares reduced costs from the current dual vector when its fully
+funded plan costs less than independent scans. The temporary reduced-cost vector
+belongs to that read, and the complete combined analysis is funded before allocation.
 
 Explicit directional probes compare the actual floating LP objective increase at
 the two adjacent integer bounds of at most two structural columns. Each child

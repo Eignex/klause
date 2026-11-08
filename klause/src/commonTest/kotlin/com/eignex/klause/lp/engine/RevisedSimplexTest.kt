@@ -46,6 +46,49 @@ class RevisedSimplexTest {
     }
 
     @Test
+    fun `paired basis costs reuse nonbasic pricing work`() {
+        for (exact in listOf(false, true)) {
+            val builder = LpBuilder()
+            val variables = Array(4) { block ->
+                intArrayOf(builder.addVar(0, 2), builder.addVar(0, 1, cost = 3L + block),
+                    builder.addVar(0, 1, cost = 5L + block))
+            }
+            val columns = variables.flatMap { it.asList() }.toIntArray()
+            for (row in variables.indices) {
+                builder.addRow(columns, LongArray(columns.size) { term ->
+                    (if (term / 3 == row) 4L else 2L) * (if (term % 3 == 2) -1L else 1L)
+                }, Relation.EQ, 5L)
+            }
+            val built = builder.build(Sense.MINIMIZE)
+            val model = if (exact) {
+                assertNotNull(LpExactState(assertNotNull(built.authoritativeModel())).ownerWorkingModel())
+            } else built
+            RevisedSimplex(model).use { solver ->
+                assertNotNull(solver.solve())
+                var independentWork = 0L
+                val independent = variables.take(2).map { variable ->
+                    assertNotNull(solver.directionalCosts(model, intArrayOf(variable[0]), 100_000L,
+                        Cancellation.Never) { independentWork += it }).single()
+                }
+                var pairedWork = 0L
+
+                val together = assertNotNull(solver.directionalCosts(model,
+                    intArrayOf(variables[0][0], variables[1][0]), independentWork - 1L,
+                    Cancellation.Never) { pairedWork += it })
+
+                assertEquals(independent.size, together.size)
+                for (index in together.indices) {
+                    val expected = assertNotNull(independent[index])
+                    val actual = assertNotNull(together[index])
+                    assertEquals(expected.down, actual.down, 1e-7)
+                    assertEquals(expected.up, actual.up, 1e-7)
+                }
+                assertTrue(pairedWork in 1L until independentWork)
+            }
+        }
+    }
+
+    @Test
     fun `two basis columns require their combined analysis allowance`() {
         for (exact in listOf(false, true)) {
             val builder = LpBuilder()
