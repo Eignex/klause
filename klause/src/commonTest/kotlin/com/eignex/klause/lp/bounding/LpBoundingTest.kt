@@ -19,9 +19,11 @@ import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.TableauCutSolver
@@ -153,6 +155,241 @@ class LpBoundingTest {
             assertFalse(outcome.prune)
             assertEquals(5.0, base.intColOf.sumOf { points.single()[it] }, 1e-8)
             assertEquals(5.0, objectives.single(), 1e-8)
+        }
+    }
+
+    @Test
+    fun `branch hints retain an optimal point when no cut is selected`() {
+        val problem = triangle(3)
+        val sink = SolveStatsSink(backend = "uncut-point-hints")
+        val session = PropagationSession(problem)
+        val points = ArrayList<DoubleArray>()
+        val objectives = ArrayList<Double>()
+        val hints = object : LpHintSink {
+            override fun clear() = Unit
+
+            override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
+                points.add(primal.copyOf())
+            }
+
+            override fun recordObjective(relaxation: LpRelaxation, objective: Double) {
+                objectives.add(objective)
+            }
+        }
+
+        LpEngine(problem, sumObjective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            val outcome = engine.sparseSafePrune(
+                assertNotNull(engine.lpRelaxer), session, Double.POSITIVE_INFINITY, sink,
+                Cancellation.Never, -1, true, hints = hints,
+            )
+
+            assertFalse(outcome.prune)
+            assertEquals(4.5, points.single().sum(), 1e-8)
+            assertEquals(4.5, objectives.single(), 1e-8)
+        }
+    }
+
+    @Test
+    fun `a nonoptimal cut point supplies no optimum sample`() {
+        val problem = triangle(3)
+        val sink = SolveStatsSink(backend = "nonoptimal-cut-hints")
+        val session = PropagationSession(problem)
+        var queries = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
+                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                        val point = delegate.resolveBounds(allowance) ?: return null
+                        queries++
+                        return if (queries == 2) FloatLpResult(point.basis, point.objective, point.duals,
+                            point.primal, optimal = false, exactState = point.exactState) else point
+                    }
+                }
+            }
+        }
+        val points = ArrayList<DoubleArray>()
+        val objectives = ArrayList<Double>()
+        val hints = object : LpHintSink {
+            override fun clear() = Unit
+
+            override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
+                points.add(primal.copyOf())
+            }
+
+            override fun recordObjective(relaxation: LpRelaxation, objective: Double) {
+                objectives.add(objective)
+            }
+        }
+        LpEngine(problem, sumObjective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
+            LpSolveContext(factory)).use { engine ->
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val base = assertNotNull(engine.nodeRelaxation(relaxer, session))
+            assertTrue(engine.cutPool.add(
+                Cut(base.intColOf, longArrayOf(1L, 1L, 1L), Relation.GE, 5L, global = true), base,
+            ))
+
+            val outcome = engine.sparseSafePrune(
+                relaxer, session, 100.0, sink, Cancellation.Never, -1, true, hints = hints,
+            )
+
+            assertFalse(outcome.prune)
+            assertEquals(2, queries)
+            assertEquals(5.0, base.intColOf.sumOf { points.single()[it] }, 1e-8)
+            assertTrue(objectives.isEmpty())
+        }
+    }
+
+    @Test
+    fun `an unfinished cut solve retains the preceding hint point`() {
+        val problem = triangle(3)
+        val sink = SolveStatsSink(backend = "unfinished-cut-hints")
+        val session = PropagationSession(problem)
+        var queries = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
+                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                        if (++queries == 2) null else delegate.resolveBounds(allowance)
+                }
+            }
+        }
+        val points = ArrayList<DoubleArray>()
+        val objectives = ArrayList<Double>()
+        val hints = object : LpHintSink {
+            override fun clear() = Unit
+
+            override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
+                points.add(primal.copyOf())
+            }
+
+            override fun recordObjective(relaxation: LpRelaxation, objective: Double) {
+                objectives.add(objective)
+            }
+        }
+        LpEngine(problem, sumObjective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
+            LpSolveContext(factory)).use { engine ->
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val base = assertNotNull(engine.nodeRelaxation(relaxer, session))
+            assertTrue(engine.cutPool.add(
+                Cut(base.intColOf, longArrayOf(1L, 1L, 1L), Relation.GE, 5L, global = true), base,
+            ))
+
+            val outcome = engine.sparseSafePrune(
+                relaxer, session, 100.0, sink, Cancellation.Never, -1, true, hints = hints,
+            )
+
+            assertFalse(outcome.prune)
+            assertEquals(2, queries)
+            assertEquals(4.5, base.intColOf.sumOf { points.single()[it] }, 1e-8)
+            assertEquals(4.5, objectives.single(), 1e-8)
+        }
+    }
+
+    @Test
+    fun `cancellation during a cut solve withholds hint publication`() {
+        val problem = triangle(3)
+        val sink = SolveStatsSink(backend = "cancelled-cut-hints")
+        val session = PropagationSession(problem)
+        var queries = 0
+        var cutCancelled = false
+        val token = Cancellation { cutCancelled }
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
+                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                        delegate.resolveBounds(allowance).also { if (++queries == 2) cutCancelled = true }
+                }
+            }
+        }
+        val points = ArrayList<DoubleArray>()
+        val objectives = ArrayList<Double>()
+        val hints = object : LpHintSink {
+            override fun clear() = Unit
+
+            override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
+                points.add(primal.copyOf())
+            }
+
+            override fun recordObjective(relaxation: LpRelaxation, objective: Double) {
+                objectives.add(objective)
+            }
+        }
+        LpEngine(problem, sumObjective, LpParams(lpPlan = LpPlan(bounding = true), cancellation = token), sink,
+            LpSolveContext(factory)).use { engine ->
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val base = assertNotNull(engine.nodeRelaxation(relaxer, session))
+            assertTrue(engine.cutPool.add(
+                Cut(base.intColOf, longArrayOf(1L, 1L, 1L), Relation.GE, 5L, global = true), base,
+            ))
+
+            val outcome = engine.sparseSafePrune(
+                relaxer, session, 100.0, sink, token, -1, true, hints = hints,
+            )
+
+            assertFalse(outcome.prune)
+            assertEquals(2, queries)
+            assertTrue(points.isEmpty())
+            assertTrue(objectives.isEmpty())
+        }
+    }
+
+    @Test
+    fun `checked cut infeasibility supplies no numeric hint sample`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(
+            Linear(intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1),
+        ))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val sink = SolveStatsSink(backend = "infeasible-cut-hints")
+        val session = PropagationSession(problem)
+        var points = 0
+        var objectives = 0
+        var infeasible = 0
+        val hints = object : LpHintSink {
+            override fun clear() = Unit
+
+            override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
+                points++
+            }
+
+            override fun recordObjective(relaxation: LpRelaxation, objective: Double) {
+                objectives++
+            }
+
+            override fun recordInfeasible() {
+                infeasible++
+            }
+        }
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val base = assertNotNull(engine.nodeRelaxation(relaxer, session))
+            assertTrue(engine.cutPool.add(Cut(intArrayOf(), longArrayOf(), Relation.GE, 1L, global = true), base))
+
+            val outcome = engine.sparseSafePrune(
+                relaxer, session, 100.0, sink, Cancellation.Never, -1, true, hints = hints,
+            )
+
+            assertTrue(outcome.prune)
+            assertEquals(1, infeasible)
+            assertEquals(0, points)
+            assertEquals(0, objectives)
         }
     }
 

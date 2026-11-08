@@ -373,6 +373,11 @@ private fun LpEngine.solveSelectedCuts(
     return LpCutOutcome.Pruned(if (learn) LpExplanation.infeasibilityClause(tightened, ray, session) else null)
 }
 
+private fun LpHintSink.recordPoint(relaxation: LpRelaxation, result: FloatLpResult) {
+    record(relaxation, result.primal, result.duals)
+    if (result.optimal) recordObjective(relaxation, result.objective)
+}
+
 /**
  * Cheap sound prune + objective-bound propagation for the LP path: float revised simplex for the duals,
  * then the tighter of the Neumaier–Shcherbina safe bound and the certificate's integer-multiplier one
@@ -557,13 +562,6 @@ internal fun LpEngine.sparseSafePrune(
     }
     if (session.decisionLevel == 0) recordRootQueryBound(relaxation, result)
     sink.lp.observeLuFill(result.luMaxFill, result.luMaxDensity, result.luMaxDim)
-    // LP-guided branching: record the fractional primal + reduced costs so the descent can order
-    // branch values toward the LP point and pick reduced-cost-impactful fractional variables. Purely
-    // advisory — it never changes feasibility or the optimum.
-    hints?.record(relaxation, result.primal, result.duals)
-    if (result.optimal && hints != null) {
-        hints.recordObjective(relaxation, result.objective)
-    }
     // The scoped owner carries appended-row bases itself; the hint is only for external fresh solves.
     var optimalBasis: Basis? = result.basis
     val rowMeter = if (problem.numRealVars > 0 &&
@@ -578,12 +576,24 @@ internal fun LpEngine.sparseSafePrune(
             return LpNodeOutcome(true, null)
         }
         if (cancellation()) return LpNodeOutcome(false, optimalBasis)
-        val constant = cutPool.constantContradiction() ?: return LpNodeOutcome(false, optimalBasis)
-        return when (val outcome = solveSelectedCuts(
+        val constant = cutPool.constantContradiction()
+        if (constant == null) {
+            hints?.recordPoint(relaxation, result)
+            return LpNodeOutcome(false, optimalBasis)
+        }
+        val outcome = solveSelectedCuts(
             session, LpCutOutcome.Solved(relaxation, result), listOf(constant), cancellation, sink, learn,
-        )) {
-            is LpCutOutcome.Pruned -> LpNodeOutcome(true, null, outcome.explanation)
-            is LpCutOutcome.Solved -> LpNodeOutcome(false, outcome.result.basis)
+        )
+        if (cancellation()) return LpNodeOutcome(false, null)
+        return when (outcome) {
+            is LpCutOutcome.Pruned -> {
+                hints?.recordInfeasible()
+                LpNodeOutcome(true, null, outcome.explanation)
+            }
+            is LpCutOutcome.Solved -> {
+                hints?.recordPoint(outcome.relaxation, outcome.result)
+                LpNodeOutcome(false, outcome.result.basis)
+            }
         }
     }
     // Pooled global cuts the LP point violates are folded in first (see foldSelectedCuts). Then, at a
@@ -592,7 +602,10 @@ internal fun LpEngine.sparseSafePrune(
     // follow the owner's row trail. The bound, certificate and reduced-cost fixing below read the
     // tightened immutable relaxation.
     val cutOutcome = foldSelectedCuts(session, relaxation, result, cancellation, sink, learn)
-    if (cutOutcome is LpCutOutcome.Pruned) return LpNodeOutcome(true, null, cutOutcome.explanation)
+    if (cutOutcome is LpCutOutcome.Pruned) {
+        hints?.recordInfeasible()
+        return LpNodeOutcome(true, null, cutOutcome.explanation)
+    }
     val cutSolved = cutOutcome as LpCutOutcome.Solved
     if (cancellation()) return LpNodeOutcome(false, null)
     var boundRel = cutSolved.relaxation
@@ -630,7 +643,10 @@ internal fun LpEngine.sparseSafePrune(
             val previous = LpCutOutcome.Solved(boundRel, boundRes)
             val outcome = solveSelectedCuts(session, previous, selectedCuts, cancellation, sink, learn)
             when (outcome) {
-                is LpCutOutcome.Pruned -> return LpNodeOutcome(true, null, outcome.explanation)
+                is LpCutOutcome.Pruned -> {
+                    hints?.recordInfeasible()
+                    return LpNodeOutcome(true, null, outcome.explanation)
+                }
                 is LpCutOutcome.Solved -> {
                     if (outcome.relaxation.model === boundRel.model) break
                     boundRel = outcome.relaxation
@@ -642,6 +658,8 @@ internal fun LpEngine.sparseSafePrune(
     // The exact basis-certificate backs the prune bound, the learnable objective-bound reason and the
     // reduced-cost fixing. Compute it once when any of them needs it; a singular/unbounded certify
     // yields null and each falls back to its cheap certificate-less path, which is sound.
+    if (cancellation()) return LpNodeOutcome(false, null)
+    hints?.recordPoint(boundRel, boundRes)
     if (cancellation()) return LpNodeOutcome(false, null)
     activateCutAttribution(boundRel)
     val additionalCertificates = ArrayList<LpDeductionCertificate>(2)
