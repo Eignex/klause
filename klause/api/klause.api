@@ -9296,6 +9296,37 @@ public final class com/eignex/klause/portfolio/PortfolioEvent$Charged : com/eign
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/portfolio/PortfolioEvent$Continuation : com/eignex/klause/portfolio/PortfolioEvent {
+	public fun <init> (JILjava/lang/String;ZJLjava/lang/Long;JLjava/lang/Long;JLjava/lang/Boolean;Ljava/lang/String;)V
+	public final fun component1 ()J
+	public final fun component10 ()Ljava/lang/Boolean;
+	public final fun component11 ()Ljava/lang/String;
+	public final fun component2 ()I
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Z
+	public final fun component5 ()J
+	public final fun component6 ()Ljava/lang/Long;
+	public final fun component7 ()J
+	public final fun component8 ()Ljava/lang/Long;
+	public final fun component9 ()J
+	public final fun copy (JILjava/lang/String;ZJLjava/lang/Long;JLjava/lang/Long;JLjava/lang/Boolean;Ljava/lang/String;)Lcom/eignex/klause/portfolio/PortfolioEvent$Continuation;
+	public static synthetic fun copy$default (Lcom/eignex/klause/portfolio/PortfolioEvent$Continuation;JILjava/lang/String;ZJLjava/lang/Long;JLjava/lang/Long;JLjava/lang/Boolean;Ljava/lang/String;ILjava/lang/Object;)Lcom/eignex/klause/portfolio/PortfolioEvent$Continuation;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getArm ()I
+	public final fun getDone ()Ljava/lang/Boolean;
+	public final fun getOfferedMillis ()Ljava/lang/Long;
+	public final fun getOfferedWork ()J
+	public final fun getOutcome ()Ljava/lang/String;
+	public final fun getRemainingMillis ()J
+	public final fun getRepaidWork ()Ljava/lang/Long;
+	public final fun getRetained ()Z
+	public final fun getSegment ()J
+	public final fun getWork ()J
+	public final fun getWorker ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/portfolio/PortfolioEvent$Finished : com/eignex/klause/portfolio/PortfolioEvent {
 	public fun <init> (Ljava/lang/String;J)V
 	public final fun component1 ()Ljava/lang/String;
