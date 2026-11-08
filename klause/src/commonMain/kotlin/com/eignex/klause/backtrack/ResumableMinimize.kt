@@ -1622,7 +1622,8 @@ internal class ResumableMinimize(
                     brancher.importPooledSolution(it.assignment, guideValues = true, preferValues = local == null)
                     params.branchObserver.observeGuidance(PooledGuidanceKind.IMPORT) {
                         PooledGuidanceObservation(PooledGuidanceKind.IMPORT, local == null, "resume",
-                            it.version, it.objective, local?.objective?.display, local?.objective?.exact?.guidanceText(),
+                            it.version, it.objective, local?.objective?.display,
+                            local?.objective?.exact?.guidanceText(),
                             observedExternalCutoff, rootRoundingPending || rootLayoutPending)
                     }
                 }

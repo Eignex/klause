@@ -128,7 +128,8 @@ internal object FinitePortfolioLpCapture {
                             queries++
                             if (owners.size < 64 || owners.containsKey(get(query, "Owner"))) {
                                 val owner = owners.computeIfAbsent(get(query, "Owner")) { owners.size }
-                                val selected = (captureWorker == "any" || worker == captureWorker) && attempts < limit &&
+                                val selectedWorker = captureWorker == "any" || worker == captureWorker
+                                val selected = selectedWorker && attempts < limit &&
                                     (captureRoute == "any" || get(query, "Route").toString() == captureRoute) &&
                                     (cutoffBits == null || cutoff?.toBits() == cutoffBits)
                                 if (queries <= 124 || selected) {
@@ -235,7 +236,9 @@ internal object FinitePortfolioLpCapture {
                                 put("exact", witness.exact)
                                 put("values", JsonArray(witness.values.map { JsonPrimitive(it.toString()) }))
                             }.toString()
-                            point = if (text.length <= 65_536) Reports.json.parseToJsonElement(text) as JsonObject else null
+                            point = if (text.length <= 65_536) {
+                                Reports.json.parseToJsonElement(text) as JsonObject
+                            } else null
                         }, finite = FiniteSolveCallbacks({}, { producer = it.workerLabel })))
                     out.resolve("result.json").writeText(buildJsonObject {
                         put("nativeResultKind", result.javaClass.simpleName)
