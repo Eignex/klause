@@ -81,6 +81,7 @@ internal object FinitePortfolioLpCapture {
                 put("cancelled", stop())
                 put("sourceVerdictClaim", false)
                 put("fullWarmReplayQualified", false)
+                put("queryScope", "LpSolveSession only; general LP calls omitted")
             }.toString())
             return
         }
@@ -209,6 +210,7 @@ internal object FinitePortfolioLpCapture {
                         "other observation costs are also inside execution")
                     put("sourceVerdictClaim", false)
                     put("fullWarmReplayQualified", false)
+                    put("queryScope", "LpSolveSession only; general LP calls omitted")
                     put("cancelled", stop())
                 }.toString())
             }
