@@ -300,12 +300,9 @@ class LinearAuthorityInvocationTest {
                 BigFraction.ofLong(100))),
         ), mapOf(integer to BigFraction.MINUS_ONE, real to BigFraction.ONE))
 
-        for ((pointCuts, operations, fractionalOrder) in listOf(
-            Triple(false, 1, false), Triple(true, 2, false), Triple(true, 2, true),
-        )) {
+        for ((pointCuts, operations) in listOf(false to 1, true to 2)) {
             val result = LinearAuthorityInvocation(source, TheoryParams(sourceAggregateCuts = true,
-                sourcePointCuts = pointCuts, sourceCutFractionalOrder = fractionalOrder,
-                sourceLpOperations = operations), boundOrdered = true).use {
+                sourcePointCuts = pointCuts, sourceLpOperations = operations), boundOrdered = true).use {
                 it.run { _, _ -> }
             }
 
@@ -315,6 +312,30 @@ class LinearAuthorityInvocationTest {
             assertEquals(SourceEvidenceCheck.Checked,
                 SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
         }
+    }
+
+    @Test
+    fun `fractional point aggregation should retain a checked bound when its LP allowance ends`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(integer, real, residual), mapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE, residual to BigFraction.ONE), BigFraction.ofLong(3))),
+            "real-lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "real-upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
+            "residual-lower" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.MINUS_ONE),
+                BigFraction.ZERO)),
+            "residual-upper" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.ONE),
+                BigFraction.ofLong(100))),
+        ), mapOf(integer to BigFraction.MINUS_ONE, real to BigFraction.ONE))
+
+        val result = LinearAuthorityInvocation(source, TheoryParams(sourceAggregateCuts = true,
+            sourcePointCuts = true, sourceCutFractionalOrder = true, sourceLpOperations = 2),
+            boundOrdered = true).use { it.run { _, _ -> } }
+
+        assertNull(result.terminal)
+        assertTrue(result.stats.smt.sourceLp.operations <= 2)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority())
+            .verify(assertNotNull(result.bound)))
     }
 
     @Test
