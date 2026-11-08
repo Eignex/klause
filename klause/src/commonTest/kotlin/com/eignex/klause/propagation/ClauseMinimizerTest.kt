@@ -1,13 +1,73 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.util.collections.IntArrayList
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class ClauseMinimizerTest {
+
+    @Test
+    fun `learned binaries should enable binary resolution without base binaries`() {
+        for (native in listOf(false, true)) {
+            val uip = Lit.make(0, true)
+            val partner = Lit.make(1, true)
+            val other = Lit.make(2, true)
+            val problem = Problem(3, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(uip, partner xor 1, other))))
+            val state = PropagationState(problem, Assumptions.None, nativeSat = native)
+            assertNull(state.runToFixpoint(allFactors = true))
+            assertEquals(native, state.nativeEngine != null)
+            state.addLearnedClause(Clause(intArrayOf(uip, partner)), 2)
+            val graph = object : ReasonGraph {
+                override fun universeSize(): Int = 3
+                override fun levelOf(v: Int): Int = if (v == 0) 2 else 1
+                override fun antecedentsOf(v: Int): IntArray? = null
+            }
+            val learned = IntArrayList().also {
+                it.add(uip)
+                it.add(partner xor 1)
+                it.add(other)
+            }
+
+            val reduced = ClauseMinimizer(state, graph).reduce(learned, 2)
+
+            assertContentEquals(intArrayOf(uip, other), reduced.toIntArray())
+        }
+    }
+
+    @Test
+    fun `retired native binaries should not justify binary resolution`() {
+        val uip = Lit.make(0, true)
+        val partner = Lit.make(1, true)
+        val other = Lit.make(2, true)
+        val problem = Problem(3, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(uip, partner xor 1, other))))
+        val state = PropagationState(problem, Assumptions.None, nativeSat = true)
+        assertNull(state.runToFixpoint(allFactors = true))
+        state.addLearnedClause(Clause(intArrayOf(uip, partner)), 9)
+        val engine = assertNotNull(state.nativeEngine)
+        assertEquals(1, engine.maintainCapWindow(0, 65_536L, 1_048_576L, { false }, { true }, { false }))
+        val graph = object : ReasonGraph {
+            override fun universeSize(): Int = 3
+            override fun levelOf(v: Int): Int = if (v == 0) 2 else 1
+            override fun antecedentsOf(v: Int): IntArray? = null
+        }
+        val learned = IntArrayList().also {
+            it.add(uip)
+            it.add(partner xor 1)
+            it.add(other)
+        }
+
+        val reduced = ClauseMinimizer(state, graph).reduce(learned, 2)
+
+        assertContentEquals(learned.toIntArray(), reduced.toIntArray())
+    }
 
     @Test
     fun `a known leaf sibling should avoid unused historical reconstruction`() {
