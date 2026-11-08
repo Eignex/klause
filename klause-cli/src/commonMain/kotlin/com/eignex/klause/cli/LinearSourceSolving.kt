@@ -1,5 +1,7 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.ir.ObjectiveSense
+
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.FiniteSolveCallbacks
@@ -118,11 +120,14 @@ internal fun solveLinearSource(
         },
     )
     if (!common.statistics) return
-    if (result is SourceExecutionResult.Numerical) {
-        val bound = result.result.bound?.claim as? com.eignex.klause.solver.evidence.SourceClaim.Bound
-        val value = bound?.value as? SourceValue.Rational
-        if (value != null) output.onAllowanceStatistics(listOf(
-            "nativeNominalObjectiveBound" to (value.value * qualified.objectiveScale.reciprocal()).toString(),
+    qualified.nativeObjectiveBound?.let { bound ->
+        output.onAllowanceStatistics(listOf(
+            "nativeNominalObjectiveBound" to bound.value.toString(),
+            "nativeNominalObjectiveBoundDirection" to if (bound.sense == ObjectiveSense.MINIMIZE)
+                "lower" else "upper",
+            "nativeNominalObjectiveBoundStrict" to bound.strict.toString(),
+            "nativeNominalObjectiveBoundScope" to "nominal-source",
+            "nativeNominalObjectiveBoundCoversTolerance" to qualified.claimsCoverTolerance.toString(),
         ))
     }
     output.onAllowanceStatistics(

@@ -292,6 +292,8 @@ internal class LinearAuthorityInvocation(
         callback(sample, exact)
     }
 
+    val objectiveBound: SourceEvidence? get() = component.rootBound
+
     fun snapshot(reason: TerminationReason): LinearInvocationResult = result ?:
         LinearInvocationResult(null, component.rootBound, incumbent, value, reason, stats)
 

@@ -23,6 +23,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.incumbent.EngineInvocation
@@ -98,6 +99,8 @@ internal class FiniteNumericalCompanions private constructor(
     class Preparation(val companions: FiniteNumericalCompanions?, val elapsedNanos: Long)
 
     val incumbents = PortfolioIncumbents.exact(objective)
+    var objectiveBound: SourceEvidence? = null
+        private set
     private val completionSharing = if (params.sourceIncumbentCompletion && incumbentCompletionCheck != null)
         LinearIncumbentSharing() else null
     private val repairGuidance = if (completionSharing != null) LinearRepairGuidance() else null
@@ -218,6 +221,7 @@ internal class FiniteNumericalCompanions private constructor(
                 }, observeExternalIncumbents = true, sharedCompletions = completionSharing,
                 incumbentCompletionCheck = incumbentCompletionCheck, repairGuidance = repairGuidance)
             private var result: MinimizeResult? = null
+            private var closed = false
             override val isDone: Boolean get() = result != null
             override val stats get() = search.stats
             override val work: Long get() = search.work
@@ -228,14 +232,19 @@ internal class FiniteNumericalCompanions private constructor(
                 val finished = search.runSlice(global, sliceMillis, sliceNodes) { sample, value ->
                     onIncumbent(MinimizeResult.BestFound(sample, value.toDouble(),
                         TerminationReason.BudgetExhausted, stats))
-                } ?: return null
+                }.also { objectiveBound = search.objectiveBound } ?: return null
                 val original = LinearOptimizationResult(context.scope, finished.terminal, finished.bound,
                     finished.incumbent, finished.value, finished.reason, finished.stats, context.semantics)
                 result = finiteNumericalCompletion(original, context, global or limits.cancellation or limits.timeout)
                 return result
             }
 
-            override fun close() = search.close()
+            override fun close() {
+                if (closed) return
+                closed = true
+                objectiveBound = search.objectiveBound
+                search.close()
+            }
         }
 
     companion object {
