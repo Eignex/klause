@@ -18,6 +18,60 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `floating query capture should retain adopted bounds and numerical limits`() {
+        var observed: LpQueryObservation? = null
+        var bytes: ByteArray? = null
+        val context = LpSolveContext(onQuery = { query ->
+            observed = query
+            bytes = query.captureExactWithin("scoped", 4096, 65_536, 64, Cancellation.Never)
+        })
+        LpScopedSolver(LpExactState(lowerBoundModel()), context = context,
+            refactorUpdateLimit = 7, trackDegeneracy = true, pricing = LpPricingOptions(tieSeed = 43L)).use { owner ->
+            assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 17L))
+
+            assertNotNull(owner.solveFloat(allowance = LpFloatAllowance(100_000L, 31))?.second)
+        }
+        val query = assertNotNull(observed)
+        val captured = LpExactCapture.decode(assertNotNull(bytes))
+        assertEquals(LpQueryRoute.SCOPED_FLOAT, query.route)
+        assertTrue(query.explicitAllowance)
+        assertNull(query.claim)
+        assertNull(query.refinementLimits)
+        assertEquals(43L, captured.settings.seed)
+        assertEquals(100_000L, captured.settings.workLimit)
+        assertEquals(31, captured.settings.pivotLimit)
+        assertEquals(7, captured.settings.refactorUpdateLimit)
+        assertTrue(captured.settings.trackDegeneracy)
+        assertEquals(BigFraction.ofLong(2L), captured.initialState.activeSide(0, false)?.side?.number?.value)
+        assertEquals(17L, captured.initialState.activeSide(0, false)?.witness)
+        assertFailsWith<IllegalStateException> { query.captureBasis() }
+    }
+
+    @Test
+    fun `resuming a floating cursor should preserve one query observation`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val observations = mutableListOf<LpQueryObservation>()
+        val context = LpSolveContext(onQuery = { observations += it })
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        LpScopedSolver(LpExactState(source), context = context).use { owner ->
+            assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100), retainFundingStop = true))
+            assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100), retainFundingStop = true))
+
+            val query = observations.single()
+            assertEquals(LpQueryRoute.SCOPED_CONTINUATION, query.route)
+            assertEquals(1L, query.sequence)
+            assertEquals(1L, query.initialQuantum)
+            assertEquals(100_000L, query.workLimit)
+            assertTrue(query.retainFundingStop)
+            assertFailsWith<IllegalStateException> { query.model }
+        }
+    }
+
+    @Test
     fun `child gains are withheld when observation changes the parent`() {
         for (n in listOf(3, 12)) {
             val builder = LpBuilder()

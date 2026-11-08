@@ -51,7 +51,7 @@ internal object FinitePortfolioLpCapture {
     internal fun inspect(options: Map<String, String>, bytes: ByteArray, out: File) {
         val required = setOf("suite", "problem", "sha256", "seed", "handoff")
         require(options.keys.containsAll(required) && (options.keys - required).all {
-            it in setOf("timeout-ms", "captures", "cutoff-bits", "capture-worker")
+            it in setOf("timeout-ms", "captures", "cutoff-bits", "capture-worker", "capture-route")
         })
         val timeout = options["timeout-ms"]?.toLong() ?: 30_000L
         val limit = options["captures"]?.toInt() ?: 1
@@ -59,7 +59,9 @@ internal object FinitePortfolioLpCapture {
         val handoff = options.getValue("handoff").toBooleanStrict()
         val cutoffBits = options["cutoff-bits"]?.toLong()
         val captureWorker = options["capture-worker"] ?: "bt/lp-default"
+        val captureRoute = options["capture-route"] ?: "any"
         require(captureWorker in setOf("bt/lp-default", "any"))
+        require(captureRoute in setOf("any", "SESSION", "SCOPED_FLOAT", "SCOPED_CONTINUATION"))
         require(timeout in 1L..30_000L && limit in 1..4)
         require(bytes.size <= 1_048_576 && sha256(bytes) == options.getValue("sha256"))
         out.mkdirs()
@@ -81,7 +83,7 @@ internal object FinitePortfolioLpCapture {
                 put("cancelled", stop())
                 put("sourceVerdictClaim", false)
                 put("fullWarmReplayQualified", false)
-                put("queryScope", "LpSolveSession only; general LP calls omitted")
+                put("queryScope", "solve sessions and scoped floating queries; other LP calls omitted")
             }.toString())
             return
         }
@@ -123,6 +125,7 @@ internal object FinitePortfolioLpCapture {
                         if (owners.size < 64 || owners.containsKey(get(query, "Owner"))) {
                             val owner = owners.computeIfAbsent(get(query, "Owner")) { owners.size }
                             val selected = (captureWorker == "any" || worker == captureWorker) && attempts < limit &&
+                                (captureRoute == "any" || get(query, "Route").toString() == captureRoute) &&
                                 (cutoffBits == null || cutoff?.toBits() == cutoffBits)
                             if (queries <= 124 || selected) {
                                 val payload = if (selected) capture(query, stop).also { attempts++ } else null
@@ -146,15 +149,22 @@ internal object FinitePortfolioLpCapture {
                                     put("latestPointProducer", producer)
                                     put("lastObservedExternalCutoffBits", cutoff?.toBits()?.toString())
                                     put("lastObservedExternalCutoff", cutoff?.toString())
-                                    put("claim", get(query, "Claim").toString())
+                                    put("route", get(query, "Route").toString())
+                                    put("claim", call(query, "getClaim")?.toString())
                                     put("workLimit", get(query, "WorkLimit").toString())
+                                    put("explicitAllowance", get(query, "ExplicitAllowance") as Boolean)
+                                    put("iterationLimit", get(query, "IterationLimit").toString())
+                                    put("initialQuantum", call(query, "getInitialQuantum")?.toString())
+                                    put("retainFundingStop", get(query, "RetainFundingStop") as Boolean)
+                                    put("refactorUpdateLimit", get(query, "RefactorUpdateLimit").toString())
+                                    put("trackDegeneracy", get(query, "TrackDegeneracy") as Boolean)
                                     put("retained", get(query, "Retained") as Boolean)
                                     put("componentSplit", get(query, "ComponentSplit") as Boolean)
                                     put("floatOffset", get(query, "FloatOffset").toString())
                                     put("opaqueFloatAcceptance", get(query, "HasFloatAcceptance") as Boolean)
                                     put("pricing", NumericalResidualProfile.json(get(query, "Pricing")))
                                     put("refinementLimits",
-                                        NumericalResidualProfile.json(get(query, "RefinementLimits")))
+                                        NumericalResidualProfile.json(call(query, "getRefinementLimits")))
                                     put("selected", selected)
                                     put("capture", file)
                                     put("captureSha256", payload?.let(::sha256))
@@ -210,7 +220,7 @@ internal object FinitePortfolioLpCapture {
                         "other observation costs are also inside execution")
                     put("sourceVerdictClaim", false)
                     put("fullWarmReplayQualified", false)
-                    put("queryScope", "LpSolveSession only; general LP calls omitted")
+                    put("queryScope", "solve sessions and scoped floating queries; other LP calls omitted")
                     put("cancelled", stop())
                 }.toString())
             }
