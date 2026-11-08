@@ -370,6 +370,7 @@ class Portfolio(
                     claim.acceptedIncumbents = 1
                 }
                 run.locked {
+                    run.exits?.solved(arm, r, failure)
                     run.record(
                         claim,
                         handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: r?.stats,
@@ -396,7 +397,7 @@ class Portfolio(
                         (claim.indeterminate && (r is SolveResult.Sat || r is SolveResult.Unsat))
                     ) {
                         r?.let(verdicts::add)
-                        run.retire(arm)
+                        run.retire(arm, retirementCause(failure))
                     }
                 }
             }
@@ -575,6 +576,7 @@ class Portfolio(
             val workerBound = {
                 val current = incumbent.current()
                 val cutoff = incumbents.bound(current)
+                run.exits?.cutoff(arm, cutoff, current?.version ?: 0L)
                 observedCutoffs[arm] = cutoff.takeIf(Double::isFinite)
                 if (current != null) run.incumbentRead(arm, current.version)
                 cutoff
@@ -660,6 +662,7 @@ class Portfolio(
                 }.exceptionOrNull()
                 work = countedWork(claim, terminal?.stats)
             }
+            run.exits?.minimized(arm, terminal, failure)
             callbackFailure?.let { throw it }
             val failed = failure != null && failure !is SearchInitializationCancelled
             if (failure is UnsoundnessException) claim.fault = failure.message
@@ -770,7 +773,7 @@ class Portfolio(
                             val closed = runCatching { run.closeHandle(arm) }
                             closed.onFailure {
                                 run.log.failure(arm, it, "close")
-                                run.retire(arm)
+                                run.retire(arm, "close-failure")
                             }
                             if (closed.isSuccess) {
                                 run.log.reseeded(arm)
@@ -799,7 +802,7 @@ class Portfolio(
                         (PortfolioReduction.isExhausted(terminal) || terminal is MinimizeResult.Unbounded)
                     )
                 ) {
-                    run.retire(arm)
+                    run.retire(arm, retirementCause(failure))
                 }
             }
         }
@@ -889,6 +892,7 @@ class Portfolio(
         private var availability: ((Int) -> Boolean)? = null
         private val earlyCoreTrials = workers.indices.filter { workers[it].earlyCoreTrial }
         private val observedContinuations = if (onProgress == null) null else BooleanArray(workers.size)
+        val exits = onProgress?.let { PortfolioExitObservations(workers.size) }
 
         @Suppress("LongParameterList")
         fun observeContinuation(
@@ -1162,7 +1166,7 @@ class Portfolio(
          */
         private fun claim(lane: Int): Claim? = locked {
             if (feasibilityComplete) {
-                for (arm in firstWitnessArms) if (!busy[arm]) retire(arm)
+                for (arm in firstWitnessArms) if (!busy[arm]) retire(arm, "first-witness")
             }
             if (remaining == 0) return@locked null
             val dedicated = diagnostics == null && lanes == workers.size && workers.none {
@@ -1530,11 +1534,15 @@ class Portfolio(
                 slice = grow(slice, maxSliceMillis)
                 sliceWork = grow(sliceWork, maxSliceWork)
             }
-            if (unproductiveTrial && (trialSearchWork[arm] >= trialWorkLimit ||
-                    (diagnostics != null && trialPreparationWork[arm] >= trialWorkLimit) ||
-                    (diagnostics == null && (trialSearchTime[arm] >= trialTimeLimit ||
-                        trialPreparationTime[arm] >= preparationTimeLimit)))
-            ) retire(arm)
+            val trialExit = when {
+                !unproductiveTrial -> null
+                trialSearchWork[arm] >= trialWorkLimit -> "trial-search-work"
+                diagnostics != null && trialPreparationWork[arm] >= trialWorkLimit -> "trial-preparation-work"
+                diagnostics == null && trialSearchTime[arm] >= trialTimeLimit -> "trial-search-time"
+                diagnostics == null && trialPreparationTime[arm] >= preparationTimeLimit -> "trial-preparation-time"
+                else -> null
+            }
+            if (trialExit != null) retire(arm, trialExit)
         }
 
         /** Quarantine [claim]'s arm for its refuted claim: retire it, count the fault, and report it. Call under
@@ -1542,20 +1550,26 @@ class Portfolio(
         fun quarantine(claim: Claim) {
             val worker = workers[claim.arm]
             log.fault(claim.arm)
-            retire(claim.arm)
+            retire(claim.arm, "source-fault")
             onFault?.invoke(ArmFault(worker.label, worker.armId, checkNotNull(claim.fault)))
         }
 
         /** Retire [arm]: close its handle and never schedule it again; the run ends once none remain. Call under
          *  [locked]. */
-        fun retire(arm: Int) {
+        fun retire(arm: Int, cause: String) {
             if (retired[arm]) return
             retired[arm] = true
             lifecycle(arm, PortfolioLifecycleKind.RETIRED)
+            emitExit(arm, cause)
             diagnostics?.onEvent?.invoke(PortfolioEvent.Retired(arm))
             remaining--
             closeHandle(arm)
             if (remaining == 0) finish()
+        }
+
+        private fun emitExit(arm: Int, cause: String) {
+            val observer = onProgress ?: return
+            observer(checkNotNull(exits).event(arm, workers[arm].label, cause))
         }
 
         /** The pool's total counters, every arm that did work included, with the schedule attached. */
@@ -1607,7 +1621,10 @@ class Portfolio(
             for (i in handles.indices) {
                 try {
                     try {
-                        if (!retired[i]) lifecycle(i, PortfolioLifecycleKind.RETIRED)
+                        if (!retired[i]) {
+                            lifecycle(i, PortfolioLifecycleKind.RETIRED)
+                            emitExit(i, if (primaryFailure == null) "invocation-close" else "invocation-failure")
+                        }
                     } finally {
                         closeHandle(i)
                     }
@@ -1623,6 +1640,12 @@ class Portfolio(
             (scopedReward?.reward(progress) ?: progress.ordinaryReward).also {
                 require(it.isFinite() && it in 0.0..1.0) { "portfolio reward must be finite and in [0, 1]" }
             }
+    }
+
+    private fun retirementCause(failure: Throwable?): String = when (failure) {
+        null -> "terminal"
+        is SearchInitializationCancelled -> "initialization-cancelled"
+        else -> "failure"
     }
 
     /** The instruction allowance a counted local-search segment of [work] units receives. */

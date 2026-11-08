@@ -2,18 +2,156 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SliceWorkAccounting
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.TestTimeSource
 
 class PortfolioProgressTest {
+    @Test
+    fun `worker exit should retain the native return before proof reinterpretation`() {
+        val sample = Sample(BooleanArray(0), LongArray(0))
+        for (native in listOf(MinimizeResult.Unknown(TerminationReason.SearchExhausted),
+            MinimizeResult.BestFound(sample, 1.0, TerminationReason.SearchExhausted))) {
+            val events = mutableListOf<PortfolioEvent>()
+            val search = TrackingResumableSearch(native)
+            val worker = trackingWorker("proof", 0, search).also { it.controlsObjectiveCutoff = true }
+
+            val result = Portfolio.thompson(listOf(worker),
+                onProgress = events::add).use { it.minimize(Cancellation.Never) }
+
+            if (native is MinimizeResult.Unknown) assertIs<MinimizeResult.Infeasible>(result)
+            else assertIs<MinimizeResult.Optimal>(result)
+            val exit = events.filterIsInstance<PortfolioEvent.WorkerExit>().single()
+            assertEquals("terminal", exit.cause)
+            assertEquals(if (native is MinimizeResult.Unknown) "unknown" else "best-found", exit.outcome)
+            assertEquals(TerminationReason.SearchExhausted, exit.reason)
+            assertNull(exit.cutoffBits)
+            assertNull(exit.incumbentVersion)
+            assertEquals(1, search.closes)
+        }
+    }
+
+    @Test
+    fun `worker exit should bind cutoff bits to the version actually read`() {
+        val events = mutableListOf<PortfolioEvent>()
+        val reads = mutableListOf<Double>()
+        val worker = PortfolioWorker.ofMinimize("reader", 0, resumable = { bound ->
+            ScriptedSearch({ true }, perSlice = 2) { reads += bound() }
+        }) { _, _, _, _ -> error("retained search required") }
+
+        Portfolio.thompson(listOf(worker), baseSliceWork = 1, maxSliceWork = 1,
+            sliceGrowth = 1.0, reseedStaleThreshold = 0,
+            diagnostics = PortfolioDiagnostics(6), onProgress = events::add).use {
+            it.minimize(Cancellation.Never)
+        }
+
+        assertEquals(listOf(Double.POSITIVE_INFINITY, 998.0), reads)
+        val exit = events.filterIsInstance<PortfolioEvent.WorkerExit>().single()
+        assertEquals("invocation-close", exit.cause)
+        assertEquals("paused", exit.outcome)
+        assertNull(exit.reason)
+        assertEquals(998.0.toRawBits(), exit.cutoffBits)
+        assertEquals(2L, exit.incumbentVersion)
+        assertEquals(4L, events.filterIsInstance<PortfolioEvent.Lifecycle>()
+            .last { it.kind == PortfolioLifecycleKind.INCUMBENT_AVAILABLE }.version)
+    }
+
+    @Test
+    fun `an empty pool cutoff read should differ from no cutoff read`() {
+        val events = mutableListOf<PortfolioEvent>()
+        val reader = PortfolioWorker.ofMinimize("reader", 0, resumable = { bound ->
+            TrackingResumableSearch(null, onRun = { bound() })
+        }) { _, _, _, _ -> error("retained search required") }
+        val unread = trackingWorker("unread", 1, TrackingResumableSearch(null))
+
+        Portfolio.thompson(listOf(reader, unread), baseSliceWork = 1, maxSliceWork = 1,
+            diagnostics = PortfolioDiagnostics(2),
+            onProgress = events::add).use { it.minimize(Cancellation.Never) }
+
+        val exits = events.filterIsInstance<PortfolioEvent.WorkerExit>().sortedBy { it.arm }
+        assertEquals(listOf("reader", "unread"), exits.map { it.worker })
+        assertEquals(listOf(Double.POSITIVE_INFINITY.toRawBits(), null), exits.map { it.cutoffBits })
+        assertEquals(listOf(0L, null), exits.map { it.incumbentVersion })
+    }
+
+    @Test
+    fun `failed worker should report failure without a native termination reason`() {
+        val events = mutableListOf<PortfolioEvent>()
+        val search = TrackingResumableSearch(null, onRun = { error("worker failed") })
+
+        Portfolio.thompson(listOf(trackingWorker("failing", 0, search)),
+            onProgress = events::add).use { it.minimize(Cancellation.Never) }
+
+        val exit = events.filterIsInstance<PortfolioEvent.WorkerExit>().single()
+        assertEquals("failure", exit.cause)
+        assertEquals("failed", exit.outcome)
+        assertNull(exit.reason)
+        assertEquals(1, search.closes)
+    }
+
+    @Test
+    fun `interrupted opening should report initialization cancellation`() {
+        val events = mutableListOf<PortfolioEvent>()
+        val worker = PortfolioWorker.ofMinimize("opening", 0, resumable = {
+            throw SearchInitializationCancelled(SolveStats.EMPTY, 17L)
+        }) { _, _, _, _ -> error("opening must not fall back") }
+
+        Portfolio.thompson(listOf(worker), onProgress = events::add).use {
+            it.minimize(Cancellation.Never)
+        }
+
+        val exit = events.filterIsInstance<PortfolioEvent.WorkerExit>().single()
+        assertEquals("initialization-cancelled", exit.cause)
+        assertEquals("initialization-cancelled", exit.outcome)
+        assertNull(exit.reason)
+        assertNull(exit.cutoffBits)
+    }
+
+    @Test
+    fun `satisfaction exit should retain its native incomplete reason`() {
+        val events = mutableListOf<PortfolioEvent>()
+        val worker = PortfolioWorker.ofSolve("declined", 0, countsInstructions = true) { _, _ ->
+            SolveResult.Unknown(TerminationReason.Unsupported)
+        }
+
+        Portfolio.thompson(listOf(worker), baseSliceWork = 1, diagnostics = PortfolioDiagnostics(1),
+            onProgress = events::add).use { it.solve(Cancellation.Never) }
+
+        val exit = events.filterIsInstance<PortfolioEvent.WorkerExit>().single()
+        assertEquals("invocation-close", exit.cause)
+        assertEquals("unknown", exit.outcome)
+        assertEquals(TerminationReason.Unsupported, exit.reason)
+        assertNull(exit.cutoffBits)
+        assertNull(exit.incumbentVersion)
+    }
+
+    @Test
+    fun `a failed exit observer should release every retained handle`() {
+        val searches = listOf(TrackingResumableSearch(null), TrackingResumableSearch(null))
+        val workers = searches.mapIndexed { i, search -> trackingWorker("worker-$i", i, search) }
+
+        assertFailsWith<IllegalStateException> {
+            Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1,
+                diagnostics = PortfolioDiagnostics(2), onProgress = {
+                if (it is PortfolioEvent.WorkerExit) error("sink failed")
+            }).use { it.minimize(Cancellation.Never) }
+        }
+
+        assertEquals(listOf(1, 1), searches.map { it.closes })
+    }
+
     @Test
     fun `first improvement continuation should report a retained debt repayment only once`() {
         val events = mutableListOf<PortfolioEvent>()
@@ -219,6 +357,7 @@ class PortfolioProgressTest {
         assertEquals(0L, progress.acceptedIncumbents)
         assertTrue(progress.refuted)
         assertEquals(0.0, result.stats.portfolio.arms.single().meanReward)
+        assertEquals("source-fault", events.filterIsInstance<PortfolioEvent.WorkerExit>().single().cause)
     }
 
     @Test

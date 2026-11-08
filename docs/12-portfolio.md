@@ -236,6 +236,14 @@ continuation; repayment can consume the entire offered allowance. These observat
 confer no proof authority, change no selection or funding, and execute inline within
 the segment. Disabled reporting constructs no continuation event and reads no handle
 accounting.
+Progress reporting also emits one worker-exit observation at retirement or invocation
+cleanup. It separates the removal cause from the last native return and incomplete-result
+reason, before coordinator proof reinterpretation. The last external cutoff retains its
+raw floating-point bits and the pool version read with it; absence means no read, and
+version zero means an empty pool. It does not describe a worker's private effective cutoff
+or establish proof authority. Observation storage is bounded per worker and allocated
+only with reporting enabled; capture adds no pool reads, cancellation polls or handle
+inspection. Reseeding a handle does not remove its worker.
 [Search statistics](09-learning.md#statistics) owns propagation/conflict accounting.
 
 ## Witnesses and proof scope
