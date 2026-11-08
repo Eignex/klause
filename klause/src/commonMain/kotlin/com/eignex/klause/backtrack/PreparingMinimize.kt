@@ -5,6 +5,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.SliceWorkAccounting
 import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -21,7 +22,9 @@ internal class PreparingMinimize(
     private val solver: BacktrackSolver,
     private val objective: LinearObjective,
     private val params: BacktrackParams,
-) : ResumableSearch, ReseedGuard {
+) : ResumableSearch, ReseedGuard, SliceWorkAccounting {
+    override var repaidWork: Long = 0L
+        private set
     private var globalToken = params.cancellation
     private val propagationToken = cancelledWhen({ globalToken.deadline() }, { globalToken.workScheduled() }) {
         globalToken()
@@ -67,12 +70,24 @@ internal class PreparingMinimize(
         sliceNodes: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
     ): MinimizeResult? {
+        repaidWork = 0L
         terminal?.let { return it }
-        search?.let { if (it.isDone) return it.runSlice(global, sliceMillis, sliceNodes, onIncumbent) }
+        val active = search
+        if (active?.isDone == true) {
+            val result = active.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+            repaidWork = active.repaidWork
+            return result
+        }
         check(!closed) { "search is closed" }
         globalToken = params.cancellation.lifetimeCancellation() or global
-        search?.let { return it.runSlice(global, sliceMillis, sliceNodes, onIncumbent) }
-        if (!budget.begin(sliceMillis, sliceNodes)) return null
+        if (active != null) {
+            val result = active.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+            repaidWork = active.repaidWork
+            return result
+        }
+        val admitted = budget.begin(sliceMillis, sliceNodes)
+        repaidWork = budget.repaidWork
+        if (!admitted) return null
         val before = work
         try {
             val preparing = checkNotNull(preparation)
@@ -97,7 +112,9 @@ internal class PreparingMinimize(
                     val nodes = if (sliceNodes < 0L) -1L else {
                         (sliceNodes - (preparedWork - before)).coerceAtLeast(0L)
                     }
-                    return prepared.runSlice(global, millis, nodes, onIncumbent)
+                    return prepared.runSlice(global, millis, nodes, onIncumbent).also {
+                        repaidWork += minOf(prepared.repaidWork, Long.MAX_VALUE - repaidWork)
+                    }
                 }
                 val session = preparing.advance()
                 budget.charge()

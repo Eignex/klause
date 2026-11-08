@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SliceWorkAccounting
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
@@ -13,6 +14,68 @@ import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.TestTimeSource
 
 class PortfolioProgressTest {
+    @Test
+    fun `first improvement continuation should report a retained debt repayment only once`() {
+        val events = mutableListOf<PortfolioEvent>()
+        val base = ScriptedSearch({ it == 0 }) { }
+        var slices = 0
+        val search = object : ResumableSearch by base, SliceWorkAccounting {
+            override var repaidWork: Long = 0L
+            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                repaidWork = if (slices++ == 1) sliceNodes else 0L
+                return if (repaidWork > 0L) null else
+                    base.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+            }
+        }
+
+        val result = Portfolio.thompson(listOf(trackingWorker("producer", 0, search)),
+            baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0, reseedStaleThreshold = 0,
+            diagnostics = PortfolioDiagnostics(5), onProgress = events::add).use {
+            it.minimize(Cancellation.Never)
+        }
+
+        val observed = events.filterIsInstance<PortfolioEvent.Continuation>().single()
+        assertEquals("producer", observed.worker)
+        assertTrue(observed.retained)
+        assertEquals(0L, observed.work)
+        assertEquals(1L, observed.offeredWork)
+        assertEquals(1L, observed.repaidWork)
+        assertEquals(false, observed.done)
+        assertEquals("paused", observed.outcome)
+        assertTrue(result.stats.portfolio.arms.single().work > 1L)
+    }
+
+    @Test
+    fun `disabled continuation reporting should not inspect handle accounting`() {
+        val base = ScriptedSearch({ it == 0 }) { }
+        val search = object : ResumableSearch by base, SliceWorkAccounting {
+            override val repaidWork: Long get() = error("reporting is disabled")
+        }
+
+        val result = Portfolio.thompson(listOf(trackingWorker("producer", 0, search)),
+            baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0, reseedStaleThreshold = 0,
+            diagnostics = PortfolioDiagnostics(5)).use { it.minimize(Cancellation.Never) }
+
+        assertTrue(result.stats.portfolio.arms.single().work > 1L)
+    }
+
+    @Test
+    fun `a failed continuation observer should release its retained handle`() {
+        val search = TrackingResumableSearch(null,
+            MinimizeResult.BestFound(Sample(BooleanArray(0), LongArray(0)), 1.0, TerminationReason.BudgetExhausted))
+
+        assertFailsWith<IllegalStateException> {
+            Portfolio.thompson(listOf(trackingWorker("producer", 0, search)),
+                baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
+                diagnostics = PortfolioDiagnostics(10), onProgress = {
+                    if (it is PortfolioEvent.Continuation) error("sink failed")
+                }).use { it.minimize(Cancellation.Never) }
+        }
+
+        assertEquals(1, search.closes)
+    }
+
     @Test
     fun `each accepted incumbent should notify its version`() {
         val events = mutableListOf<PortfolioEvent>()

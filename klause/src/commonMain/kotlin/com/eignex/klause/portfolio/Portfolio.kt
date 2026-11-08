@@ -12,6 +12,7 @@ import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchInitializationCancelled
+import com.eignex.klause.solver.SliceWorkAccounting
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.CandidateVerifier
@@ -599,6 +600,7 @@ class Portfolio(
             claim.preparing = handle?.preparationPending == true
             if (openingFailure == null) run.locked { run.firstQuery(arm) }
             var terminal: MinimizeResult? = null
+            var offeredMillis: Long? = null
             val failure: Throwable?
             val work: Long
             if (openingFailure != null) {
@@ -616,6 +618,7 @@ class Portfolio(
                 val outcome = runCatching {
                     worker.withPublicationBatch(run.token) {
                         val millis = remainingMillis(armToken)
+                        offeredMillis = millis
                         if (worker.acceptsInstructionBudget && handle is InstructionSlicedSearch) {
                             handle.runScheduledSlice(
                                 run.token, millis, instructionsOf(claim), claim.handleNodes, lsInstructionsPerWork,
@@ -699,6 +702,7 @@ class Portfolio(
             }
             claim.trialTime = evaluationStarted.elapsedNow()
             run.locked {
+                run.observeContinuation(claim, handle, !opening, work, offeredMillis, terminal, failure)
                 val checkingStarted = TimeSource.Monotonic.markNow()
                 val publication = if (!terminalPublished && !failed && claim.fault == null) {
                     terminalCheck?.check(worker, handle)
@@ -884,6 +888,29 @@ class Portfolio(
         }
         private var availability: ((Int) -> Boolean)? = null
         private val earlyCoreTrials = workers.indices.filter { workers[it].earlyCoreTrial }
+        private val observedContinuations = if (onProgress == null) null else BooleanArray(workers.size)
+
+        @Suppress("LongParameterList")
+        fun observeContinuation(
+            claim: Claim, handle: ResumableSearch?, retained: Boolean, work: Long, offeredMillis: Long?,
+            terminal: MinimizeResult?, failure: Throwable?,
+        ) {
+            val observer = onProgress ?: return
+            val observed = checkNotNull(observedContinuations)
+            if (claim.selectedPhase != PortfolioPhase.IMPROVEMENT || observed[claim.arm]) return
+            observed[claim.arm] = true
+            val repaid = (handle as? SliceWorkAccounting)?.repaidWork
+            val outcome = when {
+                failure != null -> "failed"
+                terminal is MinimizeResult.BestFound -> "terminal:${terminal.reason}"
+                terminal is MinimizeResult.Unknown -> "terminal:${terminal.reason}"
+                terminal != null -> "terminal"
+                else -> "paused"
+            }
+            observer(PortfolioEvent.Continuation(claim.segment, claim.arm, workers[claim.arm].label,
+                retained, work, offeredMillis, claim.handleNodes, repaid, remainingMillis(token),
+                handle?.isDone, outcome))
+        }
 
         fun restrictAvailability(available: (Int) -> Boolean) { availability = available }
         private val started = runTimeSource.markNow()

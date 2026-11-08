@@ -227,6 +227,15 @@ handle opening; deferred preparation belongs to segment time and live counters.
 `maxMs` is the longest segment, and `reseeds` counts arm reseeds.
 Lifecycle snapshots retain the first incumbent-availability time; subscribed
 lifecycle streams retain every accepted incumbent version.
+With progress reporting, each worker emits one continuation observation for its
+first selected improvement segment. It records retained-handle reuse, offered time
+and work, earlier slice debt repaid, measured work, the completion flag, return
+disposition and remaining containing deadline. Unsupported repayment observations
+remain absent. A zero-work pause alone establishes neither exhaustion nor lost
+continuation; repayment can consume the entire offered allowance. These observations
+confer no proof authority, change no selection or funding, and execute inline within
+the segment. Disabled reporting constructs no continuation event and reads no handle
+accounting.
 [Search statistics](09-learning.md#statistics) owns propagation/conflict accounting.
 
 ## Witnesses and proof scope
