@@ -16,6 +16,7 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.engine.LpQueryObservation
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.relaxation.LpSourcePreparation
@@ -398,6 +399,7 @@ internal class FiniteExecutionRequest(
     val sourceControls: SourceFiniteControls? = null,
     val numericalCompanionParams: TheoryParams? = null,
     val objectiveCoordinates: ObjectiveCoordinateView? = null,
+    val onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
 )
 
 /** Streaming hooks owned by a rendering frontend. */
@@ -505,6 +507,7 @@ internal fun FinitePipeline.solve(
     callbacks: FiniteSolveCallbacks,
     lpSolveContext: LpSolveContext,
     numericalCompanions: TheoryParams? = null,
+    onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
 ): FiniteSolveResult {
     require(request.engine == FiniteEngine.FIXED || lpSolveContext == LpSolveContext.Production) {
         "custom LP dependencies require the fixed finite route"
@@ -654,6 +657,7 @@ internal fun FinitePipeline.solve(
             onPortfolioEvent = request.onPortfolioEvent,
             onPortfolioFault = request.onPortfolioFault,
             lpSolveContext = lpSolveContext,
+            onPortfolioLpQuery = onPortfolioLpQuery,
             toleranceCheck = if (gridPublication == null) {
                 sourceCheck?.let { check ->
                     FiniteSourceAcceptance({ check(preparation.reconstruct(it)) }, check.permitsToleranceOptimum(),
@@ -1244,6 +1248,7 @@ private fun executePortfolio(
         preparedPlan = request.preparedPlan,
         cancellation = request.cancellation,
         numericalCompletion = request.executionOptions.numericalCompletion,
+        onLpQuery = request.onPortfolioLpQuery,
         numericalCompanions = request.numericalCompanionParams,
         sourceHints = request.sourceInvocation?.let { invocation ->
             { strategies ->

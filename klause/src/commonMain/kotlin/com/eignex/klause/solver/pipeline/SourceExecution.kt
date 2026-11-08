@@ -7,6 +7,8 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.SourceSemanticsOwner
+import com.eignex.klause.lp.engine.LpQueryObservation
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.effortStats
@@ -88,7 +90,18 @@ class SourceExecutionRequest private constructor(
     val policy: SourceExecutionPolicy = SourceExecutionPolicy(explicitPresolve = presolveConfig != null),
     /** Whether the selected preparation phase returns diagnostics without constructing search workers. */
     val prepareOnly: Boolean = false,
+    internal val onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
 ) {
+    internal fun withPortfolioLpQueryObserver(observer: (String, Double?, LpQueryObservation) -> Unit): SourceExecutionRequest {
+        require(invocation.request.engine == FiniteEngine.MIXED &&
+            SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly) {
+            "LP query observation requires mixed finite source execution"
+        }
+        return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
+            presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
+            prepareOnly, observer)
+    }
+
     /**
      * Resolve common options once for the captured route. Omitted native limits use their parameter
      * types' defaults. The finite factory supplies optional application hooks and policy defaults.
@@ -435,9 +448,9 @@ private fun executeCapturedSource(
                 finite.cancellation or Cancellation { finite.deadlineExceeded() },
                 finite.toleranceCheck == null,
             )
-            val result = if (invocation.requestsFiniteNumericalCompanions) {
-                FinitePipeline.solve(finite, callbacks.finite, request.theory.boundTo(invocation))
-            } else FinitePipeline.solve(finite, callbacks.finite)
+            val result = FinitePipeline.solve(finite, callbacks.finite, LpSolveContext.Production,
+                if (invocation.requestsFiniteNumericalCompanions) request.theory.boundTo(invocation) else null,
+                request.onPortfolioLpQuery)
             SourceExecutionResult.Finite(invocation, result)
         }
 

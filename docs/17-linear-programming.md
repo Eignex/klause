@@ -1136,6 +1136,11 @@ and bound its own retention and work within
 the containing allowance. Observation grants no witness, bound or proof authority;
 ordinary contexts allocate no query records.
 
+Exact capture encoding can bound serialized values and bytes while polling the
+containing cancellation token. Exhaustion withholds the whole payload. Rational
+text conversion checks its remaining byte envelope before allocating decimal text;
+the ordinary encoding retains its existing wire format.
+
 [LpBoundTrail](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpBoundTrail.kt)
 intersects assertions exactly and keeps a source premise for each accepted side.
 Batches publish witnesses only for a committed prefix; crossed bounds cite both
