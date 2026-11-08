@@ -205,6 +205,9 @@ internal object FinitePortfolioLpCapture {
                                         put("elapsedNs", started - executionStarted)
                                         put("latestCheckedSourcePointVersion", pointVersion)
                                         put("latestPointProducer", producer)
+                                        if (get(observation, "Kind").toString() == "IMPORT") {
+                                            put("latestCheckedSourcePoint", point ?: JsonNull)
+                                        }
                                         for (name in listOf("Kind", "Preferred", "Site", "Version", "Objective",
                                             "LocalObjective", "LocalExactObjective", "LastCutoff", "RootPending",
                                             "Decision", "Level")) {
@@ -251,6 +254,10 @@ internal object FinitePortfolioLpCapture {
                         put("queryObserverNs", queryObserverNs)
                         put("guidanceObserverNs", guidanceObserverNs)
                         put("guidanceEvents", guidanceEvents)
+                        put("captureGuidance", captureGuidance)
+                        put("captureQueries", limit > 0)
+                        put("guidanceObjectiveUnits", "native-minimized")
+                        put("guidanceExactLocalBitsPerPart", 2048)
                         put("guidanceImportAndLocalLimitPerWorker", 16)
                         put("guidanceAttemptAndCommitLimitPerWorker", 128)
                         put("guidanceBranchWindow", 8)
