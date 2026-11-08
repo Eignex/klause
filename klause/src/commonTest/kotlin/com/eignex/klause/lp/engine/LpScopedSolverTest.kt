@@ -19,31 +19,73 @@ import kotlin.test.assertTrue
 class LpScopedSolverTest {
     @Test
     fun `child gains are withheld when observation changes the parent`() {
+        for (n in listOf(3, 12)) {
+            val builder = LpBuilder()
+            repeat(n) { builder.addVar(0, 1, cost = if (n == 3) longArrayOf(3L, 2L, 4L)[it] else 38L) }
+            repeat(n) { row ->
+                if (n == 3) {
+                    builder.addRow(intArrayOf(row, (row + 1) % n), longArrayOf(1, 1), Relation.GE, 1L)
+                } else {
+                    builder.addRow(IntArray(n) { it }, LongArray(n) { if (it == row) 16L else 2L }, Relation.GE, 19L)
+                }
+            }
+            val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            LpScopedSolver(state).use { owner ->
+                assertTrue(assertNotNull(owner.solveFloat()?.second).optimal)
+                val point = assertNotNull(owner.state.ownerWorkingModel())
+                var completed = 0
+                var work = 0L
+                var seeded = false
+                var decline: LpProbeDecline? = null
+
+                val gains = owner.directionalGains(point, intArrayOf(0, 1), longArrayOf(0, 0),
+                    1_000_000L, Cancellation.Never) {
+                    work += it.work
+                    completed += it.completed
+                    decline = it.decline
+                    seeded = seeded || it.numerical?.parentValues == true
+                    if (it.completed > 0 && completed == 4) {
+                        assertTrue(owner.push())
+                        assertTrue(owner.assertBound(0, true, ExactLpSide(ExactLpNumber.of(0L)), 1L))
+                    }
+                }
+
+                assertNull(gains)
+                assertEquals(4, completed)
+                assertEquals(n == 12, seeded)
+                assertEquals(LpProbeDecline.STALE_POINT, decline)
+                assertTrue(work in 1L..1_000_000L)
+            }
+        }
+    }
+
+    @Test
+    fun `a producer retired during a seeded query supplies no advice`() {
+        val n = 12
         val builder = LpBuilder()
-        repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
-        repeat(3) { builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1), Relation.GE, 1L) }
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-        LpScopedSolver(state).use { owner ->
+        repeat(n) { builder.addVar(0, 1, cost = 38L) }
+        repeat(n) { row ->
+            builder.addRow(IntArray(n) { it }, LongArray(n) { if (it == row) 16L else 2L }, Relation.GE, 19L)
+        }
+        LpScopedSolver(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))).use { owner ->
             assertTrue(assertNotNull(owner.solveFloat()?.second).optimal)
             val point = assertNotNull(owner.state.ownerWorkingModel())
+            var seeded = false
             var completed = 0
             var work = 0L
             var decline: LpProbeDecline? = null
 
-            val gains = owner.directionalGains(point, intArrayOf(0, 1), longArrayOf(0, 0),
-                1_000_000L, Cancellation.Never) {
-                work += it.work
+            val gains = owner.directionalGains(point, intArrayOf(0), longArrayOf(0), 1_000_000L, Cancellation.Never) {
                 completed += it.completed
+                work += it.work
                 decline = it.decline
-                if (it.completed > 0 && completed == 4) {
-                    assertTrue(owner.push())
-                    assertTrue(owner.assertBound(0, true, ExactLpSide(ExactLpNumber.of(0L)), 1L))
-                }
+                if (it.numerical?.parentValues == true) { seeded = true; owner.close() }
             }
 
             assertNull(gains)
-            assertEquals(4, completed)
-            assertEquals(LpProbeDecline.STALE_POINT, decline)
+            assertTrue(seeded)
+            assertEquals(2, completed)
+            assertEquals(LpProbeDecline.OWNER, decline)
             assertTrue(work in 1L..1_000_000L)
         }
     }
