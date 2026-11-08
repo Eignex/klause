@@ -15,6 +15,35 @@ import kotlin.test.assertTrue
 
 class KotlinBasisSolverTest {
     @Test
+    fun `copied owners rebuild different bases after input mutation and producer retirement`() {
+        val source = ftSource("dense", 3)
+        val original = ftSource("dense", 3)
+        val parent = KotlinBasisSolver(source)
+        val headings = intArrayOf(0, 1, 2)
+        assertTrue(parent.refactorize(headings))
+        val offer = assertNotNull(parent.factorCopy)
+        val first = assertNotNull(offer.create(headings, IntArray(3) { -1 }, LuPivotPolicy(), offer.additionalWork))
+        val second = assertNotNull(offer.create(headings, IntArray(3) { -1 }, LuPivotPolicy(), offer.additionalWork))
+        source.values.fill(Double.NaN)
+        parent.close()
+        try {
+            val alternative = intArrayOf(0, 4, 2)
+            assertTrue(first.refactorize(headings))
+            assertTrue(second.refactorize(alternative))
+            first.close()
+            for (transpose in listOf(false, true)) {
+                val rhs = doubleArrayOf(1.0, 2.0, 3.0)
+                val solved = IndexedVector(3).also { it.scatter(rhs) }
+                if (transpose) second.btran(solved) else second.ftran(solved)
+                assertTrue(ftResidual(original, alternative, rhs, solved, transpose) <= 1e-10)
+            }
+        } finally {
+            first.close()
+            second.close()
+        }
+    }
+
+    @Test
     fun `live factor copies solve updated bases without rebuilding or charging the parent`() {
         val source = ftSource("dense", 8)
         val headings = IntArray(8) { it }
@@ -54,7 +83,7 @@ class KotlinBasisSolverTest {
             val offer = assertNotNull(parent.factorCopy)
             KotlinBasisSolver(source, denseDimensionLimit = 0).use { cold ->
                 assertTrue(cold.refactorize(headings))
-                // Both paths separately fund the identical source/workspace constructor.
+                // Source/workspace construction is funded separately from this factor-copy work.
                 assertTrue(offer.additionalWork + 6L * n + 64L < assertNotNull(cold.basisWork.build).units)
                 val privateSolver = offer.create(headings, IntArray(n) { -1 }, LuPivotPolicy(), offer.additionalWork)
                 assertNotNull(privateSolver).use { child ->
@@ -132,6 +161,7 @@ class KotlinBasisSolverTest {
             source.values.fill(Double.NaN)
             val privateSolver = offer.create(headings, IntArray(3) { -1 }, LuPivotPolicy(), offer.additionalWork)
             assertNotNull(privateSolver).use { child ->
+                parent.close()
                 assertTrue(child.refactorize(headings))
                 val rhs = doubleArrayOf(1.0, 2.0, 3.0)
                 val solved = IndexedVector(3).also { it.scatter(rhs) }

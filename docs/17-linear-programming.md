@@ -1458,6 +1458,13 @@ and reserves entries before allocation. Partial copies publish no owner. Exact
 ordering offers retain their ordinary freshness checks; numerical copies supply
 no certificate authority.
 
+Mutable coefficient inputs are defensively captured before use. Private backend
+copies retain the producer's captured immutable source snapshots across retirement.
+Their factor-builder forks allocate fresh construction buffers, and all mutable
+numerical state stays private. These copies omit repeated coefficient capture;
+ordinary construction retains its defensive snapshots. Retaining source bytes
+supplies neither a basis identity nor certificate authority.
+
 Basis scatter checks slice windows and disjoint input buffers before traversal,
 then combines index access and checked multiply/add in one pass. Slice arrays
 carry no cached validation: initial support is copied from validated CSC, while

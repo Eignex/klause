@@ -16,8 +16,8 @@ internal data class BasisSolveWork(
 // Single-threaded owner of source, factors, row transforms and scratch. Caller vectors never become retained buffers.
 // Mandatory operations/reports reject close; n and the last refactorization's singular flag remain readable.
 // Repair stays within this fixed source identity; partial repair factors remain private.
-internal class KotlinBasisSolver(
-    matrix: SparseMatrix,
+internal class KotlinBasisSolver private constructor(
+    private val ownedSource: BasisSource,
     private val policy: LuPivotPolicy = LuPivotPolicy(),
     private val updateLimit: Int = 50,
     private val fillFactor: Double = 5.0,
@@ -26,18 +26,26 @@ internal class KotlinBasisSolver(
     private val denseDimensionLimit: Int = 6,
     private val denseMinimumDensity: Double = 0.5,
     initialOrder: SymbolicLu? = null,
+    retainedBuilder: BasisFactors? = null,
 ) : BasisSolver {
-    private val sourcePointers = matrix.copyColumnPointers()
-    private val sourceRows = matrix.copyRowIndices()
-    private val sourceValues = matrix.values.copyOf()
-    private val source = SparseMatrix.wrap(
-        matrix.rows,
-        matrix.cols,
-        sourcePointers,
-        sourceRows,
-        sourceValues,
-    )
-    private val builder = BasisFactors(source)
+    constructor(
+        matrix: SparseMatrix,
+        policy: LuPivotPolicy = LuPivotPolicy(),
+        updateLimit: Int = 50,
+        fillFactor: Double = 5.0,
+        densityThreshold: Double = 0.2,
+        reusePivotOrder: Boolean = true,
+        denseDimensionLimit: Int = 6,
+        denseMinimumDensity: Double = 0.5,
+        initialOrder: SymbolicLu? = null,
+    ) : this(BasisSource(matrix), policy, updateLimit, fillFactor, densityThreshold, reusePivotOrder,
+        denseDimensionLimit, denseMinimumDensity, initialOrder)
+
+    private val sourcePointers = ownedSource.pointers
+    private val sourceRows = ownedSource.rows
+    private val sourceValues = ownedSource.values
+    private val source = ownedSource.matrix
+    private val builder = retainedBuilder ?: BasisFactors(source)
     private var denseBuilder: DenseBasisFactors? = null
     override val n = source.rows
     private val solveWorkspace = BasisWorkspace(n)
@@ -582,6 +590,7 @@ internal class KotlinBasisSolver(
         get() = cache?.takeIf { !closed && !singular && !repairActive }?.let { FactorCopy(it, generation) }
 
     private inner class FactorCopy(private val observed: BasisSolveCache, private val version: Long) : BasisFactorCopy {
+        override val sharesSource: Boolean = true
         override val dimension: Int = n
         override val entries: Long = observed.factors.lower.nnz.toLong() +
             observed.ft.upperEntries + observed.ft.transformEntries
@@ -601,12 +610,13 @@ internal class KotlinBasisSolver(
             if (!columns.contentEquals(this@KotlinBasisSolver.columns) ||
                 !unitRows.contentEquals(this@KotlinBasisSolver.unitRows)
             ) return null
-            val copied = KotlinBasisSolver(source,
+            val copied = KotlinBasisSolver(ownedSource,
                 this@KotlinBasisSolver.policy.copy(
                     maxEntries = minOf(this@KotlinBasisSolver.policy.maxEntries, policy.maxEntries),
                     maxWork = minOf(this@KotlinBasisSolver.policy.maxWork, policy.maxWork),
                     cancelled = policy.cancelled),
-                updateLimit, fillFactor, densityThreshold, reusePivotOrder, denseDimensionLimit, denseMinimumDensity)
+                updateLimit, fillFactor, densityThreshold, reusePivotOrder, denseDimensionLimit, denseMinimumDensity,
+                retainedBuilder = builder.fork())
             var published = false
             try {
                 val factors = observed.factors.copyOwned { !valid() } ?: return null
