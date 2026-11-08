@@ -653,7 +653,7 @@ limit and retains the source-row template; unavailable preparation leaves its pr
 candidates intact. Each immutable template attempts this preparation once.
 Point scoring admits at most one additional checked cut at each usable point.
 An addition waits for its completed selected query before enabling another scan
-at the next point. Only a strictly stronger checked bound, a checked incumbent or
+at its resulting point. Only a strictly stronger checked bound, a checked incumbent or
 terminal evidence enables that immediate continuation. An unchanged or unavailable
 bound, an unfinished round and a scan without an addition keep a seven-query
 discovery cooldown. Feedback applies only to the same immutable candidate
@@ -1773,8 +1773,15 @@ A selected witness or terminal keeps its selected guidance. The baseline point
 uses the selection round's existing funded retention and carries no proof authority;
 the strengthened bound and selected rows retain their own result channels. This
 requests no additional LP query and changes no generation allowance.
-A new template first runs the ordinary checked cut recipe; a completed point can
-add one selection round at that node. A trial that admits no candidate retains
+A new template first runs the ordinary checked cut recipe. Completed selected
+queries can add further checked cuts at the same node from the retained candidate
+generation. Each continuation requires a strictly growing mask; retirement,
+no addition, an unavailable point, a checked incumbent or terminal, cancellation
+or the containing resource limits stop the sequence. It performs no final base
+query or repeated candidate discovery. Pending queries retain the strongest
+completed scoped bound and the first paid base point across suspension; the base
+point supplies advisory guidance only under the requesting consumer's contract.
+A trial that admits no candidate retains
 the ordinary template, checked query and numerical owner for later queries of that
 template. Successful selection retains its checked mask instead.
 Integer-only templates and aggregate-only cut families with at most 64 fully checked

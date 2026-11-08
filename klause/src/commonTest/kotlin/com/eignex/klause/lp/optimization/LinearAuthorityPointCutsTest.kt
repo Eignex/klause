@@ -51,6 +51,22 @@ class LinearAuthorityPointCutsTest {
         "real lower" to SourcePremise(SourceInequality(mapOf(mixedReal to BigFraction.MINUS_ONE), BigFraction.ZERO)),
         "integer lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
     ), mapOf(x to BigFraction.ONE))
+    private val independentMixed = run {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val w = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        SourceProofContext(mixedMaximum.scope.copy(objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
+            mixedMaximum.coordinates + setOf(y, z, w, other), mixedMaximum.premises + mapOf(
+                "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    y to BigFraction.ofLong(2), mixedReal to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+                "other mixed" to SourcePremise(SourceInequality(mapOf(z to BigFraction.ofLong(2),
+                    w to BigFraction.ofLong(2), other to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+                "other lower" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO)),
+                "other upper" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ONE),
+                    BigFraction.ofLong(2))),
+            ), listOf(x, y, z, w).associateWith { BigFraction.ONE })
+    }
 
     @Test
     fun `point policy preparation should include scoring in its containing recipe`() {
@@ -326,65 +342,39 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
-    fun `adding another checked cut should retain the numerical owner`() {
-        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
-        val w = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
-        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
-        val context = SourceProofContext(mixedMaximum.scope.copy(
-            objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
-            mixedMaximum.coordinates + setOf(y, z, w, other), mixedMaximum.premises + mapOf(
-                "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
-                    y to BigFraction.ofLong(2), mixedReal to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
-                "other mixed" to SourcePremise(SourceInequality(mapOf(z to BigFraction.ofLong(2),
-                    w to BigFraction.ofLong(2),
-                    other to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
-                "other lower" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE),
-                    BigFraction.ZERO)),
-                "other upper" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ONE),
-                    BigFraction.ofLong(2))),
-            ), listOf(x, y, z, w).associateWith { BigFraction.ONE })
-        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
-            val first = authority.advanceWithPointCuts(context, Cancellation.Never)
-            assertEquals(SourceValue.Rational(BigFraction.ofLong(9) * BigFraction.ofLong(2).reciprocal()),
+    fun `same node separation should consume complementary cuts without a redundant base query`() {
+        val budget = SourceLpBudget()
+        LinearAuthority(budget, retainLp = true).use { authority ->
+            val first = authority.advanceWithPointCuts(independentMixed, Cancellation.Never)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(4)),
                 (assertNotNull(first.bound).claim as SourceClaim.Bound).value)
+            assertEquals(3, budget.operations)
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionBaseQueries"])
+            assertEquals(2L, authority.cutObservations()["numericalCutSelectionRounds"])
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionSameNodeContinuations"])
             val preparations = authority.preparations
 
-            val second = authority.advanceWithPointCuts(context, Cancellation.Never)
+            val second = authority.advanceWithPointCuts(independentMixed, Cancellation.Never)
 
             assertEquals(SourceValue.Rational(BigFraction.ofLong(4)),
                 (assertNotNull(second.bound).claim as SourceClaim.Bound).value)
+            assertEquals(3, budget.operations)
             assertEquals(preparations, authority.preparations)
-            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context.withLinearAuthority())
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(independentMixed.withLinearAuthority())
                 .verify(assertNotNull(second.bound)))
         }
     }
 
     @Test
     fun `retained unselected definitions should not replace the ordinary current recipe`() {
-        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
-        val w = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
-        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
-        val context = SourceProofContext(mixedMaximum.scope.copy(
-            objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
-            mixedMaximum.coordinates + setOf(y, z, w, other), mixedMaximum.premises + mapOf(
-                "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
-                    y to BigFraction.ofLong(2), mixedReal to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
-                "other mixed" to SourcePremise(SourceInequality(mapOf(z to BigFraction.ofLong(2),
-                    w to BigFraction.ofLong(2),
-                    other to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
-                "other lower" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE),
-                    BigFraction.ZERO)),
-                "other upper" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ONE),
-                    BigFraction.ofLong(2))),
-            ), listOf(x, y, z, w).associateWith { BigFraction.ONE })
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
-            authority.advanceWithPointCuts(context, Cancellation.Never)
+            authority.advanceWithPointCuts(independentMixed, Cancellation.Never)
 
-            val result = authority.advance(context, Cancellation.Never, cuts = true)
+            val result = authority.advance(independentMixed, Cancellation.Never, cuts = true)
 
             assertEquals(SourceValue.Rational(BigFraction.ofLong(5)),
                 (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
-            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context.withLinearAuthority())
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(independentMixed.withLinearAuthority())
                 .verify(assertNotNull(result.bound)))
         }
     }
@@ -953,6 +943,142 @@ class LinearAuthorityPointCutsTest {
                 (assertNotNull(completed.bound).claim as SourceClaim.Bound).value)
             assertEquals(2, budget.operations)
             assertEquals(1L, authority.cutObservations()["numericalCutSelectionImprovedRounds"])
+        }
+    }
+
+    @Test
+    fun `a paused continuation should resume with the strongest completed selected bound`() {
+        val funding = SourceLpFunding(4_000_000L, 8_000_000L).apply { grant(4_000_000L) }
+        var operations = 0L
+        var blocked = false
+        val budget = SourceLpBudget(funding = funding, onWork = {
+            operations += it.operations
+            if (!blocked && operations == 3L) {
+                blocked = true
+                funding.grant(0L)
+            }
+        })
+        LinearAuthority(budget, retainLp = true).use { authority ->
+            val paused = authority.advanceWithPointCuts(independentMixed, Cancellation.Never)
+            assertTrue(paused.paused)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(9) * BigFraction.ofLong(2).reciprocal()),
+                (assertNotNull(paused.bound).claim as SourceClaim.Bound).value)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(independentMixed.withLinearAuthority())
+                .verify(assertNotNull(paused.bound)))
+
+            funding.grant(4_000_000L)
+            val result = authority.advanceWithPointCuts(independentMixed, Cancellation.Never)
+
+            assertFalse(result.paused)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(4)),
+                (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
+            assertEquals(3, budget.operations)
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionBaseQueries"])
+            assertEquals(2L, authority.cutObservations()["numericalCutSelectionImprovedRounds"])
+        }
+    }
+
+    @Test
+    fun `stopped continuation should preserve its last completed selected bound`() {
+        for (reason in listOf("cancellation", "work", "allocation")) {
+            val funding = SourceLpFunding(4_000_000L, 8_000_000L).apply { grant(4_000_000L) }
+            var operations = 0L
+            var cancelled = false
+            val budget = SourceLpBudget(funding = funding, onWork = {
+                operations += it.operations
+                if (operations == 3L) when (reason) {
+                    "cancellation" -> cancelled = true
+                    "work" -> funding.charge(funding.remainingWork)
+                    "allocation" -> funding.charge(0L, funding.remainingAllocation)
+                }
+            })
+
+            val result = LinearAuthority(budget, retainLp = true).use {
+                it.advanceWithPointCuts(independentMixed, Cancellation { cancelled }, retainBasePoint = true)
+            }
+
+            assertEquals(3, budget.operations)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(9) * BigFraction.ofLong(2).reciprocal()),
+                (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
+            assertNull(result.incumbent)
+            assertNull(result.evidence)
+            assertNull(result.advisoryPoint)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(independentMixed.withLinearAuthority())
+                .verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
+    fun `a changed source should discard a paused continuation`() {
+        val funding = SourceLpFunding(4_000_000L, 8_000_000L).apply { grant(4_000_000L) }
+        var operations = 0L
+        var blocked = false
+        val budget = SourceLpBudget(funding = funding, onWork = {
+            operations += it.operations
+            if (!blocked && operations == 3L) {
+                blocked = true
+                funding.grant(0L)
+            }
+        })
+        LinearAuthority(budget, retainLp = true).use { authority ->
+            assertTrue(authority.advanceWithPointCuts(independentMixed, Cancellation.Never).paused)
+
+            funding.grant(4_000_000L)
+            val result = authority.advanceWithPointCuts(mixedMaximum, Cancellation.Never)
+
+            assertFalse(result.paused)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+                (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(mixedMaximum.withLinearAuthority())
+                .verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
+    fun `same node continuation should retain its first paid advisory point after resumption`() {
+        val triangle = (4..6).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val premises = independentMixed.premises.toMutableMap()
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["nonnegative $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE), BigFraction.ONE))
+        }
+        val source = SourceProofContext(independentMixed.scope, independentMixed.coordinates + triangle,
+            premises, independentMixed.objective + triangle.associateWith { BigFraction.ONE })
+        for (pause in listOf(false, true)) {
+            val funding = SourceLpFunding(4_000_000L, 8_000_000L).apply { grant(4_000_000L) }
+            var operations = 0L
+            var blocked = false
+            val budget = SourceLpBudget(funding = funding, onWork = {
+                operations += it.operations
+                if (pause && !blocked && operations == 3L) {
+                    blocked = true
+                    funding.grant(0L)
+                }
+            })
+            val result = LinearAuthority(budget, retainLp = true).use { authority ->
+                val initial = authority.advanceWithPointCuts(source, Cancellation.Never, retainBasePoint = true)
+                if (pause) {
+                    assertTrue(initial.paused)
+                    assertNull(initial.advisoryPoint)
+                    funding.grant(4_000_000L)
+                    authority.advanceWithPointCuts(source, Cancellation.Never, retainBasePoint = true)
+                } else initial
+            }
+
+            assertFalse(result.paused)
+            assertNull(result.incumbent)
+            assertNull(result.evidence)
+            val guidance = assertNotNull(result.advisoryPoint)
+            val integers = independentMixed.coordinates.filter { it.kind == SourceCoordinate.Kind.Integer }
+            assertEquals(5.0, integers.sumOf { guidance.getValue(it) })
+            assertEquals(4.0, integers.sumOf { result.relaxedPoint.getValue(it) })
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(11) * BigFraction.ofLong(2).reciprocal()),
+                (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority())
+                .verify(assertNotNull(result.bound)))
+            assertEquals(3, budget.operations)
         }
     }
 }

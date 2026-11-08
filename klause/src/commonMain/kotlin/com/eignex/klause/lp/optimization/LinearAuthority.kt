@@ -96,6 +96,7 @@ internal class LinearAuthority(
     private class PointRound(
         val query: LinearAuthorityQuery, val base: LinearAuthorityResult, val mask: Set<Int>,
         val rows: List<LinearAuthorityCut>,
+        val basePoint: Map<SourceCoordinate, Double> = base.relaxedPoint,
     ) {
         var reported = false
     }
@@ -259,40 +260,76 @@ internal class LinearAuthority(
             policy.observe("Rounds")
             budget.funding?.charge(0L, 1024L + 64L * (base.fractional.size + base.relaxedPoint.size))
         }
-        if (budget.funding?.exhausted == true || cancellation()) {
-            pointRound = null
-            return pending.base.copy(primalStages = if (pending.reported) emptyMap() else pending.base.primalStages)
+        return advancePointRounds(source, cancellation, policy, pending, retainBasePoint)
+    }
+
+    private fun advancePointRounds(
+        source: SourceProofContext, cancellation: Cancellation, policy: LinearAuthorityPointCuts,
+        initial: PointRound, retainBasePoint: Boolean,
+    ): LinearAuthorityResult {
+        var pending = initial
+        while (true) {
+            if (budget.funding?.exhausted == true || cancellation()) {
+                pointRound = null
+                return pending.base.copy(advisoryPoint = null,
+                    primalStages = if (pending.reported) emptyMap() else pending.base.primalStages)
+            }
+            var point: Pair<LinearAuthorityQuery, List<BigFraction>>? = null
+            pointListener = { query, values -> if (point == null) point = query to values }
+            val result = try {
+                advance(source, cancellation, cuts = true, cutMask = pending.mask)
+            } finally {
+                pointListener = null
+            }
+            if (!result.paused || budget.funding?.exhausted == true || cancellation()) pointRound = null
+            val previousStages = if (pending.reported) emptyMap() else pending.base.primalStages
+            pending.reported = true
+            val stages = (previousStages.keys + result.primalStages.keys).associateWith { key ->
+                val before = previousStages[key] ?: 0L
+                val after = result.primalStages[key] ?: 0L
+                if ("Max" in key) maxOf(before, after) else before + after
+            }
+            if (result.paused && (budget.funding?.exhausted == true || cancellation())) {
+                return pending.base.copy(primalStages = stages, advisoryPoint = null)
+            }
+            val completed = !result.paused && budget.funding?.paused != true && !cancellation()
+            if (!result.paused && result.evidence == null && result.incumbent == null && result.split == null) {
+                if (completed) policy.observeRound(pending.rows, improved = false)
+                policy.observe("UnavailableRounds")
+                return pending.base.copy(primalStages = stages)
+            }
+            val strongest = strongerLinearBound(pending.base.bound, result.bound)
+            if (completed) {
+                policy.observeRound(pending.rows, result.evidence != null || result.incumbent != null ||
+                    (strongest != null && strongest !== pending.base.bound))
+            }
+            val combined = result.copy(bound = strongest, primalStages = stages,
+                advisoryPoint = pending.basePoint.takeIf {
+                    retainBasePoint && completed && result.incumbent == null && result.evidence == null
+                },
+                cutBoundFamilies = if (strongest != null && strongest === pending.base.bound) {
+                    pending.base.cutBoundFamilies
+                } else result.cutBoundFamilies)
+            if (!completed || result.evidence != null || result.incumbent != null) return combined
+            val observed = point ?: return combined
+            if (template?.cuts?.rows !== pending.rows || !observed.first.matches(source, cuts = true,
+                    cutMask = pending.mask, checkUnselectedCuts = checkUnselectedCuts(pending.mask),
+                    retainMaskedCuts = retainMaskedCuts(pending.mask))) return combined
+            val selected = cutLifecycle.containing("POINT_SELECTION") {
+                policy.select(pending.rows, observed.first.coordinates, observed.first.costs,
+                    observed.first.checkedCuts, observed.second,
+                    pending.mask.intersect(observed.first.checkedCuts), cancellation)
+            }
+            if (budget.funding?.exhausted == true || cancellation()) return combined.copy(advisoryPoint = null)
+            if (selected.size <= pending.mask.size || !selected.containsAll(pending.mask)) return combined
+            pointMask = selected
+            pending = PointRound(observed.first, combined.copy(advisoryPoint = null), selected,
+                pending.rows, pending.basePoint)
+            pointRound = pending
+            policy.observe("Rounds")
+            policy.observe("SameNodeContinuations")
+            budget.funding?.charge(0L, 1024L + 64L * (combined.fractional.size + combined.relaxedPoint.size))
         }
-        val result = advance(source, cancellation, cuts = true, cutMask = pending.mask)
-        if (!result.paused || budget.funding?.exhausted == true || cancellation()) pointRound = null
-        val previousStages = if (pending.reported) emptyMap() else pending.base.primalStages
-        pending.reported = true
-        val stages = (previousStages.keys + result.primalStages.keys).associateWith { key ->
-            val before = previousStages[key] ?: 0L
-            val after = result.primalStages[key] ?: 0L
-            if ("Max" in key) maxOf(before, after) else before + after
-        }
-        if (result.paused && (budget.funding?.exhausted == true || cancellation())) {
-            return pending.base.copy(primalStages = stages)
-        }
-        val completed = !result.paused && budget.funding?.paused != true && !cancellation()
-        if (!result.paused && result.evidence == null && result.incumbent == null && result.split == null) {
-            if (completed) policy.observeRound(pending.rows, improved = false)
-            policy.observe("UnavailableRounds")
-            return pending.base.copy(primalStages = stages)
-        }
-        val strongest = strongerLinearBound(pending.base.bound, result.bound)
-        if (completed) {
-            policy.observeRound(pending.rows, result.evidence != null || result.incumbent != null ||
-                (strongest != null && strongest !== pending.base.bound))
-        }
-        return result.copy(bound = strongest, primalStages = stages,
-            advisoryPoint = pending.base.relaxedPoint.takeIf {
-                retainBasePoint && completed && result.incumbent == null && result.evidence == null
-            },
-            cutBoundFamilies = if (strongest != null && strongest === pending.base.bound) {
-                pending.base.cutBoundFamilies
-            } else result.cutBoundFamilies)
     }
 
     private fun preparePointFamily(
