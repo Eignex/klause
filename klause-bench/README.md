@@ -1111,6 +1111,14 @@ endpoint independently from the point. Its generation shares the original
 and any resulting owner replacement retain their containing source/recipe costs.
 `PointPreparationUnavailable` does not establish complete ineligibility.
 
+`MpsProofFrontier selection=true replay=true` compares disabled, originally
+installed and all-captured masks over the first four captured scope/pool pairs
+that contain cut definitions. Each mask gets two fresh owners, one operation,
+20,000,000 work and 64 MiB modeled allocation, within a ten-second inspection cap.
+`selection-replays.jsonl` retains the captured IDs, family tags, fresh native checks
+and any import decline. Replaying imports the captured pool without generation;
+these diagnostic controls establish neither throughput nor independent proof.
+
 `MpsProofFrontier point-producer=true` invokes the production point-directed
 aggregate producer at every retained completed point, including branch points.
 Each generation retains its 65,536-work and 1 MiB modeled allocation limits;

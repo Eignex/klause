@@ -1756,6 +1756,10 @@ owner or live workspace. Incomplete capture and unavailable points remain unknow
 Observing performs no solve. Explicit replay creates a fresh owner with separate
 cumulative work, allocation, operation and cancellation allowances; it rechecks
 source derivations and cannot publish deductions into the original traversal.
+Replay masks name the complete captured cut pool in its recorded order, including
+family and mixed-row metadata. Import and template validation spend the replay
+allowance; generation does not replace the captured definitions. Partial pools,
+unavailable family tags and out-of-range masks decline without numerical authority.
 
 `source-point-cuts=true` opts the retained frontier into point-based separation.
 Ordinary linear-source execution binds cut separation, selection and advisory
