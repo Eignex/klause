@@ -323,7 +323,7 @@ internal class LinearAuthority(
             if (budget.funding?.exhausted == true || cancellation()) return combined.copy(advisoryPoint = null)
             if (selected.size <= pending.mask.size || !selected.containsAll(pending.mask)) return combined
             pointMask = selected
-            pending = PointRound(observed.first, combined.copy(advisoryPoint = null), selected,
+            pending = PointRound(observed.first, combined, selected,
                 pending.rows, pending.basePoint)
             pointRound = pending
             policy.observe("Rounds")

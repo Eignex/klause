@@ -979,6 +979,26 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `a declined continuation should retain the completed bound and original advisory point`() {
+        val budget = SourceLpBudget(maxOperations = 2)
+
+        val result = LinearAuthority(budget, retainLp = true).use {
+            it.advanceWithPointCuts(independentMixed, Cancellation.Never, retainBasePoint = true)
+        }
+
+        assertEquals(2, budget.operations)
+        assertFalse(result.paused)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(9) * BigFraction.ofLong(2).reciprocal()),
+            (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
+        val integers = independentMixed.coordinates.filter { it.kind == SourceCoordinate.Kind.Integer }
+        val guidance = assertNotNull(result.advisoryPoint)
+        assertEquals(5.0, integers.sumOf { guidance.getValue(it) })
+        assertEquals(4.5, integers.sumOf { result.relaxedPoint.getValue(it) })
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(independentMixed.withLinearAuthority())
+            .verify(assertNotNull(result.bound)))
+    }
+
+    @Test
     fun `stopped continuation should preserve its last completed selected bound`() {
         for (reason in listOf("cancellation", "work", "allocation")) {
             val funding = SourceLpFunding(4_000_000L, 8_000_000L).apply { grant(4_000_000L) }
