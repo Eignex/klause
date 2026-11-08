@@ -315,6 +315,35 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
+    fun `source preparation reuse should reach the owned numerical authority`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(integer, real, residual), mapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE, residual to BigFraction.ONE), BigFraction.ofLong(3))),
+            "real-lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "real-upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
+            "residual-lower" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.MINUS_ONE),
+                BigFraction.ZERO)),
+            "residual-upper" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.ONE),
+                BigFraction.ofLong(100))),
+        ), mapOf(integer to BigFraction.MINUS_ONE, real to BigFraction.ONE))
+
+        for (enabled in listOf(false, true)) {
+            val result = LinearAuthorityInvocation(source, TheoryParams(sourceAggregateCuts = true,
+                sourcePointCuts = true, sourceCutPreparationReuse = enabled, sourceLpOperations = 2),
+                boundOrdered = true).use { it.run { _, _ -> } }
+
+            val stages = assertNotNull(result.stats.smt.completeSearchStages)
+            assertEquals(if (enabled) 1L else 0L, stages["numericalCutAggregateSourceIndexPrepared"] ?: 0L)
+            val terminal = assertNotNull(result.terminal)
+            assertEquals(SourceValue.Rational(BigFraction.MINUS_ONE),
+                assertIs<SourceClaim.Optimal>(terminal.claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        }
+    }
+
+    @Test
     fun `fractional continuation should preserve the current optimum within two operations`() {
         val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val source = SourceProofContext(scope, setOf(integer, real, residual), mapOf(
