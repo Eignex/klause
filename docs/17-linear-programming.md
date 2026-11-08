@@ -1822,8 +1822,12 @@ A selected witness or terminal keeps its selected guidance. The baseline point
 uses the selection round's existing funded retention and carries no proof authority;
 the strengthened bound and selected rows retain their own result channels. This
 requests no additional LP query and changes no generation allowance.
-Fractional-order aggregation follows the completed current point query. It keeps
-that query's checked definitions, installed mask, strongest bound and paid exact
+Fractional-order aggregation follows a completed nonterminal current point query
+whose entire retained cut pool is checked and installed. Partial pools defer
+without spending the template's generation attempt. The coverage scan charges
+`1 + 2 * poolRows` work and 64 modeled bytes to the containing allowance; counters
+record readiness, deferral and the attempted retained, checked and installed sizes.
+The continuation keeps the query's checked definitions, installed mask, strongest bound and paid exact
 point, then appends funded proposals under the 64-row ceiling in the same numerical
 generation scope. It attempts one augmentation per immutable template using only
 the containing allowance's remaining work, memory and operations. Generation and

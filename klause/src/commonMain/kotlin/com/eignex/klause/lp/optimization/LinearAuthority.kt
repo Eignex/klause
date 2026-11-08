@@ -201,6 +201,11 @@ internal class LinearAuthority(
         val family = template ?: return base
         if (observed.first !== query || fractionalFamily === family ||
             family.cuts == null || family.cuts.rows.size >= 64) return base
+        val ready = cutLifecycle.containing("POINT_SELECTION") {
+            currentPoolInstalled(observed.first, family.cuts.rows.size, cancellation)
+        }
+        if (!ready) return base.copy(advisoryPoint = base.advisoryPoint.takeUnless { cancellation() },
+            paused = budget.funding?.let { it.paused && !it.exhausted } == true)
         fractionalFamily = family
         val prepared = cutLifecycle.containing("POINT_SELECTION") {
             prepareFractionalRound(source, family, observed.first, observed.second, base, cancellation)
@@ -208,6 +213,30 @@ internal class LinearAuthority(
         if (!prepared) return base.copy(advisoryPoint = base.advisoryPoint.takeUnless { cancellation() },
             paused = budget.funding?.let { it.paused && !it.exhausted } == true)
         return advanceFractionalRound(source, cancellation, retainBasePoint)
+    }
+
+    private fun currentPoolInstalled(prepared: LinearAuthorityQuery, rows: Int,
+        cancellation: Cancellation): Boolean {
+        val policy = pointPolicy ?: return false
+        val work = 1L + rows * 2L
+        if (cancellation() || budget.funding?.availableWork?.let { work > it } == true ||
+            budget.funding?.remainingAllocation?.let { 64L > it } == true) {
+            policy.observe("FractionalPoolUnavailable")
+            return false
+        }
+        cutCost(work, 64L)
+        if (cancellation() || budget.funding?.paused == true) return false
+        policy.observe("FractionalPoolObservations")
+        val ready = prepared.checkUnselectedCuts && prepared.checkedCuts.size == rows &&
+            prepared.installedCuts.size == rows &&
+            (0 until rows).all { it in prepared.checkedCuts && it in prepared.installedCuts }
+        policy.observe(if (ready) "FractionalPoolReady" else "FractionalPoolDeferred")
+        if (ready) {
+            policy.observe("FractionalAttemptPoolRows", rows.toLong())
+            policy.observe("FractionalAttemptCheckedRows", prepared.checkedCuts.size.toLong())
+            policy.observe("FractionalAttemptInstalledRows", prepared.installedCuts.size.toLong())
+        }
+        return ready
     }
 
     private fun newPointPolicy(): LinearAuthorityPointCuts =
