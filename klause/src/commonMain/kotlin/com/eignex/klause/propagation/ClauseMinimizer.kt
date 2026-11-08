@@ -120,7 +120,8 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
      * typically shrinking the clause a few percent further and lowering its LBD.
      */
     private fun binaryMinimize(clause: IntArrayList, currentLevel: Int): IntArrayList {
-        if (clause.size <= 2 || !state.hasBinaryClauses) return clause
+        if (clause.size <= 2) return clause
+        if (!state.hasBinaryClauses && (state.nativeEngine?.activeCount ?: 0) == 0) return clause
         // The asserting literal is the unique literal at the conflict level. Bail when there
         // isn't exactly one (non-asserting clause) or it's an atom literal (the binary watch
         // index covers bool vars only).

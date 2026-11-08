@@ -50,9 +50,10 @@ class ClauseMinimizerTest {
             arrayOf(Clause(intArrayOf(uip, partner xor 1, other))))
         val state = PropagationState(problem, Assumptions.None, nativeSat = true)
         assertNull(state.runToFixpoint(allFactors = true))
+        state.addLearnedClause(Clause(intArrayOf(uip, partner xor 1, other)), 9, permanent = true)
         state.addLearnedClause(Clause(intArrayOf(uip, partner)), 9)
         val engine = assertNotNull(state.nativeEngine)
-        assertEquals(1, engine.maintainCapWindow(0, 65_536L, 1_048_576L, { false }, { true }, { false }))
+        assertEquals(1, engine.maintainCapWindow(1, 65_536L, 1_048_576L, { false }, { true }, { false }))
         val graph = object : ReasonGraph {
             override fun universeSize(): Int = 3
             override fun levelOf(v: Int): Int = if (v == 0) 2 else 1

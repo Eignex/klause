@@ -155,9 +155,9 @@ redundant literal yields a stronger implied clause, so the result stays an asser
 nogood. The redundancy memo is cleared before each conflict, since levels and
 antecedents belong to that analysis.
 
-General and native admissions register learned binaries in the binary-presence
-hint that enables binary resolution. Retirement may leave the hint positive;
-the implication walk excludes retired clauses before using their literals.
+Binary resolution consults the general binary-presence hint and also scans native
+watches when live native learned rows exist. The watch walk checks each clause's
+length and excludes retired clauses before using their literals.
 
 An opt-in redundancy preflight checks remaining sibling leaves, cycles, coupled
 integer atoms and cached failures before the first child expansion of a DFS frame,

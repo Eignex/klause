@@ -374,10 +374,6 @@ internal class NativeSatState(private val state: PropagationState) {
         state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Admitted)
         state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Asserted)
         val len = lits.size
-        if (len == 2) {
-            state.work++
-            state.learned.binaryClauseCount++
-        }
         if (len == 1) {
             learnedUnits.add(h)
             if (litFalse(lits[0])) {
