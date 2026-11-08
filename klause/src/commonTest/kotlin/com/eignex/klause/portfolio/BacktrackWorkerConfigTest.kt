@@ -29,15 +29,16 @@ import kotlin.test.assertTrue
 
 class BacktrackWorkerConfigTest {
     @Test
-    fun `a worker should decline canonical guidance for a different model or objective`() {
-        val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+    fun `a worker should read canonical guidance only for the same model and objective`() {
+        val problem = Problem(8, 0, emptyArray(), arrayOf<Factor>(
+            Cardinality(IntArray(8) { Lit.make(it, true) }, min = 3, max = 8),
         )).bake()
-        val objective = LinearObjective(boolWeights = longArrayOf(1L, 2L))
+        val objective = LinearObjective(boolWeights = longArrayOf(7L, 3L, 5L, 9L, 1L, 8L, 2L, 6L))
         val exchange = IncumbentExchange.minimizing<Sample>().apply {
-            offer(Sample(booleanArrayOf(true, false), longArrayOf()), 1.0)
+            offer(Sample(BooleanArray(8) { it < 3 }, longArrayOf()), 15.0)
         }
-        for (identity in listOf(ModelIdentity.of(Any(), objective), ModelIdentity.of(problem, Any()))) {
+        for ((identity, shouldRead) in listOf(ModelIdentity.of(problem, objective) to true,
+            ModelIdentity.of(Any(), objective) to false, ModelIdentity.of(problem, Any()) to false)) {
             var reads = 0
             val recipe = BacktrackRecipe("guided") { _, _ ->
                 BacktrackParams(valueSelector = SolutionGuided(IndomainMin),
@@ -51,7 +52,7 @@ class BacktrackWorkerConfigTest {
 
             worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }
 
-            assertEquals(0, reads)
+            assertEquals(shouldRead, reads > 0)
         }
     }
 
