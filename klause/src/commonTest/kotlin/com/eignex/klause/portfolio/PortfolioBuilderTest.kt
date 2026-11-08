@@ -8,6 +8,7 @@ import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.scheduling.Diffn
@@ -54,12 +55,12 @@ import kotlin.test.assertTrue
 class PortfolioBuilderTest {
     @Test
     fun `a native factory should guide its first descent from accepted canonical incumbents`() {
-        val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(
-            Clause(IntArray(3) { Lit.make(it, true) }),
+        val problem = Problem(8, 0, emptyArray(), arrayOf<Factor>(
+            Cardinality(IntArray(8) { Lit.make(it, true) }, min = 3, max = 8),
         )).bake()
-        val objective = LinearObjective(boolWeights = longArrayOf(1L, 2L, 4L))
+        val objective = LinearObjective(boolWeights = longArrayOf(7L, 3L, 5L, 9L, 1L, 8L, 2L, 6L))
         val canonical = IncumbentExchange.minimizing<Sample>().apply {
-            offer(Sample(booleanArrayOf(true, false, false), longArrayOf()), 1.0)
+            offer(Sample(BooleanArray(8) { it < 3 }, longArrayOf()), 15.0)
         }
         var reads = 0
         val recipe = BacktrackRecipe("guided") { _, onEvent ->
@@ -79,7 +80,7 @@ class PortfolioBuilderTest {
         }
 
         assertTrue(reads > 0)
-        assertEquals(1.0, assertIs<MinimizeResult.WithSample>(first).objective)
+        assertEquals(15.0, assertIs<MinimizeResult.WithSample>(first).objective)
     }
 
     @Test
