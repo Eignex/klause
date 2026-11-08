@@ -9,6 +9,21 @@ import kotlin.test.assertTrue
 class SliceBudgetTest {
 
     @Test
+    fun `debt observations should describe only the current slice repayment`() {
+        var work = 0L
+        val slice = SliceBudget({ 0L }, { work })
+        slice.begin(Long.MAX_VALUE, 1L)
+        work = 3L * LP_WORK_PER_NODE
+        slice.noteOverspend()
+
+        assertFalse(slice.begin(Long.MAX_VALUE, 2L))
+        assertEquals(2L, slice.repaidWork)
+        assertTrue(slice.begin(Long.MAX_VALUE, 4L))
+        assertEquals(0L, slice.repaidWork)
+        assertEquals(4L * LP_WORK_PER_NODE, slice.remainingLpWork())
+    }
+
+    @Test
     fun `expiry polls should account for native propagation completed inside a decision`() {
         var work = 0L
         val slice = SliceBudget({ 0L }, { 0L }, { work })

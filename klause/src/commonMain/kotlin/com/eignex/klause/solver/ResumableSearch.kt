@@ -97,6 +97,10 @@ internal interface ReseedGuard {
     val incumbentTrialPending: Boolean get() = false
 }
 
+internal interface SliceWorkAccounting {
+    val repaidWork: Long?
+}
+
 /**
  * An [Optimizer] whose search state can be paused and resumed across slices, such as
  * [com.eignex.klause.backtrack.BacktrackSolver] and [com.eignex.klause.localsearch.LocalSearchSolver].

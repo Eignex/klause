@@ -36,6 +36,7 @@ import com.eignex.klause.propagation.conditionedRoot
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.SliceWorkAccounting
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.incumbent.Candidate
@@ -141,7 +142,9 @@ internal class ResumableMinimize(
     preparationBudget: SliceBudget? = null,
     private val sink: SolveStatsSink = SolveStatsSink(backend = "backtrack"),
     private val deferredInstallation: Boolean = false,
-) : ResumableSearch, ReseedGuard {
+) : ResumableSearch, ReseedGuard, SliceWorkAccounting {
+    override var repaidWork: Long = 0L
+        private set
     private val hasPreparation = preparationBudget != null
     override val canReseed: Boolean
         get() = !preparationPending && clausePrimal?.isDone != false && !rootRoundingPending && !rootLayoutPending &&
@@ -572,11 +575,16 @@ internal class ResumableMinimize(
         sliceNodes: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
     ): MinimizeResult? {
+        repaidWork = 0L
         done?.let { return it }
         check(!closed) { "search is closed" }
         globalToken = baseCancellation.lifetimeCancellation() or global
         publishClausePrimalCandidate()?.let { onIncumbent(it.withSourceSemantics(problem.semantics)) }
-        if (!rootIsExhausted && !slice.begin(sliceMillis, sliceNodes)) return null
+        if (!rootIsExhausted) {
+            val admitted = slice.begin(sliceMillis, sliceNodes)
+            repaidWork = slice.repaidWork
+            if (!admitted) return null
+        }
         rootRoundingAttempted = false
         clauseExchangeEnded = false
         // A counted budget only means something if the search polls on a counted cadence: the run stops
