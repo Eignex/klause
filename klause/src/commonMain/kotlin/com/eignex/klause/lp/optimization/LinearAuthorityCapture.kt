@@ -73,6 +73,7 @@ internal data class LinearAuthorityCapturedQuery(
     val parentQuery: Int? = null,
     val boundDisposition: String = "unknown",
     val projection: LinearAuthorityFeedbackRequest = LinearAuthorityFeedbackRequest.Full,
+    val generationScope: SourceScope? = null,
 )
 
 // Source values and derivations are immutable; numerical owners, queries and their buffers never escape.
@@ -311,6 +312,15 @@ internal class LinearAuthorityCapture(
         val condition = source.scope.condition
         if (full && (!spend(condition.bools.size.toLong(), condition.bools.size * 48L) ||
             !(condition.lower.values + condition.upper.values).all(::scalar))) return
+        val generationScope = template?.numeric?.scope?.takeIf { full }
+        if (generationScope != null) {
+            if (!spend(1L, 128L)) return
+            if (generationScope != source.scope) {
+                val retained = generationScope.condition
+                if (!spend(retained.bools.size.toLong(), retained.bools.size * 48L) ||
+                    !(retained.lower.values + retained.upper.values).all(::scalar)) return
+            }
+        }
         val values = point?.takeIf { projection.point }
         // The point map was charged when it was captured.
         if (full && values != null && !values.values.all(::scalar)) return
@@ -363,7 +373,7 @@ internal class LinearAuthorityCapture(
                 point == null && !pointWithheld -> "point-unavailable"
                 result.bound == null -> "bound-unavailable"
                 else -> "completed"
-            }, projection = projection)
+            }, projection = projection, generationScope = generationScope)
         if (archive) {
             retained += captured
             recordedAttempt = attempted

@@ -56,6 +56,33 @@ class LinearAuthorityCaptureTest {
     }
 
     @Test
+    fun `warm capture should keep template generation separate from child verification scope`() {
+        val child = source.atScope(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ONE))))
+        val capture = LinearAuthorityCapture(2, 10_000L, 1_000_000L, Cancellation.Never)
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
+            authority.advance(source, Cancellation.Never, cuts = true, cutMask = emptySet())
+            authority.advance(child, Cancellation.Never, cuts = true, cutMask = emptySet())
+        }
+
+        val record = capture.records.last()
+        assertEquals(scope, record.generationScope)
+        assertEquals(child.scope, record.context.scope)
+        assertEquals(child.scope, record.numeric.scope)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(child.withLinearAuthority()).verify(assertNotNull(record.bound)))
+    }
+
+    @Test
+    fun `capture without a template should leave generation provenance unavailable`() {
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+
+        capture.record(source, null, null, null, LinearAuthorityResult())
+
+        assertNull(capture.records.single().generationScope)
+    }
+
+    @Test
     fun `retracting a cut mask should remove its stronger retained coordinate side`() {
         val capture = LinearAuthorityCapture(2, 10_000L, 1_000_000L, Cancellation.Never)
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->

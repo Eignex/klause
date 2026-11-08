@@ -151,6 +151,7 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
             put("boundDisposition", field(record, "boundDisposition") as String)
             (field(record, "parentQuery") as Int?)?.let { put("parentQuery", it) }
             put("scope", scope(context.scope))
+            (field(record, "generationScope") as SourceScope?)?.let { put("generationScope", scope(it)) }
             put("system", system(context))
             put("numericSystem", system(numeric))
             field(record, "parent")?.let { put("parent", scope(it as SourceScope)) }
