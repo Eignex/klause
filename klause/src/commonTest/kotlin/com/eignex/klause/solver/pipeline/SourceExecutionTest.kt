@@ -21,6 +21,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.engine.LpExactCapture
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
@@ -64,12 +65,14 @@ class SourceExecutionTest {
         val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
             ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
         val workers = mutableListOf<String>()
+        val captures = mutableListOf<Pair<Long, ByteArray>>()
         val request = SourceExecutionRequest(invocation,
             SourceExecutionPolicy(lpCeiling = LpConfig.OFF, portfolioLpCeiling = LpConfig.OFF),
             ExecutionOptions.parse(listOf("bt-arm=conflictDriven", "bt=1", "ls=0")),
             presolveConfig = PresolveConfig.NONE, cores = 1).withPortfolioLpQueryObserver { worker, _, query ->
             workers += worker
-            assertNotNull(query.model.exactState)
+            captures += query.pricing.tieSeed to assertNotNull(query.captureExactWithin(
+                "source-query", 4096, 65_536, 4096, Cancellation.Never))
         }
 
         val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(request))
@@ -77,6 +80,13 @@ class SourceExecutionTest {
         assertEquals(FiniteSolveVerdict.OPTIMAL, assertIs<FiniteSolveOutcome.Completed>(result.result.outcome).verdict)
         assertTrue(workers.isNotEmpty())
         assertTrue(workers.all { it == "bt/conflictDriven" })
+        assertEquals(workers.size, captures.size)
+        for ((seed, bytes) in captures) {
+            val captured = LpExactCapture.decode(bytes)
+            assertEquals("source-query", captured.settings.label)
+            assertEquals(seed, captured.settings.seed)
+            assertTrue(bytes.size <= 65_536)
+        }
     }
 
     @Test

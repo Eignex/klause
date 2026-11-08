@@ -1131,8 +1131,10 @@ An optional per-context query observer runs after a solve session adopts its exa
 model and before numerical work begins. It receives a session-local owner and query
 sequence, the borrowed working model, retained status, pricing, claim, offset,
 acceptance mode and work/refinement allowances. A basis capture owns its copied
-headings and statuses. A consumer must encode a model capture before returning
-and bound its own retention and work within
+headings and statuses. The live observation can encode an owned exact payload with
+its pricing seed, component mode and work limit under value, byte, row and
+cancellation bounds. Release invalidates this encoder with the borrowed model.
+A consumer must capture before returning and bound retention and work within
 the containing allowance. Observation grants no witness, bound or proof authority;
 ordinary contexts allocate no query records.
 

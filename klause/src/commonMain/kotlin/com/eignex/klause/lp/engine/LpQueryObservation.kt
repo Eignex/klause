@@ -1,5 +1,7 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.util.Cancellation
+
 // The model belongs to the synchronous callback's query. Retained diagnostics must encode an owned
 // capture before returning; keeping the borrowed working view can observe a later bound adoption.
 internal class LpQueryObservation(
@@ -19,6 +21,24 @@ internal class LpQueryObservation(
     private var view: LpModel? = model
     private var basisReader: (() -> Basis?)? = readBasis
     val model: LpModel get() = checkNotNull(view) { "LP query observation is outside its callback" }
+
+    fun captureExactWithin(
+        label: String,
+        valueLimit: Int,
+        byteLimit: Int,
+        maxRetainedRows: Int,
+        cancellation: Cancellation,
+    ): ByteArray? {
+        require(valueLimit >= 0 && byteLimit >= 0 && maxRetainedRows >= 0)
+        val current = model
+        if (cancellation() || current.m > maxRetainedRows) return null
+        val state = current.exactState ?: return null
+        if (state.model.m > maxRetainedRows) return null
+        val settings = LpReplaySettings(label, pricing.tieSeed, LpReplaySolverKind.PERSISTENT,
+            componentSplit = componentSplit, workLimit = workLimit)
+        return LpExactCapture.capture(state, settings, emptyList(), maxRetainedRows)
+            .encodeWithin(valueLimit, byteLimit, cancellation)
+    }
 
     fun captureBasis(): Basis? = checkNotNull(basisReader) {
         "LP query observation is outside its callback"
