@@ -14,6 +14,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
@@ -22,7 +23,9 @@ import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
+import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.TableauCutSolver
+import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
@@ -116,6 +119,41 @@ class LpBoundingTest {
         assertTrue(phases.any { (key, value) -> key.startsWith("CUT_ROOT_") &&
             key.endsWith("SOLVE") && value.work > 0L })
         assertTrue(phases.keys.any { it.startsWith("CUT_NODE_") && it.endsWith("RETIREMENT") })
+    }
+
+    @Test
+    fun `branch hints publish the point returned after pooled cuts`() {
+        val problem = triangle(3)
+        val sink = SolveStatsSink(backend = "cut-point-hints")
+        val session = PropagationSession(problem)
+        val points = ArrayList<DoubleArray>()
+        val objectives = ArrayList<Double>()
+        val hints = object : LpHintSink {
+            override fun clear() = Unit
+
+            override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
+                points.add(primal.copyOf())
+            }
+
+            override fun recordObjective(relaxation: LpRelaxation, objective: Double) {
+                objectives.add(objective)
+            }
+        }
+
+        LpEngine(problem, sumObjective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val base = assertNotNull(engine.nodeRelaxation(relaxer, session))
+            val cut = Cut(base.intColOf, longArrayOf(1L, 1L, 1L), Relation.GE, 5L, global = true)
+            assertTrue(engine.cutPool.add(cut, base))
+
+            val outcome = engine.sparseSafePrune(
+                relaxer, session, 100.0, sink, Cancellation.Never, -1, true, hints = hints,
+            )
+
+            assertFalse(outcome.prune)
+            assertEquals(5.0, base.intColOf.sumOf { points.single()[it] }, 1e-8)
+            assertEquals(5.0, objectives.single(), 1e-8)
+        }
     }
 
     @Test
