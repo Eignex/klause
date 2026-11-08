@@ -570,7 +570,7 @@ ranking by LBD. [ClauseDb](../klause/src/commonMain/kotlin/com/eignex/klause/bac
 and [SearchLearning](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchLearning.kt)
 own the respective stores.
 
-Restart-cap selection uses the bounded handle-preserving window. The candidate index
+General and custom restart-cap selection uses the bounded handle-preserving window. The candidate index
 retains the best eligible LBD keys as a max-heap; each funded step can resume without
 a whole-store selection buffer. Permanent clauses, protected reasons and policy survivors
 reduce the heap quota. A pending eviction that gains protection also consumes that
@@ -580,6 +580,37 @@ An unfunded next-row transaction suspends the cursor for a later grant. A comple
 row classification retains its pending admission while heap comparisons wait;
 cleanup comparisons finish before publishing their candidate mutations.
 Current or historical reasons can retain additional rows above the soft cap.
+The default Native policy retains its active non-permanent LBD/handle heap across reductions. Native
+LBD keys remain immutable between admission and handle remapping. New admissions,
+first-use notifications and MID aging carry the next classification work; unchanged
+LOCAL rows need no policy transaction. Private epoch markers preserve a demoted
+MID row for its demotion window and prevent duplicate effects when use and aging
+queues overlap. A completed callback retains its result before another funding
+check. Uses after classification enter the next epoch and remain protected by the
+fresh eviction check. CORE, permanent, glue, unit and reason protection retain their
+ordinary authority.
+
+Four primitive FIFO queues share an owned page pool. Bootstrap reserves pages in
+resumable atomic transactions while the generic owner continues selection within
+the same grant. A completed generic window yields its candidate array before the
+incremental owner begins classification. Reservation alone starts no tier epoch,
+and spare reserved pages release through funded unlink steps. Selected retirement
+detaches an unindexed reservation owner without restarting its generic tier epoch.
+An empty window releases its pages and leaves subsequent admissions to fresh
+reservation. Subsequent admission funds its additional capacity
+before publishing a row. Heap removals leave a processed gap in the candidate
+array, while new admissions remain in its unread suffix. Protected roots return
+through that gap before suffix compaction. Sparse marker cleanup completes the
+epoch, and funded unlink steps release spare pages. Below-cap retirement cleanup
+prunes stale handles without aging tiers. External tier changes request a rescan.
+Released metadata can erase retired comparison keys while a sift is suspended.
+After stale handles are removed, a funded heap repair completes before selection
+resumes. Another retirement restarts that cleanup without another tier callback.
+Handle remapping invalidates the heap, queues and markers under the full-remap
+preparation grant. Index scalars, references and page capacity belong to learned
+ownership accounting. Grants unable to bootstrap use the generic window. Custom
+policies first finish a funded index abort without further retirement, restore
+candidate handles and clear private markers, then enter the generic window.
 Native post-undo replay protects its queued clause handles and learned units without
 freezing unrelated retirement. Incomplete trail propagation, conflicts and root
 publication still defer the window.
