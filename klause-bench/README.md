@@ -47,6 +47,10 @@ input and records its decoded SHA-256 and byte count without parsing or solving 
 Its `capture-route=SESSION|SCOPED_FLOAT|SCOPED_CONTINUATION|any` filter selects the
 query boundary to retain; `capture-worker=bt/lp-default|any` selects its worker.
 The containing timeout includes setup, observation and retirement.
+`capture-guidance=true captures=0` records bounded native guide adoption and branch
+observations without retaining LP queries. The preference flag describes configured
+precedence; it does not compare a counterfactual value order. Last-read scalar cutoffs
+are separate from exact cutoff context, which this observer does not capture.
 
 `MpsProofFrontier selection=true` exports a captured template's actual
 `generationScope` separately from the query's current verification scope.

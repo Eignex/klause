@@ -2,6 +2,8 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackRecipe
+import com.eignex.klause.backtrack.PooledGuidanceKind
+import com.eignex.klause.backtrack.PooledGuidanceObservation
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.factor.bool.Cardinality
@@ -28,6 +30,53 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class BacktrackWorkerConfigTest {
+    @Test
+    fun `guidance observation should preserve cutoff reads and improving witnesses`() {
+        val problem = Problem(8, 0, emptyArray(), arrayOf<Factor>(
+            Cardinality(IntArray(8) { Lit.make(it, true) }, min = 3, max = 8),
+        )).bake()
+        val objective = LinearObjective(boolWeights = longArrayOf(7L, 3L, 5L, 9L, 1L, 8L, 2L, 6L))
+        val events = mutableListOf<PooledGuidanceObservation>()
+        val witnesses = mutableListOf<List<Double>>()
+        val reads = mutableListOf<Int>()
+        for (observed in listOf(false, true)) {
+            var cutoffReads = 0
+            val exchange = IncumbentExchange.minimizing<Sample>().apply {
+                offer(Sample(BooleanArray(8) { it < 3 }, longArrayOf()), 15.0)
+            }
+            val recipe = BacktrackRecipe("guided") { _, _ ->
+                BacktrackParams(valueSelector = SolutionGuided(IndomainMin),
+                    lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false))
+            }
+            val config = BacktrackWorkerConfig(recipe).let { config ->
+                if (observed) config.withGuidanceObserver { worker, event ->
+                    assertEquals("bt/guided", worker)
+                    events += event
+                } else config
+            }
+            val worker = config.materialize(problem, index = 0, armId = 0, seed = 0L, lsLambda = 1.0,
+                objective = objective, lsObjective = null, definitionalSweep = null, onEvent = null,
+                pools = SharedPools(null, null, identity = ModelIdentity.of(problem, objective),
+                    acceptedIncumbents = exchange))
+            witnesses += worker.use { it.improvements({ cutoffReads++; Double.POSITIVE_INFINITY },
+                Cancellation.Never).mapNotNull { it.objectiveValue }.toList() }
+            reads += cutoffReads
+        }
+
+        assertEquals(witnesses[0], witnesses[1])
+        assertEquals(reads[0], reads[1])
+        val imported = events.first { it.kind == PooledGuidanceKind.IMPORT }
+        assertEquals(1L, imported.version)
+        assertEquals(15.0, imported.objective)
+        assertEquals(null, imported.localObjective)
+        assertTrue(imported.preferred)
+        assertTrue(events.any { it.kind == PooledGuidanceKind.COMMIT && it.preferred && it.decision != null })
+        assertTrue(events.any { it.kind == PooledGuidanceKind.LOCAL })
+        assertTrue(events.groupBy { it.kind }.all { (kind, values) ->
+            values.size <= if (kind == PooledGuidanceKind.IMPORT || kind == PooledGuidanceKind.LOCAL) 16 else 128
+        })
+    }
+
     @Test
     fun `a worker should read canonical guidance only for the same model and objective`() {
         val problem = Problem(8, 0, emptyArray(), arrayOf<Factor>(

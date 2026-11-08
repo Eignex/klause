@@ -4,6 +4,9 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.backtrack.PooledGuidanceKind
+import com.eignex.klause.backtrack.PooledGuidanceObservation
+import com.eignex.klause.backtrack.PooledGuidanceObserver
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpTechnique
@@ -22,6 +25,8 @@ import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SharingChannel
+import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecision
 
 /**
  * A portfolio arm wrapping a [BacktrackRecipe] for execution — the backtrack counterpart of
@@ -37,19 +42,24 @@ internal class BacktrackWorkerConfig(
     private val toleranceCheck: ((Sample) -> Boolean)? = null,
     private val coreRefinement: CoreRefinementMode = CoreRefinementMode.NONE,
     private val onLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
+    private val onGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
 ) : WorkerConfig {
 
     fun withToleranceCheck(check: (Sample) -> Boolean): BacktrackWorkerConfig =
-        BacktrackWorkerConfig(recipe, zeroObjectivePricing, check, coreRefinement, onLpQuery)
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, check, coreRefinement, onLpQuery, onGuidance)
 
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
-        BacktrackWorkerConfig(recipe.spending(budget), zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery)
+        BacktrackWorkerConfig(recipe.spending(budget), zeroObjectivePricing, toleranceCheck, coreRefinement,
+            onLpQuery, onGuidance)
 
     override fun withCoreRefinement(mode: CoreRefinementMode): BacktrackWorkerConfig =
-        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, mode, onLpQuery)
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, mode, onLpQuery, onGuidance)
 
     fun withLpQueryObserver(observer: (String, Double?, LpQueryObservation) -> Unit): BacktrackWorkerConfig =
-        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, observer)
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, observer, onGuidance)
+
+    fun withGuidanceObserver(observer: (String, PooledGuidanceObservation) -> Unit): BacktrackWorkerConfig =
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery, observer)
 
     override val label: String get() = recipe.label
 
@@ -79,6 +89,31 @@ internal class BacktrackWorkerConfig(
         val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(workerLabel, e) } }
         var params = recipe.build(seed + 1000L + index, workerEvent)
         params = params.copy(zeroObjectivePricing = zeroObjectivePricing, toleranceCheck = toleranceCheck)
+        onGuidance?.let { observe ->
+            val previous = params.branchObserver
+            params = params.copy(branchObserver = object : PooledGuidanceObserver {
+                private val counts = IntArray(PooledGuidanceKind.entries.size)
+                private val windowCounts = IntArray(PooledGuidanceKind.entries.size)
+                override fun accepts(kind: PooledGuidanceKind): Boolean = when (kind) {
+                    PooledGuidanceKind.IMPORT, PooledGuidanceKind.LOCAL -> counts[kind.ordinal] < 16
+                    else -> counts[kind.ordinal] < 128 && windowCounts[kind.ordinal] < 8
+                }
+                override fun onGuidance(observation: PooledGuidanceObservation) {
+                    counts[observation.kind.ordinal]++
+                    windowCounts[observation.kind.ordinal]++
+                    if (observation.kind == PooledGuidanceKind.IMPORT || observation.kind == PooledGuidanceKind.LOCAL) {
+                        windowCounts.fill(0)
+                    }
+                    observe(workerLabel, observation)
+                }
+                override fun onAttempt(decision: SearchDecision, context: SearchContext) {
+                    previous?.onAttempt(decision, context)
+                }
+                override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
+                    previous?.onCommit(decision, decisionLevel)
+                }
+            })
+        }
         if (recipe.label == BacktrackArm.CoreGuided.label) {
             val coreParams = params
             val core = CoreGuidedWorkerConfig(params.nodeBudget, coreRefinement = coreRefinement) { coreParams }

@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.PooledGuidanceKind
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
@@ -53,7 +54,7 @@ import kotlin.time.Duration
 
 class SourceExecutionTest {
     @Test
-    fun `mixed source query observation should retain the selected native worker binding`() {
+    fun `mixed source observations should retain the selected native worker binding`() {
         val source = LinearSourceProblem(listOf(
             LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),
             LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
@@ -66,6 +67,8 @@ class SourceExecutionTest {
             ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
         val workers = mutableListOf<String>()
         val captures = mutableListOf<Pair<Long, ByteArray>>()
+        val guidanceWorkers = mutableListOf<String>()
+        val guidanceKinds = mutableListOf<PooledGuidanceKind>()
         val request = SourceExecutionRequest(invocation,
             SourceExecutionPolicy(lpCeiling = LpConfig.OFF, portfolioLpCeiling = LpConfig.OFF),
             ExecutionOptions.parse(listOf("bt-arm=conflictDriven", "bt=1", "ls=0")),
@@ -73,6 +76,9 @@ class SourceExecutionTest {
             workers += worker
             captures += query.pricing.tieSeed to assertNotNull(query.captureExactWithin(
                 "source-query", 4096, 65_536, 4096, Cancellation.Never))
+        }.withPortfolioGuidanceObserver { worker, observation ->
+            guidanceWorkers += worker
+            guidanceKinds += observation.kind
         }
 
         val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(request))
@@ -81,6 +87,9 @@ class SourceExecutionTest {
         assertTrue(workers.isNotEmpty())
         assertTrue(workers.all { it == "bt/conflictDriven" })
         assertEquals(workers.size, captures.size)
+        assertTrue(guidanceWorkers.isNotEmpty())
+        assertTrue(guidanceWorkers.all { it == "bt/conflictDriven" })
+        assertTrue(PooledGuidanceKind.LOCAL in guidanceKinds)
         for ((seed, bytes) in captures) {
             val captured = LpExactCapture.decode(bytes)
             assertEquals("source-query", captured.settings.label)

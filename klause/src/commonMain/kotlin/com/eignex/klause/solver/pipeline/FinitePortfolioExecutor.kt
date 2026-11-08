@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.PooledGuidanceObservation
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpTechnique
@@ -91,6 +92,7 @@ internal fun FinitePipeline.portfolioExecutor(
     privateRebuildBudgetOnly: Boolean = false,
     adaptiveCompanionRepair: Boolean = false,
     onLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
+    onGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
         "portfolio-work requires a finite Boolean/integer source without numerical companions"
@@ -172,6 +174,7 @@ internal fun FinitePipeline.portfolioExecutor(
         acceptedIncumbents = companions?.incumbents?.let { canonical ->
             IncumbentSource { canonical.projected()?.takeIf { it.objective.isFinite() } }
         },
+        onGuidance = onGuidance,
     ).map { factory ->
         PortfolioArmFactory(preparedPlan, factory.armId, factory.family, binding = { worker ->
             SourceWorkerBinding(
