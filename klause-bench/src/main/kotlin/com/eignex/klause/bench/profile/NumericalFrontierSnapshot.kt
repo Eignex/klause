@@ -22,6 +22,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.div
 import com.eignex.util.numbers.minus
+import java.lang.reflect.Constructor
 import java.util.IdentityHashMap
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -302,6 +303,23 @@ internal class NumericalFrontierSnapshot(
 
     companion object {
         // Reflection keeps solver ownership and inspection types out of the published API.
+        fun invocationConstructor(): Constructor<*> {
+            val loader = NumericalFrontierSnapshot::class.java.classLoader
+            fun type(name: String): Class<*> = Class.forName(name, false, loader)
+            return type("com.eignex.klause.solver.pipeline.LinearAuthorityInvocation").getDeclaredConstructor(
+                SourceProofContext::class.java, TheoryParams::class.java, Function0::class.java,
+                type("com.eignex.klause.solver.pipeline.OpenTheorySolveState"), Boolean::class.javaPrimitiveType,
+                type("com.eignex.klause.lp.optimization.LinearAuthority"),
+                Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType,
+                type("com.eignex.klause.lp.SourceLpFunding"),
+                Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType,
+                Function1::class.java, Boolean::class.javaPrimitiveType,
+                type("com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest"),
+                Boolean::class.javaPrimitiveType, Function0::class.java, Function0::class.java,
+                Boolean::class.javaPrimitiveType, type("com.eignex.klause.solver.pipeline.LinearIncumbentSharing"),
+                Function3::class.java, type("com.eignex.klause.solver.pipeline.LinearRepairGuidance"))
+        }
+
         fun open(
             context: SourceProofContext, params: TheoryParams, history: Boolean = false, frontier: Boolean = false,
             activeRows: Boolean = false, supportBranching: Boolean = false, latestFeedback: Boolean = true,
@@ -309,28 +327,17 @@ internal class NumericalFrontierSnapshot(
         ): Any {
             val stateType = Class.forName("com.eignex.klause.solver.pipeline.OpenTheorySolveState")
             val state = stateType.getDeclaredConstructor(TheoryParams::class.java).newInstance(params)
-            val type = Class.forName("com.eignex.klause.solver.pipeline.LinearAuthorityInvocation")
-            val authorityType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthority")
             val fundingType = Class.forName("com.eignex.klause.lp.SourceLpFunding")
             val funding = fundingType.getDeclaredConstructor(
                 Long::class.javaPrimitiveType, Long::class.javaPrimitiveType,
             ).newInstance(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
             val requestType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest")
-            val sharingType = Class.forName("com.eignex.klause.solver.pipeline.LinearIncumbentSharing")
-            val guidanceType = Class.forName("com.eignex.klause.solver.pipeline.LinearRepairGuidance")
             val request = if (fullFeedback) requestType.getField("Companion").get(null).let { companion ->
                 companion.javaClass.getMethod("getFull").invoke(companion)
             } else null
-            return type.getDeclaredConstructor(SourceProofContext::class.java, TheoryParams::class.java,
-                Function0::class.java, stateType, Boolean::class.javaPrimitiveType, authorityType,
-                Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, fundingType,
-                Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType,
-                Function1::class.java, Boolean::class.javaPrimitiveType, requestType, Boolean::class.javaPrimitiveType,
-                Function0::class.java, Function0::class.java, Boolean::class.javaPrimitiveType, sharingType,
-                Function3::class.java, guidanceType)
-                .newInstance(context, params, { null }, state, history, null, frontier, false,
-                    funding, frontier && params.sourceCuts, activeRows, supportBranching, null, latestFeedback,
-                    request, aggregateBranching, null, null, false, null, null, null)
+            return invocationConstructor().newInstance(context, params, { null }, state, history, null, frontier, false,
+                funding, frontier && params.sourceCuts, activeRows, supportBranching, null, latestFeedback,
+                request, aggregateBranching, null, null, false, null, null, null)
         }
 
         fun run(

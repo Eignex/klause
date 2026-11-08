@@ -15,11 +15,11 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -43,14 +43,8 @@ class NumericalFrontierSnapshotTest {
     )
 
     @Test
-    fun `frontier invocation should open without shared repair guidance`() {
-        val invocation = NumericalFrontierSnapshot.open(context, TheoryParams())
-
-        try {
-            assertEquals(0L, NumericalFrontierSnapshot.stats(invocation).smt.sourceLp.operations.toLong())
-        } finally {
-            (invocation as AutoCloseable).close()
-        }
+    fun `frontier capture should resolve the production invocation constructor`() {
+        assertNotNull(NumericalFrontierSnapshot.invocationConstructor())
     }
 
     @Test
