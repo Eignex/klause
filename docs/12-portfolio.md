@@ -150,6 +150,10 @@ no global bound; discrete pins and the complete reuse identity stay fixed.
 Original-source witness and exact objective checks precede incumbent admission,
 cutoff use or neighborhood centering. Supplied
 exact payloads retain their direct admission checks.
+Before a checked center is available, root repair can retain the ordinary
+pre-selection relaxation point for advisory centering and neighborhood order.
+Point-selected bounds remain separate; a checked selected root witness retains
+its selected guidance. Both points belong to the same funded root selection round.
 Ordinary linear sources reconstruct the completed point through the captured
 presolve mapping, check the original declarations and rows, and compare the original
 objective with the adjusted working value before import.

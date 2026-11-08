@@ -32,6 +32,7 @@ internal data class LinearAuthorityResult(
     val split: Pair<SourceCoordinate, BigFraction>? = null,
     val fractional: List<Pair<SourceCoordinate, BigFraction>> = emptyList(),
     val relaxedPoint: Map<SourceCoordinate, Double> = emptyMap(),
+    val advisoryPoint: Map<SourceCoordinate, Double>? = null,
     val paused: Boolean = false,
     val coordinateConflict: Boolean = false,
     val lpConflict: Boolean = false,
@@ -141,7 +142,8 @@ internal class LinearAuthority(
         cutLifecycle.containing("RETIREMENT") { lp.close() }
     }
 
-    fun advanceWithPointCuts(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {
+    fun advanceWithPointCuts(source: SourceProofContext, cancellation: Cancellation,
+        retainBasePoint: Boolean = false): LinearAuthorityResult {
         val policy = pointPolicy ?: LinearAuthorityPointCuts(budget, onCut = cutLifecycle::observe)
             .also { pointPolicy = it }
         if (pointFallback === template && template?.matches(source) == true) {
@@ -277,6 +279,9 @@ internal class LinearAuthority(
                 (strongest != null && strongest !== pending.base.bound))
         }
         return result.copy(bound = strongest, primalStages = stages,
+            advisoryPoint = pending.base.relaxedPoint.takeIf {
+                retainBasePoint && completed && result.incumbent == null && result.evidence == null
+            },
             cutBoundFamilies = if (strongest != null && strongest === pending.base.bound) {
                 pending.base.cutBoundFamilies
             } else result.cutBoundFamilies)

@@ -360,7 +360,7 @@ internal class JointLinearRepair(
                 observe("jointRepairRootQueries")
             }
             val result = if (boundOrdered && params.sourceCuts && params.sourcePointCuts)
-                authority.advanceWithPointCuts(source, stop)
+                authority.advanceWithPointCuts(source, stop, retainBasePoint = true)
             else authority.advance(source, stop, cuts = boundOrdered && params.sourceCuts)
             for ((stage, count) in result.primalStages) {
                 val key = "jointRepairRoot$stage"
@@ -373,12 +373,13 @@ internal class JointLinearRepair(
                 return false
             }
             if (stop()) return false
-            rootPoint = result.relaxedPoint
-            requireNotNull(selection).guide(result.relaxedPoint)
-            stages["jointRepairGuidedIntegers"] = result.relaxedPoint.keys.count {
+            val guidance = result.advisoryPoint ?: result.relaxedPoint
+            rootPoint = guidance
+            requireNotNull(selection).guide(guidance)
+            stages["jointRepairGuidedIntegers"] = guidance.keys.count {
                 it.kind == SourceCoordinate.Kind.Integer
             }.toLong()
-            if (result.relaxedPoint.isEmpty()) observe("jointRepairRootGuidanceUnavailable")
+            if (guidance.isEmpty()) observe("jointRepairRootGuidanceUnavailable")
         }
         return true
     }
