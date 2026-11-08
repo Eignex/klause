@@ -42,6 +42,7 @@ import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
@@ -55,6 +56,7 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.cancelledWhen
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -868,6 +870,62 @@ class ResumableMinimizeTest {
             assertEquals(0L, restricted.sample.ints[0])
             assertTrue(weights.indices.sumOf { weights[it] * restricted.sample.ints[it] } <= 25L)
             assertEquals(-36L, objective.evaluateLong(restricted.sample))
+        }
+    }
+
+    @Test
+    fun `pooled witness validation should spend its slice before search or publication`() {
+        val size = 128
+        val problem = Problem(0, size, Array(size) { IntDomain(0, size - 1) },
+            arrayOf<Factor>(AllDifferent(IntArray(size) { it }, domainMin = 0, domainSize = size))).bake()
+        val objective = LinearObjective(intCoefficients = LongArray(size) { if (it == 0) 1L else 0L })
+        var cancelled = false
+        var attempts = 0
+        var firstBranchWork: Long? = null
+        lateinit var current: ResumableSearch
+        val params = BacktrackParams(
+            variableSelector = InputOrder,
+            valueSelector = IndomainMin,
+            lpPlan = LpPlan(bounding = false),
+            objectiveBoundSupplier = { 5.0 },
+            cancellation = cancelledWhen({ null }, { true }) { cancelled },
+            branchObserver = object : SearchBranchAttemptObserver {
+                override fun onAttempt(decision: SearchDecision, context: SearchContext) {
+                    attempts++
+                    firstBranchWork = current.work
+                    cancelled = true
+                }
+            },
+        )
+        current = BacktrackSolver(problem).resumable(objective, params)
+        current.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+        val grant = assertNotNull(firstBranchWork) + 1L
+        assertTrue(attempts > 0)
+
+        for (valid in listOf(true, false)) {
+            cancelled = false
+            attempts = 0
+            val values = LongArray(size) { it.toLong() }.apply {
+                this[0] = 5L
+                this[5] = 0L
+                if (!valid) this[lastIndex] = 0L
+            }
+            val hints = IncumbentExchange.minimizing<Sample>().apply {
+                offer(Sample(BooleanArray(0), values), 5.0)
+            }
+            val offered = mutableListOf<Double>()
+            current = BacktrackSolver(problem).resumable(objective, params.copy(pooledIncumbents = hints))
+            current.use { search ->
+                val result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, grant) { offered += it.objective }
+
+                assertNull(result)
+                assertTrue(offered.isEmpty())
+                assertEquals(0, attempts)
+                assertTrue(search.work >= grant)
+                val paid = search.work
+                search.runSlice(Cancellation.Never, Long.MAX_VALUE, 0L) {}
+                assertEquals(paid, search.work)
+            }
         }
     }
 
