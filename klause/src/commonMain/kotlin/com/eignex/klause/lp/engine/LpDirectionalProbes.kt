@@ -48,8 +48,13 @@ internal class LpDirectionalProbes(
     private val state: LpExactState,
     private val warm: Basis,
     private val parentObjective: Double? = null,
-    private val factory: (LpModel, Long, Long) -> RevisedSimplex,
+    private val sourceView: LpScalingView? = null,
+    private val factory: (LpModel, Long, Long, LpScalingView?) -> RevisedSimplex,
 ) {
+    init {
+        require(sourceView == null || (!sourceView.applied && sourceView.source.exactState === state))
+    }
+
     fun run(
         columns: IntArray,
         splits: LongArray,
@@ -97,21 +102,25 @@ internal class LpDirectionalProbes(
             observe(LpProbeMetrics(0L, 0L, 0, decline))
             return null
         }
-        val budget = ProbeBudget(allowance, 2 * columns.size)
+        val budget = ProbeSession(allowance, 2 * columns.size)
         try {
-            val results = ArrayList<T>(columns.size)
-            for (index in columns.indices) {
-                val down = childValue(columns[index], splits[index], true, budget, token, mapping.value)
-                    ?: return null
-                val up = childValue(columns[index], splits[index] + 1L, false, budget, token, mapping.value)
-                    ?: return null
-                results.add(mapping.pair(down, up))
+            budget.use {
+                val results = ArrayList<T>(columns.size)
+                for (index in columns.indices) {
+                    val down = childValue(columns[index], splits[index], true, budget, token, mapping.value)
+                        ?: return null
+                    budget.publish(observe)
+                    val up = childValue(columns[index], splits[index] + 1L, false, budget, token, mapping.value)
+                        ?: return null
+                    budget.publish(observe)
+                    results.add(mapping.pair(down, up))
+                }
+                if (token()) {
+                    budget.decline = LpProbeDecline.CANCELLED
+                    return null
+                }
+                return results
             }
-            if (token()) {
-                budget.decline = LpProbeDecline.CANCELLED
-                return null
-            }
-            return results
         } catch (_: LpProjectionStop) {
             budget.decline = if (token()) LpProbeDecline.CANCELLED else LpProbeDecline.ALLOWANCE
             return null
@@ -122,7 +131,7 @@ internal class LpDirectionalProbes(
             budget.decline = LpProbeDecline.CHILD
             return null
         } finally {
-            observe(budget.metrics())
+            budget.publish(observe)
         }
     }
 
@@ -130,7 +139,7 @@ internal class LpDirectionalProbes(
         column: Int,
         endpoint: Long,
         upper: Boolean,
-        budget: ProbeBudget,
+        budget: ProbeSession,
         token: Cancellation,
         value: (Double) -> Double?,
     ): Double? {
@@ -146,8 +155,14 @@ internal class LpDirectionalProbes(
             budget.prepare(projection.work)
         }
         child ?: return budget.stop(LpProbeDecline.CHILD)
-        val workspace = 16L * child.numVars + 40L * child.m + 64L
-        val scaling = LpScalingView.constructionWorkBound(child)
+        val reusable = sourceView != null
+        val existing = budget.owner
+        val matrixEntries = (child.doubleView?.colPtr ?: child.csc.colPtr)[child.n].toLong() + child.m
+        val workspace = if (existing == null) {
+            16L * child.numVars + 40L * child.m + 64L + if (reusable) 8L * matrixEntries else 0L
+        } else 0L
+        val scaling = if (reusable) LpScalingView.identityRefreshWorkBound(child)
+            else LpScalingView.constructionWorkBound(child)
         if (workspace >= budget.remaining() || scaling >= budget.remaining() - workspace) {
             budget.decline = LpProbeDecline.ALLOWANCE
             return null
@@ -156,16 +171,31 @@ internal class LpDirectionalProbes(
         budget.prepare(scaling)
         val offered = budget.remaining() / budget.remainingChildren
         if (offered <= 0L) return budget.stop(LpProbeDecline.ALLOWANCE)
-        val entries = offered / 4L
+        val entries = if (existing == null) offered / 4L else budget.entryLimit
         // Keep capacity for retiring factors after a stopped or cancelled solve.
         val solveGrant = offered - entries
-        if (solveGrant <= 0L) return budget.stop(LpProbeDecline.ALLOWANCE)
+        if (entries <= 0L || solveGrant <= 0L) return budget.stop(LpProbeDecline.ALLOWANCE)
         if (token()) return budget.stop(LpProbeDecline.CANCELLED)
-        val solver = factory(child, solveGrant, entries)
+        val solver = if (existing != null) {
+            if (!existing.adoptProbe(child, token)) {
+                return budget.stop(if (token()) LpProbeDecline.CANCELLED else LpProbeDecline.CHILD)
+            }
+            existing
+        } else {
+            val view = sourceView?.refresh(child)
+            if (reusable && view == null) return budget.stop(LpProbeDecline.CHILD)
+            factory(child, solveGrant, entries, view).also {
+                if (reusable) {
+                    budget.owner = it
+                    budget.entryLimit = entries
+                }
+            }
+        }
         var recorded = false
-        solver.use {
+        try {
             try {
-                val result = solver.solve(warm)
+                val result = if (existing == null) solver.solve(warm)
+                    else solver.resolveBounds(LpFloatAllowance(solveGrant, 0))
                 if (result == null || !result.optimal || token()) {
                     return budget.stop(when {
                         token() -> LpProbeDecline.CANCELLED
@@ -189,12 +219,19 @@ internal class LpDirectionalProbes(
             } finally {
                 if (!recorded) budget.record(solver, scaling, entries)
             }
+        } finally {
+            if (!reusable) solver.close()
         }
     }
 
-    private class ProbeBudget(private val allowance: Long, private val queries: Int) {
+    private class ProbeSession(private val allowance: Long, private val queries: Int) : AutoCloseable {
         private var preparation = 0L
         private var solving = 0L
+        private var reportedPreparation = 0L
+        private var reportedSolving = 0L
+        private var reportedCompleted = 0
+        var owner: RevisedSimplex? = null
+        var entryLimit = 0L
         var completed = 0
         var decline: LpProbeDecline? = null
         val remainingChildren: Int get() = queries - completed
@@ -220,6 +257,19 @@ internal class LpDirectionalProbes(
             return null
         }
 
-        fun metrics(): LpProbeMetrics = LpProbeMetrics(preparation, solving, completed, decline)
+        fun publish(observe: (LpProbeMetrics) -> Unit) {
+            val metrics = LpProbeMetrics(preparation - reportedPreparation, solving - reportedSolving,
+                completed - reportedCompleted, decline)
+            reportedPreparation = preparation
+            reportedSolving = solving
+            reportedCompleted = completed
+            observe(metrics)
+        }
+
+        override fun close() {
+            val held = owner
+            owner = null
+            held?.close()
+        }
     }
 }

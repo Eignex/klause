@@ -1338,14 +1338,21 @@ belongs to that read, and the complete combined analysis is funded before alloca
 
 Explicit directional probes compare the actual floating LP objective increase at
 the two adjacent integer bounds of at most two structural columns. Each child
-owns an immutable bound-state fork and a separate scratch numerical owner, warm
-started from the retained parent basis. The parent state, optimum, factors and
+owns an immutable bound-state fork relative to the parent. An identity-scaled parent
+permits one private numerical owner to adopt successive sibling states, retaining
+its private factors and sharing only the immutable matrix presentation. Its first
+solve starts from the retained parent basis. Scaled parents keep separate scratch
+owners for their children. The parent state, optimum, factors and
 metrics remain untouched. Common objective constants are excluded before gain
 subtraction; objective scaling maps every result to minimized source units.
 Both directions of every candidate require a complete optimal floating result
 and a finite nonnegative gain. Infeasibility, an unfinished query, cancellation
 or failed preparation withholds the entire comparison. These estimates train no
 history and supply no pruning or certificate authority.
+Completed-child observations report preparation, solve and completion deltas;
+the final observation retains any unfinished work and decline. Every exit releases
+the private owner. Identity refreshes prepay scalar-vector visits and copies,
+while the initial private workspace also pays for its matrix and row views.
 
 Child-value consultations instead accept the basis of a completed current
 iterate, including a bound-only result. Every child still requires a complete
