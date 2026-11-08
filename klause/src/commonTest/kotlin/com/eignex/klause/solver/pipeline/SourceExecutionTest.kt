@@ -59,7 +59,7 @@ class SourceExecutionTest {
             objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))))
         val workers = mutableListOf<String>()
         val request = SourceExecutionRequest(invocation,
-            ExecutionOptions.parse(listOf("arm=bt/lp-default", "bt=1", "ls=0")),
+            ExecutionOptions.parse(listOf("bt-arm=lp-default", "arms=1", "bt=1", "ls=0")),
             presolveConfig = PresolveConfig.NONE, cores = 1).withPortfolioLpQueryObserver { worker, _, query ->
             workers += worker
             assertNotNull(query.model.exactState)
