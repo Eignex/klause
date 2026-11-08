@@ -92,7 +92,9 @@ class SourceExecutionRequest private constructor(
     val prepareOnly: Boolean = false,
     internal val onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
 ) {
-    internal fun withPortfolioLpQueryObserver(observer: (String, Double?, LpQueryObservation) -> Unit): SourceExecutionRequest {
+    internal fun withPortfolioLpQueryObserver(
+        observer: (String, Double?, LpQueryObservation) -> Unit,
+    ): SourceExecutionRequest {
         require(invocation.request.engine == FiniteEngine.MIXED &&
             SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly) {
             "LP query observation requires mixed finite source execution"

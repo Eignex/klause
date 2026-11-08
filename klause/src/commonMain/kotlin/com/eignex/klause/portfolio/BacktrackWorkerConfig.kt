@@ -172,8 +172,9 @@ internal class BacktrackWorkerConfig(
                     { supplier().also { observedCutoff = it } }
                 })
             } else null
-        val context = onLpQuery?.let { observer -> LpSolveContext(onQuery = { observer(workerLabel, observedCutoff, it) }) }
-            ?: LpSolveContext.Production
+        val context = onLpQuery?.let { observer ->
+            LpSolveContext(onQuery = { observer(workerLabel, observedCutoff, it) })
+        } ?: LpSolveContext.Production
         val solver = BacktrackSolver(problem, context, matchedPools?.nativeProjection)
         val session = StatelessSession(solver)
         worker = PortfolioWorker.of(

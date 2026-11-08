@@ -9,6 +9,7 @@ import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.ExecutionOptions
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -66,7 +67,7 @@ internal object FinitePortfolioLpCapture {
         val stop = Cancellation.after(timeout.milliseconds)
         val original = requireNotNull(Mps.parse(bytes.decodeToString()).toLinearSourceProblem(cancellation = stop))
         require(original.variables.size <= 4096 && original.rows.size <= 4096)
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(original),
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(original, ProblemSettings()),
             ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
             maximize = original.objective?.sense == ObjectiveSense.MAXIMIZE, cancellation = stop))
         val pairs = listOf("companion-integers=true", "companion-active-ms=4000",
@@ -113,7 +114,9 @@ internal object FinitePortfolioLpCapture {
                                 val file = payload?.let {
                                     "query-$owner-${get(query, "Sequence")}.klexact".also { name ->
                                         out.resolve(name).writeBytes(it)
-                                        point?.let { value -> out.resolve("$name-point.json").writeText(value.toString()) }
+                                        point?.let { value ->
+                                            out.resolve("$name-point.json").writeText(value.toString())
+                                        }
                                         retained++
                                     }
                                 }
@@ -135,7 +138,8 @@ internal object FinitePortfolioLpCapture {
                                     put("floatOffset", get(query, "FloatOffset").toString())
                                     put("opaqueFloatAcceptance", get(query, "HasFloatAcceptance") as Boolean)
                                     put("pricing", NumericalResidualProfile.json(get(query, "Pricing")))
-                                    put("refinementLimits", NumericalResidualProfile.json(get(query, "RefinementLimits")))
+                                    put("refinementLimits",
+                                        NumericalResidualProfile.json(get(query, "RefinementLimits")))
                                     put("selected", selected)
                                     put("capture", file)
                                     put("captureSha256", payload?.let(::sha256))
@@ -185,8 +189,10 @@ internal object FinitePortfolioLpCapture {
                     put("eventsDropped", eventsDropped)
                     put("queryObserverNs", queryObserverNs)
                     put("executionNs", System.nanoTime() - executionStarted)
-                    put("executionScope", "parse, source setup, execution and retirement; excludes input fetch and final output")
-                    put("queryObserverCostScope", "subset of containing execution; other observation costs are also inside execution")
+                    put("executionScope", "parse, source setup, execution and retirement; " +
+                        "excludes input fetch and final output")
+                    put("queryObserverCostScope", "subset of containing execution; " +
+                        "other observation costs are also inside execution")
                     put("sourceVerdictClaim", false)
                     put("fullWarmReplayQualified", false)
                     put("cancelled", stop())
