@@ -143,6 +143,7 @@ internal interface BasisSolver : AutoCloseable {
     val kernel: BasisKernel? get() = null
     val basisWork: BasisWork? get() = null
     val basisOperationWork: BasisOperationWork? get() = null
+    val orderHintDimension: Int? get() = null
 
     fun refactorize(basicIndex: IntArray): Boolean
     fun ftran(x: IndexedVector, expectedDensity: Double = 1.0)
@@ -161,5 +162,6 @@ internal interface BasisSolver : AutoCloseable {
     }
 
     fun ordering(): BasisOrdering? = null
+    fun orderHint(): SymbolicLu? = null
     override fun close() {}
 }

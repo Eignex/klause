@@ -15,6 +15,104 @@ import kotlin.test.assertTrue
 
 class KotlinBasisSolverTest {
     @Test
+    fun `a retained hint reduces private construction work including bounded import`() {
+        val n = 24
+        val source = ftSource("dense", n)
+        val headings = IntArray(n) { it }
+        KotlinBasisSolver(source, denseDimensionLimit = 0).use { parent ->
+            assertTrue(parent.refactorize(headings))
+            val before = parent.basisOperationWork
+            val hint = assertNotNull(parent.orderHint())
+            KotlinBasisSolver(source, denseDimensionLimit = 0).use { cold ->
+                KotlinBasisSolver(source, denseDimensionLimit = 0, initialOrder = hint).use { seeded ->
+                    assertTrue(cold.refactorize(headings))
+                    assertTrue(seeded.refactorize(headings))
+                    val coldBuild = assertNotNull(cold.basisWork.build)
+                    val privateBuild = assertNotNull(seeded.basisWork.build)
+                    val copiedPreparation = 24L * n + 64L
+
+                    assertEquals(1L, privateBuild.reusedOrders)
+                    assertTrue(privateBuild.units + copiedPreparation < coldBuild.units,
+                        "private=$privateBuild capture=$copiedPreparation cold=$coldBuild")
+                    for (transpose in listOf(false, true)) {
+                        val rhs = DoubleArray(n) { it + 1.0 }
+                        val expected = IndexedVector(n).also { it.scatter(rhs) }
+                        val actual = IndexedVector(n).also { it.scatter(rhs) }
+                        if (transpose) { cold.btran(expected); seeded.btran(actual) } else {
+                            cold.ftran(expected); seeded.ftran(actual)
+                        }
+                        for (i in 0 until n) assertEquals(expected[i], actual[i], 1e-10)
+                    }
+                    assertEquals(before, parent.basisOperationWork)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `private order imports survive hint mutation and parent close`() {
+        val source = ftSource("sparse", 8)
+        val headings = IntArray(8) { it }
+        val parent = KotlinBasisSolver(source)
+        assertTrue(parent.refactorize(headings))
+        val hint = assertNotNull(parent.orderHint())
+        KotlinBasisSolver(source, initialOrder = hint).use { seeded ->
+            hint.rowOrder.fill(-1)
+            hint.columnOrder.fill(-1)
+            assertNotNull(parent.orderHint())
+            parent.close()
+
+            assertTrue(seeded.refactorize(headings))
+
+            assertEquals(1L, assertNotNull(seeded.basisWork.build).reusedOrders)
+            val rhs = DoubleArray(8) { it + 1.0 }
+            val solved = IndexedVector(8).also { it.scatter(rhs) }
+            seeded.ftran(solved)
+            assertTrue(ftResidual(source, headings, rhs, solved, transpose = false) <= 1e-10)
+        }
+    }
+
+    @Test
+    fun `updated bases offer hints without exporting exact order authority`() {
+        val source = ftSource("dense", 3)
+        KotlinBasisSolver(source).use { parent ->
+            assertTrue(parent.refactorize(intArrayOf(0, 1, 2)))
+            val spike = IndexedVector(3).also { it.scatterColumn(source, 4) }
+            parent.ftran(spike)
+            assertEquals(BasisUpdate.APPLIED, parent.update(1, 4, spike))
+
+            assertNotNull(parent.orderHint())
+            assertEquals(3, parent.orderHintDimension)
+            assertNull(parent.ordering())
+        }
+    }
+
+    @Test
+    fun `a deficient imported hint falls back with its failed work retained`() {
+        val source = SparseMatrix.ofColumns(2, 4, listOf(
+            listOf(0 to 1.0), listOf(1 to 1.0), listOf(1 to 1.0), listOf(0 to 1.0, 1 to 1.0),
+        ))
+        val coldWork = KotlinBasisSolver(source, denseDimensionLimit = 0).use { cold ->
+            assertTrue(cold.refactorize(intArrayOf(2, 3)))
+            assertNotNull(cold.basisWork.build).units
+        }
+        KotlinBasisSolver(source, denseDimensionLimit = 0).use { parent ->
+            assertTrue(parent.refactorize(intArrayOf(0, 1)))
+            KotlinBasisSolver(source, denseDimensionLimit = 0, initialOrder = parent.orderHint()).use { seeded ->
+                assertTrue(seeded.refactorize(intArrayOf(2, 3)))
+
+                val build = assertNotNull(seeded.basisWork.build)
+                assertEquals(1L, build.fallbacks)
+                assertEquals(0L, build.reusedOrders)
+                val rhs = IndexedVector(2).also { it.scatter(doubleArrayOf(1.0, 2.0)) }
+                seeded.ftran(rhs)
+                assertContentEquals(doubleArrayOf(1.0, 1.0), rhs.toDoubleArray())
+                assertTrue(build.units > coldWork)
+            }
+        }
+    }
+
+    @Test
     fun `empty solves should retain zero support without visiting updated factors`() {
         val source = ftSource("dense", 3)
         KotlinBasisSolver(source).use { solver ->

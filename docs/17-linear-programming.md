@@ -1443,6 +1443,11 @@ owns sparse and small dense elimination, DFS reach, Forrest-Tomlin updates, logi
 repair, indexed forward/transpose solves and rational factors. Each owner has fixed
 dimension, both permutations and three-valued update results.
 
+The default backend can export and import defensive symbolic pivot-order proposals,
+including after Forrest-Tomlin updates. Each owner copies and validates the
+permutations; replay checks every numerical pivot and retains failed proposal and
+fallback work. Proposals carry no numerical factors or exact-order authority.
+
 Basis scatter checks slice windows and disjoint input buffers before traversal,
 then combines index access and checked multiply/add in one pass. Slice arrays
 carry no cached validation: initial support is copied from validated CSC, while
