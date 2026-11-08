@@ -3,20 +3,19 @@ set -euo pipefail
 
 sdk_root=${1:?SDK repository directory is required}
 sdk_version=0.1.0
+scripts=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 mkdir -p "$sdk_root"
 sdk_stage=$(mktemp -d "$sdk_root/.lab-bench.XXXXXX")
 trap 'rm -rf -- "$sdk_stage"' EXIT
 
-release=$(gh api "repos/Eignex/eignex-lab/releases/tags/lab-bench-v$sdk_version")
-for extension in module jar pom; do
-    artifact="lab-bench-$sdk_version.$extension"
-    asset_id=$(jq -er --arg name "$artifact" '
-        [.assets[] | select(.name == $name)] |
-        if length == 1 then .[0].id else error("expected one release asset") end
-    ' <<< "$release")
-    gh api -H 'Accept: application/octet-stream' \
-        "repos/Eignex/eignex-lab/releases/assets/$asset_id" > "$sdk_stage/$artifact"
-done
+while read -r extension asset; do
+    bash "$scripts/fetch-release-asset.sh" Eignex/eignex-lab "$asset" \
+        "$sdk_stage/lab-bench-$sdk_version.$extension"
+done <<'ASSETS'
+module 684339118
+jar 684339109
+pom 684339115
+ASSETS
 
 (
     cd "$sdk_stage"

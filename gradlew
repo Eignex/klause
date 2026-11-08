@@ -88,6 +88,10 @@ APP_BASE_NAME=${0##*/}
 # Discard cd standard output in case $CDPATH is set
 APP_HOME=$( cd -P "${APP_HOME:-./}" > /dev/null && printf '%s\n' "$PWD" ) || exit
 
+if [ -n "${LAB_SOURCE_COMMIT:-}" ]; then
+    exec bash "$APP_HOME/klause-bench/scripts/run-lab-gradle.sh" "$@"
+fi
+
 # Use the maximum available, or set MAX_FD != -1 to use that value.
 MAX_FD=maximum
 

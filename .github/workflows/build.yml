@@ -61,14 +61,10 @@ jobs:
       # (linuxArm64, macosArm64) are opt-in via -Ptargets.full and build on release.
 
       # Lint runs separately. Native tests have their own job because Kover instruments JVM tests.
-      - name: Stage the verified lab SDK
+      - name: Run JVM tests with coverage
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          bash klause-bench/scripts/stage-lab-sdk.sh "$RUNNER_TEMP/lab-bench-sdk"
-          printf 'ORG_GRADLE_PROJECT_labBenchRepository=file://%s\n' "$RUNNER_TEMP/lab-bench-sdk" >> "$GITHUB_ENV"
-
-      - name: Run JVM tests with coverage
+          LAB_SOURCE_COMMIT: ${{ github.sha }}
         run: ./gradlew --refresh-dependencies check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test koverXmlReport :klause-cli:installJvmDist :klause:stageLpProfileJvm
 
       - name: Start the installed JVM CLI
