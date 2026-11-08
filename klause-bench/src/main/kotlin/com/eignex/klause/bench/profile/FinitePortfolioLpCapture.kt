@@ -217,24 +217,12 @@ internal object FinitePortfolioLpCapture {
         }
     }
 
-    internal fun capture(query: Any, stop: Cancellation): ByteArray? {
+    private fun capture(query: Any, stop: Cancellation): ByteArray? {
         val model = get(query, "Model")
         if ((get(model, "M") as Int) > 4096 ||
             (get(model, "N") as Int).toLong() + (get(model, "M") as Int) > 8192) return null
-        val state = call(model, "getExactState") ?: return null
-        val settingsType = Class.forName("com.eignex.klause.lp.engine.LpReplaySettings")
-        val settings = settingsType.constructors.single { it.parameterCount == 9 }.newInstance(
-            "finite-portfolio-query", get(get(query, "Pricing"), "TieSeed"),
-            Class.forName("com.eignex.klause.lp.engine.LpReplaySolverKind").enumConstants.single {
-                it.toString() == "PERSISTENT"
-            }, get(query, "ComponentSplit"), 0, 0, get(query, "WorkLimit"), refactorLimit(), false)
-        val companion = Class.forName("com.eignex.klause.lp.engine.LpExactCapture").getField("Companion").get(null)
-        val captured = call(companion, "capture", state, settings, emptyList<Any>(), 4096) ?: return null
-        return call(captured, "encodeWithin", 65_536, 1_048_576, stop) as ByteArray?
+        return call(query, "captureExactWithin", "finite-portfolio-query", 65_536, 1_048_576, 4096, stop) as ByteArray?
     }
-
-    private fun refactorLimit(): Int = Class.forName("com.eignex.klause.lp.engine.RevisedSimplexKt")
-        .getDeclaredField("DEFAULT_REFACTOR_UPDATE_LIMIT").getInt(null)
 
     private fun writeBasis(query: Any, file: File?): String? {
         if (file == null) return null
