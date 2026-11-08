@@ -298,9 +298,14 @@ subtraction, preserving small gains when the constant exceeds floating precision
 
 The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
 `lp-directional-gains=true`, with LP bounding and branching enabled. Two recent samples
-in each direction permit a balanced gain score; otherwise reduced-cost/fractionality
+in each direction permit the geometric mean of the predicted lower and upper gains;
+both gains must be positive and finite. Otherwise reduced-cost/fractionality
 scoring and the configured selector keep their precedence. Directional scores compete
 with each other before fallback, so objective units are not mixed with reduced costs.
+The weighted minimum/maximum gain score supplies a shadow nomination on the same
+point. Fixed counters distinguish ranking disagreements and unavailable nominations;
+these proposals remain separate from committed choices. Both lookups and the comparison
+charge the existing LP overhead allowance.
 Saturated scope-wide sample counts skip history lookups while two-sided reliability
 is impossible. Passing that prerequisite still requires the variable's own recent
 samples; it grants no score or authority. History reset clears the prerequisite.

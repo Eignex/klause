@@ -30,6 +30,72 @@ import kotlin.test.assertTrue
 
 class LpHintsTest {
     @Test
+    fun `balanced and shadow nominations remain distinct from applied and withheld commitments`() {
+        val builder = LpBuilder()
+        repeat(2) { builder.addVar(0, 10, cost = 1L) }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+            booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
+        val reference = VarRef.IntVar(0)
+        val balanced = VarRef.IntVar(1)
+        val costs = ArrayList<Long>()
+        for (apply in listOf(false, true)) {
+            var work = 0L
+            val events = ArrayList<String>()
+            val hints = LpHints(2, 0, directionalGains = true, applyAdvice = apply,
+                observe = events::add, charge = { work += it })
+            for ((id, down, up) in listOf(Triple(0, 0.25, 36.0), Triple(1, 4.0, 4.0))) repeat(2) {
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+                hints.recordObjective(relaxation, 10.0)
+                hints.branch(VarRef.IntVar(id))
+                for (upper in listOf(false, true)) {
+                    hints.commit(if (upper) SearchDecision.IntAtLeast(id, 1) else SearchDecision.IntAtMost(id, 0), 1)
+                    hints.beginNode(1, 100.0)
+                    val point = doubleArrayOf(0.5, 0.5).also { it[id] = if (upper) 1.0 else 0.0 }
+                    hints.record(relaxation, point, DoubleArray(0))
+                    hints.recordObjective(relaxation, 10.0 + if (upper) up else down)
+                }
+            }
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+            hints.finishNode(trail.state)
+            val before = work
+            assertTrue(hints.directionalScore(balanced) > hints.directionalScore(reference))
+            assertTrue(hints.referenceDirectionalScore(reference) > hints.referenceDirectionalScore(balanced))
+
+            hints.compareDirectionalRankings(balanced, reference) { false }
+            val selected = assertNotNull(hints.selectVariable(balanced, reference))
+            hints.branch(selected)
+            hints.commit(SearchDecision.IntAtMost(selected.varId, 0), 1)
+
+            assertEquals(if (apply) balanced else reference, selected)
+            assertEquals(1, events.count { it == "PASSIVE_RANK_CHANGED" })
+            assertEquals(1, events.count { it == if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED"
+                else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED" })
+            costs.add(work - before)
+        }
+        assertEquals(costs.first(), costs.last())
+    }
+
+    @Test
+    fun `disabled and unready rank comparisons collect no extra work`() {
+        for (enabled in listOf(false, true)) {
+            var work = 0L
+            val events = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = enabled, observe = events::add, charge = { work += it })
+
+            val score = hints.referenceDirectionalScore(VarRef.IntVar(0))
+            hints.compareDirectionalRankings(VarRef.IntVar(0), null) { false }
+
+            assertTrue(score.isNaN())
+            assertEquals(0L, work)
+            assertTrue(events.isEmpty())
+        }
+    }
+
+    @Test
     fun `reliable passive history reaches matching applied and withheld commitments`() {
         val builder = LpBuilder()
         repeat(2) { builder.addVar(0, 10, cost = 1L) }
@@ -60,7 +126,7 @@ class LpHintsTest {
             hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
             hints.finishNode(trail.state)
-            assertEquals(1.5, hints.directionalScore(proposal), 1e-9)
+            assertEquals(kotlin.math.sqrt(3.0), hints.directionalScore(proposal), 1e-9)
             val before = work
             hints.beginPassiveSelection()
 
@@ -107,6 +173,7 @@ class LpHintsTest {
             0L, intArrayOf(0, 1), IntArray(0)), 10.0)
 
         val selected = hints.selectVariable(proposal, VarRef.IntVar(0))
+        hints.compareDirectionalRankings(proposal, VarRef.IntVar(0)) { false }
         hints.branch(VarRef.IntVar(0))
         hints.commit(SearchDecision.IntAtMost(0, 2L), 1)
 
@@ -114,6 +181,7 @@ class LpHintsTest {
         assertTrue(hints.directionalScore(proposal).isNaN())
         assertFalse("PASSIVE_VARIABLE_COMPARED" in events)
         assertFalse("PASSIVE_VARIABLE_COMMITTED" in events)
+        assertFalse("PASSIVE_RANK_COMPARED" in events)
     }
 
     @Test
@@ -149,7 +217,7 @@ class LpHintsTest {
                     assertTrue(score.isNaN())
                     assertEquals(before, work)
                 } else {
-                    assertEquals(1.5, score, 1e-9)
+                    assertEquals(kotlin.math.sqrt(3.0), score, 1e-9)
                     assertEquals(before + 1L, work)
                 }
             }
@@ -388,7 +456,7 @@ class LpHintsTest {
             hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
 
-            assertEquals(1.5, hints.directionalScore(variable), 1e-9, "constant=$constant")
+            assertEquals(kotlin.math.sqrt(3.0), hints.directionalScore(variable), 1e-9, "constant=$constant")
         }
     }
 }

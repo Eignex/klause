@@ -7,6 +7,7 @@ import com.eignex.klause.lp.engine.LpScopedRows
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
+import com.eignex.klause.util.Cancellation
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.min
@@ -128,8 +129,36 @@ internal class LpHints(
         observe("PASSIVE_VARIABLE_SCORE")
         val point = value(variable)
         if (variable is VarRef.Bool && point !in 0.0..1.0) return Double.NaN
-        return history.score(variable, point).also {
+        return history.balancedScore(variable, point).also {
             if (it.isFinite()) observe("PASSIVE_VARIABLE_RELIABLE")
+        }
+    }
+
+    fun referenceDirectionalScore(variable: VarRef): Double {
+        if (!collect || !objectiveRecorded || !history.hasTwoSidedSamples || !passivePointCurrent()) return Double.NaN
+        charge(1L)
+        observe("PASSIVE_RANK_REFERENCE_SCORE")
+        val point = value(variable)
+        if (variable is VarRef.Bool && point !in 0.0..1.0) return Double.NaN
+        return history.score(variable, point)
+    }
+
+    fun compareDirectionalRankings(balanced: VarRef?, reference: VarRef?, cancelled: Cancellation) {
+        if (!collect || !history.hasTwoSidedSamples) return
+        charge(4L)
+        observe("PASSIVE_RANK_CHECK")
+        if (cancelled() || !passivePointCurrent()) {
+            observe("PASSIVE_RANK_STALE")
+            return
+        }
+        when {
+            balanced == null && reference == null -> observe("PASSIVE_RANK_BOTH_MISSING")
+            balanced == null -> observe("PASSIVE_RANK_BALANCED_MISSING")
+            reference == null -> observe("PASSIVE_RANK_REFERENCE_MISSING")
+            else -> {
+                observe("PASSIVE_RANK_COMPARED")
+                observe(if (balanced == reference) "PASSIVE_RANK_AGREED" else "PASSIVE_RANK_CHANGED")
+            }
         }
     }
 
@@ -152,7 +181,7 @@ internal class LpHints(
             observe("PASSIVE_VARIABLE_NO_BASELINE")
             val usable = proposal != null && !cancelled() && passivePointCurrent() &&
                 (proposal !is VarRef.Bool || value(proposal) in 0.0..1.0) &&
-                history.hasTwoSidedSamples && history.score(proposal, value(proposal)).isFinite()
+                history.hasTwoSidedSamples && history.balancedScore(proposal, value(proposal)).isFinite()
             selected(proposal.takeIf { applyAdvice && usable })
             return directionalChoice ?: baseline
         }
@@ -164,7 +193,7 @@ internal class LpHints(
         val selected = choice.select(LpPassiveVariableChoice.Candidate(proposal, value(proposal)),
             LpPassiveVariableChoice.Candidate(baseline, value(baseline)), stamp,
             fresh = current,
-            reliable = { history.hasTwoSidedSamples && history.score(proposal, value(proposal)).isFinite() })
+            reliable = { history.hasTwoSidedSamples && history.balancedScore(proposal, value(proposal)).isFinite() })
         if (choice.nominatedVariable != null && !current()) {
             choice.clear()
             directionalChoice = null

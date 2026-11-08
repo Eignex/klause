@@ -22,12 +22,19 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
     var bestScore = LP_BRANCH_MIN_SCORE
     var directional: VarRef? = null
     var gainScore = LP_BRANCH_MIN_SCORE
+    var reference: VarRef? = null
+    var referenceScore = LP_BRANCH_MIN_SCORE
     for (b in 0 until problem.numBoolVars) {
         if (session.boolValue(b) != null) continue
         val gain = hints.directionalScore(VarRef.Bool(b))
         if (gain > gainScore) {
             gainScore = gain
             directional = VarRef.Bool(b)
+        }
+        val shadow = hints.referenceDirectionalScore(VarRef.Bool(b))
+        if (shadow > referenceScore) {
+            referenceScore = shadow
+            reference = VarRef.Bool(b)
         }
         val s = hints.branchScore(VarRef.Bool(b))
         if (!s.isNaN() && s > bestScore) {
@@ -42,12 +49,18 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
             gainScore = gain
             directional = VarRef.IntVar(i)
         }
+        val shadow = hints.referenceDirectionalScore(VarRef.IntVar(i))
+        if (shadow > referenceScore) {
+            referenceScore = shadow
+            reference = VarRef.IntVar(i)
+        }
         val s = hints.branchScore(VarRef.IntVar(i))
         if (!s.isNaN() && s > bestScore) {
             bestScore = s
             best = VarRef.IntVar(i)
         }
     }
+    hints.compareDirectionalRankings(directional, reference, params.cancellation)
     if (directional != null) return hints.selectVariable(directional, best, cancelled = { params.cancellation() })
     hints.selected(null)
     return best

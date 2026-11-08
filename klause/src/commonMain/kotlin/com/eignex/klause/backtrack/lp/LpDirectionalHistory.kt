@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack.lp
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import kotlin.math.floor
+import kotlin.math.sqrt
 
 internal class LpDirectionalHistory(
     private val observe: (String) -> Unit,
@@ -114,7 +115,11 @@ internal class LpDirectionalHistory(
         pending = null
     }
 
-    fun score(variable: VarRef, value: Double): Double {
+    fun score(variable: VarRef, value: Double): Double = score(variable, value, balanced = false)
+
+    fun balancedScore(variable: VarRef, value: Double): Double = score(variable, value, balanced = true)
+
+    private fun score(variable: VarRef, value: Double, balanced: Boolean): Double {
         if (!value.isFinite()) return Double.NaN
         val history = gains[variable] ?: return Double.NaN
         expire(history.down)
@@ -124,7 +129,7 @@ internal class LpDirectionalHistory(
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return Double.NaN
         val down = history.down.mean * fraction
         val up = history.up.mean * (1.0 - fraction)
-        val score = minOf(down, up) + maxOf(down, up) / 6.0
+        val score = if (balanced) sqrt(down) * sqrt(up) else minOf(down, up) + maxOf(down, up) / 6.0
         return score.takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN
     }
 
