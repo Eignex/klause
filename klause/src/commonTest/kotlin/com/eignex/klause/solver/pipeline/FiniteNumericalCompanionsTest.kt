@@ -24,14 +24,48 @@ import com.eignex.klause.solver.withRealDifferenceSystem
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
 class FiniteNumericalCompanionsTest {
+    @Test
+    fun `a paused numerical companion should retain its global bound after retirement`() {
+        val model = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+        val params = TheoryParams(sourceCuts = false)
+        val cost = finiteNumericalCompanionEligibility(model, PortfolioScenario.sequential(Kind.COP),
+            objective, params).requirements.construction
+        val companions = assertNotNull(FiniteNumericalCompanions.prepare(model, objective, params,
+            Cancellation.Never, cost).companions)
+
+        PortfolioInvocationResources(2, 1, 0, Cancellation.Never, null).use { resources ->
+            companions.factories(plan, 0).first().materialize(plan, resources.slots[0]).use { worker ->
+                val search = assertNotNull(worker.newResumableSearch { Double.POSITIVE_INFINITY })
+                search.use {
+                    repeat(32) {
+                        if (companions.objectiveBound == null) search.runSlice(Cancellation.Never, 1_000, 1) { }
+                    }
+                    assertFalse(search.isDone)
+                    assertNotNull(companions.objectiveBound)
+                }
+                val retained = assertNotNull(companions.objectiveBound)
+                search.close()
+                assertSame(retained, companions.objectiveBound)
+            }
+        }
+    }
+
     @Test
     fun `checked repair comparisons should use the current pool instead of the captured center`() {
         val model = Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf(

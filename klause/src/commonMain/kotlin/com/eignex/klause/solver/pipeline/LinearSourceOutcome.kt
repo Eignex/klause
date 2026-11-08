@@ -59,6 +59,8 @@ class LinearSourceOutcome internal constructor(
     val nativeClaimsUnrestricted: Boolean,
     /** Positive multiplier from original objective units to the retained working objective. */
     val objectiveScale: BigFraction,
+    /** Native nominal-source global bound; independent proof validation is separate. */
+    val nativeObjectiveBound: LinearSourceBound? = null,
 ) {
     /** Whether terminal statuses use numerical tolerance policy rather than exact source certification. */
     val numericalClaims: Boolean get() = source.semantics.effective.feasibilityTolerance?.isExact == false
@@ -380,11 +382,18 @@ internal fun executeLinearSource(
 
         else -> LinearSourceConclusion.UNKNOWN
     }
+    val bound = when (result) {
+        is SourceExecutionResult.Numerical -> prepared.qualifyBound(result.result.bound, nativeClaimsUnrestricted)
+        is SourceExecutionResult.Finite -> result.result.nativeObjectiveBound?.let {
+            prepared.qualifyBound(it.evidence, nativeClaimsUnrestricted, it)
+        }
+        else -> null
+    }
     val snapshot = LinearSourceOutcome(
         prepared.view.source, incumbent, native, conclusion,
         prepared.view.exact, prepared.view.constraintsExact, prepared.claimsCoverTolerance,
         prepared.acceptedObjectiveBound,
-        nativeClaimsUnrestricted, prepared.view.objectiveScale,
+        nativeClaimsUnrestricted, prepared.view.objectiveScale, bound,
     )
     return when (result) {
         is SourceExecutionResult.Prepared -> result

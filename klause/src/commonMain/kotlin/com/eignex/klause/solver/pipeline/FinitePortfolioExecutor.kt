@@ -222,6 +222,7 @@ internal fun FinitePipeline.portfolioExecutor(
                 "finiteCompanionPreparationUnavailable" to if (companions == null) 1L else 0L)
         }.orEmpty(),
         livePreparationStages = companionAdmission?.let { it::stages },
+        objectiveBound = companions?.let { { it.objectiveBound } },
     ) { workers ->
         if (companions != null && numericalCompanions?.sourceIncumbentCompletion == true) {
             for (worker in workers) if (worker.controlsObjectiveCutoff) worker.canonicalIncumbentIsCutoff = true

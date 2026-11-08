@@ -236,6 +236,7 @@ class FiniteSolveResult(
     internal val nativeSourceResult: SolveResult? get() = retainedSourceResult
     private var retainedSourceMinimum: MinimizeResult? = null
     internal val nativeSourceMinimum: MinimizeResult? get() = retainedSourceMinimum
+    internal var nativeObjectiveBound: FiniteObjectiveBound? = null
 
     internal constructor(
         preparation: FinitePipelinePreparation,
@@ -439,6 +440,7 @@ private sealed class FiniteExecutionResult {
         val nativeSourceMinimum: MinimizeResult? = null,
     ) : FiniteExecutionResult() {
         var completeSearchAdmitted: Boolean? = null
+        var nativeObjectiveBound: FiniteObjectiveBound? = null
     }
 
     /** The route was inspected instead of executed. */
@@ -521,10 +523,14 @@ internal fun FinitePipeline.solve(
         nativeSourceResult: SolveResult? = null,
         nativeSourceMinimum: MinimizeResult? = null,
         completeSearchAdmitted: Boolean? = null,
+        nativeObjectiveBound: FiniteObjectiveBound? = null,
     ): FiniteSolveResult =
         (gridPublication?.result(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum)
             ?: FiniteSolveResult(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum))
-            .also { it.bindCompleteSearchAdmission(completeSearchAdmitted) }
+            .also {
+                it.bindCompleteSearchAdmission(completeSearchAdmitted)
+                if (gridPublication == null) it.nativeObjectiveBound = nativeObjectiveBound
+            }
     if (request.shape.sourceInvocation != null && stop()) {
         return result(
             FinitePipelinePreparation(request.shape.problem, request.shape.linearObjective, { it }, null),
@@ -690,6 +696,7 @@ internal fun FinitePipeline.solve(
         (execution as? FiniteExecutionResult.Completed)?.nativeSourceResult,
         (execution as? FiniteExecutionResult.Completed)?.nativeSourceMinimum,
         (execution as? FiniteExecutionResult.Completed)?.completeSearchAdmitted,
+        (execution as? FiniteExecutionResult.Completed)?.nativeObjectiveBound,
     )
 }
 
@@ -1276,6 +1283,7 @@ private fun executePortfolio(
         } else {
             executePortfolioSatisfy(it.solve(request.cancellation), !request.engine.pureLocalSearch, callbacks, start)
         }
+        completed.nativeObjectiveBound = finiteObjectiveBound(it.nativeObjectiveBound, request.sourceMapping)
         return completed.withCompleteSearch(it.completeSearchAdmitted)
     }
 }

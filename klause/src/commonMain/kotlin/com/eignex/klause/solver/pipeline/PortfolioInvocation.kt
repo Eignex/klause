@@ -18,6 +18,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
@@ -82,6 +83,7 @@ internal class PortfolioInvocation(
     private val optimizationIncumbents: PortfolioIncumbents<BigFraction>? = null,
     preparationStages: Map<String, Long> = emptyMap(),
     private val livePreparationStages: (() -> Map<String, Long>)? = null,
+    private val objectiveBound: (() -> SourceEvidence?)? = null,
     policy: (List<PortfolioWorker>) -> PortfolioInvocationPolicy = { PortfolioInvocationPolicy() },
 ) : PortfolioExecutor {
     init { require(factories.isNotEmpty()) { "portfolio invocation requires admitted arm factories" } }
@@ -154,6 +156,8 @@ internal class PortfolioInvocation(
         throw failure
     }
     private var closed = false
+
+    val nativeObjectiveBound: SourceEvidence? get() = objectiveBound?.invoke()
 
     val completeSearchAdmitted: Boolean
         get() = workers.any {

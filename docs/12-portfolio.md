@@ -95,6 +95,16 @@ An explicit arm count, including the default-sized count, prevents automatic num
 companions. A missing complete affine capture declines both companions without
 removing finite workers.
 
+The numerical companion retains its checked root-global bound across pauses and
+retirement. Finite results carry this evidence separately from additive counters.
+Objective-preserving preparation maps its scalar through the captured positive
+scale and offset; an unavailable mapping withholds the bound. Linear source
+qualification restores original objective units and direction and retains
+strictness. Restricted or inexact nominal views withhold a global source bound.
+The result and ordinary output label this as a native nominal-source claim;
+tolerance coverage is separate, and publication confers no independent proof
+validation or terminal status. Reading the retained bound requests no LP work.
+
 Ordinary shared affine preparation precedes worker factories. Final invocation stage
 counters report `finiteCompanionPreparationAttempts`, `finiteCompanionPreparationNs`,
 `finiteCompanionPreparationReady` and `finiteCompanionPreparationUnavailable`,
