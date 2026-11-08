@@ -126,6 +126,7 @@ internal data class LpSolveContext(
     val sparsePointRecovery: Boolean = false,
     val startArbitraryPrecision: Boolean = false,
     val preserveOverflowCheckpoint: Boolean = true,
+    val onQuery: ((LpQueryObservation) -> Unit)? = null,
 ) {
     companion object {
         val Production = LpSolveContext()

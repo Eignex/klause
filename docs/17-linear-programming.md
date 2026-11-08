@@ -1127,6 +1127,15 @@ index premises. In every case the original source rows decide publication.
 
 ## Bound trail and warm state
 
+An optional per-context query observer runs after a solve session adopts its exact
+model and before numerical work begins. It receives a session-local owner and query
+sequence, the borrowed working model, retained status, pricing, claim, offset,
+acceptance mode and work/refinement allowances. A basis capture owns its copied
+headings and statuses. A consumer must encode a model capture before returning
+and bound its own retention and work within
+the containing allowance. Observation grants no witness, bound or proof authority;
+ordinary contexts allocate no query records.
+
 [LpBoundTrail](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpBoundTrail.kt)
 intersects assertions exactly and keeps a source premise for each accepted side.
 Batches publish witnesses only for a committed prefix; crossed bounds cite both
