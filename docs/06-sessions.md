@@ -266,8 +266,11 @@ that propagation ledger; probe and visit diagnostics add no separate price.
 Fractional marks survive slices and the preparation-to-search transition.
 Overspend debt is settled once and repaid by later slices; a nested private search
 leaves debt with its containing budget. Private LP rounding, pumps and proposal
-verification charge the same currency, including rejected proposals. Retained
-finite optimization behind an external cutoff converts remaining slice work into an
+verification charge the same currency, including rejected proposals. Optimization
+handles expose the current slice's repayment to optional continuation
+reporting through preparation and session ownership. Repayment spends the offered
+allowance against earlier work; it is not additional native work or a renewed grant.
+Finite optimization behind an external cutoff converts remaining slice work into an
 LP operation cap. Saturating arithmetic prevents large allowances from wrapping.
 
 Pending continuous CP completion charges visited numerical work at each pause,

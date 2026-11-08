@@ -45,6 +45,9 @@ internal class SliceBudget(
     // The excess is repaid from the slices that follow.
     private var nodeDebt: Long = preparation?.nodeDebt ?: 0L
 
+    var repaidWork: Long = 0L
+        private set
+
     fun inheritPreparation(preparation: SliceBudget) {
         lpWorkMark = preparation.lpWorkMark
         propagationWorkMark = preparation.propagationWorkMark
@@ -56,6 +59,7 @@ internal class SliceBudget(
      * when debt from earlier slices consumes the whole allowance, so the caller pauses without searching.
      */
     fun begin(sliceMillis: Long, sliceNodes: Long): Boolean {
+        repaidWork = 0L
         deadline = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
         workBounded = sliceNodes >= 0L
         nodeStart = nodeCount()
@@ -70,6 +74,7 @@ internal class SliceBudget(
         if (!workBounded) return true
         if (!ownsWorkDebt) return remainingNodes() > 0L
         val repaid = minOf(nodeDebt, sliceNodes)
+        repaidWork = repaid
         nodeDebt -= repaid
         nodeAllowance -= repaid
         if (remainingNodes() > 0L) return true

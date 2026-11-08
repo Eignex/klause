@@ -21,6 +21,32 @@ class PortfolioDiagnostics(
 
 /** Streamed portfolio events. Work-schedule events and physical lifecycle observations have separate sinks. */
 sealed interface PortfolioEvent {
+    /** First selected improvement segment per worker; observations confer no source authority. */
+    data class Continuation(
+        /** Stable schedule segment. */
+        val segment: Long,
+        /** Stable worker slot. */
+        val arm: Int,
+        /** Worker recipe. */
+        val worker: String,
+        /** Whether the segment reused an existing handle. */
+        val retained: Boolean,
+        /** Measured native work executed by the segment. */
+        val work: Long,
+        /** Time offered after handle opening, null for a one-shot worker. */
+        val offeredMillis: Long?,
+        /** Offered node-equivalent work, negative for an unbounded whole segment. */
+        val offeredWork: Long,
+        /** Earlier overspend repaid from this slice, null when the handle cannot report it. */
+        val repaidWork: Long?,
+        /** Remaining containing deadline at observation, or the largest long when no deadline is exposed. */
+        val remainingMillis: Long,
+        /** Handle completion flag after the segment, null without a retained-search interface. */
+        val done: Boolean?,
+        /** Return disposition; a paused observation does not establish why a frontier remains open. */
+        val outcome: String,
+    ) : PortfolioEvent
+
     /** Physical lifecycle observation; separate from deterministic finite work traces. */
     data class Lifecycle(
         /** Stable slot. */
