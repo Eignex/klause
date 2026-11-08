@@ -166,12 +166,12 @@ class LocalSearchEngineCompletionTest {
             LocalSearchParams(maxInstructions = 5,
                 initialAssignment = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(0.0))),
         ).use { handle ->
-            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L))
+            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L) {})
             assertFalse(handle.isDone)
             expired = false
 
             val best = assertIs<MinimizeResult.BestFound>(
-                handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+                handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
 
             assertEquals(listOf(2L, 2L), attempted)
             assertEquals(2L, best.sample.intValue(0))
