@@ -1280,6 +1280,7 @@ source and mixed portfolio with `suite`, `problem`, `sha256`, `seed` and
 `cutoff-bits` selects the last observed native external cutoff, and
 `capture-worker=bt/lp-default|any` selects queries. It retains 128 query metadata
 records and 1,024 progress events, reporting omissions and declined captures.
+A source that does not finish preparation with a finite route records a decline.
 Exact LP payloads, optional owned basis snapshots and latest checked source points
 have separate identities. They do not establish warm replay, original-source proof
 authority, CLI equivalence or production performance; capture spends the same

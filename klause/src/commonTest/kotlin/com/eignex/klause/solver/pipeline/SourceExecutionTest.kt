@@ -48,6 +48,32 @@ import kotlin.time.Duration
 
 class SourceExecutionTest {
     @Test
+    fun `mixed source query observation should retain the selected LP worker binding`() {
+        val source = Problem(0, 3, Array(3) { IntDomain(0, 2) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 3),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 3),
+        ))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
+            objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))))
+        val workers = mutableListOf<String>()
+        val request = SourceExecutionRequest(invocation,
+            ExecutionOptions.parse(listOf("arm=bt/lp-default", "bt=1", "ls=0")),
+            presolveConfig = PresolveConfig.NONE, cores = 1).withPortfolioLpQueryObserver { worker, _, query ->
+            workers += worker
+            assertNotNull(query.model.exactState)
+            assertTrue(query.model.m > 0)
+        }
+
+        val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(request))
+
+        assertEquals(FiniteSolveVerdict.OPTIMAL, assertIs<FiniteSolveOutcome.Completed>(result.result.outcome).verdict)
+        assertTrue(workers.isNotEmpty())
+        assertTrue(workers.all { it == "bt/lp-default" })
+    }
+
+    @Test
     fun `polynomial source encoder rebuilding should retain its containing work`() {
         val source = Problem(2, 0, emptyArray(), arrayOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
