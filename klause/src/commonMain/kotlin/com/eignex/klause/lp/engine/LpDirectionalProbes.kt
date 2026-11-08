@@ -220,6 +220,7 @@ internal class LpDirectionalProbes(
                 }
             }
         }
+        solver.boundProbeWork(solveGrant)
         var recorded = false
         try {
             try {

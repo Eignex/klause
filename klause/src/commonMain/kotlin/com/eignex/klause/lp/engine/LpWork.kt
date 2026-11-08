@@ -12,6 +12,8 @@ package com.eignex.klause.lp.engine
  * and, unlike time, exactly reproducible.
  */
 internal class LpWork {
+    private var limit = 0L
+
     /** Operations charged since the last [reset]. */
     var ops: Long = 0L
         private set
@@ -22,11 +24,14 @@ internal class LpWork {
 
     fun add(n: Long) {
         require(n >= 0)
+        if (limit > 0L && n > limit - ops) throw LpWorkExhausted()
         ops = if (n > Long.MAX_VALUE - ops) Long.MAX_VALUE else ops + n
     }
 
-    fun reset() {
+    fun reset(limit: Long = 0L) {
+        require(limit >= 0L)
         ops = 0L
+        this.limit = limit
     }
 
     companion object {
@@ -34,3 +39,5 @@ internal class LpWork {
         const val SECONDS_PER_OP: Double = 2e-9
     }
 }
+
+internal class LpWorkExhausted : RuntimeException()

@@ -234,7 +234,16 @@ internal class RevisedSimplex(
 
     private var floatAllowance: LpFloatAllowance? = null
     private var retainFundingStop = false
-    private val effectiveWorkLimit: Long get() = floatAllowance?.work ?: workLimit
+    private var strictProbeWorkLimit = 0L
+    private val effectiveWorkLimit: Long
+        get() {
+            val configured = floatAllowance?.work ?: workLimit
+            return when {
+                strictProbeWorkLimit == 0L -> configured
+                configured <= 0L -> strictProbeWorkLimit
+                else -> minOf(configured, strictProbeWorkLimit)
+            }
+        }
     private val effectiveIterationLimit: Int get() = floatAllowance?.iterations ?: iterationLimit
     private val m = model.m
     private val n = model.n
@@ -678,6 +687,8 @@ internal class RevisedSimplex(
             }
             if (!basisLifecycle.factorized) {
                 observations.singularRefactorizations++
+                // Repair reports completed operations; a strict private query cannot fund an unknown overrun.
+                if (strictProbeWorkLimit > 0L) throw LpWorkExhausted()
                 val remaining = effectiveWorkLimit.takeIf { it > 0 }?.let { maxOf(0, it - work.ops) }
                 val control = BasisRepairControl(cancellation, remaining)
                 val recovery = try {
@@ -1463,6 +1474,12 @@ internal class RevisedSimplex(
                 infeasibleRay = null
             }
         }
+    } catch (_: LpWorkExhausted) {
+        // Admission can stop between a new heading and its factor update; retire all partial numerical state.
+        val cancelled = cancellation()
+        close()
+        observations.termination = if (cancelled) LpFloatTermination.CANCELLED else LpFloatTermination.WORK
+        null
     } catch (primary: LpScalingArithmeticException) {
         if (repairCallbackFailure === primary) rethrowRepairCallback(primary)
         if (allowUnscaledFallback && numerical.applied && resourcesRemain(progress)) {
@@ -1534,7 +1551,7 @@ internal class RevisedSimplex(
         infeasibleRay = null
         observations.reset(warmAttempted)
         chargeWork()
-        work.reset()
+        work.reset(if (strictProbeWorkLimit > 0L) effectiveWorkLimit else 0L)
         chargedOps = 0L
         observations.lastPreparationOps = pendingNumericalWork.ops
         pendingNumericalWork.reset()
@@ -1925,17 +1942,15 @@ internal class RevisedSimplex(
      */
     private fun formPivotRow(epoch: Int): Int = profiled(SimplexProfilePhase.PRICING) {
         var touchedCount = 0
-        var pivotRowOps = 0L
         pivotEtaVec.forEachStored { i, rhoI ->
             val cols = rowCols[i]
             val vals = rowVals[i]
-            pivotRowOps += cols.size
+            work.add(cols.size)
             touchedCount = SparseSlices.scatterAxpy(
                 rhoI, cols, 0, vals, 0, cols.size,
                 pivotRowEntries, columnEpochs, epoch, touchedColumns, 0, touchedCount,
             )
         }
-        work.add(pivotRowOps)
         return@profiled touchedCount
     }
 
@@ -2015,15 +2030,15 @@ internal class RevisedSimplex(
 
     /** `b − Σ_{j nonbasic at upper} A_j·u_j` into [out], the right-hand side the basic values solve. */
     private fun adjustedRhs(out: DoubleArray) {
+        work.add(m)
         for (i in 0 until m) out[i] = numerical.rhsD(i)
         for (j in 0 until numVars) {
             if (status[j] == VarStatus.BASIC) continue
             val u = currentSeat(status[j], j)
             if (u == 0.0) continue
-            sparseAxpy(out, -u, j)
             work.add(2 * (colPtr[j + 1] - colPtr[j]))
+            sparseAxpy(out, -u, j)
         }
-        work.add(m)
     }
 
     private fun seat(source: LpScalingView, side: VarStatus, column: Int): Double = when (side) {
@@ -2365,6 +2380,7 @@ internal class RevisedSimplex(
             return false
         }
         if ((0 until m).any { previous.exactRhs(it) != model.exactRhs(it) }) return false
+        work.add(numVars)
         values.copyInto(out)
         val rhs = basicRhs
         rhs.fill(0.0)
@@ -2374,15 +2390,14 @@ internal class RevisedSimplex(
             val delta = seat(numerical, status[j], j) - seat(previousNumerical, seats[j], j)
             if (delta == 0.0) continue
             changed = true
-            sparseAxpy(rhs, -delta, j)
             work.add(2 * (colPtr[j + 1] - colPtr[j]))
+            sparseAxpy(rhs, -delta, j)
         }
-        work.add(numVars)
         if (changed) {
             val change = boundChange
             ftranDense(rhs, change, rhsVec, boundUpdateFtran = true)
-            koblas.axpy(out, 0, 1.0, change, 0, m)
             work.add(m)
+            koblas.axpy(out, 0, 1.0, change, 0, m)
         }
         return out.all { it.isFinite() }
     }
@@ -2913,6 +2928,12 @@ internal class RevisedSimplex(
         }.run(columns, splits, allowance - scan, token, observe)
     }
 
+    internal fun boundProbeWork(allowance: Long) {
+        require(allowance > 0L)
+        check(activeSolve == null) { "LP solve is suspended" }
+        strictProbeWorkLimit = allowance
+    }
+
     override fun directionalValues(
         source: LpProbeSource,
         columns: IntArray,
@@ -3392,8 +3413,8 @@ internal class RevisedSimplex(
         }
         if (leaving >= 0) {
             if (!enteringValue.isFinite()) throw BasisArithmeticException("nonfinite entering value")
-            beta[leaving] = enteringValue
             work.add(1)
+            beta[leaving] = enteringValue
         }
         progressTrace?.let { it.primalValueUpdates++ }
     }

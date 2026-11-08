@@ -1375,6 +1375,10 @@ Projection, bound-state construction, numerical scaling, workspace setup,
 objective scans and native retirement share one positive caller work allowance
 with the floating solves. Each next child receives a share of the remaining
 work; an exhausted grant is never passed as the floating API's unbounded zero.
+Private numerical owners admit each charged kernel before execution within that
+positive grant. An unfunded kernel retires partial numerical state and withholds
+the comparison while retaining the funded prefix's charge. Basis repair whose
+cost cannot be reserved declines in these owners.
 Construction reserves its scaling bound before allocation and retains actual
 preparation work when the query completes. Scratch factors use bounded entry
 and construction work limits, and every scratch owner closes on all exits.
