@@ -44,6 +44,8 @@ internal class LpScopedSolver(
     private val pricing: LpPricingOptions = LpPricingOptions(),
     private val componentSplit: Boolean = false,
 ) : AutoCloseable {
+    private val queryOwner = context.onQuery?.let { Any() }
+    private var querySequence = 0L
     private val continuationCache = LpExactContinuationCache()
     private val checkedResults = LpCounterResults()
     internal val refinementCache = LpRefinementCache()
@@ -400,6 +402,7 @@ internal class LpScopedSolver(
         lastResult = null
         lastMetrics = LpSolveMetrics()
         lastFloatTermination = null
+        val previous = solver
         if (!prepare(token)) return null
         val current = requireNotNull(solver)
         var failure: Throwable? = null
@@ -411,6 +414,7 @@ internal class LpScopedSolver(
                 val queryAllowance = allowance ?: if (current is ComponentLpSolver) {
                     LpFloatAllowance(workLimit, iterationLimit)
                 } else null
+                observeFloatQuery(current, current === previous, queryAllowance, token, LpQueryRoute.SCOPED_FLOAT)
                 (if (warm == null) current.resolveBounds(
                     queryAllowance,
                 ) else current.solve(warm)).also {
@@ -453,6 +457,7 @@ internal class LpScopedSolver(
             if (workLimit > 0L) workLimit = maxOf(workLimit, allowance.work)
             if (iterationLimit > 0) iterationLimit = maxOf(iterationLimit, allowance.iterations)
         }
+        val previous = solver
         if (!prepare(token)) {
             discardFloatProgress()
             return null
@@ -475,6 +480,8 @@ internal class LpScopedSolver(
                 closeOwner(current)
                 return null
             }
+            observeFloatQuery(current, current === previous, allowance, token,
+                LpQueryRoute.SCOPED_CONTINUATION, quantum, retainFundingStop)
             pending = PendingFloat(current.openSolve(allowance, retainFundingStop), allowance)
             pendingFloat = pending
         }
@@ -504,6 +511,29 @@ internal class LpScopedSolver(
                 if (cleanup !== primary) primary.addSuppressed(cleanup)
             }
             throw primary
+        }
+    }
+
+    private fun observeFloatQuery(
+        current: RetainedLpSolver,
+        retained: Boolean,
+        allowance: LpFloatAllowance?,
+        token: Cancellation,
+        route: LpQueryRoute,
+        quantum: Long? = null,
+        retainFundingStop: Boolean = false,
+    ) {
+        val observer = context.onQuery ?: return
+        val model = state.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return
+        check(querySequence < Long.MAX_VALUE) { "LP query sequence exhausted" }
+        val query = LpQueryObservation(checkNotNull(queryOwner), ++querySequence, model, retained,
+            allowance?.work ?: workLimit, null, 0.0, false, null, pricing, componentSplit,
+            route, allowance != null, allowance?.iterations ?: iterationLimit, quantum, retainFundingStop,
+            refactorUpdateLimit, trackDegeneracy) { current.continuationBasis(model) }
+        try {
+            observer(query)
+        } finally {
+            query.release()
         }
     }
 

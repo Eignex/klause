@@ -43,6 +43,11 @@ Concurrent planners atomically publish complete listing skeletons and reuse the 
 single-model corpus inputs and their packed hashes. It verifies each lab-fetched
 input and records its decoded SHA-256 and byte count without parsing or solving it.
 
+`FinitePortfolioLpCapture` records bounded queries from an ordinary finite portfolio.
+Its `capture-route=SESSION|SCOPED_FLOAT|SCOPED_CONTINUATION|any` filter selects the
+query boundary to retain; `capture-worker=bt/lp-default|any` selects its worker.
+The containing timeout includes setup, observation and retirement.
+
 `MpsProofFrontier selection=true` exports a captured template's actual
 `generationScope` separately from the query's current verification scope.
 Missing generation provenance stays unavailable.

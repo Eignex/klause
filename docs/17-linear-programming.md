@@ -1127,10 +1127,14 @@ index premises. In every case the original source rows decide publication.
 
 ## Bound trail and warm state
 
-An optional per-context query observer runs after a solve session adopts its exact
-model and before numerical work begins. It receives a session-local owner and query
-sequence, the borrowed working model, retained status, pricing, claim, offset,
-acceptance mode and work/refinement allowances. A basis capture owns its copied
+An optional per-context query observer runs after a solve session or scoped floating
+query adopts its exact model and before numerical work begins. It receives an owner identity,
+query sequence, the borrowed working model, retained status, pricing, claim, offset,
+acceptance mode and work/refinement allowances. Scoped floating queries have no
+certified claim or refinement request. Their route, initial continuation quantum,
+funding-stop retention and numerical limits remain distinct from session requests;
+an absent explicit allowance leaves the numerical owner's configured budget in force.
+Resuming a pending cursor does not open another observed query. A basis capture owns its copied
 headings and statuses. The live observation can encode an owned exact payload with
 its pricing seed, component mode and work limit under value, byte, row and
 cancellation bounds. Release invalidates this encoder with the borrowed model.
