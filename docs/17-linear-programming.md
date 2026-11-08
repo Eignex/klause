@@ -1361,15 +1361,45 @@ subtraction; objective scaling maps every result to minimized source units.
 Both directions of every candidate require a complete optimal floating result
 and a finite nonnegative gain. Infeasibility, an unfinished query, cancellation
 or failed preparation withholds the entire comparison. These estimates train no
-history and supply no pruning or certificate authority. Scoped owners recheck state,
-ownership and cancellation after observations before returning a comparison.
+history and supply no pruning or certificate authority.
 Completed-child observations report preparation, solve and completion deltas;
 the final observation retains any unfinished work and decline. Every exit releases
-the private owner. Refreshes prepay scalar-vector visits and copies, while the
-initial private workspace pays for the backend's separate source snapshots.
-The immutable matrix views retain no mutable parent factors or solve vectors.
+the private owner. Refreshes prepay scalar-vector visits and copies. Cold backends
+capture separate source snapshots; a compatible factor copy retains the producer's
+privately captured immutable coefficients, with a fresh factor-builder workspace.
+Parent retirement or another build cannot alter those coefficients. The initial
+private workspace omits only the eliminated coefficient-copy visits; pointer and
+scratch reservations remain conservative. Published numerical factor coefficients
+can be retained; mutable Forrest–Tomlin adjacency, solve vectors and meters stay private.
+The immutable matrix views retain no mutable parent state or solve vectors.
 Each sibling refresh forks the immutable parent scalar vectors, so tracked bound
 changes fund only their visits and the vectors they can copy.
+The default basis backend can offer a defensive symbolic pivot-order hint for
+the first private build, including after basis updates. A compatible current basis
+instead offers a private numerical owner retaining immutable base LU matrices,
+permutations and published Forrest–Tomlin coefficient slices. Adjacency containers,
+orders, transform lists, row arithmetic status, solve scratch and meters are fresh.
+Updates replace published slices rather than mutate their buffers; refactoring or
+retiring one owner preserves every other owner's factors.
+The copy retains update counts and fill/stability limits. Its immutable numerical
+matrix identity and normalized structural/unit-row headings must match; stale,
+singular, repairing, closed or cancelled producers supply no copy. Generation
+checks withhold a copy if the producer changes during capture. The private owner
+imports it once instead of rebuilding; later repairs and refactorizations retain
+their ordinary bounds. Private structural-copy work is prepaid in addition to source/workspace
+construction, and its entries reserve retirement capacity within the same
+remaining query allowance and global factor cap. This reservation trades away
+numerical solve work and grants no extra containing work.
+A matching parent optimum can also supply privately copied basic values and
+nonbasic statuses when their funded capture costs less than the setup it replaces.
+State, numerical scale and ordered basis bindings are rechecked after capture.
+The private solve restores bound deltas through the same retained-value path as
+later siblings, and incompatible or unavailable values keep ordinary numerical
+setup. This snapshot supplies no optimality, feasibility or certificate authority.
+Without a compatible copy, capturing, importing and validating a symbolic proposal
+is prepaid before allocation. Replay validates each pivot and retains declined
+proposal and fallback costs. This hint carries no factor state or exact-order
+authority; exact ordering offers retain their own freshness checks.
 
 Child-value consultations instead accept the basis of a completed current
 iterate, including a bound-only result. Every child still requires a complete
@@ -1382,8 +1412,10 @@ Busy owners, changed states and incomplete children withhold the whole compariso
 
 Projection, bound-state construction, numerical scaling, workspace setup,
 objective scans and native retirement share one positive caller work allowance
-with the floating solves. Each next child receives a share of the remaining
-work; an exhausted grant is never passed as the floating API's unbounded zero.
+with the floating solves. Each next child uses the remaining positive
+work after its preparation and retirement reservation; the first numerical solve
+can spend more than later retained solves. An exhausted grant is never passed as
+the floating API's unbounded zero.
 Private numerical owners admit each charged kernel before execution within that
 positive grant. An unfunded kernel retires partial numerical state and withholds
 the comparison while retaining the funded prefix's charge. Basis repair whose
@@ -1396,8 +1428,14 @@ Decline diagnostics distinguish exhausted work, cancellation, unavailable owners
 unfinished solves, stale points, missing optima and invalid splits. A declined
 comparison retains its completed-child count without supplying partial advice.
 Preparation preflights retain workspace and scalar requirements, remaining work,
-identity or scaled reuse, and the refusing preparation stage. These fixed observations
+factor-copy work and entries, saved source-copy work, identity or scaled reuse,
+and the refusing preparation stage. These fixed observations
 grant no work and construct no numerical owner. The caller owns probe admission and cadence.
+Numerical observations retain each positive solve grant, entry limit, termination,
+pivots, imported factor entries and factor-build costs. Basis-build work is a diagnostic within the solve,
+not an additional charge to add to the query ledger.
+Replay and fallback observations describe the last build operation of each
+numerical invocation; they do not count unreported earlier builds.
 
 A retained numerical owner can expose a private solve cursor. It suspends between
 iterations, retaining the current phase, factors, artificial seats, pricing state

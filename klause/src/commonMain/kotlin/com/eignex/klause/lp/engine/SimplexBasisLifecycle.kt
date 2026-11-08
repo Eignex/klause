@@ -4,6 +4,7 @@ import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.basis.LuPivotPolicy
+import com.eignex.klause.simplex.basis.SymbolicLu
 import com.eignex.koblas.SparseMatrix
 
 internal class SimplexBasisLifecycle(m: Int, numVars: Int) {
@@ -23,10 +24,20 @@ internal class SimplexBasisLifecycle(m: Int, numVars: Int) {
         factory: ((SparseMatrix) -> BasisSolver)?,
         entryLimit: Long,
         workLimit: Long,
+        initialOrder: SymbolicLu? = null,
         cancelled: () -> Boolean,
     ): BasisSolver = current ?: (factory?.invoke(matrix) ?: KotlinBasisSolver(
         matrix, policy = LuPivotPolicy(maxEntries = entryLimit, maxWork = workLimit, cancelled = cancelled),
+        initialOrder = initialOrder,
     )).also { current = it }
+
+    fun installCopy(solver: BasisSolver, columns: IntArray, unitRows: IntArray) {
+        check(current == null)
+        current = solver
+        this.columns = columns
+        this.unitRows = unitRows
+        factorized = true
+    }
 
     fun invalidate() {
         factorized = false

@@ -16,6 +16,140 @@ import kotlin.test.assertTrue
 
 class LpDirectionalProbesTest {
     @Test
+    fun `cancellation after a seeded child withholds advice and retains work`() {
+        val n = 12
+        val diagonal = n / 2 + 2L
+        val rhs = diagonal + n - 1L
+        val builder = LpBuilder()
+        repeat(n) { builder.addVar(0, 1, cost = 2L * rhs) }
+        repeat(n) { row ->
+            builder.addRow(IntArray(n) { it }, LongArray(n) {
+                2L * if (it == row) diagonal else 1L
+            }, Relation.GE, rhs)
+        }
+        val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            .ownerWorkingModel())
+        RevisedSimplex(model).use { parent ->
+            val point = assertNotNull(parent.solve())
+            val before = parent.lastMetrics
+            var cancelled = false
+            var charged = 0L
+            var completed = 0
+            var decline: LpProbeDecline? = null
+
+            val gains = parent.directionalGains(model, intArrayOf(0), longArrayOf(0), 1_000_000L,
+                Cancellation { cancelled }) {
+                charged += it.work
+                completed += it.completed
+                decline = it.decline
+                if (it.numerical?.parentValues == true) cancelled = true
+            }
+
+            assertNull(gains)
+            assertEquals(1, completed)
+            assertEquals(LpProbeDecline.CANCELLED, decline)
+            assertTrue(charged in 1L..1_000_000L)
+            assertEquals(before, parent.lastMetrics)
+            assertEquals(point.objective, assertNotNull(parent.resolveBounds()).objective, 1e-7)
+        }
+    }
+
+    @Test
+    fun `funded parent values reduce complete query work without changing values`() {
+        for (rowScale in listOf(1L, 1_000_000L)) {
+            val n = 12
+            val diagonal = n / 2 + 2L
+            val rhs = diagonal + n - 1L
+            val builder = LpBuilder()
+            repeat(n) { builder.addVar(0, 1, cost = 2L * rhs) }
+            repeat(n) { row ->
+                builder.addRow(IntArray(n) { it }, LongArray(n) {
+                    2L * rowScale * if (it == row) diagonal else 1L
+                }, Relation.GE, rhs * rowScale)
+            }
+            val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+                .ownerWorkingModel())
+            val results = ArrayList<List<LpDirectionalValues>>()
+            val work = ArrayList<Long>()
+            val solveWork = ArrayList<Long>()
+            val parentWork = ArrayList<Long>()
+            for (reuse in listOf(false, true)) {
+                RevisedSimplex(model, reuseProbeValues = reuse).use { parent ->
+                    val point = assertNotNull(parent.solve())
+                    val before = parent.lastMetrics
+                    val objective = parent.probeObjective(Cancellation.Never)
+                    var charged = 0L
+                    var solving = 0L
+                    val numerical = ArrayList<LpProbeNumerical>()
+                    val preflights = ArrayList<LpProbePreflight>()
+
+                    val values = parent.directionalValues(LpProbeSource(model, point.basis), intArrayOf(0, 1),
+                        longArrayOf(0, 0), 1_000_000L, Cancellation.Never) {
+                        charged += it.work
+                        solving += it.solveWork
+                        it.numerical?.let(numerical::add)
+                        it.preflight?.let(preflights::add)
+                    }
+
+                    results.add(assertNotNull(values))
+                    work.add(charged)
+                    solveWork.add(solving)
+                    assertEquals(4, numerical.size)
+                    assertEquals(1, numerical.count { it.factorCopy })
+                    assertEquals(if (reuse) 1 else 0, numerical.count { it.parentValues })
+                    assertEquals(if (reuse) 1 else 0, preflights.count { it.parentValueWork > 0L })
+                    assertEquals(before, parent.lastMetrics)
+                    assertEquals(objective, parent.probeObjective(Cancellation.Never))
+                    assertEquals(point.objective, assertNotNull(parent.resolveBounds()).objective, 1e-7)
+                    parentWork.add(parent.lastMetrics.workOps)
+                }
+            }
+            for (column in results[0].indices) {
+                assertEquals(results[0][column].down, results[1][column].down, 1e-7)
+                assertEquals(results[0][column].up, results[1][column].up, 1e-7)
+            }
+            assertTrue(work[1] < work[0], "seeded=${work[1]} ordinary=${work[0]}")
+            assertTrue(solveWork[1] < solveWork[0])
+            assertEquals(parentWork[0], parentWork[1])
+        }
+    }
+
+    @Test
+    fun `funded parent values preserve negative source units and common constants`() {
+        val n = 12
+        val diagonal = n / 2 + 2L
+        val rhs = diagonal + n - 1L
+        val builder = LpBuilder()
+        repeat(n) { builder.addVar(0, 1, cost = -2L * rhs) }
+        repeat(n) { row ->
+            builder.addRow(IntArray(n) { it }, LongArray(n) {
+                2_000_000L * if (it == row) diagonal else 1L
+            }, Relation.LE, 1_000_000L * rhs)
+        }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val objective = trail.state.model.objective
+        assertTrue(trail.replaceObjective(ExactLpObjective(List(objective.size) { objective.cost(it) },
+            scale = ExactLpNumber.of(4L), externalConstant = ExactLpNumber.of(1L shl 60))))
+        val model = assertNotNull(trail.state.ownerWorkingModel())
+        val results = ArrayList<LpDirectionalValues>()
+        for (reuse in listOf(false, true)) {
+            RevisedSimplex(model, reuseProbeValues = reuse).use { parent ->
+                val point = assertNotNull(parent.solve())
+                var reused = 0
+
+                val values = parent.directionalValues(LpProbeSource(model, point.basis), intArrayOf(0), longArrayOf(0),
+                    1_000_000L, Cancellation.Never) { if (it.numerical?.parentValues == true) reused++ }
+
+                results.add(assertNotNull(values).single())
+                assertEquals(if (reuse) 1 else 0, reused)
+            }
+        }
+        assertTrue(results[1].down < 0.0 && results[1].up < 0.0)
+        assertEquals(results[0].down, results[1].down, 1e-7)
+        assertEquals(results[0].up, results[1].up, 1e-7)
+    }
+
+    @Test
     fun `strict private probes decline repair with the failed work retained`() {
         val builder = LpBuilder()
         repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
@@ -105,7 +239,10 @@ class LpDirectionalProbesTest {
                         charged += it.work
                         completed += it.completed
                         assertTrue(charged <= grant, "grant=$grant charged=$charged")
-                        if (it.solveWork > 0L) observedSolve = true
+                        it.numerical?.let { numerical ->
+                            observedSolve = true
+                            assertTrue(it.solveWork <= numerical.workAllowance)
+                        }
                     }
 
                     if (values != null) {
@@ -124,6 +261,121 @@ class LpDirectionalProbesTest {
                 assertTrue(observedCompletion)
                 assertEquals(4.5, assertNotNull(parent.resolveBounds()).objective, 1e-7)
             }
+        }
+    }
+
+    @Test
+    fun `unfunded factor copies decline before allocating a private owner`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
+        repeat(3) { builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1), Relation.GE, 1L) }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(state.ownerWorkingModel())
+        RevisedSimplex(model).use { parent ->
+            val optimum = assertNotNull(parent.solve())
+            for (entryLimit in listOf(63L, 1_000_000L)) {
+                val probes = LpDirectionalProbes(state, optimum.basis, 4.5,
+                    sourceView = LpScalingView.create(model), factorPreparation = 128L,
+                    factorEntries = if (entryLimit == 63L) 64L else 1_000_000L,
+                    factorEntryLimit = entryLimit) { _, _, _, _ -> error("unfunded owner") }
+                var preflight: LpProbePreflight? = null
+                var spent = 0L
+                var solving = 0L
+                var completed = 0
+
+                assertNull(probes.run(intArrayOf(0, 1), longArrayOf(0, 0), 10_000L, Cancellation.Never) {
+                    preflight = it.preflight ?: preflight
+                    spent += it.work
+                    solving += it.solveWork
+                    completed += it.completed
+                })
+
+                assertEquals(LpProbePreparationStop.FACTORS, assertNotNull(preflight).stop)
+                assertEquals(128L, assertNotNull(preflight).factorCopyWork)
+                assertTrue(spent in 1L until 10_000L)
+                assertEquals(0L, solving)
+                assertEquals(0, completed)
+            }
+        }
+    }
+
+    @Test
+    fun `cancellation after an imported child withholds the comparison and preserves its charge`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
+        repeat(3) { builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1), Relation.GE, 1L) }
+        val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            .ownerWorkingModel())
+        RevisedSimplex(model).use { parent ->
+            assertNotNull(parent.solve())
+            val metrics = parent.lastMetrics
+            var cancelled = false
+            var work = 0L
+            var completed = 0
+            var copies = 0
+            var decline: LpProbeDecline? = null
+
+            assertNull(parent.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
+                10_000L, Cancellation { cancelled }) {
+                work += it.work
+                completed += it.completed
+                if (it.numerical?.factorCopy == true) copies++
+                decline = it.decline
+                if (completed == 1) cancelled = true
+            })
+
+            assertEquals(1, completed)
+            assertEquals(1, copies)
+            assertEquals(LpProbeDecline.CANCELLED, decline)
+            assertTrue(work in 1L..10_000L)
+            assertEquals(metrics, parent.lastMetrics)
+            assertEquals(4.5, assertNotNull(parent.resolveBounds()).objective, 1e-7)
+        }
+    }
+
+    @Test
+    fun `a shared allowance admits a first child requiring a larger numerical grant`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
+        repeat(3) { builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1), Relation.GE, 1L) }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(state.ownerWorkingModel())
+        RevisedSimplex(model).use { parent ->
+            val point = assertNotNull(parent.solve())
+            val probes = LpDirectionalProbes(state, point.basis, 4.5,
+                sourceView = LpScalingView.create(model)) { child, grant, _, view ->
+                RevisedSimplex(child, workLimit = grant, initialScaling = view, allowUnscaledFallback = false,
+                    basisSolverFactory = { matrix ->
+                        val backend = KotlinBasisSolver(matrix)
+                        object : BasisSolver by backend {
+                            override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                                if (grant < 2_500L) throw BasisArithmeticException("insufficient numerical funding")
+                                backend.ftran(x, expectedDensity)
+                            }
+                        }
+                    })
+            }
+            var spent = 0L
+            var completed = 0
+            val numerical = ArrayList<LpProbeNumerical>()
+
+            val gains = assertNotNull(probes.run(intArrayOf(0, 1), longArrayOf(0, 0),
+                6_000L, Cancellation.Never) {
+                spent += it.work
+                completed += it.completed
+                it.numerical?.let(numerical::add)
+            })
+
+            assertEquals(1.5, gains[0].down, 1e-7)
+            assertEquals(0.5, gains[0].up, 1e-7)
+            assertEquals(2.5, gains[1].down, 1e-7)
+            assertEquals(0.5, gains[1].up, 1e-7)
+            assertEquals(4, completed)
+            assertEquals(4, numerical.size)
+            assertTrue(numerical.all { it.workAllowance > 0L && it.entryLimit > 0L })
+            assertTrue(numerical.all { it.termination == LpFloatTermination.OPTIMAL_CANDIDATE })
+            assertTrue(spent in 1L..6_000L)
+            assertEquals(4.5, assertNotNull(parent.resolveBounds()).objective, 1e-7)
         }
     }
 
@@ -148,12 +400,14 @@ class LpDirectionalProbesTest {
                 }
                 var pooledWork = 0L
                 val preflights = ArrayList<LpProbePreflight>()
+                val numerical = ArrayList<LpProbeNumerical>()
                 var decline: LpProbeDecline? = null
 
                 val result = owner.directionalValues(source, columns, longArrayOf(0, 0),
                     independentWork - 1L, Cancellation.Never) {
                         pooledWork += it.work
                         it.preflight?.let(preflights::add)
+                        it.numerical?.let(numerical::add)
                         decline = it.decline
                     }
                 val pooled = assertNotNull(result,
@@ -167,6 +421,19 @@ class LpDirectionalProbesTest {
                 }
                 assertTrue(pooledWork in 1L until independentWork)
                 assertEquals(4, preflights.size)
+                assertEquals(4, numerical.size)
+                assertEquals(0, numerical.count { it.orderHint })
+                assertEquals(1, numerical.count { it.factorCopy })
+                assertTrue(numerical.first().copiedFactorEntries > 0L)
+                assertEquals(0L, numerical.first().basisBuildWork)
+                assertTrue(preflights.first().factorCopyWork > 0L)
+                assertEquals(36L, preflights.first().sourceCopyWorkSaved)
+                assertEquals(0L, preflights.sumOf { it.parentValueWork })
+                assertTrue(numerical.none { it.parentValues })
+                assertEquals(0L, preflights.drop(1).sumOf { it.sourceCopyWorkSaved })
+                assertEquals(280L + preflights.first().factorCopyWork, preflights.first().workspaceWork)
+                assertEquals(numerical.first().copiedFactorEntries, preflights.first().factorCopyEntries)
+                assertTrue(numerical.first().entryLimit >= numerical.first().copiedFactorEntries)
                 assertEquals(3, preflights.count { it.ownerReused })
                 val reuse = if (rowScale == 1L) LpProbeReuse.IDENTITY else LpProbeReuse.SCALED
                 assertTrue(preflights.all { it.reuse == reuse && it.stop == null })
@@ -238,7 +505,7 @@ class LpDirectionalProbesTest {
                 1_000_000L, Cancellation.Never) { if (first == null) first = it.preflight })
             val preflight = assertNotNull(first)
             val beforePreflight = 1_000_000L - preflight.offeredWork
-            for (stop in LpProbePreparationStop.entries) {
+            for (stop in listOf(LpProbePreparationStop.WORKSPACE, LpProbePreparationStop.SCALARS)) {
                 val allowance = beforePreflight + preflight.workspaceWork +
                     if (stop == LpProbePreparationStop.SCALARS) preflight.scalarWork else 0L
                 val beforeCreated = created
@@ -265,6 +532,7 @@ class LpDirectionalProbesTest {
                 assertEquals(0L, solving)
                 assertEquals(0, completed)
                 assertEquals(beforeCreated, created)
+                assertEquals(0L, assertNotNull(refusal).sourceCopyWorkSaved)
                 assertEquals(parentMetrics, owner.lastMetrics)
             }
         }
