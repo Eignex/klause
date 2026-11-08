@@ -79,7 +79,7 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
             put("query", query(record))
             val numeric = field(record, "numeric") as SourceProofContext
             val generation = field(record, "generationScope") as SourceScope?
-            generation?.let { put("generationOwnerMap", generationOwnerMap(numeric.atScope(it))) }
+            if (generation != null) put("generationOwnerMap", generationOwnerMap(numeric))
         }
         put("rejectedAttempts", field(captured, "rejectedAttempts") as Long)
         put("events", buildJsonObject {
