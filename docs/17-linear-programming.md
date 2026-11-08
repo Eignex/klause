@@ -1793,6 +1793,9 @@ every query; candidate scoring supplies no proof authority.
 The optional observer has separate record, entry, modeled byte and cancellation
 allowances. It retains immutable source values and derivations, never a numerical
 owner or live workspace. Incomplete capture and unavailable points remain unknown.
+Imported cut proof records preserve their original scope, claimed inequality and
+nested derivation. Bound and refutation imports keep their claim semantics;
+depth or cancellation limits leave an explicit unavailable derivation.
 Observing performs no solve. Explicit replay creates a fresh owner with separate
 cumulative work, allocation, operation and cancellation allowances; it rechecks
 source derivations and cannot publish deductions into the original traversal.

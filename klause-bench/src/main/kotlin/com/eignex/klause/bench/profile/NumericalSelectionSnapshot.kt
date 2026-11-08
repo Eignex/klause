@@ -243,11 +243,30 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
                     put("row", proof(value.inequality, depth + 1))
                     put("bounds", JsonArray(value.bounds.map { proof(it, depth + 1) }))
                 }
+                is SourceDerivation.Import -> {
+                    val imported = value.evidence
+                    put("scope", scope(imported.scope))
+                    put("claim", imported.claim::class.simpleName)
+                    when (val claim = imported.claim) {
+                        is SourceClaim.Consequence -> {
+                            put("coefficients", coefficients(claim.inequality.coefficients))
+                            put("rhs", claim.inequality.rhs.toString())
+                            put("strict", claim.inequality.strict)
+                        }
+                        is SourceClaim.Bound -> {
+                            put("value", (claim.value as SourceValue.Rational).value.toString())
+                            put("strict", claim.strict)
+                        }
+                        SourceClaim.Refutation -> Unit
+                        else -> error("unsupported imported numerical claim: ${claim::class.simpleName}")
+                    }
+                    put("derivation", proof(imported.derivation, depth + 1))
+                }
                 is LinearPinnedObjective -> put("bound", proof(value.bound, depth + 1))
                 is LinearPinnedRefutation -> put("conflict", proof(value.conflict, depth + 1))
                 else -> if (value::class.simpleName == "LinearActiveRefutation") {
                     put("conflict", proof(field(value, "conflict") as SourceDerivation, depth + 1))
-                } else error("unsupported captured numerical derivation")
+                } else error("unsupported captured numerical derivation: ${value::class.simpleName}")
             }
         }
     }
