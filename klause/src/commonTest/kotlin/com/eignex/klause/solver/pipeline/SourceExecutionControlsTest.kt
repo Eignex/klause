@@ -43,14 +43,14 @@ class SourceExecutionControlsTest {
             LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
         ), emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE))))
         for ((supplied, options, expected) in listOf(
-            Triple(false, emptyList<String>(), listOf(true, false, false, false)),
-            Triple(true, emptyList<String>(), listOf(true, false, false, false)),
+            Triple(false, emptyList<String>(), listOf(true, false, false, false, false)),
+            Triple(true, emptyList<String>(), listOf(true, false, false, false, false)),
             Triple(false, listOf("source-cuts=false", "source-point-cuts=true", "source-aggregate-cuts=true",
-                "source-cut-branching=true"),
-                listOf(false, true, true, true)),
+                "source-cut-branching=true", "source-cut-fractional-order=true"),
+                listOf(false, true, true, true, true)),
             Triple(true, listOf("source-cuts=false", "source-point-cuts=true", "source-aggregate-cuts=true",
-                "source-cut-branching=true"),
-                listOf(false, true, true, true)),
+                "source-cut-branching=true", "source-cut-fractional-order=true"),
+                listOf(false, true, true, true, true)),
         )) {
             val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
                 ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
@@ -66,7 +66,8 @@ class SourceExecutionControlsTest {
 
             assertTrue(invocation.requestsFiniteNumericalCompanions)
             assertEquals(expected, listOf(request.theory.sourceCuts, request.theory.sourcePointCuts,
-                request.theory.sourceAggregateCuts, request.theory.sourceCutBranching))
+                request.theory.sourceAggregateCuts, request.theory.sourceCutBranching,
+                request.theory.sourceCutFractionalOrder))
             assertFalse(scenario.explicitArms)
             assertFalse(scenario.companionIntegers)
             assertEquals(4_000L, scenario.companionActiveMillis)
@@ -201,6 +202,22 @@ class SourceExecutionControlsTest {
         val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf("source-point-cuts=true")))
 
         assertTrue(request.theory.sourcePointCuts)
+    }
+
+    @Test
+    fun `fractional cut ordering should bind to numerical execution only when enabled`() {
+        val source = SourceAttachment(
+            LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()), ProblemSettings(),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
+            linearTraversal = LinearTraversal.NUMERICAL_FRONTIER))
+        for ((options, expected) in listOf(emptyList<String>() to false,
+            listOf("source-cut-fractional-order=true") to true,
+            listOf("source-cut-fractional-order=false") to false)) {
+            val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
+
+            assertEquals(expected, request.theory.sourceCutFractionalOrder)
+        }
     }
 
     @Test

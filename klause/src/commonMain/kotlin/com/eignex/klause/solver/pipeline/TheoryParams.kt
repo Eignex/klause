@@ -107,6 +107,8 @@ data class TheoryParams(
     val sourcePointCuts: Boolean = false,
     /** Enable bounded source-bound aggregation for numerical frontier traversal. */
     val sourceAggregateCuts: Boolean = false,
+    /** Prefer fractional integer support when ordering point-directed source aggregation. */
+    val sourceCutFractionalOrder: Boolean = false,
     /** Reuse checked refutations within one numerical traversal under their proved source restrictions. */
     val sourceRefutationReuse: Boolean = false,
     /** Imply integral source bounds from checked refutations at unit prefixes in numerical traversal. */

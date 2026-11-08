@@ -761,6 +761,12 @@ invocation bounds, a funded linear partition places finite seed rows containing 
 scoped integer coordinate before other seed rows. Each group and the partner buckets
 retain their slack and source ordering. Scope incidence supplies
 only an ordering preference. Endpoint authority still comes from checked derivations.
+With `source-cut-fractional-order=true`, point aggregation ranks complete finite
+rows by maximum integer fractionality per support entry, then normalized slack and
+source order. Seed rows and incidence partners share that ordering. With no
+fractional support it retains the ordinary scoped preference. Its projections,
+score storage and sorting debit the existing generation allowance; declined ranking
+keeps source order.
 Incidence lookup, partition storage and copy-back share the containing generation
 allowance. The partition's estimate admits at most half the remaining work and
 allocation after slack ordering; a declined partition retains that order. Incomplete
@@ -1816,6 +1822,11 @@ A selected witness or terminal keeps its selected guidance. The baseline point
 uses the selection round's existing funded retention and carries no proof authority;
 the strengthened bound and selected rows retain their own result channels. This
 requests no additional LP query and changes no generation allowance.
+Fractional-order aggregation keeps the complete retained cut pool and appends
+funded proposals under the 64-row ceiling in the same numerical generation scope.
+Its explicit point round can augment an aggregate-only pool; other point preparation
+uses point-directed row alternatives. Missing capacity or interrupted preparation
+leaves the current query available.
 A new template first runs the ordinary checked cut recipe; a completed point can
 add one selection round at that node. A trial that admits no candidate retains
 the ordinary template, checked query and numerical owner for later queries of that

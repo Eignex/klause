@@ -46,6 +46,9 @@ input and records its decoded SHA-256 and byte count without parsing or solving 
 `MpsProofFrontier selection=true` exports a captured template's actual
 `generationScope` separately from the query's current verification scope.
 Missing generation provenance stays unavailable.
+With `pointCuts=true aggregateCuts=true fractionalOrder=true`, production point
+selection uses fractional integer support ordering under the existing generation
+allowance. Omit `fractionalOrder` for the current-order control.
 Imported proof records retain their original scope, consequence or bound payload,
 and nested derivation. Depth and cancellation limits mark withheld proofs
 unavailable.

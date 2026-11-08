@@ -49,6 +49,7 @@ internal class LinearAuthority(
     guidancePolicy: SparseSourceLpPolicy = SparseSourceLpPolicy(),
     additionalCuts: List<LinearAuthorityCut> = emptyList(),
     private val aggregateCuts: Boolean = false,
+    private val fractionalAggregateOrder: Boolean = false,
 ) : AutoCloseable {
     init { require(additionalCuts.size <= 64) }
     private val additionalCuts = additionalCuts.toList()
@@ -205,7 +206,8 @@ internal class LinearAuthority(
             val currentRows = checkNotNull(family.cuts).rows
             val generatedRecipe = currentRows.isNotEmpty() && currentRows.size <= 64 &&
                 currentRows.all { it.family == CutFamily.SOURCE_AGGREGATION || it.family == CutFamily.AGGREGATION_MIR }
-            if (!generatedRecipe && !checkNotNull(family.cuts).pointDirected && directedFamily !== family &&
+            if ((!generatedRecipe || fractionalAggregateOrder) &&
+                !checkNotNull(family.cuts).pointDirected && directedFamily !== family &&
                 pointMask == null &&
                 (aggregateCuts || checkNotNull(family.cuts).rows.any { it.mixed })) {
                 directedFamily = family
@@ -316,7 +318,11 @@ internal class LinearAuthority(
             work += cost
             point[prepared.coordinates[index]] = value.toDouble().takeIf(Double::isFinite) ?: return null
         }
-        val directed = family.atPoint(point, funded, { cutCost(it, 0L) }, ::cutCost) ?: return null
+        val directed = if (fractionalAggregateOrder) {
+            if (checkNotNull(family.cuts).rows.size > 64) return null
+            pointPolicy?.observe("FractionalPreparations")
+            family
+        } else family.atPoint(point, funded, { cutCost(it, 0L) }, ::cutCost) ?: return null
         val refined = withAdditionalCuts(directed, funded, point) ?: return null
         if (funded()) return null
         if (sameCurrentCuts(family, prepared, refined, funded, 65_536L - work)) return family to prepared
@@ -551,7 +557,10 @@ internal class LinearAuthority(
         if (!generateAggregates && additionalCuts.isEmpty() &&
             (point == null || prepared.cuts?.rows.orEmpty().size <= 64)) return prepared
         val funded = Cancellation { cancellation() || budget.funding?.paused == true }
-        val generated = if (generateAggregates) LinearAuthorityAggregateCuts.prepareSourcePairs(
+        val retainOriginal = fractionalAggregateOrder && point != null
+        val retained = if (retainOriginal) prepared.cuts?.rows.orEmpty().size else additionalCuts.size
+        if (retained > 64) return null
+        val generated = if (generateAggregates) LinearAuthorityAggregateCuts.prepareSourcePairsTargeted(
             prepared.numeric, funded, { name, count ->
                 when (name) {
                     "AggregateWork" -> cutCost(count, 0L)
@@ -561,15 +570,16 @@ internal class LinearAuthority(
                         cutEligibility[key] = (cutEligibility[key] ?: 0L) + count
                     }
                 }
-            }, maximumCandidates = 64 - additionalCuts.size,
+            }, maximumCandidates = 64 - retained,
             limits = if (point == null) LinearAuthorityAggregateCuts.sourcePairLimits
                 else LinearAuthorityAggregateCuts.pointSourcePairLimits,
-            point = point) else emptyList()
+            point = point, fractionalTargeting = fractionalAggregateOrder) else emptyList()
         if (funded()) return null
-        val additional = if (generated.isEmpty()) additionalCuts else {
-            cutCost(1L, 64L + (generated.size + additionalCuts.size) * 8L)
+        val fixed = if (retainOriginal) emptyList() else additionalCuts
+        val additional = if (generated.isEmpty()) fixed else {
+            cutCost(1L, 64L + (generated.size + fixed.size) * 8L)
             if (funded()) return null
-            additionalCuts + generated
+            fixed + generated
         }
         return prepared.withAdditional(additional, funded,
             maximumCandidates = if (point == null) Int.MAX_VALUE else 64, onCost = ::cutCost)

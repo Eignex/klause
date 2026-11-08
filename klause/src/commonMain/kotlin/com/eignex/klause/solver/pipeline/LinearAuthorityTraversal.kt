@@ -69,6 +69,7 @@ internal class LinearAuthorityTraversal(
     private val pointCuts: Boolean = false,
     private val onNumericalFeedback: ((SourceNumericalFeedbackResult) -> Unit)? = null,
     aggregateCuts: Boolean = false,
+    fractionalAggregateOrder: Boolean = false,
     latestFeedback: Boolean = true,
     feedbackRequest: LinearAuthorityFeedbackRequest? = null,
     composeBooleanBranches: Boolean = false,
@@ -94,7 +95,7 @@ internal class LinearAuthorityTraversal(
             shape.phase?.let { observe("numericalSparseLpPhase$it") }
             if (!shape.admitted) observe("numericalSparseLpDeclines")
         } else if (!shape.admitted) observe("numericalLpShapesOutsideDimensionGuard")
-    }, retainLp = true, aggregateCuts = aggregateCuts)
+    }, retainLp = true, aggregateCuts = aggregateCuts, fractionalAggregateOrder = fractionalAggregateOrder)
     private val initialCutObservations = authority.cutObservations()
     private val activeRows = if (useActiveRows || composeBooleanBranches)
         LinearActiveRows(source, budget, composeBranches = composeBooleanBranches) else null

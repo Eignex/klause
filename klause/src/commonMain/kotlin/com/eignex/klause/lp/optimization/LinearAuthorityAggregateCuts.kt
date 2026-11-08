@@ -19,6 +19,7 @@ import com.eignex.util.numbers.gcd
 import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.times
 import kotlin.math.abs
+import kotlin.math.round
 import kotlin.math.sqrt
 
 internal data class LinearAuthorityAggregateTerm(
@@ -59,6 +60,14 @@ internal object LinearAuthorityAggregateCuts {
         observe: (String, Long) -> Unit = { _, _ -> }, maximumCandidates: Int = 64,
         limits: LinearAuthorityAggregateLimits = sourcePairLimits,
         point: Map<SourceCoordinate, Double>? = null,
+    ): List<LinearAuthorityCut> = prepareSourcePairsTargeted(source, cancellation, observe, maximumCandidates,
+        limits, point)
+
+    fun prepareSourcePairsTargeted(
+        source: SourceProofContext, cancellation: Cancellation,
+        observe: (String, Long) -> Unit = { _, _ -> }, maximumCandidates: Int = 64,
+        limits: LinearAuthorityAggregateLimits = sourcePairLimits,
+        point: Map<SourceCoordinate, Double>? = null, fractionalTargeting: Boolean = false,
     ): List<LinearAuthorityCut> {
         require(maximumCandidates in 0..64)
         val meter = AggregateMeter(limits, cancellation, observe)
@@ -120,7 +129,7 @@ internal object LinearAuthorityAggregateCuts {
                     }
                 }
             }
-            if (point != null) orderPointRows(rows, incidence, point, meter, observe, source)
+            if (point != null) orderPointRows(rows, incidence, point, meter, observe, source, fractionalTargeting)
             val charge: (String, Long) -> Unit = { name, count ->
                 when (name) {
                     "AggregateWork" -> meter.reserve(count)
@@ -264,6 +273,7 @@ internal object LinearAuthorityAggregateCuts {
     private fun admitPointRowOrder(
         rows: List<ProbeRow>, incidence: Map<Pair<SourceCoordinate, Boolean>, List<ProbeRow>>,
         meter: AggregateMeter, observe: (String, Long) -> Unit,
+        fractionalTargeting: Boolean,
     ): Boolean {
         if (rows.size < 3) return false
         meter.reserve(rows.size.toLong() + incidence.size * 2L, 128L)
@@ -273,13 +283,15 @@ internal object LinearAuthorityAggregateCuts {
             val levels = if (size < 2) 0 else Int.SIZE_BITS - (size - 1).countLeadingZeroBits()
             return size.toLong() * (1L + levels)
         }
-        val projectionWork = 9L * (entries + rows.size)
-        val comparisonWork = sortingWork(rows.size) + incidence.values.sumOf { sortingWork(it.size) }
+        val projectionWork = (if (fractionalTargeting) 14L else 9L) * (entries + rows.size)
+        val comparisonWork = (sortingWork(rows.size) + incidence.values.sumOf { sortingWork(it.size) }) *
+            (if (fractionalTargeting) 2L else 1L)
         val allocation = 192L + rows.size * 80L + (entries + rows.size) * 96L +
-            references * 16L + incidence.size * 64L
+            references * 16L + incidence.size * 64L + (if (fractionalTargeting) 128L + rows.size * 64L else 0L)
         if (projectionWork + comparisonWork > meter.remainingWork / 2L ||
             allocation > meter.remainingAllocation / 2L) {
-            observe("AggregatePointRowOrderDeclined", 1L)
+            observe(if (fractionalTargeting) "AggregatePointFractionalOrderDeclined"
+                else "AggregatePointRowOrderDeclined", 1L)
             return false
         }
         return true
@@ -288,14 +300,17 @@ internal object LinearAuthorityAggregateCuts {
     private fun orderPointRows(
         rows: MutableList<ProbeRow>, incidence: Map<Pair<SourceCoordinate, Boolean>, MutableList<ProbeRow>>,
         point: Map<SourceCoordinate, Double>, meter: AggregateMeter, observe: (String, Long) -> Unit,
-        source: SourceProofContext,
+        source: SourceProofContext, fractionalTargeting: Boolean,
     ) {
-        if (!admitPointRowOrder(rows, incidence, meter, observe)) return
-        meter.reserve(rows.size.toLong(), 128L + rows.size * 64L)
+        if (!admitPointRowOrder(rows, incidence, meter, observe, fractionalTargeting)) return
+        meter.reserve(rows.size.toLong(), (128L + rows.size * 64L) * (if (fractionalTargeting) 2L else 1L))
         val priorities = HashMap<Int, Double>()
+        val fractions = if (fractionalTargeting) HashMap<Int, Double>() else null
+        var hasFractional = false
         for (row in rows) {
             var activity = 0.0
             var normSquared = 0.0
+            var fractionality = 0.0
             var complete = true
             for ((id, value) in row.coefficients) {
                 meter.reserve(4L)
@@ -307,6 +322,10 @@ internal object LinearAuthorityAggregateCuts {
                 val coefficient = meter.number(value).toDouble()
                 activity += coefficient * coordinate
                 normSquared += coefficient * coefficient
+                if (fractionalTargeting && id.kind == SourceCoordinate.Kind.Integer) {
+                    meter.reserve(4L)
+                    fractionality = maxOf(fractionality, abs(coordinate - round(coordinate)))
+                }
             }
             val rhs = row.term.inequality.rhs
             meter.reserve(4L)
@@ -319,9 +338,21 @@ internal object LinearAuthorityAggregateCuts {
                 observe("AggregatePointRowUnavailable", 1L)
                 Double.POSITIVE_INFINITY
             }
+            if (fractions != null) {
+                val score = if (distance.isFinite()) fractionality / row.coefficients.size else -1.0
+                fractions[row.term.owner] = score
+                if (score > 0.0) {
+                    hasFractional = true
+                    observe("AggregatePointFractionalRowsScored", 1L)
+                }
+            }
         }
         val comparator = Comparator<ProbeRow> { left, right ->
-            meter.reserve(1L)
+            meter.reserve(if (fractionalTargeting) 2L else 1L)
+            if (fractions != null && hasFractional) {
+                val fraction = fractions.getValue(right.term.owner).compareTo(fractions.getValue(left.term.owner))
+                if (fraction != 0) return@Comparator fraction
+            }
             val order = priorities.getValue(left.term.owner).compareTo(priorities.getValue(right.term.owner))
             if (order == 0) left.term.owner.compareTo(right.term.owner) else order
         }
@@ -331,7 +362,11 @@ internal object LinearAuthorityAggregateCuts {
         }
         order(rows)
         for (bucket in incidence.values) order(bucket)
-        prioritizeScopedRows(rows, priorities, source, meter, observe)
+        if (fractionalTargeting && hasFractional) observe("AggregatePointFractionalOrderComplete", 1L)
+        else {
+            if (fractionalTargeting) observe("AggregatePointFractionalOrderNoOpportunity", 1L)
+            prioritizeScopedRows(rows, priorities, source, meter, observe)
+        }
     }
 
     private fun prioritizeScopedRows(

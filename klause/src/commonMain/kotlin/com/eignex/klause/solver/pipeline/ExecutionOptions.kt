@@ -165,6 +165,10 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Bounded numerical source-bound aggregation control. */
         val sourceAggregateCuts: ExecutionOption<Boolean> = ExecutionOption("source-aggregate-cuts", ValueKind.BOOLEAN)
 
+        /** Fractional integer support ordering for point-directed numerical source aggregation. */
+        val sourceCutFractionalOrder: ExecutionOption<Boolean> =
+            ExecutionOption("source-cut-fractional-order", ValueKind.BOOLEAN)
+
         /** Bounded advisory incumbent completion under the exact companion's existing allowance. */
         val sourceIncumbentCompletion: ExecutionOption<Boolean> =
             ExecutionOption("source-incumbent-completion", ValueKind.BOOLEAN)
@@ -602,7 +606,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 presolveAbortFraction, presolveMaxRounds,
                 presolveProbePerVar, presolveProbeTotal,
                 nodeLimit, openWorkLimit, sourceLpWorkLimit, sourceLpAllocationLimit, sourceLpOperations, sourceCuts,
-                sourcePointCuts, sourceCutBranching, sourceAggregateCuts, sourceIncumbentCompletion,
+                sourcePointCuts, sourceCutBranching, sourceAggregateCuts, sourceCutFractionalOrder,
+                sourceIncumbentCompletion,
                 sourceRefutationReuse,
                 sourceRefutationPropagation,
                 sourceRefutationResolution,

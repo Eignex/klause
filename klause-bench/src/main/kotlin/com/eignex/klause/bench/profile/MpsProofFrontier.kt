@@ -135,6 +135,7 @@ internal object MpsProofFrontier {
             sourceCuts = options["cuts"]?.toBooleanStrict() ?: true,
             sourcePointCuts = options["pointCuts"]?.toBooleanStrict() ?: false,
             sourceAggregateCuts = options["aggregateCuts"]?.toBooleanStrict() ?: false,
+            sourceCutFractionalOrder = options["fractionalOrder"]?.toBooleanStrict() ?: false,
             sourceRefutationReuse = options["refutationReuse"]?.toBooleanStrict() ?: false,
             sourceLpOperations = options["operations"]?.toInt()?.also { require(it in 1..256) } ?: Int.MAX_VALUE)
         val authority = request.javaClass.declaredMethods.single {
@@ -295,6 +296,7 @@ internal object MpsProofFrontier {
                 put("feedbackRequest", feedbackRequest)
                 put("pointCuts", params.sourcePointCuts)
                 put("aggregateCuts", params.sourceAggregateCuts)
+                put("fractionalOrder", params.sourceCutFractionalOrder)
                 put("refutationReuse", params.sourceRefutationReuse)
                 put("aggregateProbe", aggregateProbe)
                 put("aggregateMixed", aggregateMixed)

@@ -89,6 +89,8 @@ internal fun bindSourceExecutionControls(
             sourcePointCuts = reader[ExecutionOption.sourcePointCuts] ?: defaults.sourcePointCuts,
             sourceCutBranching = reader[ExecutionOption.sourceCutBranching] ?: defaults.sourceCutBranching,
             sourceAggregateCuts = reader[ExecutionOption.sourceAggregateCuts] ?: defaults.sourceAggregateCuts,
+            sourceCutFractionalOrder = reader[ExecutionOption.sourceCutFractionalOrder]
+                ?: defaults.sourceCutFractionalOrder,
             sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
                 ?: defaults.sourceIncumbentCompletion,
             sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
@@ -144,6 +146,8 @@ internal fun bindSourceExecutionControls(
             sourcePointCuts = reader[ExecutionOption.sourcePointCuts] ?: defaults.sourcePointCuts,
             sourceCutBranching = reader[ExecutionOption.sourceCutBranching] ?: defaults.sourceCutBranching,
             sourceAggregateCuts = reader[ExecutionOption.sourceAggregateCuts] ?: defaults.sourceAggregateCuts,
+            sourceCutFractionalOrder = reader[ExecutionOption.sourceCutFractionalOrder]
+                ?: defaults.sourceCutFractionalOrder,
             sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
                 ?: defaults.sourceIncumbentCompletion,
             sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
@@ -275,6 +279,7 @@ private fun FiniteSolveRequest.withSourceControls(
 private fun ExecutionOptions.withoutSourceCompanionControls(): ExecutionOptions = without(
     "source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations",
     "source-cuts", "source-point-cuts", "source-cut-branching", "source-aggregate-cuts",
+    "source-cut-fractional-order",
     "source-refutation-reuse", "source-refutation-propagation", "source-refutation-resolution",
     "source-incumbent-completion",
 )

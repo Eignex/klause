@@ -88,7 +88,8 @@ internal class JointLinearRepair(
         stages["jointRepairLpMaxRows"] = maxOf(stages["jointRepairLpMaxRows"] ?: 0, shape.rows.toLong())
         stages["jointRepairLpMaxColumns"] = maxOf(stages["jointRepairLpMaxColumns"] ?: 0, shape.columns.toLong())
     }, retainLp = true, guidancePolicy = guidancePolicy,
-        aggregateCuts = boundOrdered && params.sourceAggregateCuts)
+        aggregateCuts = boundOrdered && params.sourceAggregateCuts,
+        fractionalAggregateOrder = boundOrdered && params.sourceAggregateCuts && params.sourceCutFractionalOrder)
     private var selection: JointRepairNeighborhood? = null
     private var rootPoint: Map<SourceCoordinate, Double>? = null
     private var rootStarted = false

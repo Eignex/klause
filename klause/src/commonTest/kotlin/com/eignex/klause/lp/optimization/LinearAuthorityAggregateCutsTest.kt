@@ -42,6 +42,103 @@ class LinearAuthorityAggregateCutsTest {
         BigFraction.ZERO)
 
     @Test
+    fun `fractional targeting should separate before retrying an integral branch coordinate`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ONE))),
+            setOf(x, y, real, residual), linkedMapOf(
+                "x row" to SourcePremise(left),
+                "x side" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "y row" to SourcePremise(SourceInequality(
+                    mapOf(y to BigFraction.ofLong(2), residual to BigFraction.ONE), BigFraction.ofLong(3))),
+                "y side" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            ))
+        for (value in listOf(1.0, 1.0 - 1e-15)) {
+            val observations = HashMap<String, Long>()
+            val point = mapOf(x to value, y to 1.5, real to 1.0, residual to 0.0)
+            LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+                { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+                1, LinearAuthorityAggregateCuts.pointSourcePairLimits, point)
+            assertTrue(checkNotNull(observations["AggregatePairLowEfficacy"]) > 0L)
+            observations.clear()
+
+            val cut = LinearAuthorityAggregateCuts.prepareSourcePairsTargeted(source, Cancellation.Never,
+                { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+                1, LinearAuthorityAggregateCuts.pointSourcePairLimits, point, fractionalTargeting = true).single()
+
+            assertEquals(0L, observations["AggregatePairLowEfficacy"] ?: 0L)
+            assertEquals(SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ONE), cut.inequality)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(source.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
+    }
+
+    @Test
+    fun `fractional targeting without an opportunity should preserve the existing point order`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+            "left" to SourcePremise(left), "right" to SourcePremise(right),
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        val observed = ArrayList<List<SourceInequality>>()
+        val rejected = ArrayList<Long>()
+        for (targeting in listOf(false, true)) {
+            val observations = HashMap<String, Long>()
+
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairsTargeted(source, Cancellation.Never,
+                { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+                1, LinearAuthorityAggregateCuts.pointSourcePairLimits, mapOf(x to 1.0, y to 0.0, real to 1.0),
+                fractionalTargeting = targeting)
+
+            observed += cuts.map { it.inequality }
+            rejected += observations["AggregatePairLowEfficacy"] ?: 0L
+            if (targeting) assertEquals(1L, observations["AggregatePointFractionalOrderNoOpportunity"])
+        }
+
+        assertTrue(rejected.first() > 0L)
+        assertEquals(rejected.first(), rejected.last())
+        assertEquals(observed.first(), observed.last())
+    }
+
+    @Test
+    fun `fractional ordering should decline beyond its generation allowance`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(x, y, real, residual), linkedMapOf(
+            "left" to SourcePremise(left), "right" to SourcePremise(right),
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "other lower" to SourcePremise(SourceInequality(
+                mapOf(residual to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        val observations = HashMap<String, Long>()
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(work = 256L)
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairsTargeted(source, Cancellation.Never,
+            { name, count -> observations[name] = (observations[name] ?: 0L) + count }, 1, limits,
+            mapOf(x to 1.0, y to 0.0, real to 1.0, residual to 0.0), fractionalTargeting = true)
+
+        assertEquals(1L, observations["AggregatePointFractionalOrderDeclined"])
+        assertTrue(checkNotNull(observations["AggregateWork"]) <= limits.work)
+        assertTrue(checkNotNull(observations["AggregateAllocation"]) <= limits.allocation)
+        for (cut in cuts) assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `cancelling fractional row scoring should withhold all proposals`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+            "left" to SourcePremise(left), "right" to SourcePremise(right),
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        var stopped = false
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairsTargeted(source, Cancellation { stopped },
+            { name, _ -> if (name == "AggregatePointFractionalRowsScored") stopped = true },
+            1, LinearAuthorityAggregateCuts.pointSourcePairLimits, mapOf(x to 1.25, y to 0.0, real to 0.5),
+            fractionalTargeting = true)
+
+        assertTrue(stopped)
+        assertTrue(cuts.isEmpty())
+    }
+
+    @Test
     fun `automatic source pairs should strengthen a checked bound across an unbounded continuous coordinate`() {
         val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val mixed = SourceInequality(left.coefficients + (residual to BigFraction.MINUS_ONE), left.rhs)
