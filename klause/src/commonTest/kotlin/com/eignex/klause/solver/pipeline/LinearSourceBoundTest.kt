@@ -50,7 +50,7 @@ class LinearSourceBoundTest {
                 ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, maximize = sense == ObjectiveSense.MAXIMIZE))
 
             val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(
-                invocation, presolveConfig = PresolveConfig.NONE)))
+                invocation, ExecutionOptions(), presolveConfig = PresolveConfig.NONE)))
 
             val bound = assertNotNull(result.linearSource?.nativeObjectiveBound)
             val expected = if (sense == ObjectiveSense.MINIMIZE) BigFraction.of(bigIntOf(4), bigIntOf(15))

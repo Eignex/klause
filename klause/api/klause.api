@@ -12672,6 +12672,12 @@ public final class com/eignex/klause/solver/pipeline/LinearOptimizationExecution
 	public static synthetic fun optimizeLinear$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/evidence/SourceProofContext;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/LinearOptimizationResult;
 }
 
+public final class com/eignex/klause/solver/pipeline/LinearSourceBound {
+	public final fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public final fun getStrict ()Z
+	public final fun getValue ()Lcom/eignex/klause/simplex/exact/BigFraction;
+}
+
 public final class com/eignex/klause/solver/pipeline/LinearSourceConclusion : java/lang/Enum {
 	public static final field LIMIT Lcom/eignex/klause/solver/pipeline/LinearSourceConclusion;
 	public static final field OPTIMAL Lcom/eignex/klause/solver/pipeline/LinearSourceConclusion;
@@ -12691,6 +12697,7 @@ public final class com/eignex/klause/solver/pipeline/LinearSourceOutcome {
 	public final fun getIncumbent ()Lcom/eignex/klause/solver/validation/LinearSourceWitness;
 	public final fun getNativeClaimsUnrestricted ()Z
 	public final fun getNativeConclusion ()Lcom/eignex/klause/solver/pipeline/LinearSourceConclusion;
+	public final fun getNativeObjectiveBound ()Lcom/eignex/klause/solver/pipeline/LinearSourceBound;
 	public final fun getNominalConstraintsExact ()Z
 	public final fun getNominalSourceExact ()Z
 	public final fun getNumericalClaims ()Z

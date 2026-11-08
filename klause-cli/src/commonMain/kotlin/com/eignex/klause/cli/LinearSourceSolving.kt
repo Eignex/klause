@@ -1,7 +1,6 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.ir.ObjectiveSense
-
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.FiniteSolveCallbacks
