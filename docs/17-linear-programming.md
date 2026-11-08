@@ -1824,8 +1824,10 @@ the strengthened bound and selected rows retain their own result channels. This
 requests no additional LP query and changes no generation allowance.
 Fractional-order aggregation keeps the complete retained cut pool and appends
 funded proposals under the 64-row ceiling in the same numerical generation scope.
-Its explicit point round can augment an aggregate-only pool; other point preparation
-uses point-directed row alternatives. Missing capacity or interrupted preparation
+Its explicit point round can augment an aggregate-only pool. An immutable template
+identity keeps that prepared pool compatible with explicit masks while preserving
+its original complementary provenance; each query still rechecks the selected
+derivations. Other point preparation uses point-directed row alternatives. Missing capacity or interrupted preparation
 leaves the current query available.
 A new template first runs the ordinary checked cut recipe; a completed point can
 add one selection round at that node. A trial that admits no candidate retains

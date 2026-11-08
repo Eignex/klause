@@ -328,11 +328,14 @@ internal class LinearAuthority(
         if (sameCurrentCuts(family, prepared, refined, funded, 65_536L - work)) return family to prepared
         if (funded()) return null
         val previous = template
+        val previousDirected = directedFamily
         adoptTemplate(refined)
+        if (fractionalAggregateOrder) directedFamily = refined
         query = null
         val checked = prepareQuery(source, funded, cuts = true, cutMask = emptySet())
         if (checked == null || funded() || template !== refined) {
             template = previous
+            directedFamily = previousDirected
             return null
         }
         query = checked
@@ -520,6 +523,7 @@ internal class LinearAuthority(
             template?.takeIf { it.matches(source) && (it.cuts != null) == cuts &&
                 (!cuts || it.cuts?.complementary == (cutMask != null) ||
                     pointPolicy?.managesCurrentRecipe(it.cuts?.rows) == true ||
+                    (fractionalAggregateOrder && it === directedFamily) ||
                     it.coordinates.all { coordinate -> coordinate.kind == SourceCoordinate.Kind.Integer }) }
                 ?: LinearAuthorityTemplate.prepare(source, cancellation, cuts && replay == null,
                     cutMask != null) { work ->

@@ -315,7 +315,7 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
-    fun `fractional point aggregation should retain a checked bound when its LP allowance ends`() {
+    fun `fractional point aggregation should prepare its retained pool within the LP allowance`() {
         val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val source = SourceProofContext(scope, setOf(integer, real, residual), mapOf(
             "row" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(2),
@@ -332,10 +332,13 @@ class LinearAuthorityInvocationTest {
             sourcePointCuts = true, sourceCutFractionalOrder = true, sourceLpOperations = 2),
             boundOrdered = true).use { it.run { _, _ -> } }
 
-        assertNull(result.terminal)
+        val stages = assertNotNull(result.stats.smt.completeSearchStages)
+        assertEquals(1L, stages["numericalCutSelectionFractionalPreparations"])
+        assertEquals(1L, stages["numericalCutSelectionPointPrepared"])
+        assertEquals(0L, stages["numericalCutSelectionPointPreparationUnavailable"] ?: 0L)
         assertTrue(result.stats.smt.sourceLp.operations <= 2)
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority())
-            .verify(assertNotNull(result.bound)))
+            .verify(result.terminal ?: assertNotNull(result.bound)))
     }
 
     @Test
