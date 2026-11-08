@@ -2948,13 +2948,22 @@ internal class RevisedSimplex(
             (model !== pointModel && (model.exactState == null || model.exactState !== pointModel.exactState))
         ) return null
         val factors = basisLifecycle.current ?: return null
-        val perColumn = 6L * m + 8L * numVars + 2L * colVal.size + nnzB + factors.updateCount.toLong() * m
-        if (perColumn > allowance / columns.size || columns.any { it !in 0 until n }) return null
-        val required = columns.size * perColumn
+        if (nnzB < 0 || nnzB > colVal.size) return null
+        // Basic columns are skipped before either CSC dot product.
+        val nonbasicNnz = colVal.size.toLong() - nnzB
+        val shareCosts = columns.size == 2 && nonbasicNnz > 2L * numVars
+        val shared = if (shareCosts) 2L * numVars + nonbasicNnz else 0L
+        val scans = if (shareCosts) nonbasicNnz else 2L * nonbasicNnz
+        val perColumn = 6L * m + 8L * numVars + scans + nnzB + factors.updateCount.toLong() * m
+        if (shared > allowance || perColumn > (allowance - shared) / columns.size ||
+            columns.any { it !in 0 until n }
+        ) return null
+        val required = shared + columns.size * perColumn
         charge(required)
         if (token()) return null
         val row = IndexedVector(m)
         return try {
+            val reducedCosts = if (shareCosts) directionalReducedCosts(token) ?: return null else null
             columns.map { column ->
                 if (token()) return null
                 val slot = basicVar.indexOf(column)
@@ -2962,7 +2971,7 @@ internal class RevisedSimplex(
                     row.unit(slot)
                     factors.btran(row, expectedDensity = 1.0)
                     if (token()) return null
-                    directionalRowCosts(column, row, token)
+                    directionalRowCosts(column, row, token, reducedCosts)
                 }
             }
         } catch (_: BasisArithmeticException) {
@@ -2972,7 +2981,23 @@ internal class RevisedSimplex(
         }
     }
 
-    private fun directionalRowCosts(column: Int, row: IndexedVector, token: Cancellation): LpDirectionalCost? {
+    private fun directionalReducedCosts(token: Cancellation): DoubleArray? {
+        val costs = DoubleArray(numVars)
+        for (j in 0 until numVars) {
+            if (j % 256 == 0 && token()) return null
+            if (status[j] != VarStatus.BASIC && !model.fixed(j)) {
+                costs[j] = cost(j) - columnDot(dualValues, j)
+            }
+        }
+        return costs
+    }
+
+    private fun directionalRowCosts(
+        column: Int,
+        row: IndexedVector,
+        token: Cancellation,
+        reducedCosts: DoubleArray?,
+    ): LpDirectionalCost? {
         var down = Double.POSITIVE_INFINITY
         var up = Double.POSITIVE_INFINITY
         for (j in 0 until numVars) {
@@ -2980,7 +3005,7 @@ internal class RevisedSimplex(
             if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
             var coefficient = 0.0
             for (k in colPtr[j] until colPtr[j + 1]) coefficient += row[rowIdx[k]] * colVal[k]
-            val reducedCost = cost(j) - columnDot(dualValues, j)
+            val reducedCost = reducedCosts?.get(j) ?: (cost(j) - columnDot(dualValues, j))
             if (!coefficient.isFinite() || !reducedCost.isFinite()) return null
             val orientation = if (status[j] == VarStatus.AT_UPPER) -1.0 else 1.0
             val orientedCost = reducedCost * orientation
