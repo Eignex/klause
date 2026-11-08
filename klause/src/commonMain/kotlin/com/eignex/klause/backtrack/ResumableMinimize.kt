@@ -180,6 +180,7 @@ internal class ResumableMinimize(
 
     // The allowance includes LP and propagation work so costly nodes consume proportionally more of a slice.
     private var proposalPropagationWork = 0L
+    private var initialValidationPropagationWork: (() -> Long)? = null
     private var clausePrimal: MonotoneClausePrimal? = null
     private var clausePrimalStarted = false
     private var clausePrimalCandidate: Sample? = null
@@ -189,7 +190,8 @@ internal class ResumableMinimize(
         { (if (::lpEngine.isInitialized) lpEngine.totalSolveWork() else 0L) + sink.lp.standaloneWork },
         {
             (if (::cp.isInitialized) session.work else preparedSession?.work ?: 0L) +
-                (if (::lpEngine.isInitialized) lpEngine.primalPropagationWork else 0L) + proposalPropagationWork
+                (if (::lpEngine.isInitialized) lpEngine.primalPropagationWork else 0L) + proposalPropagationWork +
+                (initialValidationPropagationWork?.invoke() ?: 0L)
         },
         preparationBudget,
         ownsWorkDebt = ownsWorkDebt,
@@ -1074,37 +1076,53 @@ internal class ResumableMinimize(
         val token = if (params.cancellation.workScheduled()) params.cancellation else
             params.cancellation or Cancellation.after(LP_VERIFY_BUDGET)
         if (token() || sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) return null
-        val validation = PropagationSession(problem, token)
-        if (validation.seed(params.assumptions) is PropagationResult.Unsat || validation.isUnsatAtRoot) return null
-        for (variable in (0 until sample.numBoolVars)) {
-            if (validation.pinBool(variable, sample.boolValue(variable)) is PropagationResult.Unsat) return null
-        }
-        for (variable in (0 until sample.numIntVars)) {
-            if (validation.pinInt(variable, sample.intValue(variable)) is PropagationResult.Unsat) return null
-        }
-        if (validation.fixpointCancelled || token()) return null
-        val accepted = if (problem.numRealVars == 0) {
-            sample
-        } else {
-            val real = completeLeaf(sample, token)
-            if (real.verdict !in listOf(
-                    LpVerdict.FEASIBLE,
-                    LpVerdict.ATTAINED_OPTIMUM,
-                    LpVerdict.TOLERANCE_OPTIMUM,
-                    LpVerdict.UNBOUNDED,
-                )
-            ) {
-                return null
+        var validation: PropagationSession? = null
+        try {
+            val checking = PropagationSession(problem, token,
+                onPropagationWork = { initialValidationPropagationWork = it })
+            validation = checking
+            if (checking.fixpointCancelled || token()) return null
+            if (checking.seed(params.assumptions) is PropagationResult.Unsat || checking.isUnsatAtRoot) return null
+            for (variable in (0 until sample.numBoolVars)) {
+                if (checking.fixpointCancelled || token()) return null
+                if (checking.pinBool(variable, sample.boolValue(variable)) is PropagationResult.Unsat) return null
             }
-            val completed = sample.copy(reals = real.reals, exactReals = real.exactReals)
-            if (real.verdict == LpVerdict.UNBOUNDED) {
-                if (!token()) unboundedLeaf = completed to checkNotNull(real.direction)
-                return null
+            for (variable in (0 until sample.numIntVars)) {
+                if (checking.fixpointCancelled || token()) return null
+                if (checking.pinInt(variable, sample.intValue(variable)) is PropagationResult.Unsat) return null
             }
-            completed
+            if (checking.fixpointCancelled || token()) return null
+            val accepted = if (problem.numRealVars == 0) {
+                sample
+            } else {
+                val real = completeLeaf(sample, token)
+                if (real.verdict !in listOf(
+                        LpVerdict.FEASIBLE,
+                        LpVerdict.ATTAINED_OPTIMUM,
+                        LpVerdict.TOLERANCE_OPTIMUM,
+                        LpVerdict.UNBOUNDED,
+                    )
+                ) {
+                    return null
+                }
+                val completed = sample.copy(reals = real.reals, exactReals = real.exactReals)
+                if (real.verdict == LpVerdict.UNBOUNDED) {
+                    if (!token()) unboundedLeaf = completed to checkNotNull(real.direction)
+                    return null
+                }
+                completed
+            }
+            if (token()) return null
+            return recordIfImproving(accepted, objective.evaluate(accepted), startingWitness = !rebindable)
+        } finally {
+            try {
+                validation?.releaseRetainedState()
+            } finally {
+                val spent = initialValidationPropagationWork?.invoke() ?: 0L
+                initialValidationPropagationWork = null
+                proposalPropagationWork += spent
+            }
         }
-        if (token()) return null
-        return recordIfImproving(accepted, objective.evaluate(accepted), startingWitness = !rebindable)
     }
 
     private fun firstRunWorkBody(): MinimizeResult.WithSample? {
