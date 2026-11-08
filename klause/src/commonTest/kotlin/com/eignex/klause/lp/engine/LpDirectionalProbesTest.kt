@@ -115,6 +115,44 @@ class LpDirectionalProbesTest {
     }
 
     @Test
+    fun `funded parent values save complete query work on an updated sparse basis`() {
+        val n = 13
+        val builder = LpBuilder()
+        repeat(n) { builder.addVar(0, 1, cost = 1L) }
+        repeat(n) { builder.addRow(intArrayOf(it, (it + 1) % n), longArrayOf(1, 1), Relation.GE, 1L) }
+        val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            .ownerWorkingModel())
+        val results = ArrayList<List<LpDirectionalGain>>()
+        val work = ArrayList<Long>()
+        for (reuse in listOf(false, true)) {
+            RevisedSimplex(model, refactorUpdateLimit = 64, reuseProbeValues = reuse).use { parent ->
+                assertTrue(assertNotNull(parent.solve()).optimal)
+                var charged = 0L
+                var completed = 0
+                var seeded = 0
+
+                val gains = parent.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
+                    50_000L, Cancellation.Never) {
+                    charged += it.work
+                    completed += it.completed
+                    if (it.numerical?.parentValues == true) seeded++
+                    assertTrue(charged <= 50_000L)
+                }
+
+                results.add(assertNotNull(gains))
+                work.add(charged)
+                assertEquals(4, completed)
+                assertEquals(if (reuse) 1 else 0, seeded)
+            }
+        }
+        for (column in results[0].indices) {
+            assertEquals(results[0][column].down, results[1][column].down, 1e-7)
+            assertEquals(results[0][column].up, results[1][column].up, 1e-7)
+        }
+        assertTrue(work[1] < work[0], "seeded=${work[1]} ordinary=${work[0]}")
+    }
+
+    @Test
     fun `funded parent values preserve negative source units and common constants`() {
         val n = 12
         val diagonal = n / 2 + 2L

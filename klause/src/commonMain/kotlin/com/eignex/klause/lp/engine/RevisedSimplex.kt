@@ -2948,8 +2948,9 @@ internal class RevisedSimplex(
             }
         ) return 0L
         val capture = 4L * m + 4L * numVars + 64L
+        val solve = nnzB.toLong() + (basisLifecycle.current?.updateCount ?: 0).toLong() * m
         // Nonzero basic values and costs require both setup solves; basic bounds preserve the nonbasic seats.
-        return capture.takeIf { it + numVars < 2L * nnzB + m } ?: 0L
+        return capture.takeIf { it + numVars < 2L * solve + m } ?: 0L
     }
 
     private fun seedProbeValues(

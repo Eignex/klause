@@ -1392,6 +1392,7 @@ remaining query allowance and global factor cap. This reservation trades away
 numerical solve work and grants no extra containing work.
 A matching parent optimum can also supply privately copied basic values and
 nonbasic statuses when their funded capture costs less than the setup it replaces.
+The comparison includes retained basis-update traversals in those setup solves.
 State, numerical scale and ordered basis bindings are rechecked after capture.
 The private solve restores bound deltas through the same retained-value path as
 later siblings, and incompatible or unavailable values keep ordinary numerical
