@@ -203,6 +203,11 @@ class LinearAuthorityPointCutsTest {
 
     @Test
     fun `cancelled fractional preparation should restore the current selector and retain its costs`() {
+        val controlBudget = SourceLpBudget()
+        val control = LinearAuthority(controlBudget, retainLp = true, aggregateCuts = true).use { authority ->
+            listOf(authority.advanceWithPointCuts(independentMixed, Cancellation.Never),
+                authority.advanceWithPointCuts(independentMixed, Cancellation.Never))
+        }
         var cancelled = false
         var observed: LinearAuthority? = null
         val budget = SourceLpBudget(onWork = {
@@ -218,11 +223,12 @@ class LinearAuthorityPointCutsTest {
                 val work = authority.cutObservations().getValue("numericalCutSelectionWork")
                 assertTrue(cancelled)
                 assertNull(stopped.advisoryPoint)
+                assertEquals(assertNotNull(control[0].bound).claim, assertNotNull(stopped.bound).claim)
 
                 val restored = authority.advanceWithPointCuts(independentMixed, Cancellation.Never)
 
-                assertEquals(2, budget.operations)
-                assertEquals(assertNotNull(stopped.bound).claim, assertNotNull(restored.bound).claim)
+                assertEquals(controlBudget.operations, budget.operations)
+                assertEquals(assertNotNull(control[1].bound).claim, assertNotNull(restored.bound).claim)
                 assertTrue(authority.cutObservations().getValue("numericalCutSelectionWork") >= work)
                 assertEquals(1L, authority.cutObservations()["numericalCutSelectionFractionalPreparations"])
                 assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(independentMixed.withLinearAuthority())
