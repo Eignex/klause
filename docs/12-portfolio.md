@@ -1047,6 +1047,14 @@ after admitting a complete improving incumbent; solution-guided selectors adopt
 better verified pooled incumbents when traversal resumes, keeping their trail and
 learned state.
 
+Finite portfolios with numerical companions supply native guidance from the same
+checked canonical exchange that supplies their cutoff. Each native subscriber uses
+that exchange's version sequence; ordinary native publication keeps its producer
+exchange and source checks. The guidance source is read-only, belongs to the same
+model and objective, and withholds non-finite floating projections. Native root
+proposals drawn from it still pass local validation. Guidance imports carry no
+improvement credit or proof authority.
+
 At its first root, a non-restarting retained CP worker with a shared cutoff revalidates
 the current pooled assignment as a starting incumbent. An equal-cutoff witness can
 supply local objective propagation without priming guidance or earning progress.

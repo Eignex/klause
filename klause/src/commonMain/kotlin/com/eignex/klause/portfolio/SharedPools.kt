@@ -9,6 +9,7 @@ import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.incumbent.ModelEvidence
 import com.eignex.klause.solver.incumbent.ModelEvidenceVerifier
 import com.eignex.klause.solver.incumbent.ModelIdentity
@@ -36,6 +37,7 @@ internal class SharedPools(
     val localSearchProjection: LocalSearchPreparation? = null,
     val localSearchInvariants: InvariantNetworkPreparation? = null,
     val identity: ModelIdentity? = null,
+    val acceptedIncumbents: IncumbentSource<Sample, Double>? = null,
 ) {
     fun offerSolution(
         model: ModelIdentity,

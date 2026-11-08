@@ -1,6 +1,11 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
@@ -15,13 +20,17 @@ import com.eignex.klause.ir.SearchGroup
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.ir.VariableSelection
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ProblemProfile
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionStrategy
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -31,6 +40,7 @@ import com.eignex.klause.solver.pipeline.ObjectiveCoordinateView
 import com.eignex.klause.solver.pipeline.PortfolioPlan
 import com.eignex.klause.solver.pipeline.PortfolioPlanRequest
 import com.eignex.klause.solver.pipeline.planPortfolio
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -42,6 +52,36 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PortfolioBuilderTest {
+    @Test
+    fun `a native factory should guide its first descent from accepted canonical incumbents`() {
+        val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(
+            Clause(IntArray(3) { Lit.make(it, true) }),
+        )).bake()
+        val objective = LinearObjective(boolWeights = longArrayOf(1L, 2L, 4L))
+        val canonical = IncumbentExchange.minimizing<Sample>().apply {
+            offer(Sample(booleanArrayOf(true, false, false), longArrayOf()), 1.0)
+        }
+        var reads = 0
+        val recipe = BacktrackRecipe("guided") { _, onEvent ->
+            BacktrackParams(variableSelector = InputOrder, valueSelector = SolutionGuided(IndomainMin),
+                phaseSaving = true,
+                lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false),
+                onEvent = onEvent)
+        }
+        val scenario = PortfolioScenario(cores = 1, arms = 1, kind = Kind.COP, engine = EngineMix.BACKTRACK,
+            btPool = listOf({ recipe }))
+        val factory = PortfolioBuilder.factories(problem, scenario, objective, null, null, null,
+            ProblemProfile.of(problem, true), numericalCompletion = false,
+            acceptedIncumbents = IncumbentSource { reads++; canonical.current() }).single()
+
+        val first = factory.materialize(0, 0L, null).use {
+            it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).first()
+        }
+
+        assertTrue(reads > 0)
+        assertEquals(1.0, assertIs<MinimizeResult.WithSample>(first).objective)
+    }
+
     @Test
     fun `materialized workers select the pool layout from integer coordinates`() {
         for (integerCount in listOf(0, 1)) {
