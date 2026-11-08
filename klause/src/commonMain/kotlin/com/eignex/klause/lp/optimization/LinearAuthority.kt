@@ -16,6 +16,7 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.BIG_ONE
@@ -24,6 +25,12 @@ import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact
+
+internal data class LinearAuthorityBranchGuidance(
+    val scope: SourceScope,
+    val split: Pair<SourceCoordinate, BigFraction>,
+    val fractional: List<Pair<SourceCoordinate, BigFraction>>,
+)
 
 internal data class LinearAuthorityResult(
     val evidence: SourceEvidence? = null,
@@ -40,6 +47,7 @@ internal data class LinearAuthorityResult(
     val cutBoundFamilies: Set<CutFamily> = emptySet(),
     val cutConflictFamilies: Set<CutFamily> = emptySet(),
     val cutTerminalBoundFamilies: Set<CutFamily> = emptySet(),
+    val branchGuidance: LinearAuthorityBranchGuidance? = null,
 )
 
 internal class LinearAuthority(
@@ -115,6 +123,7 @@ internal class LinearAuthority(
     private class FractionalRound(
         val previous: PointRecipe, val base: LinearAuthorityResult,
         val mask: Set<Int>, val rows: List<LinearAuthorityCut>,
+        val branchGuidance: LinearAuthorityBranchGuidance?,
     ) {
         var reported = false
     }
@@ -304,14 +313,19 @@ internal class LinearAuthority(
         values: List<BigFraction>, base: LinearAuthorityResult, cancellation: Cancellation,
         journal: LinearAuthorityAggregateRejections? = null,
     ): Boolean {
+        val guidanceWork = if (base.split == null) 0L else 1L + base.fractional.size
         val allocation = 256L + values.size * 8L +
-            64L * (base.fractional.size + base.relaxedPoint.size)
+            64L * (base.fractional.size + base.relaxedPoint.size) +
+            if (base.split == null) 0L else 96L + base.fractional.size * 8L
         if (values.size > 8192 || values.size != prepared.coordinates.size || cancellation() ||
-            budget.funding?.availableWork?.let { values.size.toLong() > it } == true ||
+            budget.funding?.availableWork?.let { values.size + guidanceWork > it } == true ||
             budget.funding?.remainingAllocation?.let { allocation > it } == true) return false
-        cutCost(values.size.toLong(), allocation)
+        cutCost(values.size + guidanceWork, allocation)
         if (budget.funding?.paused == true || cancellation()) return false
         val point = values.toList()
+        val branchGuidance = base.split?.let {
+            LinearAuthorityBranchGuidance(source.scope, it, base.fractional.toList())
+        }
         val previous = PointRecipe(family, prepared, pointPolicy, pointFamily, pointFallback,
             directedFamily, pointMask, primalAttempt)
         val policy = newPointPolicy()
@@ -342,7 +356,8 @@ internal class LinearAuthority(
         pointFamily = refined.first
         pointFallback = null
         fractionalFamily = refined.first
-        fractionalRound = FractionalRound(previous, base, selected, checkNotNull(refined.first.cuts).rows)
+        fractionalRound = FractionalRound(previous, base, selected, checkNotNull(refined.first.cuts).rows,
+            branchGuidance)
         policy.observe("FractionalRounds")
         return true
     }
@@ -355,7 +370,8 @@ internal class LinearAuthority(
             result.primalStages)
         pending.reported = true
         val stopped = cancellation() || budget.funding?.exhausted == true
-        if (result.paused && !stopped) return pending.base.copy(paused = true, primalStages = stages)
+        if (result.paused && !stopped) return pending.base.copy(paused = true, primalStages = stages,
+            branchGuidance = null)
         fractionalRound = null
         val completed = !stopped && !result.paused &&
             (result.evidence != null || result.bound != null || result.incumbent != null || result.split != null)
@@ -364,13 +380,19 @@ internal class LinearAuthority(
             restorePointRecipe(pending.previous)
             lp.invalidateGuidance()
             return pending.base.copy(primalStages = stages,
+                branchGuidance = null,
                 advisoryPoint = pending.base.advisoryPoint.takeUnless { stopped })
         }
         val strongest = strongerLinearBound(pending.base.bound, result.bound)
         pointPolicy?.observeRound(pending.rows, result.evidence != null || result.incumbent != null ||
             (strongest != null && strongest !== pending.base.bound))
         pending.previous.policy?.releaseCandidates()
+        val branchGuidance = pending.branchGuidance.takeIf {
+            result.incumbent == null && result.evidence == null && !cancellation()
+        }
+        if (branchGuidance != null) pointPolicy?.observe("FractionalBaselineGuidancePublished")
         return result.copy(bound = strongest, primalStages = stages,
+            branchGuidance = branchGuidance,
             advisoryPoint = (pending.base.advisoryPoint ?: pending.base.relaxedPoint).takeIf {
                 retainBasePoint && result.incumbent == null && result.evidence == null
             }, cutBoundFamilies = if (strongest != null && strongest === pending.base.bound) {

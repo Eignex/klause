@@ -240,6 +240,7 @@ class LinearAuthorityPointCutsTest {
                 assertEquals(SourceValue.Rational(BigFraction.ONE),
                     (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
                 assertEquals(2, budget.operations)
+                assertNull(result.branchGuidance)
                 assertEquals(1L, authority.cutObservations()["numericalCutSelectionFractionalRounds"])
                 for (name in listOf("Pool", "Checked", "Installed")) {
                     assertEquals(2L, authority.cutObservations()["numericalCutSelectionFractionalAttempt${name}Rows"])
@@ -312,6 +313,7 @@ class LinearAuthorityPointCutsTest {
             .use { authority ->
                 val paused = authority.advanceWithPointCuts(source, Cancellation.Never)
                 assertTrue(paused.paused)
+                assertNull(paused.branchGuidance)
                 assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
                     (assertNotNull(paused.bound).claim as SourceClaim.Bound).value)
 
@@ -365,6 +367,7 @@ class LinearAuthorityPointCutsTest {
             assertNull(result.evidence)
             assertNull(result.incumbent)
             assertNull(result.advisoryPoint)
+            assertNull(result.branchGuidance)
             assertEquals(SourceEvidenceCheck.Checked,
                 SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
         }
@@ -407,6 +410,7 @@ class LinearAuthorityPointCutsTest {
                 assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
                     (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
                 assertEquals(changed.scope, assertNotNull(result.bound).scope)
+                result.branchGuidance?.let { assertTrue(it.scope === changed.scope) }
                 assertEquals(SourceEvidenceCheck.Checked,
                     SourceEvidenceVerifier(changed.withLinearAuthority()).verify(assertNotNull(result.bound)))
             }

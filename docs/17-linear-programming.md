@@ -767,6 +767,11 @@ source order. Seed rows and incidence partners share that ordering. With no
 fractional support it retains the ordinary scoped preference. Its projections,
 score storage and sorting debit the existing generation allowance; declined ranking
 keeps source order.
+Completed nonterminal fractional augmentation retains a separate immutable baseline
+branch guide for the same verification scope. Ordinary traversal uses that guide
+while consuming the strongest checked bound; the augmented relaxation point and
+fractional coordinates retain their own meaning. Snapshot copies debit the existing
+source allowance. Pauses, cancellation and terminal results withhold the guide.
 With `source-cut-preparation-reuse=true`, point calls can retain one immutable
 source-incidence index within the numerical owner. Reuse requires the same
 generation context object and support allowance; a new context or owner release
