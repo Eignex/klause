@@ -1348,7 +1348,8 @@ subtraction; objective scaling maps every result to minimized source units.
 Both directions of every candidate require a complete optimal floating result
 and a finite nonnegative gain. Infeasibility, an unfinished query, cancellation
 or failed preparation withholds the entire comparison. These estimates train no
-history and supply no pruning or certificate authority.
+history and supply no pruning or certificate authority. Scoped owners recheck state,
+ownership and cancellation after observations before returning a comparison.
 Completed-child observations report preparation, solve and completion deltas;
 the final observation retains any unfinished work and decline. Every exit releases
 the private owner. Identity refreshes prepay scalar-vector visits and copies,
