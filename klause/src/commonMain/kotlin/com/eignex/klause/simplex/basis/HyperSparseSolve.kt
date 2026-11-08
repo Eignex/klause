@@ -222,11 +222,6 @@ internal class BasisSlice(
         val found = indices.binarySearchInt(index, offset, offset + count)
         return if (found < 0) 0.0 else values[found]
     }
-
-    fun copyOwned(): BasisSlice {
-        val end = offset + count
-        return BasisSlice(indices.copyOfRange(offset, end), values.copyOfRange(offset, end))
-    }
 }
 
 internal class BasisTriangularMatrix(var columns: Array<BasisSlice>, var order: IntArray) {

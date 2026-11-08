@@ -1452,11 +1452,13 @@ permutations; replay checks every numerical pivot and retains failed proposal an
 fallback work. Proposals carry no numerical factors or exact-order authority.
 
 The default backend also offers bounded owned copies of its current numerical
-basis. Each copy owns its LU matrices, permutations and live Forrest-Tomlin
-columns and row transforms, with fresh scratch and meters. Update counts and
+basis. Each private owner retains immutable LU matrices, permutations and published
+Forrest-Tomlin coefficient slices. Adjacency containers, orders, transform lists,
+row arithmetic status, scratch and meters stay private. Updates replace published
+buffers; refactoring or retiring one owner preserves its siblings. Update counts and
 fill/stability limits remain intact. Source keys and a producer generation check
 reject stale, singular, repairing, closed or cancelled offers. The caller funds
-ordinary source/workspace construction separately from the additional copy work
+ordinary source/workspace construction separately from private structural-copy work
 and reserves entries before allocation. Partial copies publish no owner. Exact
 ordering offers retain their ordinary freshness checks; numerical copies supply
 no certificate authority.
