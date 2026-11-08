@@ -14913,6 +14913,15 @@ final class com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest { // com
         final fun <get-zeroObjectivePricing>(): com.eignex.klause.lp.engine/LpZeroObjectivePricing // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.zeroObjectivePricing.<get-zeroObjectivePricing>|<get-zeroObjectivePricing>(){}[0]
 }
 
+final class com.eignex.klause.solver.pipeline/LinearSourceBound { // com.eignex.klause.solver.pipeline/LinearSourceBound|null[0]
+    final val sense // com.eignex.klause.solver.pipeline/LinearSourceBound.sense|{}sense[0]
+        final fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.solver.pipeline/LinearSourceBound.sense.<get-sense>|<get-sense>(){}[0]
+    final val strict // com.eignex.klause.solver.pipeline/LinearSourceBound.strict|{}strict[0]
+        final fun <get-strict>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/LinearSourceBound.strict.<get-strict>|<get-strict>(){}[0]
+    final val value // com.eignex.klause.solver.pipeline/LinearSourceBound.value|{}value[0]
+        final fun <get-value>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.pipeline/LinearSourceBound.value.<get-value>|<get-value>(){}[0]
+}
+
 final class com.eignex.klause.solver.pipeline/LinearSourceOutcome { // com.eignex.klause.solver.pipeline/LinearSourceOutcome|null[0]
     final val acceptedObjectiveBound // com.eignex.klause.solver.pipeline/LinearSourceOutcome.acceptedObjectiveBound|{}acceptedObjectiveBound[0]
         final fun <get-acceptedObjectiveBound>(): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.solver.pipeline/LinearSourceOutcome.acceptedObjectiveBound.<get-acceptedObjectiveBound>|<get-acceptedObjectiveBound>(){}[0]
@@ -14926,6 +14935,8 @@ final class com.eignex.klause.solver.pipeline/LinearSourceOutcome { // com.eigne
         final fun <get-nativeClaimsUnrestricted>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nativeClaimsUnrestricted.<get-nativeClaimsUnrestricted>|<get-nativeClaimsUnrestricted>(){}[0]
     final val nativeConclusion // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nativeConclusion|{}nativeConclusion[0]
         final fun <get-nativeConclusion>(): com.eignex.klause.solver.pipeline/LinearSourceConclusion // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nativeConclusion.<get-nativeConclusion>|<get-nativeConclusion>(){}[0]
+    final val nativeObjectiveBound // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nativeObjectiveBound|{}nativeObjectiveBound[0]
+        final fun <get-nativeObjectiveBound>(): com.eignex.klause.solver.pipeline/LinearSourceBound? // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nativeObjectiveBound.<get-nativeObjectiveBound>|<get-nativeObjectiveBound>(){}[0]
     final val nominalConstraintsExact // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nominalConstraintsExact|{}nominalConstraintsExact[0]
         final fun <get-nominalConstraintsExact>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nominalConstraintsExact.<get-nominalConstraintsExact>|<get-nominalConstraintsExact>(){}[0]
     final val nominalSourceExact // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nominalSourceExact|{}nominalSourceExact[0]
