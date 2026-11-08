@@ -32,6 +32,7 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -42,6 +43,235 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LocalSearchEngineCompletionTest {
+    @Test
+    fun `finite repairs should complete eligible mixed starts before zero floating residual`() {
+        for (realCoefficient in listOf(0.0, 10.0)) {
+            val problem = mixedProblem(finiteMinimum = 2)
+            val source = object : MoveSource {
+                override val id = MoveSourceId("finite-start-repair")
+                override val phase = Phase.Infeasible
+                override val pool = Pool.NoiseEligible
+                override fun generate(state: LocalSearchState, sink: MoveSink) {
+                    sink.addIntSet(0, 2)
+                }
+            }
+            var calls = 0
+            val search = LocalSearchEngine(LocalSearchModel.open(problem),
+                strategy = SourceDrivenStrategy(listOf(ConfiguredSource(source)),
+                    feasibleDescent = FeasibleDescent.SelfOwned),
+                greedyRepairOnRestart = false, completion = { candidate, _ ->
+                    calls++
+                    Completion.Witness(candidate.copy(reals = doubleArrayOf(0.5)), work = 4)
+                })
+            val initial = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(0.0))
+
+            val result = search.improvements(
+                LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(realCoefficient)),
+                LocalSearchParams(maxInstructions = 5, initialAssignment = initial), null,
+            ).last()
+
+            val best = assertIs<MinimizeResult.BestFound>(result)
+            assertEquals(2L, best.sample.intValue(0))
+            assertEquals(0.5, best.sample.approximateRealValue(0))
+            assertEquals(5.0, best.stats.ls.moves.sum)
+            assertEquals(1, calls)
+        }
+    }
+
+    @Test
+    fun `changed restart poses should receive completion before the first mixed incumbent`() {
+        val problem = mixedProblem(finiteMinimum = 2)
+        val restart = object : RestartPolicy {
+            override fun shouldRestart(stepsSinceLastRestart: Int) = false
+            override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
+                state.assignment.setInt(0, 2)
+                state.assignment.setReal(0, 0.0)
+                state.recompute()
+            }
+        }
+        var calls = 0
+        val search = LocalSearchEngine(LocalSearchModel.open(problem),
+            strategy = SourceDrivenStrategy(emptyList(), feasibleDescent = FeasibleDescent.SelfOwned),
+            restartPolicy = restart, greedyRepairOnRestart = false, completion = { candidate, _ ->
+                calls++
+                Completion.Witness(candidate.copy(reals = doubleArrayOf(0.5)), work = 4)
+            })
+
+        val result = search.improvements(
+            LinearObjective(realCoefficients = doubleArrayOf(1.0)),
+            LocalSearchParams(maxInstructions = 5,
+                initialAssignment = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(0.0))), null,
+        ).last()
+
+        val best = assertIs<MinimizeResult.BestFound>(result)
+        assertEquals(2L, best.sample.intValue(0))
+        assertEquals(0.5, best.sample.approximateRealValue(0))
+        assertEquals(1, calls)
+    }
+
+    @Test
+    fun `unchanged unsuccessful finite starts should not repeat completion for new real guesses`() {
+        for (decision in listOf(Completion.Refuted(work = 2), Completion.Undecided(work = 2))) {
+            val restart = object : RestartPolicy {
+                override fun shouldRestart(stepsSinceLastRestart: Int) = false
+                override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
+                    state.assignment.setInt(0, 1)
+                    state.assignment.setReal(0, 1.0)
+                    state.recompute()
+                }
+            }
+            var calls = 0
+            val search = LocalSearchEngine(LocalSearchModel.open(mixedProblem()),
+                strategy = SourceDrivenStrategy(emptyList(), feasibleDescent = FeasibleDescent.SelfOwned),
+                restartPolicy = restart, greedyRepairOnRestart = false, completion = { _, _ ->
+                    calls++
+                    decision
+                })
+
+            val result = search.improvements(
+                LinearObjective(realCoefficients = doubleArrayOf(1.0)),
+                LocalSearchParams(maxInstructions = 10,
+                    initialAssignment = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(0.0))), null,
+            ).last()
+
+            assertIs<MinimizeResult.Unknown>(result)
+            assertEquals(1, calls)
+        }
+    }
+
+    @Test
+    fun `repaired mixed start completion should resume with the same finite coordinates`() {
+        val source = object : MoveSource {
+            override val id = MoveSourceId("resumable-finite-start-repair")
+            override val phase = Phase.Infeasible
+            override val pool = Pool.NoiseEligible
+            override fun generate(state: LocalSearchState, sink: MoveSink) {
+                sink.addIntSet(0, if (state.assignment.intValue(0) == 0L) 2L else 3L)
+            }
+        }
+        val attempted = mutableListOf<Long>()
+        var expired = false
+        val search = LocalSearchEngine(LocalSearchModel.open(mixedProblem(finiteMinimum = 2)),
+            strategy = SourceDrivenStrategy(listOf(ConfiguredSource(source)),
+                feasibleDescent = FeasibleDescent.SelfOwned),
+            greedyRepairOnRestart = false, completion = { candidate, _ ->
+                attempted += candidate.intValue(0)
+                if (attempted.size == 1) {
+                    expired = true
+                    Completion.Undecided(work = 2)
+                } else Completion.Witness(candidate.copy(reals = doubleArrayOf(0.5)), work = 2)
+            })
+
+        search.resumable(LinearObjective(realCoefficients = doubleArrayOf(1.0)),
+            LocalSearchParams(maxInstructions = 5,
+                initialAssignment = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(0.0))),
+        ).use { handle ->
+            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L))
+            assertFalse(handle.isDone)
+            expired = false
+
+            val best = assertIs<MinimizeResult.BestFound>(
+                handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+
+            assertEquals(listOf(2L, 2L), attempted)
+            assertEquals(2L, best.sample.intValue(0))
+            assertEquals(0.5, best.sample.approximateRealValue(0))
+            assertEquals(5.0, best.stats.ls.moves.sum)
+        }
+    }
+
+    @Test
+    fun `an exhausted repair allowance should not start mixed completion`() {
+        val source = object : MoveSource {
+            override val id = MoveSourceId("exhausted-finite-start-repair")
+            override val phase = Phase.Infeasible
+            override val pool = Pool.NoiseEligible
+            override fun generate(state: LocalSearchState, sink: MoveSink) { sink.addIntSet(0, 2) }
+        }
+        val search = LocalSearchEngine(LocalSearchModel.open(mixedProblem(finiteMinimum = 2)),
+            strategy = SourceDrivenStrategy(listOf(ConfiguredSource(source)),
+                feasibleDescent = FeasibleDescent.SelfOwned),
+            greedyRepairOnRestart = false,
+            completion = { _, _ -> error("completion must not start after the allowance is exhausted") })
+
+        val result = search.improvements(LinearObjective(realCoefficients = doubleArrayOf(1.0)),
+            LocalSearchParams(maxInstructions = 1,
+                initialAssignment = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(0.0))), null,
+        ).last()
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(result).reason)
+        assertEquals(0.0, result.stats.ls.completions.sum)
+    }
+
+    @Test
+    fun `startup eligibility should charge domain factor and snapshot inspections`() {
+        val state = LocalSearchState(LocalSearchModel.open(mixedProblem(finiteMinimum = 2)), kotlin.random.Random(3))
+        state.assignment.setInt(0, 2)
+        state.assignment.setReal(0, 0.0)
+        state.recompute()
+        var visits = 0L
+        val work = WorkMeter { visits += it }
+
+        assertTrue(state.intValuesInDomain(work))
+        val candidate = state.completionCandidate(work)
+
+        assertNotNull(candidate)
+        assertTrue(visits >= 2L * state.problem.numIntVars + state.problem.numBoolVars +
+            state.problem.numRealVars + state.violated.size)
+    }
+
+    @Test
+    fun `unsuccessful startup completion should be scoped to one search invocation`() {
+        var calls = 0
+        val search = engine { _, _ ->
+            calls++
+            Completion.Refuted(work = 2)
+        }
+        val initial = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(0.0))
+
+        for (assumptions in listOf(Assumptions.None, Assumptions.None.withInt(0, 1))) {
+            search.improvements(LinearObjective(realCoefficients = doubleArrayOf(1.0)),
+                LocalSearchParams(maxInstructions = 2, initialAssignment = initial, assumptions = assumptions),
+                null,
+            ).last()
+        }
+
+        assertEquals(2, calls)
+    }
+
+    @Test
+    fun `startup completion work should leave search steps before another numerical attempt`() {
+        var steps = 0
+        val source = object : MoveSource {
+            override val id = MoveSourceId("funded-finite-start-repair")
+            override val phase = Phase.Infeasible
+            override val pool = Pool.NoiseEligible
+            override fun generate(state: LocalSearchState, sink: MoveSink) {
+                steps++
+                sink.addIntSet(0, if (state.assignment.intValue(0) == 1L) 2L else 1L)
+            }
+        }
+        val attemptedAt = mutableListOf<Int>()
+        val search = LocalSearchEngine(LocalSearchModel.open(mixedProblem()),
+            strategy = SourceDrivenStrategy(listOf(ConfiguredSource(source)),
+                acceptance = AcceptanceRule.WalkSatNoise(1.0), feasibleDescent = FeasibleDescent.SelfOwned),
+            greedyRepairOnRestart = false, completion = { candidate, _ ->
+                attemptedAt += steps
+                if (attemptedAt.size == 1) Completion.Refuted(work = 4)
+                else Completion.Witness(candidate.copy(reals = doubleArrayOf(0.5)), work = 1)
+            })
+
+        val result = search.improvements(LinearObjective(realCoefficients = doubleArrayOf(1.0)),
+            LocalSearchParams(maxInstructions = 10,
+                initialAssignment = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(0.0))), null,
+        ).last()
+
+        assertIs<MinimizeResult.BestFound>(result)
+        assertEquals(2, attemptedAt.size)
+        assertEquals(0, attemptedAt.first())
+        assertTrue(attemptedAt.last() >= 4)
+    }
+
     @Test
     fun `continuous satisfaction should complete before requiring zero heuristic violation`() {
         val problem = Problem(
@@ -127,13 +357,15 @@ class LocalSearchEngineCompletionTest {
     }
 
     // x + k = 2.5 and x ≤ 1 over a continuous x in [0, 10] and an integer k in [0, 5]: k ≥ 2 and x = 2.5 - k.
-    private fun mixedProblem(): Problem = Problem(
+    private fun mixedProblem(finiteMinimum: Int? = null): Problem = Problem(
         numBoolVars = 0,
         numIntVars = 1,
         intDomains = arrayOf(IntDomain(0, 5)),
         factors = arrayOf<Factor>(
             Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 2.5),
             Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0),
+        ) + if (finiteMinimum == null) emptyArray() else arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, finiteMinimum),
         ),
         numRealVars = 1,
         realLower = doubleArrayOf(0.0),

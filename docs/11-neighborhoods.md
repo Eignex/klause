@@ -184,6 +184,15 @@ objective term, a pick admits at most two completion probes, and a finite move a
 its completed reals commit as one transition. Probes are rate-limited by the
 instructions they charge, and completion consumes the same move allowance.
 
+Before the first incumbent, changed repair and restart poses can request completion
+once their finite rows and integer domains hold. A run retains one unsuccessful
+finite pose within its model and assumption scope to suppress unchanged retries.
+Completion work limits later startup attempts. Retained runs charge eligibility
+scans, snapshot copies and finite-pose comparisons to the containing inspection
+meter. Cancelled completion resumes the same pose; a witness releases the
+unsuccessful-pose marker. Post-incumbent admission keeps its objective
+and probe rules.
+
 Numerical completion uses the source tolerance callback when one is supplied;
 otherwise it needs exact certification. Exact completion uses bounded point recovery
 and sparse row repair, theory-backed linear completion keeps a worker-private

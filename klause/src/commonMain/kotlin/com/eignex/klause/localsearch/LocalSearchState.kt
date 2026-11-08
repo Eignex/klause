@@ -1458,15 +1458,18 @@ class LocalSearchState private constructor(
         return sample
     }
 
-    internal fun completionCandidate(): Sample? {
-        val finiteViolation = (0 until violated.size).any { index ->
+    internal fun completionCandidate(work: WorkMeter? = null): Sample? {
+        for (index in 0 until violated.size) {
+            work?.charge(1L)
             val id = violated[index]
             val factor = problem.factors[id]
-            factor.variables.reals.isEmpty() &&
+            if (factor.variables.reals.isEmpty() &&
                 (projection.selection?.capabilities(id) ?: factor.executionCapabilities()).assignmentCheck ==
                 AssignmentCheckCapability.EXACT
+            ) return null
         }
-        return if (finiteViolation) null else assignment.snapshot()
+        work?.charge(problem.numBoolVars.toLong() + problem.numIntVars + problem.numRealVars)
+        return assignment.snapshot()
     }
 
     // Use the committed move's single propagation pass and restore saved outputs without replaying definitions.
@@ -1656,14 +1659,10 @@ class LocalSearchState private constructor(
         adjustBoolBreakMake(factorId, +1)
     }
 
-    /**
-     * True iff every int var holds a value of its root domain. Domain membership is not a cost term, so
-     * a value in a hole reads as feasible at `cost == 0`; this is the check that keeps such an
-     * assignment from being reported. O(numIntVars), so it runs where an incumbent is published, never
-     * per move.
-     */
-    internal fun intValuesInDomain(): Boolean {
+    // Domain membership is not a cost term; holes need an explicit check before completion or publication.
+    internal fun intValuesInDomain(work: WorkMeter? = null): Boolean {
         for (v in rootDomains.indices) {
+            work?.charge(1L)
             if (assignment.intValue(v) !in rootDomains[v]) return false
         }
         return true

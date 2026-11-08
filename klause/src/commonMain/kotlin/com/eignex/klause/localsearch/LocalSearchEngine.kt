@@ -887,7 +887,10 @@ internal class LocalSearchEngine(
             },
             current = { (liveCompletion as? Completion.Witness)?.sample ?: state.assignment.snapshot() },
         ) else null
-        var checkInitialCompletion = continuousCompletion || completedMoves != null
+        val completesStarts = completion != null && problem.numRealVars > 0
+        var checkInitialCompletion = completesStarts
+        // Before an incumbent, the model, assumptions and objective bound stay fixed within this run.
+        var lastInitialCompletion: Sample? = null
 
         fun reportProgress() {
             (configuredRestart as? IteratedLocalSearchRestart)?.let {
@@ -937,21 +940,41 @@ internal class LocalSearchEngine(
                     cancelCountdown = 0
                 }
             }
-            if (checkInitialCompletion) {
+            if (checkInitialCompletion && totalFlips >= nextMoveCompletion) {
                 checkInitialCompletion = false
-                val candidate = if (state.cost != 0L && state.intValuesInDomain()) {
-                    state.completionCandidate()
+                val candidate = if (state.cost != 0L && state.intValuesInDomain(checkpoint)) {
+                    state.completionCandidate(checkpoint)
                 } else null
                 if (candidate != null) {
+                    val repeated = lastInitialCompletion?.let {
+                        checkpoint?.charge(problem.numBoolVars.toLong() + problem.numIntVars)
+                        candidate.hammingDistanceTo(it) == 0
+                    } == true
+                    if (params.cancellation()) {
+                        checkInitialCompletion = checkpoint != null
+                        cancelCountdown = 0
+                        continue
+                    }
+                    if (repeated) continue
+                    if (params.nodeBudget?.allowance?.movesLeft() == 0L) continue
+                    val before = totalFlips
                     val decided = decide(state, candidate, params.cancellation, sink.ls) { work ->
                         totalFlips += work
                         progress.charge(totalFlips)
                     }
-                    if (decided is Completion.Witness) liveCompletion = decided
+                    if (decided is Completion.Witness) {
+                        liveCompletion = decided
+                        lastInitialCompletion = null
+                    }
                     if (params.cancellation()) {
                         checkInitialCompletion = checkpoint != null && liveCompletion == null
                         cancelCountdown = 0
                         continue
+                    }
+                    lastInitialCompletion = candidate.takeUnless { decided is Completion.Witness }
+                    if (decided !is Completion.Witness) {
+                        val work = totalFlips - before
+                        nextMoveCompletion = totalFlips + minOf(work, Long.MAX_VALUE - totalFlips)
                     }
                     if (liveCompletion == null && totalFlips >= maxFlips) continue
                 }
@@ -1007,6 +1030,7 @@ internal class LocalSearchEngine(
                         }
                         liveCompletion = null
                         restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
+                        checkInitialCompletion = bestSample == null && completesStarts
                         restartCount++
                         flipsSinceRestart = 0
                         totalFlips++
@@ -1052,6 +1076,7 @@ internal class LocalSearchEngine(
                         traceEnd(RepairEndpoint.FeasibleStall, state)
                         liveCompletion = null
                         restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
+                        checkInitialCompletion = bestSample == null && completesStarts
                         stallCount++
                         restartCount++
                         flipsSinceRestart = 0
@@ -1133,6 +1158,7 @@ internal class LocalSearchEngine(
                         }
                         liveCompletion = null
                         restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
+                        checkInitialCompletion = bestSample == null && completesStarts
                         stallCount++
                         restartCount++
                         flipsSinceRestart = 0
@@ -1144,6 +1170,7 @@ internal class LocalSearchEngine(
             if (restarts.shouldRestart(flipsSinceRestart)) {
                 liveCompletion = null
                 restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
+                checkInitialCompletion = bestSample == null && completesStarts
                 restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
@@ -1164,6 +1191,7 @@ internal class LocalSearchEngine(
                 }
                 liveCompletion = null
                 restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
+                checkInitialCompletion = bestSample == null && completesStarts
                 restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
@@ -1176,6 +1204,7 @@ internal class LocalSearchEngine(
                 sink.ls.recordWork(moves = totalFlips, restarts = restartCount, stalls = stallCount)
             }
             liveCompletion = null
+            checkInitialCompletion = bestSample == null && completesStarts
             if (state.cost in 1 until bestCostInfeasible) {
                 bestCostInfeasible = state.cost
             }
