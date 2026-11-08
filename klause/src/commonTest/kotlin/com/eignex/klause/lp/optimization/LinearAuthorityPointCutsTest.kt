@@ -91,6 +91,33 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `closing the numerical owner should release retained aggregate preparation`() {
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y, mixedReal), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    mixedReal to BigFraction.ONE), BigFraction.ofLong(3))),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                    mixedReal to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            ), mapOf(x to BigFraction.ONE, y to BigFraction.ONE))
+        val cuts = source.premises.entries.mapIndexed { owner, (name, premise) ->
+            LinearAuthorityCut(owner, premise.inequality, SourceDerivation.Premise(name),
+                mixed = true, family = CutFamily.SOURCE_AGGREGATION)
+        }
+        val funding = SourceLpFunding(4_000_000L, 8_000_000L).apply { grant(4_000_000L) }
+        val authority = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true,
+            additionalCuts = cuts, aggregateCuts = true, fractionalAggregateOrder = true,
+            reuseAggregatePreparation = true)
+
+        val result = authority.use { it.advanceWithPointCuts(source, Cancellation.Never) }
+
+        assertTrue(assertNotNull(authority.cutObservations()["numericalCutAggregateSourceIndexPrepared"]) > 0L)
+        assertTrue(assertNotNull(authority.cutObservations()["numericalCutAggregateSourceIndexRetired"]) > 0L)
+        assertTrue(assertNotNull(authority.cutObservations()["numericalCutAggregateSourceIndexReleasedBytes"]) > 0L)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+    }
+
+    @Test
     fun `attempt observation should retain exact completed data after the numerical owner closes`() {
         val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
             setOf(x, y, mixedReal), linkedMapOf(

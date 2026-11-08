@@ -132,6 +132,7 @@ internal class LinearAuthorityInvocation(
         pointCuts = boundOrdered && params.sourcePointCuts, onNumericalFeedback = onNumericalFeedback,
         aggregateCuts = boundOrdered && params.sourceAggregateCuts,
         fractionalAggregateOrder = boundOrdered && params.sourceAggregateCuts && params.sourceCutFractionalOrder,
+        reuseAggregatePreparation = boundOrdered && params.sourceAggregateCuts && params.sourceCutPreparationReuse,
         latestFeedback = latestFeedback,
         feedbackRequest = feedbackRequest, aggregateBranching = aggregateBranching, repairGuidance = repairGuidance)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,

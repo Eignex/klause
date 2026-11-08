@@ -767,6 +767,15 @@ source order. Seed rows and incidence partners share that ordering. With no
 fractional support it retains the ordinary scoped preference. Its projections,
 score storage and sorting debit the existing generation allowance; declined ranking
 keeps source order.
+With `source-cut-preparation-reuse=true`, point calls can retain one immutable
+source-incidence index within the numerical owner. Reuse requires the same
+generation context object and support allowance; a new context or owner release
+drops it. Partial preparation is never retained. The index stays within 65,536
+modeled work and 1 MiB of modeled allocation, including charged reference copies
+and a prepaid constant release. Each point gets fresh seed and incidence lists,
+ordering and bound-side selection under the existing generation allowance.
+Retaining an index supplies no proof authority; query certification still checks
+the complete source premises and scope. Reuse is disabled by default.
 Incidence lookup, partition storage and copy-back share the containing generation
 allowance. The partition's estimate admits at most half the remaining work and
 allocation after slack ordering; a declined partition retains that order. Incomplete

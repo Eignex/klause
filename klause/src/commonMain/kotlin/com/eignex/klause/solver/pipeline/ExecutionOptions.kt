@@ -169,6 +169,10 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val sourceCutFractionalOrder: ExecutionOption<Boolean> =
             ExecutionOption("source-cut-fractional-order", ValueKind.BOOLEAN)
 
+        /** Reuse bounded immutable source-incidence preparation between point aggregation calls. */
+        val sourceCutPreparationReuse: ExecutionOption<Boolean> =
+            ExecutionOption("source-cut-preparation-reuse", ValueKind.BOOLEAN)
+
         /** Bounded advisory incumbent completion under the exact companion's existing allowance. */
         val sourceIncumbentCompletion: ExecutionOption<Boolean> =
             ExecutionOption("source-incumbent-completion", ValueKind.BOOLEAN)
@@ -607,6 +611,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 presolveProbePerVar, presolveProbeTotal,
                 nodeLimit, openWorkLimit, sourceLpWorkLimit, sourceLpAllocationLimit, sourceLpOperations, sourceCuts,
                 sourcePointCuts, sourceCutBranching, sourceAggregateCuts, sourceCutFractionalOrder,
+                sourceCutPreparationReuse,
                 sourceIncumbentCompletion,
                 sourceRefutationReuse,
                 sourceRefutationPropagation,

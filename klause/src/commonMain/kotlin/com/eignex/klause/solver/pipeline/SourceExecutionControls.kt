@@ -91,6 +91,8 @@ internal fun bindSourceExecutionControls(
             sourceAggregateCuts = reader[ExecutionOption.sourceAggregateCuts] ?: defaults.sourceAggregateCuts,
             sourceCutFractionalOrder = reader[ExecutionOption.sourceCutFractionalOrder]
                 ?: defaults.sourceCutFractionalOrder,
+            sourceCutPreparationReuse = reader[ExecutionOption.sourceCutPreparationReuse]
+                ?: defaults.sourceCutPreparationReuse,
             sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
                 ?: defaults.sourceIncumbentCompletion,
             sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
@@ -148,6 +150,8 @@ internal fun bindSourceExecutionControls(
             sourceAggregateCuts = reader[ExecutionOption.sourceAggregateCuts] ?: defaults.sourceAggregateCuts,
             sourceCutFractionalOrder = reader[ExecutionOption.sourceCutFractionalOrder]
                 ?: defaults.sourceCutFractionalOrder,
+            sourceCutPreparationReuse = reader[ExecutionOption.sourceCutPreparationReuse]
+                ?: defaults.sourceCutPreparationReuse,
             sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
                 ?: defaults.sourceIncumbentCompletion,
             sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
@@ -279,7 +283,7 @@ private fun FiniteSolveRequest.withSourceControls(
 private fun ExecutionOptions.withoutSourceCompanionControls(): ExecutionOptions = without(
     "source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations",
     "source-cuts", "source-point-cuts", "source-cut-branching", "source-aggregate-cuts",
-    "source-cut-fractional-order",
+    "source-cut-fractional-order", "source-cut-preparation-reuse",
     "source-refutation-reuse", "source-refutation-propagation", "source-refutation-resolution",
     "source-incumbent-completion",
 )

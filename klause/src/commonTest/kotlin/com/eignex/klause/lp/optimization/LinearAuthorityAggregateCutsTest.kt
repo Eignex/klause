@@ -42,6 +42,166 @@ class LinearAuthorityAggregateCutsTest {
         BigFraction.ZERO)
 
     @Test
+    fun `reusing source preparation should amortize allocation while preserving checked cuts`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+            "left" to SourcePremise(left), "right" to SourcePremise(right)))
+        val cache = LinearAuthorityAggregateCuts.SourcePairsCache()
+        val totals = ArrayList<Long>()
+        val recorded = ArrayList<List<LinearAuthorityCut>>()
+        for (retained in listOf(null, null, cache, cache)) {
+            var allocation = 0L
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairsCached(source, Cancellation.Never,
+                { name, count -> if (name == "AggregateAllocation") allocation += count }, 1,
+                LinearAuthorityAggregateCuts.pointSourcePairLimits, mapOf(x to 1.5, y to 0.0, real to 0.0),
+                true, null, retained)
+
+            totals += allocation
+            recorded += cuts
+            assertTrue(allocation <= LinearAuthorityAggregateCuts.pointSourcePairLimits.allocation)
+            val cut = cuts.single()
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(source.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
+
+        assertEquals(recorded.first().map { it.inequality }, recorded.last().map { it.inequality })
+        assertTrue(totals.takeLast(2).sum() < totals.take(2).sum())
+    }
+
+    @Test
+    fun `reused incidence should order each point independently`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(x, y, real, residual), linkedMapOf(
+            "x row" to SourcePremise(left),
+            "x side" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y row" to SourcePremise(SourceInequality(
+                mapOf(y to BigFraction.ofLong(2), residual to BigFraction.ONE), BigFraction.ofLong(3))),
+            "y side" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        val cache = LinearAuthorityAggregateCuts.SourcePairsCache()
+        val selected = ArrayList<SourceInequality>()
+        for ((first, second) in listOf(1.5 to 0.0, 0.0 to 1.5, 1.5 to 0.0)) {
+            val cut = LinearAuthorityAggregateCuts.prepareSourcePairsCached(source, Cancellation.Never,
+                { _, _ -> }, 1, LinearAuthorityAggregateCuts.pointSourcePairLimits,
+                mapOf(x to first, y to second, real to 0.0, residual to 0.0), true, null, cache).single()
+
+            selected += cut.inequality
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(source.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
+
+        assertEquals(listOf(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+            SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ONE),
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE)), selected)
+    }
+
+    @Test
+    fun `a different generation context should replace the retained source index`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+            "left" to SourcePremise(left), "right" to SourcePremise(right)))
+        val changed = SourceProofContext(scope.copy(revision = SourceRevision("other", "exact-affine")),
+            setOf(x, y, real), linkedMapOf("changed left" to SourcePremise(
+                SourceInequality(left.coefficients, BigFraction.ONE)), "changed right" to SourcePremise(right)))
+        val cache = LinearAuthorityAggregateCuts.SourcePairsCache()
+        val observations = HashMap<String, Long>()
+        val recorded = ArrayList<LinearAuthorityCut>()
+        for (context in listOf(source, changed)) {
+            val cut = LinearAuthorityAggregateCuts.prepareSourcePairsCached(context, Cancellation.Never,
+                { name, count -> observations[name] = (observations[name] ?: 0L) + count }, 1,
+                LinearAuthorityAggregateCuts.pointSourcePairLimits, mapOf(x to 1.5, y to 0.0, real to 0.0),
+                true, null, cache).single()
+
+            recorded += cut
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(
+                SourceEvidence(context.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
+
+        assertEquals(BigFraction.ZERO, recorded.last().inequality.rhs)
+        assertEquals(2L, observations["AggregateSourceIndexPrepared"])
+        assertEquals(1L, observations["AggregateSourceIndexRetired"])
+        assertEquals(0L, observations["AggregateSourceIndexReused"] ?: 0L)
+    }
+
+    @Test
+    fun `a tighter support allowance should invalidate the retained source index`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+            "left" to SourcePremise(left), "right" to SourcePremise(right)))
+        val cache = LinearAuthorityAggregateCuts.SourcePairsCache()
+        val observations = HashMap<String, Long>()
+        LinearAuthorityAggregateCuts.prepareSourcePairsCached(source, Cancellation.Never,
+            { _, _ -> }, 1, LinearAuthorityAggregateCuts.pointSourcePairLimits,
+            mapOf(x to 1.5, y to 0.0, real to 0.0), true, null, cache)
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairsCached(source, Cancellation.Never,
+            { name, count -> observations[name] = (observations[name] ?: 0L) + count }, 1,
+            LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(support = 1),
+            mapOf(x to 1.5, y to 0.0, real to 0.0), true, null, cache)
+
+        assertTrue(cuts.isEmpty())
+        assertEquals(1L, observations["AggregateSourceIndexRetired"])
+        assertEquals(2L, observations["AggregatePairSourceSupportLimit"])
+        assertEquals(0L, observations["AggregateSourceIndexReused"] ?: 0L)
+    }
+
+    @Test
+    fun `interrupted source preparation should retain charges without publishing an index`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+            "left" to SourcePremise(left), "right" to SourcePremise(right)))
+        for (mode in listOf("work", "allocation", "cancellation")) {
+            val cache = LinearAuthorityAggregateCuts.SourcePairsCache()
+            val observations = HashMap<String, Long>()
+            var stopped = false
+            val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(
+                work = if (mode == "work") 1L else 65_536L,
+                allocation = if (mode == "allocation") 1L else 1_048_576L)
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairsCached(source, Cancellation { stopped },
+                { name, count ->
+                    observations[name] = (observations[name] ?: 0L) + count
+                    if (name == "AggregateIncidenceReferences" && mode == "cancellation") stopped = true
+                }, 1, limits, mapOf(x to 1.5, y to 0.0, real to 0.0), true, null, cache)
+
+            assertTrue(cuts.isEmpty())
+            assertEquals(0L, observations["AggregateSourceIndexPrepared"] ?: 0L)
+            assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
+            assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
+            observations.clear()
+
+            val completed = LinearAuthorityAggregateCuts.prepareSourcePairsCached(source, Cancellation.Never,
+                { name, count -> observations[name] = (observations[name] ?: 0L) + count }, 1,
+                LinearAuthorityAggregateCuts.pointSourcePairLimits, mapOf(x to 1.5, y to 0.0, real to 0.0),
+                true, null, cache)
+
+            assertTrue(completed.isNotEmpty())
+            assertEquals(1L, observations["AggregateSourceIndexPrepared"])
+            assertEquals(0L, observations["AggregateSourceIndexReused"] ?: 0L)
+        }
+    }
+
+    @Test
+    fun `cancelling a reused point view should preserve the index for a fresh retry`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+            "left" to SourcePremise(left), "right" to SourcePremise(right)))
+        val cache = LinearAuthorityAggregateCuts.SourcePairsCache()
+        val point = mapOf(x to 1.5, y to 0.0, real to 0.0)
+        LinearAuthorityAggregateCuts.prepareSourcePairsCached(source, Cancellation.Never,
+            { _, _ -> }, 1, LinearAuthorityAggregateCuts.pointSourcePairLimits, point, true, null, cache)
+        var stopped = false
+        var allocation = 0L
+
+        val cancelled = LinearAuthorityAggregateCuts.prepareSourcePairsCached(source, Cancellation { stopped },
+            { name, count ->
+                if (name == "AggregateAllocation") allocation += count
+                if (name == "AggregateSourceIndexReused") stopped = true
+            }, 1, LinearAuthorityAggregateCuts.pointSourcePairLimits, point, true, null, cache)
+
+        assertTrue(cancelled.isEmpty())
+        assertTrue(allocation in 1L..LinearAuthorityAggregateCuts.pointSourcePairLimits.allocation)
+        val retried = LinearAuthorityAggregateCuts.prepareSourcePairsCached(source, Cancellation.Never,
+            { _, _ -> }, 1, LinearAuthorityAggregateCuts.pointSourcePairLimits, point, true, null, cache).single()
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(source.scope, SourceClaim.Consequence(retried.inequality), retried.derivation)))
+    }
+
+    @Test
     fun `fractional targeting should separate before retrying an integral branch coordinate`() {
         val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val source = SourceProofContext(scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ONE))),

@@ -50,9 +50,12 @@ internal class LinearAuthority(
     additionalCuts: List<LinearAuthorityCut> = emptyList(),
     private val aggregateCuts: Boolean = false,
     private val fractionalAggregateOrder: Boolean = false,
+    reuseAggregatePreparation: Boolean = false,
 ) : AutoCloseable {
     init { require(additionalCuts.size <= 64) }
     private val additionalCuts = additionalCuts.toList()
+    private val aggregateSourceCache = if (aggregateCuts && reuseAggregatePreparation)
+        LinearAuthorityAggregateCuts.SourcePairsCache() else null
     private var replayCuts: List<LinearAuthorityCut>? = null
 
     fun useReplayCuts(rows: List<LinearAuthorityCut>) {
@@ -170,7 +173,10 @@ internal class LinearAuthority(
         pointMask = null
         deferAggregatePreparation = false
         primalAttempt = null
-        cutLifecycle.containing("RETIREMENT") { lp.close() }
+        cutLifecycle.containing("RETIREMENT") {
+            aggregateSourceCache?.clear(::observeAggregate)
+            lp.close()
+        }
     }
 
     fun advanceWithPointCuts(source: SourceProofContext, cancellation: Cancellation,
@@ -610,6 +616,9 @@ internal class LinearAuthority(
     }
 
     private fun adoptTemplate(prepared: LinearAuthorityTemplate) {
+        if (aggregateSourceCache?.index?.source?.let { it !== prepared.numeric } == true) {
+            aggregateSourceCache.clear(::observeAggregate)
+        }
         template = prepared
         for (cut in prepared.cuts?.rows.orEmpty()) cutLifecycle.observe(cut.family, "CONSTRUCTED")
         retainedCutPeak = maxOf(retainedCutPeak, prepared.cuts?.rows?.size?.toLong() ?: 0L)
@@ -791,22 +800,15 @@ internal class LinearAuthority(
         val retainOriginal = fractional && point != null
         val retained = if (retainOriginal) prepared.cuts?.rows.orEmpty().size else additionalCuts.size
         if (retained > 64) return null
-        val generated = if (generateAggregates) LinearAuthorityAggregateCuts.prepareSourcePairsObserved(
+        val generated = if (generateAggregates) LinearAuthorityAggregateCuts.prepareSourcePairsCached(
             prepared.numeric, funded, { name, count ->
-                when (name) {
-                    "AggregateWork" -> cutCost(count, 0L)
-                    "AggregateAllocation" -> cutCost(0L, count)
-                    else -> {
-                        val key = "numericalCut$name"
-                        cutEligibility[key] = (cutEligibility[key] ?: 0L) + count
-                        journal?.observe(name, count)
-                    }
-                }
+                observeAggregate(name, count)
+                if (name != "AggregateWork" && name != "AggregateAllocation") journal?.observe(name, count)
             }, maximumCandidates = 64 - retained,
             limits = if (point == null) LinearAuthorityAggregateCuts.sourcePairLimits
                 else LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = point, fractionalTargeting = fractional,
-            rejected = journal?.let { it::record }) else emptyList()
+            rejected = journal?.let { it::record }, cache = aggregateSourceCache) else emptyList()
         if (funded()) return null
         val fixed = if (retainOriginal) emptyList() else additionalCuts
         val additional = if (generated.isEmpty()) fixed else {
@@ -822,6 +824,17 @@ internal class LinearAuthority(
         cutPreparationWork += work
         budget.observe(preparation = work)
         budget.funding?.charge(0L, allocation)
+    }
+
+    private fun observeAggregate(name: String, count: Long) {
+        when (name) {
+            "AggregateWork" -> cutCost(count, 0L)
+            "AggregateAllocation" -> cutCost(0L, count)
+            else -> {
+                val key = "numericalCut$name"
+                cutEligibility[key] = (cutEligibility[key] ?: 0L) + count
+            }
+        }
     }
 
     private fun checkSource(

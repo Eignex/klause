@@ -10,6 +10,18 @@ import kotlin.test.assertTrue
 
 class MpsProofFrontierTest {
     @Test
+    fun `source preparation reuse should bind independently without activating cut policies`() {
+        val options = MpsProofFrontier.parseOptions(arrayOf("suite=miplib3", "problem=egout",
+            "sha256=unused", "exact=true", "aggregateReuse=true"))
+
+        val params = MpsProofFrontier.controlParams(options, Cancellation.Never)
+
+        assertTrue(params.sourceCutPreparationReuse)
+        assertFalse(params.sourcePointCuts || params.sourceAggregateCuts || params.sourceCutFractionalOrder)
+        assertFalse(MpsProofFrontier.controlParams(emptyMap(), Cancellation.Never).sourceCutPreparationReuse)
+    }
+
+    @Test
     fun `selection export should have a fresh window after producer cancellation`() {
         val journal = NumericalSelectionSnapshot(Cancellation { true }).journal()
 

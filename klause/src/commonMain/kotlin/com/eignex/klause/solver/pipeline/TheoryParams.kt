@@ -121,6 +121,8 @@ data class TheoryParams(
     val sourceCutBranching: Boolean = false,
     /** Prefer fractional integer support when ordering point-directed source aggregation. */
     val sourceCutFractionalOrder: Boolean = false,
+    /** Reuse bounded immutable source-incidence preparation between point aggregation calls. */
+    val sourceCutPreparationReuse: Boolean = false,
 ) {
     init {
         require(sourceLpWorkLimit >= 0 && sourceLpAllocationLimit >= 0 && sourceLpOperations >= 0)

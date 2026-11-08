@@ -86,7 +86,7 @@ internal object MpsProofFrontier {
             "selection", "replay", "operations", "activeRows", "supportBranching", "pointCuts", "aggregate-probe",
             "aggregate-mixed", "aggregate-replay", "aggregateCuts", "refutationReuse", "feedbackDelivery",
             "feedbackRequest", "solveSeconds", "certificateState", "point-producer", "fractionalOrder",
-            "fractional-attempt", "sourceWork", "sourceAllocation", "heapMiB", "gc")
+            "fractional-attempt", "sourceWork", "sourceAllocation", "heapMiB", "gc", "aggregateReuse")
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
             (options.keys - supported).isEmpty())
         require(options["fractional-attempt"]?.toBooleanStrict() != true ||
@@ -102,6 +102,7 @@ internal object MpsProofFrontier {
             sourcePointCuts = options["pointCuts"]?.toBooleanStrict() ?: false,
             sourceAggregateCuts = options["aggregateCuts"]?.toBooleanStrict() ?: false,
             sourceCutFractionalOrder = options["fractionalOrder"]?.toBooleanStrict() ?: false,
+            sourceCutPreparationReuse = options["aggregateReuse"]?.toBooleanStrict() ?: false,
             sourceRefutationReuse = options["refutationReuse"]?.toBooleanStrict() ?: false,
             sourceLpWorkLimit = options["sourceWork"]?.toLong() ?: 1_000_000_000L,
             sourceLpAllocationLimit = options["sourceAllocation"]?.toLong() ?: 536_870_912L,
@@ -177,6 +178,7 @@ internal object MpsProofFrontier {
             put("sourcePointCuts", params.sourcePointCuts)
             put("sourceAggregateCuts", params.sourceAggregateCuts)
             put("fractionalOrder", params.sourceCutFractionalOrder)
+            put("aggregateReuse", params.sourceCutPreparationReuse)
             put("sourceWork", params.sourceLpWorkLimit)
             put("sourceAllocation", params.sourceLpAllocationLimit)
             put("sourceOperations", params.sourceLpOperations)
@@ -354,6 +356,7 @@ internal object MpsProofFrontier {
                 put("pointCuts", params.sourcePointCuts)
                 put("aggregateCuts", params.sourceAggregateCuts)
                 put("fractionalOrder", params.sourceCutFractionalOrder)
+                put("aggregateReuse", params.sourceCutPreparationReuse)
                 put("refutationReuse", params.sourceRefutationReuse)
                 put("aggregateProbe", aggregateProbe)
                 put("aggregateMixed", aggregateMixed)

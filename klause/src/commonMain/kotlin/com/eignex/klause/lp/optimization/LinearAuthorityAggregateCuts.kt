@@ -55,6 +55,32 @@ internal object LinearAuthorityAggregateCuts {
     val sourcePairLimits = LinearAuthorityAggregateLimits(work = 500_000L, allocation = 8_388_608L)
     val pointSourcePairLimits = LinearAuthorityAggregateLimits()
 
+    internal class SourcePairsCache {
+        internal var index: SourceIndex? = null
+
+        fun clear(observe: (String, Long) -> Unit = { _, _ -> }) {
+            val released = index ?: return
+            index = null
+            observe("AggregateSourceIndexRetired", 1L)
+            observe("AggregateSourceIndexReleasedBytes", released.allocation)
+        }
+    }
+
+    internal class SourceIndex(
+        val source: SourceProofContext, val support: Int,
+        val rows: List<ProbeRow>, val integerRows: List<ProbeRow>,
+        val bounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>,
+        val incidence: Map<Pair<SourceCoordinate, Boolean>, List<ProbeRow>>,
+        val references: Long, val allocation: Long,
+    )
+
+    private class SourcePairs(
+        val rows: MutableList<ProbeRow>, val integerRows: List<ProbeRow>?,
+        val bounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>,
+        val incidence: Map<Pair<SourceCoordinate, Boolean>, MutableList<ProbeRow>>,
+        val complete: Boolean,
+    )
+
     fun prepareSourcePairs(
         source: SourceProofContext, cancellation: Cancellation,
         observe: (String, Long) -> Unit = { _, _ -> }, maximumCandidates: Int = 64,
@@ -76,67 +102,29 @@ internal object LinearAuthorityAggregateCuts {
         observe: (String, Long) -> Unit, maximumCandidates: Int,
         limits: LinearAuthorityAggregateLimits, point: Map<SourceCoordinate, Double>?, fractionalTargeting: Boolean,
         rejected: ((LinearAuthorityCut, Double, Double, Double) -> Unit)?,
+    ): List<LinearAuthorityCut> = prepareSourcePairsCached(source, cancellation, observe, maximumCandidates,
+        limits, point, fractionalTargeting, rejected, null)
+
+    fun prepareSourcePairsCached(
+        source: SourceProofContext, cancellation: Cancellation,
+        observe: (String, Long) -> Unit, maximumCandidates: Int,
+        limits: LinearAuthorityAggregateLimits, point: Map<SourceCoordinate, Double>?, fractionalTargeting: Boolean,
+        rejected: ((LinearAuthorityCut, Double, Double, Double) -> Unit)?, cache: SourcePairsCache?,
     ): List<LinearAuthorityCut> {
         require(maximumCandidates in 0..64)
         val meter = AggregateMeter(limits, cancellation, observe, rejected)
         val attemptLimits = limits.copy(work = minOf(limits.work, 65_536L),
             allocation = minOf(limits.allocation, 1_048_576L))
         val candidates = ArrayList<LinearAuthorityCut>()
-        var eligibilityKnown = true
+        var eligibilityKnown: Boolean
         var retainedContinuationUsed = false
         try {
-            meter.reserve(source.premiseCount.toLong(), 512L)
-            val rows = ArrayList<ProbeRow>()
-            val integerRows = if (point == null) null else {
-                meter.reserve(1L, 128L)
-                ArrayList<ProbeRow>()
-            }
-            val bounds = HashMap<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>()
-            val incidence = HashMap<Pair<SourceCoordinate, Boolean>, MutableList<ProbeRow>>()
-            var ordinal = 0
-            source.forEachPremise { name, premise ->
-                val owner = ordinal++
-                meter.reserve(1L, 128L + name.length * 2L)
-                val term = LinearAuthorityAggregateTerm(owner, name, premise.inequality)
-                if (term.inequality.supportSize > limits.support) {
-                    eligibilityKnown = false
-                    observe("AggregatePairSourceSupportLimit", 1L)
-                    return@forEachPremise
-                }
-                meter.reserve(term.inequality.supportSize * 3L, 96L + term.inequality.supportSize * 64L)
-                val coefficients = term.inequality.coefficients
-                if (coefficients.keys.any { it.kind == SourceCoordinate.Kind.Boolean }) return@forEachPremise
-                val row = ProbeRow(term, coefficients)
-                if (row.realCount == 0) {
-                    if (integerRows != null && row.hasInteger && coefficients.size > 1) {
-                        if (integerRows.size < AggregationMirSeparator.MAX_ROWS) {
-                            meter.reserve(1L, 16L)
-                            integerRows += row
-                        } else {
-                            eligibilityKnown = false
-                            observe("AggregateIntegerRowLimit", 1L)
-                        }
-                    }
-                    return@forEachPremise
-                }
-                rows += row
-                for ((id, coefficient) in coefficients) {
-                    meter.reserve(1L)
-                    if (id.kind != SourceCoordinate.Kind.Real) continue
-                    meter.reserve(1L, 64L)
-                    val side = id to (coefficient > BigFraction.ZERO)
-                    val bucket = incidence[side] ?: run {
-                        meter.reserve(1L, 160L)
-                        ArrayList<ProbeRow>().also { incidence[side] = it }
-                    }
-                    bucket.add(row)
-                    observe("AggregateIncidenceReferences", 1L)
-                    if (coefficients.size == 1) {
-                        meter.reserve(1L, 96L)
-                        bounds.getOrPut(side) { term }
-                    }
-                }
-            }
+            val prepared = sourcePairs(source, point != null, limits, meter, observe, cache)
+            val rows = prepared.rows
+            val integerRows = prepared.integerRows
+            val bounds = prepared.bounds
+            val incidence = prepared.incidence
+            eligibilityKnown = prepared.complete
             if (point != null) orderPointRows(rows, incidence, point, meter, observe, source, fractionalTargeting)
             val charge: (String, Long) -> Unit = { name, count ->
                 when (name) {
@@ -238,6 +226,110 @@ internal object LinearAuthorityAggregateCuts {
             observe("AggregatePair${stop.reason}", 1L)
         }
         return candidates.toList()
+    }
+
+    private fun sourcePairs(
+        source: SourceProofContext, point: Boolean, limits: LinearAuthorityAggregateLimits,
+        meter: AggregateMeter, observe: (String, Long) -> Unit, suppliedCache: SourcePairsCache?,
+    ): SourcePairs {
+        val cache = suppliedCache.takeIf { point }
+        if (cache?.index?.let { it.source !== source || it.support != limits.support } == true) cache.clear(observe)
+        cache?.index?.let { index ->
+            meter.reserve(1L + index.rows.size + index.incidence.size + index.references,
+                128L + index.rows.size * 8L + index.incidence.size * 96L + index.references * 8L)
+            val rows = ArrayList(index.rows)
+            val incidence: Map<Pair<SourceCoordinate, Boolean>, MutableList<ProbeRow>> =
+                index.incidence.mapValues { (_, bucket) -> ArrayList(bucket) }
+            observe("AggregateSourceIndexReused", 1L)
+            observe("AggregateSourceIndexReusedReferences", index.references)
+            return SourcePairs(rows, index.integerRows, index.bounds, incidence, true)
+        }
+        var complete = true
+        meter.reserve(source.premiseCount.toLong(), 512L)
+        val rows = ArrayList<ProbeRow>()
+        val integerRows = if (!point) null else {
+            meter.reserve(1L, 128L)
+            ArrayList<ProbeRow>()
+        }
+        val bounds = HashMap<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>()
+        val incidence = HashMap<Pair<SourceCoordinate, Boolean>, MutableList<ProbeRow>>()
+        var ordinal = 0
+        source.forEachPremise { name, premise ->
+            val owner = ordinal++
+            meter.reserve(1L, 128L + name.length * 2L)
+            val term = LinearAuthorityAggregateTerm(owner, name, premise.inequality)
+            if (term.inequality.supportSize > limits.support) {
+                complete = false
+                observe("AggregatePairSourceSupportLimit", 1L)
+                return@forEachPremise
+            }
+            meter.reserve(term.inequality.supportSize * 3L, 96L + term.inequality.supportSize * 64L)
+            val coefficients = term.inequality.coefficients
+            if (coefficients.keys.any { it.kind == SourceCoordinate.Kind.Boolean }) return@forEachPremise
+            val row = ProbeRow(term, coefficients)
+            if (row.realCount == 0) {
+                if (integerRows != null && row.hasInteger && coefficients.size > 1) {
+                    if (integerRows.size < AggregationMirSeparator.MAX_ROWS) {
+                        meter.reserve(1L, 16L)
+                        integerRows += row
+                    } else {
+                        complete = false
+                        observe("AggregateIntegerRowLimit", 1L)
+                    }
+                }
+                return@forEachPremise
+            }
+            rows += row
+            for ((id, coefficient) in coefficients) {
+                meter.reserve(1L)
+                if (id.kind != SourceCoordinate.Kind.Real) continue
+                meter.reserve(1L, 64L)
+                val side = id to (coefficient > BigFraction.ZERO)
+                val bucket = incidence[side] ?: run {
+                    meter.reserve(1L, 160L)
+                    ArrayList<ProbeRow>().also { incidence[side] = it }
+                }
+                bucket.add(row)
+                observe("AggregateIncidenceReferences", 1L)
+                if (coefficients.size == 1) {
+                    meter.reserve(1L, 96L)
+                    bounds.getOrPut(side) { term }
+                }
+            }
+        }
+
+        if (cache != null && complete) retainSourceIndex(source, limits, rows, integerRows.orEmpty(), bounds,
+            incidence, meter, observe, cache)
+        return SourcePairs(rows, integerRows, bounds, incidence, complete)
+    }
+
+    private fun retainSourceIndex(
+        source: SourceProofContext, limits: LinearAuthorityAggregateLimits,
+        rows: List<ProbeRow>, integerRows: List<ProbeRow>,
+        bounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>,
+        incidence: Map<Pair<SourceCoordinate, Boolean>, List<ProbeRow>>,
+        meter: AggregateMeter, observe: (String, Long) -> Unit, cache: SourcePairsCache,
+    ) {
+        val references = incidence.values.sumOf { it.size.toLong() }
+        val work = 2L + rows.size + integerRows.size + bounds.size + incidence.size + references
+        val allocation = 128L + rows.size * 8L + integerRows.size * 8L + bounds.size * 64L +
+            incidence.size * 96L + references * 8L
+        val preparedWork = limits.work - meter.remainingWork
+        val preparedAllocation = limits.allocation - meter.remainingAllocation
+        if (work > meter.remainingWork || allocation > meter.remainingAllocation ||
+            preparedWork + work > pointSourcePairLimits.work ||
+            preparedAllocation + allocation > pointSourcePairLimits.allocation) {
+            observe("AggregateSourceIndexRetentionDeclined", 1L)
+            return
+        }
+        // One work unit prepays dropping the retained reference on invalidation or owner release.
+        meter.reserve(work, allocation)
+        val retained = SourceIndex(source, limits.support, rows.toList(), integerRows.toList(), bounds.toMap(),
+            incidence.mapValues { (_, bucket) -> bucket.toList() }, references, preparedAllocation + allocation)
+        meter.reserve(0L)
+        cache.index = retained
+        observe("AggregateSourceIndexPrepared", 1L)
+        observe("AggregateSourceIndexRetainedBytes", preparedAllocation + allocation)
     }
 
     private fun redundantContinuation(
@@ -477,7 +569,7 @@ internal object LinearAuthorityAggregateCuts {
         return eligible
     }
 
-    private class ProbeRow(
+    internal class ProbeRow(
         val term: LinearAuthorityAggregateTerm, val coefficients: Map<SourceCoordinate, BigFraction>,
     ) {
         val realCount = coefficients.keys.count { it.kind == SourceCoordinate.Kind.Real }

@@ -62,6 +62,10 @@ explicitly. `sourceWork` and `sourceAllocation` set the containing allowances;
 JVM arguments. The driver is a direct numerical authority with no external
 incumbent provider; these captures diagnose mechanisms and do not qualify ordinary
 CLI performance. Post-solve export has a separate bounded inspection window.
+`aggregateReuse=true` opts into bounded source-incidence preparation reuse between
+point calls. Omit it for the existing preparation control; effective controls and
+frontier records report the setting. Point ordering, bound selection and proof
+checks remain per-call work under the existing generation and source allowances.
 Imported proof records retain their original scope, consequence or bound payload,
 and nested derivation. Depth and cancellation limits mark withheld proofs
 unavailable.
