@@ -1749,6 +1749,11 @@ A selected witness or terminal keeps its selected guidance. The baseline point
 uses the selection round's existing funded retention and carries no proof authority;
 the strengthened bound and selected rows retain their own result channels. This
 requests no additional LP query and changes no generation allowance.
+Ordinary source-order traversal also retains an available exact split and its
+fractional candidates preceding a completed nonterminal selection round. Its root
+repair hint uses that advisory point. Explicit cut-support and branch-history policies use the
+selected point's candidates. The checked bound, coverage and proof scope remain
+those of the completed queries.
 A new template first runs the ordinary checked cut recipe; a completed point can
 add one selection round at that node. A trial that admits no candidate retains
 the ordinary template, checked query and numerical owner for later queries of that

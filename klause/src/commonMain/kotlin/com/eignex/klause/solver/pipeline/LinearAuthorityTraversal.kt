@@ -441,7 +441,8 @@ internal class LinearAuthorityTraversal(
                 queriedNode = current
                 queriedSource = it
             }
-        val queried = if (useGuidance && useCuts && pointCuts) authority.advanceWithPointCuts(branch, cancellation)
+        val queried = if (useGuidance && useCuts && pointCuts) authority.advanceWithPointCuts(branch, cancellation,
+            retainBasePoint = supportBranching == null && !useBranchHistory)
             else if (useGuidance) authority.advance(branch, cancellation, cuts = useCuts)
             else authority.check(branch, cancellation)
         val strongestBound = strongerLinearBound(current.partialBound, queried.bound)
@@ -463,7 +464,8 @@ internal class LinearAuthorityTraversal(
             return SearchNodeDisposition.Pause
         }
         current.pending = false
-        if (current === root && repairGuidance?.remember(source, result.relaxedPoint, budget, cancellation) == true) {
+        val repairPoint = result.advisoryPoint ?: result.relaxedPoint
+        if (current === root && repairGuidance?.remember(source, repairPoint, budget, cancellation) == true) {
             observe("numericalRepairGuidancePublished")
         }
         linkCapture(branch.scope)

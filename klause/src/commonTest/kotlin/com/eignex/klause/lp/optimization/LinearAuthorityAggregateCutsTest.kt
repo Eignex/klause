@@ -148,6 +148,8 @@ class LinearAuthorityAggregateCutsTest {
             assertNull(result.incumbent)
             assertNull(result.evidence)
             val guidance = assertNotNull(result.advisoryPoint)
+            assertTrue(result.fractional.first().first in listOf(x, y))
+            assertEquals(result.fractional.first().first, assertNotNull(result.split).first)
             assertEquals(1.5, guidance.getValue(x) + guidance.getValue(y))
             assertEquals(1.0, result.relaxedPoint.getValue(x) + result.relaxedPoint.getValue(y))
             assertEquals(SourceValue.Rational(BigFraction.ofLong(5) * BigFraction.ofLong(2).reciprocal()),

@@ -278,10 +278,13 @@ internal class LinearAuthority(
             policy.observeRound(pending.rows, result.evidence != null || result.incumbent != null ||
                 (strongest != null && strongest !== pending.base.bound))
         }
+        val retainGuidance = retainBasePoint && completed && result.incumbent == null && result.evidence == null
+        val retainSplit = retainGuidance && pending.base.split != null
+        if (retainSplit && pending.base.split != result.split) policy.observe("BaseSplitRetained")
         return result.copy(bound = strongest, primalStages = stages,
-            advisoryPoint = pending.base.relaxedPoint.takeIf {
-                retainBasePoint && completed && result.incumbent == null && result.evidence == null
-            },
+            split = if (retainSplit) pending.base.split else result.split,
+            fractional = if (retainSplit) pending.base.fractional else result.fractional,
+            advisoryPoint = pending.base.relaxedPoint.takeIf { retainGuidance },
             cutBoundFamilies = if (strongest != null && strongest === pending.base.bound) {
                 pending.base.cutBoundFamilies
             } else result.cutBoundFamilies)

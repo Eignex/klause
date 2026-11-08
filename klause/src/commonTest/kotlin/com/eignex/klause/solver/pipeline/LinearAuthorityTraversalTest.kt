@@ -32,6 +32,57 @@ import kotlin.test.assertTrue
 
 class LinearAuthorityTraversalTest {
     @Test
+    fun `point-cut bounds should preserve the preceding source-order split`() {
+        val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val scope = SourceScope(SourceRevision("cut-branch-guidance", "exact-affine"),
+            objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE))
+        val premises = linkedMapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                real to BigFraction.ONE, residual to BigFraction.ONE), BigFraction.ofLong(3))),
+            "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "lower" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.ONE), BigFraction.ONE)),
+        )
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["nonnegative $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE), BigFraction.ONE))
+        }
+        val source = SourceProofContext(scope, setOf(x, y, real, residual) + triangle, premises,
+            (triangle + x + y).associateWith { BigFraction.ONE })
+        val ordinary = LinearAuthorityTraversal(source, SourceLpBudget(), Cancellation.Never, { false }, {},
+            { null }, useGuidance = true).use { component ->
+            val session = SearchComponentSet(listOf(component)).session()
+            assertEquals(ComponentResult.Consistent, session.initialize())
+            assertEquals(SearchNodeDisposition.Expand, component.beforeBranch(session))
+            assertNotNull(component.nextBranch(session))
+        }
+        val budget = SourceLpBudget()
+
+        LinearAuthorityTraversal(source, budget, Cancellation.Never, { false }, {}, { null },
+            useGuidance = true, pointCuts = true, aggregateCuts = true).use { component ->
+            val session = SearchComponentSet(listOf(component)).session()
+            assertEquals(ComponentResult.Consistent, session.initialize())
+
+            assertEquals(SearchNodeDisposition.Expand, component.beforeBranch(session))
+
+            assertEquals(ordinary, component.nextBranch(session))
+            val bound = assertNotNull(component.rootBound)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(5) * BigFraction.ofLong(2).reciprocal()),
+                assertIs<SourceClaim.Bound>(bound.claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(bound))
+            assertEquals(2, budget.operations)
+        }
+    }
+
+    @Test
     fun `a later incumbent should close a checked partial bound without another LP query`() {
         for (sense in listOf(ObjectiveSense.MINIMIZE, ObjectiveSense.MAXIMIZE)) {
             val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
