@@ -20,6 +20,22 @@ import kotlin.time.TestTimeSource
 
 class PortfolioProgressTest {
     @Test
+    fun `an internal progress sink should not require worker exit reporting`() {
+        for (reporting in listOf(false, true)) {
+            val events = mutableListOf<PortfolioEvent>()
+            val worker = trackingWorker("search", 0, ScriptedSearch({ false }) { })
+
+            Portfolio.thompson(listOf(worker), baseSliceWork = 1,
+                diagnostics = PortfolioDiagnostics(1), onProgress = events::add).also {
+                it.workerExitReporting = reporting
+            }.use { it.minimize(Cancellation.Never) }
+
+            assertTrue(events.any { it is PortfolioEvent.Progressed })
+            assertEquals(reporting, events.any { it is PortfolioEvent.WorkerExit })
+        }
+    }
+
+    @Test
     fun `worker exit should retain the native return before proof reinterpretation`() {
         val sample = Sample(BooleanArray(0), LongArray(0))
         for (native in listOf(MinimizeResult.Unknown(TerminationReason.SearchExhausted),
