@@ -15,6 +15,237 @@ import kotlin.test.assertTrue
 
 class KotlinBasisSolverTest {
     @Test
+    fun `live factor copies solve updated bases without rebuilding or charging the parent`() {
+        val source = ftSource("dense", 8)
+        val headings = IntArray(8) { it }
+        KotlinBasisSolver(source, fillFactor = 100.0).use { parent ->
+            assertTrue(parent.refactorize(headings))
+            val spike = IndexedVector(8).also { it.scatterColumn(source, 9) }
+            parent.ftran(spike)
+            assertEquals(BasisUpdate.APPLIED, parent.update(1, 9, spike))
+            headings[1] = 9
+            val before = parent.basisOperationWork
+            val offer = assertNotNull(parent.factorCopy)
+
+            val privateSolver = offer.create(headings, IntArray(8) { -1 }, LuPivotPolicy(), offer.additionalWork)
+            assertNotNull(privateSolver).use { child ->
+                assertEquals(parent.updateCount, child.updateCount)
+                assertEquals(parent.nnz, child.nnz)
+                assertNull(child.ordering())
+                assertNull(assertNotNull(child.basisWork).build)
+                for (transpose in listOf(false, true)) {
+                    val rhs = DoubleArray(8) { it + 1.0 }
+                    val actual = IndexedVector(8).also { it.scatter(rhs) }
+                    if (transpose) child.btran(actual) else child.ftran(actual)
+                    assertTrue(ftResidual(source, headings, rhs, actual, transpose) <= 1e-10)
+                }
+                assertEquals(before, parent.basisOperationWork)
+            }
+        }
+    }
+
+    @Test
+    fun `live factor copying costs less than rebuilding the same dense basis`() {
+        val n = 24
+        val source = ftSource("dense", n)
+        val headings = IntArray(n) { it }
+        KotlinBasisSolver(source, denseDimensionLimit = 0).use { parent ->
+            assertTrue(parent.refactorize(headings))
+            val offer = assertNotNull(parent.factorCopy)
+            KotlinBasisSolver(source, denseDimensionLimit = 0).use { cold ->
+                assertTrue(cold.refactorize(headings))
+                // Both paths separately fund the identical source/workspace constructor.
+                assertTrue(offer.additionalWork + 6L * n + 64L < assertNotNull(cold.basisWork.build).units)
+                val privateSolver = offer.create(headings, IntArray(n) { -1 }, LuPivotPolicy(), offer.additionalWork)
+                assertNotNull(privateSolver).use { child ->
+                    assertEquals(cold.nnz, child.nnz)
+                    for (transpose in listOf(false, true)) {
+                        val rhs = DoubleArray(n) { it + 1.0 }
+                        val actual = IndexedVector(n).also { it.scatter(rhs) }
+                        if (transpose) child.btran(actual) else child.ftran(actual)
+                        assertTrue(ftResidual(source, headings, rhs, actual, transpose) <= 1e-10)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `copied factors retain update limits and survive parent retirement`() {
+        val source = ftSource("dense", 3)
+        val headings = intArrayOf(0, 1, 2)
+        val parent = KotlinBasisSolver(source, updateLimit = 2, fillFactor = 100.0)
+        assertTrue(parent.refactorize(headings))
+        val spike = IndexedVector(3).also { it.scatterColumn(source, 4) }
+        parent.ftran(spike)
+        assertEquals(BasisUpdate.APPLIED, parent.update(1, 4, spike))
+        headings[1] = 4
+        val offer = assertNotNull(parent.factorCopy)
+        assertNotNull(offer.create(headings, IntArray(3) { -1 }, LuPivotPolicy(), offer.additionalWork)).use { child ->
+            assertTrue(parent.refactorize(intArrayOf(0, 1, 2)))
+            parent.close()
+            val rhs = doubleArrayOf(1.0, 2.0, 3.0)
+            val solved = IndexedVector(3).also { it.scatter(rhs) }
+            child.ftran(solved)
+            assertTrue(ftResidual(source, headings, rhs, solved, false) <= 1e-10)
+            val entering = IndexedVector(3).also { it.scatterColumn(source, 3) }
+            child.ftran(entering)
+            assertEquals(BasisUpdate.REFACTORIZE, child.update(0, 3, entering))
+            assertEquals(2, child.updateCount)
+        }
+    }
+
+    @Test
+    fun `private pivots and close preserve the parent factors and meters`() {
+        val source = ftSource("dense", 3)
+        val headings = intArrayOf(0, 1, 2)
+        KotlinBasisSolver(source).use { parent ->
+            assertTrue(parent.refactorize(headings))
+            val before = parent.basisOperationWork
+            val offer = assertNotNull(parent.factorCopy)
+            val privateSolver = offer.create(headings, IntArray(3) { -1 }, LuPivotPolicy(), offer.additionalWork)
+            assertNotNull(privateSolver).use { child ->
+                val spike = IndexedVector(3).also { it.scatterColumn(source, 4) }
+                child.ftran(spike)
+                assertEquals(BasisUpdate.APPLIED, child.update(1, 4, spike))
+                assertTrue(child.refactorize(intArrayOf(0, 4, 2)))
+            }
+            assertEquals(before, parent.basisOperationWork)
+            assertEquals(0, parent.updateCount)
+            for (transpose in listOf(false, true)) {
+                val rhs = doubleArrayOf(1.0, 2.0, 3.0)
+                val solved = IndexedVector(3).also { it.scatter(rhs) }
+                if (transpose) parent.btran(solved) else parent.ftran(solved)
+                assertTrue(ftResidual(source, headings, rhs, solved, transpose) <= 1e-10)
+            }
+        }
+    }
+
+    @Test
+    fun `factor copies use the owned source after caller mutation`() {
+        val source = ftSource("dense", 3)
+        val original = ftSource("dense", 3)
+        val headings = intArrayOf(0, 1, 2)
+        KotlinBasisSolver(source).use { parent ->
+            assertTrue(parent.refactorize(headings))
+            val offer = assertNotNull(parent.factorCopy)
+            source.values.fill(Double.NaN)
+            val privateSolver = offer.create(headings, IntArray(3) { -1 }, LuPivotPolicy(), offer.additionalWork)
+            assertNotNull(privateSolver).use { child ->
+                assertTrue(child.refactorize(headings))
+                val rhs = doubleArrayOf(1.0, 2.0, 3.0)
+                val solved = IndexedVector(3).also { it.scatter(rhs) }
+                child.btran(solved)
+                assertTrue(ftResidual(original, headings, rhs, solved, true) <= 1e-10)
+            }
+        }
+    }
+
+    @Test
+    fun `factor copy admission rejects insufficient work storage and different keys`() {
+        val source = ftSource("dense", 3)
+        KotlinBasisSolver(source).use { parent ->
+            val headings = intArrayOf(0, 1, 2)
+            val units = IntArray(3) { -1 }
+            assertTrue(parent.refactorize(headings))
+            val before = parent.basisOperationWork
+            val offer = assertNotNull(parent.factorCopy)
+
+            assertNull(offer.create(headings, units, LuPivotPolicy(), offer.additionalWork - 1L))
+            assertNull(offer.create(headings, units,
+                LuPivotPolicy(maxEntries = offer.entries - 1L), offer.additionalWork))
+            assertNull(offer.create(intArrayOf(0, 4, 2), units, LuPivotPolicy(), offer.additionalWork))
+            assertNull(offer.create(headings, intArrayOf(0, -1, -1), LuPivotPolicy(), offer.additionalWork))
+            assertEquals(before, parent.basisOperationWork)
+        }
+    }
+
+    @Test
+    fun `factor offers become stale after updates refactors and close`() {
+        for (change in listOf("update", "refactor", "singular", "close")) {
+            val parent = KotlinBasisSolver(ftSource("dense", 3))
+            val headings = intArrayOf(0, 1, 2)
+            assertNull(parent.factorCopy)
+            assertTrue(parent.refactorize(headings))
+            val offer = assertNotNull(parent.factorCopy)
+            when (change) {
+                "update" -> {
+                    val spike = IndexedVector(3).also { it.scatterColumn(ftSource("dense", 3), 4) }
+                    parent.ftran(spike)
+                    assertEquals(BasisUpdate.APPLIED, parent.update(1, 4, spike))
+                }
+                "refactor" -> assertTrue(parent.refactorize(headings))
+                "singular" -> assertFalse(parent.refactorize(intArrayOf(0, 0, 0)))
+                else -> parent.close()
+            }
+
+            assertNull(offer.create(headings, IntArray(3) { -1 }, LuPivotPolicy(), offer.additionalWork))
+            if (change == "singular" || change == "close") assertNull(parent.factorCopy)
+            parent.close()
+        }
+    }
+
+    @Test
+    fun `cancellation during factor copying publishes no child and leaves the parent usable`() {
+        for (stopAt in listOf(1, 3, 7, 11)) {
+            val source = ftSource("dense", 3)
+            KotlinBasisSolver(source).use { parent ->
+                val headings = intArrayOf(0, 1, 2)
+                assertTrue(parent.refactorize(headings))
+                val before = parent.basisOperationWork
+                val offer = assertNotNull(parent.factorCopy)
+                var polls = 0
+                val policy = LuPivotPolicy(cancelled = { ++polls >= stopAt })
+
+                assertNull(offer.create(headings, IntArray(3) { -1 }, policy, offer.additionalWork))
+
+                assertEquals(before, parent.basisOperationWork)
+                val rhs = doubleArrayOf(1.0, 2.0, 3.0)
+                val solved = IndexedVector(3).also { it.scatter(rhs) }
+                parent.ftran(solved)
+                assertTrue(ftResidual(source, headings, rhs, solved, false) <= 1e-10)
+            }
+        }
+    }
+
+    @Test
+    fun `a parent revision during copy cancellation polling prevents publication`() {
+        KotlinBasisSolver(ftSource("dense", 3)).use { parent ->
+            val headings = intArrayOf(0, 1, 2)
+            assertTrue(parent.refactorize(headings))
+            val offer = assertNotNull(parent.factorCopy)
+            var polls = 0
+            val policy = LuPivotPolicy(cancelled = {
+                if (++polls == 3) assertTrue(parent.refactorize(headings))
+                false
+            })
+
+            assertNull(offer.create(headings, IntArray(3) { -1 }, policy, offer.additionalWork))
+            assertNotNull(parent.factorCopy)
+        }
+    }
+
+    @Test
+    fun `factor copies preserve repaired unit row keys`() {
+        val source = SparseMatrix.ofColumns(3, 3, listOf(listOf(1 to 1.0), listOf(1 to 1.0), emptyList()))
+        KotlinBasisSolver(source).use { parent ->
+            val repair = assertNotNull(parent.refactorizeRepairing(intArrayOf(0, 1, 2)))
+            val offer = assertNotNull(parent.factorCopy)
+            val privateSolver = offer.create(repair.columns, repair.unitRows, LuPivotPolicy(), offer.additionalWork)
+            assertNotNull(privateSolver).use { child ->
+                for (transpose in listOf(false, true)) {
+                    val expected = IndexedVector(3).also { it.scatter(doubleArrayOf(1.0, 2.0, 3.0)) }
+                    val actual = IndexedVector(3).also { it.scatter(doubleArrayOf(1.0, 2.0, 3.0)) }
+                    if (transpose) { parent.btran(expected); child.btran(actual) } else {
+                        parent.ftran(expected); child.ftran(actual)
+                    }
+                    assertContentEquals(expected.toDoubleArray(), actual.toDoubleArray())
+                }
+            }
+        }
+    }
+
+    @Test
     fun `a retained hint reduces private construction work including bounded import`() {
         val n = 24
         val source = ftSource("dense", n)

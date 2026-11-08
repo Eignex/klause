@@ -16,24 +16,57 @@ internal data class ForrestTomlinWork(
 // https://doi.org/10.1007/BF01584548.
 // T L^-1 P B Q0 = V; V(order, order) is triangular. Labels are initial LU coordinates.
 // Row transforms multiply on the left, so their transposes apply in reverse order in BTRAN.
-internal class ForrestTomlinFactors(factors: LuFactors) {
-    val upper = BasisTriangularMatrix(factors.upper)
-    val transpose = BasisTriangularMatrix(factors.upperTranspose)
-    private val transforms = mutableListOf<ForrestTomlinRow>()
+internal class ForrestTomlinFactors private constructor(
+    val upper: BasisTriangularMatrix,
+    val transpose: BasisTriangularMatrix,
+    private val initialEntries: Int,
+    private val transforms: MutableList<ForrestTomlinRow>,
+    upperEntries: Int,
+    transformEntries: Int,
+) {
+    constructor(factors: LuFactors) : this(BasisTriangularMatrix(factors.upper),
+        BasisTriangularMatrix(factors.upperTranspose), factors.upper.nnz, mutableListOf(), factors.upper.nnz, 0)
+
     private val n = upper.columns.size
     private val column = BasisWorkspace(n)
     private val row = BasisWorkspace(n)
     private val multipliers = BasisWorkspace(n)
-    private val initialEntries = factors.upper.nnz
-    var upperEntries = initialEntries
+    var upperEntries = upperEntries
         private set
-    var transformEntries = 0
+    var transformEntries = transformEntries
         private set
     val updateCount: Int get() = transforms.size
     var lastUpdateWork: ForrestTomlinWork? = null
         private set
     var lastSolveEntries = 0L
         private set
+
+    fun copyOwned(cancelled: () -> Boolean): ForrestTomlinFactors? {
+        if (cancelled()) return null
+        val copiedOrder = upper.order.copyOf()
+        if (!copiedOrder.contentEquals(transpose.order)) return null
+        return try {
+            fun copy(columns: Array<BasisSlice>): Array<BasisSlice> = Array(columns.size) { i ->
+                if (i % 128 == 0 && cancelled()) throw CopyStopped()
+                columns[i].copyOwned()
+            }
+            val copiedUpper = BasisTriangularMatrix(copy(upper.columns), copiedOrder)
+            val copiedTranspose = BasisTriangularMatrix(copy(transpose.columns), copiedOrder)
+            val copiedTransforms = mutableListOf<ForrestTomlinRow>()
+            for (i in transforms.indices) {
+                if (i % 128 == 0 && cancelled()) return null
+                val transform = transforms[i]
+                copiedTransforms.add(ForrestTomlinRow(transform.pivot, transform.entries.copyOwned()))
+            }
+            if (cancelled()) return null
+            ForrestTomlinFactors(copiedUpper, copiedTranspose, initialEntries,
+                copiedTransforms, upperEntries, transformEntries)
+        } catch (_: CopyStopped) {
+            null
+        }
+    }
+
+    private class CopyStopped : RuntimeException()
 
     fun forward(work: BasisWorkspace): Long {
         lastSolveEntries = 0

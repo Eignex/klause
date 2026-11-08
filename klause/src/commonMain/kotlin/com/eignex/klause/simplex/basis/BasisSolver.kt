@@ -144,6 +144,7 @@ internal interface BasisSolver : AutoCloseable {
     val basisWork: BasisWork? get() = null
     val basisOperationWork: BasisOperationWork? get() = null
     val orderHintDimension: Int? get() = null
+    val factorCopy: BasisFactorCopy? get() = null
 
     fun refactorize(basicIndex: IntArray): Boolean
     fun ftran(x: IndexedVector, expectedDensity: Double = 1.0)

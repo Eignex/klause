@@ -80,7 +80,24 @@ internal class LuFactors(
     val upper: SparseMatrix,
     val lowerTranspose: SparseMatrix,
     val upperTranspose: SparseMatrix,
-)
+) {
+    fun copyOwned(cancelled: () -> Boolean): LuFactors? {
+        fun copy(matrix: SparseMatrix): SparseMatrix = SparseMatrix.wrap(matrix.rows, matrix.cols,
+            matrix.copyColumnPointers(), matrix.copyRowIndices(), matrix.values.copyOf())
+        if (cancelled()) return null
+        val copiedLower = copy(lower)
+        if (cancelled()) return null
+        val copiedUpper = copy(upper)
+        if (cancelled()) return null
+        val copiedLowerTranspose = copy(lowerTranspose)
+        if (cancelled()) return null
+        val copiedUpperTranspose = copy(upperTranspose)
+        if (cancelled()) return null
+        return LuFactors(basisColumns.copyOf(), basisUnitRows.copyOf(),
+            SymbolicLu(symbolic.rowOrder.copyOf(), symbolic.columnOrder.copyOf()),
+            copiedLower, copiedUpper, copiedLowerTranspose, copiedUpperTranspose)
+    }
+}
 
 internal class BasisFactors(matrix: SparseMatrix) {
     private val source = SparseMatrix.wrap(
