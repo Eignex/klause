@@ -99,16 +99,14 @@ internal class LuFactors(
     }
 }
 
-internal class BasisFactors(matrix: SparseMatrix) {
-    private val source = SparseMatrix.wrap(
-        matrix.rows,
-        matrix.cols,
-        matrix.copyColumnPointers(),
-        matrix.copyRowIndices(),
-        matrix.values.copyOf(),
-    )
+internal class BasisFactors private constructor(private val ownedSource: BasisSource) {
+    constructor(matrix: SparseMatrix) : this(BasisSource(matrix))
+
+    private val source = ownedSource.matrix
     val dimension: Int = source.rows
     private val buffers = LuBuffers(dimension)
+
+    fun fork(): BasisFactors = BasisFactors(ownedSource)
 
     fun build(basisColumns: IntArray, policy: LuPivotPolicy = LuPivotPolicy()): LuBuildResult =
         build(basisColumns, IntArray(dimension) { -1 }, policy)

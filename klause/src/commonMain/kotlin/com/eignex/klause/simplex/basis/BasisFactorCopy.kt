@@ -5,6 +5,7 @@ internal interface BasisFactorCopy {
     val dimension: Int
     val entries: Long
     val additionalWork: Long
+    val sharesSource: Boolean get() = false
 
     fun create(
         columns: IntArray,

@@ -13,6 +13,31 @@ import kotlin.test.assertTrue
 
 class BasisFactorsTest {
     @Test
+    fun `forked construction keeps captured inputs and independent reentrant scratch`() {
+        val source = ftSource("dense", 8)
+        val original = ftSource("dense", 8)
+        val parent = BasisFactors(source)
+        val child = parent.fork()
+        source.values.fill(Double.NaN)
+        val headings = IntArray(8) { it }
+        val alternative = IntArray(8) { 15 - it }
+        var parentResult: LuBuildResult.Built? = null
+        var polls = 0
+        val policy = LuPivotPolicy(maxWork = 1_000_000L, cancelled = {
+            if (++polls == 3) parentResult = assertIs<LuBuildResult.Built>(parent.build(alternative))
+            false
+        })
+
+        val copied = assertIs<LuBuildResult.Built>(child.build(headings, policy))
+
+        assertTrue(polls >= 3)
+        assertTrue(reconstructionResidual(original, headings, copied.factors) <= 1e-12)
+        assertTrue(reconstructionResidual(original, alternative, assertNotNull(parentResult).factors) <= 1e-12)
+        val rebuilt = assertIs<LuBuildResult.Built>(parent.build(headings))
+        assertTrue(reconstructionResidual(original, headings, rebuilt.factors) <= 1e-12)
+    }
+
+    @Test
     fun `resource limits decline before publishing factors and leave the builder reusable`() {
         val matrix = sparse(arrayOf(doubleArrayOf(3.0, 1.0), doubleArrayOf(1.0, 3.0)))
         val builder = BasisFactors(matrix)
