@@ -1,6 +1,8 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.ComparisonClause
+import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.ExactLinearInvariant
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearInvariant
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -10,10 +12,15 @@ import com.eignex.klause.factor.scheduling.internals.CumulativeLsState
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.Term
 import com.eignex.klause.solver.objective.CapturedIntegerDefinition
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.result.LocalSearchResidual
 import com.eignex.klause.solver.result.LocalSearchResidualFactor
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.magnitudeBitLength
 
 internal class LocalSearchResidualRecorder {
     var best: LocalSearchResidual? = null
@@ -82,8 +89,42 @@ internal class LocalSearchResidualRecorder {
                 if (state.factors[fid] is LinearInvariant) state.longPayload[fid] else null)
             is ReifiedLinear -> rowDetails(details, factor.vars, factor.op, factor.integerConstants,
                 if (state.factors[fid] is ReifiedLinearInvariant) state.longPayload[fid] else null)
+            is ExactLinear -> exactRowDetails(details, state, fid, factor)
         }
         return details
+    }
+
+    private fun exactRowDetails(
+        details: MutableMap<String, String>,
+        state: LocalSearchState,
+        fid: Int,
+        row: ExactLinear,
+    ) {
+        details["op"] = row.relation.toString()
+        details["strict"] = row.strict.toString()
+        details["activator"] = if (row.activator == LinearRow.ALWAYS) "always" else "b${row.activator}"
+        details["bound"] = scalar(row.constants.exactBound)
+        for (k in 0 until minOf(row.size, MAX_COORDINATES)) {
+            val ref = row.ref(k)
+            val coordinate = if (Term.isInt(ref)) "i${Term.intVar(ref)}" else "r${Term.realVar(ref)}"
+            details["term.$k"] = "${scalar(row.constants.exactCoeff(k))}:$coordinate"
+            if (Term.isInt(ref)) {
+                val domain = state.rootDomains[Term.intVar(ref)]
+                details["$coordinate.domain"] = "${domain.min}:${domain.max}"
+            }
+        }
+        details["omittedTerms"] = (row.size - MAX_COORDINATES).coerceAtLeast(0).toString()
+        val activity = when (val invariant = state.factors[fid]) {
+            is LinearInvariant, is ReifiedLinearInvariant -> bigIntOf(state.longPayload[fid])
+            is ExactLinearInvariant -> invariant.exactActivity(state, fid)
+            else -> null
+        }
+        details["activity"] = activity?.let(::scalar) ?: "unsupported-grader"
+    }
+
+    private fun scalar(value: BigInt): String {
+        val bits = value.magnitudeBitLength()
+        return if (bits <= MAX_SCALAR_BITS) value.toString() else "omitted:$bits-bits"
     }
 
     private fun rowDetails(
@@ -202,5 +243,6 @@ internal class LocalSearchResidualRecorder {
     private companion object {
         const val MAX_FACTORS = 8
         const val MAX_COORDINATES = 16
+        const val MAX_SCALAR_BITS = 256
     }
 }
