@@ -49,6 +49,7 @@ internal class KotlinBasisSolver(
     private var retainedOrder: SymbolicLu? = initialOrder?.let { copyOrderProposal(it, n) }
     private var closed = false
     private var repairActive = false
+    private var generation = 0L
     override var singular = true
         private set
     var lastSolveWork: BasisSolveWork? = null
@@ -279,6 +280,7 @@ internal class KotlinBasisSolver(
             unitRows = installedUnits
             retainedOrder = installedOrder
             singular = false
+            generation++
             return result
         }
 
@@ -522,6 +524,7 @@ internal class KotlinBasisSolver(
         }
         columns[pivotRow] = entering
         unitRows[pivotRow] = -1
+        generation++
         val updateUnits = saturatedAdd(validationUnits, checkNotNull(current.ft.lastUpdateWork).units)
         workMeter.updateSuccess(updateUnits)
         operationMeter.success(BasisOperationKind.UPDATE, updateUnits)
@@ -575,6 +578,53 @@ internal class KotlinBasisSolver(
         return BasisSolveQuality(residual, residual / scale)
     }
 
+    override val factorCopy: BasisFactorCopy?
+        get() = cache?.takeIf { !closed && !singular && !repairActive }?.let { FactorCopy(it, generation) }
+
+    private inner class FactorCopy(private val observed: BasisSolveCache, private val version: Long) : BasisFactorCopy {
+        override val dimension: Int = n
+        override val entries: Long = observed.factors.lower.nnz.toLong() +
+            observed.ft.upperEntries + observed.ft.transformEntries
+        override val additionalWork: Long = 56L * n +
+            6L * (observed.factors.lower.nnz.toLong() + observed.factors.upper.nnz) +
+            4L * observed.ft.upperEntries + 2L * observed.ft.transformEntries + 4L * observed.ft.updateCount + 64L
+
+        override fun create(
+            columns: IntArray,
+            unitRows: IntArray,
+            policy: LuPivotPolicy,
+            work: Long,
+        ): BasisSolver? {
+            fun valid(): Boolean = !policy.cancelled() && !closed && !singular && !repairActive &&
+                generation == version && cache === observed
+            if (work < additionalWork || policy.maxEntries < entries || !valid()) return null
+            if (!columns.contentEquals(this@KotlinBasisSolver.columns) ||
+                !unitRows.contentEquals(this@KotlinBasisSolver.unitRows)
+            ) return null
+            val copied = KotlinBasisSolver(source,
+                this@KotlinBasisSolver.policy.copy(
+                    maxEntries = minOf(this@KotlinBasisSolver.policy.maxEntries, policy.maxEntries),
+                    maxWork = minOf(this@KotlinBasisSolver.policy.maxWork, policy.maxWork),
+                    cancelled = policy.cancelled),
+                updateLimit, fillFactor, densityThreshold, reusePivotOrder, denseDimensionLimit, denseMinimumDensity)
+            var published = false
+            try {
+                val factors = observed.factors.copyOwned { !valid() } ?: return null
+                val ft = observed.ft.copyOwned { !valid() } ?: return null
+                copied.cache = BasisSolveCache(factors, densityThreshold, ft)
+                copied.columns = this@KotlinBasisSolver.columns.copyOf()
+                copied.unitRows = this@KotlinBasisSolver.unitRows.copyOf()
+                copied.retainedOrder = factors.symbolic
+                copied.singular = false
+                if (!valid()) return null
+                published = true
+                return copied
+            } finally {
+                if (!published) copied.close()
+            }
+        }
+    }
+
     override val orderHintDimension: Int?
         get() = n.takeIf { !closed && !singular && !repairActive && retainedOrder != null }
 
@@ -606,6 +656,7 @@ internal class KotlinBasisSolver(
         check(!repairActive) { "basis repair is active" }
         if (closed) return
         closed = true
+        generation++
         denseBuilder = null
         cache = null
         columns = IntArray(0)
@@ -621,6 +672,7 @@ internal class KotlinBasisSolver(
         require(basicIndex.size == n && basicIndex.all { it in 0 until source.cols })
 
     private fun invalidate() {
+        generation++
         cache = null
         singular = true
         columns = IntArray(0)
@@ -638,6 +690,7 @@ internal class KotlinBasisSolver(
             result.factors.symbolic.columnOrder.copyOf(),
         )
         singular = false
+        generation++
     }
 
     private fun recordSolveAttempt(transpose: Boolean) {
@@ -662,8 +715,11 @@ internal class KotlinBasisSolver(
     }
 }
 
-internal class BasisSolveCache(val factors: LuFactors, threshold: Double) {
-    val ft = ForrestTomlinFactors(factors)
+internal class BasisSolveCache(
+    val factors: LuFactors,
+    threshold: Double,
+    val ft: ForrestTomlinFactors = ForrestTomlinFactors(factors),
+) {
 
     val lower = HyperSparseSolve(factors.lower, lower = true, unitDiagonal = true, threshold)
     val upper = HyperSparseSolve(ft.upper, lower = false, unitDiagonal = false, threshold)
