@@ -1,7 +1,9 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.parseBigInt
 import com.eignex.util.numbers.signum
 
@@ -631,7 +633,11 @@ private fun validateEventShape(event: LpReplayEvent, model: LpCapturedModel, ind
 
 private val CAPTURE_MAGIC: ByteArray = byteArrayOf(0x4b, 0x4c, 0x50, 0x43, 0x41, 0x50, 0x54, 0x52)
 
-private class CaptureWriter(private val valueLimit: Int = Int.MAX_VALUE, private val byteLimit: Int = Int.MAX_VALUE) {
+private class CaptureWriter(
+    private val valueLimit: Int = Int.MAX_VALUE,
+    private val byteLimit: Int = Int.MAX_VALUE,
+    private val cancellation: Cancellation? = null,
+) {
     private var data = ByteArray(256)
     private var size = 0
     private var values = 0
@@ -655,17 +661,21 @@ private class CaptureWriter(private val valueLimit: Int = Int.MAX_VALUE, private
     }
 
     private fun countValue() {
-        if (values == valueLimit) throw CaptureBudgetExceeded()
+        if (values == valueLimit || cancellation?.isCancelled() == true) throw CaptureBudgetExceeded()
         values++
     }
 
     fun string(value: String) {
+        if (value.length > byteLimit - size) throw CaptureBudgetExceeded()
         val bytes = value.encodeToByteArray()
         int(bytes.size)
         bytes(bytes)
     }
 
     fun rationalPart(value: BigInt) {
+        if (byteLimit != Int.MAX_VALUE && value.magnitudeBitLength().toLong() > (byteLimit - size).toLong() * 4L) {
+            throw CaptureBudgetExceeded()
+        }
         string(rationalStrings.getOrPut(value) { value.toString() })
     }
 
@@ -1108,6 +1118,25 @@ internal class LpExactCapture private constructor(
             int(events.size)
             events.forEach { exactEvent(it) }
         }.toByteArray()
+    }
+
+    fun encodeWithin(valueLimit: Int, byteLimit: Int, cancellation: Cancellation): ByteArray? {
+        require(valueLimit >= 0 && byteLimit >= 0)
+        if (cancellation() || events.size > valueLimit) return null
+        validateFormat()
+        return try {
+            CaptureWriter(valueLimit, byteLimit, cancellation).apply {
+                bytes(EXACT_CAPTURE_MAGIC)
+                int(version)
+                settings(settings)
+                int(maxRetainedRows)
+                exactState(initialState)
+                int(events.size)
+                events.forEach { exactEvent(it) }
+            }.toByteArray()
+        } catch (_: CaptureBudgetExceeded) {
+            null
+        }
     }
 
     fun validateFormat() {

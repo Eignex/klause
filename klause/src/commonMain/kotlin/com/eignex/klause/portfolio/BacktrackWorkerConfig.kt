@@ -8,6 +8,8 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.bounding.hasDefaultNumericalSettings
+import com.eignex.klause.lp.engine.LpQueryObservation
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.meta.coreguided.CoreRefinementMode
 import com.eignex.klause.propagation.BakedProblem
@@ -34,16 +36,20 @@ internal class BacktrackWorkerConfig(
     internal val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     private val toleranceCheck: ((Sample) -> Boolean)? = null,
     private val coreRefinement: CoreRefinementMode = CoreRefinementMode.NONE,
+    private val onLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
 ) : WorkerConfig {
 
     fun withToleranceCheck(check: (Sample) -> Boolean): BacktrackWorkerConfig =
-        BacktrackWorkerConfig(recipe, zeroObjectivePricing, check, coreRefinement)
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, check, coreRefinement, onLpQuery)
 
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
-        BacktrackWorkerConfig(recipe.spending(budget), zeroObjectivePricing, toleranceCheck, coreRefinement)
+        BacktrackWorkerConfig(recipe.spending(budget), zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery)
 
     override fun withCoreRefinement(mode: CoreRefinementMode): BacktrackWorkerConfig =
-        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, mode)
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, mode, onLpQuery)
+
+    fun withLpQueryObserver(observer: (String, Double?, LpQueryObservation) -> Unit): BacktrackWorkerConfig =
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, observer)
 
     override val label: String get() = recipe.label
 
@@ -65,6 +71,7 @@ internal class BacktrackWorkerConfig(
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         pools: SharedPools?,
     ): PortfolioWorker {
+        var observedCutoff: Double? = null
         val evidenceModel = ModelIdentity.of(problem, objective)
         lateinit var worker: PortfolioWorker
         val matchedPools = pools?.takeIf { it.identity?.matches(evidenceModel) != false }
@@ -160,8 +167,14 @@ internal class BacktrackWorkerConfig(
         }
         // A pure CSP has no bound to prune on, so withBound is wired only when optimising.
         val withBound: ((BacktrackParams, () -> Double) -> BacktrackParams)? =
-            if (objective != null) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) } else null
-        val solver = matchedPools?.nativeProjection?.let { BacktrackSolver(problem, it) } ?: BacktrackSolver(problem)
+            if (objective != null) { p, supplier ->
+                p.copy(objectiveBoundSupplier = if (onLpQuery == null) supplier else {
+                    { supplier().also { observedCutoff = it } }
+                })
+            } else null
+        val context = onLpQuery?.let { observer -> LpSolveContext(onQuery = { observer(workerLabel, observedCutoff, it) }) }
+            ?: LpSolveContext.Production
+        val solver = BacktrackSolver(problem, context, matchedPools?.nativeProjection)
         val session = StatelessSession(solver)
         worker = PortfolioWorker.of(
             workerLabel,

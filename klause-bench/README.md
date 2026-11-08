@@ -1273,6 +1273,18 @@ also includes nested stages; do not add those observations together.
 
 ## Worker admission qualification
 
+`bench.profile.FinitePortfolioLpCapture` runs through the ordinary captured MPS
+source and mixed portfolio with `suite`, `problem`, `sha256`, `seed` and
+`handoff=true|false`. Use a lab profile job. Optional `timeout-ms` is at most 30,000 ms;
+`captures=1..4` bounds exact query payloads to 1 MiB and 65,536 serialized values each.
+`cutoff-bits` selects the last observed native external cutoff, and
+`capture-worker=bt/lp-default|any` selects queries. It retains 128 query metadata
+records and 1,024 progress events, reporting omissions and declined captures.
+Exact LP payloads, optional owned basis snapshots and latest checked source points
+have separate identities. They do not establish warm replay, original-source proof
+authority, CLI equivalence or production performance; capture spends the same
+containing source deadline. Source fetching remains inside the containing lab job.
+
 For phase/lifetime diagnosis use `param.portfolio-progress=true` to retain physical
 creation/query/retirement, incumbent availability/read/import/consumption and settled
 phase/cost events in CLI stderr. `armPhase.*`, `armLifecycle.*` and

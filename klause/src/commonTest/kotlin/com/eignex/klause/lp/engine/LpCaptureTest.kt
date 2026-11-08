@@ -16,6 +16,29 @@ import kotlin.test.assertTrue
 
 class LpCaptureTest {
     @Test
+    fun `bounded exact encoding should retain the complete wire format`() {
+        val model = assertNotNull(LpBuilder().apply { addVar(0L, 3L, cost = 1L) }
+            .build(Sense.MINIMIZE).authoritativeModel())
+        val capture = LpExactCapture.capture(model, LpReplaySettings("bounded", 1L), emptyList())
+
+        val bytes = assertNotNull(capture.encodeWithin(4096, 65_536, Cancellation.Never))
+
+        assertContentEquals(capture.encode(), bytes)
+        assertContentEquals(bytes, LpExactCapture.decode(bytes).encode())
+    }
+
+    @Test
+    fun `bounded exact encoding should withhold partial or cancelled payloads`() {
+        val model = assertNotNull(LpBuilder().apply { addVar(0L, 3L, cost = 1L) }
+            .build(Sense.MINIMIZE).authoritativeModel())
+        val capture = LpExactCapture.capture(model, LpReplaySettings("bounded", 1L), emptyList())
+
+        assertNull(capture.encodeWithin(0, 65_536, Cancellation.Never))
+        assertNull(capture.encodeWithin(4096, 8, Cancellation.Never))
+        assertNull(capture.encodeWithin(4096, 65_536, Cancellation { true }))
+    }
+
+    @Test
     fun `mixed structural capture should restore scoped rows without dropping permanent definitions`() {
         val source = assertNotNull(
             LpBuilder().apply { addVar(0L, 3L, cost = 1L) }

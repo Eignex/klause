@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpTechnique
+import com.eignex.klause.lp.engine.LpQueryObservation
 import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.portfolio.EngineMix
@@ -88,6 +89,7 @@ internal fun FinitePipeline.portfolioExecutor(
     waitForCompanionImprovement: Boolean = false,
     privateRebuildBudgetOnly: Boolean = false,
     adaptiveCompanionRepair: Boolean = false,
+    onLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
         "portfolio-work requires a finite Boolean/integer source without numerical companions"
@@ -165,7 +167,7 @@ internal fun FinitePipeline.portfolioExecutor(
     }
     val finiteFactories = PortfolioBuilder.factories(
         problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
-        profile, numericalCompletion, sourceHints, objectiveCoordinates, bufferedPublications,
+        profile, numericalCompletion, sourceHints, objectiveCoordinates, bufferedPublications, onLpQuery,
     ).map { factory ->
         PortfolioArmFactory(preparedPlan, factory.armId, factory.family, binding = { worker ->
             SourceWorkerBinding(

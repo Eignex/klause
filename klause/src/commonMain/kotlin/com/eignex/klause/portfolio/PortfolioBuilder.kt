@@ -5,6 +5,7 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.InvariantNetworkPreparation
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchPreparation
+import com.eignex.klause.lp.engine.LpQueryObservation
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
@@ -100,6 +101,7 @@ object PortfolioBuilder {
         sourceHints: ((Set<ExecutionStrategy>) -> PreparedSourceHints?)? = null,
         objectiveCoordinates: ObjectiveCoordinateView? = null,
         bufferedPublications: Boolean = false,
+        onLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
     ): List<FinitePortfolioFactory> {
         val facts = ProblemFacts.of(problem, profile, scenario.lpCeiling, objective) { recipe, eligibility ->
             onEvent?.invoke("portfolio", SearchEvent.WorkerAdmission(recipe, eligibility.admitted,
@@ -161,8 +163,10 @@ object PortfolioBuilder {
                 } else {
                     admitted
                 }
-                val bounded = (budget?.let(completion::withNodeBudget) ?: completion)
+                val tuned = (budget?.let(completion::withNodeBudget) ?: completion)
                     .withCoreRefinement(scenario.coreRefinement)
+                val bounded = if (onLpQuery != null && tuned is BacktrackWorkerConfig)
+                    tuned.withLpQueryObserver(onLpQuery) else tuned
                 val privateCoordinates = objectiveCoordinates != null && bounded is LocalSearchWorkerConfig &&
                     config.label == LocalSearchArm.CblsPlateauIlsBasin.label &&
                     scenario.cores == 1 && scenario.engine == EngineMix.MIXED &&
