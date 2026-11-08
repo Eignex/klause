@@ -221,7 +221,8 @@ scheduling does not admit numerical companions.
 ## Statistics
 
 An internal observer on a captured mixed finite source request follows the ordinary
-recipe factory into native backtrack LP sessions. Each callback names the worker
+recipe factory into native backtrack LP sessions; other LP calls are outside its
+scope. Each callback names the worker
 and its last observed external cutoff; it preserves source preparation, selected
 recipes, seeds, sharing and companion admission. That cutoff and a checked source
 publication remain separate observations. Neither supplies the query's missing

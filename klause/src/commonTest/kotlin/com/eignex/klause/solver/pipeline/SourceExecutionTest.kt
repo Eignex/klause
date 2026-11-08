@@ -10,12 +10,16 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearSourceObjective
 import com.eignex.klause.ir.LinearSourceProblem
+import com.eignex.klause.ir.LinearSourceRow
+import com.eignex.klause.ir.LinearSourceTerm
 import com.eignex.klause.ir.LinearSourceVariable
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.presolve.PresolveBudget
@@ -48,29 +52,31 @@ import kotlin.time.Duration
 
 class SourceExecutionTest {
     @Test
-    fun `mixed source query observation should retain the selected LP worker binding`() {
-        val source = Problem(0, 3, Array(3) { IntDomain(0, 2) }, listOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
-            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 3),
-            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 3),
-        ))
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
-            objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))))
+    fun `mixed source query observation should retain the selected native worker binding`() {
+        val source = LinearSourceProblem(listOf(
+            LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),
+            LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
+            LinearSourceVariable("s", false, SemanticRational.ZERO, SemanticRational.ONE),
+        ), listOf(LinearSourceRow(List(3) { LinearSourceTerm(it, SemanticRational.ONE) },
+            lower = SemanticRational.ONE)),
+            LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE),
+                LinearSourceTerm(2, SemanticRational.ONE))))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
         val workers = mutableListOf<String>()
         val request = SourceExecutionRequest(invocation,
-            ExecutionOptions.parse(listOf("bt-arm=lp-default", "arms=1", "bt=1", "ls=0")),
+            SourceExecutionPolicy(lpCeiling = LpConfig.OFF, portfolioLpCeiling = LpConfig.OFF),
+            ExecutionOptions.parse(listOf("bt-arm=conflictDriven", "bt=1", "ls=0")),
             presolveConfig = PresolveConfig.NONE, cores = 1).withPortfolioLpQueryObserver { worker, _, query ->
             workers += worker
             assertNotNull(query.model.exactState)
-            assertTrue(query.model.m > 0)
         }
 
         val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(request))
 
         assertEquals(FiniteSolveVerdict.OPTIMAL, assertIs<FiniteSolveOutcome.Completed>(result.result.outcome).verdict)
         assertTrue(workers.isNotEmpty())
-        assertTrue(workers.all { it == "bt/lp-default" })
+        assertTrue(workers.all { it == "bt/conflictDriven" })
     }
 
     @Test
