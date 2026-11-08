@@ -289,8 +289,9 @@ internal class LinearAuthority(
         return ready
     }
 
-    private fun newPointPolicy(): LinearAuthorityPointCuts =
-        LinearAuthorityPointCuts(budget, onCut = cutLifecycle::observe).also { policy ->
+    private fun newPointPolicy(retainUninstalledLayout: Boolean = true): LinearAuthorityPointCuts =
+        LinearAuthorityPointCuts(budget, retainUninstalledLayout = retainUninstalledLayout,
+            onCut = cutLifecycle::observe).also { policy ->
             policy.observeTo { key, amount -> pointCounts[key] = (pointCounts[key] ?: 0L) + amount }
         }
 
@@ -328,7 +329,7 @@ internal class LinearAuthority(
         }
         val previous = PointRecipe(family, prepared, pointPolicy, pointFamily, pointFallback,
             directedFamily, pointMask, primalAttempt)
-        val policy = newPointPolicy()
+        val policy = newPointPolicy(retainUninstalledLayout = false)
         pointPolicy = policy
         val refined = preparePointFamily(source, family, prepared, point, cancellation, fractional = true,
             journal = journal)
