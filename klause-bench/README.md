@@ -46,6 +46,9 @@ input and records its decoded SHA-256 and byte count without parsing or solving 
 `MpsProofFrontier selection=true` exports a captured template's actual
 `generationScope` separately from the query's current verification scope.
 Missing generation provenance stays unavailable.
+Imported proof records retain their original scope, consequence or bound payload,
+and nested derivation. Depth and cancellation limits mark withheld proofs
+unavailable.
 
 `satcomp-xor-v1` selects 17 hash-pinned graph-parity CNFs from the SAT Competition,
 including original and camouflaged encodings.
