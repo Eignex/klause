@@ -16,11 +16,13 @@ import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FiniteSolveCallbacks
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceExecutionCallbacks
+import com.eignex.klause.solver.pipeline.SourceExecutionKind
 import com.eignex.klause.solver.pipeline.SourceExecutionPolicy
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.execute
+import com.eignex.klause.solver.pipeline.executionKind
 import com.eignex.klause.util.Cancellation
 import java.io.File
 import java.util.IdentityHashMap
@@ -70,6 +72,18 @@ internal object FinitePortfolioLpCapture {
         val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(original, ProblemSettings()),
             ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
             maximize = original.objective?.sense == ObjectiveSense.MAXIMIZE, cancellation = stop))
+        if (SourceSetup.executionKind(invocation) != SourceExecutionKind.FINITE) {
+            out.resolve("result.json").writeText(buildJsonObject {
+                put("captureDeclined", "finite source route unavailable after preparation")
+                put("executionKind", SourceSetup.executionKind(invocation).name)
+                put("executionNs", System.nanoTime() - executionStarted)
+                put("containingTimeoutMs", timeout)
+                put("cancelled", stop())
+                put("sourceVerdictClaim", false)
+                put("fullWarmReplayQualified", false)
+            }.toString())
+            return
+        }
         val pairs = listOf("companion-integers=true", "companion-active-ms=4000",
             "companion-after-incumbent=true", "companion-admission=progress-funded", "companion-repair=fixed",
             "source-incumbent-completion=$handoff", "portfolio-progress=true", "portfolio-reward=ordinary",
@@ -201,7 +215,7 @@ internal object FinitePortfolioLpCapture {
         }
     }
 
-    private fun capture(query: Any, stop: Cancellation): ByteArray? {
+    internal fun capture(query: Any, stop: Cancellation): ByteArray? {
         val model = get(query, "Model")
         if ((get(model, "M") as Int) > 4096 ||
             (get(model, "N") as Int).toLong() + (get(model, "M") as Int) > 8192) return null
