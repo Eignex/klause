@@ -12,6 +12,8 @@ internal class LpSolveSession(
     private var certification = LpCertificationSession(context, pricing)
     private var closed = false
     private var activeSolve: LpSolveCursor<CertifiedLpResult>? = null
+    private val queryOwner = context.onQuery?.let { Any() }
+    private var querySequence = 0L
 
     fun solve(
         model: LpModel,
@@ -31,6 +33,8 @@ internal class LpSolveSession(
             val previous = solver
             val current = prepare(model, cancellation, workLimit)
                 ?: return CertifiedLpResult(null, null, null, null, null, false, { null })
+            observeQuery(model, current, current === previous, workLimit, claim,
+                floatOffset, floatAccept != null, refinementLimits)
             val result = try {
                 if (current === previous) current.resolveBounds(LpFloatAllowance(workLimit, 0)) else current.solve()
             } finally {
@@ -65,6 +69,8 @@ internal class LpSolveSession(
                 val previous = solver
                 val current = prepare(model, cancellation, workLimit)
                     ?: return@LpSolveCursor cancelledResult()
+                observeQuery(model, current, current === previous, workLimit, claim,
+                    floatOffset, floatAccept != null, null)
                 val stage = solveFloating(current, current === previous, cancellation, observer, workLimit)
                 val result = when (stage) {
                     is FloatingStage.Completed -> stage.result
@@ -137,6 +143,30 @@ internal class LpSolveSession(
     private sealed interface FloatingStage {
         class Completed(val result: FloatLpResult?) : FloatingStage
         data object Cancelled : FloatingStage
+    }
+
+    private fun observeQuery(
+        model: LpModel,
+        solver: LpSolver,
+        retained: Boolean,
+        workLimit: Long,
+        claim: LpClaim,
+        floatOffset: Double,
+        hasFloatAcceptance: Boolean,
+        refinementLimits: LpRefinementLimits?,
+    ) {
+        val observer = context.onQuery ?: return
+        check(querySequence < Long.MAX_VALUE) { "LP query sequence exhausted" }
+        val query = LpQueryObservation(checkNotNull(queryOwner), ++querySequence, model, retained,
+            workLimit, claim, floatOffset, hasFloatAcceptance, refinementLimits ?: LpRefinementLimits(),
+            pricing, componentSplit) {
+            solver.continuationBasis(model)
+        }
+        try {
+            observer(query)
+        } finally {
+            query.release()
+        }
     }
 
     private fun cancelledResult(): CertifiedLpResult {

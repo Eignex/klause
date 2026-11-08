@@ -14,6 +14,96 @@ import kotlin.test.assertTrue
 
 class LpSolveSessionTest {
     @Test
+    fun `query observations should capture exact bounds before retained solves`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 5.0, cost = 1.0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val captures = ArrayList<ByteArray>()
+        val queries = ArrayList<LpQueryObservation>()
+        val pricing = LpPricingOptions(tieSeed = 7L)
+        val context = LpSolveContext(onQuery = { query ->
+            queries += query
+            captures += LpExactCapture.capture(assertNotNull(query.model.exactState),
+                LpReplaySettings("query", query.pricing.tieSeed, workLimit = query.workLimit), emptyList()).encode()
+        })
+
+        LpSolveSession(context, pricing, componentSplit = false).use { owner ->
+            assertEquals(BigFraction.ONE,
+                owner.solve(assertNotNull(trail.state.ownerWorkingModel()), workLimit = 100_000L).lowerBound)
+            assertTrue(trail.push())
+            assertTrue(trail.assertBound(x, false, ExactLpSide(ExactLpNumber.of(3L)), 7L))
+            assertEquals(BigFraction.ofLong(3L),
+                owner.solve(assertNotNull(trail.state.ownerWorkingModel()), workLimit = 200_000L).lowerBound)
+        }
+
+        assertEquals(listOf(1L, 2L), queries.map { it.sequence })
+        assertSame(queries[0].owner, queries[1].owner)
+        assertEquals(listOf(false, true), queries.map { it.retained })
+        assertEquals(listOf(100_000L, 200_000L), queries.map { it.workLimit })
+        assertTrue(queries.all { it.claim == LpClaim.ATTAINED_OPTIMUM && !it.componentSplit })
+        assertTrue(queries.all { it.pricing === pricing })
+        assertEquals(BigFraction.ZERO,
+            assertNotNull(LpExactCapture.decode(captures[0]).initialState.model.column(x).bounds.lower).number.value)
+        assertEquals(BigFraction.ofLong(3L),
+            assertNotNull(LpExactCapture.decode(captures[1]).initialState.model.column(x).bounds.lower).number.value)
+    }
+
+    @Test
+    fun `cursor queries should be observed once when numerical work starts`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val x = builder.addRealVar(0.0, 5.0, cost = 1.0)
+            builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
+        }
+        val model = assertNotNull(LpExactState(assertNotNull(
+            builder.build(Sense.MINIMIZE).authoritativeModel())).ownerWorkingModel())
+        var observations = 0
+        val context = LpSolveContext(onQuery = { observations++ })
+
+        LpSolveSession(context, componentSplit = false).use { owner ->
+            owner.openSolve(model).use { cursor ->
+                assertEquals(0, observations)
+                var step = cursor.advance(1L)
+                assertIs<LpSolveStep.Paused>(step)
+                var pauses = 0
+                while (step is LpSolveStep.Paused && pauses++ < 64) step = cursor.advance(1L)
+                assertEquals(LpVerdict.ATTAINED_OPTIMUM,
+                    assertIs<LpSolveStep.Completed<CertifiedLpResult>>(step).value.verdict)
+            }
+        }
+
+        assertEquals(1, observations)
+    }
+
+    @Test
+    fun `failed query observers should release borrowed views and permit another solve`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 5.0, cost = 1.0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
+        val model = assertNotNull(LpExactState(assertNotNull(
+            builder.build(Sense.MINIMIZE).authoritativeModel())).ownerWorkingModel())
+        val primary = IllegalArgumentException("capture stopped")
+        val factory = RecordingLpEngineFactory()
+        val queries = ArrayList<LpQueryObservation>()
+        val context = LpSolveContext(factory, onQuery = { query ->
+            queries += query
+            if (query.sequence == 1L) throw primary
+        })
+
+        LpSolveSession(context, componentSplit = false).use { owner ->
+            assertSame(primary, assertFailsWith<IllegalArgumentException> { owner.solve(model) })
+            assertEquals(BigFraction.ONE, owner.solve(model).lowerBound)
+        }
+
+        assertEquals(2, factory.calls.count { it.kind == EngineConstruction.PERSISTENT })
+        for (query in queries) {
+            assertFailsWith<IllegalStateException> { query.model }
+            assertFailsWith<IllegalStateException> { query.captureBasis() }
+        }
+    }
+
+    @Test
     fun `component cursors should reuse unchanged child results without resumable support`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 5.0, cost = 1.0)
