@@ -315,7 +315,7 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
-    fun `fractional point aggregation should prepare its retained pool within the LP allowance`() {
+    fun `fractional continuation should preserve the current optimum within two operations`() {
         val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val source = SourceProofContext(scope, setOf(integer, real, residual), mapOf(
             "row" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(2),
@@ -333,12 +333,13 @@ class LinearAuthorityInvocationTest {
             boundOrdered = true).use { it.run { _, _ -> } }
 
         val stages = assertNotNull(result.stats.smt.completeSearchStages)
-        assertEquals(1L, stages["numericalCutSelectionFractionalPreparations"])
+        assertEquals(0L, stages["numericalCutSelectionFractionalPreparations"] ?: 0L)
         assertEquals(1L, stages["numericalCutSelectionPointPrepared"])
         assertEquals(0L, stages["numericalCutSelectionPointPreparationUnavailable"] ?: 0L)
         assertTrue(result.stats.smt.sourceLp.operations <= 2)
-        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority())
-            .verify(result.terminal ?: assertNotNull(result.bound)))
+        val terminal = assertNotNull(result.terminal)
+        assertEquals(SourceValue.Rational(BigFraction.MINUS_ONE), assertIs<SourceClaim.Optimal>(terminal.claim).value)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
     }
 
     @Test

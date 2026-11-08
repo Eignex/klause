@@ -21,7 +21,10 @@ internal class LinearAuthorityPointCuts(
         val id: Int, val values: Map<SourceCoordinate, Double>, val norm: Double, val score: Double,
     )
     private val counts = linkedMapOf<String, Long>()
+    private var onObservation: (String, Long) -> Unit = { _, _ -> }
     val observations: Map<String, Long> get() = counts.toMap()
+
+    fun observeTo(observer: (String, Long) -> Unit) { onObservation = observer }
     private var family: List<LinearAuthorityCut>? = null
     private var cooldown = 0
     private var misses = 0
@@ -59,6 +62,7 @@ internal class LinearAuthorityPointCuts(
     fun observe(name: String, amount: Long = 1L) {
         val key = "numericalCutSelection$name"
         counts[key] = (counts[key] ?: 0L) + amount
+        onObservation(key, amount)
     }
 
     private inner class Meter(private val cancellation: Cancellation) {

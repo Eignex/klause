@@ -1822,13 +1822,20 @@ A selected witness or terminal keeps its selected guidance. The baseline point
 uses the selection round's existing funded retention and carries no proof authority;
 the strengthened bound and selected rows retain their own result channels. This
 requests no additional LP query and changes no generation allowance.
-Fractional-order aggregation keeps the complete retained cut pool and appends
-funded proposals under the 64-row ceiling in the same numerical generation scope.
-Its explicit point round can augment an aggregate-only pool. An immutable template
+Fractional-order aggregation follows the completed current point query. It keeps
+that query's checked definitions, installed mask, strongest bound and paid exact
+point, then appends funded proposals under the 64-row ceiling in the same numerical
+generation scope. It attempts one augmentation per immutable template using only
+the containing allowance's remaining work, memory and operations. Generation and
+the additional query have separate charged costs. A candidate selector must retain
+every still-checked installed ID before adding a row. An immutable template
 identity keeps that prepared pool compatible with explicit masks while preserving
-its original complementary provenance; each query still rechecks the selected
-derivations. Other point preparation uses point-directed row alternatives. Missing capacity or interrupted preparation
-leaves the current query available.
+its original complementary provenance; each query rechecks the selected derivations.
+A paused candidate query retains the completed current result and resumes its
+existing operation. Decline, cancellation or exhausted funding restores the current
+recipe and selector, retaining all failed-attempt costs. Cancellation withholds
+advisory data. Restoring the recipe does not promise a free numerical basis rebuild.
+Other point preparation uses point-directed row alternatives.
 A new template first runs the ordinary checked cut recipe; a completed point can
 add one selection round at that node. A trial that admits no candidate retains
 the ordinary template, checked query and numerical owner for later queries of that

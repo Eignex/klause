@@ -88,7 +88,9 @@ internal class LinearAuthority(
     private var capturedQuery: LinearAuthorityQuery? = null
     private var capturedTemplate: LinearAuthorityTemplate? = null
     private var pointListener: ((LinearAuthorityQuery, List<BigFraction>) -> Unit)? = null
+    private var continuationListener: ((LinearAuthorityQuery, List<BigFraction>) -> Unit)? = null
     private var pointPolicy: LinearAuthorityPointCuts? = null
+    private val pointCounts = linkedMapOf<String, Long>()
     private var pointFamily: LinearAuthorityTemplate? = null
     private var pointFallback: LinearAuthorityTemplate? = null
     private var directedFamily: LinearAuthorityTemplate? = null
@@ -101,6 +103,20 @@ internal class LinearAuthority(
         var reported = false
     }
     private var pointRound: PointRound? = null
+    private class PointRecipe(
+        val template: LinearAuthorityTemplate, val query: LinearAuthorityQuery,
+        val policy: LinearAuthorityPointCuts?, val family: LinearAuthorityTemplate?,
+        val fallback: LinearAuthorityTemplate?, val directed: LinearAuthorityTemplate?,
+        val mask: Set<Int>?, val primal: PrimalAttempt?,
+    )
+    private class FractionalRound(
+        val previous: PointRecipe, val base: LinearAuthorityResult,
+        val mask: Set<Int>, val rows: List<LinearAuthorityCut>,
+    ) {
+        var reported = false
+    }
+    private var fractionalRound: FractionalRound? = null
+    private var fractionalFamily: LinearAuthorityTemplate? = null
     private var cutPreparationWork = 0L
     private var cutVerificationWork = 0L
     private var retainedCutPeak = 0L
@@ -115,7 +131,7 @@ internal class LinearAuthority(
         "numericalMaxActiveCuts" to activeCutPeak,
         "numericalMaxRetainedMixedCuts" to retainedMixedCutPeak,
         "numericalMaxActiveMixedCuts" to activeMixedCutPeak,
-    ) + cutEligibility + pointPolicy?.observations.orEmpty() + cutLifecycle.snapshot()
+    ) + cutEligibility + pointCounts + cutLifecycle.snapshot()
     private class PrimalAttempt(
         val query: LinearAuthorityQuery, val point: List<BigFraction>,
     ) {
@@ -128,6 +144,8 @@ internal class LinearAuthority(
     private var primalAttempt: PrimalAttempt? = null
 
     fun invalidateGuidance() {
+        fractionalRound?.let { restorePointRecipe(it.previous) }
+        fractionalRound = null
         pointRound = null
         lp.invalidateGuidance()
     }
@@ -140,7 +158,11 @@ internal class LinearAuthority(
         capturedTemplate = null
         capturedPoint = null
         pointListener = null
+        continuationListener = null
         pointRound = null
+        fractionalRound?.previous?.policy?.releaseCandidates()
+        fractionalRound = null
+        fractionalFamily = null
         pointPolicy?.releaseCandidates()
         pointFamily = null
         pointFallback = null
@@ -153,8 +175,147 @@ internal class LinearAuthority(
 
     fun advanceWithPointCuts(source: SourceProofContext, cancellation: Cancellation,
         retainBasePoint: Boolean = false): LinearAuthorityResult {
-        val policy = pointPolicy ?: LinearAuthorityPointCuts(budget, onCut = cutLifecycle::observe)
-            .also { pointPolicy = it }
+        if (!fractionalAggregateOrder || !aggregateCuts) {
+            return advanceCurrentPointCuts(source, cancellation, retainBasePoint)
+        }
+        fractionalRound?.let { pending ->
+            val previous = pending.previous.query
+            if (previous.matches(source, true, previous.cutMask, previous.checkUnselectedCuts,
+                    previous.retainMaskedCuts)) return advanceFractionalRound(source, cancellation, retainBasePoint)
+            restorePointRecipe(pending.previous)
+            fractionalRound = null
+            lp.invalidateGuidance()
+        }
+        var point: Pair<LinearAuthorityQuery, List<BigFraction>>? = null
+        continuationListener = { prepared, values -> point = prepared to values }
+        val base = try {
+            advanceCurrentPointCuts(source, cancellation, retainBasePoint)
+        } finally {
+            continuationListener = null
+        }
+        if (base.paused || base.evidence != null || base.incumbent != null || cancellation() ||
+            budget.funding?.paused == true) {
+            return base.copy(advisoryPoint = base.advisoryPoint.takeUnless { cancellation() })
+        }
+        val observed = point ?: return base
+        val family = template ?: return base
+        if (observed.first !== query || fractionalFamily === family ||
+            family.cuts == null || family.cuts.rows.size >= 64) return base
+        fractionalFamily = family
+        val prepared = cutLifecycle.containing("POINT_SELECTION") {
+            prepareFractionalRound(source, family, observed.first, observed.second, base, cancellation)
+        }
+        if (!prepared) return base.copy(advisoryPoint = base.advisoryPoint.takeUnless { cancellation() },
+            paused = budget.funding?.let { it.paused && !it.exhausted } == true)
+        return advanceFractionalRound(source, cancellation, retainBasePoint)
+    }
+
+    private fun newPointPolicy(): LinearAuthorityPointCuts =
+        LinearAuthorityPointCuts(budget, onCut = cutLifecycle::observe).also { policy ->
+            policy.observeTo { key, amount -> pointCounts[key] = (pointCounts[key] ?: 0L) + amount }
+        }
+
+    private fun restorePointRecipe(previous: PointRecipe) {
+        pointPolicy?.takeUnless { it === previous.policy }?.releaseCandidates()
+        template = previous.template
+        query = previous.query
+        pointPolicy = previous.policy
+        pointFamily = previous.family
+        pointFallback = previous.fallback
+        directedFamily = previous.directed
+        pointMask = previous.mask
+        primalAttempt = previous.primal
+        fractionalFamily = previous.template
+        cutLifecycle.families = previous.query.cutFamilies.values.toSet()
+    }
+
+    private fun prepareFractionalRound(
+        source: SourceProofContext, family: LinearAuthorityTemplate, prepared: LinearAuthorityQuery,
+        values: List<BigFraction>, base: LinearAuthorityResult, cancellation: Cancellation,
+    ): Boolean {
+        val allocation = 256L + values.size * 8L +
+            64L * (base.fractional.size + base.relaxedPoint.size)
+        if (values.size > 8192 || values.size != prepared.coordinates.size || cancellation() ||
+            budget.funding?.availableWork?.let { values.size.toLong() > it } == true ||
+            budget.funding?.remainingAllocation?.let { allocation > it } == true) return false
+        cutCost(values.size.toLong(), allocation)
+        if (budget.funding?.paused == true || cancellation()) return false
+        val point = values.toList()
+        val previous = PointRecipe(family, prepared, pointPolicy, pointFamily, pointFallback,
+            directedFamily, pointMask, primalAttempt)
+        val policy = newPointPolicy()
+        pointPolicy = policy
+        val refined = preparePointFamily(source, family, prepared, point, cancellation, fractional = true)
+        if (refined == null || refined.first === family || budget.funding?.paused == true || cancellation()) {
+            policy.observe("FractionalDeclined")
+            restorePointRecipe(previous)
+            return false
+        }
+        val installed = prepared.installedCuts
+        val selected = policy.select(checkNotNull(refined.first.cuts).rows,
+            refined.second.coordinates, refined.second.costs, refined.second.checkedCuts,
+            point, installed, cancellation)
+        val maskWork = 2L * installed.size + selected.size
+        val covered = budget.funding?.availableWork?.let { maskWork <= it } != false
+        if (covered) cutCost(maskWork, 0L)
+        if (cancellation() || budget.funding?.paused == true ||
+            !covered ||
+            !refined.second.checkedCuts.containsAll(installed) || !selected.containsAll(installed) ||
+            selected.none { it !in installed }) {
+            policy.observe("FractionalDeclined")
+            restorePointRecipe(previous)
+            return false
+        }
+        pointMask = selected
+        pointFamily = refined.first
+        pointFallback = null
+        fractionalFamily = refined.first
+        fractionalRound = FractionalRound(previous, base, selected, checkNotNull(refined.first.cuts).rows)
+        policy.observe("FractionalRounds")
+        return true
+    }
+
+    private fun advanceFractionalRound(source: SourceProofContext, cancellation: Cancellation,
+        retainBasePoint: Boolean): LinearAuthorityResult {
+        val pending = checkNotNull(fractionalRound)
+        val result = advance(source, cancellation, cuts = true, cutMask = pending.mask)
+        val stages = mergePrimalStages(if (pending.reported) emptyMap() else pending.base.primalStages,
+            result.primalStages)
+        pending.reported = true
+        val stopped = cancellation() || budget.funding?.exhausted == true
+        if (result.paused && !stopped) return pending.base.copy(paused = true, primalStages = stages)
+        fractionalRound = null
+        val completed = !stopped && !result.paused &&
+            (result.evidence != null || result.bound != null || result.incumbent != null || result.split != null)
+        if (!completed) {
+            pointPolicy?.observe("FractionalUnavailableRounds")
+            restorePointRecipe(pending.previous)
+            lp.invalidateGuidance()
+            return pending.base.copy(primalStages = stages,
+                advisoryPoint = pending.base.advisoryPoint.takeUnless { stopped })
+        }
+        val strongest = strongerLinearBound(pending.base.bound, result.bound)
+        pointPolicy?.observeRound(pending.rows, result.evidence != null || result.incumbent != null ||
+            (strongest != null && strongest !== pending.base.bound))
+        pending.previous.policy?.releaseCandidates()
+        return result.copy(bound = strongest, primalStages = stages,
+            advisoryPoint = (pending.base.advisoryPoint ?: pending.base.relaxedPoint).takeIf {
+                retainBasePoint && result.incumbent == null && result.evidence == null
+            }, cutBoundFamilies = if (strongest != null && strongest === pending.base.bound) {
+                pending.base.cutBoundFamilies
+            } else result.cutBoundFamilies)
+    }
+
+    private fun mergePrimalStages(before: Map<String, Long>, after: Map<String, Long>): Map<String, Long> =
+        (before.keys + after.keys).associateWith { key ->
+            val first = before[key] ?: 0L
+            val second = after[key] ?: 0L
+            if ("Max" in key) maxOf(first, second) else first + second
+        }
+
+    private fun advanceCurrentPointCuts(source: SourceProofContext, cancellation: Cancellation,
+        retainBasePoint: Boolean): LinearAuthorityResult {
+        val policy = pointPolicy ?: newPointPolicy().also { pointPolicy = it }
         if (pointFallback === template && template?.matches(source) == true) {
             policy.observe("CurrentFallbackQueries")
             return advance(source, cancellation, cuts = true)
@@ -206,7 +367,7 @@ internal class LinearAuthority(
             val currentRows = checkNotNull(family.cuts).rows
             val generatedRecipe = currentRows.isNotEmpty() && currentRows.size <= 64 &&
                 currentRows.all { it.family == CutFamily.SOURCE_AGGREGATION || it.family == CutFamily.AGGREGATION_MIR }
-            if ((!generatedRecipe || fractionalAggregateOrder) &&
+            if (!generatedRecipe &&
                 !checkNotNull(family.cuts).pointDirected && directedFamily !== family &&
                 pointMask == null &&
                 (aggregateCuts || checkNotNull(family.cuts).rows.any { it.mixed })) {
@@ -269,11 +430,7 @@ internal class LinearAuthority(
         if (!result.paused || budget.funding?.exhausted == true || cancellation()) pointRound = null
         val previousStages = if (pending.reported) emptyMap() else pending.base.primalStages
         pending.reported = true
-        val stages = (previousStages.keys + result.primalStages.keys).associateWith { key ->
-            val before = previousStages[key] ?: 0L
-            val after = result.primalStages[key] ?: 0L
-            if ("Max" in key) maxOf(before, after) else before + after
-        }
+        val stages = mergePrimalStages(previousStages, result.primalStages)
         if (result.paused && (budget.funding?.exhausted == true || cancellation())) {
             return pending.base.copy(primalStages = stages)
         }
@@ -301,6 +458,7 @@ internal class LinearAuthority(
         source: SourceProofContext, family: LinearAuthorityTemplate, prepared: LinearAuthorityQuery,
         values: List<BigFraction>,
         cancellation: Cancellation,
+        fractional: Boolean = false,
     ): Pair<LinearAuthorityTemplate, LinearAuthorityQuery>? {
         if (values.size != prepared.coordinates.size || values.size > 8192) return null
         val funded = Cancellation { cancellation() || budget.funding?.paused == true }
@@ -318,19 +476,19 @@ internal class LinearAuthority(
             work += cost
             point[prepared.coordinates[index]] = value.toDouble().takeIf(Double::isFinite) ?: return null
         }
-        val directed = if (fractionalAggregateOrder) {
+        val directed = if (fractional) {
             if (checkNotNull(family.cuts).rows.size > 64) return null
             pointPolicy?.observe("FractionalPreparations")
             family
         } else family.atPoint(point, funded, { cutCost(it, 0L) }, ::cutCost) ?: return null
-        val refined = withAdditionalCuts(directed, funded, point) ?: return null
+        val refined = withAdditionalCuts(directed, funded, point, fractional) ?: return null
         if (funded()) return null
         if (sameCurrentCuts(family, prepared, refined, funded, 65_536L - work)) return family to prepared
         if (funded()) return null
         val previous = template
         val previousDirected = directedFamily
         adoptTemplate(refined)
-        if (fractionalAggregateOrder) directedFamily = refined
+        if (fractional) directedFamily = refined
         query = null
         val checked = prepareQuery(source, funded, cuts = true, cutMask = emptySet())
         if (checked == null || funded() || template !== refined) {
@@ -556,12 +714,13 @@ internal class LinearAuthority(
     private fun withAdditionalCuts(
         prepared: LinearAuthorityTemplate, cancellation: Cancellation,
         point: Map<SourceCoordinate, Double>? = null,
+        fractional: Boolean = false,
     ): LinearAuthorityTemplate? {
         val generateAggregates = aggregateCuts && !deferAggregatePreparation
         if (!generateAggregates && additionalCuts.isEmpty() &&
             (point == null || prepared.cuts?.rows.orEmpty().size <= 64)) return prepared
         val funded = Cancellation { cancellation() || budget.funding?.paused == true }
-        val retainOriginal = fractionalAggregateOrder && point != null
+        val retainOriginal = fractional && point != null
         val retained = if (retainOriginal) prepared.cuts?.rows.orEmpty().size else additionalCuts.size
         if (retained > 64) return null
         val generated = if (generateAggregates) LinearAuthorityAggregateCuts.prepareSourcePairsTargeted(
@@ -577,7 +736,7 @@ internal class LinearAuthority(
             }, maximumCandidates = 64 - retained,
             limits = if (point == null) LinearAuthorityAggregateCuts.sourcePairLimits
                 else LinearAuthorityAggregateCuts.pointSourcePairLimits,
-            point = point, fractionalTargeting = fractionalAggregateOrder) else emptyList()
+            point = point, fractionalTargeting = fractional) else emptyList()
         if (funded()) return null
         val fixed = if (retainOriginal) emptyList() else additionalCuts
         val additional = if (generated.isEmpty()) fixed else {
@@ -672,9 +831,12 @@ internal class LinearAuthority(
         val solved = guide?.result ?: lp.solve(closureRows, costs, constant, cancellation, inactive,
             claim = LpClaim.ATTAINED_OPTIMUM)
             ?: return LinearAuthorityResult(paused = budget.funding?.paused == true)
-        pointListener?.let { listener ->
+        if (pointListener != null || continuationListener != null) {
             val point = guide?.point ?: solved.result.exactPrimal?.take(coordinates.size)
-            if (point != null && point.size == coordinates.size) listener(prepared, point)
+            if (point != null && point.size == coordinates.size) {
+                pointListener?.invoke(prepared, point)
+                continuationListener?.invoke(prepared, point)
+            }
         }
         if (capture?.accepting == true && capturedPoint == null && capturedQuery === prepared) {
             val point = guide?.point ?: solved.result.exactPrimal?.take(coordinates.size)

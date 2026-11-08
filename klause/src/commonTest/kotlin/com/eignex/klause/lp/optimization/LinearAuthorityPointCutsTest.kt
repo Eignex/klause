@@ -52,6 +52,184 @@ class LinearAuthorityPointCutsTest {
         "integer lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
     ), mapOf(x to BigFraction.ONE))
 
+    private val independentMixed = run {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val w = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        SourceProofContext(mixedMaximum.scope.copy(objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
+            mixedMaximum.coordinates + setOf(y, z, w, other), mixedMaximum.premises + mapOf(
+                "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    y to BigFraction.ofLong(2), mixedReal to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+                "other mixed" to SourcePremise(SourceInequality(mapOf(z to BigFraction.ofLong(2),
+                    w to BigFraction.ofLong(2), other to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+                "other lower" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO)),
+                "other upper" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ONE),
+                    BigFraction.ofLong(2))),
+            ), listOf(x, y, z, w).associateWith { BigFraction.ONE })
+    }
+
+
+    @Test
+    fun `fractional continuation should retain installed current definitions`() {
+        val budget = SourceLpBudget()
+        val capture = LinearAuthorityCapture(3, 100_000L, 4_000_000L, Cancellation.Never)
+        LinearAuthority(budget, retainLp = true, aggregateCuts = true, fractionalAggregateOrder = true)
+            .use { authority ->
+                authority.capture = capture
+
+                val result = authority.advanceWithPointCuts(independentMixed, Cancellation.Never)
+
+                assertEquals(SourceValue.Rational(BigFraction.ofLong(4)),
+                    (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
+                assertEquals(3, budget.operations)
+                assertEquals(1L, authority.cutObservations()["numericalCutSelectionFractionalRounds"])
+                val previous = capture.records[1].cuts
+                val continued = capture.records[2].cuts
+                for (cut in previous) {
+                    val retained = continued.single { it.id == cut.id }
+                    assertEquals(cut.inequality, retained.inequality)
+                    if (cut.installed) assertTrue(retained.installed && retained.checked)
+                }
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(independentMixed.withLinearAuthority()).verify(assertNotNull(result.bound)))
+            }
+    }
+
+    @Test
+    fun `fractional query decline should retain the completed current bound within its operation limit`() {
+        val budget = SourceLpBudget(maxOperations = 2)
+
+        val result = LinearAuthority(budget, retainLp = true, aggregateCuts = true, fractionalAggregateOrder = true)
+            .use { it.advanceWithPointCuts(independentMixed, Cancellation.Never, retainBasePoint = true) }
+
+        assertEquals(2, budget.operations)
+        assertFalse(result.paused)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(9) * BigFraction.ofLong(2).reciprocal()),
+            (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
+        assertNotNull(result.advisoryPoint)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(independentMixed.withLinearAuthority()).verify(assertNotNull(result.bound)))
+    }
+
+    @Test
+    fun `a paused fractional query should resume without another current query`() {
+        val funding = SourceLpFunding(4_000_000L, 8_000_000L).apply { grant(4_000_000L) }
+        var operations = 0L
+        var blocked = false
+        val budget = SourceLpBudget(funding = funding, onWork = {
+            operations += it.operations
+            if (!blocked && operations == 3L) {
+                blocked = true
+                funding.grant(0L)
+            }
+        })
+        LinearAuthority(budget, retainLp = true, aggregateCuts = true, fractionalAggregateOrder = true)
+            .use { authority ->
+                val paused = authority.advanceWithPointCuts(independentMixed, Cancellation.Never)
+                assertTrue(paused.paused)
+                assertEquals(SourceValue.Rational(BigFraction.ofLong(9) * BigFraction.ofLong(2).reciprocal()),
+                    (assertNotNull(paused.bound).claim as SourceClaim.Bound).value)
+
+                funding.grant(4_000_000L)
+                val completed = authority.advanceWithPointCuts(independentMixed, Cancellation.Never)
+
+                assertFalse(completed.paused)
+                assertEquals(3, budget.operations)
+                assertEquals(SourceValue.Rational(BigFraction.ofLong(4)),
+                    (assertNotNull(completed.bound).claim as SourceClaim.Bound).value)
+                assertEquals(1L, authority.cutObservations()["numericalCutSelectionBaseQueries"])
+                assertEquals(1L, authority.cutObservations()["numericalCutSelectionFractionalPreparations"])
+                assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(independentMixed.withLinearAuthority())
+                    .verify(assertNotNull(completed.bound)))
+            }
+    }
+
+    @Test
+    fun `stopping a fractional query should preserve checked current authority`() {
+        for (reason in listOf("cancellation", "work", "allocation")) {
+            val funding = SourceLpFunding(4_000_000L, 8_000_000L).apply { grant(4_000_000L) }
+            var operations = 0L
+            var cancelled = false
+            val budget = SourceLpBudget(funding = funding, onWork = {
+                operations += it.operations
+                if (operations == 3L) when (reason) {
+                    "cancellation" -> cancelled = true
+                    "work" -> funding.charge(funding.remainingWork)
+                    "allocation" -> funding.charge(0L, funding.remainingAllocation)
+                }
+            })
+
+            val result = LinearAuthority(budget, retainLp = true, aggregateCuts = true, fractionalAggregateOrder = true)
+                .use { it.advanceWithPointCuts(independentMixed, Cancellation { cancelled }, retainBasePoint = true) }
+
+            assertEquals(3, budget.operations)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(9) * BigFraction.ofLong(2).reciprocal()),
+                (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
+            assertNull(result.evidence)
+            assertNull(result.incumbent)
+            assertNull(result.advisoryPoint)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(independentMixed.withLinearAuthority()).verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
+    fun `a changed source should discard a paused fractional query`() {
+        val funding = SourceLpFunding(4_000_000L, 8_000_000L).apply { grant(4_000_000L) }
+        var operations = 0L
+        var blocked = false
+        val budget = SourceLpBudget(funding = funding, onWork = {
+            operations += it.operations
+            if (!blocked && operations == 3L) {
+                blocked = true
+                funding.grant(0L)
+            }
+        })
+        LinearAuthority(budget, retainLp = true, aggregateCuts = true, fractionalAggregateOrder = true)
+            .use { authority ->
+                assertTrue(authority.advanceWithPointCuts(independentMixed, Cancellation.Never).paused)
+
+                funding.grant(4_000_000L)
+                val result = authority.advanceWithPointCuts(mixedMaximum, Cancellation.Never)
+
+                assertFalse(result.paused)
+                assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+                    (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(mixedMaximum.withLinearAuthority()).verify(assertNotNull(result.bound)))
+            }
+    }
+
+    @Test
+    fun `cancelled fractional preparation should restore the current selector and retain its costs`() {
+        var cancelled = false
+        var observed: LinearAuthority? = null
+        val budget = SourceLpBudget(onWork = {
+            if ((observed?.cutObservations()?.get("numericalCutSelectionFractionalPreparations") ?: 0L) > 0L) {
+                cancelled = true
+            }
+        })
+        LinearAuthority(budget, retainLp = true, aggregateCuts = true, fractionalAggregateOrder = true)
+            .use { authority ->
+                observed = authority
+                val stopped = authority.advanceWithPointCuts(independentMixed, Cancellation { cancelled },
+                    retainBasePoint = true)
+                val work = authority.cutObservations().getValue("numericalCutSelectionWork")
+                assertTrue(cancelled)
+                assertNull(stopped.advisoryPoint)
+
+                val restored = authority.advanceWithPointCuts(independentMixed, Cancellation.Never)
+
+                assertEquals(2, budget.operations)
+                assertEquals(assertNotNull(stopped.bound).claim, assertNotNull(restored.bound).claim)
+                assertTrue(authority.cutObservations().getValue("numericalCutSelectionWork") >= work)
+                assertEquals(1L, authority.cutObservations()["numericalCutSelectionFractionalPreparations"])
+                assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(independentMixed.withLinearAuthority())
+                    .verify(assertNotNull(restored.bound)))
+            }
+    }
+
     @Test
     fun `point policy preparation should include scoring in its containing recipe`() {
         val budget = SourceLpBudget()
