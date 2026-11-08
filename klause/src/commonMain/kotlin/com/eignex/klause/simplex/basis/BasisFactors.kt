@@ -113,7 +113,7 @@ internal class BasisFactors(matrix: SparseMatrix) {
         val units = unitRows.copyOf()
         fun attempt(order: SymbolicLu?) = LuConstruction(source, columns, units, policy, order, buffers).build()
 
-        val proposal = proposedOrder?.let { copyProposal(it, dimension) }
+        val proposal = proposedOrder?.let { copyOrderProposal(it, dimension) }
         if (proposal != null) {
             val proposed = attempt(proposal)
             if (proposed is LuAttemptResult.Built) {
@@ -163,7 +163,7 @@ private class LuBuffers(size: Int) {
 
 private val EMPTY_LU_BUILD_WORK = LuBuildWork(0, 0, 0, 0, 0, 0, 0, 0, 0)
 
-private fun copyProposal(proposal: SymbolicLu, dimension: Int): SymbolicLu? {
+internal fun copyOrderProposal(proposal: SymbolicLu, dimension: Int): SymbolicLu? {
     val rows = proposal.rowOrder.copyOf()
     val columns = proposal.columnOrder.copyOf()
     if (!rows.isPermutation(dimension) || !columns.isPermutation(dimension)) return null

@@ -25,6 +25,7 @@ internal class KotlinBasisSolver(
     private val reusePivotOrder: Boolean = true,
     private val denseDimensionLimit: Int = 6,
     private val denseMinimumDensity: Double = 0.5,
+    initialOrder: SymbolicLu? = null,
 ) : BasisSolver {
     private val sourcePointers = matrix.copyColumnPointers()
     private val sourceRows = matrix.copyRowIndices()
@@ -45,7 +46,7 @@ internal class KotlinBasisSolver(
     private var cache: BasisSolveCache? = null
     private var columns = IntArray(0)
     private var unitRows = IntArray(0)
-    private var retainedOrder: SymbolicLu? = null
+    private var retainedOrder: SymbolicLu? = initialOrder?.let { copyOrderProposal(it, n) }
     private var closed = false
     private var repairActive = false
     override var singular = true
@@ -572,6 +573,15 @@ internal class KotlinBasisSolver(
             scale = max(scale, max(abs(product[i]), abs(rhs[i])))
         }
         return BasisSolveQuality(residual, residual / scale)
+    }
+
+    override val orderHintDimension: Int?
+        get() = n.takeIf { !closed && !singular && !repairActive && retainedOrder != null }
+
+    // A proposal may outlive FT updates; replay validates it without supplying exact-order authority.
+    override fun orderHint(): SymbolicLu? {
+        if (orderHintDimension == null) return null
+        return retainedOrder?.let { copyOrderProposal(it, n) }
     }
 
     override fun ordering(): BasisOrdering? {
