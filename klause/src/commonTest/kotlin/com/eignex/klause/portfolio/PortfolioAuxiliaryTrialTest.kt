@@ -96,6 +96,7 @@ class PortfolioAuxiliaryTrialTest {
             Triple(21L, 7L, 36),
             Triple(Long.MAX_VALUE, Long.MAX_VALUE, 1),
         )) {
+            val events = mutableListOf<PortfolioEvent>()
             val reached = ArrayList<Int>()
             val search = object : ResumableSearch {
                 private var spent = 0L
@@ -118,18 +119,23 @@ class PortfolioAuxiliaryTrialTest {
                 trackingWorker("probe", 1, search),
             )
 
-            Portfolio.thompson(workers, baseSliceWork = 7, maxSliceWork = maximum, reseedStaleThreshold = 0).use {
+            Portfolio.thompson(workers, baseSliceWork = 7, maxSliceWork = maximum, reseedStaleThreshold = 0,
+                onProgress = events::add).use {
                 it.incumbentProbeArms = setOf(1)
                 it.minimize(Cancellation { reached.size >= expectedSlices + 3 })
             }
 
             assertEquals(expectedSlices, reached.count { it == 1 })
             assertEquals(listOf(0, 0), reached.takeLast(2))
+            val exit = events.filterIsInstance<PortfolioEvent.WorkerExit>().single { it.arm == 1 }
+            assertEquals("trial-search-work", exit.cause)
+            assertEquals("paused", exit.outcome)
         }
     }
 
     @Test
     fun `auxiliary search without charged work should have a bounded time trial`() {
+        val events = mutableListOf<PortfolioEvent>()
         val clock = TestTimeSource()
         val reached = ArrayList<Int>()
         val workers = listOf(
@@ -143,7 +149,7 @@ class PortfolioAuxiliaryTrialTest {
                 }),
             ),
         )
-        val portfolio = Portfolio.thompson(workers, reseedStaleThreshold = 0).also {
+        val portfolio = Portfolio.thompson(workers, reseedStaleThreshold = 0, onProgress = events::add).also {
             it.incumbentProbeArms = setOf(1)
             it.runTimeSource = clock
         }
@@ -151,6 +157,8 @@ class PortfolioAuxiliaryTrialTest {
         portfolio.use { it.minimize(Cancellation { reached.size >= 6 }) }
 
         assertEquals(listOf(0, 1, 1, 1, 0, 0), reached)
+        assertEquals("trial-search-time", events.filterIsInstance<PortfolioEvent.WorkerExit>()
+            .single { it.arm == 1 }.cause)
     }
 
     @Test
@@ -192,6 +200,7 @@ class PortfolioAuxiliaryTrialTest {
 
     @Test
     fun `auxiliary trial should bound preparation that cannot enter search`() {
+        val events = mutableListOf<PortfolioEvent>()
         val clock = TestTimeSource()
         val reached = ArrayList<Int>()
         val workers = listOf(
@@ -205,7 +214,7 @@ class PortfolioAuxiliaryTrialTest {
                 }, preparationPending = true),
             ),
         )
-        val portfolio = Portfolio.thompson(workers, reseedStaleThreshold = 0).also {
+        val portfolio = Portfolio.thompson(workers, reseedStaleThreshold = 0, onProgress = events::add).also {
             it.incumbentProbeArms = setOf(1)
             it.runTimeSource = clock
         }
@@ -214,6 +223,8 @@ class PortfolioAuxiliaryTrialTest {
 
         assertEquals(8, reached.count { it == 1 })
         assertEquals(listOf(0, 0), reached.takeLast(2))
+        assertEquals("trial-preparation-time", events.filterIsInstance<PortfolioEvent.WorkerExit>()
+            .single { it.arm == 1 }.cause)
     }
 
     @Test
