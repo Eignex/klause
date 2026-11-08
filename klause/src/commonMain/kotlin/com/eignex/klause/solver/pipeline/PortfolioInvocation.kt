@@ -127,6 +127,7 @@ internal class PortfolioInvocation(
                 }
             } ?: controls.onProgress,
         ).also {
+            it.workerExitReporting = controls.onProgress != null
             it.invocationStarted = started
             it.exactLinearObjective = objective
             it.evidenceVerification = evidence

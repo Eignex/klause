@@ -1,6 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.result.SharingChannel
+import com.eignex.klause.solver.result.TerminationReason
 
 /**
  * Opt-in single-lane scheduling by charged work. [workLimit] bounds the complete schedule;
@@ -21,6 +22,24 @@ class PortfolioDiagnostics(
 
 /** Streamed portfolio events. Work-schedule events and physical lifecycle observations have separate sinks. */
 sealed interface PortfolioEvent {
+    /** Physical worker removal; native observations confer no source proof authority. */
+    data class WorkerExit(
+        /** Stable worker slot. */
+        val arm: Int,
+        /** Worker recipe. */
+        val worker: String,
+        /** Removal site: terminal, failure, initialization-cancelled, trial limit, source-fault or invocation close. */
+        val cause: String,
+        /** Last worker-call disposition before coordinator proof reinterpretation, or not-run. */
+        val outcome: String,
+        /** Native incomplete-result reason, absent for a pause, definitive return or failed call. */
+        val reason: TerminationReason?,
+        /** Raw bits of the last external cutoff supplied, null when the worker never read it. */
+        val cutoffBits: Long?,
+        /** Pool version at that cutoff read, zero for an empty pool and null when never read. */
+        val incumbentVersion: Long?,
+    ) : PortfolioEvent
+
     /** First selected improvement segment per worker; observations confer no source authority. */
     data class Continuation(
         /** Stable schedule segment. */
