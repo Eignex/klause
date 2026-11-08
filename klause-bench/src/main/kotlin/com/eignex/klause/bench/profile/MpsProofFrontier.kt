@@ -80,14 +80,46 @@ internal object MpsProofFrontier {
         capture(args, out)
     }
 
-    private fun capture(args: Array<String>, out: File) {
+    fun parseOptions(args: Array<String>): Map<String, String> {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val supported = setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier", "cuts",
             "selection", "replay", "operations", "activeRows", "supportBranching", "pointCuts", "aggregate-probe",
             "aggregate-mixed", "aggregate-replay", "aggregateCuts", "refutationReuse", "feedbackDelivery",
-            "feedbackRequest", "solveSeconds", "certificateState", "point-producer")
+            "feedbackRequest", "solveSeconds", "certificateState", "point-producer", "fractionalOrder",
+            "fractional-attempt", "sourceWork", "sourceAllocation", "heapMiB", "gc")
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
             (options.keys - supported).isEmpty())
+        require(options["fractional-attempt"]?.toBooleanStrict() != true ||
+            (listOf("frontier", "pointCuts", "aggregateCuts", "fractionalOrder").all {
+                options[it]?.toBooleanStrict() == true
+            } && options["cuts"]?.toBooleanStrict() != false))
+        return options
+    }
+
+    fun controlParams(options: Map<String, String>, solveStop: Cancellation): TheoryParams =
+        TheoryParams(timeout = solveStop, cancellation = solveStop, randomSeed = 3L,
+            sourceCuts = options["cuts"]?.toBooleanStrict() ?: true,
+            sourcePointCuts = options["pointCuts"]?.toBooleanStrict() ?: false,
+            sourceAggregateCuts = options["aggregateCuts"]?.toBooleanStrict() ?: false,
+            sourceCutFractionalOrder = options["fractionalOrder"]?.toBooleanStrict() ?: false,
+            sourceRefutationReuse = options["refutationReuse"]?.toBooleanStrict() ?: false,
+            sourceLpWorkLimit = options["sourceWork"]?.toLong() ?: 1_000_000_000L,
+            sourceLpAllocationLimit = options["sourceAllocation"]?.toLong() ?: 536_870_912L,
+            sourceLpOperations = options["operations"]?.toInt()?.also { require(it in 1..256) } ?: Int.MAX_VALUE)
+
+    fun launchJvmOptions(options: Map<String, String>): List<String> {
+        val heap = options["heapMiB"]?.toInt() ?: 3072
+        val gc = options["gc"] ?: "serial"
+        require(heap > 0 && gc in setOf("default", "serial"))
+        return listOf("-Xmx${heap}m", "-XX:ActiveProcessorCount=1") +
+            if (gc == "serial") listOf("-XX:+UseSerialGC") else emptyList()
+    }
+
+    fun selectionSnapshot(journal: Any): JsonObject =
+        NumericalSelectionSnapshot(Cancellation.after(10.seconds)).capture(journal)
+
+    private fun capture(args: Array<String>, out: File) {
+        val options = parseOptions(args)
         val probe = options["probe"]?.toBooleanStrict() ?: false
         val historyEnabled = options["history"]?.toBooleanStrict() ?: false
         val frontierEnabled = options["frontier"]?.toBooleanStrict() ?: false
@@ -131,13 +163,33 @@ internal object MpsProofFrontier {
         require(feedbackDelivery in setOf("latest", "prefix"))
         val feedbackRequest = options["feedbackRequest"] ?: "requested"
         require(feedbackRequest in setOf("requested", "full"))
-        val params = TheoryParams(timeout = solveStop, cancellation = solveStop, randomSeed = 3L,
-            sourceCuts = options["cuts"]?.toBooleanStrict() ?: true,
-            sourcePointCuts = options["pointCuts"]?.toBooleanStrict() ?: false,
-            sourceAggregateCuts = options["aggregateCuts"]?.toBooleanStrict() ?: false,
-            sourceCutFractionalOrder = options["fractionalOrder"]?.toBooleanStrict() ?: false,
-            sourceRefutationReuse = options["refutationReuse"]?.toBooleanStrict() ?: false,
-            sourceLpOperations = options["operations"]?.toInt()?.also { require(it in 1..256) } ?: Int.MAX_VALUE)
+        val params = controlParams(options, solveStop)
+        Reports.writeJson(out.resolve("effective-controls.json").path, buildJsonObject {
+            put("driver", "direct-numerical-authority")
+            put("ordinaryCliPerformance", false)
+            put("externalIncumbentSource", "none")
+            put("fractionalAttemptObservation", options["fractional-attempt"]?.toBooleanStrict() ?: false)
+            put("declaredJvmOptions", buildJsonArray { launchJvmOptions(options).forEach { add(JsonPrimitive(it)) } })
+            put("actualJvmOptions", buildJsonArray {
+                ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
+            })
+            put("sourceCuts", params.sourceCuts)
+            put("sourcePointCuts", params.sourcePointCuts)
+            put("sourceAggregateCuts", params.sourceAggregateCuts)
+            put("fractionalOrder", params.sourceCutFractionalOrder)
+            put("sourceWork", params.sourceLpWorkLimit)
+            put("sourceAllocation", params.sourceLpAllocationLimit)
+            put("sourceOperations", params.sourceLpOperations)
+            put("refutationReuse", params.sourceRefutationReuse)
+            put("refutationPropagation", params.sourceRefutationPropagation)
+            put("refutationResolution", params.sourceRefutationResolution)
+            put("incumbentCompletion", params.sourceIncumbentCompletion)
+            put("sourceCutBranchingParam", params.sourceCutBranching)
+            put("supportBranching", supportBranching)
+            put("activeRows", activeRows)
+            put("history", historyEnabled)
+            put("seed", params.randomSeed)
+        })
         val authority = request.javaClass.declaredMethods.single {
             it.name == "authorityContext" && it.parameterCount == 2
         }.apply { isAccessible = true }
@@ -166,9 +218,13 @@ internal object MpsProofFrontier {
         val invocation = NumericalFrontierSnapshot.open(context, params, historyEnabled, frontierEnabled, activeRows,
             supportBranching, feedbackDelivery == "latest", feedbackRequest == "full")
         val selection = NumericalSelectionSnapshot(Cancellation.after(30.seconds))
-        val journal = if (options["selection"]?.toBooleanStrict() == true || aggregateProbe || pointProducer) {
+        val journal = if (options["selection"]?.toBooleanStrict() == true || aggregateProbe || pointProducer ||
+            options["fractional-attempt"]?.toBooleanStrict() == true) {
             selection.attach(invocation)
         } else null
+        if (options["fractional-attempt"]?.toBooleanStrict() == true) {
+            checkNotNull(journal).javaClass.getDeclaredMethod("observeFractionalAttempt").invoke(journal)
+        }
         val history = ArrayList<JsonObject>()
         out.resolve("incumbents.jsonl").writeText("")
         out.resolve("bounds.jsonl").writeText("")
@@ -232,7 +288,8 @@ internal object MpsProofFrontier {
             }
             runCatching { Reports.writeJson(out.resolve("cuts.json").path, snapshot.cuts(invocation)) }
             if (journal != null) {
-                Reports.writeJson(out.resolve("selection.json").path, selection.capture(journal))
+                Reports.writeJson(out.resolve("selection.json").path,
+                    selectionSnapshot(journal))
                 if (pointProducer) {
                     out.resolve("point-producer.jsonl").writeText("")
                     NumericalPointProducerSnapshot(Cancellation.after(20.seconds)).inspect(journal) {
@@ -370,7 +427,9 @@ internal object MpsProofFrontier {
     private fun launch(args: Array<String>, out: File) {
         val command = arrayListOf(
             File(System.getProperty("java.home"), "bin/java").path,
-            "-Xmx3g", "-XX:+UseSerialGC", "-XX:ActiveProcessorCount=1",
+        )
+        command += launchJvmOptions(args.associate { it.substringBefore('=') to it.substringAfter('=') })
+        command += listOf(
             "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector",
             "-XX:StartFlightRecording=filename=${out.resolve("measured-profile.jfr")},settings=profile,dumponexit=true",
         )

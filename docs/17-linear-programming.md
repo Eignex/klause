@@ -1799,6 +1799,16 @@ every query; candidate scoring supplies no proof authority.
 The optional observer has separate record, entry, modeled byte and cancellation
 allowances. It retains immutable source values and derivations, never a numerical
 owner or live workspace. Incomplete capture and unavailable points remain unknown.
+Opt-in fractional-attempt observation reserves one of its record slots for the
+first attempted query, its paid point, current and actual generation scopes, and
+preparation outcome. Funding and operation snapshots bracket preparation. Its
+128-work, 8-KiB metadata frame and captured entries/bytes debit the containing
+source allowance as well as the observer limits. A temporary journal shares the
+remaining observer limits and containing funding; it keeps at most 16 unchecked
+rejected inequalities with 128 coefficients/owners and 256-bit scalars, and at most
+64 event names. Completed records retain scalar snapshots and immutable values
+without retaining the journal's live budget. Inspection cancellation withholds new
+output without revoking already retained immutable evidence.
 Imported cut proof records preserve their original scope, claimed inequality and
 nested derivation. Bound and refutation imports keep their claim semantics;
 depth or cancellation limits leave an explicit unavailable derivation.

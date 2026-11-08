@@ -9,6 +9,8 @@ import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceObjective
+import com.eignex.klause.solver.evidence.SourcePremise
+import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.util.Cancellation
@@ -26,6 +28,19 @@ class NumericalSelectionSnapshotTest {
         condition = SourceCondition(upper = mapOf(x to BigFraction.ONE)))
     private val row = SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(2), strict = true)
     private val premise = SourceDerivation.Premise("row")
+
+    @Test
+    fun `generation owners should preserve source iteration rather than sorted premise order`() {
+        val context = SourceProofContext(generation, setOf(x), linkedMapOf(
+            "z" to SourcePremise(row), "a" to SourcePremise(row)))
+
+        val captured = NumericalSelectionSnapshot(Cancellation.Never).generationOwnerMap(context)
+
+        assertEquals("true", captured.getValue("complete").jsonPrimitive.content)
+        val owners = captured.getValue("owners").jsonArray
+        assertEquals(listOf("z", "a"), owners.map { it.jsonObject.getValue("premise").jsonPrimitive.content })
+        assertEquals(listOf("0", "1"), owners.map { it.jsonObject.getValue("owner").jsonPrimitive.content })
+    }
 
     @Test
     fun `imported consequence capture should preserve its scope row and derivation`() {

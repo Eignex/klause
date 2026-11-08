@@ -52,6 +52,16 @@ fractional integer support ordering. The continuation
 retains its checked pool and installed mask, and charges the extra generation and
 query to the remaining source allowance. Omit `fractionalOrder` for the current-order
 control.
+With `fractional-attempt=true`, the profile records the first actual attempt in
+`selection.json`, including its paid point, current and generation scopes, installed
+definitions, pre/post funding and LP counters, and bounded unchecked rejections.
+Enable `frontier=true pointCuts=true aggregateCuts=true fractionalOrder=true`
+explicitly. `sourceWork` and `sourceAllocation` set the containing allowances;
+`heapMiB=2560 gc=default` matches those JVM settings in ordinary comparisons.
+`effective-controls.json` and `launcher.json` record the declared controls and actual
+JVM arguments. The driver is a direct numerical authority with no external
+incumbent provider; these captures diagnose mechanisms and do not qualify ordinary
+CLI performance. Post-solve export has a separate bounded inspection window.
 Imported proof records retain their original scope, consequence or bound payload,
 and nested derivation. Depth and cancellation limits mark withheld proofs
 unavailable.

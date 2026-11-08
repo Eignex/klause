@@ -50,8 +50,79 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
         put("constructedModeledBytes", field(journal, "constructedBytes") as Long)
         put("limited", journal.javaClass.getDeclaredMethod("getLimited").invoke(journal) as Boolean)
         put("independentProofCheck", false)
+        put("fractionalAttempt", fractionalAttempt(journal))
         put("records", buildJsonArray { records(journal).forEach { if (!stop()) add(query(it)) } })
         put("inspectionStopped", stop())
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun fractionalAttempt(journal: Any): JsonObject = buildJsonObject {
+        put("enabled", field(journal, "fractionalEnabled") as Boolean)
+        put("attempted", field(journal, "fractionalAttempts") as Long)
+        put("limited", field(journal, "fractionalAttemptLimited") as Boolean)
+        put("independentProofCheck", false)
+        val captured = field(journal, "fractionalAttempt")
+        if (captured == null || stop()) {
+            put("available", false)
+            put("reason", if (stop()) "inspection-stopped" else "not-retained")
+            return@buildJsonObject
+        }
+        val record = field(captured, "query")
+        put("available", record != null && field(record, "point") != null)
+        put("outcome", field(captured, "outcome") as String)
+        put("observationWork", field(captured, "observationWork") as Long)
+        put("observationAllocation", field(captured, "observationAllocation") as Long)
+        for (name in listOf("before", "after")) put(name, buildJsonObject {
+            (field(captured, name) as Map<String, Long?>).forEach { (key, value) -> put(key, value) }
+        })
+        if (record != null) {
+            put("query", query(record))
+            val numeric = field(record, "numeric") as SourceProofContext
+            val generation = field(record, "generationScope") as SourceScope?
+            generation?.let { put("generationOwnerMap", generationOwnerMap(numeric.atScope(it))) }
+        }
+        put("rejectedAttempts", field(captured, "rejectedAttempts") as Long)
+        put("events", buildJsonObject {
+            (field(captured, "events") as Map<String, Long>).forEach { (name, count) -> put(name, count) }
+        })
+        put("rejectionsLimited", field(captured, "rejectionsLimited") as Boolean)
+        put("rejections", buildJsonArray {
+            for (rejected in field(captured, "rejections") as List<Any>) {
+                if (stop()) break
+                val row = field(rejected, "inequality") as SourceInequality
+                add(buildJsonObject {
+                    put("checked", false)
+                    put("coefficients", coefficients(row.coefficients))
+                    put("rhs", row.rhs.toString())
+                    put("strict", row.strict)
+                    put("family", (field(rejected, "family") as Enum<*>).name)
+                    put("owners", buildJsonArray {
+                        (field(rejected, "owners") as Set<Int>).sorted().forEach { add(JsonPrimitive(it)) }
+                    })
+                    for (name in listOf("activity", "normSquared", "efficacy", "minimumEfficacy")) {
+                        put(name, (field(rejected, name) as Double).toString())
+                    }
+                })
+            }
+        })
+        put("inspectionStopped", stop())
+    }
+
+    fun generationOwnerMap(context: SourceProofContext): JsonObject = buildJsonObject {
+        val premises = context.premises
+        var visited = 0
+        put("ordering", "source-iteration")
+        put("owners", buildJsonArray {
+            for ((owner, premise) in premises.keys.withIndex()) {
+                if (stop()) break
+                add(buildJsonObject {
+                    put("owner", owner)
+                    put("premise", premise)
+                })
+                visited++
+            }
+        })
+        put("complete", visited == premises.size && !stop())
     }
 
     fun replay(journal: Any, emit: (JsonObject) -> Unit) {

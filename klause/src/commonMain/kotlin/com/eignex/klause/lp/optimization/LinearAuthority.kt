@@ -208,12 +208,47 @@ internal class LinearAuthority(
             paused = budget.funding?.let { it.paused && !it.exhausted } == true)
         fractionalFamily = family
         val prepared = cutLifecycle.containing("POINT_SELECTION") {
-            prepareFractionalRound(source, family, observed.first, observed.second, base, cancellation)
+            val observer = capture?.takeIf { it.fractionalEnabled }
+            val recorded = observer?.beginFractionalAttempt(source, observed.first, family, observed.second,
+                base, budget, cancellation) { fractionalSnapshot(cancellation) }
+            var outcome = "interrupted"
+            try {
+                prepareFractionalRound(source, family, observed.first, observed.second, base, cancellation,
+                    recorded?.rejected).also { selected ->
+                    outcome = when {
+                        selected -> "query-selected"
+                        cancellation() -> "cancelled"
+                        budget.funding?.paused == true -> "funding-paused"
+                        else -> "declined"
+                    }
+                }
+            } finally {
+                observer?.finishFractionalAttempt(recorded, outcome) { fractionalSnapshot(cancellation) }
+            }
         }
         if (!prepared) return base.copy(advisoryPoint = base.advisoryPoint.takeUnless { cancellation() },
             paused = budget.funding?.let { it.paused && !it.exhausted } == true)
         return advanceFractionalRound(source, cancellation, retainBasePoint)
     }
+
+    private fun fractionalSnapshot(cancellation: Cancellation): Map<String, Long?> = mapOf(
+        "operations" to budget.operations.toLong(),
+        "lpPreparations" to preparations,
+        "lpReuses" to reuses,
+        "availableWork" to budget.funding?.availableWork,
+        "remainingWork" to budget.funding?.remainingWork,
+        "remainingAllocation" to budget.funding?.remainingAllocation,
+        "lpActiveNs" to budget.activeNanos,
+        "preparationWork" to budget.measuredPreparationWork,
+        "pairAttempts" to (cutEligibility["numericalCutAggregatePairAttempts"] ?: 0L),
+        "pointEligible" to (cutEligibility["numericalCutAggregatePairPointEligible"] ?: 0L),
+        "lowEfficacy" to (cutEligibility["numericalCutAggregatePairLowEfficacy"] ?: 0L),
+        "missingBounds" to (cutEligibility["numericalCutAggregateMissingBounds"] ?: 0L),
+        "allocationLimits" to (cutEligibility["numericalCutAggregateAllocationLimit"] ?: 0L),
+        "remainingDeadlineNs" to cancellation.deadline()?.let {
+            (-it.elapsedNow().inWholeNanoseconds).coerceAtLeast(0L)
+        },
+    )
 
     private fun currentPoolInstalled(prepared: LinearAuthorityQuery, rows: Int,
         cancellation: Cancellation): Boolean {
@@ -261,6 +296,7 @@ internal class LinearAuthority(
     private fun prepareFractionalRound(
         source: SourceProofContext, family: LinearAuthorityTemplate, prepared: LinearAuthorityQuery,
         values: List<BigFraction>, base: LinearAuthorityResult, cancellation: Cancellation,
+        journal: LinearAuthorityAggregateRejections? = null,
     ): Boolean {
         val allocation = 256L + values.size * 8L +
             64L * (base.fractional.size + base.relaxedPoint.size)
@@ -274,7 +310,8 @@ internal class LinearAuthority(
             directedFamily, pointMask, primalAttempt)
         val policy = newPointPolicy()
         pointPolicy = policy
-        val refined = preparePointFamily(source, family, prepared, point, cancellation, fractional = true)
+        val refined = preparePointFamily(source, family, prepared, point, cancellation, fractional = true,
+            journal = journal)
         if (refined == null || refined.first === family || budget.funding?.paused == true || cancellation()) {
             policy.observe("FractionalDeclined")
             restorePointRecipe(previous)
@@ -488,6 +525,7 @@ internal class LinearAuthority(
         values: List<BigFraction>,
         cancellation: Cancellation,
         fractional: Boolean = false,
+        journal: LinearAuthorityAggregateRejections? = null,
     ): Pair<LinearAuthorityTemplate, LinearAuthorityQuery>? {
         if (values.size != prepared.coordinates.size || values.size > 8192) return null
         val funded = Cancellation { cancellation() || budget.funding?.paused == true }
@@ -510,7 +548,7 @@ internal class LinearAuthority(
             pointPolicy?.observe("FractionalPreparations")
             family
         } else family.atPoint(point, funded, { cutCost(it, 0L) }, ::cutCost) ?: return null
-        val refined = withAdditionalCuts(directed, funded, point, fractional) ?: return null
+        val refined = withAdditionalCuts(directed, funded, point, fractional, journal) ?: return null
         if (funded()) return null
         if (sameCurrentCuts(family, prepared, refined, funded, 65_536L - work)) return family to prepared
         if (funded()) return null
@@ -744,6 +782,7 @@ internal class LinearAuthority(
         prepared: LinearAuthorityTemplate, cancellation: Cancellation,
         point: Map<SourceCoordinate, Double>? = null,
         fractional: Boolean = false,
+        journal: LinearAuthorityAggregateRejections? = null,
     ): LinearAuthorityTemplate? {
         val generateAggregates = aggregateCuts && !deferAggregatePreparation
         if (!generateAggregates && additionalCuts.isEmpty() &&
@@ -752,7 +791,7 @@ internal class LinearAuthority(
         val retainOriginal = fractional && point != null
         val retained = if (retainOriginal) prepared.cuts?.rows.orEmpty().size else additionalCuts.size
         if (retained > 64) return null
-        val generated = if (generateAggregates) LinearAuthorityAggregateCuts.prepareSourcePairsTargeted(
+        val generated = if (generateAggregates) LinearAuthorityAggregateCuts.prepareSourcePairsObserved(
             prepared.numeric, funded, { name, count ->
                 when (name) {
                     "AggregateWork" -> cutCost(count, 0L)
@@ -760,12 +799,14 @@ internal class LinearAuthority(
                     else -> {
                         val key = "numericalCut$name"
                         cutEligibility[key] = (cutEligibility[key] ?: 0L) + count
+                        journal?.observe(name, count)
                     }
                 }
             }, maximumCandidates = 64 - retained,
             limits = if (point == null) LinearAuthorityAggregateCuts.sourcePairLimits
                 else LinearAuthorityAggregateCuts.pointSourcePairLimits,
-            point = point, fractionalTargeting = fractional) else emptyList()
+            point = point, fractionalTargeting = fractional,
+            rejected = journal?.let { it::record }) else emptyList()
         if (funded()) return null
         val fixed = if (retainOriginal) emptyList() else additionalCuts
         val additional = if (generated.isEmpty()) fixed else {

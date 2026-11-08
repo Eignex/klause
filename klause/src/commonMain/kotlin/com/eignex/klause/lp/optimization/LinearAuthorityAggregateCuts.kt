@@ -68,9 +68,17 @@ internal object LinearAuthorityAggregateCuts {
         observe: (String, Long) -> Unit = { _, _ -> }, maximumCandidates: Int = 64,
         limits: LinearAuthorityAggregateLimits = sourcePairLimits,
         point: Map<SourceCoordinate, Double>? = null, fractionalTargeting: Boolean = false,
+    ): List<LinearAuthorityCut> = prepareSourcePairsObserved(source, cancellation, observe, maximumCandidates,
+        limits, point, fractionalTargeting, null)
+
+    fun prepareSourcePairsObserved(
+        source: SourceProofContext, cancellation: Cancellation,
+        observe: (String, Long) -> Unit, maximumCandidates: Int,
+        limits: LinearAuthorityAggregateLimits, point: Map<SourceCoordinate, Double>?, fractionalTargeting: Boolean,
+        rejected: ((LinearAuthorityCut, Double, Double, Double) -> Unit)?,
     ): List<LinearAuthorityCut> {
         require(maximumCandidates in 0..64)
-        val meter = AggregateMeter(limits, cancellation, observe)
+        val meter = AggregateMeter(limits, cancellation, observe, rejected)
         val attemptLimits = limits.copy(work = minOf(limits.work, 65_536L),
             allocation = minOf(limits.allocation, 1_048_576L))
         val candidates = ArrayList<LinearAuthorityCut>()
@@ -161,7 +169,7 @@ internal object LinearAuthorityAggregateCuts {
                 meter.reserve(1L, 128L)
                 val integerLimits = attemptLimits.copy(work = minOf(meter.remainingWork / 4L, 16_384L),
                     allocation = minOf(meter.remainingAllocation / 4L, 262_144L))
-                val integerMeter = AggregateMeter(integerLimits, derivedStop, charge)
+                val integerMeter = AggregateMeter(integerLimits, derivedStop, charge, rejected)
                 try {
                     integerMeter.reserve(1L, 320L)
                     PairExtension(incidence, selectedBounds, bounds, point, integerMeter, integerLimits,
@@ -465,6 +473,7 @@ internal object LinearAuthorityAggregateCuts {
         }
         val eligible = efficacy >= CutPool.MIN_EFFICACY
         observe(if (eligible) "AggregatePairPointEligible" else "AggregatePairLowEfficacy", 1L)
+        if (!eligible) meter.rejected?.invoke(cut, activity, normSquared, efficacy)
         return eligible
     }
 
@@ -1401,6 +1410,7 @@ private class AggregateMeter(
     private val limits: LinearAuthorityAggregateLimits,
     private val cancellation: Cancellation,
     private val observe: (String, Long) -> Unit,
+    val rejected: ((LinearAuthorityCut, Double, Double, Double) -> Unit)? = null,
 ) {
     private var work = 0L
     private var allocation = 0L
