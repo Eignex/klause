@@ -227,7 +227,7 @@ internal class LinearAuthority(
         cutCost(work, 64L)
         if (cancellation() || budget.funding?.paused == true) return false
         policy.observe("FractionalPoolObservations")
-        val ready = prepared.checkUnselectedCuts && prepared.checkedCuts.size == rows &&
+        val ready = prepared.checkedCuts.size == rows &&
             prepared.installedCuts.size == rows &&
             (0 until rows).all { it in prepared.checkedCuts && it in prepared.installedCuts }
         policy.observe(if (ready) "FractionalPoolReady" else "FractionalPoolDeferred")
