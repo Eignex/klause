@@ -77,6 +77,8 @@ internal class ExactLinearInvariant(
 
     private fun sumOf(state: LocalSearchState, factorId: Int): Sum = state.refPayload[factorId] as Sum
 
+    fun exactActivity(state: LocalSearchState, factorId: Int): BigInt = exact(sumOf(state, factorId))
+
     private fun coeffOf(intVar: Int): BigInt {
         val i = index[intVar]
         return if (i < 0) BIG_ZERO else coeffs[i]

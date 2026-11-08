@@ -17,6 +17,11 @@ selection time, not extra CPU or a measure of discarded work: a source may retai
 bounded coverage between picks. A null pick without scoring interruption is not
 counted as an interruption.
 
+Optional residual capture retains representative violated factors. Exact rows keep
+at most sixteen tagged terms and integer root-domain bounds; scalars beyond 256
+bits carry an omission marker. Activity comes from the committed integer grader;
+unsupported graders remain explicit, and capture does not confer source authority.
+
 This chapter describes strategies, preparation and definitions.
 [Neighborhoods and restarts](11-neighborhoods.md) covers scoring probes, structured
 moves and continuous completion. Sessions and containing resources follow
