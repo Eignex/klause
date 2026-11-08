@@ -9,6 +9,68 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `incumbent ordering favors the smaller gain at the current fractional movement`() {
+        for (scale in listOf(1.0, 8.0, 1e150, 1e-150)) {
+            val history = LpDirectionalHistory({})
+            val variable = VarRef.IntVar(0)
+            assertEquals(null, history.preferUpForIncumbent(variable, 2.25))
+            repeat(2) {
+                history.beginNode(0)
+                history.record(10.0 * scale)
+                history.branch(variable, 2.25)
+                for (up in listOf(false, true)) {
+                    history.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                    history.beginNode(1)
+                    history.record((if (up) 13.0 else 11.0) * scale)
+                }
+            }
+
+            assertEquals(false, history.preferUpForIncumbent(variable, 2.25))
+            assertEquals(true, history.preferUpForIncumbent(variable, 2.75))
+        }
+    }
+
+    @Test
+    fun `a zero predicted gain on either side keeps ordinary direction order`() {
+        for ((down, up) in listOf(0.0 to 1.0, 1.0 to 0.0, 0.0 to 0.0)) {
+            val history = LpDirectionalHistory({})
+            repeat(2) {
+                history.beginNode(0)
+                history.record(10.0)
+                history.branch(VarRef.IntVar(0), 0.5)
+                for (upper in listOf(false, true)) {
+                    history.commit(if (upper) SearchDecision.IntAtLeast(0, 1) else SearchDecision.IntAtMost(0, 0), 1)
+                    history.beginNode(1)
+                    history.record(10.0 + if (upper) up else down)
+                }
+            }
+
+            assertEquals(null, history.preferUpForIncumbent(VarRef.IntVar(0), 0.5))
+        }
+    }
+
+    @Test
+    fun `tied integral and expired directional gains retain ordinary order`() {
+        val history = LpDirectionalHistory({}, maxAge = 2)
+        val variable = VarRef.Bool(0)
+        repeat(2) {
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 0.5)
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(11.0)
+            }
+        }
+
+        assertEquals(null, history.preferUpForIncumbent(variable, 0.5))
+        assertEquals(null, history.preferUpForIncumbent(variable, 1.0))
+        repeat(3) { history.beginNode(0) }
+        assertEquals(null, history.preferUpForIncumbent(variable, 0.25))
+    }
+
+    @Test
     fun `balanced ranking favors gains on both sides over a large asymmetric gain`() {
         val history = LpDirectionalHistory({})
         for ((id, down, up) in listOf(Triple(0, 0.25, 36.0), Triple(1, 4.0, 4.0))) repeat(2) {

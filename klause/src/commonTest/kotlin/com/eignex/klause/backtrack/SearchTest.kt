@@ -30,6 +30,25 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SearchTest {
+    @Test
+    fun `branch guidance orders the constructed split without changing its thresholds`() {
+        val session = PropagationSession(problemOf(IntDomain(0, 3)))
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin)
+        val brancher = BacktrackBrancher(session, params, sink = null, restart = RestartSchedule.from(params),
+            branching = object : BacktrackBranching {
+                override fun orderAlternatives(
+                    variable: VarRef,
+                    alternatives: List<SearchDecision>,
+                ): List<SearchDecision> = alternatives.reversed()
+            })
+
+        val alternatives = brancher.nextBranch(SearchSession(emptyList()))
+
+        assertEquals(listOf<SearchDecision>(SearchDecision.IntAtLeast(0, 1), SearchDecision.IntAtMost(0, 0)),
+            alternatives)
+        assertEquals(IntDomain(0, 3), session.intDomain(0))
+    }
+
     private fun problemOf(vararg domains: IntDomain): Problem = Problem(
         numBoolVars = 0,
         numIntVars = domains.size,

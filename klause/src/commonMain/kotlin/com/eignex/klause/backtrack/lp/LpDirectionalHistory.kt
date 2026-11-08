@@ -133,6 +133,20 @@ internal class LpDirectionalHistory(
         return score.takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN
     }
 
+    fun preferUpForIncumbent(variable: VarRef, value: Double): Boolean? {
+        if (!value.isFinite()) return null
+        val history = gains[variable] ?: return null
+        expire(history.down)
+        expire(history.up)
+        if (history.down.count < RELIABILITY || history.up.count < RELIABILITY) return null
+        val fraction = value - floor(value)
+        if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
+        val down = history.down.mean * fraction
+        val up = history.up.mean * (1.0 - fraction)
+        if (!down.isFinite() || !up.isFinite() || down <= 0.0 || up <= 0.0 || down == up) return null
+        return up < down
+    }
+
     private fun expire(direction: Direction) {
         if (direction.count > 0 && stamp - direction.stamp > maxAge) {
             direction.count = 0

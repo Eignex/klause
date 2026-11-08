@@ -318,6 +318,13 @@ an unconsumed nomination.
 Disabled directional gains collect no history or retained model scope and charge no
 history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
 
+With a finite incumbent, the same reliable history can put the smaller predicted
+objective gain first in the selected variable's existing two-child split. Both
+predictions must be positive and finite; ties and unavailable information keep
+ordinary order. Reordering preserves the adjacent thresholds and exhaustive child
+set. A fresh nomination credits only its matching first commitment, separately from
+variable-choice attribution. Direction checks spend the existing overhead allowance.
+
 Samples share one retained exact base model, active-row identity, objective mapping
 and incumbent cutoff. Changed rows or cuts, layout or objective rescaling invalidate
 history and pending comparisons. Restart and assumption reseeding clear history.

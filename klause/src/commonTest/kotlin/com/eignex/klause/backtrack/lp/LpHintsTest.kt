@@ -30,6 +30,95 @@ import kotlin.test.assertTrue
 
 class LpHintsTest {
     @Test
+    fun `unavailable directional ordering preserves ordinary alternatives`() {
+        for (condition in listOf("disabled", "unbounded", "cancelled", "unmatched", "reset")) {
+            val builder = LpBuilder()
+            builder.addVar(0, 10, cost = 1L)
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val model = assertNotNull(trail.state.ownerWorkingModel())
+            val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false),
+                0L, intArrayOf(0), IntArray(0))
+            val variable = VarRef.IntVar(0)
+            val bound = if (condition == "unbounded") Double.POSITIVE_INFINITY else 100.0
+            var work = 0L
+            val events = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = condition != "disabled",
+                observe = events::add, charge = { work += it })
+            repeat(2) {
+                hints.beginNode(0, bound)
+                hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+                hints.recordObjective(relaxation, 10.0)
+                hints.branch(variable)
+                for (up in listOf(false, true)) {
+                    hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                    hints.beginNode(1, bound)
+                    hints.record(relaxation, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(0))
+                    hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+                }
+            }
+            hints.beginNode(0, bound)
+            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+            val objectiveRelaxation = if (condition == "unmatched") LpRelaxation(model, intArrayOf(0),
+                booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0)) else relaxation
+            hints.recordObjective(objectiveRelaxation, 10.0)
+            if (condition == "reset") hints.resetHistory()
+            val alternatives = listOf(SearchDecision.IntAtMost(0, 2), SearchDecision.IntAtLeast(0, 3))
+            val before = work
+
+            val ordered = hints.orderAlternatives(variable, alternatives) { condition == "cancelled" }
+
+            assertEquals(alternatives, ordered, condition)
+            assertFalse("PASSIVE_DIRECTION_COMPARED" in events, condition)
+            if (condition == "disabled") assertEquals(before, work)
+        }
+    }
+
+    @Test
+    fun `smaller passive gains reach applied and withheld first commitments`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+        val variable = VarRef.IntVar(0)
+        val alternatives = listOf(SearchDecision.IntAtMost(0, 2), SearchDecision.IntAtLeast(0, 3))
+        val costs = ArrayList<Long>()
+        for (apply in listOf(false, true)) {
+            var work = 0L
+            val events = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = true, applyAdvice = apply,
+                observe = events::add, charge = { work += it })
+            repeat(2) {
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+                hints.recordObjective(relaxation, 10.0)
+                hints.branch(variable)
+                for (up in listOf(false, true)) {
+                    hints.commit(if (up) alternatives[1] else alternatives[0], 1)
+                    hints.beginNode(1, 100.0)
+                    hints.record(relaxation, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(0))
+                    hints.recordObjective(relaxation, if (up) 11.0 else 13.0)
+                }
+            }
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+            hints.finishNode(trail.state)
+            hints.branch(variable)
+            val before = work
+
+            val ordered = hints.orderAlternatives(variable, alternatives) { false }
+            hints.commit(ordered.first(), 1)
+
+            assertEquals(if (apply) alternatives.reversed() else alternatives, ordered)
+            assertEquals(1, events.count { it == if (apply) "PASSIVE_DIRECTION_COMMIT_CHANGED"
+                else "PASSIVE_DIRECTION_COMMIT_WITHHELD_CHANGED" })
+            costs.add(work - before)
+        }
+        assertEquals(costs.first(), costs.last())
+    }
+
+    @Test
     fun `balanced and shadow nominations remain distinct from applied and withheld commitments`() {
         val builder = LpBuilder()
         repeat(2) { builder.addVar(0, 10, cost = 1L) }
