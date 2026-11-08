@@ -22,6 +22,7 @@ import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.CutColumnSource
 import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.SearchDecision

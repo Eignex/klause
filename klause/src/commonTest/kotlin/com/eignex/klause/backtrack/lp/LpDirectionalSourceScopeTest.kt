@@ -16,6 +16,7 @@ import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.relaxation.CutColumnSource
 import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.withModel
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
