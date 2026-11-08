@@ -104,6 +104,104 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `root guidance should retain the paid base point beside a stronger checked bound`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val premises = linkedMapOf(
+            "left" to SourcePremise(SourceInequality(left.coefficients + (residual to BigFraction.ONE), left.rhs)),
+            "right" to SourcePremise(right),
+            "lower" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.ONE), BigFraction.ONE)),
+        )
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["nonnegative $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE), BigFraction.ONE))
+        }
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y, real, residual) + triangle, premises,
+            (triangle + x + y).associateWith { BigFraction.ONE })
+        for (pause in listOf(false, true)) {
+            val funding = SourceLpFunding(4_000_000L, 8_000_000L).apply { grant(4_000_000L) }
+            var blocked = false
+            var operations = 0L
+            val budget = SourceLpBudget(funding = funding, onWork = {
+                operations += it.operations
+                if (pause && !blocked && operations == 2L) {
+                    blocked = true
+                    funding.grant(0L)
+                }
+            })
+
+            val result = LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+                val initial = authority.advanceWithPointCuts(source, Cancellation.Never, retainBasePoint = true)
+                if (pause) {
+                    assertTrue(initial.paused)
+                    assertNull(initial.advisoryPoint)
+                    funding.grant(4_000_000L)
+                    authority.advanceWithPointCuts(source, Cancellation.Never, retainBasePoint = true)
+                } else initial
+            }
+
+            assertFalse(result.paused)
+            assertNull(result.incumbent)
+            assertNull(result.evidence)
+            val guidance = assertNotNull(result.advisoryPoint)
+            assertEquals(1.5, guidance.getValue(x) + guidance.getValue(y))
+            assertEquals(1.0, result.relaxedPoint.getValue(x) + result.relaxedPoint.getValue(y))
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(5) * BigFraction.ofLong(2).reciprocal()),
+                assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+            assertEquals(2, budget.operations)
+        }
+    }
+
+    @Test
+    fun `a selected checked optimum should retain its selected root guidance`() {
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)),
+            setOf(x, y, real), mapOf("left" to SourcePremise(left), "right" to SourcePremise(right)),
+            mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
+
+        val result = LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
+            authority.advanceWithPointCuts(source, Cancellation.Never, retainBasePoint = true)
+        }
+
+        assertNull(result.advisoryPoint)
+        assertEquals(1.0, result.relaxedPoint.getValue(x) + result.relaxedPoint.getValue(y))
+        assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.evidence)))
+    }
+
+    @Test
+    fun `cancelled selection should preserve the paid bound without publishing new guidance`() {
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)),
+            setOf(x, y, real), mapOf("left" to SourcePremise(left), "right" to SourcePremise(right)),
+            mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
+        var cancelled = false
+        var operations = 0L
+        val budget = SourceLpBudget(onWork = {
+            operations += it.operations
+            if (operations == 2L) cancelled = true
+        })
+
+        val result = LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+            authority.advanceWithPointCuts(source, Cancellation { cancelled }, retainBasePoint = true)
+        }
+
+        assertTrue(cancelled)
+        assertNull(result.advisoryPoint)
+        assertNull(result.incumbent)
+        assertNull(result.evidence)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(-3) * BigFraction.ofLong(2).reciprocal()),
+            assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+    }
+
+    @Test
     fun `retiring a fully selected aggregate family should preserve its numerical owner`() {
         val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }

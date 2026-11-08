@@ -1739,6 +1739,12 @@ branching controls to its admitted numerical companions. The containing source r
 them from finite worker recipe options; they change neither companion admission
 nor lifetime. Joint repair binds separation, point selection and aggregation to its
 shared numerical owner for both root preparation and retained neighborhood queries.
+Its advisory root center and neighborhood order use the paid point preceding
+selection when the selected query remains nonterminal without a checked incumbent.
+A selected witness or terminal keeps its selected guidance. The baseline point
+uses the selection round's existing funded retention and carries no proof authority;
+the strengthened bound and selected rows retain their own result channels. This
+requests no additional LP query and changes no generation allowance.
 A new template first runs the ordinary checked cut recipe; a completed point can
 add one selection round at that node. A trial that admits no candidate retains
 the ordinary template, checked query and numerical owner for later queries of that
