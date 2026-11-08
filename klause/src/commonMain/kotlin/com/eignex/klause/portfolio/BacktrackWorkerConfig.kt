@@ -142,9 +142,7 @@ internal class BacktrackWorkerConfig(
                 )
                 sharing += Contribution.Bound
             }
-            // Publish this arm's incumbents and, in the other direction, dive toward the verified global
-            // best during stable phases (solution phasing). Only STABLE windows consult it, so arms explore.
-            matchedPools?.solutions?.let { sols ->
+            matchedPools?.solutions?.let {
                 params = params.copy(
                     improvedSolutionSink = { sample, value ->
                         meter.exported(SharingChannel.Incumbents, 1)
@@ -160,9 +158,11 @@ internal class BacktrackWorkerConfig(
                             )
                         }
                     },
-                    pooledIncumbents = sols.metered(meter),
-                    solutionPhasing = true,
                 )
+            }
+            // One exchange supplies the version sequence used by this worker's subscription.
+            (matchedPools?.acceptedIncumbents ?: matchedPools?.solutions)?.let { source ->
+                params = params.copy(pooledIncumbents = source.metered(meter), solutionPhasing = true)
             }
         }
         // A pure CSP has no bound to prune on, so withBound is wired only when optimising.

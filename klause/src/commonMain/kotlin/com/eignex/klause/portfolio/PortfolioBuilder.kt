@@ -14,6 +14,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -102,6 +103,7 @@ object PortfolioBuilder {
         objectiveCoordinates: ObjectiveCoordinateView? = null,
         bufferedPublications: Boolean = false,
         onLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
+        acceptedIncumbents: IncumbentSource<Sample, Double>? = null,
     ): List<FinitePortfolioFactory> {
         val facts = ProblemFacts.of(problem, profile, scenario.lpCeiling, objective) { recipe, eligibility ->
             onEvent?.invoke("portfolio", SearchEvent.WorkerAdmission(recipe, eligibility.admitted,
@@ -135,6 +137,7 @@ object PortfolioBuilder {
             selectedSweep,
             objective,
             clausePeers = (0 until count).count { configs[it % configs.size] is BacktrackWorkerConfig } > 1,
+            acceptedIncumbents = acceptedIncumbents,
         )
         return configs.mapIndexed { armId, config ->
             val family = when (config) {
@@ -323,6 +326,7 @@ object PortfolioBuilder {
         definitionalSweep: DefinitionalSweep?,
         objective: LinearObjective?,
         clausePeers: Boolean,
+        acceptedIncumbents: IncumbentSource<Sample, Double>? = null,
     ): SharedPools? {
         if (scenario.engine == EngineMix.LOCAL_SEARCH) return null
         val identity = ModelIdentity.of(problem, objective)
@@ -381,6 +385,7 @@ object PortfolioBuilder {
                 Mutex(concurrent),
             ),
             identity = identity,
+            acceptedIncumbents = acceptedIncumbents,
         )
     }
 }

@@ -2,6 +2,8 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackRecipe
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
@@ -12,6 +14,10 @@ import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.incumbent.IncumbentSource
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.util.Cancellation
@@ -22,6 +28,33 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class BacktrackWorkerConfigTest {
+    @Test
+    fun `a worker should decline canonical guidance for a different model or objective`() {
+        val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+        )).bake()
+        val objective = LinearObjective(boolWeights = longArrayOf(1L, 2L))
+        val exchange = IncumbentExchange.minimizing<Sample>().apply {
+            offer(Sample(booleanArrayOf(true, false), longArrayOf()), 1.0)
+        }
+        for (identity in listOf(ModelIdentity.of(Any(), objective), ModelIdentity.of(problem, Any()))) {
+            var reads = 0
+            val recipe = BacktrackRecipe("guided") { _, _ ->
+                BacktrackParams(valueSelector = SolutionGuided(IndomainMin),
+                    lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false))
+            }
+            val worker = BacktrackWorkerConfig(recipe).materialize(problem, index = 0, armId = 0,
+                seed = 0L, lsLambda = 1.0, objective = objective, lsObjective = null,
+                definitionalSweep = null, onEvent = null,
+                pools = SharedPools(null, null, identity = identity,
+                    acceptedIncumbents = IncumbentSource { reads++; exchange.current() }))
+
+            worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }
+
+            assertEquals(0, reads)
+        }
+    }
+
     @Test
     fun `raw LP recipes should inherit preparation policy without changing techniques`() {
         val params = BacktrackParams(lpPlan = LpPlan(bounding = true, rootMaxWork = 1234L))

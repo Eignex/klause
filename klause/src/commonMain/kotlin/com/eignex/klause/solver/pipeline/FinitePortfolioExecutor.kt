@@ -27,6 +27,7 @@ import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -168,6 +169,9 @@ internal fun FinitePipeline.portfolioExecutor(
     val finiteFactories = PortfolioBuilder.factories(
         problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
         profile, numericalCompletion, sourceHints, objectiveCoordinates, bufferedPublications, onLpQuery,
+        acceptedIncumbents = companions?.incumbents?.let { canonical ->
+            IncumbentSource { canonical.projected()?.takeIf { it.objective.isFinite() } }
+        },
     ).map { factory ->
         PortfolioArmFactory(preparedPlan, factory.armId, factory.family, binding = { worker ->
             SourceWorkerBinding(
