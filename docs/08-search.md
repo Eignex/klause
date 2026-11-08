@@ -287,9 +287,11 @@ modes stop incomplete when their model continuation would require such a blocker
 ### Finite LP directional guidance
 
 Finite optimization records passive immediate parent/child floating LP optimum gains
-in minimized working objective units. Each gain is divided by the fractional movement
-to the actual lower or upper branch. A missing or interrupted optimum, infeasibility,
-negative or nonfinite gain, integral point or mismatched split supplies no numeric
+from the final returned node relaxations in minimized working objective units.
+The point and optimum share the same cut-solved relaxation. Each gain is divided
+by the fractional movement to the actual lower or upper branch. A missing or
+interrupted optimum, infeasibility, negative or nonfinite gain, integral point or
+mismatched split supplies no numeric
 sample. These advisory observations supply no certified bound or pruning authority.
 The common objective constant stays in the scope key and is excluded from gain
 subtraction, preserving small gains when the constant exceeds floating precision.
