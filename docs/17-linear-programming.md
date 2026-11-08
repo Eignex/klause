@@ -1199,7 +1199,10 @@ masks, active source rows and scoped checked bounds/refutations, with independen
 point availability. A consumer names the projection it reads: the point, installed
 cut activity or the refutation. Delivery without an archival copy holds only the
 requested projection and records it, so a withheld field is explicit rather than
-unavailable, and the query state still reports the actual point outcome. Installed
+unavailable, and the query state still reports the actual point outcome. Full records
+retain the template's immutable generation scope separately from the current
+verification scope, charging its retained conditions to the capture allowance.
+A missing template leaves generation provenance unavailable. Installed
 cut activity keeps the installed, checked cuts with active owners; their violations
 are evaluated on demand while that query is still delivered, and a replaced,
 released, cancelled or oversized evaluation declines. A callback without a request
