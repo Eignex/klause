@@ -52,6 +52,11 @@ internal class LinearAuthorityCuts private constructor(
     }
 
     companion object {
+        fun replay(rows: List<LinearAuthorityCut>): LinearAuthorityCuts {
+            require(rows.size <= 64)
+            return LinearAuthorityCuts(rows, 0L, emptyMap(), complementary = true, pointDirected = false)
+        }
+
         fun prepare(
             source: SourceProofContext, cancellation: Cancellation, complementary: Boolean = false,
             onWork: (Long) -> Unit = {},

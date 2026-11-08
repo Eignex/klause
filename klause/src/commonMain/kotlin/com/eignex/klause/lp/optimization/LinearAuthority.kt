@@ -52,6 +52,13 @@ internal class LinearAuthority(
 ) : AutoCloseable {
     init { require(additionalCuts.size <= 64) }
     private val additionalCuts = additionalCuts.toList()
+    private var replayCuts: List<LinearAuthorityCut>? = null
+
+    fun useReplayCuts(rows: List<LinearAuthorityCut>) {
+        require(rows.size <= 64 && additionalCuts.isEmpty() && !aggregateCuts)
+        check(replayCuts == null && template == null && query == null)
+        replayCuts = rows.toList()
+    }
     private val cutLifecycle = LinearCutLifecycle(budget)
     fun observeCutConsumption(families: Set<CutFamily>, outcome: String) {
         for (family in families) cutLifecycle.observe(family, outcome)
@@ -125,6 +132,7 @@ internal class LinearAuthority(
     }
 
     override fun close() {
+        replayCuts = null
         template = null
         query = null
         capturedQuery = null
@@ -399,9 +407,13 @@ internal class LinearAuthority(
     fun advance(
         source: SourceProofContext, cancellation: Cancellation, cuts: Boolean = false, cutMask: Set<Int>? = null,
     ): LinearAuthorityResult {
-        cutLifecycle.families = if (cuts) setOf(CutFamily.SOURCE_ROUNDING, CutFamily.SOURCE_MIXED_ROUNDING) +
-            (if (aggregateCuts || additionalCuts.isNotEmpty()) setOf(CutFamily.SOURCE_AGGREGATION) else emptySet())
-            else emptySet()
+        val replay = replayCuts
+        cutLifecycle.families = when {
+            !cuts -> emptySet()
+            replay != null -> replay.mapTo(HashSet()) { it.family }
+            else -> setOf(CutFamily.SOURCE_ROUNDING, CutFamily.SOURCE_MIXED_ROUNDING) +
+                (if (aggregateCuts || additionalCuts.isNotEmpty()) setOf(CutFamily.SOURCE_AGGREGATION) else emptySet())
+        }
         val recipe = if (!cuts) "NO_CUT" else if (cutMask == null) "CURRENT" else "POINT_SELECTION"
         return cutLifecycle.containing(recipe) { advanceInternal(source, cancellation, cuts, cutMask) }
     }
@@ -497,15 +509,24 @@ internal class LinearAuthority(
                 budget.observe(preparation = work)
             }
         }
+        val replay = replayCuts
         val prepared = if (retainLp || cuts) {
             template?.takeIf { it.matches(source) && (it.cuts != null) == cuts &&
                 (!cuts || it.cuts?.complementary == (cutMask != null) ||
                     pointPolicy?.managesCurrentRecipe(it.cuts?.rows) == true ||
                     it.coordinates.all { coordinate -> coordinate.kind == SourceCoordinate.Kind.Integer }) }
-                ?: LinearAuthorityTemplate.prepare(source, cancellation, cuts, cutMask != null) { work ->
+                ?: LinearAuthorityTemplate.prepare(source, cancellation, cuts && replay == null,
+                    cutMask != null) { work ->
                     cutPreparationWork += work
                     budget.observe(preparation = work)
-                }?.let { if (cuts) withAdditionalCuts(it, cancellation) else it }?.also(::adoptTemplate) ?: return null
+                }?.let { prepared ->
+                    when {
+                        !cuts -> prepared
+                        replay != null -> prepared.withReplayCuts(replay,
+                            Cancellation { cancellation() || budget.funding?.exhausted == true }, ::cutCost)
+                        else -> withAdditionalCuts(prepared, cancellation)
+                    }
+                }?.also(::adoptTemplate) ?: return null
         } else null
         return LinearAuthorityQuery.prepare(source, prepared, cancellation, onCutWork = { work ->
             cutVerificationWork += work

@@ -55,6 +55,22 @@ internal class LinearAuthorityTemplate private constructor(
             prepared.withAdditional(additional, maximumCandidates))
     }
 
+    fun withReplayCuts(
+        supplied: List<LinearAuthorityCut>, cancellation: Cancellation, onCost: (Long, Long) -> Unit,
+    ): LinearAuthorityTemplate? {
+        require(cuts == null && supplied.size <= 64)
+        for (cut in supplied) {
+            onCost(1L + cut.owners.size + cut.inequality.supportSize, 64L)
+            if (cancellation()) return null
+            require(cut.owners.all { it in rows.indices })
+            require(cut.inequality.coefficients.keys.all { it in indices })
+        }
+        onCost(1L, 128L)
+        if (cancellation()) return null
+        return LinearAuthorityTemplate(source, numeric, coordinates, indices, rows,
+            LinearAuthorityCuts.replay(supplied))
+    }
+
     fun matches(other: SourceProofContext): Boolean = source.scope.revision == other.scope.revision &&
         source.scope.objective == other.scope.objective &&
         source.scope.condition.bools == other.scope.condition.bools && source.hasSameLinearData(other)

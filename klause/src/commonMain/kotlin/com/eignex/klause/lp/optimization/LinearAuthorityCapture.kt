@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.optimization
 
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
@@ -49,6 +50,8 @@ internal data class LinearAuthorityCapturedCut(
     val checked: Boolean,
     val violation: BigFraction?,
     val owners: Set<Int> = setOf(owner),
+    val family: CutFamily? = null,
+    val mixed: Boolean = false,
 )
 
 internal data class LinearAuthorityCapturedQuery(
@@ -330,7 +333,7 @@ internal class LinearAuthorityCapture(
             val ownerActive = query != null && cut.owners.none { it in query.inactive }
             if (projection.cuts == LinearAuthorityFeedbackRequest.Cuts.Installed && !ownerActive) continue
             val extraOwners = (cut.owners.size - 1).toLong()
-            if (!spend(1L + extraOwners, 128L + extraOwners * 32L)) return
+            if (!spend(1L + extraOwners, 144L + extraOwners * 32L)) return
             if (!shared && (!row(cut.inequality) || !proof(cut.derivation))) return
             var violation: BigFraction? = null
             if (projection.cuts == LinearAuthorityFeedbackRequest.Cuts.All && values != null &&
@@ -339,7 +342,7 @@ internal class LinearAuthorityCapture(
             }
             candidates += LinearAuthorityCapturedCut(id, cut.owner, cut.inequality, cut.derivation,
                 query != null && id in query.installedCuts, ownerActive,
-                query != null && id in query.checkedCuts, violation, cut.owners)
+                query != null && id in query.checkedCuts, violation, cut.owners, cut.family, cut.mixed)
         }
         val refutation = result.evidence?.takeIf { it.claim == SourceClaim.Refutation }
         val retainedRefutation = refutation?.takeIf { projection.refutation }

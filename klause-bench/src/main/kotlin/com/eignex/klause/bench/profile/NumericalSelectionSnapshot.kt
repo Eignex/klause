@@ -58,26 +58,34 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
         val type = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityReplay")
         val instance = type.getField("INSTANCE").get(null)
         val run = type.declaredMethods.single { it.name == "run" }
-        val select = type.declaredMethods.single { it.name == "runSelected" }
-        val parents = records(journal).asSequence().filter { field(it, "point") != null }
-            .distinctBy { (field(it, "context") as SourceProofContext).scope }.take(4)
+        val parents = records(journal).asSequence().filter { field(it, "point") != null && rows(it).isNotEmpty() }
+            .distinctBy { record -> (field(record, "context") as SourceProofContext).scope to
+                rows(record).map { field(it, "inequality") } }.take(4)
         for (record in parents) {
             if (stop()) return
             val all = rows(record).indices.toSet()
-            for (name in listOf("disabled", "all", "selected")) for (repeat in 0..1) {
+            val installed = rows(record).filter { field(it, "installed") == true }
+                .mapTo(HashSet()) { field(it, "id") as Int }
+            for (name in listOf("disabled", "installed", "all")) for (repeat in 0..1) {
                 if (stop()) return
-                val replay = if (name == "selected") {
-                    select.invoke(instance, record, 20_000_000L, 67_108_864L, stop)
-                } else run.invoke(instance, record, if (name == "all") all else emptySet<Int>(),
+                val mask = when (name) {
+                    "all" -> all
+                    "installed" -> installed
+                    else -> emptySet()
+                }
+                val replay = run.invoke(instance, record, mask,
                     20_000_000L, 67_108_864L, stop)
                 emit(buildJsonObject {
                     put("originalQuery", field(record, "id") as Int)
                     put("mask", name)
                     put("repeat", repeat)
+                    put("poolIdentity", "captured")
+                    put("capturedMask", buildJsonArray { mask.sorted().forEach { add(JsonPrimitive(it)) } })
+                    put("decline", field(replay, "decline") as String?)
                     put("diagnosticOnly", true)
                     put("maximumWork", 20_000_000L)
                     put("maximumAllocation", 67_108_864L)
-                    put("maximumOperations", if (name == "selected") 2 else 1)
+                    put("maximumOperations", 1)
                     put("operations", field(replay, "operations") as Int)
                     put("work", field(replay, "work") as Long)
                     put("allocation", field(replay, "allocation") as Long)
@@ -171,6 +179,8 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
                     val derivation = field(cut, "derivation") as SourceDerivation
                     put("id", field(cut, "id") as Int)
                     put("owner", field(cut, "owner") as Int)
+                    put("family", (field(cut, "family") as Enum<*>?)?.name)
+                    put("mixed", field(cut, "mixed") as Boolean)
                     put("owners", buildJsonArray {
                         (field(cut, "owners") as Set<Int>).sorted().forEach { add(JsonPrimitive(it)) }
                     })
