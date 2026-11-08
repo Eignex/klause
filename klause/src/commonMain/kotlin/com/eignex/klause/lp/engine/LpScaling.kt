@@ -62,9 +62,9 @@ internal class LpScalingView private constructor(
     private val lower: DoubleArray,
     private val upper: DoubleArray,
     val metrics: LpScalingMetrics,
+    val version: Long = scaleVersion(rowExponents, columnExponents),
 ) {
     val applied: Boolean get() = metrics.applied
-    val version: Long = scaleVersion(rowExponents, columnExponents)
     val n: Int get() = source.n
     val m: Int get() = source.m
     val numVars: Int get() = source.numVars
@@ -95,6 +95,18 @@ internal class LpScalingView private constructor(
     fun sourceDirection(scaled: DoubleArray): DoubleArray {
         require(scaled.size == numVars)
         return DoubleArray(numVars) { sourceCoordinate(it, scaled[it]) }
+    }
+
+    fun refreshWorkBound(next: LpModel): Long {
+        val changes = next.exactState?.projectedScalarChanges(source, next)
+        if (changes != null) {
+            val bounds = changes.bounds.size.toLong()
+            val costs = changes.costs.size.toLong()
+            return 2L * bounds + costs + (if (applied) bounds + costs else 0L) +
+                (if (bounds > 0L) 2L * numVars else 0L) + (if (costs > 0L) numVars.toLong() else 0L)
+        }
+        return if (applied) 6L * next.m + 16L * next.numVars + 64L
+            else 2L * next.m + 8L * next.numVars + 32L
     }
 
     /** Refresh vectors under the immutable matrix scale. Null leaves this view untouched. */
@@ -157,6 +169,7 @@ internal class LpScalingView private constructor(
                 sourceBasicDualResidual = 0.0,
                 work = vectorWork(next) + (if (applied) next.m.toLong() + next.numVars else 0L) + copied,
             ),
+            version = version,
         )
     }
 
@@ -204,6 +217,7 @@ internal class LpScalingView private constructor(
                 sourceBasicDualResidual = 0.0,
                 work = work,
             ),
+            version = version,
         )
     }
 
@@ -301,9 +315,6 @@ internal class LpScalingView private constructor(
             return 2L * conditioning + 2L * matrixCopyWork(model, entries) + model.m + model.numVars +
                 equilibration + 2L * vectorWork(model)
         }
-
-        // Identity refreshes visit and copy only scalar vectors; they do not rebuild the matrix.
-        fun identityRefreshWorkBound(model: LpModel): Long = 2L * model.m + 8L * model.numVars + 32L
 
         fun identityAfterFallback(model: LpModel, previous: LpScalingMetrics): LpScalingView {
             val conditioning = lpConditioning(model)

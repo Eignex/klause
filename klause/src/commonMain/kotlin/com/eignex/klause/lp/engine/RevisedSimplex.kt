@@ -129,7 +129,8 @@ internal class RevisedSimplex(
     private val phaseOneIncrementalValues: Boolean = true,
     private val singletonStart: Boolean = true,
     initialScaling: LpScalingView? = null,
-    initialColumns: SparseMatrix? = null,
+    initialMatrix: SimplexMatrixView? = null,
+    private val allowUnscaledFallback: Boolean = true,
 ) : TableauCutSolver,
     PersistentLpSolver,
     ResumableLpSolver,
@@ -240,7 +241,7 @@ internal class RevisedSimplex(
     private val numVars = model.numVars
     private val constructionState = model.exactState
     private var numerical = initialScaling?.also {
-        require(it.source === model && !it.applied)
+        require(it.source === model && (!it.applied || !allowUnscaledFallback))
     } ?: LpScalingView.create(model, scalingOptions)
     private var continuationAvailable = false
     private var stoppedContinuationBasis: Basis? = null
@@ -278,15 +279,15 @@ internal class RevisedSimplex(
      * factorizes, so a refactorization hands over the choice of columns rather than a square matrix
      * assembled for the occasion.
      */
-    private var columns: SparseMatrix = initialColumns?.also {
-        require(initialScaling != null && it.rows == m && it.cols == numVars)
-    } ?: lpColumns(numerical)
+    private var columns: SparseMatrix = initialMatrix?.also {
+        require(initialScaling != null && it.matches(numerical))
+    }?.columns ?: lpColumns(numerical)
 
     // The CSC of `columns` as flat arrays — the same structure the seam holds, read here for pricing rather
     // than copied into a second representation. Column j occupies colPtr(j) until colPtr(j+1).
-    private var colPtr: IntArray = columns.copyColumnPointers()
-    private var rowIdx: IntArray = columns.copyRowIndices()
-    private var colVal: DoubleArray = columns.values
+    private var colPtr: IntArray = initialMatrix?.colPtr ?: columns.copyColumnPointers()
+    private var rowIdx: IntArray = initialMatrix?.rowIdx ?: columns.copyRowIndices()
+    private var colVal: DoubleArray = initialMatrix?.colVal ?: columns.values
 
     // `columns` by row. The pivot row is formed from the nonzeros of ρ = B⁻ᵀeᵣ over these, so a hypersparse ρ
     // costs the rows it touches instead of a pass over every column — which is what makes a hypersparse
@@ -552,8 +553,14 @@ internal class RevisedSimplex(
     }
 
     init {
-        rebuildRowView()
+        if (initialMatrix == null) rebuildRowView() else {
+            rowCols = initialMatrix.rowCols
+            rowVals = initialMatrix.rowVals
+        }
     }
+
+    private fun matrixView(): SimplexMatrixView =
+        SimplexMatrixView(numerical, columns, colPtr, rowIdx, colVal, rowCols, rowVals)
 
     private fun rebuildRowView() {
         // Counting-sort the column view by row for hypersparse pivotal-row assembly.
@@ -1198,11 +1205,15 @@ internal class RevisedSimplex(
         installUnscaledFallback(next)
     }
 
-    internal fun adoptProbe(next: LpModel, token: Cancellation): Boolean {
+    internal fun adoptProbe(next: LpModel, source: LpScalingView, token: Cancellation): Boolean {
         val current = model.exactState ?: return false
         val state = next.exactState ?: return false
-        if (activeSolve != null || numerical.applied || !current.sameMatrix(state) || token()) return false
-        val refreshed = numerical.refresh(next) ?: return false
+        if (activeSolve != null || allowUnscaledFallback || !current.sameMatrix(state) || token()) return false
+        if (source.colPtr !== numerical.colPtr || source.rowIdx !== numerical.rowIdx ||
+            source.colVal !== numerical.colVal || source.rowExponents !== numerical.rowExponents ||
+            source.columnExponents !== numerical.columnExponents
+        ) return false
+        val refreshed = source.refresh(next) ?: return false
         if (token()) return false
         continuationAvailable = false
         stoppedContinuationBasis = null
@@ -1377,7 +1388,7 @@ internal class RevisedSimplex(
         observations.numericalMetrics = SimplexNumericalMetrics()
         numericalFailure = false
         return try {
-            var result = numericalSolve(progress, block, allowUnscaledFallback = true)
+            var result = numericalSolve(progress, block, allowUnscaledFallback = allowUnscaledFallback)
             if (result?.optimal != true &&
                 (progress.iterations >= maxIterations || (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit))
             ) {
@@ -2890,14 +2901,15 @@ internal class RevisedSimplex(
         val parentObjective = probeObjective(token) ?: return decline(
             if (token()) LpProbeDecline.CANCELLED else LpProbeDecline.NO_OPTIMUM,
         )
-        val probeColumns = this.columns
+        val probeMatrix = matrixView()
         return LpDirectionalProbes(state, basis, parentObjective,
-            sourceView = numerical.takeUnless { it.applied }) { child, work, entries, view ->
+            sourceView = numerical) { child, work, entries, view ->
             RevisedSimplex(child, token, refactorUpdateLimit, iterationLimit, work, trackDegeneracy,
                 basisSolverFactory, pricing.copy(basisEntryLimit = minOf(pricing.basisEntryLimit, entries),
                     basisWorkLimit = minOf(pricing.basisWorkLimit, work)), reuseRationalOrder, scalingOptions,
                 primalPricingTolerance, syntheticWorkEnabled, phaseOneLongSteps, phaseOneIncrementalValues,
-                singletonStart, initialScaling = view, initialColumns = probeColumns.takeIf { view != null })
+                singletonStart, initialScaling = view, initialMatrix = probeMatrix.takeIf { view != null },
+                allowUnscaledFallback = view == null)
         }.run(columns, splits, allowance - scan, token, observe)
     }
 
@@ -2931,14 +2943,15 @@ internal class RevisedSimplex(
         observe(LpProbeMetrics(scan, 0L, 0))
         if (token()) return decline(LpProbeDecline.CANCELLED)
         probeBasisDecline(source, token)?.let { return decline(it) }
-        val probeColumns = this.columns
-        return LpDirectionalProbes(state, pointBasis, sourceView = numerical.takeUnless { it.applied },
+        val probeMatrix = matrixView()
+        return LpDirectionalProbes(state, pointBasis, sourceView = numerical,
             factory = { child, work, entries, view ->
             RevisedSimplex(child, token, refactorUpdateLimit, iterationLimit, work, trackDegeneracy,
                 basisSolverFactory, pricing.copy(basisEntryLimit = minOf(pricing.basisEntryLimit, entries),
                     basisWorkLimit = minOf(pricing.basisWorkLimit, work)), reuseRationalOrder, scalingOptions,
                 primalPricingTolerance, syntheticWorkEnabled, phaseOneLongSteps, phaseOneIncrementalValues,
-                singletonStart, initialScaling = view, initialColumns = probeColumns.takeIf { view != null })
+                singletonStart, initialScaling = view, initialMatrix = probeMatrix.takeIf { view != null },
+                allowUnscaledFallback = view == null)
         }).runValues(columns, splits, allowance - scan, token, observe)
     }
 

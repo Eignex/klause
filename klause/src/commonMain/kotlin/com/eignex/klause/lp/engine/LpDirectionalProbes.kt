@@ -13,11 +13,25 @@ internal enum class LpProbeDecline {
     CANCELLED, ALLOWANCE, OWNER, BUSY, STALE_POINT, NO_OPTIMUM, NO_POINT, SPLIT, CHILD,
 }
 
+internal enum class LpProbeReuse { INDEPENDENT, IDENTITY, SCALED }
+
+internal enum class LpProbePreparationStop { WORKSPACE, SCALARS }
+
+internal data class LpProbePreflight(
+    val workspaceWork: Long,
+    val scalarWork: Long,
+    val offeredWork: Long,
+    val reuse: LpProbeReuse,
+    val ownerReused: Boolean,
+    val stop: LpProbePreparationStop?,
+)
+
 internal data class LpProbeMetrics(
     val preparationWork: Long,
     val solveWork: Long,
     val completed: Int,
     val decline: LpProbeDecline? = null,
+    val preflight: LpProbePreflight? = null,
 ) {
     val work: Long get() = preparationWork + minOf(solveWork, Long.MAX_VALUE - preparationWork)
 }
@@ -52,7 +66,7 @@ internal class LpDirectionalProbes(
     private val factory: (LpModel, Long, Long, LpScalingView?) -> RevisedSimplex,
 ) {
     init {
-        require(sourceView == null || (!sourceView.applied && sourceView.source.exactState === state))
+        require(sourceView == null || sourceView.source.exactState === state)
     }
 
     fun run(
@@ -158,12 +172,27 @@ internal class LpDirectionalProbes(
         val reusable = sourceView != null
         val existing = budget.owner
         val matrixEntries = (child.doubleView?.colPtr ?: child.csc.colPtr)[child.n].toLong() + child.m
+        // The backend and its factor builder each copy source indices and values; row views stay shared.
         val workspace = if (existing == null) {
-            16L * child.numVars + 40L * child.m + 64L + if (reusable) 8L * matrixEntries else 0L
+            16L * child.numVars + 40L * child.m + 64L + if (reusable) 4L * matrixEntries else 0L
         } else 0L
-        val scaling = if (reusable) LpScalingView.identityRefreshWorkBound(child)
-            else LpScalingView.constructionWorkBound(child)
-        if (workspace >= budget.remaining() || scaling >= budget.remaining() - workspace) {
+        val scaling = when {
+            sourceView != null -> sourceView.refreshWorkBound(child)
+            else -> LpScalingView.constructionWorkBound(child)
+        }
+        val preparationStop = when {
+            workspace >= budget.remaining() -> LpProbePreparationStop.WORKSPACE
+            scaling >= budget.remaining() - workspace -> LpProbePreparationStop.SCALARS
+            else -> null
+        }
+        val reuse = when {
+            sourceView == null -> LpProbeReuse.INDEPENDENT
+            sourceView.applied -> LpProbeReuse.SCALED
+            else -> LpProbeReuse.IDENTITY
+        }
+        budget.preflight = LpProbePreflight(workspace, scaling, budget.remaining(), reuse,
+            existing != null, preparationStop)
+        if (preparationStop != null) {
             budget.decline = LpProbeDecline.ALLOWANCE
             return null
         }
@@ -177,7 +206,7 @@ internal class LpDirectionalProbes(
         if (entries <= 0L || solveGrant <= 0L) return budget.stop(LpProbeDecline.ALLOWANCE)
         if (token()) return budget.stop(LpProbeDecline.CANCELLED)
         val solver = if (existing != null) {
-            if (!existing.adoptProbe(child, token)) {
+            if (!existing.adoptProbe(child, requireNotNull(sourceView), token)) {
                 return budget.stop(if (token()) LpProbeDecline.CANCELLED else LpProbeDecline.CHILD)
             }
             existing
@@ -234,6 +263,7 @@ internal class LpDirectionalProbes(
         var entryLimit = 0L
         var completed = 0
         var decline: LpProbeDecline? = null
+        var preflight: LpProbePreflight? = null
         val remainingChildren: Int get() = queries - completed
 
         fun remaining(): Long = if (preparation >= allowance || solving >= allowance - preparation) 0L
@@ -259,7 +289,8 @@ internal class LpDirectionalProbes(
 
         fun publish(observe: (LpProbeMetrics) -> Unit) {
             val metrics = LpProbeMetrics(preparation - reportedPreparation, solving - reportedSolving,
-                completed - reportedCompleted, decline)
+                completed - reportedCompleted, decline, preflight)
+            preflight = null
             reportedPreparation = preparation
             reportedSolving = solving
             reportedCompleted = completed
