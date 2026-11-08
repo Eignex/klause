@@ -240,7 +240,11 @@ class LinearAuthorityPointCutsTest {
                 assertEquals(SourceValue.Rational(BigFraction.ONE),
                     (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
                 assertEquals(2, budget.operations)
-                assertNull(result.branchGuidance)
+                val guidance = assertNotNull(result.branchGuidance)
+                assertTrue(guidance.scope === source.scope)
+                assertEquals(x to BigFraction.ONE, guidance.split)
+                assertEquals(listOf(x to BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
+                    guidance.fractional)
                 assertEquals(1L, authority.cutObservations()["numericalCutSelectionFractionalRounds"])
                 for (name in listOf("Pool", "Checked", "Installed")) {
                     assertEquals(2L, authority.cutObservations()["numericalCutSelectionFractionalAttempt${name}Rows"])
@@ -255,6 +259,35 @@ class LinearAuthorityPointCutsTest {
                 assertEquals(SourceEvidenceCheck.Checked,
                     SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
             }
+    }
+
+    @Test
+    fun `an integral fractional continuation should withhold baseline branch guidance`() {
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y, mixedReal), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    mixedReal to BigFraction.ONE), BigFraction.ofLong(3))),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                    mixedReal to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "x lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "x upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO)),
+            ), mapOf(x to BigFraction.ONE, y to BigFraction.ONE))
+        val cuts = source.premises.entries.mapIndexed { owner, (name, premise) ->
+            LinearAuthorityCut(owner, premise.inequality, SourceDerivation.Premise(name),
+                mixed = true, family = CutFamily.SOURCE_AGGREGATION)
+        }
+        LinearAuthority(SourceLpBudget(), retainLp = true, additionalCuts = cuts, aggregateCuts = true,
+            fractionalAggregateOrder = true).use { authority ->
+            val result = authority.advanceWithPointCuts(source, Cancellation.Never)
+
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionFractionalRounds"])
+            assertNotNull(result.incumbent)
+            assertNull(result.branchGuidance)
+            assertEquals(SourceValue.Rational(BigFraction.ONE),
+                (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+        }
     }
 
     @Test
