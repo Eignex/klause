@@ -243,7 +243,8 @@ raw floating-point bits and the pool version read with it; absence means no read
 version zero means an empty pool. It does not describe a worker's private effective cutoff
 or establish proof authority. Observation storage is bounded per worker and allocated
 only with reporting enabled; capture adds no pool reads, cancellation polls or handle
-inspection. Reseeding a handle does not remove its worker.
+inspection. Internal admission-policy progress alone does not enable exit reporting.
+Reseeding a handle does not remove its worker.
 [Search statistics](09-learning.md#statistics) owns propagation/conflict accounting.
 
 ## Witnesses and proof scope

@@ -154,6 +154,7 @@ class Portfolio(
     private val onProgress: ((PortfolioEvent) -> Unit)? = null,
 ) : PortfolioExecutor {
     internal var runTimeSource: TimeSource = TimeSource.Monotonic
+    internal var workerExitReporting: Boolean = onProgress != null
     internal var invocationStarted: TimeMark? = null
     internal var reserveBeforeIncumbentOnly: Boolean = false
     internal var disjointBooleanProof: Boolean = false
@@ -892,7 +893,7 @@ class Portfolio(
         private var availability: ((Int) -> Boolean)? = null
         private val earlyCoreTrials = workers.indices.filter { workers[it].earlyCoreTrial }
         private val observedContinuations = if (onProgress == null) null else BooleanArray(workers.size)
-        val exits = onProgress?.let { PortfolioExitObservations(workers.size) }
+        val exits = if (workerExitReporting) onProgress?.let { PortfolioExitObservations(workers.size) } else null
 
         @Suppress("LongParameterList")
         fun observeContinuation(
@@ -1568,8 +1569,9 @@ class Portfolio(
         }
 
         private fun emitExit(arm: Int, cause: String) {
+            val observations = exits ?: return
             val observer = onProgress ?: return
-            observer(checkNotNull(exits).event(arm, workers[arm].label, cause))
+            observer(observations.event(arm, workers[arm].label, cause))
         }
 
         /** The pool's total counters, every arm that did work included, with the schedule attached. */
