@@ -29,6 +29,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedConstraint
 import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
+import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.baked
@@ -1078,7 +1079,7 @@ internal class ResumableMinimize(
         if (token() || sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) return null
         var validation: PropagationSession? = null
         try {
-            val checking = PropagationSession(problem, token,
+            val checking = PropagationSession(PropagationProblem(problem), token,
                 onPropagationWork = { initialValidationPropagationWork = it })
             validation = checking
             if (checking.fixpointCancelled || token()) return null
