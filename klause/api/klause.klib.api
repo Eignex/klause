@@ -3712,6 +3712,37 @@ sealed interface com.eignex.klause.portfolio/PortfolioEvent { // com.eignex.klau
         final fun hashCode(): kotlin/Int // com.eignex.klause.portfolio/PortfolioEvent.Started.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.portfolio/PortfolioEvent.Started.toString|toString(){}[0]
     }
+
+    final class WorkerExit : com.eignex.klause.portfolio/PortfolioEvent { // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit|null[0]
+        constructor <init>(kotlin/Int, kotlin/String, kotlin/String, kotlin/String, com.eignex.klause.solver.result/TerminationReason?, kotlin/Long?, kotlin/Long?) // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.<init>|<init>(kotlin.Int;kotlin.String;kotlin.String;kotlin.String;com.eignex.klause.solver.result.TerminationReason?;kotlin.Long?;kotlin.Long?){}[0]
+
+        final val arm // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.arm|{}arm[0]
+            final fun <get-arm>(): kotlin/Int // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.arm.<get-arm>|<get-arm>(){}[0]
+        final val cause // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.cause|{}cause[0]
+            final fun <get-cause>(): kotlin/String // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.cause.<get-cause>|<get-cause>(){}[0]
+        final val cutoffBits // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.cutoffBits|{}cutoffBits[0]
+            final fun <get-cutoffBits>(): kotlin/Long? // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.cutoffBits.<get-cutoffBits>|<get-cutoffBits>(){}[0]
+        final val incumbentVersion // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.incumbentVersion|{}incumbentVersion[0]
+            final fun <get-incumbentVersion>(): kotlin/Long? // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.incumbentVersion.<get-incumbentVersion>|<get-incumbentVersion>(){}[0]
+        final val outcome // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.outcome|{}outcome[0]
+            final fun <get-outcome>(): kotlin/String // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.outcome.<get-outcome>|<get-outcome>(){}[0]
+        final val reason // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.reason|{}reason[0]
+            final fun <get-reason>(): com.eignex.klause.solver.result/TerminationReason? // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.reason.<get-reason>|<get-reason>(){}[0]
+        final val worker // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.worker|{}worker[0]
+            final fun <get-worker>(): kotlin/String // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.worker.<get-worker>|<get-worker>(){}[0]
+
+        final fun component1(): kotlin/Int // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.component1|component1(){}[0]
+        final fun component2(): kotlin/String // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.component2|component2(){}[0]
+        final fun component3(): kotlin/String // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.component3|component3(){}[0]
+        final fun component4(): kotlin/String // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.component4|component4(){}[0]
+        final fun component5(): com.eignex.klause.solver.result/TerminationReason? // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.component5|component5(){}[0]
+        final fun component6(): kotlin/Long? // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.component6|component6(){}[0]
+        final fun component7(): kotlin/Long? // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.component7|component7(){}[0]
+        final fun copy(kotlin/Int = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., com.eignex.klause.solver.result/TerminationReason? = ..., kotlin/Long? = ..., kotlin/Long? = ...): com.eignex.klause.portfolio/PortfolioEvent.WorkerExit // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.copy|copy(kotlin.Int;kotlin.String;kotlin.String;kotlin.String;com.eignex.klause.solver.result.TerminationReason?;kotlin.Long?;kotlin.Long?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.portfolio/PortfolioEvent.WorkerExit.toString|toString(){}[0]
+    }
 }
 
 sealed interface com.eignex.klause.presolve/OpenPresolveResult { // com.eignex.klause.presolve/OpenPresolveResult|null[0]
