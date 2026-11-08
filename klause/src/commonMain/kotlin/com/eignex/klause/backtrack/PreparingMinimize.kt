@@ -113,7 +113,7 @@ internal class PreparingMinimize(
                         (sliceNodes - (preparedWork - before)).coerceAtLeast(0L)
                     }
                     return prepared.runSlice(global, millis, nodes, onIncumbent).also {
-                        repaidWork += prepared.repaidWork
+                        repaidWork += minOf(prepared.repaidWork, Long.MAX_VALUE - repaidWork)
                     }
                 }
                 val session = preparing.advance()
