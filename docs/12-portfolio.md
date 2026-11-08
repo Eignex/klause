@@ -1055,6 +1055,15 @@ model and objective, and withholds non-finite floating projections. Native root
 proposals drawn from it still pass local validation. Guidance imports carry no
 improvement credit or proof authority.
 
+An internal opt-in observer records checked guide adoption, the last scalar cutoff
+read, private incumbent standing and attempted or committed branches. Each worker
+streams at most 16 adoption and local-incumbent events of each kind, and 128 attempt
+and commit events of each kind. Each adoption or local incumbent opens a window
+of eight attempts and commits within those limits. It reads no additional cutoff and evaluates no
+counterfactual value order. Its preference flag describes configured precedence,
+not proof that a saved value changed a decision; exact cutoff context is unavailable.
+Oversized exact local objectives and opaque theory decision payloads are withheld.
+
 At its first root, a non-restarting retained CP worker with a shared cutoff revalidates
 the current pooled assignment as a starting incumbent. An equal-cutoff witness can
 supply local objective propagation without priming guidance or earning progress.

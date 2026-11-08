@@ -36,9 +36,9 @@ import com.eignex.klause.propagation.conditionedRoot
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
-import com.eignex.klause.solver.SliceWorkAccounting
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchInitializationCancelled
+import com.eignex.klause.solver.SliceWorkAccounting
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.IncumbentSubscription
 import com.eignex.klause.solver.incumbent.Publication
@@ -233,12 +233,14 @@ internal class ResumableMinimize(
     private var objVarBest: Long? = null
     private val externalShared = params.objectiveBoundSupplier != null
     private var lastExternalCutoff = Double.POSITIVE_INFINITY
+    private var observedExternalCutoff: Double? = null
     private var lastObjBoundAsserted: Long? = null
     private var lastBoolCutoffValue: BigFraction? = null
     private var lastOpenCutoff: Long? = null
 
     private fun externalCutoff(): Double {
         val bound = params.objectiveBoundSupplier?.invoke() ?: Double.POSITIVE_INFINITY
+        if (params.branchObserver is PooledGuidanceObserver) observedExternalCutoff = bound
         if (rebindable) {
             require(!bound.isNaN() && bound <= lastExternalCutoff) {
                 "repair objective cutoff must be non-increasing"
@@ -1617,6 +1619,11 @@ internal class ResumableMinimize(
             val local = incumbents.current()
             if (params.valueSelector is SolutionGuided && (local != null || lpEngine.params.lpPlan.bounding)) {
                 pooledIncumbents?.poll()?.takeIf { local == null || it.objective < local.objective.display }?.let {
+                    params.branchObserver.observeGuidance(PooledGuidanceKind.IMPORT) {
+                        PooledGuidanceObservation(PooledGuidanceKind.IMPORT, local == null, "resume",
+                            it.version, it.objective, local?.objective?.display, local?.objective?.exact?.guidanceText(),
+                            observedExternalCutoff, rootRoundingPending || rootLayoutPending)
+                    }
                     brancher.importPooledSolution(it.assignment, guideValues = true, preferValues = local == null)
                 }
             }

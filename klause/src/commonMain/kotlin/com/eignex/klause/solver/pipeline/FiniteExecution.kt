@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.backtrack.PooledGuidanceObservation
 import com.eignex.klause.backtrack.SearchOutcome
 import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.factor.scheduling.Cumulative
@@ -400,6 +401,7 @@ internal class FiniteExecutionRequest(
     val numericalCompanionParams: TheoryParams? = null,
     val objectiveCoordinates: ObjectiveCoordinateView? = null,
     val onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
+    val onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
 )
 
 /** Streaming hooks owned by a rendering frontend. */
@@ -508,6 +510,7 @@ internal fun FinitePipeline.solve(
     lpSolveContext: LpSolveContext,
     numericalCompanions: TheoryParams? = null,
     onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
+    onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
 ): FiniteSolveResult {
     require(request.engine == FiniteEngine.FIXED || lpSolveContext == LpSolveContext.Production) {
         "custom LP dependencies require the fixed finite route"
@@ -658,6 +661,7 @@ internal fun FinitePipeline.solve(
             onPortfolioFault = request.onPortfolioFault,
             lpSolveContext = lpSolveContext,
             onPortfolioLpQuery = onPortfolioLpQuery,
+            onPortfolioGuidance = onPortfolioGuidance,
             toleranceCheck = if (gridPublication == null) {
                 sourceCheck?.let { check ->
                     FiniteSourceAcceptance({ check(preparation.reconstruct(it)) }, check.permitsToleranceOptimum(),
@@ -1249,6 +1253,7 @@ private fun executePortfolio(
         cancellation = request.cancellation,
         numericalCompletion = request.executionOptions.numericalCompletion,
         onLpQuery = request.onPortfolioLpQuery,
+        onGuidance = request.onPortfolioGuidance,
         numericalCompanions = request.numericalCompanionParams,
         sourceHints = request.sourceInvocation?.let { invocation ->
             { strategies ->

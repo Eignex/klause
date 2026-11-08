@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.backtrack.PooledGuidanceObservation
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.LinearSourceObjective
 import com.eignex.klause.ir.ObjectiveSense
@@ -91,6 +92,7 @@ class SourceExecutionRequest private constructor(
     /** Whether the selected preparation phase returns diagnostics without constructing search workers. */
     val prepareOnly: Boolean = false,
     internal val onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
+    internal val onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
 ) {
     internal fun withPortfolioLpQueryObserver(
         observer: (String, Double?, LpQueryObservation) -> Unit,
@@ -101,7 +103,19 @@ class SourceExecutionRequest private constructor(
         }
         return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, observer)
+            prepareOnly, observer, onPortfolioGuidance)
+    }
+
+    internal fun withPortfolioGuidanceObserver(
+        observer: (String, PooledGuidanceObservation) -> Unit,
+    ): SourceExecutionRequest {
+        require(invocation.request.engine == FiniteEngine.MIXED &&
+            SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly) {
+            "guidance observation requires mixed finite source execution"
+        }
+        return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
+            presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
+            prepareOnly, onPortfolioLpQuery, observer)
     }
 
     /**
@@ -452,7 +466,7 @@ private fun executeCapturedSource(
             )
             val result = FinitePipeline.solve(finite, callbacks.finite, LpSolveContext.Production,
                 if (invocation.requestsFiniteNumericalCompanions) request.theory.boundTo(invocation) else null,
-                request.onPortfolioLpQuery)
+                request.onPortfolioLpQuery, request.onPortfolioGuidance)
             SourceExecutionResult.Finite(invocation, result)
         }
 
