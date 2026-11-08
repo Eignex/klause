@@ -296,7 +296,8 @@ internal class LinearAuthority(
             if (!result.paused && result.evidence == null && result.incumbent == null && result.split == null) {
                 if (completed) policy.observeRound(pending.rows, improved = false)
                 policy.observe("UnavailableRounds")
-                return pending.base.copy(primalStages = stages)
+                return pending.base.copy(primalStages = stages,
+                    advisoryPoint = pending.base.advisoryPoint.takeIf { completed })
             }
             val strongest = strongerLinearBound(pending.base.bound, result.bound)
             if (completed) {
