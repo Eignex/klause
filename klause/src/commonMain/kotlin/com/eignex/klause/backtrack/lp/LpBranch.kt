@@ -26,38 +26,40 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
     var referenceScore = LP_BRANCH_MIN_SCORE
     for (b in 0 until problem.numBoolVars) {
         if (session.boolValue(b) != null) continue
-        val gain = hints.directionalScore(VarRef.Bool(b))
+        val variable = VarRef.Bool(b)
+        val gain = hints.directionalScore(variable)
         if (gain > gainScore) {
             gainScore = gain
-            directional = VarRef.Bool(b)
+            directional = variable
         }
-        val shadow = hints.referenceDirectionalScore(VarRef.Bool(b))
+        val shadow = hints.referenceDirectionalScore(variable)
         if (shadow > referenceScore) {
             referenceScore = shadow
-            reference = VarRef.Bool(b)
+            reference = variable
         }
-        val s = hints.branchScore(VarRef.Bool(b))
+        val s = hints.branchScore(variable)
         if (!s.isNaN() && s > bestScore) {
             bestScore = s
-            best = VarRef.Bool(b)
+            best = variable
         }
     }
     for (i in 0 until problem.numIntVars) {
         if (session.intDomain(i).isFixed) continue
-        val gain = hints.directionalScore(VarRef.IntVar(i))
+        val variable = VarRef.IntVar(i)
+        val gain = hints.directionalScore(variable)
         if (gain > gainScore) {
             gainScore = gain
-            directional = VarRef.IntVar(i)
+            directional = variable
         }
-        val shadow = hints.referenceDirectionalScore(VarRef.IntVar(i))
+        val shadow = hints.referenceDirectionalScore(variable)
         if (shadow > referenceScore) {
             referenceScore = shadow
-            reference = VarRef.IntVar(i)
+            reference = variable
         }
-        val s = hints.branchScore(VarRef.IntVar(i))
+        val s = hints.branchScore(variable)
         if (!s.isNaN() && s > bestScore) {
             bestScore = s
-            best = VarRef.IntVar(i)
+            best = variable
         }
     }
     hints.compareDirectionalRankings(directional, reference, params.cancellation)
