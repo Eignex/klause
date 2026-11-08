@@ -1,6 +1,8 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisSolver
+import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -13,14 +15,17 @@ import kotlin.test.assertTrue
 class LpDirectionalProbesTest {
     @Test
     fun `pooled child values match independent queries with less work`() {
-        for (columns in listOf(intArrayOf(0, 1), intArrayOf(1, 0))) {
+        for (rowScale in listOf(1L, 1_000_000L)) for (columns in listOf(intArrayOf(0, 1), intArrayOf(1, 0))) {
             val builder = LpBuilder()
             repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
-            repeat(3) { builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1), Relation.GE, 1L) }
+            repeat(3) {
+                builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(rowScale, rowScale), Relation.GE, rowScale)
+            }
             val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
                 .ownerWorkingModel())
             RevisedSimplex(model).use { owner ->
                 val point = assertNotNull(owner.solve())
+                assertEquals(rowScale != 1L, owner.scalingMetrics.applied)
                 val source = LpProbeSource(model, point.basis)
                 var independentWork = 0L
                 val independent = columns.map { column ->
@@ -28,9 +33,18 @@ class LpDirectionalProbesTest {
                         1_000_000L, Cancellation.Never) { independentWork += it.work }).single()
                 }
                 var pooledWork = 0L
+                val preflights = ArrayList<LpProbePreflight>()
+                var decline: LpProbeDecline? = null
 
-                val pooled = assertNotNull(owner.directionalValues(source, columns, longArrayOf(0, 0),
-                    independentWork - 1L, Cancellation.Never) { pooledWork += it.work })
+                val result = owner.directionalValues(source, columns, longArrayOf(0, 0),
+                    independentWork - 1L, Cancellation.Never) {
+                        pooledWork += it.work
+                        it.preflight?.let(preflights::add)
+                        decline = it.decline
+                    }
+                val pooled = assertNotNull(result,
+                    "scale=$rowScale columns=${columns.toList()} independent=$independentWork work=$pooledWork " +
+                        "decline=$decline preflights=$preflights")
 
                 assertEquals(independent.size, pooled.size)
                 for (index in pooled.indices) {
@@ -38,24 +52,132 @@ class LpDirectionalProbesTest {
                     assertEquals(independent[index].up, pooled[index].up, 1e-7)
                 }
                 assertTrue(pooledWork in 1L until independentWork)
+                assertEquals(4, preflights.size)
+                assertEquals(3, preflights.count { it.ownerReused })
+                val reuse = if (rowScale == 1L) LpProbeReuse.IDENTITY else LpProbeReuse.SCALED
+                assertTrue(preflights.all { it.reuse == reuse && it.stop == null })
             }
         }
     }
 
     @Test
     fun `cancellation after a pooled child retires private factors`() {
+        for (rowScale in listOf(1L, 1_000_000L)) {
+            val builder = LpBuilder()
+            repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
+            repeat(3) {
+                builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(rowScale, rowScale), Relation.GE, rowScale)
+            }
+            val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+                .ownerWorkingModel())
+            var created = 0
+            var closed = 0
+            RevisedSimplex(model, basisSolverFactory = { matrix ->
+                created++
+                val backend = KotlinBasisSolver(matrix)
+                object : BasisSolver by backend {
+                    private var retired = false
+                    override fun close() {
+                        if (!retired) { retired = true; closed++ }
+                        backend.close()
+                    }
+                }
+            }).use { owner ->
+                assertNotNull(owner.solve())
+                val parentLive = created - closed
+                var cancelled = false
+                var completed = 0
+                var work = 0L
+                var decline: LpProbeDecline? = null
+
+                val gains = owner.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
+                    1_000_000L, Cancellation { cancelled }) {
+                    work += it.work
+                    completed += it.completed
+                    decline = it.decline
+                    if (it.completed > 0) cancelled = true
+                }
+
+                assertNull(gains)
+                assertEquals(1, completed)
+                assertEquals(LpProbeDecline.CANCELLED, decline)
+                assertEquals(parentLive, created - closed)
+                assertTrue(work in 1L..1_000_000L)
+                assertEquals(4.5, assertNotNull(owner.resolveBounds()).objective, 1e-7)
+            }
+            assertEquals(created, closed)
+        }
+    }
+
+    @Test
+    fun `preparation refusals retain spent work without constructing private factors`() {
         val builder = LpBuilder()
         repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
         repeat(3) { builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1), Relation.GE, 1L) }
         val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
             .ownerWorkingModel())
         var created = 0
+        RevisedSimplex(model, basisSolverFactory = { matrix -> created++; KotlinBasisSolver(matrix) }).use { owner ->
+            assertNotNull(owner.solve())
+            var first: LpProbePreflight? = null
+            assertNotNull(owner.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
+                1_000_000L, Cancellation.Never) { if (first == null) first = it.preflight })
+            val preflight = assertNotNull(first)
+            val beforePreflight = 1_000_000L - preflight.offeredWork
+            for (stop in LpProbePreparationStop.entries) {
+                val allowance = beforePreflight + preflight.workspaceWork +
+                    if (stop == LpProbePreparationStop.SCALARS) preflight.scalarWork else 0L
+                val beforeCreated = created
+                val parentMetrics = owner.lastMetrics
+                var work = 0L
+                var solving = 0L
+                var completed = 0
+                var refusal: LpProbePreflight? = null
+                var decline: LpProbeDecline? = null
+
+                val gains = owner.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
+                    allowance, Cancellation.Never) {
+                    work += it.work
+                    solving += it.solveWork
+                    completed += it.completed
+                    it.preflight?.let { p -> refusal = p }
+                    decline = it.decline
+                }
+
+                assertNull(gains)
+                assertEquals(stop, assertNotNull(refusal).stop)
+                assertEquals(LpProbeDecline.ALLOWANCE, decline)
+                assertEquals(beforePreflight, work)
+                assertEquals(0L, solving)
+                assertEquals(0, completed)
+                assertEquals(beforeCreated, created)
+                assertEquals(parentMetrics, owner.lastMetrics)
+            }
+        }
+    }
+
+    @Test
+    fun `scaled child failures decline without constructing an unscaled retry`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
+        repeat(3) {
+            builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1_000_000, 1_000_000), Relation.GE, 1_000_000L)
+        }
+        val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            .ownerWorkingModel())
+        var probing = false
+        var created = 0
         var closed = 0
         RevisedSimplex(model, basisSolverFactory = { matrix ->
             created++
             val backend = KotlinBasisSolver(matrix)
+            val fail = probing
             object : BasisSolver by backend {
                 private var retired = false
+                override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                    backend.ftran(x, expectedDensity)
+                    if (fail) throw BasisArithmeticException("injected private child failure")
+                }
                 override fun close() {
                     if (!retired) { retired = true; closed++ }
                     backend.close()
@@ -63,26 +185,25 @@ class LpDirectionalProbesTest {
             }
         }).use { owner ->
             assertNotNull(owner.solve())
-            val parentLive = created - closed
-            var cancelled = false
-            var completed = 0
+            assertTrue(owner.scalingMetrics.applied)
+            val beforeCreated = created
+            val beforeClosed = closed
+            val parentMetrics = owner.lastMetrics
+            val parentScaling = owner.scalingMetrics
+            probing = true
             var work = 0L
             var decline: LpProbeDecline? = null
 
             val gains = owner.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
-                1_000_000L, Cancellation { cancelled }) {
-                work += it.work
-                completed += it.completed
-                decline = it.decline
-                if (it.completed > 0) cancelled = true
-            }
+                1_000_000L, Cancellation.Never) { work += it.work; decline = it.decline }
 
             assertNull(gains)
-            assertEquals(1, completed)
-            assertEquals(LpProbeDecline.CANCELLED, decline)
-            assertEquals(parentLive, created - closed)
+            assertEquals(LpProbeDecline.CHILD, decline)
+            assertEquals(beforeCreated + 1, created)
+            assertEquals(beforeClosed + 1, closed)
             assertTrue(work in 1L..1_000_000L)
-            assertEquals(4.5, assertNotNull(owner.resolveBounds()).objective, 1e-7)
+            assertEquals(parentMetrics, owner.lastMetrics)
+            assertEquals(parentScaling, owner.scalingMetrics)
         }
         assertEquals(created, closed)
     }
@@ -248,35 +369,39 @@ class LpDirectionalProbesTest {
 
     @Test
     fun `child probes leave the parent state optimum basis and metrics unchanged`() {
-        for (valueMode in listOf(false, true)) {
-            val builder = LpBuilder()
-            repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
-            repeat(3) { builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1), Relation.GE, 1L) }
-            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-            val state = trail.state
-            val model = assertNotNull(state.ownerWorkingModel())
-            RevisedSimplex(model).use { solver ->
-                val before = assertNotNull(solver.solve())
-                val basic = before.basis.basicVars.copyOf()
-                val statuses = before.basis.status.copyOf()
-                val metrics = solver.lastMetrics
-
-                val result = if (valueMode) {
-                    solver.directionalValues(LpProbeSource(model, before.basis), intArrayOf(0, 1), longArrayOf(0, 0),
-                        1_000_000L, Cancellation.Never) {}
-                } else {
-                    solver.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
-                        1_000_000L, Cancellation.Never) {}
+        for (rowScale in listOf(1L, 1_000_000L)) {
+            for (valueMode in listOf(false, true)) {
+                val builder = LpBuilder()
+                repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
+                repeat(3) {
+                    builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(rowScale, rowScale), Relation.GE, rowScale)
                 }
-                assertNotNull(result)
+                val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+                val state = trail.state
+                val model = assertNotNull(state.ownerWorkingModel())
+                RevisedSimplex(model).use { solver ->
+                    val before = assertNotNull(solver.solve())
+                    val basic = before.basis.basicVars.copyOf()
+                    val statuses = before.basis.status.copyOf()
+                    val metrics = solver.lastMetrics
 
-                assertTrue(trail.state === state)
-                assertContentEquals(basic, assertNotNull(solver.retainedBasis()).basicVars)
-                assertContentEquals(statuses, assertNotNull(solver.retainedBasis()).status)
-                assertContentEquals(basic, before.basis.basicVars)
-                assertContentEquals(statuses, before.basis.status)
-                assertEquals(metrics, solver.lastMetrics)
-                assertEquals(4.5, assertNotNull(solver.resolveBounds()).objective, 1e-7)
+                    val result = if (valueMode) {
+                        solver.directionalValues(LpProbeSource(model, before.basis), intArrayOf(0, 1),
+                            longArrayOf(0, 0), 1_000_000L, Cancellation.Never) {}
+                    } else {
+                        solver.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
+                            1_000_000L, Cancellation.Never) {}
+                    }
+                    assertNotNull(result)
+
+                    assertTrue(trail.state === state)
+                    assertContentEquals(basic, assertNotNull(solver.retainedBasis()).basicVars)
+                    assertContentEquals(statuses, assertNotNull(solver.retainedBasis()).status)
+                    assertContentEquals(basic, before.basis.basicVars)
+                    assertContentEquals(statuses, before.basis.status)
+                    assertEquals(metrics, solver.lastMetrics)
+                    assertEquals(4.5, assertNotNull(solver.resolveBounds()).objective, 1e-7)
+                }
             }
         }
     }

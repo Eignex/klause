@@ -1338,11 +1338,12 @@ belongs to that read, and the complete combined analysis is funded before alloca
 
 Explicit directional probes compare the actual floating LP objective increase at
 the two adjacent integer bounds of at most two structural columns. Each child
-owns an immutable bound-state fork relative to the parent. An identity-scaled parent
-permits one private numerical owner to adopt successive sibling states, retaining
-its private factors and sharing only the immutable matrix presentation. Its first
-solve starts from the retained parent basis. Scaled parents keep separate scratch
-owners for their children. The parent state, optimum, factors and
+owns an immutable bound-state fork relative to the parent. One private numerical
+owner adopts successive sibling states under the parent's immutable numerical
+transform, retaining its private factors. It shares immutable CSC and row views;
+its first solve starts from the retained parent basis. A private query declines
+unsafe scalar refreshes or numerical fallback instead of rebuilding the shared
+matrix. The parent state, optimum, factors and
 metrics remain untouched. Common objective constants are excluded before gain
 subtraction; objective scaling maps every result to minimized source units.
 Both directions of every candidate require a complete optimal floating result
@@ -1352,8 +1353,11 @@ history and supply no pruning or certificate authority. Scoped owners recheck st
 ownership and cancellation after observations before returning a comparison.
 Completed-child observations report preparation, solve and completion deltas;
 the final observation retains any unfinished work and decline. Every exit releases
-the private owner. Identity refreshes prepay scalar-vector visits and copies,
-while the initial private workspace also pays for its matrix and row views.
+the private owner. Refreshes prepay scalar-vector visits and copies, while the
+initial private workspace pays for the backend's separate source snapshots.
+The immutable matrix views retain no mutable parent factors or solve vectors.
+Each sibling refresh forks the immutable parent scalar vectors, so tracked bound
+changes fund only their visits and the vectors they can copy.
 
 Child-value consultations instead accept the basis of a completed current
 iterate, including a bound-only result. Every child still requires a complete
@@ -1375,7 +1379,9 @@ Failed and partial work remains in the reported preparation and solve metrics.
 Decline diagnostics distinguish exhausted work, cancellation, unavailable owners,
 unfinished solves, stale points, missing optima and invalid splits. A declined
 comparison retains its completed-child count without supplying partial advice.
-The caller owns probe admission and cadence.
+Preparation preflights retain workspace and scalar requirements, remaining work,
+identity or scaled reuse, and the refusing preparation stage. These fixed observations
+grant no work and construct no numerical owner. The caller owns probe admission and cadence.
 
 A retained numerical owner can expose a private solve cursor. It suspends between
 iterations, retaining the current phase, factors, artificial seats, pricing state
