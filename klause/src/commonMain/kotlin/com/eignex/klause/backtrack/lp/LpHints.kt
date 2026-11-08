@@ -27,9 +27,13 @@ internal class LpHints(
     private val directionalGains: Boolean = false,
     private val observe: (String) -> Unit = {},
     private val charge: (Long) -> Unit = {},
+    private val applyAdvice: Boolean = true,
 ) : LpHintSink {
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
     private val history = LpDirectionalHistory(observe)
+    private val passiveChoice = if (collect) LpPassiveVariableChoice(applyAdvice, observe, charge) else null
+    private var passivePoint: LpRelaxation? = null
+    private var passiveState: LpExactState? = null
     private var freshRecord = false
     private var objectiveRecorded = false
     private var directionalChoice: VarRef? = null
@@ -42,6 +46,7 @@ internal class LpHints(
     private var cutoff = Double.NaN
 
     fun beginNode(depth: Int, bound: Double) {
+        clearPassivePoint()
         if (scopeModel != null) charge(1L)
         cutoff = bound
         freshRecord = false
@@ -51,6 +56,12 @@ internal class LpHints(
     }
 
     override fun recordObjective(relaxation: LpRelaxation, objective: Double) {
+        if (passiveChoice != null) {
+            charge(2L)
+            observe("PASSIVE_VARIABLE_OPTIMUM_CHECK")
+            passiveChoice.clear()
+            passiveState = null
+        }
         if (!collect || relaxation.colVarId.size > 8192) return
         val state = relaxation.model.exactState ?: return
         charge(2L * relaxation.colVarId.size + 1L)
@@ -70,12 +81,17 @@ internal class LpHints(
         }
         // The scoped constant cancels in every gain; adding it can round away a small difference.
         objectiveRecorded = objective.isFinite()
+        if (passiveChoice != null && passivePoint === relaxation) passiveState = state
         history.record(objective)
     }
 
-    override fun recordInfeasible() = history.infeasible()
+    override fun recordInfeasible() {
+        clearPassivePoint()
+        history.infeasible()
+    }
 
     fun finishNode(state: LpExactState? = null) {
+        passiveChoice?.clear()
         history.finishNode()
         if (scopeModel != null && state != null &&
             (scopeModel !== state.baseModel || scopeRows !== state.rows)
@@ -86,6 +102,7 @@ internal class LpHints(
     }
 
     fun branch(variable: VarRef) {
+        passiveChoice?.branch(variable, if (passivePointCurrent()) solveStamp else -1)
         if (directionalGains && scopeModel != null) {
             observe(if (directionalChoice == variable) "CONSUMED" else "FALLBACK")
         }
@@ -97,6 +114,7 @@ internal class LpHints(
     }
 
     fun commit(decision: SearchDecision, depth: Int) {
+        passiveChoice?.commit(decision)
         if (collect && scopeModel != null) {
             charge(129L)
             history.commit(decision, depth)
@@ -105,12 +123,66 @@ internal class LpHints(
 
     fun directionalScore(variable: VarRef): Double {
         if (!collect || !directionalGains || !objectiveRecorded || !history.hasTwoSidedSamples) return Double.NaN
+        if (!passivePointCurrent()) return Double.NaN
         charge(1L)
-        return history.score(variable, value(variable))
+        observe("PASSIVE_VARIABLE_SCORE")
+        val point = value(variable)
+        if (variable is VarRef.Bool && point !in 0.0..1.0) return Double.NaN
+        return history.score(variable, point).also {
+            if (it.isFinite()) observe("PASSIVE_VARIABLE_RELIABLE")
+        }
     }
 
     fun selected(variable: VarRef?) {
+        passiveChoice?.clear()
         directionalChoice = variable
+    }
+
+    fun beginPassiveSelection() {
+        passiveChoice?.clear()
+        if (!collect || !history.hasTwoSidedSamples) return
+        charge(4L)
+        observe("PASSIVE_VARIABLE_CHECK")
+    }
+
+    fun selectVariable(proposal: VarRef?, baseline: VarRef?, cancelled: () -> Boolean = { false }): VarRef? {
+        val choice = passiveChoice ?: return baseline
+        if (proposal == null || baseline == null) {
+            charge(4L)
+            observe("PASSIVE_VARIABLE_NO_BASELINE")
+            val usable = proposal != null && !cancelled() && passivePointCurrent() &&
+                (proposal !is VarRef.Bool || value(proposal) in 0.0..1.0) &&
+                history.hasTwoSidedSamples && history.score(proposal, value(proposal)).isFinite()
+            selected(proposal.takeIf { applyAdvice && usable })
+            return directionalChoice ?: baseline
+        }
+        val point = passivePoint
+        val state = passiveState
+        val stamp = solveStamp
+        val current = { !cancelled() && passivePoint === point && passiveState === state &&
+            stamp == solveStamp && passivePointCurrent() }
+        val selected = choice.select(LpPassiveVariableChoice.Candidate(proposal, value(proposal)),
+            LpPassiveVariableChoice.Candidate(baseline, value(baseline)), stamp,
+            fresh = current,
+            reliable = { history.hasTwoSidedSamples && history.score(proposal, value(proposal)).isFinite() })
+        if (choice.nominatedVariable != null && !current()) {
+            choice.clear()
+            directionalChoice = null
+            observe("PASSIVE_VARIABLE_STALE")
+            return baseline
+        }
+        directionalChoice = choice.nominatedVariable.takeIf { applyAdvice }
+        return selected
+    }
+
+    private fun passivePointCurrent(): Boolean = freshRecord && objectiveRecorded && passiveState != null &&
+        passivePoint?.model?.exactState === passiveState
+
+    private fun clearPassivePoint() {
+        val choice = passiveChoice ?: return
+        choice.clear()
+        passivePoint = null
+        passiveState = null
     }
 
     private fun value(variable: VarRef): Double = if (!freshRecord) Double.NaN else when (variable) {
@@ -141,6 +213,7 @@ internal class LpHints(
     private var recorded = false
 
     fun resetHistory() {
+        clearPassivePoint()
         if (scopeModel != null) {
             charge(history.retainedEntries.toLong() + scopeVariables.size + scopeBooleans.size)
             history.clear()
@@ -175,6 +248,13 @@ internal class LpHints(
      * ([branchScore]) selection, never feasibility or the optimum.
      */
     override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
+        if (passiveChoice != null) {
+            charge(2L)
+            observe("PASSIVE_VARIABLE_POINT")
+            passiveChoice.clear()
+            passivePoint = relaxation
+            passiveState = null
+        }
         recorded = true
         freshRecord = true
         val model = relaxation.model
