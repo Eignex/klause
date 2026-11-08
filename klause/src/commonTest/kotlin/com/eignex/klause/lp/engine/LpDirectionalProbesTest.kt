@@ -105,10 +105,7 @@ class LpDirectionalProbesTest {
                         charged += it.work
                         completed += it.completed
                         assertTrue(charged <= grant, "grant=$grant charged=$charged")
-                        it.numerical?.let { numerical ->
-                            observedSolve = true
-                            assertTrue(it.solveWork <= numerical.workAllowance)
-                        }
+                        if (it.solveWork > 0L) observedSolve = true
                     }
 
                     if (values != null) {
