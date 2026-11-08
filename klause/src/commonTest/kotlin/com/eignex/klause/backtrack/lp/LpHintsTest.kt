@@ -24,10 +24,98 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpHintsTest {
+    @Test
+    fun `reliable passive history reaches matching applied and withheld commitments`() {
+        val builder = LpBuilder()
+        repeat(2) { builder.addVar(0, 10, cost = 1L) }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+            booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
+        val baseline = VarRef.IntVar(0)
+        val proposal = VarRef.IntVar(1)
+        val costs = ArrayList<Long>()
+        for (apply in listOf(false, true)) {
+            var work = 0L
+            val events = ArrayList<String>()
+            val hints = LpHints(2, 0, directionalGains = true, applyAdvice = apply,
+                observe = events::add, charge = { work += it })
+            repeat(2) {
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
+                hints.recordObjective(relaxation, 10.0)
+                hints.branch(proposal)
+                for (up in listOf(false, true)) {
+                    hints.commit(if (up) SearchDecision.IntAtLeast(1, 4L) else SearchDecision.IntAtMost(1, 3L), 1)
+                    hints.beginNode(1, 100.0)
+                    hints.record(relaxation, doubleArrayOf(2.25, if (up) 4.0 else 3.0), DoubleArray(0))
+                    hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+                }
+            }
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+            hints.finishNode(trail.state)
+            assertEquals(1.5, hints.directionalScore(proposal), 1e-9)
+            val before = work
+            hints.beginPassiveSelection()
+
+            val selected = assertNotNull(hints.selectVariable(proposal, baseline))
+            hints.branch(selected)
+            hints.commit(SearchDecision.IntAtMost(selected.varId, if (apply) 3L else 2L), 1)
+
+            assertEquals(if (apply) proposal else baseline, selected)
+            val event = if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED" else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
+            assertEquals(1, events.count { it == event })
+            assertEquals(2, events.count { it == "UP" })
+            assertEquals(2, events.count { it == "DOWN" })
+            costs.add(work - before)
+        }
+        assertEquals(costs.first(), costs.last())
+    }
+
+    @Test
+    fun `passive selection withholds advice from an unmatched current point`() {
+        val builder = LpBuilder()
+        repeat(2) { builder.addVar(0, 10, cost = 1L) }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(trail.state.ownerWorkingModel())
+        val relaxation = LpRelaxation(model, intArrayOf(0, 1), booleanArrayOf(false, false),
+            0L, intArrayOf(0, 1), IntArray(0))
+        val events = ArrayList<String>()
+        val hints = LpHints(2, 0, directionalGains = true, observe = events::add)
+        val proposal = VarRef.IntVar(1)
+        repeat(2) {
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+            hints.branch(proposal)
+            for (up in listOf(false, true)) {
+                hints.commit(if (up) SearchDecision.IntAtLeast(1, 4L) else SearchDecision.IntAtMost(1, 3L), 1)
+                hints.beginNode(1, 100.0)
+                hints.record(relaxation, doubleArrayOf(2.25, if (up) 4.0 else 3.0), DoubleArray(0))
+                hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+            }
+        }
+        hints.beginNode(0, 100.0)
+        hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
+        hints.recordObjective(LpRelaxation(model, intArrayOf(0, 1), booleanArrayOf(false, false),
+            0L, intArrayOf(0, 1), IntArray(0)), 10.0)
+
+        val selected = hints.selectVariable(proposal, VarRef.IntVar(0))
+        hints.branch(VarRef.IntVar(0))
+        hints.commit(SearchDecision.IntAtMost(0, 2L), 1)
+
+        assertEquals(VarRef.IntVar(0), selected)
+        assertTrue(hints.directionalScore(proposal).isNaN())
+        assertFalse("PASSIVE_VARIABLE_COMPARED" in events)
+        assertFalse("PASSIVE_VARIABLE_COMMITTED" in events)
+    }
+
     @Test
     fun `directional scoring skips lookup work until both directions have enough samples`() {
         for (prefix in listOf(listOf(false, false), listOf(false, true))) {

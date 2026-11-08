@@ -17,6 +17,7 @@ import com.eignex.klause.solver.search.VarRef
 internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?): VarRef? {
     hints ?: return null
     if (problem.numBoolVars + problem.numIntVars > LP_BRANCH_SCAN_CAP) return null // too wide ⇒ delegate
+    hints.beginPassiveSelection()
     var best: VarRef? = null
     var bestScore = LP_BRANCH_MIN_SCORE
     var directional: VarRef? = null
@@ -47,8 +48,9 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
             best = VarRef.IntVar(i)
         }
     }
-    hints.selected(directional)
-    return directional ?: best
+    if (directional != null) return hints.selectVariable(directional, best, cancelled = { params.cancellation() })
+    hints.selected(null)
+    return best
 }
 
 /** Minimum LP branch score (reduced-cost × fractionality) to override the configured selector; below

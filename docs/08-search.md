@@ -304,6 +304,12 @@ with each other before fallback, so objective units are not mixed with reduced c
 Saturated scope-wide sample counts skip history lookups while two-sided reliability
 is impossible. Passing that prerequisite still requires the variable's own recent
 samples; it grants no score or authority. History reset clears the prerequisite.
+Selection rechecks that the fractional point and optimum belong to the same current
+relaxation and exact state, and declines on cancellation or stale information. A
+nomination retains only its variable, point and solve stamp. Comparison and
+changed-proposal observations remain separate from the actual variable and matching
+adjacent split committed by search; replacement, retraction and retirement discard
+an unconsumed nomination.
 Disabled directional gains collect no history or retained model scope and charge no
 history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
 
