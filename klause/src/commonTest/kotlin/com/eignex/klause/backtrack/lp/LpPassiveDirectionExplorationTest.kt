@@ -16,12 +16,14 @@ class LpPassiveDirectionExplorationTest {
             val down = if (boolean) SearchDecision.Bool(1) else SearchDecision.IntAtMost(0, 2)
             val up = if (boolean) SearchDecision.Bool(0) else SearchDecision.IntAtLeast(0, 3)
             val history = LpDirectionalHistory({})
-            history.beginNode(0)
-            history.record(10.0)
-            history.branch(variable, point)
-            history.commit(down, 1)
-            history.beginNode(1)
-            history.record(11.0)
+            repeat(2) {
+                history.beginNode(0)
+                history.record(10.0)
+                history.branch(variable, point)
+                history.commit(down, 1)
+                history.beginNode(1)
+                history.record(11.0)
+            }
             val events = ArrayList<String>()
             var work = 0L
             val exploration = LpPassiveDirectionExploration(events::add, { work += it })
@@ -40,14 +42,20 @@ class LpPassiveDirectionExplorationTest {
 
     @Test
     fun `unavailable history points and splits retain ordinary order`() {
-        for (condition in listOf("missing", "equal", "reliable", "integral", "foreign", "cancelled")) {
+        for (condition in listOf(
+            "missing", "single-down", "single-up", "equal", "reliable", "integral", "foreign", "cancelled",
+        )) {
             val history = LpDirectionalHistory({})
             val variable = VarRef.IntVar(0)
-            if (condition != "missing") repeat(if (condition == "reliable") 2 else 1) {
+            if (condition != "missing") repeat(if (condition in listOf("single-down", "single-up", "equal")) 1 else 2) {
                 history.beginNode(0)
                 history.record(10.0)
                 history.branch(variable, 2.25)
-                val directions = if (condition in listOf("equal", "reliable")) listOf(false, true) else listOf(false)
+                val directions = when (condition) {
+                    "equal", "reliable" -> listOf(false, true)
+                    "single-up" -> listOf(true)
+                    else -> listOf(false)
+                }
                 for (up in directions) {
                     history.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
                     history.beginNode(1)
@@ -79,7 +87,7 @@ class LpPassiveDirectionExplorationTest {
             val history = LpDirectionalHistory({})
             val variable = VarRef.IntVar(0)
             val alternatives = listOf(SearchDecision.IntAtMost(0, 2), SearchDecision.IntAtLeast(0, 3))
-            if (limit == "selections") {
+            if (limit == "selections") repeat(2) {
                 history.beginNode(0)
                 history.record(10.0)
                 history.branch(variable, 2.25)
@@ -90,12 +98,14 @@ class LpPassiveDirectionExplorationTest {
             exploration.select(variable, 2.25, alternatives, history, 1) { true }
             exploration.clear()
             history.clear()
-            history.beginNode(0)
-            history.record(10.0)
-            history.branch(variable, 2.25)
-            history.commit(alternatives.first(), 1)
-            history.beginNode(1)
-            history.record(11.0)
+            repeat(2) {
+                history.beginNode(0)
+                history.record(10.0)
+                history.branch(variable, 2.25)
+                history.commit(alternatives.first(), 1)
+                history.beginNode(1)
+                history.record(11.0)
+            }
             val before = work
 
             val selected = exploration.select(variable, 2.25, alternatives, history, 2) { true }
@@ -113,12 +123,14 @@ class LpPassiveDirectionExplorationTest {
             val history = LpDirectionalHistory({})
             val variable = VarRef.IntVar(0)
             val alternatives = listOf(SearchDecision.IntAtMost(0, 2), SearchDecision.IntAtLeast(0, 3))
-            history.beginNode(0)
-            history.record(10.0)
-            history.branch(variable, 2.25)
-            history.commit(alternatives.first(), 1)
-            history.beginNode(1)
-            history.record(11.0)
+            repeat(2) {
+                history.beginNode(0)
+                history.record(10.0)
+                history.branch(variable, 2.25)
+                history.commit(alternatives.first(), 1)
+                history.beginNode(1)
+                history.record(11.0)
+            }
             val events = ArrayList<String>()
             val exploration = LpPassiveDirectionExploration(events::add, {})
             var consultations = 0

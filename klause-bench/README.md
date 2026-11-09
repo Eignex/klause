@@ -1454,7 +1454,9 @@ work and allocation, publication checks, total wall/core time and measured RSS.
 Failed preparation, checking and retirement belong to the containing comparison.
 F1's work-driven mode remains available for finite integer/Boolean controls and
 rejects numerical companions; mixed numerical elapsed schedules are not reproducible
-work traces. S1's directional LP gains remain a separate opt-in branch control.
+work traces. Finite LP directional guidance follows the
+[shared search default](../docs/08-search.md#finite-lp-directional-guidance);
+`param.lp-directional-gains=false` disables collection and advice.
 Native completion flags do not independently validate proofs.
 
 [The admission contract](https://github.com/Eignex/klause/pull/3859) is exercised by

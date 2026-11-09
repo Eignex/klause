@@ -9,16 +9,18 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
-    fun `collection reads prefer only unequal incomplete recent direction counts`() {
-        for (condition in listOf("down", "up", "equal", "reliable", "missing", "expired")) {
+    fun `collection reads require one reliable direction and one incomplete direction`() {
+        for (condition in listOf(
+            "down", "up", "single-down", "single-up", "equal", "reliable", "missing", "expired",
+        )) {
             val history = LpDirectionalHistory({})
             val variable = VarRef.IntVar(0)
-            if (condition != "missing") repeat(if (condition == "equal") 1 else 2) {
+            if (condition != "missing") repeat(if (condition in listOf("single-down", "single-up", "equal")) 1 else 2) {
                 history.beginNode(0)
                 history.record(10.0)
                 history.branch(variable, 2.25)
                 val directions = when (condition) {
-                    "up" -> listOf(true)
+                    "up", "single-up" -> listOf(true)
                     "equal", "reliable" -> listOf(false, true)
                     else -> listOf(false)
                 }

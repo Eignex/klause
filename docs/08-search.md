@@ -331,9 +331,10 @@ variable-choice attribution. Direction checks spend the existing overhead allowa
 
 Before both directions are reliable, a bounded collector can visit the selected
 variable's less-sampled child first. It requires a finite incumbent, a fresh matching
-point and optimum, an existing numeric sample, unequal recent directional counts,
-and the same adjacent exhaustive split. Missing or equally sampled histories keep
-ordinary order; reliable gain advice takes precedence. Collection supplies no gain
+point and optimum, two recent numeric samples in one direction, an incompletely
+sampled opposite direction, and the same adjacent exhaustive split. Missing,
+singly sampled or already reliable histories keep ordinary order; reliable gain
+advice takes precedence. Collection supplies no gain
 estimate or pruning authority. Only the ordinary completed child optimum can train
 history, under the exact pending-observation scope.
 Each worker invocation permits at most 128 collection checks and 32 selection

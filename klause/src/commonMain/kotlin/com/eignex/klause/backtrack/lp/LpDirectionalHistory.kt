@@ -165,6 +165,7 @@ internal class LpDirectionalHistory(
         expire(history.up)
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
+        if (maxOf(history.down.count, history.up.count) < RELIABILITY) return null
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) return null
         if (history.down.count == history.up.count) return null
         return history.up.count < history.down.count
