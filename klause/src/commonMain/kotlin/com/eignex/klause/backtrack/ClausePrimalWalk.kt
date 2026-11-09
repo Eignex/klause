@@ -5,6 +5,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.collections.DynamicBits
 import kotlin.random.Random
 
 internal class ClausePrimalWalk(
@@ -25,7 +26,7 @@ internal class ClausePrimalWalk(
     private var unsatisfiedSize = 0
     private val random = Random(seed ?: 0L)
     private var saved: BooleanArray? = null
-    private var fixed = BooleanArray(values.size)
+    private val fixed = DynamicBits(values.size).apply { reserve(values.size) }
     private var visits = 0L
     private var trialMoves = 0
     private var contradiction = false
@@ -43,7 +44,7 @@ internal class ClausePrimalWalk(
             }
             require(counts[index] > 0)
         }
-        val costly = BooleanArray(values.size)
+        val costly = DynamicBits(values.size).apply { reserve(values.size) }
         for (variable in costs) {
             visits++
             costly[variable] = true
@@ -167,11 +168,11 @@ internal class ClausePrimalWalk(
         visits += 2L * values.size + 2L * clauses.size + costs.size + pins.bools.size
         val assignments = IntArray(values.size) { -1 }
         val remaining = IntArray(clauses.size) { clauses[it].literals.size }
-        val satisfied = BooleanArray(clauses.size)
+        val satisfied = DynamicBits(clauses.size).apply { reserve(clauses.size) }
         val queue = ArrayDeque<Pair<Int, Boolean>>()
         for (variable in costs) queue.addLast(variable to values[variable])
         for ((variable, value) in pins.bools) queue.addLast(variable to value)
-        fixed = BooleanArray(values.size)
+        fixed.clear()
         while (queue.isNotEmpty()) {
             if (cancellation()) {
                 contradiction = true
