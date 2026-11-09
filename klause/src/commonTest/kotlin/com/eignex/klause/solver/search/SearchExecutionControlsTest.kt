@@ -158,14 +158,18 @@ class SearchExecutionControlsTest {
     fun `an expired slice should not become lifetime cancellation after resumption`() {
         var cancelled = false
         var firstCheck = true
+        val checked = ArrayList<Boolean>()
         val controls = SearchExecutionControlAdapter(Cancellation { cancelled })
         val component = object : SearchComponent {
-            override fun check(context: SearchContext): ComponentCheck = if (firstCheck) {
-                firstCheck = false
-                cancelled = true
-                ComponentCheck.Indeterminate
-            } else {
-                ComponentCheck.Infeasible()
+            override fun check(context: SearchContext): ComponentCheck {
+                checked += checkNotNull(context.boolValue(0))
+                return if (firstCheck) {
+                    firstCheck = false
+                    cancelled = true
+                    ComponentCheck.Indeterminate
+                } else {
+                    ComponentCheck.Infeasible()
+                }
             }
         }
         val session = SearchSession(listOf(component), executionControls = controls)
@@ -178,9 +182,10 @@ class SearchExecutionControlsTest {
         assertIs<SearchRunEvent.Paused>(run.next())
         cancelled = false
 
-        assertIs<SearchRunEvent.Indeterminate.Component>(run.next())
+        assertEquals(SearchRunEvent.Exhausted, run.next())
 
-        assertEquals(SearchStopCause.RepresentationDecline, controls.stopCause)
+        assertEquals(listOf(false, false, true), checked)
+        assertNull(controls.stopCause)
     }
 
     @Test
