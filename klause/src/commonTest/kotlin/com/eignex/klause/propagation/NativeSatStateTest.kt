@@ -14,6 +14,31 @@ import kotlin.test.assertTrue
 
 class NativeSatStateTest {
     @Test
+    fun `selected retirement should retain tiny grant progress after index initialization`() {
+        for (grant in listOf(89L, 96L)) {
+            val session = session(8, or(6, true, 7, true))
+            val configuration = NativeCapConfiguration(false, 2, 6)
+            repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+            session.maintainCapWindow(31, 65_536L, 1_048_576L,
+                { false }, canDrop = { false }, nativePolicy = configuration) { false }
+            val handle = assertNotNull(session.queueLearnedRetirement(0, session.learnedRetirementGeneration,
+                256L, 256L, 1_024L, { false }).handle)
+            session.authorizeLearnedRetirement(handle, true, 256L, 256L) { false }
+
+            repeat(8) {
+                val before = session.work
+                session.advanceLearnedRetirements(grant, 256L, { false }, publicationPending = false)
+                assertTrue(session.work - before <= grant)
+            }
+            repeat(128) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
+            val memory = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+            assertEquals(LearnedRetirementStatus.Retired, handle.status, "grant=$grant")
+            assertEquals(64L, memory.getValue("sessionWatchEntries"), "grant=$grant")
+        }
+    }
+
+    @Test
     fun `generic fallback between indexed sweeps should retain physical watch cleanup`() {
         val session = session(8, or(6, true, 7, true))
         val configuration = NativeCapConfiguration(false, 2, 6)

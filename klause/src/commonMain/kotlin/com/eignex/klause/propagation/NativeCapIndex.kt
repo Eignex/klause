@@ -124,6 +124,14 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
 
     fun invalidateRetiredHandles() { revision++ }
 
+    fun prepareUntrackedRetirement(retirement: Int, budget: ReclamationPreparation) {
+        if (retirement <= retirementBaseline) return
+        budget.visit(1L)
+        budget.visit(0L)
+        retirementBaseline = retirement
+        budget.advanced()
+    }
+
     fun reset() {
         retirementBaseline = 0
         dirty.reset()

@@ -827,10 +827,10 @@ internal class NativeSatState(private val state: PropagationState) {
             metadata[index, NativeLearnedMetadata.BOOL_REASONS] > 0 ||
             metadata[index, NativeLearnedMetadata.STAGES] and 2 != 0
         ) return LearnedRetirementResult(LearnedRetirementStatus.ProtectedFloor)
-        val watched = if (defaultCapIndex?.hasIndexedRows == true) retiringWatchLiterals(index, budget) else -1L
+        val owner = defaultCapIndex
+        if (owner?.hasIndexedRows == true) owner.prepareUntrackedRetirement(retiredCount + 1, budget)
         budget.visit(40L + (if (defaultCapIndex == null) 0L else 1L))
         budget.visit(0L)
-        markRetiredWatchLists(watched)
         learnedPayloads.release(index)
         metadata[index, NativeLearnedMetadata.STAGES] = metadata[index, NativeLearnedMetadata.STAGES] or RETIRED
         state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)

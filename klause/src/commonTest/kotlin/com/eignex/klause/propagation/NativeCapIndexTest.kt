@@ -5,11 +5,38 @@ import com.eignex.util.collections.IntArrayList
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class NativeCapIndexTest {
+    @Test
+    fun `completed untracked retirement preparation should not repay its work`() {
+        val rows = Rows()
+        val first = ReclamationPreparation(1L, 64L, { false }, {})
+        rows.index.prepareUntrackedRetirement(7, first)
+        val next = ReclamationPreparation(0L, 64L, { false }, {})
+
+        rows.index.prepareUntrackedRetirement(7, next)
+
+        assertEquals(1L, first.work)
+        assertEquals(0L, next.work)
+        assertEquals(7, rows.index.retirementBaseline)
+    }
+
+    @Test
+    fun `cancellation at untracked retirement debit should preserve the baseline`() {
+        val rows = Rows()
+        var charged = 0L
+        val budget = ReclamationPreparation(64L, 64L, { charged >= 1L }, { charged += it })
+
+        assertFailsWith<ReclamationPreparation.Deferred> { rows.index.prepareUntrackedRetirement(7, budget) }
+
+        assertEquals(0, rows.index.retirementBaseline)
+        assertEquals(1L, budget.work)
+    }
+
     @Test
     fun `initialization should capture retirements completed during reservation`() {
         val rows = Rows()
