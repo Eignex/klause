@@ -376,6 +376,7 @@ class Portfolio(
                         claim,
                         handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: r?.stats,
                         cumulative = handle != null,
+                        newSearch = opening,
                         work = work,
                         failed = failed,
                         failure = failure,
@@ -721,6 +722,7 @@ class Portfolio(
                     claim,
                     stats,
                     cumulative = handle != null,
+                    newSearch = opening,
                     work = work,
                     failed = failed,
                     failure = failure,
@@ -1420,6 +1422,7 @@ class Portfolio(
             claim: Claim,
             stats: SolveStats?,
             cumulative: Boolean,
+            newSearch: Boolean,
             work: Long,
             failed: Boolean,
             failure: Throwable?,
@@ -1447,13 +1450,14 @@ class Portfolio(
             armWork[arm] += charge
             chargedWork += minOf(charge, Long.MAX_VALUE - chargedWork)
             diagnostics?.onEvent?.invoke(PortfolioEvent.Charged(claim.segment, arm, work, checking, charge, failed))
+            val observer = if (workers[arm].auxiliaryProof) checkNotNull(proofProgress) else progress
+            if (newSearch) observer.startSearch(arm)
             if (stats != null) {
                 if (cumulative) {
                     liveStats[arm] = stats
                 } else {
                     completedStats[arm] = (completedStats[arm] ?: SolveStats.EMPTY).mergedWith(stats)
                 }
-                val observer = if (workers[arm].auxiliaryProof) checkNotNull(proofProgress) else progress
                 observer.observe(account, arm, stats)
             }
             contributions?.drain { kind, origin, amount ->
