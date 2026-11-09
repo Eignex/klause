@@ -94,6 +94,9 @@ check on that retained leaf adds no unresolved coverage. A leaf abandoned with a
 undecided required check still prevents exhaustion from proving completeness;
 later pauses do not clear that state.
 
+When cancellation pauses before root-model blocking, the completed model and trail
+remain for the next slice. Resuming blocks that model before exploring another.
+
 Five owners divide the work:
 
 - [SearchSession](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchSession.kt)

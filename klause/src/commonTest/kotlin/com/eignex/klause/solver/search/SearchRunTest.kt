@@ -2,6 +2,8 @@ package com.eignex.klause.solver.search
 
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.bounding.LpPropagator
+import com.eignex.klause.lp.bounding.LpSearchPolicy
 import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
@@ -246,6 +248,111 @@ class SearchRunTest {
         val result = run.next()
 
         assertEquals(SearchRunEvent.Indeterminate.Component, result)
+    }
+
+    @Test
+    fun `cancelled model blocking should retain a completed model across slices`() {
+        for (disposition in listOf(SearchModelDisposition.Surface, SearchModelDisposition.Continue)) {
+            var cancelled = false
+            val models = ArrayList<Boolean>()
+            val cp = CpSearchComponent(
+                PropagationSession(Problem(1, 0, emptyArray(), emptyArray()).bake()),
+                branching = CpBranching.None,
+            )
+            LpPropagator(object : LpSearchPolicy {
+                override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
+            }).use { lp ->
+                val session = SearchSession(listOf(cp, lp), cancellation = Cancellation { cancelled })
+                session.initialize()
+                val run = session.openRun(
+                    1,
+                    modelContinuation = SearchModelContinuation.BlockAtRoot,
+                    modelPolicy = object : SearchModelPolicy {
+                        override fun onModel(
+                            model: AssembledSearchModel,
+                            context: SearchContext,
+                        ): SearchModelDisposition {
+                            models += checkNotNull(model.valueOf(SearchBoolValue(0)))
+                            if (models.size == 1) cancelled = true
+                            return disposition
+                        }
+                    },
+                    lifecycle = object : SearchRunLifecycle {
+                        override fun onCancellation(context: SearchContext): SearchRunDisposition =
+                            SearchRunDisposition.Pause
+                    },
+                )
+
+                val first = run.next()
+                if (disposition == SearchModelDisposition.Surface) {
+                    assertEquals(false, assertIs<SearchRunEvent.Satisfied>(first).model.valueOf(SearchBoolValue(0)))
+                    assertIs<SearchRunEvent.Paused>(run.next())
+                } else {
+                    assertIs<SearchRunEvent.Paused>(first)
+                }
+                assertEquals(listOf(false), models)
+                assertEquals(false, session.boolValue(0))
+                assertEquals(1, session.decisionLevel)
+                cancelled = false
+
+                val resumed = run.next()
+                if (disposition == SearchModelDisposition.Surface) {
+                    assertEquals(true, assertIs<SearchRunEvent.Satisfied>(resumed).model.valueOf(SearchBoolValue(0)))
+                    assertEquals(SearchRunEvent.Exhausted, run.next())
+                } else {
+                    assertEquals(SearchRunEvent.Exhausted, resumed)
+                }
+                assertEquals(listOf(false, true), models)
+                assertNull(session.executionControls.stopCause)
+            }
+        }
+    }
+
+    @Test
+    fun `a hard cancellation before model blocking should remain terminal after rearming`() {
+        var cancelled = false
+        val cp = CpSearchComponent(
+            PropagationSession(Problem(1, 0, emptyArray(), emptyArray()).bake()),
+            branching = CpBranching.None,
+        )
+        LpPropagator(object : LpSearchPolicy {
+            override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
+        }).use { lp ->
+            val session = SearchSession(listOf(cp, lp), cancellation = Cancellation { cancelled })
+            session.initialize()
+            val run = session.openRun(1, modelContinuation = SearchModelContinuation.BlockAtRoot)
+            assertIs<SearchRunEvent.Satisfied>(run.next())
+            cancelled = true
+
+            val result = run.next()
+
+            assertEquals(SearchRunEvent.Indeterminate.Component, result)
+            assertEquals(SearchStopCause.Cancelled, session.executionControls.stopCause)
+            cancelled = false
+            assertSame(result, run.next())
+        }
+    }
+
+    @Test
+    fun `a noncancelled model block decline should preserve incomplete coverage`() {
+        val cp = CpSearchComponent(
+            PropagationSession(Problem(1, 0, emptyArray(), emptyArray()).bake()),
+            branching = CpBranching.None,
+        )
+        LpPropagator(object : LpSearchPolicy {
+            override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
+        }).use { lp ->
+            val session = SearchSession(listOf(cp, lp))
+            session.initialize()
+            val run = session.openRun(1, modelContinuation = SearchModelContinuation.BlockAtRoot)
+            assertIs<SearchRunEvent.Satisfied>(run.next())
+            lp.close()
+
+            val result = run.next()
+
+            assertEquals(SearchRunEvent.Indeterminate.Component, result)
+            assertSame(result, run.next())
+        }
     }
 
     @Test

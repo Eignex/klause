@@ -93,6 +93,7 @@ class SearchRun internal constructor(
             if (!backtrack()) return stopAfterBacktrack()
         }
         if (resumeAfterSolution) {
+            stopBeforeModelBlock()?.let { return it }
             resumeAfterSolution = false
             when (modelContinuation) {
                 SearchModelContinuation.Chronological -> if (!backtrack()) return stopAfterBacktrack()
@@ -262,6 +263,7 @@ class SearchRun internal constructor(
             }
 
             SearchModelDisposition.Continue -> {
+                stopBeforeModelBlock()?.let { return it }
                 resumeAfterSolution = false
                 when (modelContinuation) {
                     SearchModelContinuation.Chronological -> if (!backtrack()) {
@@ -287,6 +289,11 @@ class SearchRun internal constructor(
             }
         }
         return null
+    }
+
+    private fun stopBeforeModelBlock(): SearchRunEvent? {
+        if (modelContinuation != SearchModelContinuation.BlockAtRoot || !session.cancelled()) return null
+        return lifecycle.onCancellation(session).toEvent() ?: finish(SearchRunEvent.Indeterminate.Cancelled)
     }
 
     private fun alternatives(): Alternatives {
