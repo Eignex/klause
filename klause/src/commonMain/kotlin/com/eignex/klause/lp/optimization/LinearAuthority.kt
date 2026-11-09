@@ -288,8 +288,9 @@ internal class LinearAuthority(
         put("refinementWork", budget.measuredRefinementWork)
         put("boundCertificationWork", budget.measuredBoundCertificationWork)
         put("conflictCertificationWork", budget.measuredConflictCertificationWork)
-        for (stage in listOf("OwnerPrepared", "OwnerReused", "OwnerExtended", "BasisBuildWork", "FactorEntriesBuilt",
-                "QueryFillSamples", "QueryMaxFillRatioMicrosSum")) {
+        for (stage in listOf("OwnerPrepared", "OwnerReused", "OwnerExtended", "BasisBuildWork",
+                "BasisBuildDeclined", "BasisBuildUnmeasured", "FactorEntriesBuilt", "QueryFillSamples",
+                "QueryMaxFillRatioMicrosSum")) {
             put(stage, cutLifecycle.recipeMetric("POINT_SELECTION", stage))
         }
     }
@@ -410,11 +411,11 @@ internal class LinearAuthority(
                 finishFractionalQueryCost(pending, "observation-limit")
             }
         }
+        var returned = false
         val result = try {
-            advance(source, cancellation, cuts = true, cutMask = pending.mask)
-        } catch (error: Exception) {
-            finishFractionalQueryCost(pending, "failed")
-            throw error
+            advance(source, cancellation, cuts = true, cutMask = pending.mask).also { returned = true }
+        } finally {
+            if (!returned) finishFractionalQueryCost(pending, "failed")
         }
         val stages = mergePrimalStages(if (pending.reported) emptyMap() else pending.base.primalStages,
             result.primalStages)

@@ -46,6 +46,7 @@ class LinearAuthorityCaptureTest {
             authority.advance(source, Cancellation.Never, cuts = true)
         }
         val rejected = LinearAuthorityAggregateRejections(budget, Cancellation.Never)
+        capture.observeFractionalAttempt()
         capture.finishFractionalAttempt(LinearAuthorityFractionalObservation(capture.records.single(),
             emptyMap(), rejected, 0L, 0L), "query-selected") { emptyMap() }
         capture.restrict(2, capture.constructedEntries, capture.constructedBytes)

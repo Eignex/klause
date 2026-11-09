@@ -175,7 +175,7 @@ internal class LinearAuthorityCapture(
         scope: SourceScope, installed: Set<Int>, budget: SourceLpBudget, cancellation: Cancellation,
         snapshot: () -> Map<String, Long?>,
     ): LinearAuthorityFractionalQueryObservation? {
-        if (fractionalQueryCostStarted || fractionalAttempt?.outcome != "query-selected") return null
+        if (!fractionalEnabled || fractionalQueryCostStarted || fractionalAttempt?.outcome != "query-selected") return null
         fractionalQueryCostStarted = true
         val funding = budget.funding
         if (funding == null || stop() || cancellation() || maximumRecords < 1 || installed.size > 64 ||
