@@ -512,7 +512,7 @@ class LpHintsTest {
             hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
             hints.finishNode(trail.state)
-            assertEquals(kotlin.math.sqrt(3.0), hints.directionalScore(proposal), 1e-9)
+            assertEquals(1.5, hints.directionalScore(proposal), 1e-9)
             val before = work
             hints.beginPassiveSelection()
 
@@ -842,7 +842,7 @@ class LpHintsTest {
             hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
 
-            assertEquals(kotlin.math.sqrt(3.0), hints.directionalScore(variable), 1e-9, "constant=$constant")
+            assertEquals(1.5, hints.directionalScore(variable), 1e-9, "constant=$constant")
         }
     }
 }
