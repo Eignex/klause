@@ -105,6 +105,15 @@ internal class LinearAuthorityCapture(
         private set
     var fractionalAttempt: LinearAuthorityFractionalAttempt? = null
         private set
+    var fractionalQueryCost: LinearAuthorityFractionalQueryCost? = null
+        private set
+    var fractionalQueryCostStarted: Boolean = false
+        private set
+    var fractionalQueryCostPending: Boolean = false
+        private set
+    var fractionalQueryCostLimited: Boolean = false
+        private set
+    private var fractionalQueryObservation: LinearAuthorityFractionalQueryObservation? = null
     private val maximumQueryRecords: Int get() = (maximumRecords - if (fractionalEnabled) 1 else 0).coerceAtLeast(0)
 
     fun observeFractionalAttempt() { fractionalEnabled = true }
@@ -161,6 +170,62 @@ internal class LinearAuthorityCapture(
             rejected.records.toList(), rejected.events, rejected.attempted, rejected.limited,
             observed.work + rejected.work, observed.allocation + rejected.allocation)
     }
+
+    fun beginFractionalQueryCost(
+        scope: SourceScope, installed: Set<Int>, budget: SourceLpBudget, cancellation: Cancellation,
+        snapshot: () -> Map<String, Long?>,
+    ): LinearAuthorityFractionalQueryObservation? {
+        if (fractionalQueryCostStarted || fractionalAttempt?.outcome != "query-selected") return null
+        fractionalQueryCostStarted = true
+        val funding = budget.funding
+        if (funding == null || stop() || cancellation() || maximumRecords < 1 || installed.size > 64 ||
+            fractionalAttempt?.query?.point == null ||
+            maximumEntries - constructedEntries < FRACTIONAL_FRAME_WORK ||
+            maximumBytes - constructedBytes < FRACTIONAL_FRAME_BYTES ||
+            funding.availableWork < FRACTIONAL_FRAME_WORK || funding.remainingAllocation < FRACTIONAL_FRAME_BYTES) {
+            fractionalQueryCostLimited = true
+            return null
+        }
+        val before = snapshot()
+        budget.observe(preparation = FRACTIONAL_FRAME_WORK)
+        funding.charge(0L, FRACTIONAL_FRAME_BYTES)
+        entries += FRACTIONAL_FRAME_WORK
+        bytes += FRACTIONAL_FRAME_BYTES
+        constructedEntries += FRACTIONAL_FRAME_WORK
+        constructedBytes += FRACTIONAL_FRAME_BYTES
+        fractionalQueryCostPending = true
+        return LinearAuthorityFractionalQueryObservation(scope, installed.toSet(), before,
+            FRACTIONAL_FRAME_WORK, FRACTIONAL_FRAME_BYTES).also { fractionalQueryObservation = it }
+    }
+
+    fun observeFractionalQueryCall(observed: LinearAuthorityFractionalQueryObservation, budget: SourceLpBudget,
+        cancellation: Cancellation): Boolean {
+        val funding = budget.funding
+        if (fractionalQueryObservation !== observed) return false
+        if (funding == null || stop() || cancellation() || constructedEntries >= maximumEntries ||
+            funding.availableWork < 1L) {
+            fractionalQueryCostLimited = true
+            return false
+        }
+        budget.observe(preparation = 1L)
+        entries++
+        constructedEntries++
+        observed.work++
+        observed.calls++
+        return true
+    }
+
+    fun finishFractionalQueryCost(observed: LinearAuthorityFractionalQueryObservation?, outcome: String,
+        snapshot: () -> Map<String, Long?>) {
+        if (observed == null || fractionalQueryObservation !== observed) return
+        fractionalQueryCostPending = false
+        fractionalQueryObservation = null
+        val stopped = stop()
+        fractionalQueryCost = LinearAuthorityFractionalQueryCost(observed.scope, observed.installed,
+            observed.before, if (stopped) null else snapshot(), if (stopped) "inspection-stopped" else outcome,
+            observed.calls, observed.pauses, observed.work, observed.allocation)
+    }
+
     val records: List<LinearAuthorityCapturedQuery> get() = retained.toList()
     val lastRecord: LinearAuthorityCapturedQuery? get() = retained.lastOrNull()
     var entries: Long = 0L

@@ -19,6 +19,7 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.util.Cancellation
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -75,6 +76,7 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
         for (name in listOf("before", "after")) put(name, buildJsonObject {
             (field(captured, name) as Map<String, Long?>).forEach { (key, value) -> put(key, value) }
         })
+        put("queryCost", fractionalQueryCost(journal))
         if (record != null) {
             put("query", query(record))
             val numeric = field(record, "numeric") as SourceProofContext
@@ -105,6 +107,38 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
                 })
             }
         })
+        put("inspectionStopped", stop())
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun fractionalQueryCost(journal: Any): JsonObject = buildJsonObject {
+        put("pending", field(journal, "fractionalQueryCostPending") as Boolean)
+        put("limited", field(journal, "fractionalQueryCostLimited") as Boolean)
+        put("independentProofCheck", false)
+        val captured = field(journal, "fractionalQueryCost")
+        if (captured == null || stop()) {
+            put("available", false)
+            put("complete", false)
+            put("reason", if (stop()) "inspection-stopped" else "not-retained")
+            return@buildJsonObject
+        }
+        val outcome = field(captured, "outcome") as String
+        val after = field(captured, "after") as Map<String, Long?>?
+        put("available", after != null)
+        put("complete", after != null && outcome == "completed")
+        put("outcome", outcome)
+        put("scope", scope(field(captured, "scope") as SourceScope))
+        put("installed", buildJsonArray {
+            (field(captured, "installed") as Set<Int>).sorted().forEach { add(JsonPrimitive(it)) }
+        })
+        for (name in listOf("calls", "pauses", "observationWork", "observationAllocation")) {
+            put(name, field(captured, name) as Long)
+        }
+        fun counts(values: Map<String, Long?>) = buildJsonObject {
+            values.forEach { (key, value) -> put(key, value) }
+        }
+        put("before", counts(field(captured, "before") as Map<String, Long?>))
+        put("after", after?.let(::counts) ?: JsonNull)
         put("inspectionStopped", stop())
     }
 

@@ -57,6 +57,8 @@ control.
 With `fractional-attempt=true`, the profile records the first actual attempt in
 `selection.json`, including its paid point, current and generation scopes, installed
 definitions, pre/post funding and LP counters, and bounded unchecked rejections.
+Its `queryCost` frame separates augmented-query snapshots from preparation, retaining
+the installed mask, pause/resume counts and observation charges; incomplete frames cannot qualify a complete query cost.
 Enable `frontier=true pointCuts=true aggregateCuts=true fractionalOrder=true`
 explicitly. `sourceWork` and `sourceAllocation` set the containing allowances;
 `heapMiB=2560 gc=default` matches those JVM settings in ordinary comparisons.

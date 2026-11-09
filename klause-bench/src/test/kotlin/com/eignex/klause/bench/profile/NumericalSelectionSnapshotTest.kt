@@ -30,6 +30,55 @@ class NumericalSelectionSnapshotTest {
     private val premise = SourceDerivation.Premise("row")
 
     @Test
+    fun `query cost should retain its scalar interval scope and installed mask`() {
+        val snapshot = NumericalSelectionSnapshot(Cancellation.Never)
+        val journal = snapshot.journal()
+        val type = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityFractionalQueryCost")
+        val cost = type.declaredConstructors.single { it.parameterCount == 9 }.newInstance(
+            generation, setOf(3, 1), mapOf("operations" to 1L), mapOf("operations" to 2L),
+            "completed", 1L, 0L, 129L, 8192L)
+        journal.javaClass.getDeclaredField("fractionalQueryCost").apply { isAccessible = true }.set(journal, cost)
+
+        val captured = snapshot.fractionalQueryCost(journal)
+
+        assertEquals("true", captured.getValue("complete").jsonPrimitive.content)
+        assertEquals(NumericalFrontierSnapshot.scope(generation), captured.getValue("scope"))
+        assertEquals(listOf("1", "3"), captured.getValue("installed").jsonArray.map { it.jsonPrimitive.content })
+        assertEquals("1", captured.getValue("before").jsonObject.getValue("operations").jsonPrimitive.content)
+        assertEquals("2", captured.getValue("after").jsonObject.getValue("operations").jsonPrimitive.content)
+        assertEquals("129", captured.getValue("observationWork").jsonPrimitive.content)
+        assertEquals("8192", captured.getValue("observationAllocation").jsonPrimitive.content)
+    }
+
+    @Test
+    fun `stopped query cost should not claim a complete query interval`() {
+        val snapshot = NumericalSelectionSnapshot(Cancellation.Never)
+        val journal = snapshot.journal()
+        val type = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityFractionalQueryCost")
+        val cost = type.declaredConstructors.single { it.parameterCount == 9 }.newInstance(
+            generation, emptySet<Int>(), mapOf("operations" to 1L), mapOf("operations" to 1L),
+            "stopped", 1L, 0L, 129L, 8192L)
+        journal.javaClass.getDeclaredField("fractionalQueryCost").apply { isAccessible = true }.set(journal, cost)
+
+        val captured = snapshot.fractionalQueryCost(journal)
+
+        assertEquals("true", captured.getValue("available").jsonPrimitive.content)
+        assertEquals("false", captured.getValue("complete").jsonPrimitive.content)
+        assertEquals("stopped", captured.getValue("outcome").jsonPrimitive.content)
+    }
+
+    @Test
+    fun `unretained query cost should remain unavailable`() {
+        val snapshot = NumericalSelectionSnapshot(Cancellation.Never)
+
+        val captured = snapshot.fractionalQueryCost(snapshot.journal())
+
+        assertEquals("false", captured.getValue("available").jsonPrimitive.content)
+        assertEquals("false", captured.getValue("complete").jsonPrimitive.content)
+        assertFalse("after" in captured)
+    }
+
+    @Test
     fun `generation owners should preserve source iteration rather than sorted premise order`() {
         val context = SourceProofContext(generation, setOf(x), linkedMapOf(
             "z" to SourcePremise(row), "a" to SourcePremise(row)))

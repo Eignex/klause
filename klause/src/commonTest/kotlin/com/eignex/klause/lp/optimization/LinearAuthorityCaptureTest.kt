@@ -2,6 +2,7 @@ package com.eignex.klause.lp.optimization
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
@@ -34,6 +35,32 @@ class LinearAuthorityCaptureTest {
     ), mapOf(x to BigFraction.ONE))
     private val installed = LinearAuthorityFeedbackRequest(point = true,
         cuts = LinearAuthorityFeedbackRequest.Cuts.Installed)
+
+    @Test
+    fun `an exhausted query observation allowance should preserve source funding`() {
+        val capture = LinearAuthorityCapture(2, 10_000L, 1_000_000L, Cancellation.Never)
+        val funding = SourceLpFunding(1_000_000L, 1_000_000L).apply { grant(1_000_000L) }
+        val budget = SourceLpBudget(funding = funding)
+        LinearAuthority(budget, retainLp = true).use { authority ->
+            authority.capture = capture
+            authority.advance(source, Cancellation.Never, cuts = true)
+        }
+        val rejected = LinearAuthorityAggregateRejections(budget, Cancellation.Never)
+        capture.finishFractionalAttempt(LinearAuthorityFractionalObservation(capture.records.single(),
+            emptyMap(), rejected, 0L, 0L), "query-selected") { emptyMap() }
+        capture.restrict(2, capture.constructedEntries, capture.constructedBytes)
+        val spent = funding.spent
+        val allocated = funding.allocated
+
+        val observed = capture.beginFractionalQueryCost(scope, setOf(0), budget, Cancellation.Never) {
+            error("unfunded snapshot")
+        }
+
+        assertNull(observed)
+        assertTrue(capture.fractionalQueryCostLimited)
+        assertEquals(spent, funding.spent)
+        assertEquals(allocated, funding.allocated)
+    }
 
     @Test
     fun `candidate violation should precede insertion and survive owner close`() {

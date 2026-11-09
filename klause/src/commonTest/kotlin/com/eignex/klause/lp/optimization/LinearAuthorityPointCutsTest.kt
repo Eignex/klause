@@ -155,6 +155,17 @@ class LinearAuthorityPointCutsTest {
         assertTrue(attempt.observationWork > 0L && attempt.observationAllocation > 0L)
         assertTrue(funding.spent >= attempt.observationWork)
         assertTrue(funding.allocated >= attempt.observationAllocation)
+        val cost = assertNotNull(capture.fractionalQueryCost)
+        assertEquals(source.scope, cost.scope)
+        assertTrue(cost.installed.containsAll(query.cuts.map { it.id }))
+        val after = assertNotNull(cost.after)
+        assertEquals(1L, cost.before["operations"])
+        assertEquals(2L, after["operations"])
+        assertEquals("completed", cost.outcome)
+        assertEquals(1L, cost.calls)
+        assertEquals(0L, cost.pauses)
+        assertTrue(assertNotNull(after["fundedWork"]) - assertNotNull(cost.before["fundedWork"]) >=
+            cost.observationWork)
         assertEquals(SourceEvidenceCheck.Checked,
             SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
     }
@@ -181,6 +192,84 @@ class LinearAuthorityPointCutsTest {
 
         assertEquals(0L, capture.fractionalAttempts)
         assertNull(capture.fractionalAttempt)
+        assertFalse(capture.fractionalQueryCostStarted)
+        assertNull(capture.fractionalQueryCost)
+    }
+
+    @Test
+    fun `query cost should span a paused fractional continuation`() {
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y, mixedReal), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    mixedReal to BigFraction.ONE), BigFraction.ofLong(3))),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                    mixedReal to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            ), mapOf(x to BigFraction.ONE, y to BigFraction.ONE))
+        val cuts = source.premises.entries.mapIndexed { owner, (name, premise) ->
+            LinearAuthorityCut(owner, premise.inequality, SourceDerivation.Premise(name),
+                mixed = true, family = CutFamily.SOURCE_AGGREGATION)
+        }
+        val funding = SourceLpFunding(4_000_000L, 8_000_000L).apply { grant(4_000_000L) }
+        var operations = 0L
+        var blocked = false
+        val budget = SourceLpBudget(funding = funding, onWork = {
+            operations += it.operations
+            if (!blocked && operations == 2L) {
+                blocked = true
+                funding.grant(0L)
+            }
+        })
+        val capture = LinearAuthorityCapture(4, 100_000L, 4_000_000L, Cancellation.Never)
+        capture.observeFractionalAttempt()
+        LinearAuthority(budget, retainLp = true, additionalCuts = cuts, aggregateCuts = true,
+            fractionalAggregateOrder = true).use { authority ->
+            authority.capture = capture
+            assertTrue(authority.advanceWithPointCuts(source, Cancellation.Never).paused)
+            assertTrue(capture.fractionalQueryCostPending)
+            assertNull(capture.fractionalQueryCost)
+
+            funding.grant(4_000_000L)
+            assertFalse(authority.advanceWithPointCuts(source, Cancellation.Never).paused)
+        }
+
+        val cost = assertNotNull(capture.fractionalQueryCost)
+        assertEquals("completed", cost.outcome)
+        assertEquals(2L, cost.calls)
+        assertEquals(1L, cost.pauses)
+        assertEquals(1L, cost.before["operations"])
+        assertEquals(2L, assertNotNull(cost.after)["operations"])
+        assertFalse(capture.fractionalQueryCostPending)
+    }
+
+    @Test
+    fun `an operation limit should leave fractional query cost incomplete`() {
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y, mixedReal), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    mixedReal to BigFraction.ONE), BigFraction.ofLong(3))),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                    mixedReal to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            ), mapOf(x to BigFraction.ONE, y to BigFraction.ONE))
+        val cuts = source.premises.entries.mapIndexed { owner, (name, premise) ->
+            LinearAuthorityCut(owner, premise.inequality, SourceDerivation.Premise(name),
+                mixed = true, family = CutFamily.SOURCE_AGGREGATION)
+        }
+        val funding = SourceLpFunding(4_000_000L, 8_000_000L).apply { grant(4_000_000L) }
+        val capture = LinearAuthorityCapture(4, 100_000L, 4_000_000L, Cancellation.Never)
+        capture.observeFractionalAttempt()
+
+        val result = LinearAuthority(SourceLpBudget(maxOperations = 1, funding = funding), retainLp = true,
+            additionalCuts = cuts, aggregateCuts = true, fractionalAggregateOrder = true).use {
+            it.capture = capture
+            it.advanceWithPointCuts(source, Cancellation.Never)
+        }
+
+        val cost = assertNotNull(capture.fractionalQueryCost)
+        assertEquals("unavailable", cost.outcome)
+        assertEquals(1L, cost.before["operations"])
+        assertEquals(1L, assertNotNull(cost.after)["operations"])
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
+            (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
     }
 
     @Test

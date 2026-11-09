@@ -126,6 +126,9 @@ internal class LinearAuthority(
         val branchGuidance: LinearAuthorityBranchGuidance?,
     ) {
         var reported = false
+        var observeCost = false
+        var costStarted = false
+        var cost: LinearAuthorityFractionalQueryObservation? = null
     }
     private var fractionalRound: FractionalRound? = null
     private var fractionalFamily: LinearAuthorityTemplate? = null
@@ -156,13 +159,17 @@ internal class LinearAuthority(
     private var primalAttempt: PrimalAttempt? = null
 
     fun invalidateGuidance() {
-        fractionalRound?.let { restorePointRecipe(it.previous) }
+        fractionalRound?.let {
+            finishFractionalQueryCost(it, "invalidated")
+            restorePointRecipe(it.previous)
+        }
         fractionalRound = null
         pointRound = null
         lp.invalidateGuidance()
     }
 
     override fun close() {
+        fractionalRound?.let { finishFractionalQueryCost(it, "closed") }
         replayCuts = null
         template = null
         query = null
@@ -197,6 +204,7 @@ internal class LinearAuthority(
             val previous = pending.previous.query
             if (previous.matches(source, true, previous.cutMask, previous.checkUnselectedCuts,
                     previous.retainMaskedCuts)) return advanceFractionalRound(source, cancellation, retainBasePoint)
+            finishFractionalQueryCost(pending, "scope-changed")
             restorePointRecipe(pending.previous)
             fractionalRound = null
             lp.invalidateGuidance()
@@ -230,6 +238,7 @@ internal class LinearAuthority(
             try {
                 prepareFractionalRound(source, family, observed.first, observed.second, base, cancellation,
                     recorded?.rejected).also { selected ->
+                    if (selected && recorded != null) fractionalRound?.observeCost = true
                     outcome = when {
                         selected -> "query-selected"
                         cancellation() -> "cancelled"
@@ -264,6 +273,32 @@ internal class LinearAuthority(
             (-it.elapsedNow().inWholeNanoseconds).coerceAtLeast(0L)
         },
     )
+
+    private fun fractionalQuerySnapshot(): Map<String, Long?> = buildMap {
+        put("operations", budget.operations.toLong())
+        put("lpPreparations", preparations)
+        put("lpReuses", reuses)
+        put("fundedWork", budget.funding?.spent)
+        put("fundedAllocation", budget.funding?.allocated)
+        put("lpReservedAllocation", budget.reservedAllocation)
+        put("lpActiveNs", budget.activeNanos)
+        put("preparationWork", budget.measuredPreparationWork)
+        put("floatWork", budget.measuredFloatWork)
+        put("continuationWork", budget.measuredContinuationWork)
+        put("refinementWork", budget.measuredRefinementWork)
+        put("boundCertificationWork", budget.measuredBoundCertificationWork)
+        put("conflictCertificationWork", budget.measuredConflictCertificationWork)
+        for (stage in listOf("OwnerPrepared", "OwnerReused", "OwnerExtended", "BasisBuildWork", "FactorEntriesBuilt",
+                "QueryFillSamples", "QueryMaxFillRatioMicrosSum")) {
+            put(stage, cutLifecycle.recipeMetric("POINT_SELECTION", stage))
+        }
+    }
+
+    private fun finishFractionalQueryCost(pending: FractionalRound, outcome: String) {
+        if (pending.cost == null) return
+        capture?.finishFractionalQueryCost(pending.cost, outcome, ::fractionalQuerySnapshot)
+        pending.cost = null
+    }
 
     private fun currentPoolInstalled(prepared: LinearAuthorityQuery, rows: Int,
         cancellation: Cancellation): Boolean {
@@ -365,16 +400,38 @@ internal class LinearAuthority(
     private fun advanceFractionalRound(source: SourceProofContext, cancellation: Cancellation,
         retainBasePoint: Boolean): LinearAuthorityResult {
         val pending = checkNotNull(fractionalRound)
-        val result = advance(source, cancellation, cuts = true, cutMask = pending.mask)
+        if (pending.observeCost && !pending.costStarted) {
+            pending.costStarted = true
+            pending.cost = capture?.beginFractionalQueryCost(source.scope, pending.mask, budget, cancellation,
+                ::fractionalQuerySnapshot)
+        }
+        pending.cost?.let {
+            if (capture?.observeFractionalQueryCall(it, budget, cancellation) != true) {
+                finishFractionalQueryCost(pending, "observation-limit")
+            }
+        }
+        val result = try {
+            advance(source, cancellation, cuts = true, cutMask = pending.mask)
+        } catch (error: Exception) {
+            finishFractionalQueryCost(pending, "failed")
+            throw error
+        }
         val stages = mergePrimalStages(if (pending.reported) emptyMap() else pending.base.primalStages,
             result.primalStages)
         pending.reported = true
         val stopped = cancellation() || budget.funding?.exhausted == true
-        if (result.paused && !stopped) return pending.base.copy(paused = true, primalStages = stages,
-            branchGuidance = null)
+        if (result.paused && !stopped) {
+            pending.cost?.let { it.pauses++ }
+            return pending.base.copy(paused = true, primalStages = stages, branchGuidance = null)
+        }
         fractionalRound = null
         val completed = !stopped && !result.paused &&
             (result.evidence != null || result.bound != null || result.incumbent != null || result.split != null)
+        finishFractionalQueryCost(pending, when {
+            stopped -> "stopped"
+            completed -> "completed"
+            else -> "unavailable"
+        })
         if (!completed) {
             pointPolicy?.observe("FractionalUnavailableRounds")
             restorePointRecipe(pending.previous)

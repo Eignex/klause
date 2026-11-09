@@ -1825,6 +1825,14 @@ rejected inequalities with 128 coefficients/owners and 256-bit scalars, and at m
 64 event names. Completed records retain scalar snapshots and immutable values
 without retaining the journal's live budget. Inspection cancellation withholds new
 output without revoking already retained immutable evidence.
+The first retained fractional attempt can reserve a separate 128-work, 8-KiB frame
+for its augmented query's scope, installed mask and scalar funding, owner, basis,
+fill and certification snapshots. Each observed call charges one additional work
+unit to both ledgers. Pauses retain one frame and count resumed calls;
+completion, failure, scope change or invalidation ends the interval. An unfinished
+or stopped observation supplies no complete cost. Snapshots include observation
+charges and any intervening work sharing the containing budget; they overlap the
+existing totals and supply no independent proof or whole-source timing claim.
 Imported cut proof records preserve their original scope, claimed inequality and
 nested derivation. Bound and refutation imports keep their claim semantics;
 depth or cancellation limits leave an explicit unavailable derivation.
