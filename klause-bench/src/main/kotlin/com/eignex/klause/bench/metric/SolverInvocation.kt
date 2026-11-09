@@ -47,6 +47,7 @@ internal object SolverInvocation {
         val completeAssignment: Boolean = false,
         val sourceStaging: SourceStaging = SourceStaging.CACHE,
         val observeSourceHarness: Boolean = false,
+        val verbose: Boolean? = null,
     )
 
     /** One subprocess solve: verdict, best objective + time-to-best, proof status, the captured
@@ -262,13 +263,11 @@ internal object SolverInvocation {
             add("-r")
             add(s.seed.toString())
             add("-s")
-            if (s.params.any {
-                    it.startsWith("portfolio-work=") || it.startsWith("companion-integers=") ||
-                        it == "portfolio-progress=true"
-                }
-            ) {
-                    add("-v")
-                }
+            val verbose = s.verbose ?: s.params.any {
+                it.startsWith("portfolio-work=") || it.startsWith("companion-integers=") ||
+                    it == "portfolio-progress=true"
+            }
+            if (verbose) add("-v")
             if (s.exact) add("--exact")
             if (s.completeAssignment && entry.ref.format == Format.MINIZINC) add("--output-complete-assignment")
             if (optimize) {

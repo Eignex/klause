@@ -56,6 +56,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
         require(gc in setOf("default", "serial", "parallel", "g1", "z"))
         require(wallTimeout <= 604800) { "Combined solve and compiler ceilings exceed the lab's seven-day case limit" }
         parameters["exact"]?.toBooleanStrict()
+        parameters["verbose"]?.toBooleanStrict()
         parameters["complete-assignment"]?.toBooleanStrict()
         parameters["lp"]?.let { require(runCatching { LpConfig.parse(it) }.isSuccess) { "Invalid LP configuration" } }
         parameters["presolve"]?.let {
@@ -80,7 +81,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
     )
 
     fun caseParameters(engine: String, seed: Long, control: String = ""): Map<String, String> =
-        parameters.filterKeys { it.startsWith("param.") || it in setOf("lp", "presolve", "exact") } + mapOf(
+        parameters.filterKeys { it.startsWith("param.") || it in setOf("lp", "presolve", "exact", "verbose") } + mapOf(
             "input-only" to inputOnly.toString(),
             "engine" to engine,
             "seed" to seed.toString(),
@@ -125,7 +126,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
         val SELECTORS = setOf("suite", "set", "name", "category", "tag", "kind", "per-family", "seed", "max", "balance")
         private val OPTIONS = setOf(
             "input-only", "selections", "engines", "solver-seeds", "repeats", "cpus", "memory-mib", "timeout-ms", "lp",
-            "presolve", "exact", "debug", "measurement", "heap-mib", "gc", "compile-timeout-sec",
+            "presolve", "exact", "debug", "verbose", "measurement", "heap-mib", "gc", "compile-timeout-sec",
             "complete-assignment", "propagation-controls", "compiler-seed", "comparison-series",
             "source-staging", "harness-jfr",
         )

@@ -116,6 +116,7 @@ internal object NativeLpSuite : BenchSuite {
             lp = p["lp"], presolve = p["presolve"], exact = p["exact"]?.toBooleanStrict() ?: false,
             captureDirectory = report.toFile(), measureResources = p.getValue("measurement") != "none",
             completeAssignment = p["complete-assignment"]?.toBooleanStrict() ?: false,
+            verbose = p["verbose"]?.toBooleanStrict(),
         )
         val budget = Budget(p.getValue("timeout-ms").toLong())
         val timestamp = Instant.now().toString()
