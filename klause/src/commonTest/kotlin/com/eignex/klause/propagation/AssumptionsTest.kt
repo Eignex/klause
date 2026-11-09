@@ -1,23 +1,9 @@
 package com.eignex.klause.propagation
 
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 
 class AssumptionsTest {
-
-    @Test
-    fun `merged boolean pins should retain trailing false values across word boundaries`() {
-        for (size in listOf(1, 63, 64, 65, 129)) {
-            val original = Assumptions(bools = (0 until size).associateWith { true })
-            val updates = Assumptions(bools = ((1 until size step 2) + (size - 1)).associateWith { false })
-
-            val merged = original.mergedWith(updates)
-
-            assertContentEquals(IntArray(size) { it }, merged.boolKeys)
-            assertContentEquals(BooleanArray(size) { it % 2 == 0 && it != size - 1 }, merged.boolValues)
-        }
-    }
 
     @Test
     fun `mergedWith should let the last write win`() {

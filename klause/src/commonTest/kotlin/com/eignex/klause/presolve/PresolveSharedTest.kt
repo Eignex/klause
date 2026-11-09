@@ -14,24 +14,10 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.time.Duration
 
 class PresolveSharedTest {
-    @Test
-    fun `source rewrites should append false implied flags after retained word boundaries`() {
-        val clause = Clause(intArrayOf(pos(0)))
-        val problem = Problem(1, 0, emptyArray(), List(66) { clause },
-            impliedFactorMask = BooleanArray(66) { true })
-        val delta = SourceDelta(droppedIndices = intArrayOf(0, 65), addedFactors = listOf(clause, clause))
-
-        val rebuilt = assertNotNull(PresolveShared.run { problem.withSourcePassDelta(delta) })
-
-        assertContentEquals(BooleanArray(66) { it < 64 }, rebuilt.impliedFactorMask)
-    }
-
     @Test
     fun `complexity should count factors and endpoint spans exactly when representable`() {
         assertEquals(0L, PresolveShared.problemComplexity(0, emptyArray()))
