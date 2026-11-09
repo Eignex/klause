@@ -40,7 +40,18 @@ class NativeWatchEntriesTest {
         entries.truncateTo(0)
 
         assertEquals(0, entries.size)
-        assertEquals(12L, entries.primitiveBytes)
+        assertEquals(16L, entries.primitiveBytes)
+    }
+
+    @Test
+    fun `retirement tracking should remain in the posting primitive ownership`() {
+        val entries = NativeWatchEntries()
+        entries.retirementEpoch = 7
+        val sample = SharingMemoryObservation(1000L, 32, { false }, {})
+
+        val memory = assertNotNull(sample.snapshot { entries.sharingMemory(sample) { false } }.completeValues)
+
+        assertEquals(16L, memory.getValue("ownedPrimitiveBytes"))
     }
 
     @Test

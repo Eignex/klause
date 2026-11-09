@@ -11,6 +11,32 @@ import kotlin.test.assertTrue
 
 class NativeCapIndexTest {
     @Test
+    fun `initialization should capture retirements completed during reservation`() {
+        val rows = Rows()
+        rows.add(9)
+        rows.budget = ReclamationPreparation(64L, 512L, { false }, {})
+        try { rows.index.advance(0, rows.configuration, rows.budget, rows.policy) }
+        catch (_: ReclamationPreparation.Deferred) { }
+        rows.retirements = 7
+
+        rows.finish(0)
+
+        assertEquals(7, rows.index.retirementBaseline)
+    }
+
+    @Test
+    fun `reset should discard the preceding retirement baseline`() {
+        val rows = Rows()
+        rows.add(9)
+        rows.retirements = 7
+        rows.finish(0)
+
+        rows.index.reset()
+
+        assertEquals(0, rows.index.retirementBaseline)
+    }
+
+    @Test
     fun `incremental windows should retain the same LBD and handle priorities`() {
         val rows = Rows()
         repeat(6) { rows.add(9 - it) }
@@ -402,12 +428,14 @@ class NativeCapIndexTest {
         val tiers = Array(32) { ClauseTier.LOCAL }
         var configuration = NativeCapConfiguration(true, 2, 6)
         var count = 0
+        var retirements = 0
         var cancelled = false
         var budget = ReclamationPreparation(100_000L, 1_048_576L, { cancelled }, {})
         var keepHook: (Int) -> Unit = {}
         var retireHook: () -> Unit = {}
         val policy = object : NativeIndexedCapPolicy {
             override val activeCount: Int get() = alive.count { it }
+            override val retirementCount: Int get() = retirements
             override fun alive(index: Int): Boolean = alive[index]
             override fun lbd(index: Int): Int = keys[index]
             override fun prepare(index: Int): Boolean { budget.visit(36L); return true }

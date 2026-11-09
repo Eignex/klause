@@ -7,6 +7,7 @@ internal data class NativeCapConfiguration(val tiered: Boolean, val glue: Int, v
 
 internal interface NativeIndexedCapPolicy : LearnedCapPolicy {
     val activeCount: Int
+    val retirementCount: Int get() = 0
     fun classified(index: Int): Boolean
     fun markClassification(index: Int, keep: Boolean): Boolean
     fun clearClassification(index: Int)
@@ -14,6 +15,8 @@ internal interface NativeIndexedCapPolicy : LearnedCapPolicy {
 
 // Live Native LBD keys are immutable until remapping. Unread admissions follow the heap and its processed gap.
 internal class NativeCapIndex(private val candidates: IntArrayList) {
+    var retirementBaseline = 0
+        private set
     private val pool = NativeCapPages()
     private val dirty = NativeCapQueue()
     private val aging = NativeCapQueue()
@@ -70,7 +73,7 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
     val recordsUses: Boolean get() = readyForAdmissions && tiered && !captureSuppressed
     val primitiveBytes: Long get() = SCALAR_BYTES + 48L + pool.pages * 36L
     val modeledBytes: Long get() = primitiveBytes + (REFERENCES + 9L + pool.pages * 2L) * Long.SIZE_BYTES
-    val resetWork: Long get() = 64L
+    val resetWork: Long get() = 65L
 
     fun ownsClassification(index: Int): Boolean = callback && pending == index
 
@@ -122,6 +125,7 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
     fun invalidateRetiredHandles() { revision++ }
 
     fun reset() {
+        retirementBaseline = 0
         dirty.reset()
         aging.reset()
         retries.reset()
@@ -173,8 +177,9 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                 Stage.Idle -> return Completion.None
                 Stage.Reserve -> {
                     reservePages(budget)
-                    budget.visit(8L)
+                    budget.visit(9L)
                     budget.visit(0L)
+                    retirementBaseline = policy.retirementCount
                     initialized = true
                     begin(policy.activeCount <= cap, budget)
                 }
@@ -573,9 +578,9 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
     }
 
     companion object {
-        const val CREATION_WORK = 100L
-        const val CREATION_BYTES = 319L
-        private const val SCALAR_BYTES = 103L
+        const val CREATION_WORK = 101L
+        const val CREATION_BYTES = 323L
+        private const val SCALAR_BYTES = 107L
         private const val REFERENCES = 12L
         private fun requiredSlots(rows: Int): Long = rows.toLong() * 5L + 64L
     }

@@ -14,6 +14,81 @@ import kotlin.test.assertTrue
 
 class NativeSatStateTest {
     @Test
+    fun `indexed retirement cleanup should skip unchanged live postings`() {
+        val cleanupWork = listOf(0, 512).map { fillers ->
+            val session = session(8, or(6, true, 7, true))
+            val configuration = NativeCapConfiguration(false, 2, 6)
+            repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+            session.maintainCapWindow(31, 65_536L, 1_048_576L, { false },
+                canDrop = { false }, nativePolicy = configuration) { false }
+            repeat(fillers) { session.addLearnedClause(Clause(or(2, true, 3, true)), 2, permanent = true) }
+            session.addLearnedClause(Clause(or(0, true, 1, true)), 10)
+            session.maintainCapWindow(32 + fillers, 65_536L, 1_048_576L,
+                { false }, nativePolicy = configuration) { false }
+            assertEquals(32 + fillers, session.activeLearnedClauseCount)
+            val before = session.ownershipWork
+
+            session.reclaimLearnedMemory(Long.MAX_VALUE, 65_536L, 1_048_576L)
+
+            session.ownershipWork - before
+        }
+
+        assertTrue(cleanupWork[1] <= cleanupWork[0] + 512L)
+    }
+
+    @Test
+    fun `new retirement during an older watch sweep should remain eligible for cleanup`() {
+        for (slices in listOf(0, 4, 8, 16, 32)) {
+            val session = session(8, or(6, true, 7, true))
+            val configuration = NativeCapConfiguration(false, 2, 6)
+            repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+            session.maintainCapWindow(31, 65_536L, 1_048_576L,
+                { false }, canDrop = { false }, nativePolicy = configuration) { false }
+            session.addLearnedClause(Clause(or(0, true, 1, true)), 10)
+            session.maintainCapWindow(32, 65_536L, 1_048_576L,
+                { false }, nativePolicy = configuration) { false }
+            repeat(slices) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
+            session.addLearnedClause(Clause(or(0, true, 1, true)), 11)
+            session.maintainCapWindow(32, 65_536L, 1_048_576L,
+                { false }, nativePolicy = configuration) { false }
+
+            repeat(128) {
+                val before = session.work
+                session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L)
+                assertTrue(session.work - before <= 40L)
+            }
+            val memory = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+            assertEquals(66L, memory.getValue("sessionWatchEntries"), "slices=$slices")
+        }
+    }
+
+    @Test
+    fun `index bootstrap should retain cleanup of earlier generic retirements`() {
+        val session = session(8, or(6, true, 7, true))
+        val configuration = NativeCapConfiguration(false, 2, 6)
+        repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+        var attempts = 0
+        while (session.activeLearnedClauseCount > 31 && attempts++ < 32) {
+            session.maintainCapWindow(31, 4096L, 1_048_576L,
+                { false }, nativePolicy = configuration) { false }
+        }
+        assertEquals(31, session.activeLearnedClauseCount)
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 10)
+        repeat(4) {
+            session.maintainCapWindow(31, 65_536L, 1_048_576L,
+                { false }, canDrop = { false }, nativePolicy = configuration) { false }
+        }
+        session.maintainCapWindow(31, 65_536L, 1_048_576L,
+            { false }, nativePolicy = configuration) { false }
+
+        repeat(128) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
+        val memory = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        assertEquals(64L, memory.getValue("sessionWatchEntries"))
+    }
+
+    @Test
     fun `custom cap policy should abort a pending native index without retiring its handles`() {
         val session = session(4, or(2, true, 3, true))
         repeat(16) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }

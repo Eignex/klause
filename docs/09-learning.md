@@ -337,6 +337,13 @@ retired hole moves the next live posting without copying the remaining tail.
 Propagation rewinds an affected scan before its next cleanup step. Cursor updates,
 posting swaps and removals are charged and cancellable before mutation, and the
 scan reuses the fixed cleanup state.
+An initialized Native cap index marks the two current watched literal postings before
+retiring a row. Each posting owns one retirement epoch; a completed sweep clears only
+epochs captured by that sweep. A newer retirement remains pending across suspended
+cleanup. Clean postings can be skipped only after a conservative sweep covers every
+retirement preceding index initialization. Generic policy fallback keeps the full scan,
+and remapping conservatively marks retained postings. Epoch storage, initialization,
+retirement reads and writes, and cleanup transitions debit their owning ledgers.
 Payload page directories keep their first page directly and use a bounded compressed index
 for later pages. Fixed directory state belongs to propagation preparation.
 Index lookups debit the active

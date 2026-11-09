@@ -95,7 +95,10 @@ internal class NativeSatState(private val state: PropagationState) {
             watchSizes[arena.lits[arena.start(h) + 1]]++
         }
         Array(watchSizes.size) { lit ->
-            if (watchSizes[lit] == 0) null else NativeWatchEntries(watchSizes[lit])
+            if (watchSizes[lit] == 0) null else {
+                state.preparationIndexWork++
+                NativeWatchEntries(watchSizes[lit])
+            }
         }.also { watchSizes.fill(0) }
     }
 
@@ -124,7 +127,7 @@ internal class NativeSatState(private val state: PropagationState) {
     init {
         state.preparationIndexWork += metadata.preparationWork
         state.preparationIndexWork += learnedPayloads.preparationWork
-        state.preparationIndexWork++
+        state.preparationIndexWork += 2L
         for (h in 0 until baseCount) {
             val len = arena.length(h)
             if (len == 1) {
@@ -166,6 +169,7 @@ internal class NativeSatState(private val state: PropagationState) {
         get() = if (watchCleanupScan < 0) watchCleanupScan.inv() else watchCleanupScan
     // An inactive epoch encodes the completed retirement count without retaining another cursor.
     private var watchCleanupEpoch = -1
+    private var watchCleanupSparse = false
 
     private var retiredMetadataCount = 0
 
@@ -194,7 +198,10 @@ internal class NativeSatState(private val state: PropagationState) {
     }
 
     private fun addWatch(lit: Int, handle: Int, blocker: Int) {
-        val entries = watchEntries[lit] ?: NativeWatchEntries().also { watchEntries[lit] = it }
+        val entries = watchEntries[lit] ?: run {
+            state.work++
+            NativeWatchEntries().also { watchEntries[lit] = it }
+        }
         state.work += entries.appendWork
         entries.add(packWatch(handle, blocker))
         watchSizes[lit] = entries.size
@@ -252,17 +259,28 @@ internal class NativeSatState(private val state: PropagationState) {
         if (retiredCount == 0) return
         if (watchCleanupEpoch < 0) {
             if (watchCleanupEpoch.inv() == retiredCount) return
-            budget.visit(4L)
+            val index = defaultCapIndex
+            val sparse = index?.hasIndexedRows == true && watchCleanupEpoch.inv() >= index.retirementBaseline
+            budget.visit(if (watchCleanupSparse == sparse) 4L else 5L)
             budget.visit(0L)
+            if (watchCleanupSparse != sparse) watchCleanupSparse = sparse
             watchCleanupEpoch = retiredCount
         }
         while (watchCleanupLiteral < watchEntries.size) {
-            budget.visit(4L)
+            val index = defaultCapIndex
+            val sparse = watchCleanupSparse && index?.hasIndexedRows == true &&
+                index.retirementBaseline <= watchCleanupEpoch
+            budget.visit(if (sparse) 5L else 4L)
             budget.visit(0L)
             val entries = watchEntries[watchCleanupLiteral]
-            if (entries == null || watchCleanupIndex >= entries.size) {
-                budget.visit(if (watchCleanupScan == 0) 0L else 1L)
+            if (entries == null || watchCleanupIndex >= entries.size ||
+                (sparse && watchCleanupIndex == 0 && watchCleanupScan == 0 && entries.retirementEpoch == 0)
+            ) {
+                val clear = entries != null && entries.retirementEpoch != 0 &&
+                    entries.retirementEpoch <= watchCleanupEpoch
+                budget.visit((if (watchCleanupScan == 0) 0L else 1L) + (if (clear) 1L else 0L))
                 budget.visit(0L)
+                if (clear) checkNotNull(entries).retirementEpoch = 0
                 watchCleanupLiteral++
                 watchCleanupIndex = 0
                 watchCleanupScan = 0
@@ -523,8 +541,8 @@ internal class NativeSatState(private val state: PropagationState) {
         sample.ownedReferences(watchEntries, watchEntries.size.toLong(), true)
         var watchBytes = 0L
         var watchPostings = 0L
-        sample.ownedPool(this, 32L, (if (protectedRows) 12L else 0L) +
-            (if (watchCleanupEpoch >= 0) 16L else 0L) +
+        sample.ownedPool(this, 33L, (if (protectedRows) 12L else 0L) +
+            (if (watchCleanupEpoch >= 0) 17L else 0L) +
             (if (metadata.hasRetiredRows) 4L else 0L))
         for (entries in watchEntries) {
             sample.step()
@@ -545,7 +563,7 @@ internal class NativeSatState(private val state: PropagationState) {
             "learnedPayloadReferenceCapacity" to learnedPayloads.referenceCapacity,
             "learnedPayloadDirectoryCapacity" to learnedPayloads.directoryCapacity,
             "learnedMetadataCapacityBytes" to metadataBytes,
-            "learnedCleanupCursorCapacityBytes" to 20L,
+            "learnedCleanupCursorCapacityBytes" to 21L,
             "learnedCapIndexStateBytes" to capRanking.modeledBytes + state.learned.capRanking.modeledBytes +
                 Long.SIZE_BYTES + (defaultCapIndex?.modeledBytes ?: 0L),
             "sessionWatchEntries" to watchPostings,
@@ -710,6 +728,7 @@ internal class NativeSatState(private val state: PropagationState) {
         indexed: Boolean = false,
     ): NativeIndexedCapPolicy = object : NativeIndexedCapPolicy {
         override val activeCount: Int get() = learnedCount - retiredCount
+        override val retirementCount: Int get() = retiredCount
         override fun alive(index: Int): Boolean = !retiredOf(index)
         private var prepared = -1
         private var protected = false
@@ -729,8 +748,10 @@ internal class NativeSatState(private val state: PropagationState) {
             if (!mayDrop(index)) return false
             val pinned = if (!indexed && index == prepared) protected else capProtected(index, budget, 0L)
             if (pinned) return false
+            val watched = if (indexed) retiringWatchLiterals(index, budget) else -1L
             budget.visit(24L)
             budget.visit(0L)
+            markRetiredWatchLists(watched)
             learnedPayloads.release(index)
             metadata[index, NativeLearnedMetadata.STAGES] = metadata[index, NativeLearnedMetadata.STAGES] or RETIRED
             state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
@@ -767,6 +788,20 @@ internal class NativeSatState(private val state: PropagationState) {
             metadata[index, NativeLearnedMetadata.BOOL_REASONS] > 0
     }
 
+    private fun retiringWatchLiterals(index: Int, budget: ReclamationPreparation): Long {
+        budget.visit(8L)
+        val literals = learnedPayloads[index]
+        val first = literals[metadata[index, NativeLearnedMetadata.WATCH_FIRST]]
+        val second = literals[metadata[index, NativeLearnedMetadata.WATCH_SECOND]]
+        return (second.toLong() shl 32) or (first.toLong() and 0xFFFFFFFFL)
+    }
+
+    private fun markRetiredWatchLists(watched: Long) {
+        if (watched < 0L) return
+        watchEntries[watched.toInt()]?.retirementEpoch = retiredCount + 1
+        watchEntries[(watched ushr 32).toInt()]?.retirementEpoch = retiredCount + 1
+    }
+
     internal fun noteBoolReason(factor: Int, delta: Int) {
         val index = factor - baseCount
         if (index !in 0 until learnedCount) return
@@ -792,8 +827,10 @@ internal class NativeSatState(private val state: PropagationState) {
             metadata[index, NativeLearnedMetadata.BOOL_REASONS] > 0 ||
             metadata[index, NativeLearnedMetadata.STAGES] and 2 != 0
         ) return LearnedRetirementResult(LearnedRetirementStatus.ProtectedFloor)
+        val watched = if (defaultCapIndex?.hasIndexedRows == true) retiringWatchLiterals(index, budget) else -1L
         budget.visit(40L + (if (defaultCapIndex == null) 0L else 1L))
         budget.visit(0L)
+        markRetiredWatchLists(watched)
         learnedPayloads.release(index)
         metadata[index, NativeLearnedMetadata.STAGES] = metadata[index, NativeLearnedMetadata.STAGES] or RETIRED
         state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
@@ -890,6 +927,7 @@ internal class NativeSatState(private val state: PropagationState) {
         }
         learnedPayloads.prepareRemap(budget)
         metadata.prepareRemap(budget)
+        budget.atomic(1L)
         defaultCapIndex?.let { budget.atomic(it.resetWork + learnedCount.toLong() * 8L) }
         for (column in listOf(learnedUnits, rechecks, capCandidates)) {
             budget.atomic(column.backingData.size.toLong(), column.backingData.size.toLong() * Int.SIZE_BYTES)
@@ -935,6 +973,8 @@ internal class NativeSatState(private val state: PropagationState) {
         for (lit in watchEntries.indices) {
             state.work++
             val entries = watchEntries[lit] ?: continue
+            state.work++
+            entries.retirementEpoch = 1
             var w = 0
             for (r in 0 until watchSizes[lit]) {
                 state.work++
@@ -954,6 +994,8 @@ internal class NativeSatState(private val state: PropagationState) {
         watchCleanupIndex = 0
         watchCleanupScan = 0
         watchCleanupEpoch = -1
+        state.work++
+        watchCleanupSparse = false
 
         // A survivor's destination precedes its source, so moving references cannot overwrite unread rows.
         permanentCount = 0
