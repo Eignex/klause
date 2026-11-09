@@ -86,13 +86,21 @@ internal object MpsProofFrontier {
             "selection", "replay", "operations", "activeRows", "supportBranching", "pointCuts", "aggregate-probe",
             "aggregate-mixed", "aggregate-replay", "aggregateCuts", "refutationReuse", "feedbackDelivery",
             "feedbackRequest", "solveSeconds", "certificateState", "point-producer", "fractionalOrder",
-            "fractional-attempt", "sourceWork", "sourceAllocation", "heapMiB", "gc", "aggregateReuse")
+            "fractional-attempt", "sourceWork", "sourceAllocation", "heapMiB", "gc", "aggregateReuse",
+            "aggregate-query", "aggregate-work", "aggregate-allocation")
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
             (options.keys - supported).isEmpty())
         require(options["fractional-attempt"]?.toBooleanStrict() != true ||
             (listOf("frontier", "pointCuts", "aggregateCuts", "fractionalOrder").all {
                 options[it]?.toBooleanStrict() == true
             } && options["cuts"]?.toBooleanStrict() != false))
+        if (options.keys.any { it in setOf("aggregate-query", "aggregate-work", "aggregate-allocation") }) {
+            require(options["aggregate-probe"]?.toBooleanStrict() == true &&
+                options["selection"]?.toBooleanStrict() == true)
+        }
+        options["aggregate-query"]?.toInt()?.let { require(it >= 0) }
+        options["aggregate-work"]?.toLong()?.let { require(it in 0L..20_000_000L) }
+        options["aggregate-allocation"]?.toLong()?.let { require(it in 0L..67_108_864L) }
         return options
     }
 
@@ -309,7 +317,10 @@ internal object MpsProofFrontier {
                         NumericalSelectionSnapshot(Cancellation.after(20.seconds)).capture(journal))
                     out.resolve("aggregate-pairs.jsonl").writeText("")
                     var replayParent: Pair<Any, List<Any>>? = null
-                    NumericalAggregateSnapshot(Cancellation.after(20.seconds), aggregateMixed).inspect(journal,
+                    NumericalAggregateSnapshot(Cancellation.after(20.seconds), aggregateMixed,
+                        query = options["aggregate-query"]?.toInt(),
+                        maximumWork = options["aggregate-work"]?.toLong() ?: 20_000_000L,
+                        maximumAllocation = options["aggregate-allocation"]?.toLong() ?: 67_108_864L).inspect(journal,
                         onAccepted = { record, cuts ->
                             if (aggregateReplay && replayParent == null) replayParent = record to cuts
                         }) {
