@@ -5,6 +5,9 @@ import jdk.jfr.consumer.RecordingFile
 import kotlinx.serialization.json.*
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.DateTimeException
+import java.time.Duration
+import java.time.Instant
 
 internal object HarnessRecording {
     private val events = setOf(
@@ -32,7 +35,8 @@ internal object HarnessRecording {
                         put("failurePolicy", "aborted source-preparation may include cleanup before its phase closes")
                         put("stackDepthLimit", 32)
                         put("fieldPolicy",
-                            "scalar fields only; nested objects remain in raw capture; timespans in nanoseconds")
+                            "scalar fields only; nested objects remain in raw capture; timespans in nanoseconds; " +
+                                "unrepresentable times are null and listed in unavailableTemporalFields")
                         put("ioPolicy", "IO call duration includes scheduling and GC; it does not prove device wait")
                         putJsonArray("eventTypes") {
                             input.readEventTypes().filter { it.name in events }.forEach { type ->
@@ -63,10 +67,13 @@ internal object HarnessRecording {
     }
 
     private fun describe(event: RecordedEvent): JsonObject = buildJsonObject {
+        val unavailable = mutableListOf<String>()
         put("event", event.eventType.name)
         put("eventTypeId", event.eventType.id)
-        put("start", event.startTime.toString())
-        put("durationNanos", event.duration.toNanos())
+        put("start", instantText { event.startTime }.also { if (it == null) unavailable.add("start") })
+        put("durationNanos", durationNanos { event.duration }.also {
+            if (it == null) unavailable.add("durationNanos")
+        })
         val thread = if (event.hasField("sampledThread")) event.getThread("sampledThread") else event.thread
         put("thread", thread?.javaName)
         put("stackTruncated", event.stackTrace?.isTruncated)
@@ -80,8 +87,12 @@ internal object HarnessRecording {
             for (field in event.fields) {
                 if (field.name in setOf("startTime", "duration", "eventThread", "stackTrace")) continue
                 when (field.contentType) {
-                    "jdk.jfr.Timespan" -> put(field.name, event.getDuration(field.name).toNanos())
-                    "jdk.jfr.Timestamp" -> put(field.name, event.getInstant(field.name).toString())
+                    "jdk.jfr.Timespan" -> put(field.name, durationNanos { event.getDuration(field.name) }.also {
+                        if (it == null) unavailable.add("fields.${field.name}")
+                    })
+                    "jdk.jfr.Timestamp" -> put(field.name, instantText { event.getInstant(field.name) }.also {
+                        if (it == null) unavailable.add("fields.${field.name}")
+                    })
                     else -> when (val value = event.getValue<Any?>(field.name)) {
                         null -> put(field.name, JsonNull)
                         is String -> put(field.name, value)
@@ -98,5 +109,20 @@ internal object HarnessRecording {
                 }
             }
         }
+        putJsonArray("unavailableTemporalFields") { unavailable.forEach { add(it) } }
+    }
+
+    internal fun durationNanos(read: () -> Duration): Long? = try {
+        read().toNanos()
+    } catch (_: ArithmeticException) {
+        null
+    }
+
+    internal fun instantText(read: () -> Instant): String? = try {
+        read().toString()
+    } catch (_: ArithmeticException) {
+        null
+    } catch (_: DateTimeException) {
+        null
     }
 }
