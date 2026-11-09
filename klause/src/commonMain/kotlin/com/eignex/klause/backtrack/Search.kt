@@ -736,6 +736,7 @@ internal class BacktrackBrancher(
     private val branchObserver = params.branchObserver
     private var restartCount = 0L
     private var preferImportedSolution = false
+    private var preferImportedOverPhase = false
 
     init {
         session.completeAtLeaves(leafColumns)
@@ -758,10 +759,11 @@ internal class BacktrackBrancher(
             ?: return null
         if (restart.phaseMode() != PhaseMode.UNMANAGED) phase.setManagedMode(restart.phaseMode())
         branching.onBranch(variable)
-        val preferred = branching.orderValues(
-            variable,
-            phase.applyPhase(variable, values.values(session, variable, rng), rng),
-        )
+        val phased = phase.applyPhase(variable, values.values(session, variable, rng), rng)
+        val guided = if (preferImportedOverPhase && values is SolutionGuided) {
+            values.guide(session, variable, phased)
+        } else phased
+        val preferred = branching.orderValues(variable, guided)
         val ordered = if (preferImportedSolution && values is SolutionGuided) {
             values.guide(session, variable, preferred)
         } else preferred
@@ -791,7 +793,7 @@ internal class BacktrackBrancher(
     override fun onAttempt(decision: SearchDecision, context: SearchContext) {
         branchObserver?.onAttempt(decision, context)
         branchObserver.observeGuidance(PooledGuidanceKind.ATTEMPT) {
-            PooledGuidanceObservation(PooledGuidanceKind.ATTEMPT, preferImportedSolution,
+            PooledGuidanceObservation(PooledGuidanceKind.ATTEMPT, preferImportedSolution || preferImportedOverPhase,
                 decision = decision.guidanceText(), level = context.decisionLevel)
         }
     }
@@ -800,7 +802,7 @@ internal class BacktrackBrancher(
         branching.onCommit(decision, decisionLevel)
         branchObserver?.onCommit(decision, decisionLevel)
         branchObserver.observeGuidance(PooledGuidanceKind.COMMIT) {
-            PooledGuidanceObservation(PooledGuidanceKind.COMMIT, preferImportedSolution,
+            PooledGuidanceObservation(PooledGuidanceKind.COMMIT, preferImportedSolution || preferImportedOverPhase,
                 decision = decision.guidanceText(), level = decisionLevel)
         }
         val (variable, value) = decision.asSelectorDecision() ?: return
@@ -853,18 +855,25 @@ internal class BacktrackBrancher(
 
     fun onSolution(sample: Sample) {
         branchObserver.observeGuidance(PooledGuidanceKind.LOCAL) {
-            PooledGuidanceObservation(PooledGuidanceKind.LOCAL, preferImportedSolution)
+            PooledGuidanceObservation(PooledGuidanceKind.LOCAL, preferImportedSolution || preferImportedOverPhase)
         }
         preferImportedSolution = false
+        preferImportedOverPhase = false
         variables.onSolution(sample)
         values.onSolution(sample)
         phase.onSolution(sample)
     }
 
-    fun importPooledSolution(sample: Sample, guideValues: Boolean = false, preferValues: Boolean = false) {
+    fun importPooledSolution(
+        sample: Sample,
+        guideValues: Boolean = false,
+        preferValues: Boolean = false,
+        preferOverPhase: Boolean = false,
+    ) {
         if (guideValues && values is SolutionGuided) {
             values.onSolution(sample)
             preferImportedSolution = preferValues
+            preferImportedOverPhase = preferOverPhase && !preferValues
         }
         phase.onSolution(sample)
     }

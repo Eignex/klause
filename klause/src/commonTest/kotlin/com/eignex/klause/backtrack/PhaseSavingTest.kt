@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
@@ -23,6 +24,25 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class PhaseSavingTest {
+
+    @Test
+    fun `a local witness should clear imported phase preference`() {
+        val native = boolSession(1)
+        val cp = CpSearchComponent(native, branching = CpBranching.None)
+        val session = SearchSession(listOf(cp), atoms = SearchAtomRegistry(1))
+        val params = BacktrackParams(variableSelector = InputOrder,
+            valueSelector = SolutionGuided(IndomainMin), phaseSaving = true)
+        val brancher = BacktrackBrancher(native, params, null, NoRestartSchedule)
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+        session.popTo(0)
+        brancher.importPooledSolution(Sample(booleanArrayOf(false), longArrayOf()),
+            guideValues = true, preferOverPhase = true)
+
+        brancher.onSolution(Sample(booleanArrayOf(false), longArrayOf()))
+
+        assertEquals(SearchDecision.Bool(Lit.make(0, true)), brancher.nextBranch(session)?.first())
+    }
 
     @Test
     fun `a propagated phase should survive backtracking`() {

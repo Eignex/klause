@@ -1638,10 +1638,11 @@ internal class ResumableMinimize(
             val local = incumbents.current()
             if (params.valueSelector is SolutionGuided && (local != null || lpEngine.params.lpPlan.bounding)) {
                 pooledIncumbents?.poll()?.takeIf { local == null || it.objective < local.objective.display }?.let {
-                    val preferred = local == null || lpEngine.params.lpPlan.bounding
-                    brancher.importPooledSolution(it.assignment, guideValues = true, preferValues = preferred)
+                    val preferOverPhase = local != null && lpEngine.params.lpPlan.bounding
+                    brancher.importPooledSolution(it.assignment, guideValues = true,
+                        preferValues = local == null, preferOverPhase = preferOverPhase)
                     params.branchObserver.observeGuidance(PooledGuidanceKind.IMPORT) {
-                        PooledGuidanceObservation(PooledGuidanceKind.IMPORT, preferred, "resume",
+                        PooledGuidanceObservation(PooledGuidanceKind.IMPORT, local == null || preferOverPhase, "resume",
                             it.version, it.objective, local?.objective?.display,
                             local?.objective?.exact?.guidanceText(),
                             observedExternalCutoff, rootRoundingPending || rootLayoutPending)

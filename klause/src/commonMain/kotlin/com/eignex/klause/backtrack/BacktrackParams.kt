@@ -304,8 +304,9 @@ data class BacktrackParams(
      * After its first discovered incumbent,
      * [SolutionGuided] value selection
      * adopts better pooled incumbents when optimization resumes, without restarting traversal.
-     * LP-bounding search prefers those values over phase and LP ordering before its first local witness
-     * and after adopting a better pooled incumbent, until its next local witness.
+     * LP-bounding search prefers those values over phase and LP ordering before its first local witness.
+     * After adopting a better pooled incumbent, they override saved phases while fresh LP ordering
+     * retains precedence, until the next local witness.
      * `null` (default) disables it.
      */
     val pooledIncumbents: IncumbentSource<Sample, Double>? = null,

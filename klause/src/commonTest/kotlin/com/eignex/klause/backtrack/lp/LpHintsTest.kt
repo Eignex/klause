@@ -1,5 +1,12 @@
 package com.eignex.klause.backtrack.lp
 
+import com.eignex.klause.backtrack.BacktrackBrancher
+import com.eignex.klause.backtrack.BacktrackBranching
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.NoRestartSchedule
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -19,8 +26,10 @@ import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.VarRef
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -178,6 +187,42 @@ class LpHintsTest {
     fun `a fractional lp value should put the floor split first`() {
         val ordered = recordedHints(3.7).order(VarRef.IntVar(0), (0L..10L).asSequence())
         assertEquals(3L, ordered.first())
+    }
+
+    @Test
+    fun `a phase-preferred pooled guide should preserve the fractional lp split`() {
+        val native = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyArray()))
+        val hints = recordedHints(3.7)
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = SolutionGuided(IndomainMin))
+        val brancher = BacktrackBrancher(native, params, null, NoRestartSchedule,
+            branching = object : BacktrackBranching {
+                override fun orderValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> =
+                    hints.order(variable, values)
+            })
+        brancher.importPooledSolution(Sample(booleanArrayOf(), longArrayOf(9)),
+            guideValues = true, preferOverPhase = true)
+
+        val alternatives = brancher.nextBranch(SearchSession(emptyList()))
+
+        assertEquals(listOf(SearchDecision.IntAtMost(0, 3), SearchDecision.IntAtLeast(0, 4)), alternatives)
+    }
+
+    @Test
+    fun `a fully preferred pooled guide should precede the fractional lp split`() {
+        val native = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyArray()))
+        val hints = recordedHints(3.7)
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = SolutionGuided(IndomainMin))
+        val brancher = BacktrackBrancher(native, params, null, NoRestartSchedule,
+            branching = object : BacktrackBranching {
+                override fun orderValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> =
+                    hints.order(variable, values)
+            })
+        brancher.importPooledSolution(Sample(booleanArrayOf(), longArrayOf(9)),
+            guideValues = true, preferValues = true)
+
+        val alternatives = brancher.nextBranch(SearchSession(emptyList()))
+
+        assertEquals(listOf(SearchDecision.IntAtMost(0, 9), SearchDecision.IntAtLeast(0, 10)), alternatives)
     }
 
     @Test
