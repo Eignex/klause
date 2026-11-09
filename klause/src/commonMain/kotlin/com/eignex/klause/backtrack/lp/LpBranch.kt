@@ -4,16 +4,7 @@ import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
 
-/**
- * Reduced-cost-average branching: pick the unassigned variable with the highest LP branch score
- * (reduced-cost pseudo-cost × fractionality, [LpHints.branchScore]), or null when LP branching is off,
- * the LP gives no fractional signal, or the residual problem is too wide to scan. Purely advisory — the
- * descent falls back to the configured `VariableSelector` on null, and any chosen variable is a sound
- * branch, so search stays complete and correct regardless. `O(unassigned)` per call, capped.
- *
- * Lives in the search layer (not [LpEngine]'s home) because it reads the backtrack [VarRef] selector type
- * and the search-owned [LpHints]; the engine only records LP solutions into the hint sink.
- */
+// Search owns variable selection so the LP engine depends only on the hint-recording sink.
 internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?): VarRef? {
     hints ?: return null
     if (problem.numBoolVars + problem.numIntVars > LP_BRANCH_SCAN_CAP) return null // too wide ⇒ delegate
@@ -68,9 +59,8 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
     return best
 }
 
-/** Minimum LP branch score (reduced-cost × fractionality) to override the configured selector; below
- *  this a variable is effectively LP-integral / cost-free, so the configured heuristic decides. */
+// Scores near zero do not justify overriding the fallback selector.
 private const val LP_BRANCH_MIN_SCORE = 1e-9
 
-/** Skip reduced-cost-average branching above this variable count — the per-decision scan is `O(vars)`. */
+// The fixed scan cap bounds per-branch advisory work.
 private const val LP_BRANCH_SCAN_CAP = 8192

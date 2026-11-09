@@ -168,7 +168,7 @@ internal class LpHints(
         observe("PASSIVE_VARIABLE_SCORE")
         val point = value(variable)
         if (variable is VarRef.Bool && point !in 0.0..1.0) return Double.NaN
-        return history.balancedScore(variable, point).also {
+        return history.score(variable, point).also {
             if (it.isFinite()) observe("PASSIVE_VARIABLE_RELIABLE")
         }
     }
@@ -179,7 +179,7 @@ internal class LpHints(
         observe("PASSIVE_RANK_REFERENCE_SCORE")
         val point = value(variable)
         if (variable is VarRef.Bool && point !in 0.0..1.0) return Double.NaN
-        return history.score(variable, point)
+        return history.balancedScore(variable, point)
     }
 
     fun compareDirectionalRankings(balanced: VarRef?, reference: VarRef?, cancelled: Cancellation) {

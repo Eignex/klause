@@ -416,14 +416,14 @@ class LpHintsTest {
     }
 
     @Test
-    fun `balanced and shadow nominations remain distinct from applied and withheld commitments`() {
+    fun `weighted and shadow nominations remain distinct from applied and withheld commitments`() {
         val builder = LpBuilder()
         repeat(2) { builder.addVar(0, 10, cost = 1L) }
         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
             booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
-        val reference = VarRef.IntVar(0)
-        val balanced = VarRef.IntVar(1)
+        val reference = VarRef.IntVar(1)
+        val weighted = VarRef.IntVar(0)
         val costs = ArrayList<Long>()
         for (apply in listOf(false, true)) {
             var work = 0L
@@ -448,15 +448,15 @@ class LpHintsTest {
             hints.recordObjective(relaxation, 10.0)
             hints.finishNode(trail.state)
             val before = work
-            assertTrue(hints.directionalScore(balanced) > hints.directionalScore(reference))
-            assertTrue(hints.referenceDirectionalScore(reference) > hints.referenceDirectionalScore(balanced))
+            assertTrue(hints.directionalScore(weighted) > hints.directionalScore(reference))
+            assertTrue(hints.referenceDirectionalScore(reference) > hints.referenceDirectionalScore(weighted))
 
-            hints.compareDirectionalRankings(balanced, reference) { false }
-            val selected = assertNotNull(hints.selectVariable(balanced, reference))
+            hints.compareDirectionalRankings(weighted, reference) { false }
+            val selected = assertNotNull(hints.selectVariable(weighted, reference))
             hints.branch(selected)
             hints.commit(SearchDecision.IntAtMost(selected.varId, 0), 1)
 
-            assertEquals(if (apply) balanced else reference, selected)
+            assertEquals(if (apply) weighted else reference, selected)
             assertEquals(1, events.count { it == "PASSIVE_RANK_CHANGED" })
             assertEquals(1, events.count { it == if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED"
                 else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED" })
@@ -603,7 +603,7 @@ class LpHintsTest {
                     assertTrue(score.isNaN())
                     assertEquals(before, work)
                 } else {
-                    assertEquals(kotlin.math.sqrt(3.0), score, 1e-9)
+                    assertEquals(1.5, score, 1e-9)
                     assertEquals(before + 1L, work)
                 }
             }

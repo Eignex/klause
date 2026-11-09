@@ -202,7 +202,7 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
-    fun `a zero predicted gain on either side keeps the balanced fallback`() {
+    fun `a zero predicted gain on either side keeps both scoring fallbacks`() {
         for ((down, up) in listOf(0.0 to 1.0, 1.0 to 0.0, 0.0 to 0.0)) {
             val history = LpDirectionalHistory({})
             repeat(2) {
@@ -217,6 +217,7 @@ class LpDirectionalHistoryTest {
             }
 
             assertTrue(history.balancedScore(VarRef.IntVar(0), 0.5).isNaN())
+            assertTrue(history.score(VarRef.IntVar(0), 0.5).isNaN())
         }
     }
 

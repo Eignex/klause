@@ -302,10 +302,10 @@ subtraction, preserving small gains when the constant exceeds floating precision
 Directional guidance is enabled by default for finite optimization with LP bounding
 and branching. `BacktrackParams.lpDirectionalGains=false` or `lp-directional-gains=false`
 disables collection and advice; ordinary recipes inherit the shared default.
-Two recent samples in each direction permit variable scores from the geometric
-mean of the predicted gains. Both gains must be positive and finite. A reliable
+Two recent samples in each direction permit variable scores from the smaller
+predicted gain plus one sixth of the larger gain. Both gains must be positive and finite. A reliable
 nomination precedes reduced-cost/fractionality scoring and the configured selector;
-unavailable advice keeps that fallback. A weighted minimum/maximum score supplies
+unavailable advice keeps that fallback. The geometric mean supplies
 a diagnostic reference ranking. Fixed counters distinguish ranking disagreements,
 proposals and matching committed variable choices. Both lookups and the comparison
 charge the existing LP overhead allowance.

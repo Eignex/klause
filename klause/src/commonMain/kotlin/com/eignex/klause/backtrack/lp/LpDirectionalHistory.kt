@@ -140,6 +140,7 @@ internal class LpDirectionalHistory(
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return Double.NaN
         val down = history.down.mean * fraction
         val up = history.up.mean * (1.0 - fraction)
+        if (down <= 0.0 || up <= 0.0) return Double.NaN
         val score = if (balanced) sqrt(down) * sqrt(up) else minOf(down, up) + maxOf(down, up) / 6.0
         return score.takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN
     }
