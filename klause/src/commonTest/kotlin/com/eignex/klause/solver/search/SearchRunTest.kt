@@ -215,7 +215,8 @@ class SearchRunTest {
                 val session = SearchSession(listOf(cp, component), cancellation = Cancellation { cancelled })
                 session.initialize()
                 val run = session.openRun(1, modelContinuation = continuation, lifecycle = object : SearchRunLifecycle {
-                    override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
+                    override fun onCancellation(context: SearchContext): SearchRunDisposition =
+                        SearchRunDisposition.Pause
                 })
 
                 assertIs<SearchRunEvent.Paused>(run.next())
