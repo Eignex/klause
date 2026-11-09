@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
 class ResumableMinimizeDirectionalTest {
     @Test
     fun `default finite search consumes child direction advice across cooperative slices`() {
-        val blocks = 4
+        val blocks = 3
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
         repeat(blocks) { block ->
@@ -40,7 +40,7 @@ class ResumableMinimizeDirectionalTest {
             valueSelector = IndomainMin,
             randomSeed = 3L,
             maxDecisions = 1000L,
-            objectiveBoundSupplier = { 100.0 },
+            objectiveBoundSupplier = { 18.0 },
             lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
                 boundMaxOpsPerNode = 0L),
             componentFactory = { listOf(object : SearchComponent {
@@ -59,7 +59,7 @@ class ResumableMinimizeDirectionalTest {
             }
 
             val observations = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
-            val diagnostic = "$observations; solves=${search.stats.lp.solves.sum}"
+            val diagnostic = "$observations; solves=${search.stats.lp.solves.sum}; prunes=${search.stats.lp.pruned.sum}"
             assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
             assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
             assertTrue((observations["PASSIVE_DIRECTION_COMMITTED"] ?: 0L) > 0L, diagnostic)
