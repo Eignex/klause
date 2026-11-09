@@ -14,6 +14,28 @@ import kotlin.test.assertTrue
 
 class NativeSatStateTest {
     @Test
+    fun `initialized cap retirement should retain forty unit grant progress`() {
+        val session = session(8, or(6, true, 7, true))
+        val configuration = NativeCapConfiguration(false, 2, 6)
+        repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+        session.maintainCapWindow(31, 65_536L, 1_048_576L,
+            { false }, canDrop = { false }, nativePolicy = configuration) { false }
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 10)
+
+        repeat(64) {
+            val before = session.work
+            session.maintainCapWindow(32, 40L, 64L, { false }, nativePolicy = configuration) { false }
+            assertTrue(session.work - before <= 40L)
+        }
+        repeat(128) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
+        val memory = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        assertEquals(32, session.activeLearnedClauseCount)
+        assertFalse(session.isLearnedClause(32))
+        assertEquals(66L, memory.getValue("sessionWatchEntries"))
+    }
+
+    @Test
     fun `selected retirement should retain tiny grant progress after index initialization`() {
         for (grant in listOf(89L, 96L)) {
             val session = session(8, or(6, true, 7, true))

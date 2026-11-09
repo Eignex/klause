@@ -748,7 +748,10 @@ internal class NativeSatState(private val state: PropagationState) {
             if (!mayDrop(index)) return false
             val pinned = if (!indexed && index == prepared) protected else capProtected(index, budget, 0L)
             if (pinned) return false
-            val watched = if (indexed) retiringWatchLiterals(index, budget) else -1L
+            val watched = if (indexed && budget.supports(48L, 0L)) retiringWatchLiterals(index, budget) else {
+                if (indexed) defaultCapIndex?.prepareUntrackedRetirement(retiredCount + 1, budget)
+                -1L
+            }
             budget.visit(24L)
             budget.visit(0L)
             markRetiredWatchLists(watched)

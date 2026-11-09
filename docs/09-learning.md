@@ -344,9 +344,10 @@ cleanup. Clean postings can be skipped only after a conservative sweep covers ev
 retirement preceding index initialization. Generic policy fallback keeps the full scan,
 and remapping conservatively marks retained postings. Epoch storage, initialization,
 retirement reads and writes, and cleanup transitions debit their owning ledgers.
-Selected retirements conservatively advance the index baseline in a separately funded
-preparation step before their atomic retirement. That preparation survives a short grant;
-the physical sweep covers unmarked selected postings without enlarging the atomic step.
+Selected retirements and short indexed-retirement grants conservatively advance the
+index baseline in a separately funded preparation step before their atomic retirement.
+That preparation survives a short grant; the physical sweep covers unmarked postings
+without enlarging the atomic step.
 Payload page directories keep their first page directly and use a bounded compressed index
 for later pages. Fixed directory state belongs to propagation preparation.
 Index lookups debit the active
