@@ -1,13 +1,20 @@
 package com.eignex.klause.bench.metric
 
+import com.eignex.klause.bench.catalog.Category
+import com.eignex.klause.bench.catalog.Expected
+import com.eignex.klause.bench.catalog.Format
+import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
+import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.bench.source.SourceStaging
 import com.github.luben.zstd.ZstdOutputStreamNoFinalizer
 
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -32,6 +39,35 @@ class SolverInvocationTest {
         @JvmStatic
         fun initializeCodec() {
             ZstdOutputStreamNoFinalizer(ByteArrayOutputStream(), 1).use { it.write(ByteArray(0)) }
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource("auto,true,true", "auto,false,false", "true,true,true", "true,false,true",
+        "false,true,false", "false,false,false")
+    fun `explicit verbosity should control logging without changing solver parameters`(
+        requested: String,
+        companion: Boolean,
+        expectedVerbose: Boolean,
+    ) {
+        val root = Files.createTempDirectory("solver-command").toFile()
+        try {
+            val executable = root.resolve("klause-cli").apply { writeText("fixture"); setExecutable(true) }
+            val source = root.resolve("source.cnf")
+            val ref = ProblemRef("source", Format.DIMACS, ProblemSource.Prepared(source), Category.CSP,
+                Expected.Unknown)
+            val entry = ResolvedProblem(ref, lazy { error("command construction must not parse the source") })
+            val parameters = if (companion) listOf("companion-integers=true", "source-incumbent-completion=true")
+                else emptyList()
+            val settings = SolverInvocation.Settings(params = parameters,
+                verbose = requested.takeUnless { it == "auto" }?.toBooleanStrict())
+
+            val command = SolverInvocation.klauseCommand(entry, settings, Budget(1000), false, source, executable)
+
+            assertEquals(expectedVerbose, "-v" in command)
+            assertEquals(parameters, command.windowed(2).filter { it.first() == "--param" }.map { it.last() })
+        } finally {
+            root.deleteRecursively()
         }
     }
 

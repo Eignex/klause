@@ -139,7 +139,7 @@ class LabAdapterTest {
         "typo,true", "cpus,0", "memory-mib,2047", "repeats,0", "timeout-ms,0", "engines,no-such-engine",
         "debug,yes", "exact,yes", "measurement,arbitrary", "heap-mib,8192", "gc,arbitrary", "compile-timeout-sec,0",
         "max,no", "lp,invalid", "presolve,invalid", "param.,value", "complete-assignment,yes", "compiler-seed,3",
-        "source-staging,arbitrary", "harness-jfr,yes",
+        "source-staging,arbitrary", "harness-jfr,yes", "verbose,yes",
     )
     fun `invalid controls fail validation`(key: String, value: String) {
         assertFailsWith<IllegalArgumentException> { LabSettings(mapOf(key to value)) }
@@ -181,9 +181,23 @@ class LabAdapterTest {
         assertEquals("cli-inclusive-v1", baseline["deadlinePolicy"])
         assertEquals("cache", baseline["sourceStaging"])
         assertEquals("false", baseline["harnessJfr"])
+        assertEquals("auto", baseline["verbose"])
         assertEquals("2", controls(mapOf("cpus" to "2"))["cpus"])
         assertEquals("5000", controls(mapOf("timeout-ms" to "5000"))["solverBudgetMs"])
         assertEquals("true", controls(mapOf("exact" to "true"))["exact"])
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `verbosity should remain explicit in planned parameters and comparison controls`(verbose: Boolean) {
+        val settings = LabSettings(mapOf("verbose" to verbose.toString(), "param.companion-integers" to "true"))
+        val case = BenchCase("case", settings.caseParameters("cp", 3), settings.resources())
+
+        val controls = KlauseLabSuite.comparisonControls(case)
+
+        assertEquals(verbose.toString(), case.parameters["verbose"])
+        assertEquals("true", case.parameters["param.companion-integers"])
+        assertEquals(verbose.toString(), controls["verbose"])
     }
 
     @ParameterizedTest
