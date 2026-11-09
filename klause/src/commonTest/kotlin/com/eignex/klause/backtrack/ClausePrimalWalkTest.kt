@@ -11,6 +11,28 @@ import kotlin.test.assertTrue
 
 class ClausePrimalWalkTest {
     @Test
+    fun `a failed cost trial should leave the next repair free to choose another variable`() {
+        val clauses = listOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(64, true))),
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(65, true))),
+            Clause(intArrayOf(Lit.make(64, false), Lit.make(65, false))),
+            Clause(intArrayOf(Lit.make(63, true), Lit.make(64, true), Lit.make(65, true))),
+        )
+        val walk = ClausePrimalWalk(Sample(BooleanArray(66) { it == 0 || it == 63 }, longArrayOf()),
+            clauses, listOf(0, 63), Assumptions.None, 3L, null)
+
+        walk.begin(0, Cancellation.Never)
+        assertEquals(false, walk.advance(Cancellation.Never, -1L))
+        walk.begin(63, Cancellation.Never)
+        assertEquals(true, walk.advance(Cancellation.Never, -1L))
+        val sample = walk.sample()
+
+        assertTrue(sample.bools[0])
+        assertTrue(!sample.bools[63])
+        assertTrue(sample.bools[64] xor sample.bools[65])
+    }
+
+    @Test
     fun `a repair paused before its first move should resume the same trial`() {
         val clauses = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))),
