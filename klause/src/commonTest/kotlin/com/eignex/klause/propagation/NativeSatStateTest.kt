@@ -6,12 +6,247 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class NativeSatStateTest {
+    @Test
+    fun `initialized cap retirement should retain forty unit grant progress`() {
+        val session = session(8, or(6, true, 7, true))
+        val configuration = NativeCapConfiguration(false, 2, 6)
+        repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+        session.maintainCapWindow(31, 65_536L, 1_048_576L,
+            { false }, canDrop = { false }, nativePolicy = configuration) { false }
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 10)
+
+        repeat(64) {
+            val before = session.work
+            session.maintainCapWindow(32, 40L, 64L, { false }, nativePolicy = configuration) { false }
+            assertTrue(session.work - before <= 40L)
+        }
+        repeat(128) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
+        val memory = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        assertEquals(32, session.activeLearnedClauseCount)
+        assertFalse(session.isLearnedClause(32))
+        assertEquals(66L, memory.getValue("sessionWatchEntries"))
+    }
+
+    @Test
+    fun `selected retirement should retain tiny grant progress after index initialization`() {
+        for (grant in listOf(89L, 96L)) {
+            val session = session(8, or(6, true, 7, true))
+            val configuration = NativeCapConfiguration(false, 2, 6)
+            repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+            session.maintainCapWindow(31, 65_536L, 1_048_576L,
+                { false }, canDrop = { false }, nativePolicy = configuration) { false }
+            val handle = assertNotNull(session.queueLearnedRetirement(0, session.learnedRetirementGeneration,
+                256L, 256L, 1_024L, { false }).handle)
+            session.authorizeLearnedRetirement(handle, true, 256L, 256L) { false }
+
+            repeat(8) {
+                val before = session.work
+                session.advanceLearnedRetirements(grant, 256L, { false }, publicationPending = false)
+                assertTrue(session.work - before <= grant)
+            }
+            repeat(128) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
+            val memory = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+            assertEquals(LearnedRetirementStatus.Retired, handle.status, "grant=$grant")
+            assertEquals(64L, memory.getValue("sessionWatchEntries"), "grant=$grant")
+        }
+    }
+
+    @Test
+    fun `generic fallback between indexed sweeps should retain physical watch cleanup`() {
+        val session = session(8, or(6, true, 7, true))
+        val configuration = NativeCapConfiguration(false, 2, 6)
+        repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+        session.maintainCapWindow(31, 65_536L, 1_048_576L,
+            { false }, canDrop = { false }, nativePolicy = configuration) { false }
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 10)
+        session.maintainCapWindow(32, 65_536L, 1_048_576L,
+            { false }, nativePolicy = configuration) { false }
+        session.reclaimLearnedMemory(Long.MAX_VALUE, 65_536L, 1_048_576L)
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 11)
+        repeat(4) { session.maintainCapWindow(32, 65_536L, 1_048_576L, { false }) { false } }
+        session.addLearnedClause(Clause(or(4, true, 5, true)), 12)
+        session.maintainCapWindow(32, 65_536L, 1_048_576L,
+            { false }, canDrop = { false }, nativePolicy = configuration) { false }
+        session.maintainCapWindow(32, 65_536L, 1_048_576L,
+            { false }, nativePolicy = configuration) { false }
+
+        repeat(128) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
+        val memory = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        assertEquals(66L, memory.getValue("sessionWatchEntries"))
+    }
+
+    @Test
+    fun `retirement after remapping should release its watched postings`() {
+        val session = session(8, or(6, true, 7, true))
+        val configuration = NativeCapConfiguration(false, 2, 6)
+        repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+        session.maintainCapWindow(31, 65_536L, 1_048_576L,
+            { false }, canDrop = { false }, nativePolicy = configuration) { false }
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 10)
+        session.maintainCapWindow(32, 65_536L, 1_048_576L,
+            { false }, nativePolicy = configuration) { false }
+        repeat(2) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
+        assertTrue(session.explanationState.forgetLearnedClauses(10_000_000L, 1_048_576L) { id, _ -> id < 16 })
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 11)
+        session.maintainCapWindow(16, 65_536L, 1_048_576L,
+            { false }, canDrop = { false }, nativePolicy = configuration) { false }
+        session.maintainCapWindow(16, 65_536L, 1_048_576L,
+            { false }, nativePolicy = configuration) { false }
+
+        repeat(128) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
+        val memory = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        assertEquals(34L, memory.getValue("sessionWatchEntries"))
+    }
+
+    @Test
+    fun `indexed retirement cleanup should skip unchanged live postings`() {
+        val cleanupWork = listOf(0, 512).map { fillers ->
+            val session = session(8, or(6, true, 7, true))
+            val configuration = NativeCapConfiguration(false, 2, 6)
+            repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+            session.maintainCapWindow(31, 65_536L, 1_048_576L, { false },
+                canDrop = { false }, nativePolicy = configuration) { false }
+            repeat(fillers) { session.addLearnedClause(Clause(or(2, true, 3, true)), 2, permanent = true) }
+            session.addLearnedClause(Clause(or(0, true, 1, true)), 10)
+            session.maintainCapWindow(32 + fillers, 65_536L, 1_048_576L,
+                { false }, nativePolicy = configuration) { false }
+            assertEquals(32 + fillers, session.activeLearnedClauseCount)
+            val before = session.ownershipWork
+
+            session.reclaimLearnedMemory(Long.MAX_VALUE, 65_536L, 1_048_576L)
+
+            session.ownershipWork - before
+        }
+
+        assertTrue(cleanupWork[1] <= cleanupWork[0] + 512L)
+    }
+
+    @Test
+    fun `new retirement during an older watch sweep should remain eligible for cleanup`() {
+        for (slices in listOf(0, 4, 8, 16, 32)) {
+            val session = session(8, or(6, true, 7, true))
+            val configuration = NativeCapConfiguration(false, 2, 6)
+            repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+            session.maintainCapWindow(31, 65_536L, 1_048_576L,
+                { false }, canDrop = { false }, nativePolicy = configuration) { false }
+            session.addLearnedClause(Clause(or(0, true, 1, true)), 10)
+            session.maintainCapWindow(32, 65_536L, 1_048_576L,
+                { false }, nativePolicy = configuration) { false }
+            repeat(slices) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
+            session.addLearnedClause(Clause(or(0, true, 1, true)), 11)
+            session.maintainCapWindow(32, 65_536L, 1_048_576L,
+                { false }, nativePolicy = configuration) { false }
+
+            repeat(128) {
+                val before = session.work
+                session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L)
+                assertTrue(session.work - before <= 40L)
+            }
+            val memory = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+            assertEquals(66L, memory.getValue("sessionWatchEntries"), "slices=$slices")
+        }
+    }
+
+    @Test
+    fun `index bootstrap should retain cleanup of earlier generic retirements`() {
+        val session = session(8, or(6, true, 7, true))
+        val configuration = NativeCapConfiguration(false, 2, 6)
+        repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+        var attempts = 0
+        while (session.activeLearnedClauseCount > 31 && attempts++ < 32) {
+            session.maintainCapWindow(31, 4096L, 1_048_576L,
+                { false }, nativePolicy = configuration) { false }
+        }
+        assertEquals(31, session.activeLearnedClauseCount)
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 10)
+        repeat(4) {
+            session.maintainCapWindow(31, 65_536L, 1_048_576L,
+                { false }, canDrop = { false }, nativePolicy = configuration) { false }
+        }
+        session.maintainCapWindow(31, 65_536L, 1_048_576L,
+            { false }, nativePolicy = configuration) { false }
+
+        repeat(128) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
+        val memory = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        assertEquals(64L, memory.getValue("sessionWatchEntries"))
+    }
+
+    @Test
+    fun `custom cap policy should abort a pending native index without retiring its handles`() {
+        val session = session(4, or(2, true, 3, true))
+        repeat(16) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+        val configuration = NativeCapConfiguration(false, 2, 6)
+        session.maintainCapWindow(1, 65_536L, 1_048_576L,
+            { session.nativeCapTraversalVisits >= 2L }, nativePolicy = configuration) { false }
+        assertEquals(16, session.activeLearnedClauseCount)
+        assertTrue(session.nativeCapWindowPending)
+
+        repeat(64) {
+            val before = session.work
+            session.maintainCapWindow(1, 256L, 64L, { false }, canDrop = { false }) { true }
+            assertTrue(session.work - before <= 256L)
+        }
+
+        assertEquals(16, session.activeLearnedClauseCount)
+        assertFalse(session.nativeCapWindowPending)
+        repeat(16) { assertTrue(session.isLearnedClause(it)) }
+    }
+
+    @Test
+    fun `tiny grants should preserve and resume an initialized native index`() {
+        val session = session(4, or(2, true, 3, true))
+        repeat(16) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+        val configuration = NativeCapConfiguration(false, 2, 6)
+        session.maintainCapWindow(8, 65_536L, 1_048_576L, { false }, nativePolicy = configuration) { false }
+        assertEquals(8, session.activeLearnedClauseCount)
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 10)
+
+        repeat(64) {
+            val before = session.work
+            session.maintainCapWindow(4, 64L, 64L, { false }, nativePolicy = configuration) { false }
+            assertTrue(session.work - before <= 64L)
+        }
+
+        assertEquals(4, session.activeLearnedClauseCount)
+        assertFalse(session.nativeCapWindowPending)
+        repeat(4) { assertTrue(session.isLearnedClause(it)) }
+    }
+
+    @Test
+    fun `native remapping should discard private cap markers and queue ownership`() {
+        val session = session(4, or(2, true, 3, true))
+        repeat(16) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+        val configuration = NativeCapConfiguration(false, 2, 6)
+        session.maintainCapWindow(1, 65_536L, 1_048_576L,
+            { session.nativeCapTraversalVisits >= 2L }, nativePolicy = configuration) { false }
+        val before = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        assertTrue(session.explanationState.forgetLearnedClauses(10_000_000L, 1_048_576L) { id, _ -> id == 15 })
+        val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 10)
+        repeat(8) {
+            session.maintainCapWindow(1, 65_536L, 1_048_576L, { false }, nativePolicy = configuration) { false }
+        }
+
+        assertTrue(after.getValue("learnedCapIndexStateBytes") < before.getValue("learnedCapIndexStateBytes"))
+        assertEquals(1, session.activeLearnedClauseCount)
+        assertTrue(session.isLearnedClause(0))
+        assertFalse(session.isLearnedClause(1))
+    }
+
     private fun session(numVars: Int, vararg clauses: IntArray): PropagationSession = PropagationSession(
         Problem(
             numBoolVars = numVars,
