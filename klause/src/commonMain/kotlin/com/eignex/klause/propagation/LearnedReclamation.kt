@@ -53,6 +53,11 @@ internal class ReclamationPreparation(
         scratch += scratchBytes
     }
 
+    fun completeAtomic(units: Long) {
+        check(units >= 0L && units <= atomicUnits / ATOMIC_PRICE)
+        atomicUnits -= units * ATOMIC_PRICE
+    }
+
     fun ready() {
         if (cancelled() || atomicUnits > maxWork - work) throw Deferred()
     }

@@ -97,6 +97,7 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
             budget.visit(0L)
             pool.reserve()
             changed()
+            budget.completeAtomic(NATIVE_CAP_PAGE_WORK)
         }
     }
 

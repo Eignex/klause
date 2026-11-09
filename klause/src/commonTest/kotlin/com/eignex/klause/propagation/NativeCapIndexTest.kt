@@ -12,6 +12,65 @@ import kotlin.test.assertTrue
 
 class NativeCapIndexTest {
     @Test
+    fun `page reservation should catch a growing candidate window within bounded grants`() {
+        for (initialRows in listOf(4_000, 20_000)) {
+            val candidates = IntArrayList()
+            repeat(initialRows) { candidates.add(it) }
+            val index = NativeCapIndex(candidates)
+            var completed = false
+            repeat(8) {
+                if (!completed) {
+                    repeat(128) { candidates.add(candidates.size) }
+                    var charged = 0L
+                    val budget = ReclamationPreparation(65_536L, 1_048_576L, { false }, { charged += it })
+                    try {
+                        index.reservePages(budget)
+                        completed = true
+                    } catch (_: ReclamationPreparation.Deferred) { }
+                    assertTrue(charged <= 65_536L)
+                    assertEquals(charged, budget.work)
+                }
+            }
+
+            assertTrue(completed, "initialRows=$initialRows")
+            assertEquals((0 until candidates.size).toList(), candidates.toIntArray().toList())
+        }
+    }
+
+    @Test
+    fun `completed page reservation should retain the scratch limit for another page`() {
+        val candidates = IntArrayList()
+        candidates.add(0)
+        val index = NativeCapIndex(candidates)
+        val before = index.modeledBytes
+        val budget = ReclamationPreparation(65_536L, NATIVE_CAP_PAGE_BYTES, { false }, {})
+
+        assertFailsWith<ReclamationPreparation.Deferred> { index.reservePages(budget) }
+
+        assertEquals(NATIVE_CAP_PAGE_BYTES, index.modeledBytes - before)
+        assertTrue(budget.work <= 65_536L)
+    }
+
+    @Test
+    fun `cancellation before page publication should retain reservation progress for a fresh grant`() {
+        for (stop in 1..4) {
+            val candidates = IntArrayList()
+            candidates.add(0)
+            val index = NativeCapIndex(candidates)
+            val before = index.modeledBytes
+            var polls = 0
+            val cancelled = ReclamationPreparation(65_536L, 1_048_576L, { ++polls == stop }, {})
+
+            assertFailsWith<ReclamationPreparation.Deferred> { index.reservePages(cancelled) }
+            assertEquals(before, index.modeledBytes, "stop=$stop")
+            val resumed = ReclamationPreparation(65_536L, NATIVE_CAP_PAGE_BYTES, { false }, {})
+            assertFailsWith<ReclamationPreparation.Deferred> { index.reservePages(resumed) }
+
+            assertEquals(NATIVE_CAP_PAGE_BYTES, index.modeledBytes - before, "stop=$stop")
+        }
+    }
+
+    @Test
     fun `completed untracked retirement preparation should not repay its work`() {
         val rows = Rows()
         val first = ReclamationPreparation(1L, 64L, { false }, {})

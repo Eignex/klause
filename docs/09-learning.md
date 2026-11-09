@@ -603,8 +603,11 @@ ordinary authority.
 
 Four primitive FIFO queues share an owned page pool. Bootstrap reserves pages in
 resumable atomic transactions while the generic owner continues selection within
-the same grant. A completed generic window yields its candidate array before the
-incremental owner begins classification. Reservation alone starts no tier epoch,
+the same grant. A published page releases its completed atomic work reservation;
+its charged work and scratch reservation remain consumed for the grant. Pending
+atomic operations retain their conservative funding. A completed generic window
+yields its candidate array before the incremental owner begins classification.
+Reservation alone starts no tier epoch,
 and spare reserved pages release through funded unlink steps. Selected retirement
 detaches an unindexed reservation owner without restarting its generic tier epoch.
 An empty window releases its pages and leaves subsequent admissions to fresh
