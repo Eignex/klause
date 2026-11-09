@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
 class ResumableMinimizeDirectionalTest {
     @Test
     fun `default finite search consumes child direction advice across cooperative slices`() {
-        val blocks = 3
+        val blocks = 4
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
         repeat(blocks) { block ->
@@ -55,7 +55,7 @@ class ResumableMinimizeDirectionalTest {
                 (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
                     ?.get("PASSIVE_DIRECTION_COMMITTED") ?: 0L) == 0L
             ) {
-                search.runSlice(Cancellation.Never, 1000L, 32L) {}
+                search.runSlice(Cancellation.Never, 1000L, 128L) {}
             }
 
             val observations = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
