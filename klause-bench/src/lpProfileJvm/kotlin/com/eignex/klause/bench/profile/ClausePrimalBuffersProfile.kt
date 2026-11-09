@@ -33,7 +33,7 @@ object ClausePrimalBuffersProfile {
         check(bean.getThreadAllocatedBytes(thread) >= 0L)
         val until = System.nanoTime() + 1_000_000_000L
         do { fixture.run(1, bean, thread) } while (System.nanoTime() < until)
-        val sessions = (65_536 / (groups * 3)).coerceIn(1, 128)
+        val sessions = (524_288 / (groups * 3)).coerceIn(8, 8192)
         val samples = List(7) { fixture.run(sessions, bean, thread) }
         fun median(field: (Observation) -> Double) = samples.map(field).sorted()[samples.size / 2]
         val result = buildJsonObject {
