@@ -190,9 +190,11 @@ class SearchRun internal constructor(
                     }
 
                     ComponentCheck.Indeterminate -> {
+                        val cancelledDisposition = if (session.cancelled()) lifecycle.onCancellation(session) else null
+                        if (cancelledDisposition == SearchRunDisposition.Pause) return SearchRunEvent.Paused
                         rememberIndeterminate()
-                        if (session.cancelled()) {
-                            return lifecycle.onCancellation(session).toEvent()
+                        if (cancelledDisposition != null) {
+                            return cancelledDisposition.toEvent()
                                 ?: finish(SearchRunEvent.Indeterminate.Cancelled)
                         }
                         if (!backtrack()) return stopAfterBacktrack(indeterminate = true)
