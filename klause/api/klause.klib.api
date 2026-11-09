@@ -5068,6 +5068,33 @@ sealed interface com.eignex.klause.solver.result/SatisfyResult { // com.eignex.k
 }
 
 sealed interface com.eignex.klause.solver.result/SearchEvent { // com.eignex.klause.solver.result/SearchEvent|null[0]
+    final class BacktrackIncomplete : com.eignex.klause.solver.result/SearchEvent { // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete|null[0]
+        constructor <init>(com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.Path, com.eignex.klause.solver.search/SearchStopCause?) // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.<init>|<init>(com.eignex.klause.solver.result.SearchEvent.BacktrackIncomplete.Path;com.eignex.klause.solver.search.SearchStopCause?){}[0]
+
+        final val path // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.path|{}path[0]
+            final fun <get-path>(): com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.Path // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.path.<get-path>|<get-path>(){}[0]
+        final val stopCause // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.stopCause|{}stopCause[0]
+            final fun <get-stopCause>(): com.eignex.klause.solver.search/SearchStopCause? // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.stopCause.<get-stopCause>|<get-stopCause>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.Path // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.solver.search/SearchStopCause? // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.Path = ..., com.eignex.klause.solver.search/SearchStopCause? = ...): com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.copy|copy(com.eignex.klause.solver.result.SearchEvent.BacktrackIncomplete.Path;com.eignex.klause.solver.search.SearchStopCause?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.toString|toString(){}[0]
+
+        final enum class Path : kotlin/Enum<com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.Path> { // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.Path|null[0]
+            enum entry Component // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.Path.Component|null[0]
+            enum entry UnresolvedLeaf // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.Path.UnresolvedLeaf|null[0]
+
+            final val entries // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.Path.entries|#static{}entries[0]
+                final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.Path> // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.Path.entries.<get-entries>|<get-entries>#static(){}[0]
+
+            final fun valueOf(kotlin/String): com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.Path // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.Path.valueOf|valueOf#static(kotlin.String){}[0]
+            final fun values(): kotlin/Array<com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.Path> // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.Path.values|values#static(){}[0]
+        }
+    }
+
     final class CompanionComparison : com.eignex.klause.solver.result/SearchEvent { // com.eignex.klause.solver.result/SearchEvent.CompanionComparison|null[0]
         constructor <init>(kotlin/Long, kotlin/String, kotlin/Long, kotlin/Long, kotlin/String?, kotlin/String?, kotlin/String?, kotlin/String?, kotlin/String?, kotlin/String) // com.eignex.klause.solver.result/SearchEvent.CompanionComparison.<init>|<init>(kotlin.Long;kotlin.String;kotlin.Long;kotlin.Long;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String){}[0]
 

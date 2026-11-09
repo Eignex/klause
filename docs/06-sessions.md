@@ -321,6 +321,11 @@ local decline. Open routing maps representation decline to `Unsupported` and
 operation, check, decision and work stops to `BudgetExhausted`. Slice pauses are
 lifecycle events, never refutations.
 
+The optional `SearchEvent.BacktrackIncomplete` observation distinguishes finite
+optimization returning with an unresolved objective leaf from an undecided
+component. It includes the native stop visible at return, when present. The
+CLI's verbose stream tags the worker; the event changes no result or allowance.
+
 Tight loops without an attached meter poll cancellation at most every 64 primitive
 visits; an attached meter polls after every debit. Entry, bulk allocation, result
 delivery and nonpublication exits force a poll. Batching grants no work, and a

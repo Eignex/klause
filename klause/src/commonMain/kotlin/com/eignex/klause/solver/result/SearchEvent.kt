@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.result
 
 import com.eignex.klause.portfolio.PortfolioEvent
+import com.eignex.klause.solver.search.SearchStopCause
 
 /**
  * Coarse-grained live search events, reported through the caller-supplied `onEvent` hook
@@ -17,6 +18,23 @@ import com.eignex.klause.portfolio.PortfolioEvent
  * stats summarize a finished solve, events narrate one in flight (e.g. the CLI's `-v`).
  */
 sealed interface SearchEvent {
+    /** Native optimization returned incomplete; this observation supplies no exhaustion proof. */
+    data class BacktrackIncomplete(
+        /** Return path responsible for withholding a complete verdict. */
+        val path: Path,
+        /** Native stop visible at return, or null when none was recorded. */
+        val stopCause: SearchStopCause?,
+    ) : SearchEvent {
+        /** Native optimization paths that preserve unresolved coverage. */
+        enum class Path {
+            /** At least one objective leaf remained unresolved. */
+            UnresolvedLeaf,
+
+            /** A required component could not decide the residual. */
+            Component,
+        }
+    }
+
     /** Recipe eligibility and requirements; these descriptions confer no publication authority. */
     data class WorkerAdmission(
         /** Configured recipe or companion identity. */
