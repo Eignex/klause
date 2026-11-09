@@ -160,6 +160,10 @@ internal class ProgressCredit(arms: Int) {
     private val glueSeen = DoubleArray(arms)
     private var recordViolation = Double.POSITIVE_INFINITY
 
+    fun startSearch(arm: Int) {
+        glueSeen[arm] = 0.0
+    }
+
     /** Credit [arm] in [ledger] for the progress in [stats], cumulative for a resumable handle or one segment's. */
     fun observe(ledger: RewardLedger, arm: Int, stats: SolveStats) {
         val fixed = stats.search.rootFixed.max
@@ -176,10 +180,8 @@ internal class ProgressCredit(arms: Int) {
         recordViolation = violation
     }
 
-    // Credit what [total] grew by since [arm] last showed it. A re-seeded handle starts its counters over, so a
-    // total below the last one seen is a new search: it is credited whole and becomes the new mark.
     private fun creditGrowth(ledger: RewardLedger, arm: Int, signal: Signal, total: Double, seen: DoubleArray) {
-        val grown = if (total < seen[arm]) total else total - seen[arm]
+        val grown = total - seen[arm]
         if (grown > 0.0) ledger.credit(arm, signal, grown)
         seen[arm] = total
     }

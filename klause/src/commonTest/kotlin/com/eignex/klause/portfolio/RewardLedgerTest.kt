@@ -66,14 +66,17 @@ class RewardLedgerTest {
 
     @Test
     fun `root fixings an arm already showed should earn nothing again`() {
-        val ledger = RewardLedger(1)
-        val progress = ProgressCredit(1)
-        progress.observe(ledger, 0, stats(rootFixed = 5.0))
-        ledger.settle(0, 100)
+        for (newSearch in listOf(false, true)) {
+            val ledger = RewardLedger(1)
+            val progress = ProgressCredit(1)
+            progress.observe(ledger, 0, stats(rootFixed = 5.0))
+            ledger.settle(0, 100)
 
-        progress.observe(ledger, 0, stats(rootFixed = 5.0))
+            if (newSearch) progress.startSearch(0)
+            progress.observe(ledger, 0, stats(rootFixed = 5.0))
 
-        assertEquals(0.0, ledger.settle(0, 100))
+            assertEquals(0.0, ledger.settle(0, 100), "newSearch=$newSearch")
+        }
     }
 
     @Test
@@ -87,6 +90,46 @@ class RewardLedgerTest {
         progress.observe(ledger, 0, SolveStats(search = search))
 
         assertEquals(mapOf("Glue" to 3.0), ledger.creditOf(0))
+    }
+
+    @Test
+    fun `a new search should earn its full clause count`() {
+        for (clauses in listOf(1.0, 3.0, 5.0)) {
+            val ledger = RewardLedger(1)
+            val progress = ProgressCredit(1)
+            progress.observe(ledger, 0, SolveStats(search = SearchStats(glueClauses = SumResult(3.0))))
+            ledger.settle(0, 100)
+
+            progress.startSearch(0)
+            progress.observe(ledger, 0, SolveStats(search = SearchStats(glueClauses = SumResult(clauses))))
+
+            assertEquals(mapOf("Glue" to 3.0 + clauses), ledger.creditOf(0), "clauses=$clauses")
+        }
+    }
+
+    @Test
+    fun `a retained search should earn only subsequent clause growth`() {
+        val ledger = RewardLedger(1)
+        val progress = ProgressCredit(1)
+        progress.observe(ledger, 0, SolveStats(search = SearchStats(glueClauses = SumResult(3.0))))
+        ledger.settle(0, 100)
+
+        progress.observe(ledger, 0, SolveStats(search = SearchStats(glueClauses = SumResult(5.0))))
+
+        assertEquals(mapOf("Glue" to 2.0), ledger.pendingCreditOf(0))
+    }
+
+    @Test
+    fun `a new search should preserve the record violation`() {
+        val ledger = RewardLedger(1)
+        val progress = ProgressCredit(1)
+        progress.observe(ledger, 0, stats(violation = 8.0))
+        ledger.settle(0, 100)
+
+        progress.startSearch(0)
+        progress.observe(ledger, 0, stats(violation = 2.0))
+
+        assertEquals(mapOf("Violation" to 0.75), ledger.creditOf(0))
     }
 
     @Test

@@ -640,6 +640,11 @@ The scheduler assigns bounded slices, revisits pending preparation and reseeds s
 workers under the containing [allowance](06-sessions.md#resource-allowances).
 Scheduling changes work order, never publication authority.
 
+Clause-learning credit follows each search instance's cumulative counter. Opening
+a replacement handle or an independent one-shot search resets that counter's cursor;
+retained slices earn only new clauses. Root-fixing maxima and the best violation
+remain shared across the worker's searches within the invocation.
+
 `portfolio-probes=heuristic-second` gives the first initially eligible local-search
 worker the probe after the leading complete worker. It applies to curated single-core
 mixed finite Boolean/integer optimization with a containing deadline. Source search

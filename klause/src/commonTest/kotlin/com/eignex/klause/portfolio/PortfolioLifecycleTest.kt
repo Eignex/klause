@@ -228,6 +228,58 @@ class PortfolioLifecycleTest {
     }
 
     @Test
+    fun `replacement handles should earn their complete clause count`() {
+        for (clauses in listOf(1.0, 3.0, 5.0)) {
+            var slices = 0
+            var opened = 0
+            val worker = PortfolioWorker.ofMinimize("search", 0, resumable = {
+                val first = ++opened == 1
+                val base = ScriptedSearch({ first && it == 0 }) { slices++ }
+                object : ResumableSearch by base {
+                    override val stats: SolveStats get() = SolveStats(
+                        search = SearchStats(glueClauses = SumResult(if (first) 3.0 else clauses)),
+                    )
+                }
+            }) { _, _, _, _ -> error("the retained handle must resume") }
+                .also { it.restartingSearch = true }
+
+            val result = Portfolio(listOf(worker), fixedBandit(1, 0),
+                baseSliceWork = 1, maxSliceWork = 1, reseedStaleThreshold = 1,
+                diagnostics = PortfolioDiagnostics(10),
+            ).use { it.minimize(Cancellation { slices >= 3 }) }
+
+            assertEquals(2, opened)
+            assertEquals(3.0 + clauses, result.stats.portfolio.arms.single().credit["Glue"], "clauses=$clauses")
+        }
+    }
+
+    @Test
+    fun `one shot searches should each earn their complete clause count`() {
+        for (optimize in listOf(false, true)) {
+            var calls = 0
+            val stats = SolveStats(search = SearchStats(glueClauses = SumResult(3.0)))
+            val worker = if (optimize) {
+                PortfolioWorker.ofMinimize("search", 0) { _, _, _, _ ->
+                    calls++
+                    sequenceOf(MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats))
+                }
+            } else {
+                PortfolioWorker.ofSolve("search", 0) { _, _ ->
+                    calls++
+                    SolveResult.Unknown(TerminationReason.BudgetExhausted, stats)
+                }
+            }
+            val token = Cancellation { calls >= 3 }
+
+            val result = Portfolio.thompson(listOf(worker)).use {
+                if (optimize) it.minimize(token).stats else it.solve(token).stats
+            }
+
+            assertEquals(9.0, result.portfolio.arms.single().credit["Glue"], "optimize=$optimize")
+        }
+    }
+
+    @Test
     fun `ordinary arm diagnostics should preserve the surviving optimization verdict`() {
         for (phase in listOf("opening", "slice", "one-shot")) {
             val failedHandle = TrackingResumableSearch(null, onRun = { error("arm failure") })
