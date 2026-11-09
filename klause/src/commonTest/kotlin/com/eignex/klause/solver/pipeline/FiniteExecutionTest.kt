@@ -37,12 +37,28 @@ class FiniteExecutionTest {
     }
 
     @Test
-    fun `typed and parsed companion repair modes should reach completion enabled portfolios`() {
-        val variants = listOf("fixed", "adaptive").flatMap { repair ->
-            listOf(ExecutionOptions(ExecutionOption.companionRepair(repair)),
-                ExecutionOptions.parse(listOf("companion-repair=$repair")))
+    fun `typed companion repair modes should reach completion enabled portfolios`() {
+        for (repair in listOf("fixed", "adaptive")) {
+            val options = ExecutionOptions(ExecutionOption.companionRepair(repair))
+            val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+            val shape = FiniteSolveShape(model, true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy().finiteRequest(shape, FiniteEngine.MIXED,
+                presolveConfig = PresolveConfig.NONE, executionOptions = options,
+                cancellation = Cancellation.after(1.seconds), nodeBudget = NodeBudget(8))
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}),
+                TheoryParams(sourceIncumbentCompletion = true))
+
+            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
         }
-        for (options in variants) {
+    }
+
+    @Test
+    fun `parsed companion repair modes should reach completion enabled portfolios`() {
+        for (repair in listOf("fixed", "adaptive")) {
+            val options = ExecutionOptions.parse(listOf("companion-repair=$repair"))
             val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
                 realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
             val shape = FiniteSolveShape(model, true, false, null,
