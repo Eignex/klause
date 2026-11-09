@@ -131,10 +131,12 @@ diagnosis; these observations do not retire the rebuilding objective.
 
 ## Build and run
 
-Linux CI stages the checksum-pinned lab SDK through the GitHub release-asset API.
-For the same dependency transport locally, run `bash klause-bench/scripts/stage-lab-sdk.sh DIRECTORY`
-and pass `-PlabBenchRepository=file://ABSOLUTE_DIRECTORY` to Gradle. This changes only
-the SDK download route.
+Gradle stages the checksum-pinned lab SDK through the public GitHub release-asset API using the JDK.
+Verified artifacts are cached in `.gradle/lab-bench-sdk`; each artifact allows three attempts with
+10-second connection and 30-second read timeouts. This dependency resolution needs no external HTTP tool.
+An explicit `-PlabBenchRepository=URL` selects another repository. To prepare a local repository with
+the command-line client, run `bash klause-bench/scripts/stage-lab-sdk.sh DIRECTORY` and pass
+`-PlabBenchRepository=file://ABSOLUTE_DIRECTORY` to Gradle.
 
 Ordinary single-core mixed clausal satisfaction admits a bounded automatic private
 parity trial. `param.private-rebuild-work=0` disables it. Mixed private views require at least
