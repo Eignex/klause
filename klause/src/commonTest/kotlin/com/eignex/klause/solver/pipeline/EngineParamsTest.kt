@@ -171,10 +171,31 @@ class EngineParamsTest {
     }
 
     @Test
-    fun `directional lp gains remain opt in and survive fixed backtrack overrides`() {
+    fun `default directional lp guidance reaches fixed and portfolio workers`() {
         val base = com.eignex.klause.backtrack.BacktrackParams()
-        assertTrue(!base.lpDirectionalGains)
-        assertTrue(applyBacktrackParams(base, EngineParams(listOf("lp-directional-gains=true"))).lpDirectionalGains)
+        val settings = EngineParams(emptyList())
+
+        val fixed = applyFixedBacktrackParams(base, settings, allowSelectors = true)
+        val selected = pool("bt-arm=lp-aggressive")
+        val worker = selected.pool!!.single()().editing(selected.edit).build(3L, null)
+
+        assertTrue(fixed.lpDirectionalGains)
+        assertTrue(worker.lpDirectionalGains)
+    }
+
+    @Test
+    fun `explicit directional lp guidance overrides reach fixed and portfolio workers`() {
+        for (enabled in listOf(false, true)) {
+            val base = com.eignex.klause.backtrack.BacktrackParams(lpDirectionalGains = !enabled)
+            val settings = EngineParams(listOf("lp-directional-gains=$enabled"))
+
+            val fixed = applyFixedBacktrackParams(base, settings, allowSelectors = true)
+            val selected = pool("bt-arm=lp-aggressive", "lp-directional-gains=$enabled")
+            val worker = selected.pool!!.single()().editing(selected.edit).build(3L, null)
+
+            assertEquals(enabled, fixed.lpDirectionalGains)
+            assertEquals(enabled, worker.lpDirectionalGains)
+        }
     }
 
     @Test

@@ -299,8 +299,9 @@ sample. These advisory observations supply no certified bound or pruning authori
 The common objective constant stays in the scope key and is excluded from gain
 subtraction, preserving small gains when the constant exceeds floating precision.
 
-The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
-`lp-directional-gains=true`, with LP bounding and branching enabled. Two recent samples
+Directional guidance is enabled by default for finite optimization with LP bounding
+and branching. `BacktrackParams.lpDirectionalGains=false` or `lp-directional-gains=false`
+disables collection and advice; ordinary recipes inherit the shared default. Two recent samples
 in each direction permit the geometric mean of the predicted lower and upper gains;
 both gains must be positive and finite. Otherwise reduced-cost/fractionality
 scoring and the configured selector keep their precedence. Directional scores compete
@@ -340,8 +341,7 @@ attempts, charging 16 work per check, 16 per selection and 4 per commitment chec
 to its existing LP overhead allowance. Failed attempts retain their charge, and
 history reset, reseeding and source changes do not renew the collector. Node and
 point invalidation discard its private nomination. Separate fixed counters attribute
-collection and reliable advice. The private advice-withheld control retains the same
-collection policy while withholding reliable choices. Disabled gains create no collector.
+collection and reliable advice. Disabled gains create no collector.
 
 Pending parent/child observations share one exact base model and active-row identity.
 Every row or model edit discards the pending measurement and ancestor split records;

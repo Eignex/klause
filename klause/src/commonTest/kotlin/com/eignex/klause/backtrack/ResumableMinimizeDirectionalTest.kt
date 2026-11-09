@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
 
 class ResumableMinimizeDirectionalTest {
     @Test
-    fun `finite search consumes both directional gains across cooperative slices`() {
+    fun `default finite search consumes both directional gains across cooperative slices`() {
         val blocks = 4
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
@@ -42,7 +42,6 @@ class ResumableMinimizeDirectionalTest {
             maxDecisions = 1000L,
             lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
                 boundMaxOpsPerNode = 0L),
-            lpDirectionalGains = true,
             componentFactory = { listOf(object : SearchComponent {
                 override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Infeasible()
             }) },

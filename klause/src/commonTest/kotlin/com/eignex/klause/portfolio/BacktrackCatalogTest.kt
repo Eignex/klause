@@ -7,6 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class BacktrackCatalogTest {
     @Test
@@ -74,6 +75,15 @@ class BacktrackCatalogTest {
     fun `each arm should build by label with a matching label`() {
         for (label in BacktrackCatalog.labels(Kind.COP)) {
             assertEquals(label, BacktrackCatalog.byLabel(label).label, label)
+        }
+    }
+
+    @Test
+    fun `lp recipes should inherit default directional guidance`() {
+        for (label in listOf("lp-aggressive", "lp-default", "lp-conservative", "lp-lbtree")) {
+            val params = BacktrackCatalog.byLabel(label).build(3L, null)
+
+            assertTrue(params.lpDirectionalGains, label)
         }
     }
 

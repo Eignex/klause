@@ -1018,7 +1018,9 @@ source projection and lower-bound publisher while the floating cursor stays susp
 Dual-only certification checks exact Lagrangian evidence under its own sparse input,
 arithmetic and allocation limits. A refused binary dual candidate enters the bounded
 dual-vector rational reconstruction schedule under the same work, allocation and
-attempt limits. The first checked bound ends that schedule without primal recovery
+attempt limits. A retained-basis proposal uses the first attempt before residual
+scaling and denominator selection; those scans serve the generic vector fallback.
+The first checked bound ends that schedule without primal recovery
 or exact feasibility continuation. A retained basis supplies a dual proposal by
 reusing logical-column layout, peeling singleton equations and variables without
 fill, and solving admitted residual components with the rational basis factors.

@@ -35,6 +35,9 @@ internal class ReclamationPreparation(
 
     fun supports(units: Long, scratchBytes: Long): Boolean = units <= maxWork && scratchBytes <= maxScratchBytes
 
+    fun supportsAtomic(units: Long, actualWork: Long, scratchBytes: Long): Boolean =
+        actualWork < maxWork && units <= (maxWork - actualWork - 1L) / ATOMIC_PRICE && scratchBytes <= maxScratchBytes
+
     fun visit(units: Long = 1L, scratchBytes: Long = 0L) {
         if (cancelled() || units > maxWork - work || scratchBytes > maxScratchBytes - scratch) throw Deferred()
         charge(units)

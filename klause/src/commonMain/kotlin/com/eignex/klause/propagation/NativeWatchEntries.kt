@@ -7,7 +7,8 @@ internal class NativeWatchEntries(initialCapacity: Int = 0) {
     private var capacityWords = 0L
     var size = 0
         private set
-    val primitiveBytes: Long get() = 12L + capacityWords * Long.SIZE_BYTES
+    var retirementEpoch = 0
+    val primitiveBytes: Long get() = 16L + capacityWords * Long.SIZE_BYTES
     val referenceSlots: Long get() = pages.size + 1L
 
     init {
@@ -100,7 +101,7 @@ internal class NativeWatchEntries(initialCapacity: Int = 0) {
             }
         }
         val retained = protectedWords > 0L
-        sample.ownedPool(this, primitiveBytes, if (retained) 12L + protectedWords * Long.SIZE_BYTES else 0L)
+        sample.ownedPool(this, primitiveBytes, if (retained) 16L + protectedWords * Long.SIZE_BYTES else 0L)
         sample.ownedReferences(this, 1L, retained)
         sample.ownedReferences(pages, pages.size.toLong(), retained)
         return primitiveBytes
