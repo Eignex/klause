@@ -48,7 +48,7 @@ class ResumableMinimizeDirectionalTest {
             }) },
         )
 
-        val objective = LinearObjective(intCoefficients = LongArray(variables) { if (it % 3 == 0) 1L else 2L })
+        val objective = LinearObjective(intCoefficients = LongArray(variables) { 2L + it % 3 })
         ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
             var slices = 0
             while (slices++ < 128 && !search.isDone &&
