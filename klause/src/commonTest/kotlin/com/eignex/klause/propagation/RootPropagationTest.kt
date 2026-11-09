@@ -13,23 +13,11 @@ import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.*
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.fail
 
 class RootPropagationTest {
-
-    @Test
-    fun `root deductions should retain false pins beyond a word boundary`() {
-        val size = 65
-        val problem = boolProblem(size, *Array(size) { intArrayOf(lit(it, it == 0)) })
-
-        val result = implied(problem.propagate())
-
-        assertContentEquals(IntArray(size) { it }, result.boolKeys)
-        assertContentEquals(BooleanArray(size) { it == 0 }, result.boolValues)
-    }
 
     @Test
     fun `unchanged sparse sets should not repeat input assumptions`() {

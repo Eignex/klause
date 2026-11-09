@@ -14,7 +14,6 @@ import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.klause.util.SharingMemorySnapshot
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.arrays.emptyLongArray
-import com.eignex.util.collections.DynamicBits
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 import com.eignex.util.numbers.CheckedLongOverflowException
@@ -1803,7 +1802,7 @@ class PropagationSession private constructor(
      */
     private fun computeImplied(): PropagationResult.Implied {
         val bKeys = IntArrayList(initialCapacity = 8)
-        val bVals = DynamicBits()
+        val bVals = ArrayList<Boolean>()
         for (v in 0 until problem.numBoolVars) {
             val b = state.boolValues[v] ?: continue
             if (boolPinned[v] != -1) continue
@@ -1822,7 +1821,7 @@ class PropagationSession private constructor(
         }
         return PropagationResult.Implied(
             boolKeys = bKeys.toIntArray(),
-            boolValues = bVals.toBooleanArray(),
+            boolValues = BooleanArray(bVals.size) { bVals[it] },
             intKeys = iKeys.toIntArray(),
             intValues = iVals.toLongArray(),
         )
@@ -1852,7 +1851,7 @@ class PropagationSession private constructor(
             }
         }
         val bKeys = IntArrayList()
-        val bVals = DynamicBits()
+        val bVals = ArrayList<Boolean>()
         if (bRaw.size > 0) {
             val sorted = bRaw.toIntArray()
             sorted.sort()
@@ -1904,7 +1903,7 @@ class PropagationSession private constructor(
         }
         return PropagationResult.Implied(
             boolKeys = bKeys.toIntArray(),
-            boolValues = bVals.toBooleanArray(),
+            boolValues = BooleanArray(bVals.size) { bVals[it] },
             intKeys = iKeys.toIntArray(),
             intValues = iVals.toLongArray(),
             intMinKeys = minKeys,

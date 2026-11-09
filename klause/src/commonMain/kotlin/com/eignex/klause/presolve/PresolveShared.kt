@@ -8,7 +8,6 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
-import com.eignex.util.collections.DynamicBits
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
@@ -56,7 +55,7 @@ internal object PresolveShared {
         }
         val capacity = factors.size - delta.droppedIndices.size + delta.addedFactors.size
         val kept = ArrayList<Factor>(capacity)
-        val implied = impliedFactorMask?.let { DynamicBits(capacity) }
+        val implied = impliedFactorMask?.let { ArrayList<Boolean>(capacity) }
         for (index in factors.indices) {
             if (dropped == null || index !in dropped) {
                 kept.add(factors[index])
