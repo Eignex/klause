@@ -14,6 +14,55 @@ import kotlin.test.assertTrue
 
 class NativeSatStateTest {
     @Test
+    fun `generic fallback between indexed sweeps should retain physical watch cleanup`() {
+        val session = session(8, or(6, true, 7, true))
+        val configuration = NativeCapConfiguration(false, 2, 6)
+        repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+        session.maintainCapWindow(31, 65_536L, 1_048_576L,
+            { false }, canDrop = { false }, nativePolicy = configuration) { false }
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 10)
+        session.maintainCapWindow(32, 65_536L, 1_048_576L,
+            { false }, nativePolicy = configuration) { false }
+        session.reclaimLearnedMemory(Long.MAX_VALUE, 65_536L, 1_048_576L)
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 11)
+        repeat(4) { session.maintainCapWindow(32, 65_536L, 1_048_576L, { false }) { false } }
+        session.addLearnedClause(Clause(or(4, true, 5, true)), 12)
+        session.maintainCapWindow(32, 65_536L, 1_048_576L,
+            { false }, canDrop = { false }, nativePolicy = configuration) { false }
+        session.maintainCapWindow(32, 65_536L, 1_048_576L,
+            { false }, nativePolicy = configuration) { false }
+
+        repeat(128) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
+        val memory = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        assertEquals(66L, memory.getValue("sessionWatchEntries"))
+    }
+
+    @Test
+    fun `retirement after remapping should release its watched postings`() {
+        val session = session(8, or(6, true, 7, true))
+        val configuration = NativeCapConfiguration(false, 2, 6)
+        repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+        session.maintainCapWindow(31, 65_536L, 1_048_576L,
+            { false }, canDrop = { false }, nativePolicy = configuration) { false }
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 10)
+        session.maintainCapWindow(32, 65_536L, 1_048_576L,
+            { false }, nativePolicy = configuration) { false }
+        repeat(2) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
+        assertTrue(session.explanationState.forgetLearnedClauses(10_000_000L, 1_048_576L) { id, _ -> id < 16 })
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 11)
+        session.maintainCapWindow(16, 65_536L, 1_048_576L,
+            { false }, canDrop = { false }, nativePolicy = configuration) { false }
+        session.maintainCapWindow(16, 65_536L, 1_048_576L,
+            { false }, nativePolicy = configuration) { false }
+
+        repeat(128) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
+        val memory = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        assertEquals(34L, memory.getValue("sessionWatchEntries"))
+    }
+
+    @Test
     fun `indexed retirement cleanup should skip unchanged live postings`() {
         val cleanupWork = listOf(0, 512).map { fillers ->
             val session = session(8, or(6, true, 7, true))
