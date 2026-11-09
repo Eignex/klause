@@ -89,6 +89,11 @@ See [theory roles](14-theories.md#extension-roles-and-completeness). The session
 exchanges Boolean literals, semantic integer bounds and opaque theory decisions
 rather than native CP domains.
 
+A cancellation pause retains the current leaf for a complete retry. An interrupted
+check on that retained leaf adds no unresolved coverage. A leaf abandoned with an
+undecided required check still prevents exhaustion from proving completeness;
+later pauses do not clear that state.
+
 Five owners divide the work:
 
 - [SearchSession](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchSession.kt)
