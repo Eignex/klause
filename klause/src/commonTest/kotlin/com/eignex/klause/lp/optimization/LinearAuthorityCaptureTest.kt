@@ -43,11 +43,13 @@ class LinearAuthorityCaptureTest {
         val budget = SourceLpBudget(funding = funding)
         LinearAuthority(budget, retainLp = true).use { authority ->
             authority.capture = capture
-            authority.advance(source, Cancellation.Never, cuts = true)
+            authority.advance(source, Cancellation.Never, cuts = true, cutMask = emptySet())
         }
         val rejected = LinearAuthorityAggregateRejections(budget, Cancellation.Never)
         capture.observeFractionalAttempt()
-        capture.finishFractionalAttempt(LinearAuthorityFractionalObservation(capture.records.single(),
+        val query = capture.records.single()
+        assertNotNull(query.point)
+        capture.finishFractionalAttempt(LinearAuthorityFractionalObservation(query,
             emptyMap(), rejected, 0L, 0L), "query-selected") { emptyMap() }
         capture.restrict(2, capture.constructedEntries, capture.constructedBytes)
         val spent = funding.spent
