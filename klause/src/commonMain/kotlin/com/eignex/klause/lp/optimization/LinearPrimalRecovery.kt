@@ -5,6 +5,8 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntIndexedCollection
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.magnitudeBitLength
@@ -29,7 +31,7 @@ internal fun recoverLinearPrimal(
     rows: List<ExactRationalInequality>,
     inactive: Set<Int>,
     cancellation: Cancellation,
-    complete: (List<ExactRationalInequality>, List<Int>, Cancellation) -> List<BigFraction>?,
+    complete: (List<ExactRationalInequality>, IntIndexedCollection, Cancellation) -> List<BigFraction>?,
     observe: (String, Long) -> Unit,
     limits: LinearPrimalRecoveryLimits = LinearPrimalRecoveryLimits(),
     progress: LinearPrimalRecoveryProgress = LinearPrimalRecoveryProgress(),
@@ -89,18 +91,18 @@ internal fun recoverLinearPrimal(
             return reconstructed
         }
         val residual = ArrayList<ExactRationalInequality>()
-        val incidence = List(point.size) { ArrayList<Int>() }
+        val incidence = arrayOfNulls<IntArrayList>(point.size)
         for (row in active) {
             meter.reserve(row.columns.size.toLong() + 1L, 64L + 64L * row.columns.size)
             var rhs = row.rhs
-            val columns = ArrayList<Int>()
+            val columns = IntArrayList()
             val coefficients = ArrayList<BigFraction>()
             for (entry in row.columns.indices) {
                 val column = row.columns[entry]
                 val coefficient = row.coefficients[entry]
                 if (coefficient.isZero) continue
                 if (coordinates[column].kind == SourceCoordinate.Kind.Real) {
-                    columns += column
+                    columns.add(column)
                     coefficients += coefficient
                 } else {
                     rhs = meter.subtractProduct(rhs, coefficient, point[column])
@@ -112,7 +114,10 @@ internal fun recoverLinearPrimal(
                     return null
                 }
             } else {
-                for (column in columns) incidence[column] += residual.size
+                columns.forEach { column ->
+                    val adjacent = incidence[column] ?: IntArrayList(1).also { incidence[column] = it }
+                    adjacent.add(residual.size)
+                }
                 residual += ExactRationalInequality(columns.toIntArray(), coefficients, rhs, row.strict)
             }
         }
@@ -122,38 +127,40 @@ internal fun recoverLinearPrimal(
         val local = IntArray(point.size) { -1 }
         for (root in point.indices) {
             meter.reserve(1L)
-            if (seen[root] || incidence[root].isEmpty()) continue
-            val members = arrayListOf(root)
-            val componentRows = ArrayList<Int>()
+            if (seen[root] || incidence[root] == null) continue
+            val members = IntArrayList(1).also { it.add(root) }
+            val componentRows = IntArrayList()
             seen[root] = true
             var next = 0
             while (next < members.size) {
                 val column = members[next++]
                 meter.reserve(1L, 16L)
-                for (id in incidence[column]) {
+                val adjacent = incidence[column] ?: continue
+                adjacent.forEach { id ->
                     meter.reserve(1L)
-                    if (selected[id]) continue
+                    if (selected[id]) return@forEach
                     selected[id] = true
-                    componentRows += id
+                    componentRows.add(id)
                     for (neighbor in residual[id].columns) {
                         meter.reserve(1L)
                         if (!seen[neighbor]) {
                             seen[neighbor] = true
-                            members += neighbor
+                            members.add(neighbor)
                         }
                     }
                 }
             }
             meter.reserve(members.size.toLong() * (Int.SIZE_BITS - members.size.countLeadingZeroBits()))
-            members.sort()
-            for (index in members.indices) local[members[index]] = index
-            val localRows = componentRows.map { id ->
+            members.backingData.sort(0, members.size)
+            for (index in 0 until members.size) local[members[index]] = index
+            val localRows = ArrayList<ExactRationalInequality>(componentRows.size)
+            componentRows.forEach { id ->
                 val row = residual[id]
                 meter.reserve(row.columns.size.toLong() + 1L, 64L + 32L * row.columns.size)
-                ExactRationalInequality(row.columns.map { local[it] }.toIntArray(), row.coefficients,
-                    row.rhs, row.strict)
+                localRows.add(ExactRationalInequality(IntArray(row.columns.size) { local[row.columns[it]] },
+                    row.coefficients, row.rhs, row.strict))
             }
-            if (meter.satisfies(members.map { recovered[it] }, localRows)) continue
+            if (meter.satisfies(List(members.size) { recovered[members[it]] }, localRows)) continue
             observe("PrimalRecoveryComponents", 1L)
             val values = progress.completed[root]?.also { observe("PrimalRecoveryComponentReused", 1L) }
                 ?: complete(localRows, members, cancellation)
@@ -162,7 +169,7 @@ internal fun recoverLinearPrimal(
                 observe("PrimalRecoveryComponentUnavailable", 1L)
                 return null
             }
-            for (index in members.indices) recovered[members[index]] = meter.number(values[index])
+            for (index in 0 until members.size) recovered[members[index]] = meter.number(values[index])
             if (root !in progress.completed) {
                 meter.reserve(values.size.toLong(), 32L * values.size)
                 progress.completed[root] = values.toList()
@@ -203,11 +210,12 @@ internal fun refineLinearPrimal(
             return null
         }
         meter.reserve(0L, 64L * coordinates.size)
-        val members = coordinates.indices.filter { coordinates[it].kind == SourceCoordinate.Kind.Real }
-        val objective = members.map { meter.number(costs[it]) }
+        val members = IntArrayList()
+        for (id in coordinates.indices) if (coordinates[id].kind == SourceCoordinate.Kind.Real) members.add(id)
+        val objective = List(members.size) { meter.number(costs[members[it]]) }
         observe("PrimalRefinementAttempts", 1L)
         val local = IntArray(point.size) { -1 }
-        for (id in members.indices) local[members[id]] = id
+        for (id in 0 until members.size) local[members[id]] = id
         val residual = ArrayList<ExactRationalInequality>()
         var entries = 0L
         for (id in rows.indices) {
@@ -217,13 +225,13 @@ internal fun refineLinearPrimal(
             if (entries > LinearPrimalRecoveryLimits().entries) throw LinearPrimalStop("Entries")
             meter.reserve(row.columns.size.toLong() + 1L, 64L + 64L * row.columns.size)
             var rhs = meter.number(row.rhs)
-            val columns = ArrayList<Int>()
+            val columns = IntArrayList()
             val coefficients = ArrayList<BigFraction>()
             for (entry in row.columns.indices) {
                 val column = row.columns[entry]
                 val coefficient = meter.number(row.coefficients[entry])
                 if (local[column] >= 0) {
-                    columns += local[column]
+                    columns.add(local[column])
                     coefficients += coefficient
                 } else {
                     if (point[column].den != BIG_ONE) return null
@@ -237,7 +245,7 @@ internal fun refineLinearPrimal(
         val refined = complete(residual, objective, cancellation) ?: return null
         if (refined.size != members.size) return null
         var difference = BigFraction.ZERO
-        for (id in members.indices) {
+        for (id in 0 until members.size) {
             difference = meter.subtractProduct(difference, objective[id], refined[id])
             difference = meter.subtractProduct(difference, objective[id].negated(), point[members[id]])
         }
@@ -248,7 +256,7 @@ internal fun refineLinearPrimal(
         if (!meter.satisfies(refined, residual)) return null
         observe("PrimalRefinementImproved", 1L)
         point.toMutableList().also { values ->
-            for (id in members.indices) values[members[id]] = refined[id]
+            for (id in 0 until members.size) values[members[id]] = refined[id]
         }
     } catch (stop: LinearPrimalStop) {
         observe("PrimalRefinement${stop.reason}", 1L)

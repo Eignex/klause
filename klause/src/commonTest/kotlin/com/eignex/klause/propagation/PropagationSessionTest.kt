@@ -11,6 +11,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.*
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
@@ -18,6 +19,24 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PropagationSessionTest {
+    @Test
+    fun `full and incremental deductions should retain trailing false pins`() {
+        val size = 65
+        val clauses = (1..size).map { variable ->
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(variable, variable == 64)))
+        }
+        for (seed in listOf(false, true)) {
+            val session = PropagationSession(Problem(size + 1, 0, emptyArray(), clauses))
+
+            val result = assertIs<PropagationResult.Implied>(if (seed) {
+                session.seed(Assumptions(bools = mapOf(0 to true)))
+            } else session.pinBool(0, true))
+
+            assertContentEquals(IntArray(size) { it + 1 }, result.boolKeys)
+            assertContentEquals(BooleanArray(size) { it == 63 }, result.boolValues)
+        }
+    }
+
     @Test
     fun `integer learning configuration should be reported before row admission`() {
         for (enabled in listOf(false, true)) {

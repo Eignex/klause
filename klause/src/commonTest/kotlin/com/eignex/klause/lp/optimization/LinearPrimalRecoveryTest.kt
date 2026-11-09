@@ -4,6 +4,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.collections.IntIndexedCollection
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -120,10 +121,11 @@ class LinearPrimalRecoveryTest {
         val progress = LinearPrimalRecoveryProgress()
         val stages = mutableMapOf<String, Long>()
         var calls = 0
-        val complete: (List<ExactRationalInequality>, List<Int>, Cancellation) -> List<BigFraction>? = { _, _, _ ->
-            calls++
-            if (calls == 2) null else listOf(BigFraction.ONE)
-        }
+        val complete: (List<ExactRationalInequality>, IntIndexedCollection, Cancellation) -> List<BigFraction>? =
+            { _, _, _ ->
+                calls++
+                if (calls == 2) null else listOf(BigFraction.ONE)
+            }
         val observe: (String, Long) -> Unit = { stage, count -> stages[stage] = (stages[stage] ?: 0L) + count }
 
         val first = recoverLinearPrimal(listOf(real, other), List(2) { BigFraction.ZERO }, rows, emptySet(),
@@ -147,8 +149,8 @@ class LinearPrimalRecoveryTest {
         }
 
         val point = recoverLinearPrimal(coordinates, List(3) { BigFraction.ZERO }, rows, emptySet(), Cancellation.Never,
-            complete = { _, columns, _ -> List(columns.size) { BigFraction.ONE } }, observe = { _, _ -> })
+            complete = { _, columns, _ -> List(columns.size) { BigFraction.ofLong(it + 1L) } }, observe = { _, _ -> })
 
-        assertEquals(List(3) { BigFraction.ONE }, point)
+        assertEquals(List(3) { BigFraction.ofLong(it + 1L) }, point)
     }
 }

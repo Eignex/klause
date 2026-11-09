@@ -5,6 +5,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.DynamicBits
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 
@@ -67,7 +68,7 @@ private fun collectRootPropagation(
 internal fun PropagationState.rootDeductions(assumptions: Assumptions): PropagationResult.Implied {
     val state = this
     val boolKeys = IntArrayList(initialCapacity = 8)
-    val boolValues = ArrayList<Boolean>()
+    val boolValues = DynamicBits()
     for (variable in 0 until problem.numBoolVars) {
         val value = state.boolValues[variable] ?: continue
         if (assumptions.boolValueOrNull(variable) == value) continue
@@ -135,7 +136,7 @@ internal fun PropagationState.rootDeductions(assumptions: Assumptions): Propagat
     }
     return PropagationResult.Implied(
         boolKeys = boolKeys.toIntArray(),
-        boolValues = BooleanArray(boolValues.size) { boolValues[it] },
+        boolValues = boolValues.toBooleanArray(),
         intKeys = intKeys.toIntArray(),
         intValues = intValues.toLongArray(),
         intMinKeys = intMinKeys.toIntArray(),
