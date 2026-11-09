@@ -13,6 +13,7 @@ import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.lowering.approximateGridValue
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.collections.IntArrayList
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.bigIntOf
@@ -37,7 +38,7 @@ internal class FloatGridAbsentPins(
     val columns: List<FloatGridColumn>,
     val booleans: Int,
     val factors: List<Factor>,
-    val origins: List<Int>,
+    val origins: IntArray,
     val pinRows: Map<Int, Pair<FloatGridColumn, BigFraction>>,
 )
 
@@ -49,7 +50,7 @@ internal fun prepareFloatGridAbsentPins(
 ): FloatGridAbsentPins? {
     val columns = ArrayList<FloatGridColumn>(primary.size)
     val factors = ArrayList<Factor>()
-    val origins = ArrayList<Int>()
+    val origins = IntArrayList()
     val rows = HashMap<Int, Pair<FloatGridColumn, BigFraction>>()
     var booleans = source.numBoolVars
     var integers = source.numIntVars.toLong() + primary.size
@@ -86,7 +87,7 @@ internal fun prepareFloatGridAbsentPins(
             factors += ReifiedLinear(booleans + 1, longArrayOf(1),
                 intArrayOf(selector.coordinate.variable), LinearOp.EQ, nearest)
             factors += Clause(intArrayOf(Lit.make(pin.present.index, true), Lit.make(booleans + 1, true)))
-            repeat(4) { origins += pin.factors.first() }
+            repeat(4) { origins.add(pin.factors.first()) }
             booleans += 2
         }
         for (factor in pin.factors) {
@@ -98,7 +99,7 @@ internal fun prepareFloatGridAbsentPins(
         }
         columns += column
     }
-    return if (cancellation()) null else FloatGridAbsentPins(columns, booleans, factors, origins, rows)
+    return if (cancellation()) null else FloatGridAbsentPins(columns, booleans, factors, origins.toIntArray(), rows)
 }
 
 private fun absentValueColumn(primary: FloatGridColumn, default: BigFraction, variable: Long): FloatGridColumn? {

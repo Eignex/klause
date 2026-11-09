@@ -1,22 +1,25 @@
 package com.eignex.klause.arithmetic.difference
 
 import com.eignex.klause.ir.Lit
+import com.eignex.util.arrays.binarySearchInt
+import com.eignex.util.collections.IntHashSet
 
 internal class DifferenceFragment(val edges: List<DifferenceEdge>) {
     val nodes: IntArray = run {
-        val seen = HashSet<Int>()
+        val seen = IntHashSet()
         for (e in edges) {
             if (e.source != ZERO) seen.add(e.source)
             if (e.target != ZERO) seen.add(e.target)
         }
-        seen.toIntArray().sortedArray()
+        seen.toIntArray().also { it.sort() }
     }
 
     val numNodes: Int get() = nodes.size + 1
 
     val zeroNode: Int get() = nodes.size
 
-    fun nodeOf(endpoint: Int): Int = if (endpoint == ZERO) zeroNode else indexOfSorted(nodes, endpoint)
+    fun nodeOf(endpoint: Int): Int =
+        if (endpoint == ZERO) zeroNode else nodes.binarySearchInt(endpoint).coerceAtLeast(-1)
 
     fun carriesAPotential(): Boolean = numNodes > 0 && edges.none { it.exceedsPotentialBound() }
 
@@ -50,21 +53,6 @@ internal class DifferenceFragment(val edges: List<DifferenceEdge>) {
     internal companion object {
         const val ZERO: Int = -1
     }
-}
-
-internal fun indexOfSorted(sorted: IntArray, value: Int): Int {
-    var lo = 0
-    var hi = sorted.size - 1
-    while (lo <= hi) {
-        val mid = (lo + hi) ushr 1
-        val v = sorted[mid]
-        when {
-            v < value -> lo = mid + 1
-            v > value -> hi = mid - 1
-            else -> return mid
-        }
-    }
-    return -1
 }
 
 /** One value per integer column witnessing feasibility, or an infeasible/abandoned outcome. */

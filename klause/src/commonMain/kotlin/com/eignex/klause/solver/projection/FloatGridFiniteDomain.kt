@@ -7,6 +7,8 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.LongHashSet
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
@@ -23,7 +25,8 @@ internal fun lowerGridFiniteValues(
     column: FloatGridColumn,
     cancellation: Cancellation,
 ): List<Factor>? {
-    val admitted = ArrayList<Long>()
+    val admitted = LongArrayList()
+    val seen = LongHashSet()
     for (index in 0 until size) {
         cancellation.charge(1)
         if (cancellation()) return null
@@ -36,12 +39,12 @@ internal fun lowerGridFiniteValues(
             val position = (value - column.origin) * column.step.reciprocal()
             if (position.den == BIG_ONE && position.num.fitsLong()) {
                 val bucket = position.num.toLongExact()
-                if (column.coordinate.contains(bucket)) admitted += bucket
+                if (column.coordinate.contains(bucket) && seen.add(bucket)) admitted.add(bucket)
             }
         }
     }
     if (cancellation()) return null
     return if (admitted.isEmpty()) {
         listOf(Linear(longArrayOf(1L), intArrayOf(column.coordinate.variable), LinearOp.LE, -1L))
-    } else listOf(Table(intArrayOf(column.coordinate.variable), admitted.distinct().toLongArray()))
+    } else listOf(Table(intArrayOf(column.coordinate.variable), admitted.toLongArray()))
 }

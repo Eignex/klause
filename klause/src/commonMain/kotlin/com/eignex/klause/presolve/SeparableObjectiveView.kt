@@ -5,6 +5,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.MutableIntLongMap
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.mulExact
@@ -47,8 +49,8 @@ private class Expansion(
 ) {
     private val definitions = HashMap<Int, MutableList<Linear>>()
     private val selected = HashMap<Int, Linear?>()
-    private val coefficients = HashMap<Int, Long>()
-    private val active = HashSet<Int>()
+    private val coefficients = MutableIntLongMap()
+    private val active = IntHashSet()
     private val rows = HashSet<Linear>()
     private var constant = source.constant
     private var visits = source.boolWeightValues.size + source.intCoefficientValues.size +
@@ -79,13 +81,13 @@ private class Expansion(
         if (!changed) return null
         visit(2 * problem.numIntVars + source.boolWeightValues.size + source.realCoefficientValues.size)
         val result = LongArray(problem.numIntVars)
-        for ((variable, coefficient) in coefficients) result[variable] = coefficient
+        coefficients.forEach { variable, coefficient -> result[variable] = coefficient }
         return source.copy(intCoefficients = result, constant = constant)
     }
 
     private fun selectDefinitions(root: Int) {
         val frontier = ArrayDeque<Pair<Int, Int>>()
-        val queued = HashSet<Int>()
+        val queued = IntHashSet()
         frontier.addLast(root to 0)
         queued.add(root)
         while (frontier.isNotEmpty()) {
@@ -118,9 +120,9 @@ private class Expansion(
         ) stop()
         val definition = selected[variable]
         if (definition == null) {
-            val merged = addExact(coefficients[variable] ?: 0L, coefficient)
+            val merged = addExact(coefficients.getOrDefault(variable, 0L), coefficient)
             if (merged == Long.MIN_VALUE) stop()
-            if (merged == 0L) coefficients.remove(variable) else coefficients[variable] = merged
+            if (merged == 0L) coefficients.remove(variable) else coefficients.put(variable, merged)
             if (coefficients.size > 256) stop()
         } else {
             if (depth >= 16) stop()

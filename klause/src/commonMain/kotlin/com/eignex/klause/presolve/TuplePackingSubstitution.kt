@@ -9,6 +9,8 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongHashSet
+import com.eignex.util.collections.MutableLongIntMap
 
 internal object TuplePackingSubstitution {
     internal class Limits(
@@ -69,7 +71,7 @@ internal object TuplePackingSubstitution {
                 val kept = LinkedHashSet<Tuple>()
                 for (row in 0 until table.numTuples) {
                     val tuple = LongArray(table.arity)
-                    val occupied = HashSet<Long>()
+                    val occupied = LongHashSet()
                     var feasible = true
                     for (column in table.xs.indices) {
                         if (!meter.visit()) return null
@@ -90,7 +92,7 @@ internal object TuplePackingSubstitution {
                 continue
             }
             val capacity = LinkedHashMap<Long, IntArrayList>()
-            val mandatory = HashMap<Long, Int>()
+            val mandatory = MutableLongIntMap()
             val local = ArrayList<Factor>()
             val steps = ArrayList<RebuildStep>()
             var localBool = nextBool
@@ -99,17 +101,17 @@ internal object TuplePackingSubstitution {
                 val tuples = rows[group]
                 val literals = IntArray(tuples.size) { Lit.make(localBool++, true) }
                 local.add(Cardinality.exactlyOne(literals))
-                val counts = HashMap<Long, Int>()
+                val counts = MutableLongIntMap()
                 for ((row, tuple) in tuples.withIndex()) {
                     for (value in tuple.values) {
                         if (!meter.visit()) return null
                         capacity.getOrPut(value) { IntArrayList() }.add(literals[row])
-                        counts[value] = (counts[value] ?: 0) + 1
+                        counts.addTo(value, 1)
                     }
                 }
-                for ((value, count) in counts) {
+                counts.forEach { value, count ->
                     if (!meter.visit()) return null
-                    if (count == tuples.size) mandatory[value] = (mandatory[value] ?: 0) + 1
+                    if (count == tuples.size) mandatory.addTo(value, 1)
                 }
                 for (column in table.xs.indices) {
                     if (!meter.visit()) return null
@@ -123,8 +125,10 @@ internal object TuplePackingSubstitution {
             }
             // Every group chooses a placement. Two groups requiring one value exceed its capacity
             // even when no scalar coordinate has a singleton domain.
-            if (mandatory.values.any { it > 1 }) {
-                return Substitution(RootBaker.provenInfeasible(problem, BakeConfig.NONE), SourceRebuilds.NONE, 0)
+            mandatory.forEach { _, count ->
+                if (count > 1) {
+                    return Substitution(RootBaker.provenInfeasible(problem, BakeConfig.NONE), SourceRebuilds.NONE, 0)
+                }
             }
             val exactCover = capacity.size == packing.scope.size
             for (literals in capacity.values) {

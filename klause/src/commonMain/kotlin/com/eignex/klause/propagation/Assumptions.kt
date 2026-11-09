@@ -5,6 +5,7 @@ import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.arrays.emptyBooleanArray
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.DynamicBits
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.LongArrayList
@@ -96,7 +97,7 @@ class Assumptions internal constructor(
         if (other.isEmpty && other.deductions.isEmpty) return this
         if (this.isEmpty && deductions.isEmpty) return other
         val mergedBoolKeys = IntArrayList(boolKeys.size + other.boolKeys.size)
-        val mergedBoolValues = ArrayList<Boolean>(boolKeys.size + other.boolKeys.size)
+        val mergedBoolValues = DynamicBits(boolKeys.size + other.boolKeys.size)
         sortedMergeBools(
             boolKeys,
             boolValues,
@@ -121,7 +122,7 @@ class Assumptions internal constructor(
         val mergedDeductions = deductions.mergedWith(other.deductions, pinned)
         return Assumptions(
             boolKeys = mergedBoolKeys.toIntArray(),
-            boolValues = BooleanArray(mergedBoolValues.size) { mergedBoolValues[it] },
+            boolValues = mergedBoolValues.toBooleanArray(),
             intKeys = mergedIntKeys.toIntArray(),
             intValues = mergedIntValues.toLongArray(),
             deductions = mergedDeductions,
@@ -275,7 +276,7 @@ class Assumptions internal constructor(
             bk: IntArray,
             bv: BooleanArray,
             outK: IntArrayList,
-            outV: ArrayList<Boolean>,
+            outV: DynamicBits,
         ) {
             var i = 0
             var j = 0

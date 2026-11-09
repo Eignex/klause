@@ -2,7 +2,9 @@ package com.eignex.klause.solver.projection
 
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.GridCoordinate
 import com.eignex.klause.factor.arithmetic.RealFiniteDomain
+import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceFormat
@@ -16,11 +18,23 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 
 class FloatGridFiniteDomainTest {
+    @Test
+    fun `finite grid values should keep their first occurrence order without duplicates`() {
+        val column = FloatGridColumn(SourceRealId(0), GridCoordinate(0, 0.0, 4.0, 5),
+            BigFraction.ZERO, BigFraction.ONE)
+        val values = doubleArrayOf(3.0, 1.0, 3.0, 0.0, 1.0)
+
+        val lowered = assertNotNull(lowerGridFiniteValues(values.size, { values[it] }, column, Cancellation.Never))
+
+        assertContentEquals(longArrayOf(3, 1, 0), assertIs<Table>(lowered.single()).tuples)
+    }
+
     @Test
     fun `constant private grids should retain their original membership attribution`() {
         val source = Problem(0, 0, emptyArray(), arrayOf(RealFiniteDomain(0, doubleArrayOf(0.125))),
