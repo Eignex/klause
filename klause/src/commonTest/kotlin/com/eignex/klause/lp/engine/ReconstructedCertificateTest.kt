@@ -147,6 +147,58 @@ class ReconstructedCertificateTest {
     }
 
     @Test
+    fun `zero dual rows should certify within the sparse work allowance`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 1L)
+            repeat(64) { addRow(intArrayOf(0), longArrayOf(1L), Relation.LE, 1L) }
+        }.build(Sense.MINIMIZE)
+
+        val result = certifyLpBoundOnly(model, DoubleArray(64),
+            ReconstructionLimits(maxWork = 4_000L, maxAttempts = 0))
+
+        assertEquals(BigFraction.ZERO, assertNotNull(result.bound).value)
+    }
+
+    @Test
+    fun `zero dual rows should retain input scalar limits`() {
+        val zero = ExactLpNumber.of(0L)
+        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 128, BIG_ONE))
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, huge))),
+            listOf(huge),
+            List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
+        )
+
+        val result = certifyLpBoundOnly(assertNotNull(LpExactState(source).toWorkingModel()), doubleArrayOf(0.0),
+            ReconstructionLimits(maxBits = 128, maxAttempts = 0))
+
+        assertNull(result.bound)
+        assertEquals(ReconstructionDecline.BITS, result.metrics.decline)
+    }
+
+    @Test
+    fun `zero dual rows should still reject a missing objective bound side`() {
+        val zero = ExactLpNumber.of(0L)
+        for (cost in listOf(BigFraction.MINUS_ONE, BigFraction.of(BIG_ONE shl 128, BIG_ONE).negated())) {
+            val source = ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
+                listOf(ExactLpNumber.of(1L)),
+                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(ExactLpNumber.of(cost), zero)),
+            )
+
+            val result = certifyLpBoundOnly(assertNotNull(LpExactState(source).toWorkingModel()),
+                doubleArrayOf(0.0), ReconstructionLimits(maxAttempts = 0))
+
+            assertNull(result.bound)
+            assertEquals(ReconstructionDecline.CANDIDATE, result.metrics.decline)
+        }
+    }
+
+    @Test
     fun `fixed arithmetic overflow should restart the full point from rational authority`() {
         val huge = BigFraction.of(BIG_ONE shl 100, BIG_ONE)
         val one = ExactLpNumber.of(1L)
