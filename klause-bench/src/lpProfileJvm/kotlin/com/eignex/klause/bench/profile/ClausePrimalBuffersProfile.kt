@@ -107,7 +107,9 @@ object ClausePrimalBuffersProfile {
                 result.work += walk.work - work
                 val sample = walk.sample()
                 check(trialVariables.all { !sample.bools[it] })
-                check(clauses.all { clause -> clause.literals.any { Lit.evaluate(it, sample.bools[Lit.variable(it)]) } })
+                check(clauses.all { clause ->
+                    clause.literals.any { Lit.evaluate(it, sample.bools[Lit.variable(it)]) }
+                })
                 result.checksum = 31 * result.checksum + sample.bools.contentHashCode()
                 consumed = result.checksum
             }
