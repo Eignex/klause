@@ -28,7 +28,12 @@ import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.search.ComponentCheck
+import com.eignex.klause.solver.search.SearchComponent
+import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -777,8 +782,10 @@ class ResumableMinimizeRealLeafTest {
     fun `an unresolved real leaf should not prove infeasibility under shared bounds`() {
         for (shared in listOf(false, true)) {
             val fixture = UnresolvedRealLeafFixture(false)
+            val events = ArrayList<SearchEvent>()
             val params = fixture.params.copy(
                 objectiveBoundSupplier = if (shared) ({ Double.POSITIVE_INFINITY }) else null,
+                onEvent = { events += it },
             )
             fixture.solver.resumable(fixture.objective, params).use { search ->
                 val result = assertIs<MinimizeResult.Unknown>(search.runSlice(Cancellation.Never, 1000L, 256L) {})
@@ -786,6 +793,37 @@ class ResumableMinimizeRealLeafTest {
                 fixture.assertVisitedLeaves()
                 assertTrue(search.isDone)
                 assertSame(result, search.runSlice(Cancellation.Never, 1000L, 256L) {})
+                assertEquals(SearchEvent.BacktrackIncomplete.Path.UnresolvedLeaf,
+                    events.filterIsInstance<SearchEvent.BacktrackIncomplete>().single().path)
+            }
+        }
+    }
+
+    @Test
+    fun `an undecided component should report its native stop without proving exhaustion`() {
+        for (cause in listOf(SearchStopCause.RepresentationDecline, SearchStopCause.OperationAllowance)) {
+            val events = ArrayList<SearchEvent>()
+            val problem = Problem(1, 0, emptyArray(), emptyArray()).bake()
+            val params = BacktrackParams(
+                onEvent = { events += it },
+                componentFactory = {
+                    listOf(object : SearchComponent {
+                        override fun check(context: SearchContext): ComponentCheck {
+                            context.executionControls.reportStop(cause)
+                            return ComponentCheck.Indeterminate
+                        }
+                    })
+                },
+            )
+
+            BacktrackSolver(problem).resumable(LinearObjective(boolWeights = longArrayOf(1L)), params).use { search ->
+                val result = assertIs<MinimizeResult.Unknown>(search.runSlice(Cancellation.Never, 1000L, 256L) {})
+
+                assertEquals(TerminationReason.Unsupported, result.reason)
+                assertTrue(search.isDone)
+                assertSame(result, search.runSlice(Cancellation.Never, 1000L, 256L) {})
+                assertEquals(listOf(SearchEvent.BacktrackIncomplete(SearchEvent.BacktrackIncomplete.Path.Component, cause)),
+                    events.filterIsInstance<SearchEvent.BacktrackIncomplete>())
             }
         }
     }
@@ -794,8 +832,12 @@ class ResumableMinimizeRealLeafTest {
     fun `an unresolved improving region should preserve an independently verified incumbent`() {
         for (shared in listOf(false, true)) {
             val fixture = UnresolvedRealLeafFixture(true)
+            val events = ArrayList<SearchEvent>()
             var bound = Double.POSITIVE_INFINITY
-            val params = fixture.params.copy(objectiveBoundSupplier = if (shared) ({ bound }) else null)
+            val params = fixture.params.copy(
+                objectiveBoundSupplier = if (shared) ({ bound }) else null,
+                onEvent = { events += it },
+            )
             fixture.solver.resumable(fixture.objective, params).use { search ->
                 val result = assertIs<MinimizeResult.BestFound>(
                     search.runSlice(Cancellation.Never, 1000L, 256L) {
@@ -806,6 +848,8 @@ class ResumableMinimizeRealLeafTest {
                 assertEquals(TerminationReason.Unsupported, result.reason)
                 fixture.assertIncumbent(result.sample)
                 fixture.assertVisitedLeaves()
+                assertEquals(SearchEvent.BacktrackIncomplete.Path.UnresolvedLeaf,
+                    events.filterIsInstance<SearchEvent.BacktrackIncomplete>().single().path)
             }
         }
     }

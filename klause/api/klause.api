@@ -15673,6 +15673,27 @@ public final class com/eignex/klause/solver/result/SchedulingStats {
 public abstract interface class com/eignex/klause/solver/result/SearchEvent {
 }
 
+public final class com/eignex/klause/solver/result/SearchEvent$BacktrackIncomplete : com/eignex/klause/solver/result/SearchEvent {
+	public fun <init> (Lcom/eignex/klause/solver/result/SearchEvent$BacktrackIncomplete$Path;Lcom/eignex/klause/solver/search/SearchStopCause;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/result/SearchEvent$BacktrackIncomplete$Path;
+	public final fun component2 ()Lcom/eignex/klause/solver/search/SearchStopCause;
+	public final fun copy (Lcom/eignex/klause/solver/result/SearchEvent$BacktrackIncomplete$Path;Lcom/eignex/klause/solver/search/SearchStopCause;)Lcom/eignex/klause/solver/result/SearchEvent$BacktrackIncomplete;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SearchEvent$BacktrackIncomplete;Lcom/eignex/klause/solver/result/SearchEvent$BacktrackIncomplete$Path;Lcom/eignex/klause/solver/search/SearchStopCause;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SearchEvent$BacktrackIncomplete;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPath ()Lcom/eignex/klause/solver/result/SearchEvent$BacktrackIncomplete$Path;
+	public final fun getStopCause ()Lcom/eignex/klause/solver/search/SearchStopCause;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/result/SearchEvent$BacktrackIncomplete$Path : java/lang/Enum {
+	public static final field Component Lcom/eignex/klause/solver/result/SearchEvent$BacktrackIncomplete$Path;
+	public static final field UnresolvedLeaf Lcom/eignex/klause/solver/result/SearchEvent$BacktrackIncomplete$Path;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/result/SearchEvent$BacktrackIncomplete$Path;
+	public static fun values ()[Lcom/eignex/klause/solver/result/SearchEvent$BacktrackIncomplete$Path;
+}
+
 public final class com/eignex/klause/solver/result/SearchEvent$CompanionComparison : com/eignex/klause/solver/result/SearchEvent {
 	public fun <init> (JLjava/lang/String;JJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public final fun component1 ()J
