@@ -23,6 +23,7 @@ import kotlinx.serialization.json.jsonPrimitive
 fun main(args: Array<String>) {
     val protocolOutput = System.out
     System.setOut(System.err)
+    configureLabPaths()
     BenchCli.execute(ClausePrimalBuffersSuite, args, stdout = protocolOutput)
 }
 
