@@ -87,7 +87,7 @@ object ClausePrimalBuffersProfile {
 
         fun run(sessions: Int, bean: ThreadMXBean, thread: Long): Observation {
             val result = Observation()
-            repeat(sessions) {
+            repeat(sessions) { _ ->
                 var bytes = bean.getThreadAllocatedBytes(thread)
                 var started = System.nanoTime()
                 val walk = ClausePrimalWalk(Sample(BooleanArray(groups * 3) { it % 3 == 0 }, longArrayOf()),
