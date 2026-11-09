@@ -852,6 +852,7 @@ internal class ResumableMinimize(
     }
 
     private fun terminalExhausted(core: UnsatCore?): MinimizeResult {
+        if (sawIndeterminateLeaf) observeIncomplete(SearchEvent.BacktrackIncomplete.Path.UnresolvedLeaf)
         sink.stop()
         val stats = sink.snapshot()
         val b = incumbents.current()
@@ -879,6 +880,7 @@ internal class ResumableMinimize(
     }
 
     private fun terminalUndecided(): MinimizeResult {
+        observeIncomplete(SearchEvent.BacktrackIncomplete.Path.Component)
         sink.stop()
         val stats = sink.snapshot()
         val b = incumbents.current()
@@ -887,6 +889,10 @@ internal class ResumableMinimize(
         } else {
             MinimizeResult.Unknown(TerminationReason.Unsupported, stats)
         }
+    }
+
+    private fun observeIncomplete(path: SearchEvent.BacktrackIncomplete.Path) {
+        params.onEvent?.invoke(SearchEvent.BacktrackIncomplete(path, searchSession.executionControls.stopCause))
     }
 
     private fun terminalBudget(): MinimizeResult {

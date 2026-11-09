@@ -1616,6 +1616,11 @@ packages retain no floating vectors or ordered basis; exact factor reuse still r
 its existing matrix and ordered-basis compatibility checks. Edits and owner retirement
 invalidate checked packages. Cache admission and arithmetic budgets retain their limits.
 
+Exact dual checks validate the complete input before skipping products with exactly
+zero multipliers. Skipped row and matrix entries retain their visit charges and
+cancellation polling; reduced-cost signs, required bound sides and source support
+remain part of the complete check in both fixed-width and arbitrary precision.
+
 Claim phases report inclusive certification time, existing charged work and terminal
 refusal, including unsupported authority, missing bound sides, scalar limits, singularity,
 resource stops and policy refusal. These work totals overlap the certifier ledger and

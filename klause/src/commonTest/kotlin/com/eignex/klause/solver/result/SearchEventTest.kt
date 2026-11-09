@@ -71,6 +71,7 @@ class SearchEventTest {
         assertEquals(incumbents.map { it.objective }, incumbents.map { it.objective }.sortedDescending())
         val streamed = improvements.filterIsInstance<MinimizeResult.BestFound>().size
         assertTrue(incumbents.size >= streamed, "events $incumbents vs streamed $streamed")
+        assertTrue(events.none { it is SearchEvent.BacktrackIncomplete })
     }
 
     @Test
