@@ -405,13 +405,17 @@ private class FixedReconstructionVerifier(
         meter.storage((a.m.toLong() + a.size) * 48L)
         val y = multipliers.map { from(it) }
         var value = if (ray) from(BigFraction.ZERO) else from(a.constant)
-        for (i in y.indices) value = plus(value, times(y[i], from(a.rhs[i])))
+        for (i in y.indices) {
+            if (y[i].isZero) meter.step() else value = plus(value, times(y[i], from(a.rhs[i])))
+        }
         val reduced = ArrayList<BigFraction>(a.size)
         val selected = ArrayList<ExactSimplexBound>()
         var strict = false
         for (j in 0 until a.size) {
             var d = if (ray) from(BigFraction.ZERO) else from(a.costs[j])
-            for ((row, coefficient) in a.matrix[j]) d = minus(d, times(y[row], from(coefficient)))
+            for ((row, coefficient) in a.matrix[j]) {
+                if (y[row].isZero) meter.step() else d = minus(d, times(y[row], from(coefficient)))
+            }
             val sign = sign(d)
             if (sign != 0) {
                 val upper = sign < 0
@@ -485,13 +489,17 @@ private class BigReconstructionVerifier(
         meter.storage((a.m.toLong() + a.size) * 48L)
         val y = multipliers.map { from(it) }
         var value = if (ray) from(BigFraction.ZERO) else from(a.constant)
-        for (i in y.indices) value = plus(value, times(y[i], from(a.rhs[i])))
+        for (i in y.indices) {
+            if (y[i].isZero) meter.step() else value = plus(value, times(y[i], from(a.rhs[i])))
+        }
         val reduced = ArrayList<BigFraction>(a.size)
         val selected = ArrayList<ExactSimplexBound>()
         var strict = false
         for (j in 0 until a.size) {
             var d = if (ray) from(BigFraction.ZERO) else from(a.costs[j])
-            for ((row, coefficient) in a.matrix[j]) d = minus(d, times(y[row], from(coefficient)))
+            for ((row, coefficient) in a.matrix[j]) {
+                if (y[row].isZero) meter.step() else d = minus(d, times(y[row], from(coefficient)))
+            }
             val sign = sign(d)
             if (sign != 0) {
                 val upper = sign < 0
