@@ -154,6 +154,101 @@ class SearchRunTest {
     }
 
     @Test
+    fun `a cancelled leaf check should retry before exhausting completed coverage`() {
+        for (continuation in listOf(SearchModelContinuation.Chronological, SearchModelContinuation.BlockAtRoot)) {
+            var cancelled = false
+            var interrupted = false
+            val checks = ArrayList<Boolean>()
+            val cp = CpSearchComponent(
+                PropagationSession(Problem(1, 0, emptyArray(), emptyArray()).bake()),
+                branching = CpBranching.None,
+            )
+            val component = object : SearchComponent {
+                override fun check(context: SearchContext): ComponentCheck {
+                    checks += checkNotNull(context.boolValue(0))
+                    if (!interrupted) {
+                        interrupted = true
+                        cancelled = true
+                        return ComponentCheck.Indeterminate
+                    }
+                    return ComponentCheck.Feasible
+                }
+            }
+            val session = SearchSession(listOf(cp, component), cancellation = Cancellation { cancelled })
+            session.initialize()
+            val run = session.openRun(1, modelContinuation = continuation, lifecycle = object : SearchRunLifecycle {
+                override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
+            })
+
+            assertIs<SearchRunEvent.Paused>(run.next())
+            assertEquals(listOf(false), checks)
+            cancelled = false
+
+            assertEquals(false, assertIs<SearchRunEvent.Satisfied>(run.next()).model.valueOf(SearchBoolValue(0)))
+            assertEquals(true, assertIs<SearchRunEvent.Satisfied>(run.next()).model.valueOf(SearchBoolValue(0)))
+            assertEquals(SearchRunEvent.Exhausted, run.next())
+            assertEquals(listOf(false, false, true), checks)
+        }
+    }
+
+    @Test
+    fun `a cancellation pause should preserve genuinely unresolved sibling coverage`() {
+        for (continuation in listOf(SearchModelContinuation.Chronological, SearchModelContinuation.BlockAtRoot)) {
+            for (unresolvedBeforePause in listOf(false, true)) {
+                var cancelled = false
+                var interrupted = false
+                val cp = CpSearchComponent(
+                    PropagationSession(Problem(1, 0, emptyArray(), emptyArray()).bake()),
+                    branching = CpBranching.None,
+                )
+                val component = object : SearchComponent {
+                    override fun check(context: SearchContext): ComponentCheck {
+                        val value = checkNotNull(context.boolValue(0))
+                        if (!interrupted && value == unresolvedBeforePause) {
+                            interrupted = true
+                            cancelled = true
+                            return ComponentCheck.Indeterminate
+                        }
+                        return if (value) ComponentCheck.Feasible else ComponentCheck.Indeterminate
+                    }
+                }
+                val session = SearchSession(listOf(cp, component), cancellation = Cancellation { cancelled })
+                session.initialize()
+                val run = session.openRun(1, modelContinuation = continuation, lifecycle = object : SearchRunLifecycle {
+                    override fun onCancellation(context: SearchContext): SearchRunDisposition =
+                        SearchRunDisposition.Pause
+                })
+
+                assertIs<SearchRunEvent.Paused>(run.next())
+                cancelled = false
+
+                assertEquals(true, assertIs<SearchRunEvent.Satisfied>(run.next()).model.valueOf(SearchBoolValue(0)))
+                assertEquals(SearchRunEvent.Indeterminate.Component, run.next())
+            }
+        }
+    }
+
+    @Test
+    fun `cancellation should retain unresolved coverage when the lifecycle reports exhaustion`() {
+        var cancelled = false
+        val component = object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck {
+                cancelled = true
+                return ComponentCheck.Indeterminate
+            }
+        }
+        val session = SearchSession(listOf(component), cancellation = Cancellation { cancelled })
+        session.initialize()
+        val run = session.openRun(0, lifecycle = object : SearchRunLifecycle {
+            override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Exhausted
+        })
+
+        val result = run.next()
+
+        assertEquals(SearchRunEvent.Indeterminate.Component, result)
+    }
+
+    @Test
     fun `solution notification should precede model assembly`() {
         var notified = false
         val key = SearchModelKey(Boolean::class)

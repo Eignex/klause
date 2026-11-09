@@ -122,7 +122,7 @@ internal class LinearIncumbentCompletion(
                 budget.observe(preparation = columns.size.toLong())
                 budget.funding?.charge(0L, allocation)
                 if (budget.funding?.exhausted == true) return@recovery null
-                val costs = columns.map { query.costs[it] }
+                val costs = List(columns.size) { query.costs[columns[it]] }
                 val objective = costs.takeIf { it.any { cost -> !cost.isZero } }
                 val residual = attempt.residual ?: LinearResidualCompletion(budget, SparseSourceLpPolicy())
                     .also { attempt.residual = it }

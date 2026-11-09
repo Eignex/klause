@@ -13,6 +13,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.FloatInterval
 import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableIntObjectMap
 import kotlin.math.abs
 import kotlin.math.pow
 
@@ -58,7 +60,7 @@ internal fun prepareFloatGridColumns(
         }
         if (definition != null && definition.output in auxiliary) definitions += definition
     }
-    val waiting = HashMap<Int, MutableList<Int>>()
+    val waiting = MutableIntObjectMap<IntArrayList>()
     val missing = IntArray(definitions.size)
     val ready = IntArrayDeque()
     for ((index, definition) in definitions.withIndex()) {
@@ -67,13 +69,15 @@ internal fun prepareFloatGridColumns(
             if (cancellation()) return null
             if (input !in columns) {
                 missing[index]++
-                waiting.getOrPut(input) { ArrayList() } += index
+                waiting.getOrPut(input) { IntArrayList(1) }.add(index)
             }
         }
         if (missing[index] == 0) ready.addLast(index)
     }
     fun release(output: Int): Boolean {
-        for (index in waiting.remove(output).orEmpty()) {
+        val dependents = waiting[output] ?: return true
+        waiting.remove(output)
+        dependents.forEach { index ->
             cancellation.charge(1)
             if (cancellation()) return false
             if (--missing[index] == 0) ready.addLast(index)

@@ -8,8 +8,8 @@ import com.eignex.klause.factor.arithmetic.GridProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealAbs
-import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
+import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
@@ -23,6 +23,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.FloatInterval
+import com.eignex.util.collections.IntArrayList
 
 internal data class FloatGridVariable(
     val source: SourceRealId,
@@ -110,7 +111,7 @@ internal fun prepareFloatGrid(request: FloatGridRequest, cancellation: Cancellat
     }
     val rename = VarRemap(IntArray(source.numBoolVars) { it }, IntArray(source.numIntVars) { it }, retained)
     val factors = ArrayList<Factor>()
-    val origins = ArrayList<Int>()
+    val origins = IntArrayList()
     for ((id, factor) in source.factors.withIndex()) {
         stop.charge(1)
         if (stop()) return FloatGridPreparation.Declined(FloatGridDecline.RESOURCE)
@@ -128,7 +129,7 @@ internal fun prepareFloatGrid(request: FloatGridRequest, cancellation: Cancellat
             stop.charge(1)
             if (stop()) return FloatGridPreparation.Declined(FloatGridDecline.RESOURCE)
             factors += converted
-            origins += id
+            origins.add(id)
         }
     }
     factors.addAll(optional.factors)

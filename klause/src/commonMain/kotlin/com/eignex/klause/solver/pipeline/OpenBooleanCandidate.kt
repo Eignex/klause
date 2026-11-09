@@ -13,6 +13,9 @@ import com.eignex.klause.solver.result.HintIndexOutcome
 import com.eignex.klause.solver.result.OpenHintUsageSink
 import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.MutableIntObjectMap
 
 /** Local-search work allowance spent on one candidate draw. */
 private const val DEFAULT_CANDIDATE_FLIPS = 20_000L
@@ -145,33 +148,33 @@ internal class SourceConjunctionHints private constructor(
             return null
         }
         if (!consultation.reserve(4)) return null
-        val values = HashMap<Int, Boolean>()
-        val visiting = HashSet<Int>()
-        val stack = arrayListOf(variable)
-        while (stack.isNotEmpty()) {
+        val values = MutableIntObjectMap<Boolean>()
+        val visiting = IntHashSet()
+        val stack = IntArrayList(1).also { it.add(variable) }
+        while (!stack.isEmpty()) {
             if (!consultation.visit(3) || values.size + visiting.size + stack.size > MAX_INDEX_ENTRIES) return null
             val current = stack.last()
-            if (current in values) {
-                stack.removeAt(stack.lastIndex)
+            if (values.containsKey(current)) {
+                stack.truncateTo(stack.size - 1)
                 continue
             }
             if (current in inputs) {
                 val value = consultation.primitive(current) ?: return null
                 if (!consultation.reserve()) return null
-                stack.removeAt(stack.lastIndex)
-                values[current] = value
+                stack.truncateTo(stack.size - 1)
+                values.put(current, value)
                 continue
             }
             val gate = gates[current] ?: return null
             if (current !in visiting) {
                 if (values.size + visiting.size + stack.size + gate.inputs.size + 1 > MAX_INDEX_ENTRIES) return null
-                visiting += current
+                visiting.add(current)
                 if (!consultation.reserve(gate.inputs.size + 1)) return null
                 for (literal in gate.inputs) {
                     if (!consultation.visit(1)) return null
                     val input = Lit.variable(literal)
                     if (input in visiting) return null
-                    if (input !in values) stack += input
+                    if (!values.containsKey(input)) stack.add(input)
                 }
             } else {
                 var value = true
@@ -181,8 +184,8 @@ internal class SourceConjunctionHints private constructor(
                     value = value && input == Lit.isPositive(literal)
                 }
                 visiting.remove(current)
-                stack.removeAt(stack.lastIndex)
-                values[current] = value == Lit.isPositive(gate.target)
+                stack.truncateTo(stack.size - 1)
+                values.put(current, value == Lit.isPositive(gate.target))
                 if (!consultation.reserve()) return null
             }
         }

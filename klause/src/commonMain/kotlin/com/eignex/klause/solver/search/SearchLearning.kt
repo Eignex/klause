@@ -4,6 +4,7 @@ import com.eignex.klause.solver.result.GLUE_LBD
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 import kotlin.time.TimeSource
 
 internal class SearchLearning(
@@ -239,7 +240,7 @@ internal class SearchLearning(
     fun learn(literals: IntArray, host: ClauseWatchHost) {
         lifecycle.note(LearnedKind.Clause, LearnedStage.Constructed)
         if (literals.isEmpty()) return
-        val levels = HashSet<Int>(literals.size)
+        val levels = IntHashSet(literals.size)
         for (literal in literals) { chargeOrdinary(1L); levels.add(host.levelOf(literal)) }
         chargeOrdinary(literals.size.toLong() + 32L)
         val row = learned.add(literals.copyOf(), levels.size)

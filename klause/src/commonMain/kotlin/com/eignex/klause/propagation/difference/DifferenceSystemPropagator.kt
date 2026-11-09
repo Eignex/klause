@@ -2,13 +2,14 @@ package com.eignex.klause.propagation.difference
 
 import com.eignex.klause.arithmetic.difference.DifferenceEdge
 import com.eignex.klause.arithmetic.difference.DifferenceFragment
-import com.eignex.klause.arithmetic.difference.indexOfSorted
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 
 /**
  * Maximum open heads visited per refutation sweep. Each costs at most one shortest-path search;
@@ -147,15 +148,15 @@ internal class DifferenceSystemPropagator(
     init {
         // Numbered over every endpoint, including those only a domain edge mentions, so the vertex space
         // does not depend on which edges the graph ends up holding.
-        val seen = HashSet<Int>()
+        val seen = IntHashSet()
         for (e in edges) {
             if (e.source != DifferenceFragment.ZERO) seen.add(e.source)
             if (e.target != DifferenceFragment.ZERO) seen.add(e.target)
         }
-        nodes = seen.toIntArray().sortedArray()
+        nodes = seen.toIntArray().also { it.sort() }
         val zeroNode = nodes.size
         fun nodeOf(endpoint: Int) =
-            if (endpoint == DifferenceFragment.ZERO) zeroNode else indexOfSorted(nodes, endpoint)
+            if (endpoint == DifferenceFragment.ZERO) zeroNode else nodes.binarySearchInt(endpoint).coerceAtLeast(-1)
         numVertices = nodes.size + 1
 
         guards = IntArray(edges.size)
