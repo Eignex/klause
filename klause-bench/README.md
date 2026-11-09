@@ -57,6 +57,14 @@ are separate from exact cutoff context, which this observer does not capture.
 `MpsProofFrontier selection=true` exports a captured template's actual
 `generationScope` separately from the query's current verification scope.
 Missing generation provenance stays unavailable.
+With `selection=true aggregate-probe=true`, `aggregate-query=ID` restricts post-solve
+inspection to one retained query. `aggregate-work` and `aggregate-allocation` set
+the inspection's cumulative modeled work and byte allowances, including proof checks; they
+default to 20,000,000 and 67,108,864 and cannot exceed those ceilings.
+The summary reports selected and examined queries separately. A missing query or a
+stopped inspection establishes no absence of useful candidates. Atomic work can
+overspend an allowance; its cost remains recorded. Inspection grants
+are separate from solver grants, and inspection does not change the running policy.
 Imported proof records retain their original scope, consequence or bound payload,
 and nested derivation. Depth and cancellation limits mark withheld proofs
 unavailable.
