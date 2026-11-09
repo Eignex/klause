@@ -63,6 +63,7 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
         }
     }
     hints.compareDirectionalRankings(directional, reference, params.cancellation)
+    if (directional != null) return hints.selectVariable(directional, best, cancelled = { params.cancellation() })
     hints.selected(null)
     return best
 }

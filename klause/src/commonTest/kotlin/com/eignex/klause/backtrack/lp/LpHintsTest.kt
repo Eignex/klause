@@ -35,6 +35,46 @@ import kotlin.test.assertTrue
 
 class LpHintsTest {
     @Test
+    fun `disabled reliable direction ordering preserves exhaustive alternatives`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+        val variable = VarRef.IntVar(0)
+        val alternatives = listOf(SearchDecision.IntAtMost(0, 2), SearchDecision.IntAtLeast(0, 3))
+        for (apply in listOf(false, true)) {
+            val events = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = true, applyAdvice = apply,
+                observe = events::add, orderReliableDirections = false)
+            repeat(2) {
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+                hints.recordObjective(relaxation, 10.0)
+                hints.branch(variable)
+                for (up in listOf(false, true)) {
+                    hints.commit(if (up) alternatives[1] else alternatives[0], 1)
+                    hints.beginNode(1, 100.0)
+                    hints.record(relaxation, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(0))
+                    hints.recordObjective(relaxation, if (up) 11.0 else 13.0)
+                }
+            }
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+            assertTrue(hints.directionalScore(variable).isFinite())
+            hints.branch(variable)
+
+            val ordered = hints.orderAlternatives(variable, alternatives) { false }
+            hints.commit(ordered.first(), 1)
+
+            assertEquals(alternatives, ordered)
+            assertTrue(events.none { it.startsWith("PASSIVE_DIRECTION_") })
+            assertTrue(events.none { it == "PASSIVE_EXPLORATION_COMMITTED" })
+        }
+    }
+
+    @Test
     fun `applied and withheld advice share ordinary child collection`() {
         for (apply in listOf(false, true)) {
             val builder = LpBuilder()

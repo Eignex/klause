@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
 
 class ResumableMinimizeDirectionalTest {
     @Test
-    fun `default finite search consumes child direction advice across cooperative slices`() {
+    fun `default finite search consumes variable advice across cooperative slices`() {
         val blocks = 3
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
@@ -53,7 +53,7 @@ class ResumableMinimizeDirectionalTest {
             var slices = 0
             while (slices++ < 128 && !search.isDone &&
                 (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
-                    ?.get("PASSIVE_DIRECTION_COMMITTED") ?: 0L) == 0L
+                    ?.get("PASSIVE_VARIABLE_COMMITTED") ?: 0L) == 0L
             ) {
                 search.runSlice(Cancellation.Never, 1000L, 128L) {}
             }
@@ -62,10 +62,15 @@ class ResumableMinimizeDirectionalTest {
             val diagnostic = "$observations; solves=${search.stats.lp.solves.sum}; prunes=${search.stats.lp.pruned.sum}"
             assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
             assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
-            assertTrue((observations["PASSIVE_DIRECTION_COMMITTED"] ?: 0L) > 0L, diagnostic)
-            assertEquals(0L, observations["CONSUMED"] ?: 0L, diagnostic)
-            assertEquals(0L, observations["PASSIVE_VARIABLE_CONSUMED"] ?: 0L, diagnostic)
-            assertEquals(0L, observations["PASSIVE_VARIABLE_COMMITTED"] ?: 0L, diagnostic)
+            assertTrue((observations["PASSIVE_VARIABLE_COMMITTED"] ?: 0L) > 0L, diagnostic)
+            assertTrue((observations["CONSUMED"] ?: 0L) > 0L, diagnostic)
+            assertEquals(0L, observations["PASSIVE_VARIABLE_COMMIT_WITHHELD"] ?: 0L, diagnostic)
+            assertEquals(0L, observations["PASSIVE_DIRECTION_CHECK"] ?: 0L, diagnostic)
+            assertEquals(0L, observations["PASSIVE_DIRECTION_SELECTION"] ?: 0L, diagnostic)
+            assertEquals(0L, observations["PASSIVE_DIRECTION_CONSUMED"] ?: 0L, diagnostic)
+            assertEquals(0L, observations["PASSIVE_DIRECTION_WITHHELD"] ?: 0L, diagnostic)
+            assertEquals(0L, observations["PASSIVE_DIRECTION_COMMITTED"] ?: 0L, diagnostic)
+            assertEquals(0L, observations["PASSIVE_DIRECTION_COMMIT_WITHHELD"] ?: 0L, diagnostic)
         }
     }
 

@@ -29,6 +29,7 @@ internal class LpHints(
     private val observe: (String) -> Unit = {},
     private val charge: (Long) -> Unit = {},
     private val applyAdvice: Boolean = true,
+    private val orderReliableDirections: Boolean = true,
 ) : LpHintSink {
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
     private val history = LpDirectionalHistory(observe)
@@ -267,7 +268,7 @@ internal class LpHints(
         direction.clear()
         passiveExploration?.clear()
         if (!cutoff.isFinite()) return alternatives
-        if (history.hasTwoSidedSamples) {
+        if (orderReliableDirections && history.hasTwoSidedSamples) {
             charge(4L)
             observe("PASSIVE_DIRECTION_CHECK")
             if (cancelled() || !passivePointCurrent()) return alternatives
