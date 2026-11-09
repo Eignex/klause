@@ -86,6 +86,11 @@ A standalone `cp` control sets both `param.bt-arm=LABEL` and `param.arms=1`.
 Named recipes repeat across the configured worker slots otherwise. Check the
 emitted `arm.*` entries to verify the actual worker count before comparing controls.
 
+Set the bench request's `verbose=false` to suppress CLI progress logging while
+retaining companion parameters. `verbose=true` requests logging; omission infers it
+from those parameters. Quiet comparisons also use `debug=false`,
+`param.portfolio-progress=false` and `harness-jfr=false`. CLI statistics remain enabled.
+
 `bench.profile.LocalSearchTrajectory` accepts hash-pinned XCSP3 sources and
 `format=mps` for exactly retained pure-integer minimization sources.
 `preparationEngine=mixed|ls` selects the preparation route and `seed` its seed.
