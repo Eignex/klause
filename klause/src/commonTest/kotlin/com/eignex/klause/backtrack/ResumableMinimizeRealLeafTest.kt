@@ -822,8 +822,10 @@ class ResumableMinimizeRealLeafTest {
                 assertEquals(TerminationReason.Unsupported, result.reason)
                 assertTrue(search.isDone)
                 assertSame(result, search.runSlice(Cancellation.Never, 1000L, 256L) {})
-                assertEquals(listOf(SearchEvent.BacktrackIncomplete(SearchEvent.BacktrackIncomplete.Path.Component, cause)),
-                    events.filterIsInstance<SearchEvent.BacktrackIncomplete>())
+                assertEquals(
+                    listOf(SearchEvent.BacktrackIncomplete(SearchEvent.BacktrackIncomplete.Path.Component, cause)),
+                    events.filterIsInstance<SearchEvent.BacktrackIncomplete>(),
+                )
             }
         }
     }
