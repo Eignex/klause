@@ -883,22 +883,23 @@ class ResumableMinimizeTest {
         var attempts = 0
         var firstBranchWork: Long? = null
         lateinit var current: ResumableSearch
+        val cancellation = cancelledWhen({ null }, { true }) { cancelled }
         val params = BacktrackParams(
             variableSelector = InputOrder,
             valueSelector = IndomainMin,
             lpPlan = LpPlan(bounding = false),
             objectiveBoundSupplier = { 5.0 },
-            cancellation = cancelledWhen({ null }, { true }) { cancelled },
+            cancellation = cancellation,
             branchObserver = object : SearchBranchAttemptObserver {
                 override fun onAttempt(decision: SearchDecision, context: SearchContext) {
                     attempts++
-                    firstBranchWork = current.work
+                    if (firstBranchWork == null) firstBranchWork = current.work
                     cancelled = true
                 }
             },
         )
         current = BacktrackSolver(problem).resumable(objective, params)
-        current.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+        current.use { it.runSlice(cancellation, Long.MAX_VALUE, -1L) {} }
         val grant = assertNotNull(firstBranchWork) + 1L
         assertTrue(attempts > 0)
 
@@ -916,14 +917,14 @@ class ResumableMinimizeTest {
             val offered = mutableListOf<Double>()
             current = BacktrackSolver(problem).resumable(objective, params.copy(pooledIncumbents = hints))
             current.use { search ->
-                val result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, grant) { offered += it.objective }
+                val result = search.runSlice(cancellation, Long.MAX_VALUE, grant) { offered += it.objective }
 
                 assertNull(result)
                 assertTrue(offered.isEmpty())
                 assertEquals(0, attempts)
                 assertTrue(search.work >= grant)
                 val paid = search.work
-                search.runSlice(Cancellation.Never, Long.MAX_VALUE, 0L) {}
+                search.runSlice(cancellation, Long.MAX_VALUE, 0L) {}
                 assertEquals(paid, search.work)
             }
         }
