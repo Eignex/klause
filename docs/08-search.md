@@ -259,8 +259,10 @@ linear completion owner reuses the point of its last numerical check, and the op
 `openHintFlips` provider indexes source clauses and prefers the polarity that breaks
 fewer of them. Index construction is bounded and charged to the opening token; see
 [native arithmetic allowances](06-sessions.md#native-arithmetic-allowances).
-Solution-guided LP bounding may also order values by verified peer incumbents until
-its first local witness. Hints supply no incumbent, pruning or publication authority.
+Solution-guided LP bounding gives verified peer incumbents priority over phase and
+LP value ordering before its first local witness and after adopting a better pooled
+incumbent. Its next local witness ends that priority. Hints supply no incumbent,
+pruning or publication authority.
 
 A non-restarting retained complete optimization worker with an external cutoff reads
 the current pooled assignment at its first root and revalidates it before using it

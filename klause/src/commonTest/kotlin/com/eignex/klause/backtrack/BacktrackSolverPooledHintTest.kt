@@ -14,6 +14,10 @@ import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.solver.search.SearchBranchAttemptObserver
+import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -71,6 +75,40 @@ class BacktrackSolverPooledHintTest {
         BacktrackSolver(problem().bake()).minimize(LinearObjective(boolWeights = weights), params)
 
         assertEquals(0, firstRead)
+    }
+
+    @Test
+    fun `a better pooled LP guide should override a saved phase after a local witness`() {
+        for (lp in listOf(false, true)) {
+            val objectives = ArrayList<Double>()
+            val exchange = IncumbentExchange.minimizing<Sample>()
+            var nextBranch: SearchDecision? = null
+            val params = BacktrackParams(
+                variableSelector = InputOrder,
+                valueSelector = SolutionGuided(IndomainMin),
+                phaseSaving = true,
+                solutionPhasing = false,
+                lpPlan = LpPlan(bounding = lp, branching = false, rootBudgetMillis = 0L, rootCutHarvest = false),
+                pooledIncumbents = exchange,
+                cancellation = Cancellation { nextBranch != null },
+                branchObserver = object : SearchBranchAttemptObserver {
+                    override fun onAttempt(decision: SearchDecision, context: SearchContext) {
+                        if (objectives.isNotEmpty() && nextBranch == null) nextBranch = decision
+                    }
+                },
+                onEvent = {
+                    if (it is SearchEvent.Incumbent) {
+                        objectives += it.objective
+                        exchange.offer(pooledHint, 15.0)
+                    }
+                },
+            )
+
+            BacktrackSolver(problem().bake()).minimize(LinearObjective(boolWeights = weights), params)
+
+            assertEquals(listOf(16.0), objectives)
+            assertEquals(SearchDecision.Bool(Lit.make(0, lp)), nextBranch)
+        }
     }
 
     @Test
