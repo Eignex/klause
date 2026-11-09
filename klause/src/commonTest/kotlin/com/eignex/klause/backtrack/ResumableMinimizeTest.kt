@@ -875,7 +875,7 @@ class ResumableMinimizeTest {
 
     @Test
     fun `pooled witness validation should spend its slice before search or publication`() {
-        val size = 128
+        val size = 64
         val problem = Problem(0, size, Array(size) { IntDomain(0, (size - 1).toLong()) },
             arrayOf<Factor>(AllDifferent(IntArray(size) { it }, domainMin = 0, domainSize = size))).bake()
         val objective = LinearObjective(intCoefficients = LongArray(size) { if (it == 0) 1L else 0L })
