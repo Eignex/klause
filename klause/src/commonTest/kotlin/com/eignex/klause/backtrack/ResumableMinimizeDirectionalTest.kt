@@ -24,8 +24,8 @@ import kotlin.test.assertTrue
 
 class ResumableMinimizeDirectionalTest {
     @Test
-    fun `default finite search consumes both directional gains across cooperative slices`() {
-        val blocks = 4
+    fun `default finite search consumes child direction advice across cooperative slices`() {
+        val blocks = 3
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
         repeat(blocks) { block ->
@@ -40,6 +40,7 @@ class ResumableMinimizeDirectionalTest {
             valueSelector = IndomainMin,
             randomSeed = 3L,
             maxDecisions = 1000L,
+            objectiveBoundSupplier = { 100.0 },
             lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
                 boundMaxOpsPerNode = 0L),
             componentFactory = { listOf(object : SearchComponent {
@@ -47,11 +48,12 @@ class ResumableMinimizeDirectionalTest {
             }) },
         )
 
-        val objective = LinearObjective(intCoefficients = LongArray(variables) { 1L })
+        val objective = LinearObjective(intCoefficients = LongArray(variables) { if (it % 3 == 0) 1L else 2L })
         ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
             var slices = 0
             while (slices++ < 128 && !search.isDone &&
-                (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("CONSUMED") ?: 0L) == 0L
+                (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
+                    ?.get("PASSIVE_DIRECTION_COMMITTED") ?: 0L) == 0L
             ) {
                 search.runSlice(Cancellation.Never, 1000L, 32L) {}
             }
@@ -60,7 +62,10 @@ class ResumableMinimizeDirectionalTest {
             val diagnostic = "$observations; solves=${search.stats.lp.solves.sum}"
             assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
             assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
-            assertTrue((observations["CONSUMED"] ?: 0L) > 0L, diagnostic)
+            assertTrue((observations["PASSIVE_DIRECTION_COMMITTED"] ?: 0L) > 0L, diagnostic)
+            assertEquals(0L, observations["CONSUMED"] ?: 0L, diagnostic)
+            assertEquals(0L, observations["PASSIVE_VARIABLE_CONSUMED"] ?: 0L, diagnostic)
+            assertEquals(0L, observations["PASSIVE_VARIABLE_COMMITTED"] ?: 0L, diagnostic)
         }
     }
 

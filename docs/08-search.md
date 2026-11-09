@@ -301,33 +301,30 @@ subtraction, preserving small gains when the constant exceeds floating precision
 
 Directional guidance is enabled by default for finite optimization with LP bounding
 and branching. `BacktrackParams.lpDirectionalGains=false` or `lp-directional-gains=false`
-disables collection and advice; ordinary recipes inherit the shared default. Two recent samples
-in each direction permit the geometric mean of the predicted lower and upper gains;
-both gains must be positive and finite. Otherwise reduced-cost/fractionality
-scoring and the configured selector keep their precedence. Directional scores compete
-with each other before fallback, so objective units are not mixed with reduced costs.
-The weighted minimum/maximum gain score supplies a shadow nomination on the same
-point. Fixed counters distinguish ranking disagreements and unavailable nominations;
-these proposals remain separate from committed choices. Both lookups and the comparison
-charge the existing LP overhead allowance.
+disables collection and advice; ordinary recipes inherit the shared default.
+Variable selection retains reduced-cost/fractionality scoring and the configured
+selector. Two recent samples in each direction permit diagnostic variable scores
+from the geometric mean and weighted minimum/maximum of the predicted gains.
+Both gains must be positive and finite. Fixed counters distinguish ranking
+disagreements and unavailable nominations; these diagnostic proposals do not
+replace the selected variable. Both lookups and the comparison charge the existing
+LP overhead allowance.
 Saturated scope-wide sample counts skip history lookups while two-sided reliability
 is impossible. Passing that prerequisite still requires the variable's own recent
 samples; it grants no score or authority. History reset clears the prerequisite.
-Selection rechecks that the fractional point and optimum belong to the same current
-relaxation and exact state, and declines on cancellation or stale information. A
-nomination retains only its variable, point and solve stamp. Comparison and
-changed-proposal observations remain separate from the actual variable and matching
-adjacent split committed by search; replacement, retraction and retirement discard
-an unconsumed nomination.
 Disabled directional gains collect no history or retained model scope and charge no
 history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
 
-With a finite incumbent, the same reliable history can put the smaller predicted
+With a finite incumbent cutoff, the same reliable history can put the smaller predicted
 objective gain first in the selected variable's existing two-child split. Both
 predictions must be positive and finite; ties and unavailable information keep
 ordinary order. Reordering preserves the adjacent thresholds and exhaustive child
-set. A fresh nomination credits only its matching first commitment, separately from
-variable-choice attribution. Direction checks spend the existing overhead allowance.
+set. Selection rechecks that the fractional point and optimum belong to the same
+current relaxation and exact state, and declines on cancellation or stale information.
+A fresh nomination credits only its matching first commitment. Comparison and changed
+proposals remain separate from actual commitments; replacement, retraction and
+retirement discard an unconsumed nomination. Direction checks spend the existing
+overhead allowance.
 
 Before both directions are reliable, a bounded collector can visit the selected
 variable's less-sampled child first. It requires a finite incumbent, a fresh matching
