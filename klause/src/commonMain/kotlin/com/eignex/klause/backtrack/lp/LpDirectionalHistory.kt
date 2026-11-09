@@ -41,6 +41,8 @@ internal class LpDirectionalHistory(
 
     val hasTwoSidedSamples: Boolean get() = upSamples >= RELIABILITY && downSamples >= RELIABILITY
 
+    val hasObservations: Boolean get() = upSamples > 0 || downSamples > 0
+
     fun clear(report: Boolean = true) {
         gains.clear()
         parents.clear()
@@ -154,6 +156,18 @@ internal class LpDirectionalHistory(
         val up = history.up.mean * (1.0 - fraction)
         if (!down.isFinite() || !up.isFinite() || down <= 0.0 || up <= 0.0 || down == up) return null
         return up < down
+    }
+
+    fun preferUnderObservedDirection(variable: VarRef, value: Double): Boolean? {
+        if (!value.isFinite() || (variable is VarRef.Bool && value !in 0.0..1.0)) return null
+        val history = gains[variable] ?: return null
+        expire(history.down)
+        expire(history.up)
+        val fraction = value - floor(value)
+        if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
+        if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) return null
+        if (history.down.count == history.up.count) return null
+        return history.up.count < history.down.count
     }
 
     private fun expire(direction: Direction) {

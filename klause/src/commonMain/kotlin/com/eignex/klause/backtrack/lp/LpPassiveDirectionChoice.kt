@@ -8,10 +8,30 @@ internal class LpPassiveDirectionChoice(
     private val applyAdvice: Boolean,
     private val observe: (String) -> Unit,
     private val charge: (Long) -> Unit,
+    private val kind: Kind = Kind.ADVICE,
 ) {
+    enum class Kind(prefix: String) {
+        ADVICE("PASSIVE_DIRECTION"), EXPLORATION("PASSIVE_EXPLORATION");
+
+        val selection = "${prefix}_SELECTION"
+        val stale = "${prefix}_STALE"
+        val compared = "${prefix}_COMPARED"
+        val proposalChanged = "${prefix}_PROPOSAL_CHANGED"
+        val proposalAgreed = "${prefix}_PROPOSAL_AGREED"
+        val consumed = "${prefix}_CONSUMED"
+        val withheld = "${prefix}_WITHHELD"
+        val commitCheck = "${prefix}_COMMIT_CHECK"
+        val committed = "${prefix}_COMMITTED"
+        val commitChanged = "${prefix}_COMMIT_CHANGED"
+        val commitWithheld = "${prefix}_COMMIT_WITHHELD"
+        val commitWithheldChanged = "${prefix}_COMMIT_WITHHELD_CHANGED"
+    }
+
     private var first: SearchDecision? = null
     private var stamp = -1
     private var changed = false
+
+    val hasNomination: Boolean get() = first != null
 
     fun clear() {
         first = null
@@ -28,8 +48,8 @@ internal class LpPassiveDirectionChoice(
     ): List<SearchDecision> {
         clear()
         charge(16L)
-        observe("PASSIVE_DIRECTION_SELECTION")
-        if (!fresh()) return alternatives.also { observe("PASSIVE_DIRECTION_STALE") }
+        observe(kind.selection)
+        if (!fresh()) return alternatives.also { observe(kind.stale) }
         val fraction = point - floor(point)
         if (!point.isFinite() || fraction <= 1e-6 || fraction >= 1.0 - 1e-6) return alternatives
         val down: SearchDecision
@@ -48,11 +68,11 @@ internal class LpPassiveDirectionChoice(
         if (alternatives != listOf(down, up) && alternatives != listOf(up, down)) return alternatives
         val proposal = if (preferUp) up else down
         val differs = alternatives.first() != proposal
-        if (!fresh()) return alternatives.also { observe("PASSIVE_DIRECTION_STALE") }
-        observe("PASSIVE_DIRECTION_COMPARED")
-        observe(if (differs) "PASSIVE_DIRECTION_PROPOSAL_CHANGED" else "PASSIVE_DIRECTION_PROPOSAL_AGREED")
-        observe(if (applyAdvice) "PASSIVE_DIRECTION_CONSUMED" else "PASSIVE_DIRECTION_WITHHELD")
-        if (!fresh()) return alternatives.also { observe("PASSIVE_DIRECTION_STALE") }
+        if (!fresh()) return alternatives.also { observe(kind.stale) }
+        observe(kind.compared)
+        observe(if (differs) kind.proposalChanged else kind.proposalAgreed)
+        observe(if (applyAdvice) kind.consumed else kind.withheld)
+        if (!fresh()) return alternatives.also { observe(kind.stale) }
         first = if (applyAdvice) proposal else alternatives.first()
         stamp = solveStamp
         changed = differs
@@ -62,13 +82,12 @@ internal class LpPassiveDirectionChoice(
     fun commit(decision: SearchDecision, solveStamp: Int, fresh: () -> Boolean) {
         val expected = first ?: return
         charge(4L)
-        observe("PASSIVE_DIRECTION_COMMIT_CHECK")
+        observe(kind.commitCheck)
         val accepted = decision == expected && stamp == solveStamp && fresh()
         val wasChanged = changed
         clear()
         if (!accepted) return
-        observe(if (applyAdvice) "PASSIVE_DIRECTION_COMMITTED" else "PASSIVE_DIRECTION_COMMIT_WITHHELD")
-        if (wasChanged) observe(if (applyAdvice) "PASSIVE_DIRECTION_COMMIT_CHANGED"
-            else "PASSIVE_DIRECTION_COMMIT_WITHHELD_CHANGED")
+        observe(if (applyAdvice) kind.committed else kind.commitWithheld)
+        if (wasChanged) observe(if (applyAdvice) kind.commitChanged else kind.commitWithheldChanged)
     }
 }

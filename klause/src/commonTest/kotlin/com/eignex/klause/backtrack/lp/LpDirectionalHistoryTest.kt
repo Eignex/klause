@@ -9,6 +9,40 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `collection reads prefer only unequal incomplete recent direction counts`() {
+        for (condition in listOf("down", "up", "equal", "reliable", "missing", "expired")) {
+            val history = LpDirectionalHistory({})
+            val variable = VarRef.IntVar(0)
+            if (condition != "missing") repeat(if (condition == "equal") 1 else 2) {
+                history.beginNode(0)
+                history.record(10.0)
+                history.branch(variable, 2.25)
+                val directions = when (condition) {
+                    "up" -> listOf(true)
+                    "equal", "reliable" -> listOf(false, true)
+                    else -> listOf(false)
+                }
+                for (up in directions) {
+                    history.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                    history.beginNode(1)
+                    history.record(11.0)
+                }
+            }
+            if (condition == "expired") repeat(257) { history.beginNode(0) }
+            val expected = when (condition) {
+                "down" -> true
+                "up" -> false
+                else -> null
+            }
+
+            val preferred = history.preferUnderObservedDirection(variable, 2.25)
+
+            assertEquals(expected, preferred)
+            if (preferred != null) assertTrue(history.balancedScore(variable, 2.25).isNaN())
+        }
+    }
+
+    @Test
     fun `discarded observations preserve completed gains without borrowing pending or ancestor objectives`() {
         for (unfinished in listOf("pending", "ancestor")) {
             val history = LpDirectionalHistory({})

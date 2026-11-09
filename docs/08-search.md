@@ -325,6 +325,21 @@ ordinary order. Reordering preserves the adjacent thresholds and exhaustive chil
 set. A fresh nomination credits only its matching first commitment, separately from
 variable-choice attribution. Direction checks spend the existing overhead allowance.
 
+Before both directions are reliable, a bounded collector can visit the selected
+variable's less-sampled child first. It requires a finite incumbent, a fresh matching
+point and optimum, an existing numeric sample, unequal recent directional counts,
+and the same adjacent exhaustive split. Missing or equally sampled histories keep
+ordinary order; reliable gain advice takes precedence. Collection supplies no gain
+estimate or pruning authority. Only the ordinary completed child optimum can train
+history, under the exact pending-observation scope.
+Each worker invocation permits at most 128 collection checks and 32 selection
+attempts, charging 16 work per check, 16 per selection and 4 per commitment check
+to its existing LP overhead allowance. Failed attempts retain their charge, and
+history reset, reseeding and source changes do not renew the collector. Node and
+point invalidation discard its private nomination. Separate fixed counters attribute
+collection and reliable advice. The private advice-withheld control retains the same
+collection policy while withholding reliable choices. Disabled gains create no collector.
+
 Pending parent/child observations share one exact base model and active-row identity.
 Every row or model edit discards the pending measurement and ancestor split records;
 an objective from a different relaxation cannot complete it. Current nominations still
