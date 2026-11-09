@@ -61,13 +61,6 @@ jobs:
       # (linuxArm64, macosArm64) are opt-in via -Ptargets.full and build on release.
 
       # Lint runs separately. Native tests have their own job because Kover instruments JVM tests.
-      - name: Stage the verified lab SDK
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          bash klause-bench/scripts/stage-lab-sdk.sh "$RUNNER_TEMP/lab-bench-sdk"
-          printf 'ORG_GRADLE_PROJECT_labBenchRepository=file://%s\n' "$RUNNER_TEMP/lab-bench-sdk" >> "$GITHUB_ENV"
-
       - name: Run JVM tests with coverage
         run: ./gradlew --refresh-dependencies check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test koverXmlReport :klause-cli:installJvmDist :klause:stageLpProfileJvm
 
@@ -128,13 +121,6 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-konan-${{ hashFiles('**/*.gradle.kts', '**/gradle.properties', '**/gradle-wrapper.properties', '**/*.versions.toml') }}
           restore-keys: ${{ runner.os }}-${{ runner.arch }}-konan-
 
-      - name: Stage the verified lab SDK
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          bash klause-bench/scripts/stage-lab-sdk.sh "$RUNNER_TEMP/lab-bench-sdk"
-          printf 'ORG_GRADLE_PROJECT_labBenchRepository=file://%s\n' "$RUNNER_TEMP/lab-bench-sdk" >> "$GITHUB_ENV"
-
       - name: Run Linux native tests
         run: ./gradlew --refresh-dependencies :klause:linuxX64Test :klause-cli:linkReleaseExecutableLinuxX64 :klause:linkLpProfileReleaseExecutableLinuxX64
 
@@ -184,13 +170,6 @@ jobs:
           path: ~/.konan
           key: ${{ runner.os }}-${{ runner.arch }}-konan-${{ hashFiles('**/*.gradle.kts', '**/gradle.properties', '**/gradle-wrapper.properties', '**/*.versions.toml') }}
           restore-keys: ${{ runner.os }}-${{ runner.arch }}-konan-
-
-      - name: Stage the verified lab SDK
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          bash klause-bench/scripts/stage-lab-sdk.sh "$RUNNER_TEMP/lab-bench-sdk"
-          printf 'ORG_GRADLE_PROJECT_labBenchRepository=file://%s\n' "$RUNNER_TEMP/lab-bench-sdk" >> "$GITHUB_ENV"
 
       - name: Run linter
         run: ./gradlew --refresh-dependencies lintDocs
