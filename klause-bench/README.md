@@ -28,6 +28,8 @@ of its members is materialized locally. Each solve verifies its planned input by
 
 The standard and Linux JVM lab manifests request source snapshots: the lab stages the selected revision as a compact
 Git pack with its original commit identity. Builds and tools use the current revision without requiring ancestors or tags.
+Use `lab/bench-mps-linux.json` for MPS-only selections; it uses the same Linux adapter and runtime without staging
+the MiniZinc compiler. `lab/bench-linux.json` includes that compiler for MiniZinc workloads.
 
 Corpus input indexes are committed under `klause-bench/corpus-index/<collection>.tsv.gz`
 (`path<TAB>sha256<TAB>bytes`), so declared-input planning makes no network requests and
