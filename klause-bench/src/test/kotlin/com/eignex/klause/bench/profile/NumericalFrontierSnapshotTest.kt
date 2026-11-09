@@ -43,6 +43,38 @@ class NumericalFrontierSnapshotTest {
     )
 
     @Test
+    fun `aggregate inspection should visit only the requested retained query`() {
+        val journal = NumericalSelectionSnapshot(Cancellation.Never).journal()
+        val result = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityResult")
+            .getDeclaredConstructor().newInstance()
+        val record = journal.javaClass.declaredMethods.single { it.name == "record" && it.parameterCount == 6 }
+        repeat(2) { record.invoke(journal, context, null, null, null, result, null) }
+        val records = mutableListOf<JsonObject>()
+
+        NumericalAggregateSnapshot(Cancellation.Never, query = 1).inspect(journal, emit = records::add)
+
+        assertEquals(listOf("1"), records.filter { "originalQuery" in it }
+            .map { it.getValue("originalQuery").jsonPrimitive.content })
+        assertEquals("1", records.last().getValue("selectedQueries").jsonPrimitive.content)
+    }
+
+    @Test
+    fun `aggregate inspection should report an unavailable requested query without claiming a scan`() {
+        val journal = NumericalSelectionSnapshot(Cancellation.Never).journal()
+        val records = mutableListOf<JsonObject>()
+
+        NumericalAggregateSnapshot(Cancellation.Never, query = 5, maximumWork = 65_536L,
+            maximumAllocation = 1_048_576L).inspect(journal, emit = records::add)
+
+        val summary = records.single()
+        assertEquals("5", summary.getValue("requestedQuery").jsonPrimitive.content)
+        assertEquals("0", summary.getValue("selectedQueries").jsonPrimitive.content)
+        assertEquals("0", summary.getValue("examinedQueries").jsonPrimitive.content)
+        assertEquals("0", summary.getValue("lpQueries").jsonPrimitive.content)
+        assertEquals("false", summary.getValue("stopped").jsonPrimitive.content)
+    }
+
+    @Test
     fun `frontier capture should resolve the production invocation constructor`() {
         assertNotNull(NumericalFrontierSnapshot.invocationConstructor())
     }

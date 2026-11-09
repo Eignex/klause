@@ -19,7 +19,18 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-internal class NumericalAggregateSnapshot(private val stop: Cancellation, private val allowMixed: Boolean = false) {
+internal class NumericalAggregateSnapshot(
+    private val stop: Cancellation,
+    private val allowMixed: Boolean = false,
+    private val query: Int? = null,
+    private val maximumWork: Long = 20_000_000L,
+    private val maximumAllocation: Long = 67_108_864L,
+) {
+    init {
+        require(query == null || query >= 0)
+        require(maximumWork in 0L..20_000_000L && maximumAllocation in 0L..67_108_864L)
+    }
+
     @Suppress("UNCHECKED_CAST")
     fun inspect(
         journal: Any, onAccepted: (Any, List<Any>) -> Unit = { _, _ -> }, emit: (JsonObject) -> Unit,
@@ -35,16 +46,17 @@ internal class NumericalAggregateSnapshot(private val stop: Cancellation, privat
             .getDeclaredConstructor(Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
                 Int::class.javaPrimitiveType, Long::class.javaPrimitiveType, Long::class.javaPrimitiveType,
                 Long::class.javaPrimitiveType)
-        val maximumWork = 20_000_000L
-        val maximumAllocation = 67_108_864L
         var work = 0L
         var allocation = 0L
+        var selected = 0
         var examined = 0
         var unavailable = 0
         val active = Cancellation { stop() || work >= maximumWork || allocation >= maximumAllocation }
         for (record in records) {
             if (active()) break
             work++
+            if (query != null && field(record, "id") != query) continue
+            selected++
             allocation += 256L
             if (active()) break
             val point = field(record, "point") as Map<SourceCoordinate, BigFraction>?
@@ -166,6 +178,8 @@ internal class NumericalAggregateSnapshot(private val stop: Cancellation, privat
         emit(buildJsonObject {
             put("summary", true)
             put("capturedQueries", records.size)
+            query?.let { put("requestedQuery", it) }
+            put("selectedQueries", selected)
             put("examinedQueries", examined)
             put("pointUnavailableQueries", unavailable)
             put("captureLimited", journal.javaClass.getDeclaredMethod("getLimited").invoke(journal) as Boolean)
