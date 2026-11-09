@@ -9,7 +9,9 @@
     ":klause-bench:installDist",
     ":klause-bench:prepareLabRuntime"
   ],
+  "planIdentity": "committed",
   "planInputs": [
+    "klause",
     "klause-bench",
     "build.gradle.kts",
     "settings.gradle.kts",
