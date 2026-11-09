@@ -675,7 +675,7 @@ Retired unselected candidates
 are omitted from proof replay as well as scoring. Masked-query reuse distinguishes
 whether unselected candidates are checked; installed cuts retain fresh source
 verification under the current scope.
-Managed current masks and admitted candidate layouts retain unselected and
+Managed current masks and fully checked selected families retain unselected and
 retired row definitions as inactive numerical rows. A completed scoring scan with
 an installed or newly selected cut can retain the candidate layout within the
 same pool and preparation limits. Layout retention does not change discovery
@@ -772,11 +772,6 @@ branch guide for the same verification scope. Ordinary traversal uses that guide
 while consuming the strongest checked bound; the augmented relaxation point and
 fractional coordinates retain their own meaning. Snapshot copies debit the existing
 source allowance. Pauses, cancellation and terminal results withhold the guide.
-An expanded fractional family keeps its unselected definitions outside the
-numerical layout until a completed query has installed every checked candidate.
-Its selected mask remains usable before that point. Later mask changes use ordinary
-preparation and append fallbacks within the containing allowance; candidates and
-their certificates remain available throughout.
 With `source-cut-preparation-reuse=true`, point calls can retain one immutable
 source-incidence index within the numerical owner. Reuse requires the same
 generation context object and support allowance; a new context or owner release

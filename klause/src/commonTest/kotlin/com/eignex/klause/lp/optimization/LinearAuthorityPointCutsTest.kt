@@ -246,7 +246,6 @@ class LinearAuthorityPointCutsTest {
                 assertEquals(listOf(x to BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
                     guidance.fractional)
                 assertEquals(1L, authority.cutObservations()["numericalCutSelectionFractionalRounds"])
-                assertTrue((authority.cutObservations()["numericalCutSelectionLayoutDeferred"] ?: 0L) > 0L)
                 for (name in listOf("Pool", "Checked", "Installed")) {
                     assertEquals(2L, authority.cutObservations()["numericalCutSelectionFractionalAttempt${name}Rows"])
                 }
@@ -832,69 +831,6 @@ class LinearAuthorityPointCutsTest {
                 (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
             assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context.withLinearAuthority())
                 .verify(assertNotNull(result.bound)))
-        }
-    }
-
-    @Test
-    fun `a deferred layout should require installed candidates rather than a selected mask`() {
-        val rows = listOf(
-            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),
-                SourceDerivation.Premise("x upper")),
-            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ZERO),
-                SourceDerivation.Premise("y upper")),
-        )
-        val selection = LinearAuthorityPointCuts(SourceLpBudget(), retainUninstalledLayout = false)
-        val selected = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
-            listOf(BigFraction.ZERO, BigFraction.ONE), setOf(0), Cancellation.Never)
-        assertEquals(setOf(0, 1), selected)
-        assertFalse(selection.retainsCandidateLayout(rows))
-
-        val retained = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
-            List(2) { BigFraction.ZERO }, selected, Cancellation.Never)
-
-        assertEquals(selected, retained)
-        assertTrue(selection.retainsCandidateLayout(rows))
-        assertEquals(1L, selection.observations["numericalCutSelectionLayoutDeferred"])
-    }
-
-    @Test
-    fun `an expanded candidate family should earn its deferred layout again`() {
-        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
-        val rows = listOf(
-            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),
-                SourceDerivation.Premise("x upper")),
-            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ZERO),
-                SourceDerivation.Premise("y upper")),
-        )
-        val selection = LinearAuthorityPointCuts(SourceLpBudget(), retainUninstalledLayout = false)
-        selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
-            List(2) { BigFraction.ZERO }, setOf(0, 1), Cancellation.Never)
-        assertTrue(selection.retainsCandidateLayout(rows))
-        val expanded = rows + LinearAuthorityCut(2,
-            SourceInequality(mapOf(z to BigFraction.ONE), BigFraction.ZERO), SourceDerivation.Premise("z upper"))
-
-        val selected = selection.select(expanded, listOf(x, y, z), List(3) { BigFraction.ZERO }, setOf(0, 1, 2),
-            listOf(BigFraction.ZERO, BigFraction.ZERO, BigFraction.ONE), setOf(0, 1), Cancellation.Never)
-
-        assertEquals(setOf(0, 1, 2), selected)
-        assertFalse(selection.retainsCandidateLayout(expanded))
-    }
-
-    @Test
-    fun `an unavailable scan should not earn a completed candidate layout`() {
-        val rows = listOf(LinearAuthorityCut(0,
-            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO), SourceDerivation.Premise("x upper")))
-        for (reason in listOf("cancellation", "allocation")) {
-            val funding = SourceLpFunding(1_000L, if (reason == "allocation") 0L else 1_000_000L)
-                .apply { grant(1_000L) }
-            val selection = LinearAuthorityPointCuts(SourceLpBudget(funding = funding),
-                retainUninstalledLayout = false)
-
-            val retained = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
-                listOf(BigFraction.ZERO), setOf(0), Cancellation { reason == "cancellation" })
-
-            assertEquals(setOf(0), retained)
-            assertFalse(selection.retainsCandidateLayout(rows))
         }
     }
 

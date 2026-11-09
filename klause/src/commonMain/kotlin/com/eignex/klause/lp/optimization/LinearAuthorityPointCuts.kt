@@ -15,7 +15,6 @@ internal class LinearAuthorityPointCuts(
     private val budget: SourceLpBudget,
     private val maximumCuts: Int = 64,
     private val maximumSupport: Int = 8192,
-    private val retainUninstalledLayout: Boolean = true,
     private val onCut: (CutFamily, String, Long) -> Unit = { _, _, _ -> },
 ) {
     private data class Scored(
@@ -255,9 +254,7 @@ internal class LinearAuthorityPointCuts(
             }
             observe("Selected", selected.size.toLong())
             for (cut in selected) onCut(rows[cut.id].family, "POINT_SELECTED", 1L)
-            val layoutRequested = !retainedLayout && (installed.isNotEmpty() || selected.isNotEmpty())
-            val layoutPending = layoutRequested && (retainUninstalledLayout || complete)
-            if (layoutRequested && !layoutPending) observe("LayoutDeferred")
+            val layoutPending = !retainedLayout && (installed.isNotEmpty() || selected.isNotEmpty())
             val installedPending = complete && !managedInstalled
             val layoutCovered = (layoutPending || installedPending) && rows.size <= maximumCuts &&
                 checked.size == rows.size && !meter.limited && meter.charge(rows.size * 2L) &&
