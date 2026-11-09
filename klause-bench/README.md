@@ -47,6 +47,10 @@ input and records its decoded SHA-256 and byte count without parsing or solving 
 Its `capture-route=SESSION|SCOPED_FLOAT|SCOPED_CONTINUATION|any` filter selects the
 query boundary to retain; `capture-worker=bt/lp-default|any` selects its worker.
 The containing timeout includes setup, observation and retirement.
+`capture-guidance=true captures=0` records bounded native guide adoption and branch
+observations without retaining LP queries. The preference flag describes configured
+precedence; it does not compare a counterfactual value order. Last-read scalar cutoffs
+are separate from exact cutoff context, which this observer does not capture.
 
 `MpsProofFrontier selection=true` exports a captured template's actual
 `generationScope` separately from the query's current verification scope.
@@ -319,6 +323,8 @@ retaining the original recording scope in its header. Event timestamps establish
 order; file order need not be chronological. Recording thresholds and retention
 settings still apply. Event-type IDs, active settings and recording-loss/shutdown
 events are retained when present, so missing events need not be mistaken for disabled capture.
+Unrepresentable temporal values are `null`, with their field paths listed in
+`unavailableTemporalFields`; finite durations retain signed nanosecond precision.
 The raw hash-checked capture and sampled summary survive
 event-extraction failure, with an error artifact and failed analysis result.
 Decoding and both analysis passes spend the containing case/job allowance; no solver runs.

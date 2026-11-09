@@ -29,6 +29,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedConstraint
 import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
+import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.baked
@@ -36,9 +37,9 @@ import com.eignex.klause.propagation.conditionedRoot
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
-import com.eignex.klause.solver.SliceWorkAccounting
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchInitializationCancelled
+import com.eignex.klause.solver.SliceWorkAccounting
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.IncumbentSubscription
 import com.eignex.klause.solver.incumbent.Publication
@@ -180,6 +181,7 @@ internal class ResumableMinimize(
 
     // The allowance includes LP and propagation work so costly nodes consume proportionally more of a slice.
     private var proposalPropagationWork = 0L
+    private var initialValidationPropagationWork: (() -> Long)? = null
     private var clausePrimal: MonotoneClausePrimal? = null
     private var clausePrimalStarted = false
     private var clausePrimalCandidate: Sample? = null
@@ -189,7 +191,8 @@ internal class ResumableMinimize(
         { (if (::lpEngine.isInitialized) lpEngine.totalSolveWork() else 0L) + sink.lp.standaloneWork },
         {
             (if (::cp.isInitialized) session.work else preparedSession?.work ?: 0L) +
-                (if (::lpEngine.isInitialized) lpEngine.primalPropagationWork else 0L) + proposalPropagationWork
+                (if (::lpEngine.isInitialized) lpEngine.primalPropagationWork else 0L) + proposalPropagationWork +
+                (initialValidationPropagationWork?.invoke() ?: 0L)
         },
         preparationBudget,
         ownsWorkDebt = ownsWorkDebt,
@@ -233,12 +236,14 @@ internal class ResumableMinimize(
     private var objVarBest: Long? = null
     private val externalShared = params.objectiveBoundSupplier != null
     private var lastExternalCutoff = Double.POSITIVE_INFINITY
+    private var observedExternalCutoff: Double? = null
     private var lastObjBoundAsserted: Long? = null
     private var lastBoolCutoffValue: BigFraction? = null
     private var lastOpenCutoff: Long? = null
 
     private fun externalCutoff(): Double {
         val bound = params.objectiveBoundSupplier?.invoke() ?: Double.POSITIVE_INFINITY
+        if (params.branchObserver is PooledGuidanceObserver) observedExternalCutoff = bound
         if (rebindable) {
             require(!bound.isNaN() && bound <= lastExternalCutoff) {
                 "repair objective cutoff must be non-increasing"
@@ -1072,37 +1077,53 @@ internal class ResumableMinimize(
         val token = if (params.cancellation.workScheduled()) params.cancellation else
             params.cancellation or Cancellation.after(LP_VERIFY_BUDGET)
         if (token() || sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) return null
-        val validation = PropagationSession(problem, token)
-        if (validation.seed(params.assumptions) is PropagationResult.Unsat || validation.isUnsatAtRoot) return null
-        for (variable in (0 until sample.numBoolVars)) {
-            if (validation.pinBool(variable, sample.boolValue(variable)) is PropagationResult.Unsat) return null
-        }
-        for (variable in (0 until sample.numIntVars)) {
-            if (validation.pinInt(variable, sample.intValue(variable)) is PropagationResult.Unsat) return null
-        }
-        if (validation.fixpointCancelled || token()) return null
-        val accepted = if (problem.numRealVars == 0) {
-            sample
-        } else {
-            val real = completeLeaf(sample, token)
-            if (real.verdict !in listOf(
-                    LpVerdict.FEASIBLE,
-                    LpVerdict.ATTAINED_OPTIMUM,
-                    LpVerdict.TOLERANCE_OPTIMUM,
-                    LpVerdict.UNBOUNDED,
-                )
-            ) {
-                return null
+        var validation: PropagationSession? = null
+        try {
+            val checking = PropagationSession(PropagationProblem(problem), token,
+                onPropagationWork = { initialValidationPropagationWork = it })
+            validation = checking
+            if (checking.fixpointCancelled || token()) return null
+            if (checking.seed(params.assumptions) is PropagationResult.Unsat || checking.isUnsatAtRoot) return null
+            for (variable in (0 until sample.numBoolVars)) {
+                if (checking.fixpointCancelled || token()) return null
+                if (checking.pinBool(variable, sample.boolValue(variable)) is PropagationResult.Unsat) return null
             }
-            val completed = sample.copy(reals = real.reals, exactReals = real.exactReals)
-            if (real.verdict == LpVerdict.UNBOUNDED) {
-                if (!token()) unboundedLeaf = completed to checkNotNull(real.direction)
-                return null
+            for (variable in (0 until sample.numIntVars)) {
+                if (checking.fixpointCancelled || token()) return null
+                if (checking.pinInt(variable, sample.intValue(variable)) is PropagationResult.Unsat) return null
             }
-            completed
+            if (checking.fixpointCancelled || token()) return null
+            val accepted = if (problem.numRealVars == 0) {
+                sample
+            } else {
+                val real = completeLeaf(sample, token)
+                if (real.verdict !in listOf(
+                        LpVerdict.FEASIBLE,
+                        LpVerdict.ATTAINED_OPTIMUM,
+                        LpVerdict.TOLERANCE_OPTIMUM,
+                        LpVerdict.UNBOUNDED,
+                    )
+                ) {
+                    return null
+                }
+                val completed = sample.copy(reals = real.reals, exactReals = real.exactReals)
+                if (real.verdict == LpVerdict.UNBOUNDED) {
+                    if (!token()) unboundedLeaf = completed to checkNotNull(real.direction)
+                    return null
+                }
+                completed
+            }
+            if (token()) return null
+            return recordIfImproving(accepted, objective.evaluate(accepted), startingWitness = !rebindable)
+        } finally {
+            try {
+                validation?.releaseRetainedState()
+            } finally {
+                val spent = initialValidationPropagationWork?.invoke() ?: 0L
+                initialValidationPropagationWork = null
+                proposalPropagationWork += spent
+            }
         }
-        if (token()) return null
-        return recordIfImproving(accepted, objective.evaluate(accepted), startingWitness = !rebindable)
     }
 
     private fun firstRunWorkBody(): MinimizeResult.WithSample? {
@@ -1623,6 +1644,12 @@ internal class ResumableMinimize(
             if (params.valueSelector is SolutionGuided && (local != null || lpEngine.params.lpPlan.bounding)) {
                 pooledIncumbents?.poll()?.takeIf { local == null || it.objective < local.objective.display }?.let {
                     brancher.importPooledSolution(it.assignment, guideValues = true, preferValues = local == null)
+                    params.branchObserver.observeGuidance(PooledGuidanceKind.IMPORT) {
+                        PooledGuidanceObservation(PooledGuidanceKind.IMPORT, local == null, "resume",
+                            it.version, it.objective, local?.objective?.display,
+                            local?.objective?.exact?.guidanceText(),
+                            observedExternalCutoff, rootRoundingPending || rootLayoutPending)
+                    }
                 }
             }
             return SearchRunDisposition.Continue

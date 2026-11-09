@@ -51,11 +51,13 @@ internal object JfrCaptureSummary : BenchSuite {
         if (events) HarnessRecording.extract(context.outputDirectory, capture,
             "retained capture: ${case.parameters.getValue("source")}; original recording scope applies")
         val error = context.outputDirectory.resolve("harness-analysis-error.txt")
+        val extractionFailed = events && Files.exists(error)
         val artifacts = listOf("capture.jfr", "summary.json") +
             if (events) listOf("harness-events.jsonl", "harness-analysis.json", "harness-analysis-error.txt")
             else emptyList()
         return BenchResult(case.id,
-            status = if (events && Files.exists(error)) BenchStatus.FAILED else BenchStatus.SUCCESS,
+            status = if (extractionFailed) BenchStatus.FAILED else BenchStatus.SUCCESS,
+            message = if (extractionFailed) "JFR event extraction failed; see harness-analysis-error.txt" else null,
             artifacts = artifacts
                 .filter { Files.isRegularFile(context.outputDirectory.resolve(it)) }
                 .map { BenchArtifact(it) },

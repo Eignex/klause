@@ -790,11 +790,19 @@ internal class BacktrackBrancher(
 
     override fun onAttempt(decision: SearchDecision, context: SearchContext) {
         branchObserver?.onAttempt(decision, context)
+        branchObserver.observeGuidance(PooledGuidanceKind.ATTEMPT) {
+            PooledGuidanceObservation(PooledGuidanceKind.ATTEMPT, preferImportedSolution,
+                decision = decision.guidanceText(), level = context.decisionLevel)
+        }
     }
 
     override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
         branching.onCommit(decision, decisionLevel)
         branchObserver?.onCommit(decision, decisionLevel)
+        branchObserver.observeGuidance(PooledGuidanceKind.COMMIT) {
+            PooledGuidanceObservation(PooledGuidanceKind.COMMIT, preferImportedSolution,
+                decision = decision.guidanceText(), level = decisionLevel)
+        }
         val (variable, value) = decision.asSelectorDecision() ?: return
         variables.onCommit(variable)
         values.onCommit(variable, value)
@@ -844,6 +852,9 @@ internal class BacktrackBrancher(
     }
 
     fun onSolution(sample: Sample) {
+        branchObserver.observeGuidance(PooledGuidanceKind.LOCAL) {
+            PooledGuidanceObservation(PooledGuidanceKind.LOCAL, preferImportedSolution)
+        }
         preferImportedSolution = false
         variables.onSolution(sample)
         values.onSolution(sample)
