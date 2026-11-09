@@ -222,6 +222,39 @@ class LpBoundCertificationTest {
     }
 
     @Test
+    fun `basis bounds should remain available when unrepaired residuals exceed the scalar limit`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = assertNotNull(LpExactState(ExactLpModel(
+            listOf(
+                listOf(ExactLpEntry(0, ExactLpNumber.of(3L))),
+                listOf(ExactLpEntry(0, ExactLpNumber.of((1L shl 60) + 1L))),
+            ),
+            listOf(ExactLpNumber.of(1L)),
+            listOf(ExactLpColumn(ExactLpBounds())) +
+                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(ExactLpNumber.of(-1L), zero, zero)),
+        )).toWorkingModel())
+        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER, VarStatus.AT_LOWER))
+
+        val result = certifyLpBoundOnly(source, doubleArrayOf(-1.0 / 3.0),
+            ReconstructionLimits(maxBits = 64, maxAttempts = 1), basis = basis)
+
+        assertEquals(BigFraction.ofLong(-3L).reciprocal(), assertNotNull(result.bound).value)
+        assertTrue(result.metrics.maxBits <= 64)
+    }
+
+    @Test
+    fun `exhausted reconstruction attempts should withhold a basis derived bound`() {
+        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
+
+        val result = certifyLpBoundOnly(model(upper = null, coefficient = 3L, rhs = 1L),
+            doubleArrayOf(-1.0 / 3.0), ReconstructionLimits(maxAttempts = 0), basis = basis)
+
+        assertNull(result.bound)
+    }
+
+    @Test
     fun `deferred singleton columns should recover after the coupled dual core`() {
         val zero = ExactLpNumber.of(0L)
         val source = assertNotNull(LpExactState(ExactLpModel(
