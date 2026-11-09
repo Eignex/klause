@@ -133,7 +133,7 @@ class LpHintsTest {
         ))
         val next = relaxation.withModel(assertNotNull(trail.state.ownerWorkingModel()), map)
 
-        hints.record(next, doubleArrayOf(2.25), DoubleArray(0))
+        hints.record(next, doubleArrayOf(2.25), DoubleArray(next.model.m))
         hints.recordObjective(next, 10000.0)
 
         assertEquals(score, hints.directionalScore(variable))
@@ -172,7 +172,7 @@ class LpHintsTest {
         assertTrue(hints.directionalScore(variable).isNaN())
         val next = relaxation.withModel(assertNotNull(trail.state.ownerWorkingModel()), map)
         hints.beginNode(1, 100.0)
-        hints.record(next, doubleArrayOf(2.25), DoubleArray(0))
+        hints.record(next, doubleArrayOf(2.25), DoubleArray(next.model.m))
         hints.recordObjective(next, 10.0)
 
         assertEquals(score, hints.directionalScore(variable))
