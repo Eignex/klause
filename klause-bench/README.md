@@ -1596,6 +1596,17 @@ The smaller magic-square source's AllDifferent-only conflicts, compressed-byte
 hash refusal, worker network failure, earlier truncated captures and preparation
 timeouts retain their costs and provenance in the external campaign ledger.
 
+## Clausal repair buffer comparison
+
+`lab/clause-primal-buffers.json` compares the production `ClausePrimalWalk` through
+the repository bench protocol. Parameters `groups`, `costs` and `seeds` select
+generated independent clause groups, two or up to 64 positive-cost variables, and
+repair seeds. Cases verify the final original clauses and each attempted cost pin.
+The JVM profile retains seven samples after warmup, with exact current-thread
+allocation counters, construction and trial latency, work and assignment checksums.
+These library measurements do not establish whole-solver throughput. Compare
+revisions with identical harness sources in ordinary paired lab rows.
+
 ## Comparable sweep controls
 
 The status-sweep recipe uses [lab/bench-linux.json](lab/bench-linux.json) and pins
