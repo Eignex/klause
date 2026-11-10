@@ -15,6 +15,8 @@ import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
+import com.sun.management.OperatingSystemMXBean as SunOperatingSystemMXBean
+import com.sun.management.ThreadMXBean as SunThreadMXBean
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -25,12 +27,17 @@ import kotlinx.serialization.json.put
 import java.io.File
 import java.io.Writer
 import java.lang.management.ManagementFactory
+import java.util.Locale
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 
 /** The trajectory or charged-work quantity a fixed-work limit counts. */
 @Serializable
-enum class FixedWorkUnit(val label: String) {
+enum class FixedWorkUnit(
+    /** Request parameter spelling. */
+    val label: String,
+) {
     /** Conflicts observed through the value selector. */
     CONFLICTS("conflicts"),
 
@@ -41,6 +48,7 @@ enum class FixedWorkUnit(val label: String) {
     WORK("work"),
     ;
 
+    /** Lookup by request spelling. */
     companion object {
         /** The unit named [label]. */
         fun of(label: String): FixedWorkUnit = requireNotNull(entries.firstOrNull { it.label == label }) {
@@ -121,7 +129,7 @@ object FixedWorkSatMeasurement {
         val preparation = Meter()
         val model = try {
             Dimacs.parse(bytes.decodeToString()).toProblem().bake(cancellation = deadline)
-        } catch (failure: RuntimeException) {
+        } catch (failure: CancellationException) {
             if (!deadline()) throw failure
             null
         } finally {
@@ -171,7 +179,7 @@ object FixedWorkSatMeasurement {
                 }
                 stats = handle.stats
             }
-        } catch (failure: RuntimeException) {
+        } catch (failure: CancellationException) {
             // The engine aborts handle construction when its cancellation fires before the search opens.
             if (!deadline()) throw failure
         } finally {
@@ -315,8 +323,8 @@ object FixedWorkSatMeasurement {
 
         companion object {
             private val threads = ManagementFactory.getThreadMXBean()
-            private val sunThreads = threads as? com.sun.management.ThreadMXBean
-            private val os = ManagementFactory.getOperatingSystemMXBean() as? com.sun.management.OperatingSystemMXBean
+            private val sunThreads = threads as? SunThreadMXBean
+            private val os = ManagementFactory.getOperatingSystemMXBean() as? SunOperatingSystemMXBean
             private val compiler = ManagementFactory.getCompilationMXBean()
 
             fun threadCpu(): Long? = if (threads.isCurrentThreadCpuTimeSupported && threads.isThreadCpuTimeEnabled) {
@@ -333,7 +341,8 @@ object FixedWorkSatMeasurement {
                     (millis + bean.collectionTime.coerceAtLeast(0L))
             }
 
-            fun compilation(): Long? = compiler?.takeIf { it.isCompilationTimeMonitoringSupported }?.totalCompilationTime
+            fun compilation(): Long? =
+                compiler?.takeIf { it.isCompilationTimeMonitoringSupported }?.totalCompilationTime
         }
     }
 
@@ -440,7 +449,7 @@ object FixedWorkSatMeasurement {
             put("digest", digest())
         }
 
-        private fun digest(): String = "%016x%016x".format(high, low)
+        private fun digest(): String = "%016x%016x".format(Locale.ROOT, high, low)
 
         private fun row(tag: Char, vararg values: Long) {
             fold(tag.code.toLong())

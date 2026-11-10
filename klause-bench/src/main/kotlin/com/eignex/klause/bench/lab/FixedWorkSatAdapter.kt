@@ -134,7 +134,9 @@ internal object FixedWorkSatSuite : BenchSuite {
         require(input.root == BenchInputRoot.CORPUS && input.sha256 == declared.sha256 &&
             input.path == declared.path) { "Case input differs from its parameters" }
         LabInputs.verify(case, context)
-        val bytes = CorpusFiles.open(LabInputs.path(input, context).toFile()).use { it.readNBytes(MAX_SOURCE_BYTES + 1) }
+        val bytes = CorpusFiles.open(LabInputs.path(input, context).toFile()).use {
+            it.readNBytes(MAX_SOURCE_BYTES + 1)
+        }
         require(bytes.size <= MAX_SOURCE_BYTES) { "Source exceeds $MAX_SOURCE_BYTES bytes" }
         val source = out.resolve("source.cnf")
         Files.write(source, bytes)
@@ -248,7 +250,7 @@ internal object FixedWorkSatSuite : BenchSuite {
         add(out.toString())
     }
 
-    /** Run the child to completion or the emergency [ceilingSeconds]; returns its exit code and whether it was killed. */
+    /** Run the child until it exits or reaches [ceilingSeconds]; returns its exit code and whether it was killed. */
     private fun launch(argv: List<String>, context: BenchContext, ceilingSeconds: Long): Pair<Int?, Boolean> {
         val process = ProcessBuilder(argv).directory(context.outputDirectory.toFile()).redirectErrorStream(true)
             .redirectOutput(context.outputDirectory.resolve(LOG).toFile()).apply {
