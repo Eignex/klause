@@ -43,6 +43,226 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `returning to a completed refuted region should reuse it without another query or proof credit`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = arrayOf(Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0),
+                LinearOp.EQ, 0.0)), numRealVars = 1,
+            realLower = doubleArrayOf(0.5), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO),
+            mapOf(0 to BigFraction.ZERO))
+        for (completion in listOf(false, true)) {
+            val events = mutableListOf<JointRepairComparison>()
+            JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = completion),
+                onComparison = events::add).use { repair ->
+                var result = repair.check(condition, Cancellation.Never)
+                repeat(64) {
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                }
+                assertEquals(ExactNeighborhoodResult.Refuted, result)
+                val other = condition.copy(lower = mapOf(0 to BigFraction.ZERO, 1 to BigFraction.ONE))
+                result = repair.check(other, Cancellation.Never)
+                repeat(64) {
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(other, Cancellation.Never)
+                }
+                assertEquals(ExactNeighborhoodResult.Refuted, result)
+                val before = repair.stats.smt.sourceLp
+
+                val repeated = repair.check(condition, Cancellation.Never)
+                val after = repair.stats.smt.sourceLp
+
+                assertEquals(ExactNeighborhoodResult.Refuted, repeated)
+                assertEquals(2, events.count { it.phase == "query" && it.disposition == "opened" })
+                assertEquals(before.operations, after.operations)
+                assertEquals(before.floatWork, after.floatWork)
+                assertEquals(before.conflictCertificationWork, after.conflictCertificationWork)
+                assertTrue(after.preparationWork > before.preparationWork)
+            }
+        }
+    }
+
+    @Test
+    fun `changed Boolean bounds and cutoff conditions should open their own query`() {
+        val model = Problem(1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = arrayOf(Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0),
+                LinearOp.EQ, 0.0)), numRealVars = 1,
+            realLower = doubleArrayOf(0.5), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val condition = ExactNeighborhoodCondition(mapOf(0 to false), mapOf(0 to BigFraction.ZERO),
+            mapOf(0 to BigFraction.ZERO))
+        val variants = listOf(condition.copy(bools = mapOf(0 to true)),
+            condition.copy(lower = mapOf(0 to BigFraction.ONE)),
+            condition.copy(upper = mapOf(0 to BigFraction.ONE)), condition.copy(cutoff = BigFraction.ONE))
+        for (changed in variants) {
+            val events = mutableListOf<JointRepairComparison>()
+            JointLinearRepair(model, source, objective, TheoryParams(), onComparison = events::add).use { repair ->
+                var result = repair.check(condition, Cancellation.Never)
+                repeat(64) {
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                }
+                assertEquals(ExactNeighborhoodResult.Refuted, result)
+
+                result = repair.check(changed, Cancellation.Never)
+                repeat(64) {
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(changed, Cancellation.Never)
+                }
+
+                assertTrue(result != ExactNeighborhoodResult.Paused)
+                assertEquals(2, events.count { it.phase == "query" && it.disposition == "opened" })
+            }
+        }
+    }
+
+    @Test
+    fun `mutating caller bounds should not turn a later feasible region into a remembered refutation`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = arrayOf(Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0),
+                LinearOp.EQ, 0.0)), numRealVars = 1,
+            realLower = doubleArrayOf(0.5), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val pins = mutableMapOf(0 to BigFraction.ZERO)
+        val condition = ExactNeighborhoodCondition(emptyMap(), pins, pins)
+        JointLinearRepair(model, source, objective, TheoryParams()).use { repair ->
+            var result = repair.check(condition, Cancellation.Never)
+            repeat(64) {
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+            }
+            assertEquals(ExactNeighborhoodResult.Refuted, result)
+            pins[0] = BigFraction.ONE
+
+            result = repair.check(condition, Cancellation.Never)
+            repeat(64) {
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+            }
+
+            val point = assertIs<ExactNeighborhoodResult.Witness>(result).sample
+            assertEquals(1L, point.intValue(0))
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(source.scope, SourceClaim.Witness(point), SourceDerivation.SourceWitness)))
+        }
+    }
+
+    @Test
+    fun `slice cancellation during reuse should pause before opening another query`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = arrayOf(Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0),
+                LinearOp.EQ, 0.0)), numRealVars = 1,
+            realLower = doubleArrayOf(0.5), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO),
+            mapOf(0 to BigFraction.ZERO))
+        val events = mutableListOf<JointRepairComparison>()
+        JointLinearRepair(model, source, objective, TheoryParams(), onComparison = events::add).use { repair ->
+            var result = repair.check(condition, Cancellation.Never)
+            repeat(64) {
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+            }
+            assertEquals(ExactNeighborhoodResult.Refuted, result)
+            var polls = 0
+
+            val cancelled = repair.check(condition, Cancellation { ++polls >= 3 })
+            val resumed = repair.check(condition, Cancellation.Never)
+
+            assertEquals(ExactNeighborhoodResult.Paused, cancelled)
+            assertEquals(ExactNeighborhoodResult.Refuted, resumed)
+            assertEquals(1, events.count { it.phase == "query" && it.disposition == "opened" })
+        }
+    }
+
+    @Test
+    fun `containing cancellation should withhold a remembered regional result`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = arrayOf(Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0),
+                LinearOp.EQ, 0.0)), numRealVars = 1,
+            realLower = doubleArrayOf(0.5), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO),
+            mapOf(0 to BigFraction.ZERO))
+        var cancelled = false
+        val params = TheoryParams(cancellation = Cancellation { cancelled })
+        JointLinearRepair(model, source, objective, params).use { repair ->
+            var result = repair.check(condition, Cancellation.Never)
+            repeat(64) {
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+            }
+            assertEquals(ExactNeighborhoodResult.Refuted, result)
+            cancelled = true
+
+            val stopped = repair.attempt(condition, Cancellation.Never)
+
+            assertEquals(ExactNeighborhoodResult.Undecided, stopped.result)
+            assertEquals(TerminationReason.Cancelled, stopped.reason)
+        }
+    }
+
+    @Test
+    fun `an attempt that saw an external point should not seed regional reuse`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = arrayOf(Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0),
+                LinearOp.EQ, 0.0)), numRealVars = 1,
+            realLower = doubleArrayOf(0.5), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO),
+            mapOf(0 to BigFraction.ZERO))
+        var offered: Sample? = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(1.0),
+            exactReals = listOf(BigFraction.ONE))
+        val events = mutableListOf<JointRepairComparison>()
+        JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true),
+            external = { offered }, onComparison = events::add).use { repair ->
+            var result = repair.check(condition, Cancellation.Never)
+            repeat(64) {
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+            }
+            assertEquals(ExactNeighborhoodResult.Refuted, result)
+            offered = null
+
+            result = repair.check(condition, Cancellation.Never)
+            repeat(64) {
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+            }
+
+            assertEquals(ExactNeighborhoodResult.Refuted, result)
+            assertEquals(2, events.count { it.phase == "query" && it.disposition == "opened" })
+        }
+    }
+
+    @Test
+    fun `an unavailable original source point should not become a remembered refutation`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
+        val events = mutableListOf<JointRepairComparison>()
+        JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true),
+            incumbentCompletionCheck = { _, _, _ -> false }, onComparison = events::add).use { repair ->
+            repeat(2) {
+                var result = repair.check(condition, Cancellation.Never)
+                repeat(64) {
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                }
+
+                assertEquals(ExactNeighborhoodResult.Undecided, result)
+            }
+
+            assertEquals(2, events.count { it.phase == "query" && it.disposition == "opened" })
+        }
+    }
+
+    @Test
     fun `refuted root pins should guide a checked first point within two repair attempts`() {
         val model = Problem(0,
             intBounds = IntBounds.fromModelBounds(LongArray(6), LongArray(6) { 1 }, null, null),

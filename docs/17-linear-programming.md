@@ -1901,6 +1901,15 @@ funding. One eligible pin and its exact value survive for one proposal; a change
 pin value, cutoff or checked incumbent discards that hint. Branch-local, unavailable
 and unsupported feedback supplies no seed. This is advisory ordering: the refutation
 keeps its complete scope, and every discovered point still needs full source checking.
+Each joint owner retains at most four completed pre-incumbent regional refutations.
+Its source, semantics and objective stay fixed; exact keys snapshot every Boolean
+pin, numeric bound and cutoff. Only a terminal refutation in the queried root scope
+without an external point is retained. Reusing an identical region spends paid
+lookup work, opens no numerical query and earns no fresh native proof credit.
+Snapshots and retention debit the containing funding, with bounded entry, byte and
+scalar widths. Changed conditions, incomplete results and checked centers do not
+reuse these entries; owner retirement releases them. This reuse neither reduces proof
+scope nor publishes a global refutation.
 A new template first runs the ordinary checked cut recipe; a completed point can
 add one selection round at that node. A trial that admits no candidate retains
 the ordinary template, checked query and numerical owner for later queries of that
