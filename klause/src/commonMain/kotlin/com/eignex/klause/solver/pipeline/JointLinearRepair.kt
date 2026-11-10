@@ -19,6 +19,7 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStats
@@ -27,6 +28,7 @@ import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.magnitudeBitLength
 import kotlin.math.round
 import kotlin.time.TimeSource
 
@@ -97,6 +99,10 @@ internal class JointLinearRepair(
     private var query: LinearAuthorityInvocation? = null
     private var anchor: Sample? = null
     private var pending: ExactNeighborhoodCondition? = null
+    private val refutedConditions = ArrayDeque<ExactNeighborhoodCondition>()
+    private var queryRefutationKey: ExactNeighborhoodCondition? = null
+    private var queryRefutationScope: SourceScope? = null
+    private var querySawExternal = false
     private var guidedProposal: ExactNeighborhoodCondition? = null
     private var queryFreedIntegers = 0
     private var checkedTrialWidth = 0
@@ -187,6 +193,7 @@ internal class JointLinearRepair(
             return null
         }
         compare("center", "checked", completed = value, cutoff = cutoff)
+        refutedConditions.clear()
         return CheckedCenter(sample, value)
     }
 
@@ -452,37 +459,55 @@ internal class JointLinearRepair(
 
     private fun advanceAttempt(condition: ExactNeighborhoodCondition, cancellation: Cancellation): JointRepairAttempt {
         check(!closed)
-        if (stop() || exhausted) return JointRepairAttempt(ExactNeighborhoodResult.Undecided, when {
-            params.timeout() -> TerminationReason.Timeout
-            stop() -> TerminationReason.Cancelled
-            else -> TerminationReason.BudgetExhausted
-        })
+        if (stop() || exhausted) return stoppedAttempt()
         if (cancellation()) return JointRepairAttempt(ExactNeighborhoodResult.Paused)
         if (pending != condition) {
             retire()
+            val key = refutationKey(condition, cancellation)
+            val reused = key != null && refutedConditions.any { it == key }
+            if (stop() || exhausted) return stoppedAttempt()
+            if (cancellation()) return JointRepairAttempt(ExactNeighborhoodResult.Paused)
+            if (reused) {
+                queryFreedIntegers = 0
+                selection?.clearRefutation()
+                observe("jointRepairRepeatedQueriesSkipped")
+                compare("reuse", "checked-refutation")
+                return JointRepairAttempt(ExactNeighborhoodResult.Refuted, TerminationReason.SearchExhausted)
+            }
+            val captured = key ?: condition
             var bounds = source.scope.condition
             var pinnedIntegers = 0
-            for ((id, value) in condition.bools) bounds = bounds.pin(id, value)
-            for ((upper, entries) in listOf(false to condition.lower, true to condition.upper)) {
+            for ((id, value) in captured.bools) bounds = bounds.pin(id, value)
+            for ((upper, entries) in listOf(false to captured.lower, true to captured.upper)) {
                 for ((id, value) in entries) {
-                    if (!upper && id < model.numIntVars && condition.upper[id] == value) pinnedIntegers++
+                    if (!upper && id < model.numIntVars && captured.upper[id] == value) pinnedIntegers++
                     val coordinate = if (id < model.numIntVars) SourceCoordinate(SourceCoordinate.Kind.Integer, id)
                         else SourceCoordinate(SourceCoordinate.Kind.Real, id - model.numIntVars)
                     bounds = bounds.bound(coordinate, value, upper)
                 }
             }
-            pending = condition
+            pending = captured
             if (onComparison != null) conditionSequence++
             compare("query", "opened", cutoff = condition.cutoff)
             val querySource = source.atScope(source.scope.copy(condition = bounds))
+            queryRefutationKey = key
+            queryRefutationScope = querySource.scope
+            querySawExternal = false
             val refutationGuidance = completion != null && anchor == null && preparedCenter == null &&
                 condition.cutoff == null
             query = LinearAuthorityInvocation(querySource,
                 params.copy(sourceIncumbentCompletion = false),
-                external = { externalIncumbent() ?: anchor }, state = state, borrowedAuthority = authority,
+                external = {
+                    (externalIncumbent() ?: anchor).also { sample ->
+                        if (sample != null) {
+                            querySawExternal = true
+                            refutedConditions.clear()
+                        }
+                    }
+                }, state = state, borrowedAuthority = authority,
                 boundOrdered = boundOrdered, guidance = true, funding = funding,
                 onNumericalFeedback = if (refutationGuidance) { feedback ->
-                    guideRefutation(condition, querySource, feedback)
+                    guideRefutation(captured, querySource, feedback)
                 } else null,
                 feedbackRequest = if (refutationGuidance) LinearAuthorityFeedbackRequest(refutation = true) else null)
             val freed = (sourceIntegers?.size ?: model.numIntVars) - pinnedIntegers
@@ -534,6 +559,7 @@ internal class JointLinearRepair(
             retire()
             if (checked == SourceEvidenceCheck.Checked && originalChecked) {
                 anchor = sample
+                refutedConditions.clear()
                 observe("jointRepairCheckedIncumbents")
                 return JointRepairAttempt(ExactNeighborhoodResult.Witness(sample),
                     feasiblePoint = sample, bound = snapshot.bound)
@@ -560,12 +586,62 @@ internal class JointLinearRepair(
             return JointRepairAttempt(ExactNeighborhoodResult.Paused, feasiblePoint = snapshot.incumbent,
                 bound = snapshot.bound)
         }
+        val refuted = result.terminal?.claim == SourceClaim.Refutation
+        val completedKey = queryRefutationKey.takeIf { refuted && !querySawExternal &&
+            result.terminal?.scope == queryRefutationScope }
         retire()
+        if (completedKey != null) rememberRefutation(completedKey, cancellation)
         return JointRepairAttempt(
-            if (result.terminal?.claim == SourceClaim.Refutation) ExactNeighborhoodResult.Refuted
+            if (refuted) ExactNeighborhoodResult.Refuted
             else ExactNeighborhoodResult.Undecided,
             if (result.terminal?.claim is SourceClaim.Ray) TerminationReason.Unsupported else result.reason,
             result.incumbent, result.bound)
+    }
+
+    private fun stoppedAttempt() = JointRepairAttempt(ExactNeighborhoodResult.Undecided, when {
+        params.timeout() -> TerminationReason.Timeout
+        stop() -> TerminationReason.Cancelled
+        else -> TerminationReason.BudgetExhausted
+    })
+
+    private fun refutationKey(condition: ExactNeighborhoodCondition,
+        cancellation: Cancellation): ExactNeighborhoodCondition? {
+        if (anchor != null || preparedCenter != null || condition.cutoff != null) return null
+        val entries = condition.bools.size.toLong() + condition.lower.size + condition.upper.size
+        if (entries > MAX_REFUTATION_ENTRIES || stop() || cancellation()) return null
+        // Metadata work spends the owner ledger without renewing a numerical query grant.
+        val scan = 1L + entries
+        if (funding.remainingWork <= scan || funding.remainingAllocation <= 64L) return null
+        budget.observe(preparation = scan)
+        funding.charge(0L, 64L)
+        var work = 1L + 16L * entries
+        var bytes = 256L + 64L * entries
+        for (values in listOf(condition.lower, condition.upper)) for (value in values.values) {
+            if (stop() || cancellation() || funding.exhausted) return null
+            val bits = value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength()
+            if (bits > MAX_REFUTATION_SCALAR_BITS) return null
+            work += MAX_REFUTED_CONDITIONS * (1L + bits * bits / 64L)
+            bytes += 64L + (bits + 7L) / 8L
+            if (work >= funding.remainingWork || bytes >= funding.remainingAllocation ||
+                bytes > MAX_REFUTATION_BYTES) return null
+        }
+        if (work >= funding.remainingWork || bytes >= funding.remainingAllocation ||
+            bytes > MAX_REFUTATION_BYTES) return null
+        budget.observe(preparation = work)
+        funding.charge(0L, bytes)
+        if (stop() || cancellation() || funding.exhausted) return null
+        return condition.copy(bools = condition.bools.toMap(), lower = condition.lower.toMap(),
+            upper = condition.upper.toMap())
+    }
+
+    private fun rememberRefutation(key: ExactNeighborhoodCondition, cancellation: Cancellation) {
+        if (stop() || cancellation() || anchor != null || preparedCenter != null ||
+            funding.remainingWork <= 1L || funding.remainingAllocation <= 64L) return
+        budget.observe(preparation = 1L)
+        funding.charge(0L, 64L)
+        if (stop() || cancellation() || funding.exhausted) return
+        if (refutedConditions.size == MAX_REFUTED_CONDITIONS) refutedConditions.removeFirst()
+        refutedConditions.addLast(key)
     }
 
     private fun guideRefutation(condition: ExactNeighborhoodCondition, querySource: SourceProofContext,
@@ -585,6 +661,9 @@ internal class JointLinearRepair(
         val active = query
         query = null
         pending = null
+        queryRefutationKey = null
+        queryRefutationScope = null
+        querySawExternal = false
         active?.close()
     }
 
@@ -609,6 +688,7 @@ internal class JointLinearRepair(
         checkedTrialCenter = null
         guidedProposal = null
         selection?.clearRefutation()
+        refutedConditions.clear()
         queryFreedIntegers = 0
         val resources = SearchInvocationResources()
         resources.own(authority)
@@ -620,3 +700,7 @@ internal class JointLinearRepair(
 
 private const val QUERY_SLICE_MILLIS = 10L
 private const val QUERY_SLICE_WORK = 64L
+private const val MAX_REFUTED_CONDITIONS = 4
+private const val MAX_REFUTATION_ENTRIES = 4096
+private const val MAX_REFUTATION_SCALAR_BITS = 4096
+private const val MAX_REFUTATION_BYTES = 1_048_576L
