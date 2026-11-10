@@ -1666,15 +1666,30 @@ and no time metrics. A child without a measured record fails the case and retain
 its completed warmups. Verdicts are native claims without independent source
 validation, and no record qualifies ordinary ten-second performance.
 
-`deploy/lab cases ID --json | scripts/compare-fixed-work.sh CONTROL CANDIDATE`
-pairs arms per row. Rows whose prefix digests agree, or whose arms reach a verdict
-with equal full digests, are `matched` and report candidate/control wall and CPU
-ratios at the limit point or verdict. Rows with different trajectories
-are `diverged`, with the first differing checkpoint, unless both arms completed with
-a verdict (`completed-diverged`, wall ratio only). Interrupted or missing arms stay
-`incomparable` or `incomplete`. The summary counts each class and cross-host rows.
-Seeds need not change the trajectory; compare digests across seeds before counting
-them as independent samples.
+`deploy/lab cases ID --json | scripts/compare-fixed-work.sh CONTROL CANDIDATE [--allow FACET]...`
+pairs arms per comparison key and repeat; build it with `:klause-bench:installDist`.
+A row is valid only when each arm has exactly one retained case that completed
+comparable fixed work, both arms carry one accepted worker receipt and execution
+frame (`record.labExecution`), and source hashes, seed, work unit and limit,
+measurement, warmups, recipe, engine options, deadline, trace rows, runtime, case
+resources, parameters, revision, solver library and harness and library fingerprints
+agree within each arm and between arms. A shared host alone does not pair arms.
+`--allow` declares intended differences: `revision` (revision and solver library),
+`harness`, `library`, or the treatments `recipe`, `deadline-seconds`, `trace-rows`
+and `heap-mib`. Contradicting evidence makes a row `invalid`, an arm without
+completed comparable work `incomparable`, a missing arm `incomplete`, and a missing
+receipt, frame, digest, hash or identity `unverifiable`. These rows list their
+reasons and keep their trajectory diagnostic, but contribute no ratio. The lab
+attaches worker receipts to solver records only, so fixed-work rows without one are
+`unverifiable`.
+
+Valid rows whose limit-point digests agree, or whose arms both reach a verdict with
+equal full digests, are `matched` and report candidate/control wall and CPU ratios
+at the limit point or verdict. Rows with different trajectories are `diverged`,
+with the first differing checkpoint, unless both arms completed with a verdict
+(`completed-diverged`, wall ratio only). The summary counts each class; its medians
+cover matched rows only. Seeds need not change the trajectory; compare digests
+across seeds before counting them as independent samples.
 
 ## Comparable sweep controls
 
