@@ -1759,3 +1759,33 @@ or finish probing without a partition; require actual task observations before
 claiming task use. Probe work is a subset of worker work, while ordinary schedule
 charges retain reservations and coordinator checks. Native closures do not supply
 independent proof checking.
+
+## Paired comparison audit
+
+`scripts/paired-audit.sh` audits a retained paired job read-only, after `:klause-bench:installDist`:
+
+```sh
+klause-bench/scripts/paired-audit.sh --cases lab-cases.jsonl --request request.json \
+  --execution execution.json --job job.json > audit.json
+```
+
+`--request` declares the arms from the experiment's `configs`, its `param.` keys as treatments
+and, when the configs name different refs, a revision difference. Without it pass `--arms a,b`.
+`--treatment KEY` adds a benchCase parameter that may differ between arms, `--allow FACET`
+permits an identity difference (`revision`, `runtime`, `harness`, `libraries`, `checker` or
+`controls.KEY`), `--control KEY=VALUE` pins a comparison control and `--rows N` declares the
+expected row count. Execution and job listings are optional.
+
+A row is one pair key, seed and repetition. It is accepted when every declared arm is retained
+once with status `DONE`, all arms share one worker receipt, machine and execution frame, and
+their sources, seeds, comparison controls, parameters and identities match except for declared
+differences. Different rows may use different machines. Rows report `COMPLETE`, `CENSORED` when
+an arm has no terminal verdict within its budget, `INVALID` with reasons, or `MISSING` for
+cancelled or absent arms. The script exits 0 only when no row is invalid or missing.
+
+Outcomes keep native claims, checked witnesses and native proofs apart; a valid check whose
+witness digest does not match the retained witness is `valid-unbound`, and no retained record
+carries an independent proof. Cost scopes stay separate because they nest: CLI CPU inside adapter
+CPU, solver elapsed inside command wall time, and worker attempt counters over every row they ran.
+Each case and attempt is counted once, unknown values are counted, and uncommitted attempts keep
+their costs. Benefit thresholds belong to the campaign; an accepted comparison is not a speedup.
