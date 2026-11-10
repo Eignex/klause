@@ -15673,6 +15673,19 @@ public final class com/eignex/klause/solver/result/SchedulingStats {
 public abstract interface class com/eignex/klause/solver/result/SearchEvent {
 }
 
+public final class com/eignex/klause/solver/result/SearchEvent$BacktrackComponentStop : com/eignex/klause/solver/result/SearchEvent {
+	public fun <init> (Lcom/eignex/klause/solver/search/SearchComponentStop;Z)V
+	public final fun component1 ()Lcom/eignex/klause/solver/search/SearchComponentStop;
+	public final fun component2 ()Z
+	public final fun copy (Lcom/eignex/klause/solver/search/SearchComponentStop;Z)Lcom/eignex/klause/solver/result/SearchEvent$BacktrackComponentStop;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SearchEvent$BacktrackComponentStop;Lcom/eignex/klause/solver/search/SearchComponentStop;ZILjava/lang/Object;)Lcom/eignex/klause/solver/result/SearchEvent$BacktrackComponentStop;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReplayed ()Z
+	public final fun getStop ()Lcom/eignex/klause/solver/search/SearchComponentStop;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/solver/result/SearchEvent$BacktrackIncomplete : com/eignex/klause/solver/result/SearchEvent {
 	public fun <init> (Lcom/eignex/klause/solver/result/SearchEvent$BacktrackIncomplete$Path;Lcom/eignex/klause/solver/search/SearchStopCause;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/result/SearchEvent$BacktrackIncomplete$Path;
@@ -16539,6 +16552,43 @@ public final class com/eignex/klause/solver/search/SearchComponentSet {
 	public final fun session (JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;Lcom/eignex/klause/solver/search/SearchAtomRegistry;Lcom/eignex/klause/solver/search/SearchExecutionControls;)Lcom/eignex/klause/solver/search/SearchSession;
 	public static synthetic fun session$default (Lcom/eignex/klause/solver/search/SearchComponentSet;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;Lcom/eignex/klause/solver/search/SearchAtomRegistry;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchSession;
 	public static synthetic fun session$default (Lcom/eignex/klause/solver/search/SearchComponentSet;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;Lcom/eignex/klause/solver/search/SearchAtomRegistry;Lcom/eignex/klause/solver/search/SearchExecutionControls;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchSession;
+}
+
+public final class com/eignex/klause/solver/search/SearchComponentStop {
+	public fun <init> (Lcom/eignex/klause/solver/search/SearchComponentStop$Site;Lcom/eignex/klause/solver/search/SearchStopCause;ZZI)V
+	public final fun component1 ()Lcom/eignex/klause/solver/search/SearchComponentStop$Site;
+	public final fun component2 ()Lcom/eignex/klause/solver/search/SearchStopCause;
+	public final fun component3 ()Z
+	public final fun component4 ()Z
+	public final fun component5 ()I
+	public final fun copy (Lcom/eignex/klause/solver/search/SearchComponentStop$Site;Lcom/eignex/klause/solver/search/SearchStopCause;ZZI)Lcom/eignex/klause/solver/search/SearchComponentStop;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/search/SearchComponentStop;Lcom/eignex/klause/solver/search/SearchComponentStop$Site;Lcom/eignex/klause/solver/search/SearchStopCause;ZZIILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchComponentStop;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCancelled ()Z
+	public final fun getDecisionLevel ()I
+	public final fun getSite ()Lcom/eignex/klause/solver/search/SearchComponentStop$Site;
+	public final fun getStopCause ()Lcom/eignex/klause/solver/search/SearchStopCause;
+	public final fun getUnresolvedCoverage ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/search/SearchComponentStop$Site : java/lang/Enum {
+	public static final field Cancellation Lcom/eignex/klause/solver/search/SearchComponentStop$Site;
+	public static final field Coverage Lcom/eignex/klause/solver/search/SearchComponentStop$Site;
+	public static final field LeafCheck Lcom/eignex/klause/solver/search/SearchComponentStop$Site;
+	public static final field LearnedConflict Lcom/eignex/klause/solver/search/SearchComponentStop$Site;
+	public static final field ModelBlock Lcom/eignex/klause/solver/search/SearchComponentStop$Site;
+	public static final field ModelBlocked Lcom/eignex/klause/solver/search/SearchComponentStop$Site;
+	public static final field ModelPolicy Lcom/eignex/klause/solver/search/SearchComponentStop$Site;
+	public static final field NodePolicy Lcom/eignex/klause/solver/search/SearchComponentStop$Site;
+	public static final field Restart Lcom/eignex/klause/solver/search/SearchComponentStop$Site;
+	public static final field RestartPropagation Lcom/eignex/klause/solver/search/SearchComponentStop$Site;
+	public static final field Resume Lcom/eignex/klause/solver/search/SearchComponentStop$Site;
+	public static final field Start Lcom/eignex/klause/solver/search/SearchComponentStop$Site;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/search/SearchComponentStop$Site;
+	public static fun values ()[Lcom/eignex/klause/solver/search/SearchComponentStop$Site;
 }
 
 public abstract interface class com/eignex/klause/solver/search/SearchConflictResolution {

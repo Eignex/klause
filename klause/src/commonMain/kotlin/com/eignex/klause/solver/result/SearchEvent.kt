@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.result
 
 import com.eignex.klause.portfolio.PortfolioEvent
+import com.eignex.klause.solver.search.SearchComponentStop
 import com.eignex.klause.solver.search.SearchStopCause
 
 /**
@@ -18,6 +19,14 @@ import com.eignex.klause.solver.search.SearchStopCause
  * stats summarize a finished solve, events narrate one in flight (e.g. the CLI's `-v`).
  */
 sealed interface SearchEvent {
+    /** Retained component-terminal provenance; it supplies no completeness or retry authority. */
+    data class BacktrackComponentStop(
+        /** First component-terminal observation, retained across slice rearming. */
+        val stop: SearchComponentStop,
+        /** Whether a later traversal call consumed the cached terminal. */
+        val replayed: Boolean,
+    ) : SearchEvent
+
     /** Native optimization returned incomplete; this observation supplies no exhaustion proof. */
     data class BacktrackIncomplete(
         /** Return path responsible for withholding a complete verdict. */

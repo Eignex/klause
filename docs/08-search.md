@@ -89,6 +89,28 @@ See [theory roles](14-theories.md#extension-roles-and-completeness). The session
 exchanges Boolean literals, semantic integer bounds and opaque theory decisions
 rather than native CP domains.
 
+A cancellation pause retains the current leaf for a complete retry. An interrupted
+check on that retained leaf adds no unresolved coverage. A leaf abandoned with an
+undecided required check still prevents exhaustion from proving completeness;
+later pauses do not clear that state.
+
+A node-owned learned consequence can retain unfinished shared propagation only
+after its native registration and consequence publication have completed. A
+cancellation pause preserves the recipient cursor and resumes delivery before
+lifecycle boundary work or another branch. It registers no duplicate constraint
+and charges no duplicate conflict. Interrupted native registration/publication
+and genuine undecidable propagation still leave the run incomplete. Automatic
+reseeding declines while that delivery is pending. Explicit query replacement
+discards it through root reset; engine retirement releases it during cleanup.
+
+When cancellation pauses before root-model blocking, the completed model and trail
+remain for the next slice. Resuming blocks that model before exploring another.
+
+Optional component-terminal observations retain the first terminal boundary,
+its visible stop and cancellation state, unresolved coverage and decision level. A
+cached-terminal marker distinguishes later consumption after a slice is rearmed.
+These observations grant no completeness or retry authority.
+
 Five owners divide the work:
 
 - [SearchSession](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchSession.kt)
