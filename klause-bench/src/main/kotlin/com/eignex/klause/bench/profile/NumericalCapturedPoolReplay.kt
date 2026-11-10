@@ -120,6 +120,8 @@ internal class NumericalCapturedPoolReplay(private val stop: Cancellation) {
         val row = field(cut, "inequality") as SourceInequality
         return buildJsonObject {
             put("id", field(cut, "id") as Int)
+            put("owner", field(cut, "owner") as Int)
+            put("mixed", field(cut, "mixed") as Boolean)
             put("installed", field(cut, "installed") as Boolean)
             put("checked", field(cut, "checked") as Boolean)
             put("ownerActive", field(cut, "ownerActive") as Boolean)
