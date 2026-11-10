@@ -23,6 +23,8 @@ import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -479,6 +481,35 @@ class LocalSearchEngineCompletionTest {
         val ls = assertIs<SolveResult.Sat>(result).stats.ls
         assertEquals(2.0, ls.completions.sum)
         assertEquals(1.0, ls.completionsRefuted.sum)
+        assertEquals(0.0, ls.completionsPrecheckRefuted.sum)
+        assertEquals(1.0, ls.completionsProviderRefuted.sum)
+        assertEquals(0.0, ls.completionsPostcheckRefuted.sum)
+    }
+
+    @Test
+    fun `checks after completion should retain their rejection stage`() {
+        val original = mixedProblem()
+        val factor = object : Factor by original.factors[0], Propagator {
+            override fun propagate(state: PropagationState, factorId: Int): Boolean =
+                !state.intDomains[0].isFixed
+        }
+        val problem = original.withFactors(arrayOf<Factor>(factor))
+        var calls = 0
+        val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false,
+            completion = { candidate, _ ->
+                calls++
+                Completion.Witness(candidate)
+            })
+
+        val result = search.solve(LocalSearchParams(maxFlips = 1,
+            initialAssignment = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))), null)
+
+        val stats = assertIs<SolveResult.Unknown>(result).stats.ls
+        assertTrue(calls > 0)
+        assertTrue(stats.completionsRefuted.sum > 0)
+        assertEquals(stats.completionsRefuted.sum, stats.completionsPostcheckRefuted.sum)
+        assertEquals(0.0, stats.completionsPrecheckRefuted.sum)
+        assertEquals(0.0, stats.completionsProviderRefuted.sum)
     }
 
     @Test

@@ -19,9 +19,9 @@ data class LocalSearchStats(
     val incumbentObjective: Double = Double.NaN,
     /** Total constraint violation at the best incumbent: 0 once feasible, else the lowest residual. NaN unset. */
     val incumbentViolation: Double = Double.NaN,
-    /** Candidates a completion decided, over continuous columns; 0 on a model without them. */
+    /** Candidates decided by required checks or a neighborhood completion. */
     val completions: SumResult = ZERO_COUNT,
-    /** Of [completions], those it refuted — the floating-point search reached a point no exact completion holds. */
+    /** Of [completions], those rejected under the captured candidate context. */
     val completionsRefuted: SumResult = ZERO_COUNT,
     /** Of [completions], those it could not decide within its budget. */
     val completionsUndecided: SumResult = ZERO_COUNT,
@@ -41,6 +41,12 @@ data class LocalSearchStats(
     val geometricProposalCandidates: SumResult = ZERO_COUNT,
     /** Optional objective scoring counts and selection interruptions with their elapsed nanoseconds. */
     val objectiveScoring: Map<String, Long> = emptyMap(),
+    /** Candidate rejections from required checks before a completion provider runs. */
+    val completionsPrecheckRefuted: SumResult = ZERO_COUNT,
+    /** Candidate rejections returned by a completion or neighborhood provider. */
+    val completionsProviderRefuted: SumResult = ZERO_COUNT,
+    /** Candidate rejections from required checks after a provider returns a witness. */
+    val completionsPostcheckRefuted: SumResult = ZERO_COUNT,
 ) {
     /** Combine two workers: moves/stalls add, earliest time-to-best wins, incumbent from the lower violation. */
     fun mergedWith(o: LocalSearchStats): LocalSearchStats = LocalSearchStats(
@@ -62,6 +68,9 @@ data class LocalSearchStats(
         completions = SumResult(completions.sum + o.completions.sum),
         completionsRefuted = SumResult(completionsRefuted.sum + o.completionsRefuted.sum),
         completionsUndecided = SumResult(completionsUndecided.sum + o.completionsUndecided.sum),
+        completionsPrecheckRefuted = SumResult(completionsPrecheckRefuted.sum + o.completionsPrecheckRefuted.sum),
+        completionsProviderRefuted = SumResult(completionsProviderRefuted.sum + o.completionsProviderRefuted.sum),
+        completionsPostcheckRefuted = SumResult(completionsPostcheckRefuted.sum + o.completionsPostcheckRefuted.sum),
         bestResidual = when {
             bestResidual == null -> o.bestResidual
             o.bestResidual == null -> bestResidual
@@ -100,6 +109,9 @@ internal class LocalSearchStatsSink {
     private var completions: Long = 0L
     private var completionsRefuted: Long = 0L
     private var completionsUndecided: Long = 0L
+    private var completionsPrecheckRefuted = 0L
+    private var completionsProviderRefuted = 0L
+    private var completionsPostcheckRefuted = 0L
     private var boardRestartChanges = 0L
     private var boardRestartDeclines = 0L
     private var geometricProposalRuns = 0L
@@ -110,9 +122,17 @@ internal class LocalSearchStatsSink {
     var objectiveScoring: (() -> Map<String, Long>)? = null
 
     /** Count one decided candidate: [refuted] or [undecided] when it was not accepted. */
-    fun recordCompletion(refuted: Boolean, undecided: Boolean) {
+    fun recordCompletion(refuted: Boolean, undecided: Boolean,
+        stage: CompletionRefutationStage = CompletionRefutationStage.PROVIDER) {
         completions++
-        if (refuted) completionsRefuted++
+        if (refuted) {
+            completionsRefuted++
+            when (stage) {
+                CompletionRefutationStage.PRECHECK -> completionsPrecheckRefuted++
+                CompletionRefutationStage.PROVIDER -> completionsProviderRefuted++
+                CompletionRefutationStage.POSTCHECK -> completionsPostcheckRefuted++
+            }
+        }
         if (undecided) completionsUndecided++
     }
 
@@ -151,6 +171,9 @@ internal class LocalSearchStatsSink {
         completions = SumResult(completions.toDouble()),
         completionsRefuted = SumResult(completionsRefuted.toDouble()),
         completionsUndecided = SumResult(completionsUndecided.toDouble()),
+        completionsPrecheckRefuted = SumResult(completionsPrecheckRefuted.toDouble()),
+        completionsProviderRefuted = SumResult(completionsProviderRefuted.toDouble()),
+        completionsPostcheckRefuted = SumResult(completionsPostcheckRefuted.toDouble()),
         bestResidual = bestResidual,
         phaseNanos = phaseNanos?.invoke() ?: emptyMap(),
         boardRestartChanges = SumResult(boardRestartChanges.toDouble()),
@@ -161,3 +184,5 @@ internal class LocalSearchStatsSink {
         objectiveScoring = objectiveScoring?.invoke() ?: emptyMap(),
     )
 }
+
+internal enum class CompletionRefutationStage { PRECHECK, PROVIDER, POSTCHECK }

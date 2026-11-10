@@ -299,6 +299,13 @@ internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
         out += "lsCompletions" to "$completions"
         out += "lsCompletionsRefuted" to "${stats.ls.completionsRefuted.sum.toLong()}"
         out += "lsCompletionsUndecided" to "${stats.ls.completionsUndecided.sum.toLong()}"
+        val attributed = stats.ls.completionsPrecheckRefuted.sum + stats.ls.completionsProviderRefuted.sum +
+            stats.ls.completionsPostcheckRefuted.sum
+        if (attributed > 0.0 && attributed == stats.ls.completionsRefuted.sum) {
+            out += "lsCompletionsPrecheckRefuted" to "${stats.ls.completionsPrecheckRefuted.sum.toLong()}"
+            out += "lsCompletionsProviderRefuted" to "${stats.ls.completionsProviderRefuted.sum.toLong()}"
+            out += "lsCompletionsPostcheckRefuted" to "${stats.ls.completionsPostcheckRefuted.sum.toLong()}"
+        }
     }
     return out
 }

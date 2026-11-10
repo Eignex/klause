@@ -120,8 +120,12 @@ class LocalSearchEnginePublicationTest {
             },
         )
 
-        assertIs<SolveResult.Unknown>(solver.solve(params))
+        val rejected = assertIs<SolveResult.Unknown>(solver.solve(params)).stats.ls
         assertEquals(0, calls)
+        assertTrue(rejected.completionsRefuted.sum > 0)
+        assertEquals(rejected.completionsRefuted.sum, rejected.completionsPrecheckRefuted.sum)
+        assertEquals(0.0, rejected.completionsProviderRefuted.sum)
+        assertEquals(0.0, rejected.completionsPostcheckRefuted.sum)
         assertIs<SolveResult.Sat>(solver.solve(params.copy(initialAssignment = valid)))
         assertEquals(1, calls)
     }
