@@ -87,7 +87,8 @@ internal object MpsProofFrontier {
             "aggregate-mixed", "aggregate-replay", "aggregateCuts", "refutationReuse", "feedbackDelivery",
             "feedbackRequest", "solveSeconds", "certificateState", "point-producer", "fractionalOrder",
             "fractional-attempt", "sourceWork", "sourceAllocation", "heapMiB", "gc", "aggregateReuse",
-            "aggregate-query", "aggregate-work", "aggregate-allocation", "aggregate-production")
+            "aggregate-query", "aggregate-work", "aggregate-allocation", "aggregate-production",
+            "aggregate-production-replay")
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
             (options.keys - supported).isEmpty())
         require(options["fractional-attempt"]?.toBooleanStrict() != true ||
@@ -101,6 +102,8 @@ internal object MpsProofFrontier {
         options["aggregate-query"]?.toInt()?.let { require(it >= 0) }
         options["aggregate-work"]?.toLong()?.let { require(it in 0L..20_000_000L) }
         options["aggregate-allocation"]?.toLong()?.let { require(it in 0L..67_108_864L) }
+        require(options["aggregate-production-replay"]?.toBooleanStrict() != true ||
+            options["aggregate-production"]?.toBooleanStrict() == true)
         if (options["aggregate-production"]?.toBooleanStrict() == true) {
             require(options["aggregate-probe"]?.toBooleanStrict() == true &&
                 options["selection"]?.toBooleanStrict() == true &&
@@ -330,8 +333,15 @@ internal object MpsProofFrontier {
                 }
                 if (options["aggregate-production"]?.toBooleanStrict() == true) {
                     out.resolve("production-aggregates.jsonl").writeText("")
+                    val productionReplay = options["aggregate-production-replay"]?.toBooleanStrict() == true
+                    if (productionReplay) out.resolve("production-replays.jsonl").writeText("")
                     NumericalProductionAggregateSnapshot(Cancellation.after(20.seconds)).inspect(journal,
-                        options.getValue("aggregate-query").toInt()) {
+                        options.getValue("aggregate-query").toInt(), onAccepted = { record, candidates ->
+                            if (productionReplay) NumericalCapturedPoolReplay(Cancellation.after(30.seconds))
+                                .replay(record, candidates) {
+                                    out.resolve("production-replays.jsonl").appendText(it.toString() + "\n")
+                                }
+                        }) {
                         out.resolve("production-aggregates.jsonl").appendText(it.toString() + "\n")
                     }
                 } else if (aggregateProbe) {
@@ -394,6 +404,7 @@ internal object MpsProofFrontier {
                 put("aggregateProbe", aggregateProbe)
                 put("aggregateMixed", aggregateMixed)
                 put("aggregateReplay", aggregateReplay)
+                put("productionReplay", options["aggregate-production-replay"]?.toBooleanStrict() ?: false)
                 put("pointProducer", pointProducer)
                 put("sourceLpOperationAllowance", params.sourceLpOperations)
                 put("activeRows", activeRows)

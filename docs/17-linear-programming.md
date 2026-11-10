@@ -1239,8 +1239,11 @@ charging references and their retained extent to the same archive allowance.
 Their identity belongs to the generating template; a rescoped verification copy
 does not establish preparation-cache compatibility. Releasing this optional
 retention drops its context references without retaining a numerical solver owner.
-Installed
-cut activity keeps the installed, checked cuts with active owners; their violations
+Captured-pool replay preserves row definitions and their identifiers, appends supplied
+consequences within the same row ceiling, and selects the combined pool by an explicit
+mask. Import and copying debit its query allowance; selected derivations are checked
+afresh. It owns a fresh authority and retains no numerical owner from the capture.
+Installed cut activity keeps the installed, checked cuts with active owners; their violations
 are evaluated on demand while that query is still delivered, and a replaced,
 released, cancelled or oversized evaluation declines. A callback without a request
 receives the full record, and an external observer keeps its full archive. Such coordinates can contain numerical residuals and require

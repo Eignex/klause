@@ -10,6 +10,14 @@ import kotlin.test.assertTrue
 
 class MpsProofFrontierTest {
     @Test
+    fun `production replay should require the production generator observation`() {
+        assertFailsWith<IllegalArgumentException> {
+            MpsProofFrontier.parseOptions(arrayOf("suite=miplib3", "problem=egout", "sha256=unused", "exact=true",
+                "selection=true", "aggregate-probe=true", "aggregate-query=9", "aggregate-production-replay=true"))
+        }
+    }
+
+    @Test
     fun `production inspection should require a later query and isolated fixed grants`() {
         val controls = listOf("suite=miplib3", "problem=egout", "sha256=unused", "exact=true",
             "selection=true", "aggregate-probe=true", "aggregate-production=true", "aggregate-query=9")

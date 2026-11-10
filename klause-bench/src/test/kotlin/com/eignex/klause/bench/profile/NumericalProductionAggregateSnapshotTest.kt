@@ -24,7 +24,7 @@ class NumericalProductionAggregateSnapshotTest {
         val journal = NumericalSelectionSnapshot(Cancellation.Never).journal()
         val records = mutableListOf<JsonObject>()
 
-        NumericalProductionAggregateSnapshot(Cancellation.Never).inspect(journal, 9, records::add)
+        NumericalProductionAggregateSnapshot(Cancellation.Never).inspect(journal, 9, emit = records::add)
 
         assertEquals("requested-point-generation-context-or-installed-pool-unavailable",
             records.first().getValue("state").jsonPrimitive.content)

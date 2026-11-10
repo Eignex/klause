@@ -58,6 +58,16 @@ internal object LinearAuthorityReplay {
     ): LinearAuthorityReplayResult = solve(query, mask, additional, cuts, false,
         maximumWork, maximumAllocation, stop)
 
+    fun runWithCapturedCandidates(
+        query: LinearAuthorityCapturedQuery,
+        mask: Set<Int>,
+        additional: List<LinearAuthorityCut>,
+        maximumWork: Long,
+        maximumAllocation: Long,
+        stop: Cancellation,
+    ): LinearAuthorityReplayResult = solve(query, mask, additional, true, false,
+        maximumWork, maximumAllocation, stop, capturedPool = true)
+
     fun generatedAggregates(
         query: LinearAuthorityCapturedQuery, maximumWork: Long, maximumAllocation: Long, stop: Cancellation,
     ): LinearAuthorityReplayResult = solve(query, null, emptyList(), true, true,
@@ -70,11 +80,13 @@ internal object LinearAuthorityReplay {
     ): LinearAuthorityReplayResult {
         val funding = SourceLpFunding(maximumWork, maximumAllocation).apply { grant(maximumWork) }
         val budget = SourceLpBudget(maxOperations = 1, funding = funding)
-        val supplied = if (capturedPool) capturedCuts(query, mask, budget, stop) ?: return LinearAuthorityReplayResult(
+        val supplied = if (capturedPool) capturedCuts(query, mask, additional, budget, stop)
+            ?: return LinearAuthorityReplayResult(
             null, 0, funding.spent, funding.allocated, stop() || funding.exhausted,
             decline = "captured cut pool unavailable") else null
         val capture = LinearAuthorityCapture(1, 1_000_000L, 16_777_216L, stop)
-        val observations = LinearAuthority(budget, retainLp = true, additionalCuts = additional,
+        val observations = LinearAuthority(budget, retainLp = true,
+            additionalCuts = if (capturedPool) emptyList() else additional,
             aggregateCuts = aggregate).use { authority ->
             if (supplied != null) authority.useReplayCuts(supplied)
             authority.capture = capture
@@ -89,7 +101,8 @@ internal object LinearAuthorityReplay {
     }
 
     private fun capturedCuts(
-        query: LinearAuthorityCapturedQuery, mask: Set<Int>?, budget: SourceLpBudget, stop: Cancellation,
+        query: LinearAuthorityCapturedQuery, mask: Set<Int>?, additional: List<LinearAuthorityCut>,
+        budget: SourceLpBudget, stop: Cancellation,
     ): List<LinearAuthorityCut>? {
         val funding = checkNotNull(budget.funding)
         fun charge(work: Long, allocation: Long): Boolean {
@@ -99,16 +112,21 @@ internal object LinearAuthorityReplay {
             return true
         }
         if (stop() || funding.exhausted || query.projection.cuts != LinearAuthorityFeedbackRequest.Cuts.All ||
-            query.cuts.size > 64 || mask == null || mask.size > query.cuts.size) return null
-        if (!charge(1L + query.cuts.size * 2L + mask.size, 128L + query.cuts.size * 16L)) return null
-        if (stop() || funding.exhausted || mask.any { it !in query.cuts.indices }) return null
-        val result = ArrayList<LinearAuthorityCut>(query.cuts.size)
+            query.cuts.size > 64 || additional.size > 64 - query.cuts.size || mask == null) return null
+        val size = query.cuts.size + additional.size
+        if (mask.size > size || !charge(1L + size * 2L + mask.size, 128L + size * 16L)) return null
+        if (stop() || funding.exhausted || mask.any { it !in 0 until size }) return null
+        val result = ArrayList<LinearAuthorityCut>(size)
         for ((id, cut) in query.cuts.withIndex()) {
             if (cut.id != id || cut.family == null) return null
             if (!charge(1L + cut.owners.size, 128L + cut.owners.size * 32L)) return null
             if (stop() || funding.exhausted) return null
             result += LinearAuthorityCut(cut.owner, cut.inequality, cut.derivation,
                 cut.mixed, cut.owners, cut.family)
+        }
+        for (cut in additional) {
+            if (!charge(1L + cut.owners.size, 128L + cut.owners.size * 32L)) return null
+            result += cut
         }
         return result
     }

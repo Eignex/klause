@@ -1197,6 +1197,17 @@ no LP query and changes no production policy. Pay cold preparation and failed
 checks; this reconstruction supplies no ordinary performance comparison or
 independently validated proof. It cannot be combined with other replay modes.
 
+Adding `aggregate-production-replay=true` replays the later point's freshly native-checked
+proposals after releasing generation resources. Three fresh owners receive the same
+captured and appended definitions, with masks for no cuts, the full current pool,
+and the full pool plus proposals. No individual-cut family is regenerated. Each arm
+has one LP operation, 20,000,000 work and 64 MiB modeled allocation; all arms share
+a 30-second deadline and a separate 100,000-poll, 16 MiB native postcheck allowance.
+`production-replays.jsonl` records definitions, masks, fresh checks, bound/refutation
+derivations and costs. Common import costs and fresh bases make this a diagnostic
+bound comparison; stronger bounds still need later search use and ordinary-source
+benefit qualification before any production policy change.
+
 The generated-aggregate replay includes the ordinary opt-in producer's bounded
 source-pair indexing and discovery. Keep this cost separate from replaying supplied
 diagnostic proposals. `AggregatePair*` reports coverage, attempts and limiting

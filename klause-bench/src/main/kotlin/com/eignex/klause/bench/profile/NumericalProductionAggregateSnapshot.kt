@@ -9,6 +9,7 @@ import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
@@ -70,7 +71,9 @@ internal class NumericalProductionAggregateSnapshot(private val stop: Cancellati
         var withheld = 0
             private set
 
-        fun check(point: Point, row: SourceInequality, derivation: SourceDerivation): Pair<String, String?>? {
+        fun check(
+            point: Point, row: SourceInequality, derivation: SourceDerivation,
+        ): Pair<SourceEvidenceCheck, SourceEvidenceCheck?>? {
             val bytes = 262_144L +
                 (point.generation.premises.size.toLong() + point.verification.premises.size) * 64L
             if (stop() || work >= 100_000L || bytes > 16_777_216L - allocation) {
@@ -88,11 +91,11 @@ internal class NumericalProductionAggregateSnapshot(private val stop: Cancellati
                 point.generation.scope, SourceClaim.Consequence(row), derivation), active)
             if (stop() || work >= 100_000L) {
                 withheld++
-                return generation.toString() to null
+                return generation to null
             }
             val verification = SourceEvidenceVerifier(point.verification).verify(SourceEvidence(
                 point.verification.scope, SourceClaim.Consequence(row), derivation), active)
-            return generation.toString() to verification.toString()
+            return generation to verification
         }
     }
 
@@ -136,13 +139,16 @@ internal class NumericalProductionAggregateSnapshot(private val stop: Cancellati
     }
 
     @Suppress("LongMethod")
-    fun inspect(journal: Any, query: Int, emit: (JsonObject) -> Unit) {
+    fun inspect(
+        journal: Any, query: Int, onAccepted: (Any, List<Any>) -> Unit = { _, _ -> }, emit: (JsonObject) -> Unit,
+    ) {
         require(query > 0)
         var kernel: Kernel? = null
         val totals = linkedMapOf<String, Long>()
         val released = linkedMapOf<String, Long>()
         val proofs = ProofBudget(stop)
         var calls = 0
+        var accepted: Pair<Any, List<Any>>? = null
         try {
             val activeKernel = Kernel().also { kernel = it }
             val seed = point(journal, 0)
@@ -170,6 +176,11 @@ internal class NumericalProductionAggregateSnapshot(private val stop: Cancellati
                 val beforeWork = proofs.work
                 val beforeAllocation = proofs.allocation
                 val values = candidates.map { cut -> candidate(point, cut, proofs) }
+                if (fractional && !stop()) {
+                    @Suppress("UNCHECKED_CAST")
+                    val record = (field(journal, "retained") as List<Any>).single { field(it, "id") == query }
+                    accepted = record to candidates.filterIndexed { index, _ -> values[index].second }
+                }
                 emit(buildJsonObject {
                     put("originalQuery", point.id)
                     put("role", if (fractional) "later-fractional" else "cold-current-order-seed")
@@ -194,7 +205,7 @@ internal class NumericalProductionAggregateSnapshot(private val stop: Cancellati
                     put("observations", buildJsonObject { observations.forEach { (key, value) -> put(key, value) } })
                     put("proofWork", proofs.work - beforeWork)
                     put("proofModeledAllocation", proofs.allocation - beforeAllocation)
-                    put("candidates", buildJsonArray { values.forEach { add(it) } })
+                    put("candidates", buildJsonArray { values.forEach { add(it.first) } })
                     put("lpQueries", 0)
                     put("independentProofCheck", false)
                     put("sourceVerdictClaim", false)
@@ -227,18 +238,19 @@ internal class NumericalProductionAggregateSnapshot(private val stop: Cancellati
                 put("independentProofCheck", false)
             })
         }
+        accepted?.let { (record, candidates) -> onAccepted(record, candidates) }
     }
 
-    private fun candidate(point: Point, candidate: Any, proofs: ProofBudget): JsonObject {
+    private fun candidate(point: Point, candidate: Any, proofs: ProofBudget): Pair<JsonObject, Boolean> {
         val row = field(candidate, "inequality") as SourceInequality
         val derivation = field(candidate, "derivation") as SourceDerivation
         val checked = proofs.check(point, row, derivation)
-        return buildJsonObject {
+        val snapshot = buildJsonObject {
             put("coefficients", coefficients(row.coefficients))
             put("rhs", row.rhs.toString())
             put("strict", row.strict)
-            put("generationCheck", checked?.first)
-            put("verificationCheck", checked?.second)
+            put("generationCheck", checked?.first?.toString())
+            put("verificationCheck", checked?.second?.toString())
             put("proofBudgetWithheld", checked == null || checked.second == null)
             put("derivation", NumericalSelectionSnapshot(stop).proof(derivation))
             put("proofSerializationStopped", stop())
@@ -247,5 +259,7 @@ internal class NumericalProductionAggregateSnapshot(private val stop: Cancellati
                 (field(candidate, "owners") as Set<Int>).sorted().forEach { add(JsonPrimitive(it)) }
             })
         }
+        return snapshot to (checked?.first == SourceEvidenceCheck.Checked &&
+            checked?.second == SourceEvidenceCheck.Checked && !stop())
     }
 }
