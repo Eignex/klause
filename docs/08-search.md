@@ -100,7 +100,8 @@ cancellation pause preserves the recipient cursor and resumes delivery before
 lifecycle boundary work or another branch. It registers no duplicate constraint
 and charges no duplicate conflict. Interrupted native registration/publication
 and genuine undecidable propagation still leave the run incomplete. Reseeding
-declines while that delivery is pending; root reset discards it with the old trail.
+declines while that delivery is pending. Root reset and engine retirement release
+the retained continuation.
 
 When cancellation pauses before root-model blocking, the completed model and trail
 remain for the next slice. Resuming blocks that model before exploring another.

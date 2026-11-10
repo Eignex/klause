@@ -642,6 +642,10 @@ class SearchRun internal constructor(
         return true
     }
 
+    internal fun releasePendingPropagation() {
+        pendingLearnedPropagation = null
+    }
+
     /** Reset traversal state after its components have been reseeded at root. */
     fun reset() {
         check(session.decisionLevel == minimumDecisionLevel) { "a search run may only reset at its root" }

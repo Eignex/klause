@@ -26,7 +26,6 @@ import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.lp.relaxation.LeafRealSolver
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedConstraint
 import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationProblem
@@ -431,6 +430,7 @@ internal class ResumableMinimize(
         ).also {
             it.conflictStats = sink.ca
             resources.own(AutoCloseable {
+                if (::run.isInitialized) run.releasePendingPropagation()
                 inprocessing?.reset()
                 if (::searchSession.isInitialized) searchSession.releaseLearning()
                 it.releaseRetainedState()
