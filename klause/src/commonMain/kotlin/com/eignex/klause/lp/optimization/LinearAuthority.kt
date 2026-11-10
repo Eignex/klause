@@ -83,9 +83,14 @@ internal class LinearAuthority(
         cutLifecycle.shared("${metrics.phase.name}_Calls", 1L)
         cutLifecycle.shared("${metrics.phase.name}_Work", metrics.work)
         cutLifecycle.shared("${metrics.phase.name}_${metrics.outcome}", 1L)
-        if (metrics.phase == LpSolvePhase.BOUND_RECONSTRUCTION_INPUT ||
-            metrics.phase == LpSolvePhase.BOUND_CERTIFICATE) {
-            cutLifecycle.shared("${metrics.phase.name}_Nanos", metrics.nanos)
+        when (metrics.phase) {
+            LpSolvePhase.BOUND_CERTIFICATE,
+            LpSolvePhase.BOUND_RECONSTRUCTION_INPUT,
+            LpSolvePhase.BOUND_RECONSTRUCTION_BASIS,
+            LpSolvePhase.BOUND_RECONSTRUCTION_FIXED_DUAL,
+            LpSolvePhase.BOUND_RECONSTRUCTION_BIG_DUAL ->
+                cutLifecycle.shared("${metrics.phase.name}_Nanos", metrics.nanos)
+            else -> Unit
         }
         if (metrics.phase.name.startsWith("CLAIM_")) {
             val key = "Certification" + metrics.phase.name

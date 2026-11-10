@@ -1610,7 +1610,12 @@ resource stops and policy refusal. These work totals overlap the certifier ledge
 must not be added to it. Bound reconstruction additionally reports its
 validation and exact-input capture prefix, including stopped prefixes, through the
 optional phase observer. Its work and time are subsets of the inclusive bound
-certificate phase; vector reconstruction, dual arithmetic and support follow it.
+certificate phase. Exact-basis candidate reconstruction and fixed-width and arbitrary-precision
+dual verification report separate child phases, retaining overflow and declined prefixes.
+Their work and time are disjoint from input capture and remain subsets of inclusive
+certification. Vector reconstruction and support remain in the containing phase.
+A reconstructed candidate supplies no authority until the complete certificate check
+and policy accept it.
 Separate consumption observations count accepted leaf packages
 and actual bound or conflict pruning; a successful check alone is not consumption.
 Source optimization records deterministic claim work and outcomes in its existing stage
