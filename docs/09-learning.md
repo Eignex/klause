@@ -1069,6 +1069,8 @@ Boolean learned literals.
 `learningIntegerSessions` counts native sessions with integer-row learning enabled,
 independently of constructed, admitted and consumed objects.
 Missing metrics stay absent, including root theory results that never enter traversal.
+Live solve snapshots include presolve LP work once and retain the observed LP snapshot
+when no aggregation is needed.
 `smtCompleteSearch*` stage observations overlap and cannot be summed as a work total.
 [SearchStats](../klause/src/commonMain/kotlin/com/eignex/klause/solver/result/SearchStats.kt)
 and [CLI statistics](20-cli.md#statistics) define the exported fields.

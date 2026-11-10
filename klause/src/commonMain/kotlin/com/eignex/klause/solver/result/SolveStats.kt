@@ -174,7 +174,12 @@ internal class SolveStatsSink(var backend: String, lpProbeRoute: LpRoute = LpRou
             run = RunStats(backend = backend, wallMs = elapsedMs, timedOut = timedOut),
             search = searchStats,
             ca = ca.snapshot(),
-            lp = lp.snapshot().mergedWith(presolve?.lpStats ?: LpStats()),
+            lp = lp.snapshot().let { live ->
+                val prepared = presolve?.lpStats
+                // Sparse summaries retain the merge's zero floor for recorded counters.
+                if (prepared == null && live.sparseTrial.isEmpty()) live
+                else live.mergedWith(prepared ?: LpStats())
+            },
             scheduling = scheduling.snapshot(),
             ls = ls.snapshot(),
             openTheory = openTheory,
