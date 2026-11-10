@@ -32,6 +32,7 @@ import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.SearchComponent
+import com.eignex.klause.solver.search.SearchComponentStop
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.validation.FiniteSourceAcceptance
@@ -823,7 +824,11 @@ class ResumableMinimizeRealLeafTest {
                 assertTrue(search.isDone)
                 assertSame(result, search.runSlice(Cancellation.Never, 1000L, 256L) {})
                 assertEquals(
-                    listOf(SearchEvent.BacktrackIncomplete(SearchEvent.BacktrackIncomplete.Path.Component, cause)),
+                    listOf(SearchEvent.BacktrackIncomplete(
+                        SearchEvent.BacktrackIncomplete.Path.Component, cause,
+                        SearchComponentStop(SearchComponentStop.Site.Coverage, cause,
+                            cancelled = false, unresolvedCoverage = true, decisionLevel = 0),
+                    )),
                     events.filterIsInstance<SearchEvent.BacktrackIncomplete>(),
                 )
             }

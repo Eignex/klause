@@ -97,6 +97,11 @@ later pauses do not clear that state.
 When cancellation pauses before root-model blocking, the completed model and trail
 remain for the next slice. Resuming blocks that model before exploring another.
 
+Optional incomplete-result observations retain the first component-terminal boundary,
+its visible stop and cancellation state, unresolved coverage and decision level. A
+cached-terminal marker distinguishes later consumption after a slice is rearmed.
+These observations grant no completeness or retry authority.
+
 Five owners divide the work:
 
 - [SearchSession](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchSession.kt)

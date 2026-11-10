@@ -534,7 +534,9 @@ internal class ResumableMinimize(
             }
         }
         if (!deferredInstallation) checkInitialization()
-        run = searchSession.openRun(problem.numBoolVars, traversal)
+        run = searchSession.openRun(problem.numBoolVars, traversal).also {
+            it.recordComponentStops = params.onEvent != null
+        }
         initialWork = slice.spent()
     }.iterator()
 
@@ -891,7 +893,9 @@ internal class ResumableMinimize(
     }
 
     private fun observeIncomplete(path: SearchEvent.BacktrackIncomplete.Path) {
-        params.onEvent?.invoke(SearchEvent.BacktrackIncomplete(path, searchSession.executionControls.stopCause))
+        params.onEvent?.invoke(SearchEvent.BacktrackIncomplete(
+            path, searchSession.executionControls.stopCause, run.componentStop, run.componentStopReplayed,
+        ))
     }
 
     private fun terminalBudget(): MinimizeResult {

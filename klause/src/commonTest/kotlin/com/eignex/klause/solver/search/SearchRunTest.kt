@@ -356,6 +356,135 @@ class SearchRunTest {
     }
 
     @Test
+    fun `component stop snapshots should survive cached consumption after cancellation is rearmed`() {
+        for (record in listOf(false, true)) {
+            var interruptBlock = false
+            var cancelled = false
+            val cp = CpSearchComponent(
+                PropagationSession(Problem(1, 0, emptyArray(), emptyArray()).bake()),
+                branching = CpBranching.None,
+            )
+            LpPropagator(object : LpSearchPolicy {
+                override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
+                override fun propagate(context: SearchContext): ComponentResult {
+                    if (!interruptBlock) return ComponentResult.Consistent
+                    cancelled = true
+                    return ComponentResult.Indeterminate
+                }
+            }).use { lp ->
+                val session = SearchSession(listOf(cp, lp), cancellation = Cancellation { cancelled })
+                session.initialize()
+                val run = session.openRun(1, modelContinuation = SearchModelContinuation.BlockAtRoot).also {
+                    it.recordComponentStops = record
+                }
+                assertIs<SearchRunEvent.Satisfied>(run.next())
+                interruptBlock = true
+
+                val terminal = run.next()
+                val stop = run.componentStop
+
+                assertEquals(SearchRunEvent.Indeterminate.Component, terminal)
+                if (record) {
+                    assertEquals(
+                        SearchComponentStop(SearchComponentStop.Site.ModelBlock, SearchStopCause.Cancelled,
+                            cancelled = true, unresolvedCoverage = false, decisionLevel = 0),
+                        stop,
+                    )
+                } else {
+                    assertNull(stop)
+                }
+                assertFalse(run.componentStopReplayed)
+                cancelled = false
+                assertSame(terminal, run.next())
+                assertEquals(record, run.componentStopReplayed)
+                assertSame(stop, run.componentStop)
+                assertNull(session.executionControls.stopCause)
+            }
+        }
+    }
+
+    @Test
+    fun `component stop snapshots should reset with their traversal`() {
+        var decline = true
+        val session = SearchSession(listOf(object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
+        }))
+        session.initialize()
+        val run = session.openRun(0, nodePolicy = object : SearchNodePolicy {
+            override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
+                if (decline) SearchNodeDisposition.Indeterminate else SearchNodeDisposition.Expand
+        }).also { it.recordComponentStops = true }
+        assertEquals(SearchRunEvent.Indeterminate.Component, run.next())
+        assertEquals(SearchComponentStop.Site.NodePolicy, run.componentStop?.site)
+        run.next()
+        assertTrue(run.componentStopReplayed)
+
+        run.reset()
+        decline = false
+
+        assertNull(run.componentStop)
+        assertFalse(run.componentStopReplayed)
+        assertNull(session.executionControls.stopCause)
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+        assertEquals(SearchRunEvent.Exhausted, run.next())
+        assertNull(run.componentStop)
+    }
+
+    @Test
+    fun `component stop sites should distinguish model and lifecycle boundaries`() {
+        val sites = listOf(SearchComponentStop.Site.Start, SearchComponentStop.Site.Resume,
+            SearchComponentStop.Site.ModelBlocked,
+            SearchComponentStop.Site.ModelPolicy, SearchComponentStop.Site.Cancellation)
+        for (site in sites) {
+            var cancelled = false
+            val cp = CpSearchComponent(
+                PropagationSession(Problem(1, 0, emptyArray(), emptyArray()).bake()),
+                branching = CpBranching.None,
+            )
+            val session = SearchSession(listOf(cp), cancellation = Cancellation { cancelled })
+            session.initialize()
+            val run = session.openRun(
+                1,
+                modelContinuation = SearchModelContinuation.BlockAtRoot,
+                modelPolicy = object : SearchModelPolicy {
+                    override fun onModel(model: AssembledSearchModel, context: SearchContext): SearchModelDisposition =
+                        if (site == SearchComponentStop.Site.ModelPolicy) SearchModelDisposition.Indeterminate
+                        else SearchModelDisposition.Surface
+                },
+                lifecycle = object : SearchRunLifecycle {
+                    override fun onStart(context: SearchContext): SearchRunDisposition =
+                        if (site == SearchComponentStop.Site.Start) SearchRunDisposition.Indeterminate
+                        else SearchRunDisposition.Continue
+                    override fun onResume(context: SearchContext): SearchRunDisposition =
+                        if (site == SearchComponentStop.Site.Resume) SearchRunDisposition.Indeterminate
+                        else SearchRunDisposition.Continue
+                    override fun onModelBlocked(context: SearchContext): SearchRunDisposition =
+                        if (site == SearchComponentStop.Site.ModelBlocked) SearchRunDisposition.Indeterminate
+                        else SearchRunDisposition.Continue
+                },
+            ).also { it.recordComponentStops = true }
+
+            var result = run.next()
+            if (result is SearchRunEvent.Satisfied) {
+                cancelled = site == SearchComponentStop.Site.Cancellation
+                result = run.next()
+            }
+
+            assertEquals(SearchRunEvent.Indeterminate.Component, result)
+            val stop = assertIs<SearchComponentStop>(run.componentStop)
+            assertEquals(site, stop.site)
+            assertEquals(site == SearchComponentStop.Site.Cancellation, stop.cancelled)
+            assertFalse(stop.unresolvedCoverage)
+            val retainedModel = site == SearchComponentStop.Site.ModelPolicy ||
+                site == SearchComponentStop.Site.Cancellation
+            assertEquals(
+                if (retainedModel) 1 else 0,
+                stop.decisionLevel,
+            )
+        }
+    }
+
+    @Test
     fun `solution notification should precede model assembly`() {
         var notified = false
         val key = SearchModelKey(Boolean::class)
