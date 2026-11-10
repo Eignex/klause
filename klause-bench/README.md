@@ -54,6 +54,11 @@ query boundary to retain; `capture-worker=bt/lp-default|any` selects its worker.
 The worker filter applies before the bounded metadata and owner budgets.
 Reports separate all callbacks, selected-worker callbacks, unselected callbacks and dropped selected metadata.
 The containing timeout includes setup, observation and retirement.
+`capture-mode=joint-before` runs the standalone joint owner with a four-second producer
+grant and at most four snapshots. A retained rejected ray does not stop capture after
+another ray passes the complete kernel check. `missingBoundSideObserved` records the
+rejection history; `stoppedOnUnresolvedMissingSide` identifies an unresolved matching
+rejection that stopped the producer. Snapshot and source-journal limits remain separate.
 `capture-guidance=true captures=0` records bounded native guide adoption and branch
 observations without retaining LP queries. The preference flag describes configured
 precedence; it does not compare a counterfactual value order. Last-read scalar cutoffs

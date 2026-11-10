@@ -126,10 +126,11 @@ internal object JointRepairLpCapture {
         val search = requireNotNull(call(owner, "search", false, seed + 9, false))
         val seen = IdentityHashMap<Any, Boolean>()
         var missingSide = false
+        var unresolvedMissingSide = false
         var rejectionCondition: Int? = null
         var rejectionRayCapture: String? = null
         try {
-            while (!active() && call(owner, "getExhausted") != true && !missingSide) {
+            while (!active() && call(owner, "getExhausted") != true && !unresolvedMissingSide) {
                 val offer: (Sample, Any?) -> Unit = { _, _ -> }
                 call(search, "advance", active, 1L, offer)
                 val lp = field(authority, "lp")
@@ -138,6 +139,11 @@ internal object JointRepairLpCapture {
                 if (guide != null && seen.put(guide, true) == null) {
                     val metrics = call(guide, "getCertificateMetrics")
                     val rejection = metrics?.let { call(it, "getDualRejection") }
+                    val phase = call(guide, "getPhase").toString()
+                    val termination = call(guide, "getTermination").toString()
+                    val guidanceClaim = if (termination == "INFEASIBLE_CANDIDATE") "CONTRADICTION" else "BOUND"
+                    val raySuccesses = (metrics?.let { call(it, "getRaySuccesses") } as? Number)?.toLong() ?: 0L
+                    val checkedRay = phase == "COMPLETE" && termination == "INFEASIBLE_CANDIDATE" && raySuccesses > 0
                     val scope = field(session, "query")?.let { field(it, "scope") } as SourceScope?
                     val id = scopes[scope]
                     if (id != null) {
@@ -150,10 +156,9 @@ internal object JointRepairLpCapture {
                         } else null
                         observerNs += System.nanoTime() - started
                         out.resolve("guidance.jsonl").appendText(buildJsonObject {
-                            put("phase", call(guide, "getPhase").toString())
-                            put("termination", call(guide, "getTermination").toString())
-                            put("guidanceClaim", if (call(guide, "getTermination").toString() ==
-                                "INFEASIBLE_CANDIDATE") "CONTRADICTION" else "BOUND")
+                            put("phase", phase)
+                            put("termination", termination)
+                            put("guidanceClaim", guidanceClaim)
                             put("primalSize", (call(guide, "getPrimal") as DoubleArray?)?.size)
                             put("certificateMetrics", NumericalResidualProfile.json(metrics))
                             put("scope", NumericalFrontierSnapshot.scope(requireNotNull(scope)))
@@ -169,9 +174,12 @@ internal object JointRepairLpCapture {
                                 })
                             }
                             put("missingBoundSide", rejection != null)
+                            put("checkedKernelRayAvailable", checkedRay)
                         }.toString() + "\n")
-                        missingSide = rejection != null && matched
-                        if (missingSide) {
+                        val matchedRejection = rejection != null && matched
+                        unresolvedMissingSide = matchedRejection && !checkedRay
+                        if (matchedRejection) {
+                            missingSide = true
                             rejectionCondition = id
                             rejectionRayCapture = rayCapture
                         }
@@ -196,6 +204,7 @@ internal object JointRepairLpCapture {
                 put("captureObserverNs", observerNs)
                 put("observerTimeInsideActiveLimit", true)
                 put("missingBoundSideObserved", missingSide)
+                put("stoppedOnUnresolvedMissingSide", unresolvedMissingSide)
                 put("resultRequiresMatchingCaptureState", true)
                 put("rejectionCondition", rejectionCondition)
                 put("rejectionCaptureAvailable", rejectionCondition?.let {
