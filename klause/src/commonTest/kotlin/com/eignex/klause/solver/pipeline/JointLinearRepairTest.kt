@@ -43,6 +43,59 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `fixed repair should remain unknown when independent refuted pin groups alternate`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 1), null, null),
+            factors = Array(2) { id ->
+                Linear(intArrayOf(id), doubleArrayOf(1.0), intArrayOf(id), doubleArrayOf(-1.0), LinearOp.EQ, 0.0)
+            }, numRealVars = 2, realLower = DoubleArray(2) { 0.5 }, realUpper = DoubleArray(2) { 1.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(2) { 1.0 })
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        for (completion in listOf(false, true)) {
+            val params = TheoryParams(sourceIncumbentCompletion = completion, sourceCuts = false, maxFlips = 4)
+            JointLinearRepair(model, source, objective, params).use { repair ->
+                repair.search(adaptive = false).use { search ->
+                    var done = false
+                    repeat(64) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+
+                    val result = search.minimizeResult(TerminationReason.BudgetExhausted)
+
+                    assertTrue(done)
+                    assertIs<MinimizeResult.Unknown>(result)
+                    val stages = repair.stats.smt.completeSearchStages.orEmpty()
+                    assertTrue((stages["jointRepairClosedLeaves"] ?: 0L) >= 2L)
+                    assertEquals(1L, stages["jointRepairMaxFreedIntegers"])
+                    if (completion) assertTrue((stages["jointRepairRefutationSeeds"] ?: 0L) > 0L)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `freeing both independent pin groups should complete an original source point`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 1), null, null),
+            factors = Array(2) { id ->
+                Linear(intArrayOf(id), doubleArrayOf(1.0), intArrayOf(id), doubleArrayOf(-1.0), LinearOp.EQ, 0.0)
+            }, numRealVars = 2, realLower = DoubleArray(2) { 0.5 }, realUpper = DoubleArray(2) { 1.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(2) { 1.0 })
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
+        JointLinearRepair(model, source, objective, TheoryParams(sourceCuts = false)).use { repair ->
+            var result = repair.check(condition, Cancellation.Never)
+            repeat(64) {
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+            }
+
+            val sample = assertIs<ExactNeighborhoodResult.Witness>(result).sample
+
+            assertEquals(listOf(1L, 1L), sample.ints.toList())
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(source.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)))
+        }
+    }
+
+    @Test
     fun `returning to a completed refuted region should reuse it without another query or proof credit`() {
         val model = Problem(0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
