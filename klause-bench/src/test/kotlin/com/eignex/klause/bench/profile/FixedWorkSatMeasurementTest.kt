@@ -27,8 +27,8 @@ class FixedWorkSatMeasurementTest {
 
     @Test
     fun `repeated invocations with one seed share the prefix digest`() {
-        val first = measure(FixedWorkUnit.CONFLICTS, 40, index = 0)
-        val second = measure(FixedWorkUnit.CONFLICTS, 40, index = 1)
+        val first = measure(FixedWorkUnit.CONFLICTS, 20, index = 0, source = pigeonhole(6, 5))
+        val second = measure(FixedWorkUnit.CONFLICTS, 20, index = 1, source = pigeonhole(6, 5))
 
         assertEquals(first.path("trajectory", "prefix").text("digest"),
             second.path("trajectory", "prefix").text("digest"))
