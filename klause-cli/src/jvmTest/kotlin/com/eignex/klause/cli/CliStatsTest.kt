@@ -583,6 +583,31 @@ class CliStatsTest {
     }
 
     @Test
+    fun `ls refutation stages should be emitted only with complete attribution`() {
+        for (attributed in listOf(0, 2, 3)) {
+            val stats = SolveStats(run = RunStats(backend = "ls"), ls = LocalSearchStats(
+                completions = SumResult(4.0), completionsRefuted = SumResult(3.0),
+                completionsPrecheckRefuted = SumResult(if (attributed > 0) 1.0 else 0.0),
+                completionsProviderRefuted = SumResult(if (attributed == 3) 2.0 else 0.0),
+                completionsPostcheckRefuted = SumResult(if (attributed == 2) 1.0 else 0.0),
+            ))
+
+            val pairs = lsStatPairs(stats, solveTimeMs = 0).toMap()
+
+            assertEquals("3", pairs["lsCompletionsRefuted"])
+            if (attributed == 3) {
+                assertEquals("1", pairs["lsCompletionsPrecheckRefuted"])
+                assertEquals("2", pairs["lsCompletionsProviderRefuted"])
+                assertEquals("0", pairs["lsCompletionsPostcheckRefuted"])
+            } else {
+                assertTrue("lsCompletionsPrecheckRefuted" !in pairs)
+                assertTrue("lsCompletionsProviderRefuted" !in pairs)
+                assertTrue("lsCompletionsPostcheckRefuted" !in pairs)
+            }
+        }
+    }
+
+    @Test
     fun `ls stats should derive move rates and the incumbent`() {
         val stats = SolveStats(
             run = RunStats(backend = "ls", wallMs = 2000L),

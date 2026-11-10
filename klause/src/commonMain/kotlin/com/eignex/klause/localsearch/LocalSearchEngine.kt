@@ -26,6 +26,7 @@ import com.eignex.klause.solver.executionCapabilities
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
+import com.eignex.klause.solver.result.CompletionRefutationStage
 import com.eignex.klause.solver.result.LocalSearchStatsSink
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
@@ -1346,7 +1347,13 @@ internal class LocalSearchEngine(
             Completion.Undecided(sourceChecked.work)
         } else sourceChecked
         charge(decided.work)
-        stats?.recordCompletion(refuted = decided is Completion.Refuted, undecided = decided is Completion.Undecided)
+        val refutationStage = when {
+            preliminary is Completion.Refuted -> CompletionRefutationStage.PRECHECK
+            real is Completion.Refuted -> CompletionRefutationStage.PROVIDER
+            else -> CompletionRefutationStage.POSTCHECK
+        }
+        stats?.recordCompletion(refuted = decided is Completion.Refuted, undecided = decided is Completion.Undecided,
+            stage = refutationStage)
         if (decided is Completion.Refuted) {
             val weights = state.weights.factorWeights
             for (f in decided.factors) weights[f] += 1.0

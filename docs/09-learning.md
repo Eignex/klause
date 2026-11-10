@@ -1057,6 +1057,14 @@ most half the remaining time and 5 seconds.
 ### Statistics
 
 Counters describe observed work, never proof coverage.
+
+Local-search candidate refutations distinguish required checks before completion,
+the completion or neighborhood provider, and required checks after its witness.
+Their sum belongs to the existing candidate-refutation total. A rejected candidate
+does not refute the unrestricted source. Missing historical stage counts do not
+identify a rejection stage; the CLI emits the split only when it accounts for the
+whole refutation total.
+
 `propagations` counts deductions from completed finite fixpoints, excluding decision
 and root pins; `propagationWork` also counts dispatch, watcher, scheduling and reason visits
 across undo. Root figures are subsets of totals. Fixpoint time excludes some counted
