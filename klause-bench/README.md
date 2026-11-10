@@ -46,6 +46,9 @@ single-model corpus inputs and their packed hashes. It verifies each lab-fetched
 input and records its decoded SHA-256 and byte count without parsing or solving it.
 
 `FinitePortfolioLpCapture` records bounded queries from an ordinary finite portfolio.
+Select `portfolio-policy=ordinary|retained|complete`; omitted policy retains the companion preset.
+The ordinary preset requires `handoff=false` and leaves algorithm controls at source defaults.
+`portfolio-progress=false` disables progress logging; its default is `true`.
 Its `capture-route=SESSION|SCOPED_FLOAT|SCOPED_CONTINUATION|any` filter selects the
 query boundary to retain; `capture-worker=bt/lp-default|any` selects its worker.
 The containing timeout includes setup, observation and retirement.

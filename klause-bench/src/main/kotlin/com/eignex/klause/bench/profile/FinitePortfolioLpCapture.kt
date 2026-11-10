@@ -38,6 +38,7 @@ internal object FinitePortfolioLpCapture {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
+        parameters(options)
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         val reference = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
@@ -48,16 +49,33 @@ internal object FinitePortfolioLpCapture {
         inspect(options, bytes, out)
     }
 
-    internal fun inspect(options: Map<String, String>, bytes: ByteArray, out: File) {
+    internal fun parameters(options: Map<String, String>): List<String> {
         val required = setOf("suite", "problem", "sha256", "seed", "handoff")
         require(options.keys.containsAll(required) && (options.keys - required).all {
-            it in setOf("timeout-ms", "captures", "cutoff-bits", "capture-worker", "capture-route", "capture-guidance")
+            it in setOf("timeout-ms", "captures", "cutoff-bits", "capture-worker", "capture-route", "capture-guidance",
+                "portfolio-policy", "portfolio-progress")
         })
+        val preset = options["portfolio-policy"] ?: "retained"
+        require(preset in setOf("ordinary", "retained", "complete")) { "unsupported portfolio policy: $preset" }
+        val handoff = options.getValue("handoff").toBooleanStrict()
+        val progress = options["portfolio-progress"]?.toBooleanStrict() ?: true
+        if (preset == "ordinary") {
+            require(!handoff) { "ordinary portfolio policy requires handoff=false" }
+            return listOf("portfolio-progress=$progress")
+        }
+        return listOf("companion-integers=true", "companion-active-ms=4000",
+            "companion-after-incumbent=true", "companion-admission=progress-funded", "companion-repair=fixed",
+            "source-incumbent-completion=$handoff", "portfolio-progress=$progress", "portfolio-reward=ordinary",
+            "phase-retention=0.25", "reseed-stale-threshold=3", "portfolio-probes=ordinary",
+            "portfolio-proof-workers=$preset", "portfolio-proof-share=0.5")
+    }
+
+    internal fun inspect(options: Map<String, String>, bytes: ByteArray, out: File) {
+        val pairs = parameters(options)
         val timeout = options["timeout-ms"]?.toLong() ?: 30_000L
         val limit = options["captures"]?.toInt() ?: 1
         val captureGuidance = options["capture-guidance"]?.toBooleanStrict() ?: false
         val seed = options.getValue("seed").toLong()
-        val handoff = options.getValue("handoff").toBooleanStrict()
         val cutoffBits = options["cutoff-bits"]?.toLong()
         val captureWorker = options["capture-worker"] ?: "bt/lp-default"
         val captureRoute = options["capture-route"] ?: "any"
@@ -79,6 +97,9 @@ internal object FinitePortfolioLpCapture {
             out.resolve("result.json").writeText(buildJsonObject {
                 put("captureDeclined", "finite source route unavailable after preparation")
                 put("executionKind", SourceSetup.executionKind(invocation).name)
+                put("portfolioPolicy", options["portfolio-policy"] ?: "retained")
+                put("finiteEngine", FiniteEngine.MIXED.id)
+                put("parameters", JsonArray(pairs.map(::JsonPrimitive)))
                 put("executionNs", System.nanoTime() - executionStarted)
                 put("containingTimeoutMs", timeout)
                 put("cancelled", stop())
@@ -88,11 +109,6 @@ internal object FinitePortfolioLpCapture {
             }.toString())
             return
         }
-        val pairs = listOf("companion-integers=true", "companion-active-ms=4000",
-            "companion-after-incumbent=true", "companion-admission=progress-funded", "companion-repair=fixed",
-            "source-incumbent-completion=$handoff", "portfolio-progress=true", "portfolio-reward=ordinary",
-            "phase-retention=0.25", "reseed-stale-threshold=3", "portfolio-probes=ordinary",
-            "portfolio-proof-workers=retained", "portfolio-proof-share=0.5")
         val policy = SourceExecutionPolicy()
         val owners = IdentityHashMap<Any, Int>()
         var queries = 0
@@ -243,6 +259,8 @@ internal object FinitePortfolioLpCapture {
                     out.resolve("result.json").writeText(buildJsonObject {
                         put("nativeResultKind", result.javaClass.simpleName)
                         put("sourceSemantics", original.semantics.toString())
+                        put("portfolioPolicy", options["portfolio-policy"] ?: "retained")
+                        put("finiteEngine", FiniteEngine.MIXED.id)
                         put("parameters", JsonArray(pairs.map(::JsonPrimitive)))
                         put("seed", seed)
                         put("containingTimeoutMs", timeout)
