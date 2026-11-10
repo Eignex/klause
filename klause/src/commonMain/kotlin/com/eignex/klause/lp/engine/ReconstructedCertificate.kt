@@ -405,12 +405,10 @@ private class FixedReconstructionVerifier(
         meter.storage((a.m.toLong() + a.size) * 48L)
         val y = multipliers.map { from(it) }
         var value = if (ray) from(BigFraction.ZERO) else from(a.constant)
-        for (i in y.indices) {
-            if (y[i].isZero || a.rhs[i].isZero) meter.step()
-            else value = plus(value, times(y[i], from(a.rhs[i])))
-        }
         val reduced = ArrayList<BigFraction>(a.size)
         val selected = ArrayList<ExactSimplexBound>()
+        meter.storage(64L + a.size.toLong() * 8L)
+        val selectedReduced = ArrayList<Frac128>(a.size)
         var strict = false
         for (j in 0 until a.size) {
             var d = if (ray) from(BigFraction.ZERO) else from(a.costs[j])
@@ -424,12 +422,22 @@ private class FixedReconstructionVerifier(
                     meter.dualRejection = ReconstructionDualRejection(j, upper, big(d))
                     return null
                 }
-                if (side.number.value.isZero) meter.step()
-                else value = plus(value, times(d, from(side.number.value)))
                 selected += ExactSimplexBound(j, upper)
+                selectedReduced += d
                 strict = strict || side.strict
             }
             reduced += big(d)
+        }
+        for (i in y.indices) {
+            if (y[i].isZero || a.rhs[i].isZero) meter.step()
+            else value = plus(value, times(y[i], from(a.rhs[i])))
+        }
+        for (index in selected.indices) {
+            meter.step()
+            val cited = selected[index]
+            val side = requireNotNull(if (cited.upper) a.bounds[cited.column].upper else a.bounds[cited.column].lower)
+            if (side.number.value.isZero) meter.step()
+            else value = plus(value, times(selectedReduced[index], from(side.number.value)))
         }
         if (!ray) value = plus(times(value, reciprocal(from(a.scale))), from(a.external))
         return ReconstructedDual(big(value), reduced, selected.toList(), strict)
@@ -491,10 +499,6 @@ private class BigReconstructionVerifier(
         meter.storage((a.m.toLong() + a.size) * 48L)
         val y = multipliers.map { from(it) }
         var value = if (ray) from(BigFraction.ZERO) else from(a.constant)
-        for (i in y.indices) {
-            if (y[i].isZero || a.rhs[i].isZero) meter.step()
-            else value = plus(value, times(y[i], from(a.rhs[i])))
-        }
         val reduced = ArrayList<BigFraction>(a.size)
         val selected = ArrayList<ExactSimplexBound>()
         var strict = false
@@ -510,12 +514,20 @@ private class BigReconstructionVerifier(
                     meter.dualRejection = ReconstructionDualRejection(j, upper, big(d))
                     return null
                 }
-                if (side.number.value.isZero) meter.step()
-                else value = plus(value, times(d, from(side.number.value)))
                 selected += ExactSimplexBound(j, upper)
                 strict = strict || side.strict
             }
             reduced += big(d)
+        }
+        for (i in y.indices) {
+            if (y[i].isZero || a.rhs[i].isZero) meter.step()
+            else value = plus(value, times(y[i], from(a.rhs[i])))
+        }
+        for (cited in selected) {
+            meter.step()
+            val side = requireNotNull(if (cited.upper) a.bounds[cited.column].upper else a.bounds[cited.column].lower)
+            if (side.number.value.isZero) meter.step()
+            else value = plus(value, times(reduced[cited.column], from(side.number.value)))
         }
         if (!ray) value = plus(times(value, reciprocal(from(a.scale))), from(a.external))
         return ReconstructedDual(big(value), reduced, selected.toList(), strict)
