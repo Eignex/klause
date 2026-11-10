@@ -55,6 +55,8 @@ class SearchRun internal constructor(
     private var pendingAdvance = false
     private var pendingCancellation = false
     private var retryingAssertion = false
+    private var pendingLearnedPropagation: SearchPendingLearnedPropagation? = null
+    internal val learnedPropagationPending: Boolean get() = pendingLearnedPropagation != null
 
     /**
      * Poll the cancellation token on a fixed cadence rather than a time-adaptive one.
@@ -82,6 +84,19 @@ class SearchRun internal constructor(
         if (!started) {
             started = true
             lifecycle.onStart(session).toEvent(SearchComponentStop.Site.Start)?.let { return it }
+        }
+        pendingLearnedPropagation?.let { pending ->
+            if (session.cancelled()) return pauseLearnedPropagation()
+            when (pending.continuePropagation(session)) {
+                ComponentResult.Consistent -> pendingLearnedPropagation = null
+
+                is ComponentResult.Conflict -> {
+                    pendingLearnedPropagation = null
+                    if (!backtrack()) return stopAfterBacktrack()
+                }
+
+                ComponentResult.Indeterminate -> return pauseLearnedPropagation()
+            }
         }
         lifecycle.onResume(session).toEvent(SearchComponentStop.Site.Resume)?.let { return it }
         if (retryingAssertion) {
@@ -142,7 +157,7 @@ class SearchRun internal constructor(
                 is SearchNodeDisposition.Backjump -> {
                     observer.onConflict(null)
                     observer.onLearnedNodeBackjump()
-                    when (applyLearnedConflict(node.consequence)) {
+                    when (applyLearnedConflict(node.consequence, retainPropagation = true)) {
                         SearchLearnedConflictResult.Resume -> continue
 
                         SearchLearnedConflictResult.Exhausted -> return finish(SearchRunEvent.Exhausted)
@@ -150,6 +165,7 @@ class SearchRun internal constructor(
                         SearchLearnedConflictResult.Chronological -> if (!backtrack()) return stopAfterBacktrack()
 
                         SearchLearnedConflictResult.Indeterminate -> {
+                            if (learnedPropagationPending) return pauseLearnedPropagation()
                             return finish(
                                 SearchRunEvent.Indeterminate.Component, SearchComponentStop.Site.LearnedConflict,
                             )
@@ -484,7 +500,10 @@ class SearchRun internal constructor(
         is SearchLearnedConflictResult.Backjump -> error("learned conflict cascade did not terminate")
     }
 
-    private fun applyLearnedConflict(initial: SearchLearnedConflict): SearchLearnedConflictResult {
+    private fun applyLearnedConflict(
+        initial: SearchLearnedConflict,
+        retainPropagation: Boolean = false,
+    ): SearchLearnedConflictResult {
         var conflict = initial
         learnedApplied = false
         repeat(MAX_NODE_BACKJUMPS) {
@@ -500,13 +519,28 @@ class SearchRun internal constructor(
                 SearchLearnedConflictResult.Resume,
                 SearchLearnedConflictResult.Exhausted,
                 SearchLearnedConflictResult.Chronological,
-                SearchLearnedConflictResult.Indeterminate,
                 -> return result
+
+                SearchLearnedConflictResult.Indeterminate -> {
+                    pendingLearnedPropagation = (conflict as? SearchPendingLearnedPropagation)
+                        ?.takeIf { retainPropagation && it.propagationPending }
+                    return result
+                }
 
                 is SearchLearnedConflictResult.Backjump -> conflict = result.conflict
             }
         }
         return SearchLearnedConflictResult.Chronological
+    }
+
+    private fun pauseLearnedPropagation(): SearchRunEvent {
+        if (pendingLearnedPropagation?.propagationPending == true && session.cancelled() &&
+            lifecycle.onCancellation(session) == SearchRunDisposition.Pause
+        ) {
+            return SearchRunEvent.Paused
+        }
+        pendingLearnedPropagation = null
+        return finish(SearchRunEvent.Indeterminate.Component, SearchComponentStop.Site.LearnedConflict)
     }
 
     private fun exhausted(): SearchRunEvent = if (sawIndeterminate) {
@@ -593,7 +627,8 @@ class SearchRun internal constructor(
     internal fun retainBooleanRoot(literal: Int): Boolean {
         if (modelContinuation != SearchModelContinuation.Chronological || queryRoot != minimumDecisionLevel ||
             !started || terminal != null || sawIndeterminate || pendingModel != null || lastModel != null ||
-            consumedModel || pendingCancellation || retryingAssertion || budgetInterrupted) return false
+            consumedModel || pendingCancellation || retryingAssertion || learnedPropagationPending ||
+            budgetInterrupted) return false
         val frame = frames.firstOrNull() ?: return false
         if (frame.level != minimumDecisionLevel || session.decisionLevel <= frame.level ||
             frame.decisions.size != 2) return false
@@ -626,6 +661,7 @@ class SearchRun internal constructor(
         pendingAdvance = false
         pendingCancellation = false
         retryingAssertion = false
+        pendingLearnedPropagation = null
         started = false
         session.beginTraversal()
         cancellationPoller.reset()
