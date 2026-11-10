@@ -104,10 +104,24 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
                     for (name in listOf("activity", "normSquared", "efficacy", "minimumEfficacy")) {
                         put(name, (field(rejected, name) as Double).toString())
                     }
+                    put("cost", rejectionCost(field(rejected, "cost")) ?: JsonNull)
                 })
             }
         })
         put("inspectionStopped", stop())
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun rejectionCost(cost: Any?): JsonObject? = cost?.let {
+        buildJsonObject {
+            put("kind", "cumulative-source-pair-prefix")
+            put("attempt", field(cost, "attempt") as Long)
+            put("phases", buildJsonObject {
+                for ((phase, value) in field(cost, "phases") as Map<Enum<*>, Any>) put(phase.name, buildJsonObject {
+                    for (name in listOf("work", "allocation", "spans")) put(name, field(value, name) as Long)
+                })
+            })
+        }
     }
 
     @Suppress("UNCHECKED_CAST")

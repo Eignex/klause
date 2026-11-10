@@ -20,6 +20,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 
 class NumericalSelectionSnapshotTest {
     private val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
@@ -28,6 +29,31 @@ class NumericalSelectionSnapshotTest {
         condition = SourceCondition(upper = mapOf(x to BigFraction.ONE)))
     private val row = SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(2), strict = true)
     private val premise = SourceDerivation.Premise("row")
+
+    @Test
+    fun `rejection cost should preserve cumulative attempt and phase values`() {
+        val phaseType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityAggregatePhase")
+        val phase = phaseType.enumConstants.single { (it as Enum<*>).name == "BoundRounding" }
+        val phaseCostType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityAggregatePhaseCost")
+        val phaseCost = phaseCostType.declaredConstructors.single().newInstance(70L, 1024L, 2L)
+        val prefixType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityAggregateCostPrefix")
+        val prefix = prefixType.declaredConstructors.single().newInstance(3L, mapOf(phase to phaseCost))
+
+        val captured = checkNotNull(NumericalSelectionSnapshot(Cancellation.Never).rejectionCost(prefix))
+
+        assertEquals("cumulative-source-pair-prefix", captured.getValue("kind").jsonPrimitive.content)
+        assertEquals("3", captured.getValue("attempt").jsonPrimitive.content)
+        val rounding = captured.getValue("phases").jsonObject.getValue("BoundRounding").jsonObject
+        assertEquals("70", rounding.getValue("work").jsonPrimitive.content)
+        assertEquals("1024", rounding.getValue("allocation").jsonPrimitive.content)
+        assertEquals("2", rounding.getValue("spans").jsonPrimitive.content)
+        assertFalse("checked" in captured)
+    }
+
+    @Test
+    fun `unobserved rejection cost should remain absent`() {
+        assertNull(NumericalSelectionSnapshot(Cancellation.Never).rejectionCost(null))
+    }
 
     @Test
     fun `query cost should retain its scalar interval scope and installed mask`() {

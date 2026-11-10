@@ -42,6 +42,76 @@ class LinearAuthorityAggregateCutsTest {
         BigFraction.ZERO)
 
     @Test
+    fun `generation cost capture should preserve cuts and partition accepted charges`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+            "left" to SourcePremise(left), "right" to SourcePremise(right),
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        for (value in listOf(1.0, 1.5)) {
+            val point = mapOf(x to value, y to 0.0, real to if (value == 1.5) 0.0 else 1.0)
+            val control = HashMap<String, Long>()
+            val expected = LinearAuthorityAggregateCuts.prepareSourcePairsTargeted(source, Cancellation.Never,
+                { name, count -> control[name] = (control[name] ?: 0L) + count }, 1,
+                LinearAuthorityAggregateCuts.pointSourcePairLimits, point, fractionalTargeting = true)
+            val funding = SourceLpFunding(100_000L, 1_000_000L).apply { grant(100_000L) }
+            val capture = LinearAuthorityAggregateRejections(SourceLpBudget(funding = funding), Cancellation.Never)
+            val observed = HashMap<String, Long>()
+
+            val actual = LinearAuthorityAggregateCuts.prepareSourcePairsObserved(source, Cancellation.Never,
+                { name, count ->
+                    observed[name] = (observed[name] ?: 0L) + count
+                    if (name != "AggregateWork" && name != "AggregateAllocation") capture.observe(name, count)
+                }, 1, LinearAuthorityAggregateCuts.pointSourcePairLimits, point, true, capture::record)
+
+            assertEquals(expected.map { Triple(it.inequality, it.owners, it.family) },
+                actual.map { Triple(it.inequality, it.owners, it.family) })
+            for (cut in actual) assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(source.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+            assertEquals(control, observed.filterKeys { !it.startsWith("AggregateCost") })
+            assertFalse(capture.limited)
+            if (value == 1.5) {
+                assertTrue(actual.isNotEmpty())
+                continue
+            }
+            assertTrue(capture.records.isNotEmpty())
+            val phases = LinearAuthorityAggregatePhase.entries
+            assertTrue(phases.sumOf { observed[it.workEvent] ?: 0L } <= observed.getValue("AggregateWork"))
+            assertTrue(phases.sumOf { observed[it.allocationEvent] ?: 0L } <= observed.getValue("AggregateAllocation"))
+            val prefix = assertNotNull(capture.records.first().cost)
+            for (phase in listOf(LinearAuthorityAggregatePhase.Aggregation,
+                LinearAuthorityAggregatePhase.ProofCombination,
+                LinearAuthorityAggregatePhase.BoundRounding, LinearAuthorityAggregatePhase.PointScreen)) {
+                assertTrue(prefix.phases.getValue(phase).work > 0L)
+            }
+        }
+    }
+
+    @Test
+    fun `interrupted derivation should retain its paid phase prefix without a rejection`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+            "left" to SourcePremise(left), "right" to SourcePremise(right)))
+        val observed = HashMap<String, Long>()
+        var deriving = false
+        var stopped = false
+
+        LinearAuthorityAggregateCuts.prepareSourcePairsObserved(source, Cancellation { stopped },
+            { name, count ->
+                observed[name] = (observed[name] ?: 0L) + count
+                if (name == "AggregateAttempts") deriving = true
+                if (deriving && name == "AggregateWork" && count > 0L) stopped = true
+            }, 1, LinearAuthorityAggregateCuts.pointSourcePairLimits,
+            mapOf(x to 1.5, y to 0.0, real to 0.0), true,
+            { _, _, _, _ -> error("interrupted derivation has no rejected cut") })
+
+        assertTrue(stopped)
+        assertTrue(observed.getValue(LinearAuthorityAggregatePhase.Aggregation.workEvent) > 0L)
+        assertTrue(LinearAuthorityAggregatePhase.entries.sumOf { observed[it.workEvent] ?: 0L } <=
+            observed.getValue("AggregateWork"))
+        assertTrue(LinearAuthorityAggregatePhase.entries.sumOf { observed[it.allocationEvent] ?: 0L } <=
+            observed.getValue("AggregateAllocation"))
+    }
+
+    @Test
     fun `reusing source preparation should amortize allocation while preserving checked cuts`() {
         val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
             "left" to SourcePremise(left), "right" to SourcePremise(right)))

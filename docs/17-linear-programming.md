@@ -1861,6 +1861,14 @@ rejected inequalities with 128 coefficients/owners and 256-bit scalars, and at m
 64 event names. Completed records retain scalar snapshots and immutable values
 without retaining the journal's live budget. Inspection cancellation withholds new
 output without revoking already retained immutable evidence.
+The journal can attribute disjoint generation phases to accepted containing-meter
+charges. Parent spans close before child derivations; interrupted spans retain
+their paid prefix. Rejected rows keep funded immutable cumulative phase costs
+within their seed-row or source-pair attempt. Continuations share that attempt, so
+its successive prefixes overlap. Bound substitution, rounding and their remaining
+proof construction form one phase. Indexing and ordering remain in the containing
+totals. Fixed phase snapshots and record copies share the existing observer and
+source allowances; absent or limited observation supplies no complete cost.
 The first retained fractional attempt can reserve a separate 128-work, 8-KiB frame
 for its augmented query's scope, installed mask and scalar funding, owner, basis,
 fill and certification snapshots. Each observed call charges one additional work

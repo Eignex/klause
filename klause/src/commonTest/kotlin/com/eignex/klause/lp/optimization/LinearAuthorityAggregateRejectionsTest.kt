@@ -12,12 +12,78 @@ import com.eignex.util.numbers.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LinearAuthorityAggregateRejectionsTest {
     private val cut = LinearAuthorityCut(0, SourceInequality(
         mapOf(SourceCoordinate(SourceCoordinate.Kind.Integer, 0) to BigFraction.ONE), BigFraction.ZERO),
         SourceDerivation.Premise("upper"))
+
+    @Test
+    fun `cost records should retain immutable cumulative prefixes within each attempt`() {
+        val funding = SourceLpFunding(100_000L, 1_000_000L).apply { grant(100_000L) }
+        val capture = LinearAuthorityAggregateRejections(SourceLpBudget(funding = funding), Cancellation.Never)
+        val phase = LinearAuthorityAggregatePhase.Aggregation
+
+        capture.observe("AggregateCostAttempt", 1L)
+        capture.observe(phase.workEvent, 7L)
+        capture.observe(phase.allocationEvent, 100L)
+        capture.observe(phase.spansEvent, 1L)
+        capture.record(cut, -1.0, 1.0, -1.0)
+        capture.observe(phase.workEvent, 3L)
+        capture.observe(phase.spansEvent, 1L)
+        capture.record(cut, -2.0, 1.0, -2.0)
+        capture.observe("AggregateCostAttempt", 1L)
+        capture.observe(phase.workEvent, 2L)
+        capture.observe(phase.spansEvent, 1L)
+        capture.record(cut, -3.0, 1.0, -3.0)
+
+        val costs = capture.records.map { assertNotNull(it.cost) }
+        assertEquals(listOf(1L, 1L, 2L), costs.map { it.attempt })
+        assertEquals(listOf(LinearAuthorityAggregatePhaseCost(7L, 100L, 1L),
+            LinearAuthorityAggregatePhaseCost(10L, 100L, 2L), LinearAuthorityAggregatePhaseCost(2L, 0L, 1L)),
+            costs.map { it.phases.getValue(phase) })
+        assertEquals(LinearAuthorityAggregatePhaseCost(0L, 0L, 0L),
+            costs.first().phases.getValue(LinearAuthorityAggregatePhase.IntegerHalf))
+        assertFalse(capture.limited)
+        assertEquals(capture.work, funding.spent)
+        assertEquals(capture.allocation, funding.allocated)
+    }
+
+    @Test
+    fun `an unfunded attempt snapshot should leave no rejection record`() {
+        val funding = SourceLpFunding(100_000L, 1_000_000L).apply { grant(100_000L) }
+        val capture = LinearAuthorityAggregateRejections(SourceLpBudget(funding = funding), Cancellation.Never,
+            maximumWork = 18L)
+
+        capture.observe("AggregateCostAttempt", 1L)
+        capture.record(cut, -1.0, 1.0, -1.0)
+
+        assertTrue(capture.limited)
+        assertTrue(capture.records.isEmpty())
+        assertEquals(2L, funding.spent)
+        assertEquals(capture.work, funding.spent)
+    }
+
+    @Test
+    fun `an unfunded cost prefix should not publish a partially funded record`() {
+        val funding = SourceLpFunding(100_000L, 1_000_000L).apply { grant(100_000L) }
+        val capture = LinearAuthorityAggregateRejections(SourceLpBudget(funding = funding), Cancellation.Never,
+            maximumWork = 41L)
+        val phase = LinearAuthorityAggregatePhase.Aggregation
+        capture.observe("AggregateCostAttempt", 1L)
+        capture.observe(phase.workEvent, 7L)
+        capture.observe(phase.allocationEvent, 100L)
+        capture.observe(phase.spansEvent, 1L)
+
+        capture.record(cut, -1.0, 1.0, -1.0)
+
+        assertTrue(capture.limited)
+        assertTrue(capture.records.isEmpty())
+        assertEquals(41L, funding.spent)
+        assertEquals(capture.work, funding.spent)
+    }
 
     @Test
     fun `event capture should stop at its remaining observation work`() {

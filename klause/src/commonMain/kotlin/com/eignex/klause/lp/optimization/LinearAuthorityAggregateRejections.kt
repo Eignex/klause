@@ -8,6 +8,21 @@ import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.magnitudeBitLength
 
+internal enum class LinearAuthorityAggregatePhase {
+    Aggregation, ProofCombination, BoundRounding, PointScreen, Continuation, IntegerHalf;
+
+    val workEvent = "AggregateCost${name}Work"
+    val allocationEvent = "AggregateCost${name}Allocation"
+    val spansEvent = "AggregateCost${name}Spans"
+}
+
+internal data class LinearAuthorityAggregatePhaseCost(val work: Long, val allocation: Long, val spans: Long)
+
+internal data class LinearAuthorityAggregateCostPrefix(
+    val attempt: Long,
+    val phases: Map<LinearAuthorityAggregatePhase, LinearAuthorityAggregatePhaseCost>,
+)
+
 internal data class LinearAuthorityAggregateRejection(
     val inequality: SourceInequality,
     val owners: Set<Int>,
@@ -16,6 +31,7 @@ internal data class LinearAuthorityAggregateRejection(
     val normSquared: Double,
     val efficacy: Double,
     val minimumEfficacy: Double = CutPool.MIN_EFFICACY,
+    val cost: LinearAuthorityAggregateCostPrefix? = null,
 )
 
 internal class LinearAuthorityAggregateRejections(
@@ -37,6 +53,8 @@ internal class LinearAuthorityAggregateRejections(
         private set
     private val eventCounts = linkedMapOf<String, Long>()
     val events: Map<String, Long> get() = eventCounts.toMap()
+    private var phaseStarts: LongArray? = null
+    private var attempt = 0L
 
     init {
         require(maximumRecords in 0..16)
@@ -65,6 +83,35 @@ internal class LinearAuthorityAggregateRejections(
         }
         val previous = eventCounts[name] ?: 0L
         eventCounts[name] = previous + minOf(amount, Long.MAX_VALUE - previous)
+        if (name == "AggregateCostAttempt") beginAttempt()
+    }
+
+    private fun beginAttempt() {
+        val entries = LinearAuthorityAggregatePhase.entries
+        if (!charge(entries.size * 3L, if (phaseStarts == null) 64L + entries.size * 24L else 0L)) {
+            limited = true
+            return
+        }
+        val starts = phaseStarts ?: LongArray(entries.size * 3).also { phaseStarts = it }
+        for (phase in entries) {
+            val index = phase.ordinal * 3
+            starts[index] = eventCounts[phase.workEvent] ?: 0L
+            starts[index + 1] = eventCounts[phase.allocationEvent] ?: 0L
+            starts[index + 2] = eventCounts[phase.spansEvent] ?: 0L
+        }
+        attempt = eventCounts.getValue("AggregateCostAttempt")
+    }
+
+    private fun costPrefix(): LinearAuthorityAggregateCostPrefix? {
+        val starts = phaseStarts ?: return null
+        val phases = LinearAuthorityAggregatePhase.entries.associateWith { phase ->
+            val index = phase.ordinal * 3
+            LinearAuthorityAggregatePhaseCost(
+                (eventCounts[phase.workEvent] ?: 0L) - starts[index],
+                (eventCounts[phase.allocationEvent] ?: 0L) - starts[index + 1],
+                (eventCounts[phase.spansEvent] ?: 0L) - starts[index + 2])
+        }
+        return LinearAuthorityAggregateCostPrefix(attempt, phases)
     }
 
     fun record(cut: LinearAuthorityCut, activity: Double, normSquared: Double, efficacy: Double) {
@@ -89,8 +136,13 @@ internal class LinearAuthorityAggregateRejections(
             limited = true
             return
         }
+        if (phaseStarts != null && !charge(1L + LinearAuthorityAggregatePhase.entries.size * 3L,
+                128L + LinearAuthorityAggregatePhase.entries.size * 128L)) {
+            limited = true
+            return
+        }
         val records = retained ?: ArrayList<LinearAuthorityAggregateRejection>(maximumRecords).also { retained = it }
         records += LinearAuthorityAggregateRejection(cut.inequality, cut.owners.toSet(), cut.family,
-            activity, normSquared, efficacy)
+            activity, normSquared, efficacy, cost = costPrefix())
     }
 }

@@ -1246,6 +1246,19 @@ retain rejected projections; `AggregatePairPointEligible` counts proposals admit
 to the bounded candidate pool. All derivation and projection costs, including those
 without retained rows, remain in the existing generation work/allocation totals.
 Aggregate-only generation retains its source-order proposal policy.
+An observed fractional rejection can include `cost.kind=cumulative-source-pair-prefix`
+and an `attempt` ordinal. `phases` reports modeled `work`, `allocation` and completed
+or interrupted `spans` for `Aggregation`, `ProofCombination`, `BoundRounding`,
+`PointScreen`, `Continuation` and `IntegerHalf`. `ProofCombination` includes prepaid
+premise identity/proof storage; `BoundRounding` combines bound substitution,
+rounding and remaining proof construction. Integer half-rounding and its proof
+construction are also combined. Zero spans mean the phase has not run in that
+prefix. Rejections sharing an attempt have overlapping cumulative costs: compare
+successive prefixes, never sum them. `AggregateCost*` events retain global phase
+totals, including paid work without a rejection. These phases partition part of
+the containing generation charges; indexing, ordering and observation retain their
+separate charges. Missing or limited capture is incomplete, and all rejected rows
+remain unchecked.
 Point-directed aggregation selects each coordinate's nearer established source
 endpoint when both distances are finite. `AggregatePointLowerBounds` and
 `AggregatePointUpperBounds` count these indexed choices; endpoint projection and
