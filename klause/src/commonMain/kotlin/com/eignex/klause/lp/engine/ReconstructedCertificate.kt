@@ -775,20 +775,27 @@ private fun reconstructCandidates(
     cancellation: Cancellation,
     limits: ReconstructionLimits,
     goal: ReconstructionGoal = ReconstructionGoal.ATTAINMENT,
+    inputObserver: LpCertificationObserver? = null,
     validate: (ReconstructionMeter) -> Unit = {},
 ): ReconstructedCertificate {
     val meter = ReconstructionMeter(limits, cancellation)
     var run: ReconstructionRun? = null
     var decline: ReconstructionDecline? = null
     try {
-        meter.step()
-        if ((primal != null && primalSize != model.n) || (duals != null && dualSize != model.m) ||
-            (ray != null && raySize != model.m)
-        ) {
-            throw ReconstructionStop(ReconstructionDecline.INVALID_INPUT)
+        val inputTimer = inputObserver?.let { LpPhaseTimer(it, LpSolvePhase.BOUND_RECONSTRUCTION_INPUT) }
+        var inputComplete = false
+        val authority = try {
+            meter.step()
+            if ((primal != null && primalSize != model.n) || (duals != null && dualSize != model.m) ||
+                (ray != null && raySize != model.m)
+            ) {
+                throw ReconstructionStop(ReconstructionDecline.INVALID_INPUT)
+            }
+            validate(meter)
+            ReconstructionAuthority(model, meter).also { inputComplete = true }
+        } finally {
+            inputTimer?.finish(if (inputComplete) "CAPTURED" else "DECLINED", meter.spentWork)
         }
-        validate(meter)
-        val authority = ReconstructionAuthority(model, meter)
         val current = ReconstructionRun(authority, meter)
         run = current
         meter.storage((primalSize.toLong() + dualSize + raySize) * 24L)
@@ -1197,6 +1204,7 @@ private fun certifyLpBoundOnlyWithin(
         model, 0, duals.size, 0, null,
         { meter -> reconstructIeee(duals, meter) }, null, basis, cancellation, limits,
         goal = ReconstructionGoal.BOUND,
+        inputObserver = observer,
         validate = { meter ->
             meter.poll()
             meter.step(duals.size.toLong())
