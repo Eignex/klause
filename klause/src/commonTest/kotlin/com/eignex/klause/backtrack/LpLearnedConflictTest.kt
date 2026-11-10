@@ -272,6 +272,7 @@ class LpLearnedConflictTest {
 
             assertIs<SearchRunEvent.Paused>(run.next())
             assertTrue(run.learnedPropagationPending)
+            assertFalse(native.fixpointCancelled)
             session.popTo(0)
             run.reset()
 

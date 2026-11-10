@@ -694,7 +694,6 @@ internal class ResumableMinimize(
     fun rebind(assumptions: Assumptions, decisionBudget: Long) {
         check(rebindable) { "search is not rebindable" }
         check(!closed) { "search is closed" }
-        check(!run.learnedPropagationPending) { "learned propagation is pending" }
         globalToken = baseCancellation.lifetimeCancellation()
         slice.begin(Long.MAX_VALUE, -1L)
         val pending = pendingRealLeaf
