@@ -430,7 +430,7 @@ internal class ResumableMinimize(
         ).also {
             it.conflictStats = sink.ca
             resources.own(AutoCloseable {
-                if (::run.isInitialized) run.releasePendingPropagation()
+                if (this@ResumableMinimize::run.isInitialized) run.releasePendingPropagation()
                 inprocessing?.reset()
                 if (::searchSession.isInitialized) searchSession.releaseLearning()
                 it.releaseRetainedState()
