@@ -110,11 +110,8 @@ internal object FinitePortfolioLpCapture {
             return
         }
         val policy = SourceExecutionPolicy()
-        val owners = IdentityHashMap<Any, Int>()
-        var queries = 0
-        var attempts = 0
+        val window = QueryWindow(captureWorker, limit)
         var retained = 0
-        var metadataDropped = 0
         var eventCount = 0
         var eventsDropped = 0
         var queryObserverNs = 0L
@@ -141,65 +138,63 @@ internal object FinitePortfolioLpCapture {
                     val observer: (String, Double?, Any) -> Unit = { worker, cutoff, query ->
                         val started = System.nanoTime()
                         try {
-                            queries++
-                            if (owners.size < 64 || owners.containsKey(get(query, "Owner"))) {
-                                val owner = owners.computeIfAbsent(get(query, "Owner")) { owners.size }
-                                val selectedWorker = captureWorker == "any" || worker == captureWorker
-                                val selected = selectedWorker && attempts < limit &&
-                                    (captureRoute == "any" || get(query, "Route").toString() == captureRoute) &&
+                            val observation = window.observe(worker, { get(query, "Owner") }) {
+                                (captureRoute == "any" || get(query, "Route").toString() == captureRoute) &&
                                     (cutoffBits == null || cutoff?.toBits() == cutoffBits)
-                                if (queries <= 124 || selected) {
-                                    val payload = if (selected) capture(query, stop).also { attempts++ } else null
-                                    val file = payload?.let {
-                                        "query-$owner-${get(query, "Sequence")}.klexact".also { name ->
-                                            out.resolve(name).writeBytes(it)
-                                            point?.let { value ->
-                                                out.resolve("$name-point.json").writeText(value.toString())
-                                            }
-                                            retained++
+                            }
+                            if (observation != null) {
+                                val owner = observation.owner
+                                val selected = observation.capture
+                                val payload = if (selected) capture(query, stop) else null
+                                val file = payload?.let {
+                                    "query-$owner-${get(query, "Sequence")}.klexact".also { name ->
+                                        out.resolve(name).writeBytes(it)
+                                        point?.let { value ->
+                                            out.resolve("$name-point.json").writeText(value.toString())
                                         }
+                                        retained++
                                     }
-                                    val basisHash = if (selected) writeBasis(query,
-                                        file?.let { out.resolve("$it-basis.json") }) else null
-                                    records.appendLine(buildJsonObject {
-                                        put("worker", worker)
-                                        put("owner", owner)
-                                        put("sequence", get(query, "Sequence").toString())
-                                        put("sourceSha256", sourceHash)
-                                        put("latestCheckedSourcePointVersion", pointVersion)
-                                        put("latestPointProducer", producer)
-                                        put("lastObservedExternalCutoffBits", cutoff?.toBits()?.toString())
-                                        put("lastObservedExternalCutoff", cutoff?.toString())
-                                        put("route", get(query, "Route").toString())
-                                        put("claim", call(query, "getClaim")?.toString())
-                                        put("workLimit", get(query, "WorkLimit").toString())
-                                        put("explicitAllowance", get(query, "ExplicitAllowance") as Boolean)
-                                        put("iterationLimit", get(query, "IterationLimit").toString())
-                                        put("initialQuantum", call(query, "getInitialQuantum")?.toString())
-                                        put("retainFundingStop", get(query, "RetainFundingStop") as Boolean)
-                                        put("refactorUpdateLimit", get(query, "RefactorUpdateLimit").toString())
-                                        put("trackDegeneracy", get(query, "TrackDegeneracy") as Boolean)
-                                        put("retained", get(query, "Retained") as Boolean)
-                                        put("componentSplit", get(query, "ComponentSplit") as Boolean)
-                                        put("floatOffset", get(query, "FloatOffset").toString())
-                                        put("opaqueFloatAcceptance", get(query, "HasFloatAcceptance") as Boolean)
-                                        put("pricing", NumericalResidualProfile.json(get(query, "Pricing")))
-                                        put("refinementLimits",
-                                            NumericalResidualProfile.json(call(query, "getRefinementLimits")))
-                                        put("selected", selected)
-                                        put("capture", file)
-                                        put("captureSha256", payload?.let(::sha256))
-                                        put("basisSha256", basisHash)
-                                        put("sourcePointFile", file?.takeIf { point != null }?.let { "$it-point.json" })
-                                        put("sourcePointSha256", point?.takeIf { file != null }?.let {
-                                            sha256(it.toString().encodeToByteArray())
-                                        })
-                                        put("captureDeclined", selected && payload == null)
-                                        put("sourceVerdictClaim", false)
-                                    }.toString())
-                                    records.flush()
-                                } else metadataDropped++
-                            } else metadataDropped++
+                                }
+                                val basisHash = if (selected) writeBasis(query,
+                                    file?.let { out.resolve("$it-basis.json") }) else null
+                                records.appendLine(buildJsonObject {
+                                    put("worker", worker)
+                                    put("owner", owner)
+                                    put("sequence", get(query, "Sequence").toString())
+                                    put("sourceSha256", sourceHash)
+                                    put("latestCheckedSourcePointVersion", pointVersion)
+                                    put("latestPointProducer", producer)
+                                    put("lastObservedExternalCutoffBits", cutoff?.toBits()?.toString())
+                                    put("lastObservedExternalCutoff", cutoff?.toString())
+                                    put("route", get(query, "Route").toString())
+                                    put("claim", call(query, "getClaim")?.toString())
+                                    put("workLimit", get(query, "WorkLimit").toString())
+                                    put("explicitAllowance", get(query, "ExplicitAllowance") as Boolean)
+                                    put("iterationLimit", get(query, "IterationLimit").toString())
+                                    put("initialQuantum", call(query, "getInitialQuantum")?.toString())
+                                    put("retainFundingStop", get(query, "RetainFundingStop") as Boolean)
+                                    put("refactorUpdateLimit", get(query, "RefactorUpdateLimit").toString())
+                                    put("trackDegeneracy", get(query, "TrackDegeneracy") as Boolean)
+                                    put("retained", get(query, "Retained") as Boolean)
+                                    put("componentSplit", get(query, "ComponentSplit") as Boolean)
+                                    put("floatOffset", get(query, "FloatOffset").toString())
+                                    put("opaqueFloatAcceptance", get(query, "HasFloatAcceptance") as Boolean)
+                                    put("pricing", NumericalResidualProfile.json(get(query, "Pricing")))
+                                    put("refinementLimits",
+                                        NumericalResidualProfile.json(call(query, "getRefinementLimits")))
+                                    put("selected", selected)
+                                    put("capture", file)
+                                    put("captureSha256", payload?.let(::sha256))
+                                    put("basisSha256", basisHash)
+                                    put("sourcePointFile", file?.takeIf { point != null }?.let { "$it-point.json" })
+                                    put("sourcePointSha256", point?.takeIf { file != null }?.let {
+                                        sha256(it.toString().encodeToByteArray())
+                                    })
+                                    put("captureDeclined", selected && payload == null)
+                                    put("sourceVerdictClaim", false)
+                                }.toString())
+                                records.flush()
+                            }
                         } finally {
                             queryObserverNs += System.nanoTime() - started
                         }
@@ -267,10 +262,13 @@ internal object FinitePortfolioLpCapture {
                         put("queryMetadataLimit", 128)
                         put("captureValueLimit", 65_536)
                         put("captureByteLimit", 1_048_576)
-                        put("queries", queries)
-                        put("captureAttempts", attempts)
+                        put("queries", window.queries)
+                        put("workerQueries", window.workerQueries)
+                        put("unselectedWorkerQueries", window.unselectedWorkerQueries)
+                        put("captureAttempts", window.captureAttempts)
                         put("retainedCaptures", retained)
-                        put("metadataDropped", metadataDropped)
+                        put("metadataDropped", window.metadataDropped)
+                        put("metadataScope", "capture-worker; unselected callbacks counted separately")
                         put("eventsDropped", eventsDropped)
                         put("queryObserverNs", queryObserverNs)
                         put("guidanceObserverNs", guidanceObserverNs)
@@ -297,6 +295,48 @@ internal object FinitePortfolioLpCapture {
                 }
             }
         }
+    }
+
+    internal class QueryWindow(private val worker: String, private val captureLimit: Int) {
+        private val owners = IdentityHashMap<Any, Int>()
+        var queries = 0
+            private set
+        var workerQueries = 0
+            private set
+        var unselectedWorkerQueries = 0
+            private set
+        var metadataDropped = 0
+            private set
+        var captureAttempts = 0
+            private set
+
+        init {
+            require(captureLimit in 0..4)
+        }
+
+        fun observe(worker: String, owner: () -> Any, selected: () -> Boolean): Observation? {
+            queries++
+            if (this.worker != "any" && worker != this.worker) {
+                unselectedWorkerQueries++
+                return null
+            }
+            workerQueries++
+            val identity = owner()
+            if (owners.size >= 64 && !owners.containsKey(identity)) {
+                metadataDropped++
+                return null
+            }
+            val id = owners.computeIfAbsent(identity) { owners.size }
+            val capture = captureAttempts < captureLimit && selected()
+            if (workerQueries > 124 && !capture) {
+                metadataDropped++
+                return null
+            }
+            if (capture) captureAttempts++
+            return Observation(id, capture)
+        }
+
+        data class Observation(val owner: Int, val capture: Boolean)
     }
 
     private fun capture(query: Any, stop: Cancellation): ByteArray? {

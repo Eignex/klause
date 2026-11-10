@@ -51,6 +51,8 @@ The ordinary preset requires `handoff=false` and leaves algorithm controls at so
 `portfolio-progress=false` disables progress logging; its default is `true`.
 Its `capture-route=SESSION|SCOPED_FLOAT|SCOPED_CONTINUATION|any` filter selects the
 query boundary to retain; `capture-worker=bt/lp-default|any` selects its worker.
+The worker filter applies before the bounded metadata and owner budgets.
+Reports separate all callbacks, selected-worker callbacks, unselected callbacks and dropped selected metadata.
 The containing timeout includes setup, observation and retirement.
 `capture-guidance=true captures=0` records bounded native guide adoption and branch
 observations without retaining LP queries. The preference flag describes configured
