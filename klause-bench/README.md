@@ -1613,15 +1613,15 @@ revisions with identical harness sources in ordinary paired lab rows.
 
 ## Fixed-work SAT trajectories
 
-`lab/fixed-work-sat.json` measures the direct native backtrack recipe on one
-hash-pinned DIMACS source up to a fixed amount of work. Submit it with
+`lab/fixed-work-sat.json` measures the direct native backtrack recipe on hash-pinned
+DIMACS sources up to a fixed amount of work. Submit it with
 `deploy/lab run` and one config per revision; each row then holds every arm on one
 machine and attempt. Required parameters:
 
 | Parameter | Meaning |
 |---|---|
-| `source-path`, `sha256` | Corpus path and declared input hash, verified before the solve |
-| `seeds` | One to eight distinct solver seeds, one case each |
+| `sources` | One to eight `SHA256:PATH` corpus entries; each declared hash is verified before the solve |
+| `seeds` | One to eight distinct solver seeds; each source and seed is one case |
 | `unit` | `conflicts` or `decisions` observed through the selectors, or charged handle `work` |
 | `limit` | Fixed-work limit in `unit`, at most 10^9 |
 | `deadline-seconds` | Emergency deadline per invocation, covering preparation and search, at most 900 |
