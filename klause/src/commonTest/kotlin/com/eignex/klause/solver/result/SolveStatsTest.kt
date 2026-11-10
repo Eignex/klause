@@ -333,6 +333,28 @@ class SolveStatsTest {
     }
 
     @Test
+    fun `snapshots combine live LP observations and presolve contributions`() {
+        val prepared = listOf(null, LpStats(), LpStats(rootPasses = SumResult(2.0),
+            solves = SumResult(3.0), phases = mapOf("PRESOLVE" to
+                LpPhaseStats(calls = 1L, outcomes = mapOf("ACCEPTED" to 1L)))))
+        for (presolveLp in prepared) {
+            for (sparse in listOf(emptyMap(), mapOf("Pending" to -1L, "Rows" to 3L))) {
+                val sink = SolveStatsSink("backtrack")
+                repeat(2) { sink.lp.observeSolve() }
+                sink.lp.observeDirectionalBranch("PASSIVE_VARIABLE_COMMITTED")
+                sink.lp.observeTemplateUse(rows = 2, bounds = 3, exactBounds = 1)
+                sink.lp.sparseTrial = sparse
+                sink.presolve = presolveLp?.let { PresolveStats(lpStats = it) }
+                val expected = sink.lp.snapshot().mergedWith(presolveLp ?: LpStats())
+
+                val observed = sink.snapshot().lp
+
+                assertEquals(expected, observed)
+            }
+        }
+    }
+
+    @Test
     fun `withPresolve should attach presolve LP work once`() {
         val presolve = PresolveStats(lpStats = LpStats(rootPasses = SumResult(2.0)))
 
