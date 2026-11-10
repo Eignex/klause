@@ -141,6 +141,33 @@ class FinitePortfolioLpCaptureTest {
         assertEquals(listOf("portfolio-progress=$progress"), parameters.filter { it.startsWith("portfolio-progress=") })
     }
 
+    @Test
+    fun `joint capture should retain ordinary pre incumbent grants`() {
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "true", "capture-mode" to "joint-before")
+
+        val parameters = FinitePortfolioLpCapture.parameters(options).associate {
+            it.substringBefore('=') to it.substringAfter('=')
+        }
+
+        assertEquals("ordinary", parameters["companion-admission"])
+        assertEquals("false", parameters["companion-after-incumbent"])
+        assertEquals("4000", parameters["companion-active-ms"])
+        assertEquals("fixed", parameters["companion-repair"])
+        assertEquals("complete", parameters["portfolio-proof-workers"])
+    }
+
+    @ParameterizedTest
+    @CsvSource("handoff,false", "portfolio-policy,retained", "portfolio-progress,true", "capture-worker,any")
+    fun `joint capture should reject incompatible controls before corpus resolution`(key: String, value: String) {
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "true", "capture-mode" to "joint-before") + (key to value)
+
+        assertFailsWith<IllegalArgumentException> {
+            FinitePortfolioLpCapture.main(options.map { (name, setting) -> "$name=$setting" }.toTypedArray())
+        }
+    }
+
     @ParameterizedTest
     @CsvSource("portfolio-policy,unknown", "portfolio-progress,yes", "handoff,true", "unsupported,true")
     fun `invalid policy requests should fail before corpus resolution`(key: String, value: String) {
