@@ -8,6 +8,8 @@ import com.eignex.lab.bench.BenchRequest
 import kotlinx.serialization.encodeToString
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
@@ -67,5 +69,17 @@ class FrozenSourceAdapterTest {
         } else {
             assertFailsWith<IllegalArgumentException> { FrozenSourceSuite.plan(request) }
         }
+    }
+
+    @Test
+    fun `planning names the missing decoded identity of each rejected case`() {
+        val input = BenchInput("miplib2017/timtab1CUTS.mps.zst", BenchInputRoot.CORPUS, "model", "1".repeat(64))
+        val template = BenchCase("timtab1CUTS", inputs = listOf(input), attributes = mapOf("suite" to "miplib2017",
+            "problem" to "timtab1CUTS", "format" to "MPS", "category" to "OPTIMIZATION"))
+        val request = BenchRequest(mapOf("cases" to BenchProtocol.json.encodeToString(listOf(template))))
+
+        val failure = assertFailsWith<IllegalArgumentException> { FrozenSourceSuite.plan(request) }
+
+        assertContains(failure.message.orEmpty(), "case 'timtab1CUTS': attribute sourcePlainSha256 is missing")
     }
 }

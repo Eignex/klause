@@ -635,6 +635,16 @@ qualification. The diagnostic prehash uses 8 KiB reads; ordinary identity hashin
 uses 64 KiB reads. Both read the full plain source before the invocation timer, but
 they do not have identical IO call sizes.
 
+`scripts/source-eligibility.sh check DESCRIPTOR` applies the same descriptor rules before submission
+and checks each stored hash against the committed corpus index. `DESCRIPTOR` is a `cases` array, a bench
+request, an experiment or a stored job. Every violation names its case and the record that supplies the
+missing identity. With `--manifest`, it reports each case as exposed, eligible or unresolved against an
+explicit `source-exposure-v1` manifest kept outside the repository. Sources match only through identical stored or
+decoded bytes and recorded relations. Eligibility requires a verified decoded hash and declared
+complete coverage of every collection those identities touch. `exposures --use USE --label LABEL
+lab-cases.jsonl...` records every retained row as exposure, including failed, unsuitable and no-witness
+outcomes. Rows without hashed inputs are recorded as gaps.
+
 `lab/frozen-minizinc-linux.json` also accepts plain `.mzn` models and an optional
 plain `.dzn` data input with role `data` and attribute `sourceDataPlainSha256`.
 Both inputs use declared corpus paths and hashes; planning reads neither source.

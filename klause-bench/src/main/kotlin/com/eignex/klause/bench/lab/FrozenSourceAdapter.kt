@@ -1,12 +1,9 @@
 package com.eignex.klause.bench.lab
 
-import com.eignex.klause.bench.catalog.Category
-import com.eignex.klause.bench.catalog.Format
 import com.eignex.lab.bench.BenchCase
 import com.eignex.lab.bench.BenchCli
 import com.eignex.lab.bench.BenchContext
 import com.eignex.lab.bench.BenchDescriptor
-import com.eignex.lab.bench.BenchInputRoot
 import com.eignex.lab.bench.BenchProtocol
 import com.eignex.lab.bench.BenchRequest
 import com.eignex.lab.bench.BenchResult
@@ -31,32 +28,13 @@ internal object FrozenSourceSuite : BenchSuite {
         val settings = LabSettings(request.parameters - "cases")
         require(!settings.inputOnly && !settings.propagationControls)
         val templates = BenchProtocol.json.decodeFromString<List<BenchCase>>(request.parameters.getValue("cases"))
-        require(templates.size in 1..8 && templates.map { it.id }.distinct().size == templates.size)
-        require(templates.map { it.attributes["suite"] to it.attributes["problem"] }.distinct().size == templates.size)
+        val violations = FrozenSourceDescriptors.violations(templates)
+        require(violations.isEmpty()) { "Frozen source descriptor rejected:\n" + violations.joinToString("\n") }
         require(templates.size.toLong() * settings.engines.size * settings.seeds.size * settings.repeats <= 128)
         return templates.flatMap { template ->
-            val attributes = template.attributes.filterKeys { !it.startsWith("lab") }
+            val attributes = FrozenSourceDescriptors.attributes(template)
             val suite = attributes.getValue("suite")
             val problem = attributes.getValue("problem")
-            require(suite.isNotBlank() && problem.isNotBlank())
-            val format = Format.valueOf(attributes.getValue("format"))
-            require(format in setOf(Format.DIMACS, Format.WCNF, Format.MPS, Format.OPB, Format.MINIZINC))
-            Category.valueOf(attributes.getValue("category"))
-            require(attributes.getValue("sourcePlainSha256").matches(Regex("[a-f0-9]{64}")))
-            val model = template.inputs.single { it.role == "model" }
-            val data = template.inputs.singleOrNull { it.role == "data" }
-            require(template.inputs.size == 1 + if (data == null) 0 else 1)
-            require(template.inputs.all {
-                it.root == BenchInputRoot.CORPUS && it.sha256?.matches(Regex("[a-f0-9]{64}")) == true
-            })
-            if (format == Format.MINIZINC) {
-                require(model.path.endsWith(".mzn") && (data == null || data.path.endsWith(".dzn")))
-                if (data != null) {
-                    require(attributes["sourceDataPlainSha256"]?.matches(Regex("[a-f0-9]{64}")) == true)
-                }
-            } else {
-                require(data == null && model.path.endsWith(".zst"))
-            }
             settings.engines.flatMap { engine ->
                 settings.seeds.flatMap { seed ->
                     (0 until settings.repeats).map { repeat ->
