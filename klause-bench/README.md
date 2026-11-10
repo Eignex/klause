@@ -1161,6 +1161,12 @@ endpoint independently from the point. Its generation shares the original
 65,536-work allowance; point projection, failed preparation, fresh verification
 and any resulting owner replacement retain their containing source/recipe costs.
 `PointPreparationUnavailable` does not establish complete ineligibility.
+The explicit fractional policy allows at most two discovery attempts per current
+immutable generation context. `numericalCutSelectionFractionalPassAttempts` includes
+declines; the later attempt needs a newer completed paid query and a fully installed,
+checked pool. Each attempt keeps its 65,536-work/1 MiB generation ceiling and the
+containing source allowance. Retain failed and deferred readiness costs alongside
+successful generation and subsequent query costs.
 
 `MpsProofFrontier selection=true replay=true` compares disabled, originally
 installed and all-captured masks over the first four captured scope/pool pairs

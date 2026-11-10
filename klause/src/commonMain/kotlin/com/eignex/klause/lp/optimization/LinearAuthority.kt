@@ -131,7 +131,9 @@ internal class LinearAuthority(
         var cost: LinearAuthorityFractionalQueryObservation? = null
     }
     private var fractionalRound: FractionalRound? = null
-    private var fractionalFamily: LinearAuthorityTemplate? = null
+    private var fractionalSource: SourceProofContext? = null
+    private var fractionalPasses = 0
+    private var fractionalOperation = -1
     private var cutPreparationWork = 0L
     private var cutVerificationWork = 0L
     private var retainedCutPeak = 0L
@@ -181,7 +183,9 @@ internal class LinearAuthority(
         pointRound = null
         fractionalRound?.previous?.policy?.releaseCandidates()
         fractionalRound = null
-        fractionalFamily = null
+        fractionalSource = null
+        fractionalPasses = 0
+        fractionalOperation = -1
         pointPolicy?.releaseCandidates()
         pointFamily = null
         pointFallback = null
@@ -222,14 +226,21 @@ internal class LinearAuthority(
         }
         val observed = point ?: return base
         val family = template ?: return base
-        if (observed.first !== query || fractionalFamily === family ||
-            family.cuts == null || family.cuts.rows.size >= 64) return base
+        if (observed.first !== query || family.cuts == null || family.cuts.rows.size >= 64) return base
+        if (fractionalSource !== family.numeric) {
+            fractionalSource = family.numeric
+            fractionalPasses = 0
+            fractionalOperation = -1
+        }
+        if (fractionalPasses >= 2 || budget.operations <= fractionalOperation) return base
         val ready = cutLifecycle.containing("POINT_SELECTION") {
             currentPoolInstalled(observed.first, family.cuts.rows.size, cancellation)
         }
         if (!ready) return base.copy(advisoryPoint = base.advisoryPoint.takeUnless { cancellation() },
             paused = budget.funding?.let { it.paused && !it.exhausted } == true)
-        fractionalFamily = family
+        fractionalPasses++
+        fractionalOperation = budget.operations
+        pointPolicy?.observe("FractionalPassAttempts")
         val prepared = cutLifecycle.containing("POINT_SELECTION") {
             val observer = capture?.takeIf { it.fractionalEnabled }
             val recorded = observer?.beginFractionalAttempt(source, observed.first, family, observed.second,
@@ -340,7 +351,6 @@ internal class LinearAuthority(
         directedFamily = previous.directed
         pointMask = previous.mask
         primalAttempt = previous.primal
-        fractionalFamily = previous.template
         cutLifecycle.families = previous.query.cutFamilies.values.toSet()
     }
 
@@ -391,7 +401,6 @@ internal class LinearAuthority(
         pointMask = selected
         pointFamily = refined.first
         pointFallback = null
-        fractionalFamily = refined.first
         fractionalRound = FractionalRound(previous, base, selected, checkNotNull(refined.first.cuts).rows,
             branchGuidance)
         policy.observe("FractionalRounds")
@@ -426,6 +435,7 @@ internal class LinearAuthority(
             return pending.base.copy(paused = true, primalStages = stages, branchGuidance = null)
         }
         fractionalRound = null
+        fractionalOperation = budget.operations
         val completed = !stopped && !result.paused &&
             (result.evidence != null || result.bound != null || result.incumbent != null || result.split != null)
         finishFractionalQueryCost(pending, when {

@@ -767,6 +767,12 @@ source order. Seed rows and incidence partners share that ordering. With no
 fractional support it retains the ordinary scoped preference. Its projections,
 score storage and sorting debit the existing generation allowance; declined ranking
 keeps source order.
+Fractional discovery permits at most two attempts for the current immutable generation
+context. A later attempt requires a newer completed paid query and a fully checked,
+active, installed pool; a cached point cannot unlock it. Failed preparation consumes
+an attempt. Both passes preserve existing definitions and their installed mask and
+retain the same per-pass generation and containing source allowances. Paused augmented
+queries resume their pending pass without reserving another attempt.
 Completed nonterminal fractional augmentation retains a separate immutable baseline
 branch guide for the same verification scope. Ordinary traversal uses that guide
 while consuming the strongest checked bound; the augmented relaxation point and

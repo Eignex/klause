@@ -71,6 +71,66 @@ class LinearAuthorityPointCutsTest {
 
 
     @Test
+    fun `later paid points should stop fractional discovery after two attempts`() {
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y, mixedReal), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    mixedReal to BigFraction.ONE), BigFraction.ofLong(3))),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                    mixedReal to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            ), mapOf(x to BigFraction.ONE, y to BigFraction.ONE))
+        val cuts = source.premises.entries.mapIndexed { owner, (name, premise) ->
+            LinearAuthorityCut(owner, premise.inequality, SourceDerivation.Premise(name),
+                mixed = true, family = CutFamily.SOURCE_AGGREGATION)
+        }
+        val funding = SourceLpFunding(8_000_000L, 16_000_000L).apply { grant(8_000_000L) }
+        val budget = SourceLpBudget(maxOperations = 16, funding = funding)
+        LinearAuthority(budget, retainLp = true, additionalCuts = cuts, aggregateCuts = true,
+            fractionalAggregateOrder = true).use { authority ->
+            authority.advanceWithPointCuts(source, Cancellation.Never)
+            for (step in 1..5) {
+                val child = source.atScope(source.scope.copy(condition = SourceCondition(lower = mapOf(
+                    mixedReal to BigFraction.ofLong(step * 2L - 1L) * BigFraction.ofLong(2).reciprocal()))))
+                val result = authority.advanceWithPointCuts(child, Cancellation.Never)
+                result.bound?.let {
+                    assertEquals(SourceEvidenceCheck.Checked,
+                        SourceEvidenceVerifier(child.withLinearAuthority()).verify(it))
+                }
+            }
+
+            assertEquals(2L, authority.cutObservations()["numericalCutSelectionFractionalPassAttempts"])
+            assertTrue(budget.operations <= 16)
+        }
+    }
+
+    @Test
+    fun `an exhausted operation allowance should not unlock another fractional attempt`() {
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y, mixedReal), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    mixedReal to BigFraction.ONE), BigFraction.ofLong(3))),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                    mixedReal to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            ), mapOf(x to BigFraction.ONE, y to BigFraction.ONE))
+        val cuts = source.premises.entries.mapIndexed { owner, (name, premise) ->
+            LinearAuthorityCut(owner, premise.inequality, SourceDerivation.Premise(name),
+                mixed = true, family = CutFamily.SOURCE_AGGREGATION)
+        }
+        val budget = SourceLpBudget(maxOperations = 2)
+        LinearAuthority(budget, retainLp = true, additionalCuts = cuts, aggregateCuts = true,
+            fractionalAggregateOrder = true).use { authority ->
+            authority.advanceWithPointCuts(source, Cancellation.Never)
+            val child = source.atScope(source.scope.copy(condition = SourceCondition(lower = mapOf(
+                mixedReal to BigFraction.ofLong(2).reciprocal()))))
+
+            authority.advanceWithPointCuts(child, Cancellation.Never)
+
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionFractionalPassAttempts"])
+            assertEquals(2, budget.operations)
+        }
+    }
+
+    @Test
     fun `partial current pools should defer fractional generation without changing current selection`() {
         val controlBudget = SourceLpBudget()
         val control = LinearAuthority(controlBudget, retainLp = true, aggregateCuts = true).use {
