@@ -33,6 +33,7 @@ class JointRepairLpCaptureTest {
 
         assertEquals(listOf(0, 1), captured)
     }
+
     @Test
     fun `changed model versions should retain a fresh snapshot within the capture cap`() {
         val window = JointRepairLpCapture.ConditionWindow(2)
@@ -47,5 +48,4 @@ class JointRepairLpCaptureTest {
         assertEquals(listOf(0, 1), captured)
         assertEquals(2, window.size)
     }
-
 }

@@ -480,6 +480,10 @@ internal object NumericalResidualProfile {
     internal fun json(value: Any?, depth: Int = 0): JsonElement = when {
         value == null -> JsonNull
 
+        value is Double && !value.isFinite() -> JsonPrimitive(value.toString())
+
+        value is Float && !value.isFinite() -> JsonPrimitive(value.toString())
+
         value is Number -> JsonPrimitive(value)
 
         value is Boolean -> JsonPrimitive(value)
@@ -496,7 +500,7 @@ internal object NumericalResidualProfile {
 
         value is IntArray -> JsonArray(value.take(256).map(::JsonPrimitive))
 
-        value is DoubleArray -> JsonArray(value.take(256).map(::JsonPrimitive))
+        value is DoubleArray -> JsonArray(value.take(256).map { json(it, depth + 1) })
 
         else -> buildJsonObject {
             value.javaClass.methods.filter {
