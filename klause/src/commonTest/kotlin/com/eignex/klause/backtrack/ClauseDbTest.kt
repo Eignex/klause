@@ -20,6 +20,64 @@ import kotlin.test.assertTrue
 class ClauseDbTest {
 
     @Test
+    fun `pending native generic window should finish within two funded grants`() {
+        val session = PropagationSession(chainProblem().bake(), nativeSat = true)
+        repeat(200) { session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 6) }
+        val params = BacktrackParams(maxLearnedClauses = 32, tieredLearnedDb = true,
+            learnedMemoryWork = 4096L)
+        val first = session.work
+        forgetIfOverCap(session, params)
+        assertTrue(session.work - first <= 4096L)
+        assertTrue(session.nativeCapWindowPending)
+        val second = session.work
+
+        forgetIfOverCap(session, params)
+
+        assertTrue(session.work - second <= 4096L)
+        assertFalse(session.nativeCapWindowPending)
+        assertEquals(200, session.activeLearnedClauseCount)
+        assertTrue((0 until 200).all { session.learnedClauseTier(it) == ClauseTier.LOCAL })
+    }
+
+    @Test
+    fun `appended row should join the pending native generic tier epoch`() {
+        val session = PropagationSession(chainProblem().bake(), nativeSat = true)
+        repeat(200) { session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 6) }
+        val params = BacktrackParams(maxLearnedClauses = 32, tieredLearnedDb = true,
+            learnedMemoryWork = 4096L)
+        forgetIfOverCap(session, params)
+        assertTrue(session.nativeCapWindowPending)
+        session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 6)
+        val before = session.work
+
+        forgetIfOverCap(session, params)
+
+        assertTrue(session.work - before <= 4096L)
+        assertFalse(session.nativeCapWindowPending)
+        assertEquals(201, session.activeLearnedClauseCount)
+        assertTrue((0 until 201).all { session.learnedClauseTier(it) == ClauseTier.LOCAL })
+    }
+
+    @Test
+    fun `cancellation should preserve the pending native generic classifications`() {
+        val session = PropagationSession(chainProblem().bake(), nativeSat = true)
+        repeat(200) { session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 6) }
+        val params = BacktrackParams(maxLearnedClauses = 32, tieredLearnedDb = true,
+            learnedMemoryWork = 4096L)
+        forgetIfOverCap(session, params)
+        assertTrue(session.nativeCapWindowPending)
+        val tiers = (0 until 200).map(session::learnedClauseTier)
+        val before = session.work
+
+        forgetIfOverCap(session, params.copy(cancellation = Cancellation { true }))
+
+        assertEquals(before, session.work)
+        assertTrue(session.nativeCapWindowPending)
+        assertEquals(200, session.activeLearnedClauseCount)
+        assertEquals(tiers, (0 until 200).map(session::learnedClauseTier))
+    }
+
+    @Test
     fun `native retained windows should classify only new local admissions`() {
         val session = PropagationSession(chainProblem().bake(), nativeSat = true)
         repeat(64) { session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 9) }
