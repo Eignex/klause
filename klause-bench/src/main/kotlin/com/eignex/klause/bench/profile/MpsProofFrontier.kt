@@ -87,7 +87,7 @@ internal object MpsProofFrontier {
             "aggregate-mixed", "aggregate-replay", "aggregateCuts", "refutationReuse", "feedbackDelivery",
             "feedbackRequest", "solveSeconds", "certificateState", "point-producer", "fractionalOrder",
             "fractional-attempt", "sourceWork", "sourceAllocation", "heapMiB", "gc", "aggregateReuse",
-            "aggregate-query", "aggregate-work", "aggregate-allocation")
+            "aggregate-query", "aggregate-work", "aggregate-allocation", "aggregate-production")
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
             (options.keys - supported).isEmpty())
         require(options["fractional-attempt"]?.toBooleanStrict() != true ||
@@ -101,6 +101,16 @@ internal object MpsProofFrontier {
         options["aggregate-query"]?.toInt()?.let { require(it >= 0) }
         options["aggregate-work"]?.toLong()?.let { require(it in 0L..20_000_000L) }
         options["aggregate-allocation"]?.toLong()?.let { require(it in 0L..67_108_864L) }
+        if (options["aggregate-production"]?.toBooleanStrict() == true) {
+            require(options["aggregate-probe"]?.toBooleanStrict() == true &&
+                options["selection"]?.toBooleanStrict() == true &&
+                (options["aggregate-query"]?.toInt() ?: 0) > 0 &&
+                listOf("aggregate-replay", "replay", "point-producer").none {
+                    options[it]?.toBooleanStrict() == true
+                })
+            require(options["aggregate-work"]?.toLong()?.let { it == 65_536L } != false &&
+                options["aggregate-allocation"]?.toLong()?.let { it == 1_048_576L } != false)
+        }
         return options
     }
 
@@ -235,6 +245,12 @@ internal object MpsProofFrontier {
         if (options["fractional-attempt"]?.toBooleanStrict() == true) {
             checkNotNull(journal).javaClass.getDeclaredMethod("observeFractionalAttempt").invoke(journal)
         }
+        if (options["aggregate-production"]?.toBooleanStrict() == true) {
+            val retained = checkNotNull(journal)
+            val retain = retained.javaClass.getDeclaredMethod("retainGenerationContext", Int::class.javaPrimitiveType)
+            require(retain.invoke(retained, 0) == true)
+            require(retain.invoke(retained, options.getValue("aggregate-query").toInt()) == true)
+        }
         val history = ArrayList<JsonObject>()
         out.resolve("incumbents.jsonl").writeText("")
         out.resolve("bounds.jsonl").writeText("")
@@ -312,7 +328,13 @@ internal object MpsProofFrontier {
                         out.resolve("selection-replays.jsonl").appendText(it.toString() + "\n")
                     }
                 }
-                if (aggregateProbe) {
+                if (options["aggregate-production"]?.toBooleanStrict() == true) {
+                    out.resolve("production-aggregates.jsonl").writeText("")
+                    NumericalProductionAggregateSnapshot(Cancellation.after(20.seconds)).inspect(journal,
+                        options.getValue("aggregate-query").toInt()) {
+                        out.resolve("production-aggregates.jsonl").appendText(it.toString() + "\n")
+                    }
+                } else if (aggregateProbe) {
                     Reports.writeJson(out.resolve("aggregate-parents.json").path,
                         NumericalSelectionSnapshot(Cancellation.after(20.seconds)).capture(journal))
                     out.resolve("aggregate-pairs.jsonl").writeText("")
@@ -409,7 +431,13 @@ internal object MpsProofFrontier {
                     .probeRoot(invocation) { out.resolve("root-probes.jsonl").appendText(it.toString() + "\n") }
             }
         } finally {
-            (invocation as AutoCloseable).close()
+            try {
+                if (options["aggregate-production"]?.toBooleanStrict() == true) {
+                    journal?.javaClass?.getDeclaredMethod("releaseGenerationContexts")?.invoke(journal)
+                }
+            } finally {
+                (invocation as AutoCloseable).close()
+            }
         }
     }
 

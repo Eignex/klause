@@ -1233,7 +1233,13 @@ requested projection and records it, so a withheld field is explicit rather than
 unavailable, and the query state still reports the actual point outcome. Full records
 retain the template's immutable generation scope separately from the current
 verification scope, charging its retained conditions to the capture allowance.
-A missing template leaves generation provenance unavailable. Installed
+A missing template leaves generation provenance unavailable. An attached
+inspection may explicitly retain at most two immutable generation contexts,
+charging references and their retained extent to the same archive allowance.
+Their identity belongs to the generating template; a rescoped verification copy
+does not establish preparation-cache compatibility. Releasing this optional
+retention drops its context references without retaining a numerical solver owner.
+Installed
 cut activity keeps the installed, checked cuts with active owners; their violations
 are evaluated on demand while that query is still delivered, and a replaced,
 released, cancelled or oversized evaluation declines. A callback without a request

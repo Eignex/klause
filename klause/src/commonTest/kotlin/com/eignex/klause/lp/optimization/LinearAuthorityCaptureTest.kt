@@ -37,6 +37,52 @@ class LinearAuthorityCaptureTest {
         cuts = LinearAuthorityFeedbackRequest.Cuts.Installed)
 
     @Test
+    fun `requested generation contexts should preserve identity across verification scopes`() {
+        val child = source.atScope(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ONE))))
+        val capture = LinearAuthorityCapture(2, 10_000L, 1_000_000L, Cancellation.Never)
+        assertTrue(capture.retainGenerationContext(0))
+        assertTrue(capture.retainGenerationContext(1))
+
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
+            authority.advance(source, Cancellation.Never, cuts = true, cutMask = emptySet())
+            authority.advance(child, Cancellation.Never, cuts = true, cutMask = emptySet())
+        }
+
+        val generation = assertNotNull(capture.generationContext(0))
+        assertTrue(generation === capture.generationContext(1))
+        assertEquals(scope, generation.scope)
+        assertEquals(child.scope, capture.records.last().numeric.scope)
+    }
+
+    @Test
+    fun `generation contexts should remain unavailable without an explicit request`() {
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
+            authority.advance(source, Cancellation.Never, cuts = true, cutMask = emptySet())
+        }
+
+        assertNull(capture.generationContext(0))
+    }
+
+    @Test
+    fun `generation context release should drop retained references`() {
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        assertTrue(capture.retainGenerationContext(0))
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
+            authority.advance(source, Cancellation.Never, cuts = true, cutMask = emptySet())
+        }
+
+        val released = capture.releaseGenerationContexts()
+
+        assertEquals(1, released)
+        assertNull(capture.generationContext(0))
+    }
+
+    @Test
     fun `an exhausted query observation allowance should preserve source funding`() {
         val capture = LinearAuthorityCapture(2, 10_000L, 1_000_000L, Cancellation.Never)
         val funding = SourceLpFunding(1_000_000L, 1_000_000L).apply { grant(1_000_000L) }

@@ -1179,6 +1179,22 @@ The inspection shares a 20-second, 20,000,000-work and 64 MiB containing cap.
 It installs no rows and performs no LP query; accepted consequences alone do not
 establish strict separation, bound strengthening, later pruning or independent proof.
 
+`MpsProofFrontier aggregate-production=true aggregate-probe=true selection=true
+aggregate-query=N` inspects a later retained query whose checked pool is fully
+installed. It retains the actual immutable generation contexts for query zero and
+query N within the existing archive allowance, then invokes the production cached
+source-pair kernel in a private diagnostic cache: current ordering at zero,
+fractional ordering at N. Each call has 65,536 generation work and 1 MiB modeled
+allocation; point projection has the same separate per-point ceilings. Both native
+consequence checks share 100,000 proof polls and 16 MiB modeled proof reservation.
+`production-aggregates.jsonl` records scopes, generation-context identity,
+preparation/discovery counters, candidates, checks and release. Missing retained
+points decline; context retention can shorten the archive prefix. The observation
+has a 20-second deadline, releases its private index and context references, issues
+no LP query and changes no production policy. Pay cold preparation and failed
+checks; this reconstruction supplies no ordinary performance comparison or
+independently validated proof. It cannot be combined with other replay modes.
+
 The generated-aggregate replay includes the ordinary opt-in producer's bounded
 source-pair indexing and discovery. Keep this cost separate from replaying supplied
 diagnostic proposals. `AggregatePair*` reports coverage, attempts and limiting

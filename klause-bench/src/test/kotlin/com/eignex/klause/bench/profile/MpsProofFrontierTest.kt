@@ -10,6 +10,27 @@ import kotlin.test.assertTrue
 
 class MpsProofFrontierTest {
     @Test
+    fun `production inspection should require a later query and isolated fixed grants`() {
+        val controls = listOf("suite=miplib3", "problem=egout", "sha256=unused", "exact=true",
+            "selection=true", "aggregate-probe=true", "aggregate-production=true", "aggregate-query=9")
+        for (invalid in listOf("aggregate-query=0", "aggregate-replay=true", "replay=true",
+            "point-producer=true", "aggregate-work=65537", "aggregate-allocation=1048577")) {
+            assertFailsWith<IllegalArgumentException> {
+                MpsProofFrontier.parseOptions((controls + invalid).toTypedArray())
+            }
+        }
+    }
+
+    @Test
+    fun `production inspection should accept explicit production grants`() {
+        val options = MpsProofFrontier.parseOptions(arrayOf("suite=miplib3", "problem=egout",
+            "sha256=unused", "exact=true", "selection=true", "aggregate-probe=true", "aggregate-production=true",
+            "aggregate-query=9", "aggregate-work=65536", "aggregate-allocation=1048576"))
+
+        assertEquals("true", options["aggregate-production"])
+    }
+
+    @Test
     fun `aggregate inspection controls should require an exported selection and enabled probe`() {
         for (missing in listOf("selection=true", "aggregate-probe=true")) {
             val options = listOf("suite=miplib3", "problem=egout", "sha256=unused", "exact=true",

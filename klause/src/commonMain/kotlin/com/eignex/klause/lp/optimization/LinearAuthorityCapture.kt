@@ -265,6 +265,25 @@ internal class LinearAuthorityCapture(
     private var liveEntries = 0L
     private var liveBytes = 0L
     private var pointWithheld = false
+    private var generationContexts: MutableMap<Int, SourceProofContext?>? = null
+
+    fun retainGenerationContext(query: Int): Boolean {
+        require(query >= 0 && attempted == 0L && maximumRecords > 0)
+        val requested = generationContexts
+        if (requested?.containsKey(query) == true) return true
+        require((requested?.size ?: 0) < 2)
+        if (!spend(1L, 192L)) return false
+        (requested ?: linkedMapOf<Int, SourceProofContext?>().also { generationContexts = it })[query] = null
+        return true
+    }
+
+    fun generationContext(query: Int): SourceProofContext? = generationContexts?.get(query)
+
+    fun releaseGenerationContexts(): Int {
+        val released = generationContexts?.values?.count { it != null } ?: 0
+        generationContexts = null
+        return released
+    }
 
     fun restrict(records: Int, entries: Long, bytes: Long) {
         require(records >= 0 && entries >= 0 && bytes >= 0)
@@ -493,7 +512,18 @@ internal class LinearAuthorityCapture(
         for (evidence in listOfNotNull(result.bound, retainedRefutation)) {
             if (if (full) !proof(evidence.derivation) else !spend(1L, 16L)) return
         }
-        val captured = LinearAuthorityCapturedQuery((attempted - 1L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+        val id = (attempted - 1L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        val generation = template?.numeric?.takeIf {
+            full && archive && generationContexts?.containsKey(id) == true
+        }
+        if (generation != null) {
+            val shared = generationContexts?.values?.any { it === generation } == true
+            val work = if (shared) 3L else 2L + generation.premiseCount + generation.coordinateCount * 2L
+            val allocation = if (shared) 16L else
+                128L + generation.premiseCount * 64L + generation.coordinateCount * 128L
+            if (!spend(work, allocation)) return
+        }
+        val captured = LinearAuthorityCapturedQuery(id,
             source, numeric.atScope(source.scope),
             query?.coordinates.orEmpty().let { if (full) it.toList() else it },
             cited.toList(), query?.inactive.orEmpty().let { if (full) it.toSet() else it },
@@ -510,6 +540,7 @@ internal class LinearAuthorityCapture(
             }, projection = projection, generationScope = generationScope)
         if (archive) {
             retained += captured
+            if (generation != null) generationContexts?.set(id, generation)
             recordedAttempt = attempted
         }
         if (live) {
