@@ -92,6 +92,9 @@ positive continuous terms drop and negative terms scale by `1 / (1 - frac(rhs))`
 the right side rounds down. The closed row is valid for strict input rows too.
 Every bound and row keeps its source guards and invocation scope. Affine mappings
 decline transfer without an integrality-preserving coordinate justification.
+Zero endpoint contributions and discarded terms leave the exact right side
+unchanged. Bound identity, scalar width, complete coverage and per-coordinate
+cancellation checks still apply when their products and right-side updates are omitted.
 
 `SourceSemanticsChecker` owns complete exact witness and recession checks for the
 declared source language and declines unsupported semantics.
