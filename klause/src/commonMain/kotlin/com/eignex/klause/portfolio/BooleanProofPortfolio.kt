@@ -21,6 +21,7 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.BooleanProofContext
+import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.SchedulingCancellation
@@ -52,6 +53,7 @@ internal class BooleanProofPortfolio private constructor(
     }
 
     private var taskContext: BooleanProofContext? = null
+    private val points = FinitePointCheck(problem)
     private val openingTokens = Array(parameters.size) { Cancellation.Never }
     private val parameters = parameters.mapIndexed { worker, params ->
         params.withCancellation(object : SchedulingCancellation {
@@ -181,7 +183,7 @@ internal class BooleanProofPortfolio private constructor(
             val step = search.runSlice(global, millis, work)
             step.sample?.let { sample ->
                 val verification = finiteWitnessVerifier(problem, null,
-                    Assumptions(bools = condition.bools), global).verify(Candidate(sample, null))
+                    Assumptions(bools = condition.bools), global, points = points).verify(Candidate(sample, null))
                 if (verification is Verification.Accepted) return finish(
                     SolveResult.Sat(sample, semantics = problem.semantics),
                 )

@@ -70,8 +70,8 @@ internal fun verifyOpenWitness(
     if (cancellation()) return Verification.Indeterminate("open witness check cancelled")
     val point = discrete.withIntDomains(Array(model.numIntVars) { IntDomain(sample.intValue(it), sample.intValue(it)) })
     return try {
-        composedFixpoint(projection.bakeRetainedView(point, retained.toIntArray(), cancellation),
-            Candidate(sample, Unit), cancellation)
+        FinitePointCheck(projection.bakeRetainedView(point, retained.toIntArray(), cancellation))
+            .check(Candidate(sample, Unit), cancellation)
     } catch (_: CancellationException) {
         Verification.Indeterminate("open witness check cancelled")
     }

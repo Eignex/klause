@@ -9,11 +9,11 @@ import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.util.Cancellation
 import kotlin.math.nextDown
 import kotlin.math.nextUp
-import com.eignex.klause.solver.validation.composedFixpoint as validateComposedFixpoint
 
 internal class SourceObjectiveScore(reported: Double, val exact: BigFraction? = null) {
     val pruningBound: Double = exact?.let { exactDoubleCeiling(it, reported) } ?: reported
@@ -145,7 +145,7 @@ internal fun minimizingSampleExchange(
  *
  * A heuristic proposes from its own partial view — a relaxation, a rounding, a dive under branch
  * decisions — and its notion of feasible is its own. This pins every Boolean and integer variable of a
- * fresh session to the proposed value and requires the composed fixpoint to survive: a wipeout refutes
+ * disposable session to the proposed value and requires the composed fixpoint to survive: a wipeout refutes
  * that one proposal (never the model), and a fixpoint cut short by [cancellation] decides nothing, so
  * it reports [Verification.Indeterminate] rather than pass a half-propagated state off as feasible.
  *
@@ -163,6 +163,7 @@ internal class ComposedSampleVerifier(
     private val assumptions: Assumptions = Assumptions.None,
     private val onWork: (Long) -> Unit = {},
     toleranceCheck: ((Sample) -> Boolean)? = null,
+    private val pointCheck: FinitePointCheck = FinitePointCheck(problem),
 ) : CandidateVerifier<Sample, Double> {
 
     private val admission = sampleAdmission(problem, toleranceCheck)
@@ -181,25 +182,7 @@ internal class ComposedSampleVerifier(
         if (evaluated != candidate.objective) {
             return Verification.Rejected("objective is $evaluated, not the claimed ${candidate.objective}")
         }
-        return validateComposedFixpoint(problem, candidate, cancellation, assumptions, onWork)
+        return pointCheck.check(candidate, cancellation, assumptions, onWork)
     }
 }
 
-// Package-local forwarders to the shared composed-fixpoint validation.
-internal fun <V> composedFixpoint(
-    problem: Problem,
-    candidate: Candidate<Sample, V>,
-    cancellation: Cancellation,
-    assumptions: Assumptions = Assumptions.None,
-    onWork: (Long) -> Unit = {},
-): Verification<Sample, V> = validateComposedFixpoint(problem, candidate, cancellation, assumptions, onWork)
-
-internal fun <V> composedFixpoint(
-    problem: Problem,
-    candidate: Candidate<Sample, V>,
-    cancellation: Cancellation,
-    assumptions: Assumptions = Assumptions.None,
-    enforcingPeers: Set<Int>,
-    onWork: (Long) -> Unit = {},
-): Verification<Sample, V> =
-    validateComposedFixpoint(problem, candidate, cancellation, assumptions, enforcingPeers, onWork)

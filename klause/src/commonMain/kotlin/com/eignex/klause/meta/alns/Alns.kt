@@ -27,6 +27,7 @@ import com.eignex.klause.solver.result.AlnsStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
@@ -182,6 +183,7 @@ internal class Alns(
         private var seenVersion = 0L
         private val toleranceCheck = incumbentToleranceCheck
         private val assumptions = backtrackParams?.assumptions?.mergedWith(params.assumptions) ?: params.assumptions
+        private val points = FinitePointCheck(problem)
         private var supplied = false
 
         fun acquire(current: Sample?, cancellation: Cancellation): Sample? {
@@ -208,7 +210,7 @@ internal class Alns(
             cancellation: Cancellation,
             claimed: Double? = null,
         ): Boolean {
-            val checked = finiteWitnessVerifier(problem, objective, assumptions, cancellation, toleranceCheck)
+            val checked = finiteWitnessVerifier(problem, objective, assumptions, cancellation, toleranceCheck, points)
                 .verify(Candidate(sample, claimed))
             if (checked !is Verification.Accepted || cancellation()) return false
             if (!objective.evaluate(sample).isFinite()) return false

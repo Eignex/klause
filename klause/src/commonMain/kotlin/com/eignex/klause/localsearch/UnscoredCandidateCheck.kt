@@ -11,7 +11,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.executionCapabilities
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.solver.validation.composedFixpoint
+import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.util.Cancellation
 
 internal class UnscoredCandidateCheck(
@@ -38,7 +38,7 @@ internal class UnscoredCandidateCheck(
             IntDomain(candidate.intValue(it), candidate.intValue(it))
         })
         val selectedPoint = uncheckedSelection?.let { point.bake(it.forEngineView(point), cancellation) } ?: point
-        val checked = composedFixpoint(selectedPoint, Candidate(candidate, Unit), cancellation, assumptions)
+        val checked = FinitePointCheck(selectedPoint).check(Candidate(candidate, Unit), cancellation, assumptions)
         if (cancellation()) return Completion.Undecided()
         return when (checked) {
             is Verification.Accepted -> Completion.Witness(candidate)

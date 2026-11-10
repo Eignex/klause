@@ -15,7 +15,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.solver.validation.composedFixpoint
+import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.fitsLong
@@ -82,8 +82,8 @@ private fun checkQuadraticIrWitness(
     val discrete = Sample(point.bools, point.ints)
     val finite = plan.finiteFactorProjections?.let { model.finite.bake(it, cancellation) }
         ?: model.finite.bake(cancellation)
-    when (val checked = composedFixpoint(finite, Candidate(discrete, Unit), cancellation,
-        enforcingPeers = model.finiteEnforcingFactors)) {
+    when (val checked = FinitePointCheck(finite, model.finiteEnforcingFactors)
+        .check(Candidate(discrete, Unit), cancellation)) {
         is Verification.Rejected -> return SourceEvidenceCheck.Rejected(checked.reason)
         is Verification.Indeterminate -> return SourceEvidenceCheck.Unavailable(checked.reason)
         is Verification.Accepted -> Unit

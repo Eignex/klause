@@ -216,7 +216,7 @@ internal object RepairTrajectory {
             put("stalls", result.stats.ls.stalls.sum)
             put("runElapsedNanos", runNanos)
             put("runThreadAllocatedBytes", allocatedBytes)
-            put("checker", "native finiteWitnessVerifier/composedFixpoint")
+            put("checker", "native finiteWitnessVerifier/FinitePointCheck")
             put("independentWitnessCheck", false)
             result.assignment?.let {
                 val reconstructed = prepared.reconstruct(it)

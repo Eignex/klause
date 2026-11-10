@@ -8,7 +8,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.validation.composedFixpoint
+import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.PolynomialTheoryInvocation
 import com.eignex.klause.theory.qfnra.QfNraResult
@@ -28,6 +28,7 @@ internal class PolynomialExactNeighborhood(
     }.toMap()
     private val coordinates = (0 until model.service.realCount).filter { it !in integerPins }
     private val objectiveValue = objective?.evaluateExact(fixed)
+    private val pointCheck = FinitePointCheck(finite, model.finiteEnforcingFactors)
 
     override fun check(
         condition: ExactNeighborhoodCondition,
@@ -36,8 +37,7 @@ internal class PolynomialExactNeighborhood(
         if (condition.cutoff != null && objectiveValue != null && objectiveValue >= condition.cutoff) {
             return ExactNeighborhoodResult.Refuted
         }
-        when (composedFixpoint(finite, Candidate(fixed, Unit), cancellation, assumptions,
-            enforcingPeers = model.finiteEnforcingFactors)) {
+        when (pointCheck.check(Candidate(fixed, Unit), cancellation, assumptions)) {
             is Verification.Rejected -> return ExactNeighborhoodResult.Refuted
             is Verification.Indeterminate -> return ExactNeighborhoodResult.Undecided
             is Verification.Accepted -> Unit

@@ -24,7 +24,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-class ComposedFixpointTest {
+class FinitePointCheckTest {
     @Test
     fun `a complete point satisfying the relation should be accepted`() {
         val model = Problem(
@@ -33,7 +33,7 @@ class ComposedFixpointTest {
         ).bake()
         val candidate = Candidate(Sample(booleanArrayOf(), longArrayOf(3, 7)), Unit)
 
-        val result = composedFixpoint(model, candidate, Cancellation.Never)
+        val result = FinitePointCheck(model).check(candidate, Cancellation.Never)
 
         assertEquals(candidate, assertIs<Verification.Accepted<Sample, Unit>>(result).candidate)
     }
@@ -46,7 +46,7 @@ class ComposedFixpointTest {
         ).bake()
         val candidate = Candidate(Sample(booleanArrayOf(), longArrayOf(3, 6)), Unit)
 
-        val result = composedFixpoint(model, candidate, Cancellation.Never)
+        val result = FinitePointCheck(model).check(candidate, Cancellation.Never)
 
         assertIs<Verification.Rejected>(result)
     }
@@ -60,7 +60,7 @@ class ComposedFixpointTest {
         val candidate = Candidate(Sample(booleanArrayOf(), longArrayOf(3, 7)), Unit)
         val assumptions = Assumptions.None.withInt(0, 4)
 
-        val result = composedFixpoint(model, candidate, Cancellation.Never, assumptions)
+        val result = FinitePointCheck(model).check(candidate, Cancellation.Never, assumptions)
 
         assertIs<Verification.Rejected>(result)
     }
@@ -71,7 +71,7 @@ class ComposedFixpointTest {
         val candidate = Candidate(Sample(booleanArrayOf(true), longArrayOf()), Unit)
         val assumptions = Assumptions.None.withBool(0, false)
 
-        val result = composedFixpoint(model, candidate, Cancellation.Never, assumptions)
+        val result = FinitePointCheck(model).check(candidate, Cancellation.Never, assumptions)
 
         assertIs<Verification.Rejected>(result)
     }
@@ -81,7 +81,7 @@ class ComposedFixpointTest {
         val model = Problem(0, 1, arrayOf(IntDomain(0, 0)), emptyArray()).bake()
         val candidate = Candidate(Sample(booleanArrayOf(), longArrayOf(1)), Unit)
 
-        val result = composedFixpoint(model, candidate, Cancellation.Never)
+        val result = FinitePointCheck(model).check(candidate, Cancellation.Never)
 
         assertIs<Verification.Rejected>(result)
     }
@@ -93,9 +93,10 @@ class ComposedFixpointTest {
             arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 10)),
         ).bake()
         val points = listOf(longArrayOf(3, 7), longArrayOf(8, 2))
+        val check = FinitePointCheck(model)
 
         val results = points.map {
-            composedFixpoint(model, Candidate(Sample(booleanArrayOf(), it), Unit), Cancellation.Never)
+            check.check(Candidate(Sample(booleanArrayOf(), it), Unit), Cancellation.Never)
         }
 
         for (result in results) assertIs<Verification.Accepted<*, *>>(result)
@@ -118,7 +119,7 @@ class ComposedFixpointTest {
         val model = source.bake(providers)
         val candidate = Candidate(Sample(booleanArrayOf(false, false), longArrayOf()), Unit)
 
-        val result = composedFixpoint(model, candidate, Cancellation.Never)
+        val result = FinitePointCheck(model).check(candidate, Cancellation.Never)
 
         assertIs<Verification.Rejected>(result)
     }
@@ -132,7 +133,7 @@ class ComposedFixpointTest {
         var work = -1L
         val cancellation = Cancellation { ++polls == 17 }
 
-        val result = composedFixpoint(model, candidate, cancellation, onWork = {
+        val result = FinitePointCheck(model).check(candidate, cancellation, onWork = {
             reports++
             work = it
         })
@@ -165,7 +166,7 @@ class ComposedFixpointTest {
         cancelled = false
         val candidate = Candidate(Sample(booleanArrayOf(true), longArrayOf()), Unit)
 
-        val result = composedFixpoint(model, candidate, Cancellation { cancelled })
+        val result = FinitePointCheck(model).check(candidate, Cancellation { cancelled })
 
         assertIs<Verification.Indeterminate>(result)
     }
@@ -180,9 +181,76 @@ class ComposedFixpointTest {
         val candidate = Candidate(Sample(booleanArrayOf(), LongArray(columns) { (it % 2).toLong() }), Unit)
         var work = -1L
 
-        val result = composedFixpoint(source, candidate, Cancellation.Never, onWork = { work = it })
+        val result = FinitePointCheck(source).check(candidate, Cancellation.Never, onWork = { work = it })
 
         assertIs<Verification.Accepted<*, *>>(result)
         assertTrue(work in 1L until 32L * columns, "propagation work was $work for $columns columns")
     }
+
+    @Test
+    fun `an unchanged point should reuse its completed verdict without propagation`() {
+        val check = FinitePointCheck(sumModel())
+        val point = Sample(booleanArrayOf(), longArrayOf(3, 7))
+        check.check(Candidate(point, Unit), Cancellation.Never)
+        var work = -1L
+
+        val result = check.check(Candidate(point.copy(), Unit), Cancellation.Never, onWork = { work = it })
+
+        assertIs<Verification.Accepted<*, *>>(result)
+        assertEquals(0L, work)
+    }
+
+    @Test
+    fun `a changed coordinate should invalidate the retained verdict`() {
+        val check = FinitePointCheck(sumModel())
+        check.check(Candidate(Sample(booleanArrayOf(), longArrayOf(3, 7)), Unit), Cancellation.Never)
+
+        val result = check.check(Candidate(Sample(booleanArrayOf(), longArrayOf(4, 7)), Unit), Cancellation.Never)
+
+        assertIs<Verification.Rejected>(result)
+    }
+
+    @Test
+    fun `a retained point should still be checked against new caller pins`() {
+        val check = FinitePointCheck(sumModel())
+        val point = Sample(booleanArrayOf(), longArrayOf(3, 7))
+        check.check(Candidate(point, Unit), Cancellation.Never)
+
+        val result = check.check(Candidate(point, Unit), Cancellation.Never, Assumptions.None.withInt(0, 4))
+
+        assertIs<Verification.Rejected>(result)
+    }
+
+    @Test
+    fun `an interrupted check should not be retained`() {
+        var cancelled = false
+        val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0))))
+        val providers = FactorProjectionProviders(
+            propagation = PropagationProjectionProvider {
+                PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) {
+                    object : Propagator {
+                        override fun propagate(state: PropagationState, factorId: Int): Boolean {
+                            cancelled = true
+                            return true
+                        }
+                    }
+                }
+            },
+        )
+        val check = FinitePointCheck(source.bake(providers))
+        val candidate = Candidate(Sample(booleanArrayOf(true), longArrayOf()), Unit)
+        cancelled = false
+        check.check(candidate, Cancellation { cancelled })
+        var work = -1L
+
+        val result = check.check(candidate, Cancellation.Never, onWork = { work = it })
+
+        assertIs<Verification.Accepted<*, *>>(result)
+        assertTrue(work > 0L, "the retried check reported $work work")
+    }
+
+    private fun sumModel() = Problem(
+        0, 2, Array(2) { IntDomain(0, 10) },
+        arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 10)),
+    ).bake()
 }

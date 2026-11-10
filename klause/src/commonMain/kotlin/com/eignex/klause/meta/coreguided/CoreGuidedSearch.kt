@@ -33,7 +33,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsoundnessException
-import com.eignex.klause.solver.validation.composedFixpoint
+import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
@@ -124,6 +124,7 @@ internal class CoreGuidedSearch(
     private var workDebt = 0L
     private var best: Sample? = null
     private var candidate: Sample? = null
+    private val pointCheck = FinitePointCheck(base)
     private var verificationConstruction = 2L * base.numBoolVars + base.numIntVars + base.numFactors +
         objective.boolWeightValues.size + objective.intCoefficientValues.size
     private var bestValue: BigFraction? = null
@@ -339,8 +340,8 @@ internal class CoreGuidedSearch(
     ): MinimizeResult? {
         val sample = requireNotNull(candidate)
         recordVerification(verificationConstruction)
-        when (val verified = composedFixpoint(
-            base, Candidate(sample, Unit), token, params.assumptions, onWork = ::recordVerification,
+        when (val verified = pointCheck.check(
+            Candidate(sample, Unit), token, params.assumptions, onWork = ::recordVerification,
         )) {
             is Verification.Rejected -> throw UnsoundnessException(verified.reason)
             is Verification.Indeterminate -> return when {

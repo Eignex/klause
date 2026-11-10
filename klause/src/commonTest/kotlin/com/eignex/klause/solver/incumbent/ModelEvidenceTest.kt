@@ -2,6 +2,7 @@ package com.eignex.klause.solver.incumbent
 
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -212,6 +213,22 @@ class ModelEvidenceTest {
         val verifier = ModelEvidenceVerifier<Sample, Unit>(model, CandidateVerifier.trusting())
 
         val checked = verifier.verify(ModelEvidence.Witness(model, Candidate(other, Unit), certificate))
+
+        assertIs<Verification.Rejected>(checked)
+    }
+
+    @Test
+    fun `verify should check consumer restrictions that a producer check did not cover`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(1, 3)), emptyArray())
+        val model = ModelIdentity.of(source)
+        val plan = source.prepareExecutionPlan()
+        val producer = EngineInvocation(plan, model)
+        val consumer = EngineInvocation(plan, model, executionAssumptions = Assumptions.None.withInt(0, 2))
+        val evidence = ModelEvidence.Witness(model, Candidate(Sample(booleanArrayOf(), longArrayOf(1)), Unit))
+        val verifier = ModelEvidenceVerifier<Sample, Unit>(model, CandidateVerifier.trusting())
+        verifier.verify(evidence, restrictions = WitnessRestrictions(producer))
+
+        val checked = verifier.verify(evidence, restrictions = WitnessRestrictions(producer, consumer = consumer))
 
         assertIs<Verification.Rejected>(checked)
     }
