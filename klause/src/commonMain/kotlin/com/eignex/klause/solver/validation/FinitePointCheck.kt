@@ -43,6 +43,9 @@ internal class FinitePointCheck(private val problem: Problem, private val enforc
 
     private val decided = AtomicReference<DecidedPoint?>(null)
 
+    // Whether a verdict covers every selected relation of [model], so a caller may key its result on [model].
+    fun checksAllOf(model: Problem): Boolean = model === problem && enforcingPeers.isEmpty()
+
     private fun projection(): PropagationProblem = shared ?: PropagationProblem(problem)
 
     fun <V> check(

@@ -86,8 +86,8 @@ internal class PortfolioEvidence(
         val minimized = completion as? CompletedEngineResult.Minimize
         val pointValue = minimized?.result?.objectiveValue
         val value = if (kind == EvidenceKind.Bound) minimized?.executionBound else pointValue
-        // An unbounded claim checks its point together with its certificate.
-        if (sample != null && kind != EvidenceKind.Unbounded) {
+        // The point passes witness admission first; an unbounded claim then reuses the receipts it recorded.
+        if (sample != null) {
             when (val checked = witness(worker, sample, pointValue)) {
                 is Verification.Rejected -> return checked
                 is Verification.Indeterminate -> return checked

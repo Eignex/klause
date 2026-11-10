@@ -176,4 +176,16 @@ class FiniteWitnessVerificationTest {
         0, 0, emptyArray(), emptyList<Factor>(),
         numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
     ).bake()
+
+    @Test
+    fun `another model should check an accepted point again`() {
+        var checks = 0
+        val tolerance: (Sample) -> Boolean = { checks++; true }
+        val point = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
+        finiteWitnessVerifier(realModel(), null, toleranceCheck = tolerance).verify(Candidate(point, null))
+
+        finiteWitnessVerifier(realModel(), null, toleranceCheck = tolerance).verify(Candidate(point, null))
+
+        assertEquals(2, checks)
+    }
 }

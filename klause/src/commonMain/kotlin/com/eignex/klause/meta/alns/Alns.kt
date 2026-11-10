@@ -183,7 +183,8 @@ internal class Alns(
         private var seenVersion = 0L
         private val toleranceCheck = incumbentToleranceCheck
         private val assumptions = backtrackParams?.assumptions?.mergedWith(params.assumptions) ?: params.assumptions
-        private val points = FinitePointCheck(problem)
+        private val seedProblem = problem
+        private val points = FinitePointCheck(seedProblem)
         private var supplied = false
 
         fun acquire(current: Sample?, cancellation: Cancellation): Sample? {
@@ -210,7 +211,7 @@ internal class Alns(
             cancellation: Cancellation,
             claimed: Double? = null,
         ): Boolean {
-            val checked = finiteWitnessVerifier(problem, objective, assumptions, cancellation, toleranceCheck, points)
+            val checked = finiteWitnessVerifier(seedProblem, objective, assumptions, cancellation, toleranceCheck, points)
                 .verify(Candidate(sample, claimed))
             if (checked !is Verification.Accepted || cancellation()) return false
             if (!objective.evaluate(sample).isFinite()) return false
