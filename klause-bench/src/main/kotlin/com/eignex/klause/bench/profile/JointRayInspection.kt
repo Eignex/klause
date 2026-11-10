@@ -115,7 +115,7 @@ internal object JointRayInspection {
             call(current, "dual", vector, true, false, null)
         } catch (failure: InvocationTargetException) {
             val cause = failure.targetException
-            if (cause.javaClass.simpleName != "ReconstructionStop") throw cause
+            if (cause.javaClass.simpleName != "ReconstructionStop") throw failure
             decline = call(cause, "getReason")
         }
         val conflict = run?.let { call(it, "getConflict") } != null
