@@ -43,7 +43,7 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
-    fun `fixed repair should remain unknown when independent refuted pin groups alternate`() {
+    fun `persistent refutation roots should complete independent pin groups within the fixed width`() {
         val model = Problem(0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 1), null, null),
             factors = Array(2) { id ->
@@ -61,11 +61,20 @@ class JointLinearRepairTest {
                     val result = search.minimizeResult(TerminationReason.BudgetExhausted)
 
                     assertTrue(done)
-                    assertIs<MinimizeResult.Unknown>(result)
                     val stages = repair.stats.smt.completeSearchStages.orEmpty()
                     assertTrue((stages["jointRepairClosedLeaves"] ?: 0L) >= 2L)
-                    assertEquals(1L, stages["jointRepairMaxFreedIntegers"])
-                    if (completion) assertTrue((stages["jointRepairRefutationSeeds"] ?: 0L) > 0L)
+                    if (completion) {
+                        val completed = assertIs<MinimizeResult.WithSample>(result)
+                        assertEquals(listOf(1L, 1L), completed.sample.ints.toList())
+                        assertEquals(2L, stages["jointRepairMaxFreedIntegers"])
+                        assertTrue((stages["jointRepairAdditionalRefutationSeeds"] ?: 0L) > 0L)
+                        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                            SourceEvidence(source.scope, SourceClaim.Witness(completed.sample),
+                                SourceDerivation.SourceWitness)))
+                    } else {
+                        assertIs<MinimizeResult.Unknown>(result)
+                        assertEquals(1L, stages["jointRepairMaxFreedIntegers"])
+                    }
                 }
             }
         }

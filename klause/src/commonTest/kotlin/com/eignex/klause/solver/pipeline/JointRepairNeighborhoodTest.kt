@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
 
 class JointRepairNeighborhoodTest {
     @Test
-    fun `a cited eligible pin should seed only the next connected proposal`() {
+    fun `a cited eligible pin should persist until its advice is cleared`() {
         val columns = (0..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val source = SourceProofContext(SourceScope(SourceRevision("refuted-pins", "exact")), columns.toSet(),
             mapOf("edge" to SourcePremise(SourceInequality(mapOf(columns[2] to BigFraction.ONE,
@@ -39,6 +39,8 @@ class JointRepairNeighborhoodTest {
 
         assertEquals(mapOf(0 to BigFraction.ZERO), guided.lower)
         assertEquals(guided.lower, guided.upper)
+        assertEquals(guided, repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null))
+        repair.clearRefutation()
         assertEquals(ordinary, repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null))
         assertTrue(funding.spent > 0)
         assertTrue(funding.allocated > 0)
@@ -48,11 +50,11 @@ class JointRepairNeighborhoodTest {
     fun `stale or unpaid refutation guidance should retain the ordinary proposal`() {
         val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val source = SourceProofContext(SourceScope(SourceRevision("refuted-fallback", "exact")),
-            columns.toSet(), emptyMap())
-        for (variant in listOf("center", "cutoff", "cancelled", "work", "allocation", "unpinned")) {
+            columns.toSet() + SourceCoordinate(SourceCoordinate.Kind.Boolean, 0), emptyMap())
+        for (variant in listOf("center", "boolean", "cutoff", "cancelled", "work", "allocation", "unpinned")) {
             val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, Cancellation.Never))
             val centers = List(3) { BigFraction.ZERO }
-            val pinned = repair.propose(centers, booleanArrayOf(), 2, 0, BigFraction.ONE, null)
+            val pinned = repair.propose(centers, booleanArrayOf(false), 2, 0, BigFraction.ONE, null)
             val funding = SourceLpFunding(if (variant == "work") 0 else 1_000,
                 if (variant == "allocation") 0 else 1_000).also { it.grant(1_000) }
             repair.guideRefutation(setOf(SourceDerivation.Assumption(columns[2], false)),
@@ -62,10 +64,80 @@ class JointRepairNeighborhoodTest {
                 else centers
             val cutoff = if (variant == "cutoff") BigFraction.ONE else null
 
-            val proposed = repair.propose(current, booleanArrayOf(), 2, 1, BigFraction.ONE, cutoff)
+            val proposed = repair.propose(current, booleanArrayOf(variant == "boolean"), 2, 1, BigFraction.ONE, cutoff)
 
             assertEquals(mapOf(1 to current[1], 2 to current[2]), proposed.lower)
             assertEquals(proposed.lower, proposed.upper)
+        }
+    }
+
+    @Test
+    fun `independent refuted pins should share the existing free variable quota`() {
+        val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val source = SourceProofContext(SourceScope(SourceRevision("independent-pins", "exact")),
+            columns.toSet(), emptyMap())
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, Cancellation.Never))
+        val centers = List(3) { BigFraction.ZERO }
+        val budget = SourceLpBudget(funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) })
+        val pinned = repair.propose(centers, booleanArrayOf(), 2, 0, BigFraction.ONE, null)
+        assertTrue(repair.guideRefutation(setOf(SourceDerivation.Assumption(columns[0], false)),
+            pinned, budget, Cancellation.Never))
+        val first = repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null)
+        assertTrue(repair.guideRefutation(setOf(SourceDerivation.Assumption(columns[1], false)),
+            first, budget, Cancellation.Never))
+
+        val combined = repair.propose(centers, booleanArrayOf(), 2, 2, BigFraction.ONE, null)
+
+        assertEquals(mapOf(2 to BigFraction.ZERO), combined.lower)
+        assertEquals(combined.lower, combined.upper)
+    }
+
+    @Test
+    fun `retained guidance should spend containing funding without renewing a numerical grant`() {
+        val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val source = SourceProofContext(SourceScope(SourceRevision("retained-funding", "exact")), columns.toSet(),
+            mapOf("edge" to SourcePremise(SourceInequality(mapOf(columns[1] to BigFraction.ONE,
+                columns[2] to BigFraction.ONE), BigFraction.ONE))))
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, Cancellation.Never))
+        val centers = List(3) { BigFraction.ZERO }
+        val funding = SourceLpFunding(10_000, 10_000).also { it.grant(1_000) }
+        val pinned = repair.propose(centers, booleanArrayOf(), 2, 0, BigFraction.ONE, null)
+        assertTrue(repair.guideRefutation(setOf(SourceDerivation.Assumption(columns[2], false)),
+            pinned, SourceLpBudget(funding = funding), Cancellation.Never))
+        funding.grant(0)
+        val before = funding.spent
+
+        val guided = repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null)
+
+        assertEquals(mapOf(0 to BigFraction.ZERO), guided.lower)
+        assertTrue(funding.spent > before)
+        assertEquals(0L, funding.availableWork)
+    }
+
+    @Test
+    fun `exhausted or cancelled retained guidance should restore ordinary selection`() {
+        val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val source = SourceProofContext(SourceScope(SourceRevision("retained-stop", "exact")), columns.toSet(),
+            mapOf("edge" to SourcePremise(SourceInequality(mapOf(columns[1] to BigFraction.ONE,
+                columns[2] to BigFraction.ONE), BigFraction.ONE))))
+        for (variant in listOf("work", "allocation", "cancellation")) {
+            val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, Cancellation.Never))
+            val centers = List(3) { BigFraction.ZERO }
+            val ordinary = repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null)
+            val funding = SourceLpFunding(10_000, 10_000).also { it.grant(1_000) }
+            val pinned = repair.propose(centers, booleanArrayOf(), 2, 0, BigFraction.ONE, null)
+            var cancelled = false
+            assertTrue(repair.guideRefutation(setOf(SourceDerivation.Assumption(columns[2], false)),
+                pinned, SourceLpBudget(funding = funding), Cancellation { cancelled }))
+            when (variant) {
+                "work" -> funding.charge(funding.remainingWork)
+                "allocation" -> funding.charge(0L, funding.remainingAllocation)
+                else -> cancelled = true
+            }
+
+            val proposed = repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null)
+
+            assertEquals(ordinary, proposed)
         }
     }
 
