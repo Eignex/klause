@@ -622,6 +622,7 @@ preparation grant. Index scalars, references and page capacity belong to learned
 ownership accounting. Grants unable to bootstrap use the generic window. Custom
 policies first finish a funded index abort without further retirement, restore
 candidate handles and clear private markers, then enter the generic window.
+An abort completes a pending removal from the index without retiring a live row.
 Native post-undo replay protects its queued clause handles and learned units without
 freezing unrelated retirement. Incomplete trail propagation, conflicts and root
 publication still defer the window.
