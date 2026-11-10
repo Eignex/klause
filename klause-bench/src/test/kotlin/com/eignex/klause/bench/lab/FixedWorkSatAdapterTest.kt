@@ -79,7 +79,8 @@ class FixedWorkSatAdapterTest {
     }
 
     private fun outcome(records: List<JsonObject>, exit: Int?, killed: Boolean) = FixedWorkSatSuite.outcome(
-        "case", FixedWorkSatSuite.Options.parse(PARAMETERS, planned = false), JsonObject(emptyMap()), null, records, exit, killed,
+        "case", FixedWorkSatSuite.Options.parse(PARAMETERS, planned = false), JsonObject(emptyMap()), null,
+        records, exit, killed,
     )
 
     private fun JsonObject?.flag(key: String): Boolean = requireNotNull(this).getValue(key).jsonPrimitive.boolean
