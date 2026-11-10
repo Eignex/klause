@@ -454,9 +454,10 @@ internal object SourceEligibility {
                         )
                     }.orEmpty()
                     if (identities.isEmpty() || identities.any { it.packedSha256 == null && it.plainSha256 == null }) {
+                        val model = problem?.get("model")?.jsonPrimitive?.contentOrNull
                         gaps += Gap(
-                            problem?.get("collection")?.jsonPrimitive?.contentOrNull,
-                            "$where has no hashed declared inputs",
+                            problem?.get("collection")?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() },
+                            "$where has no hashed declared inputs" + model?.let { " for $it" }.orEmpty(),
                         )
                     } else {
                         rows.getOrPut(identities to outcome(row["status"]?.jsonPrimitive?.contentOrNull, record)) {
