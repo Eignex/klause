@@ -1033,8 +1033,9 @@ certify its own original real relation; see
 
 `finiteWitnessVerifier` combines the finite point check with exact real checking or
 the caller's explicit tolerance policy, checking pins and deduced bounds directly on
-the completed point. A tolerance callback cut short by cancellation is indeterminate. A tolerance callback requires complete finite real coordinates
-and does not change exact evidence semantics. See
+the completed point. A tolerance callback requires complete finite real coordinates
+and does not change exact evidence semantics; one cut short by cancellation is
+indeterminate. See
 [model ownership](02-model.md#published-assignments-and-objectives) for coordinate
 lifetimes.
 
@@ -1049,12 +1050,14 @@ defines the publication policy.
 
 An accepted check records a receipt on the immutable `Sample` it checked.
 `finiteWitnessVerifier`, the open-model witness verifier and
-[invocation restriction checks](12-portfolio.md#verification-outcomes) keep receipts. The receipt
-names the identities the check read besides the coordinates: model, objective, proof
-context and tolerance policy. A verifier with the same identities accepts a receipted
-point without repeating source checks. It still checks its own caller restrictions and
-claimed objective, which no receipt covers. Identities are compared by reference, so
-a transformed, rebuilt or structurally equal model needs its own check. A copy with
+[invocation restriction checks](12-portfolio.md#verification-outcomes) keep receipts.
+A witness receipt names the identities its check read besides the coordinates: model,
+objective, proof context and tolerance policy. A verifier with the same identities
+accepts a receipted point without repeating source checks. It still checks its own
+caller restrictions and claimed objective, which no receipt covers. Witness receipts
+compare these identities by reference, so a transformed, rebuilt or structurally equal
+model needs its own check. A restriction receipt names a matching invocation or an
+equal source condition, whose check reads nothing else. A copy with
 equal coordinates keeps its receipts; changed coordinates make a new sample with none.
 Rejected, indeterminate or cancelled checks record nothing, so the next consumer
 checks again. A receipt is in-memory bookkeeping, not a proof.
