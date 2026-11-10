@@ -26,6 +26,7 @@ internal object PairedRows {
             done.forEach { case -> case.recordError?.let { add("${case.arm}: $it") } }
             addAll(attempt(done, declaration))
             addAll(identity(done.filter { it.record != null }, declaration))
+            done.forEach { addAll(DeclaredExperiment.reasons(it, declaration)) }
             if (done.any { it.inputs in sourceDrift }) {
                 add("plain source identity differs between rows declaring the same inputs")
             }
@@ -90,6 +91,9 @@ internal object PairedRows {
             .forEach { add("${it.arm} seed identities disagree: ${it.seeds}") }
         done.forEach { addAll(controls(it, declaration)) }
         val facets = done.map(::facets)
+        done.zip(facets).groupBy({ declaration.expected[it.first.arm]?.revision }, { it.second[REVISION] })
+            .filter { (revision, builds) -> revision != null && builds.distinct().size > 1 }
+            .forEach { (revision, _) -> add("arms declaring revision $revision differ in build identity") }
         for (facet in facets.flatMap { it.keys }.distinct().sorted()) {
             val allowed = facet in declaration.allowed || facet.removePrefix(CONTROLS) in declaration.treatments
             if (!allowed && facets.map { it[facet] }.distinct().size > 1) add("undeclared $facet difference")

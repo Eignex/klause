@@ -1762,26 +1762,50 @@ independent proof checking.
 
 ## Paired comparison audit
 
-`scripts/paired-audit.sh` audits a retained paired job read-only, after `:klause-bench:installDist`:
+`scripts/paired-audit.sh` audits a retained paired job read-only, after `:klause-bench:installDist`.
+Fetch the job with `lab fetch ID job/` and save `lab show ID` and `lab execution ID`:
 
 ```sh
-klause-bench/scripts/paired-audit.sh --cases lab-cases.jsonl --request request.json \
-  --execution execution.json --job job.json > audit.json
+klause-bench/scripts/paired-audit.sh --cases job/lab-cases.jsonl --job job.json \
+  --execution execution.json --plans job/preparation --executed job/cases \
+  --files files.json > audit.json
 ```
 
-`--request` declares the arms from the experiment's `configs`, its `param.` keys as treatments
-and, when the configs name different refs, a revision difference. Without it pass `--arms a,b`.
+`--request` takes the experiment request; without it the job's `experiment` is used. Each arm is a
+config over `base`; its `param.` keys are treatments, arms with different refs may differ in revision,
+and `bench.request.parameters` supplies inherited values. Without a request pass `--arms a,b`.
 `--treatment KEY` adds a benchCase parameter that may differ between arms, `--allow FACET`
 permits an identity difference (`revision`, `runtime`, `harness`, `libraries`, `checker` or
 `controls.KEY`), `--control KEY=VALUE` pins a comparison control and `--rows N` declares the
-expected row count. Execution and job listings are optional.
+expected row count.
+
+The declared experiment binds every arm to evidence the job retains:
+
+- **Revision.** A ref that is a full commit id is the arm's revision; pin any other ref with
+  `--revision ARM=SHA` from the submission. Each record's `gitSha` must equal it, and arms with one
+  revision must share solver jar hashes. `--files` (`lab files ID --json`) also requires an
+  accepted preparation archive for each revision.
+- **Treatment values.** `--executed` reads each case's executed `N/bench-case.json`; `lab-cases.jsonl`
+  holds the row's first-arm case for every arm. Request keys the planner passes through (`param.`,
+  `lp`, `presolve`, `exact`, `verbose`) must carry the arm's value, or be absent when the arm leaves
+  them unset and so inherits the solver default of its revision.
+- **Resolved plan.** `--plans` reads `bench-plan-N.jsonl`, N counting non-reference arms in config
+  order. Executed parameters and inputs must equal the arm's plan, plans must agree with the request,
+  and planner keys where plans differ, such as `engines` resolved to `engine`, are treatments.
+- **Cohort.** The first plan, or `bench.frozenCases`, crossed with the lab's seeds and repeats gives the
+  expected rows. Absent rows are missing; a row or case outside the cohort, or with other inputs, is invalid.
+
+`declared.gaps` names the evidence that is unavailable, such as an unpinned ref, absent plans or
+executed cases, records without a commit, or a reference filter that may drop planned rows. Gaps
+never fail rows; they withhold `declared.verified` and no history is resolved to fill them.
 
 A row is one pair key, seed and repetition. It is accepted when every declared arm is retained
 once with status `DONE`, all arms share one worker receipt, machine and execution frame, and
 their sources, seeds, comparison controls, parameters and identities match except for declared
 differences. Different rows may use different machines. Rows report `COMPLETE`, `CENSORED` when
 an arm has no terminal verdict within its budget, `INVALID` with reasons, or `MISSING` for
-cancelled or absent arms. The script exits 0 only when no row is invalid or missing.
+cancelled or absent arms. The script exits 1 when a row is invalid or missing, 3 when rows are
+accepted but the declared experiment is only partly verified, and 0 when it is verified.
 
 Outcomes keep native claims, checked witnesses and native proofs apart; a valid check whose
 witness digest does not match the retained witness is `valid-unbound`, and no retained record

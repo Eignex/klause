@@ -69,7 +69,38 @@ internal data class AttemptCosts(
 @Serializable
 internal data class AttemptSummary(val classes: List<AttemptCosts>, val committedRows: Int, val errors: List<String>)
 
-/** The complete audit result; [accepted] holds when no row is invalid or missing and the job is consistent. */
+/** One arm's declared revision and expected case parameters; a null value inherits the solver default. */
+@Serializable
+internal data class DeclaredArm(
+    val ref: String?,
+    val revision: String?,
+    val parameters: Map<String, String?>,
+    val resolvedPlan: Boolean,
+)
+
+/** Expected paired rows from [source], how many were retained, and those absent or outside the cohort. */
+@Serializable
+internal data class CohortCoverage(
+    val source: String,
+    val expected: Int,
+    val retained: Int,
+    val absent: List<String>,
+    val unexpected: List<String>,
+)
+
+/** Whether the requested experiment was verified; [gaps] name the evidence that withholds [verified]. */
+@Serializable
+internal data class DeclaredCoverage(
+    val verified: Boolean,
+    val arms: Map<String, DeclaredArm>,
+    val cohort: CohortCoverage?,
+    val gaps: List<String>,
+)
+
+/**
+ * The complete audit result; [accepted] holds when no row is invalid or missing and the job is consistent, and
+ * [declared] reports how much of the requested experiment that acceptance covers.
+ */
 @Serializable
 internal data class PairedAuditReport(
     val arms: List<String>,
@@ -80,6 +111,7 @@ internal data class PairedAuditReport(
     val invalid: Int,
     val missing: Int,
     val accepted: Boolean,
+    val declared: DeclaredCoverage,
     val jobErrors: List<String>,
     val outcomes: Map<String, ArmOutcomes>,
     val costs: Map<String, CaseCosts>,

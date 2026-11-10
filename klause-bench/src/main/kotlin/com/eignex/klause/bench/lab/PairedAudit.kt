@@ -17,9 +17,12 @@ import java.io.File
 import java.io.Reader
 import kotlin.system.exitProcess
 
+private const val PARTIAL = 3
+
 /**
  * Audits a retained paired lab comparison without changing it; see `klause-bench/scripts/paired-audit.sh`.
- * Exits 0 when every retained or expected row is accepted, 1 when a row is invalid or missing.
+ * Exits 0 when every row is accepted and the declared experiment is fully verified, 1 when a row is invalid or
+ * missing, and 3 when rows are accepted but the declared treatments, revisions or cohort are only partly verifiable.
  */
 fun main(args: Array<String>) {
     val report = runCatching { PairedAudit.run(args.toList()) }.getOrElse { failure ->
@@ -27,7 +30,13 @@ fun main(args: Array<String>) {
         exitProcess(2)
     }
     println(Reports.json.encodeToString(PairedAuditReport.serializer(), report))
-    exitProcess(if (report.accepted) 0 else 1)
+    exitProcess(
+        when {
+            !report.accepted -> 1
+            !report.declared.verified -> PARTIAL
+            else -> 0
+        },
+    )
 }
 
 /**
@@ -39,10 +48,12 @@ internal data class AuditedCase(
     val status: String,
     val arm: String?,
     val rowKey: String,
+    val caseKey: String,
     val host: String?,
     val seeds: List<String?>,
     val inputs: Map<String, String?>,
     val parameters: Map<String, String>,
+    val executed: Boolean,
     val record: SolveRecord?,
     val recordError: String?,
     val receipt: String?,
@@ -59,6 +70,8 @@ internal object PairedAudit {
     /**
      * What a comparison may differ in: its [arms], benchCase parameter keys set per arm ([treatments]),
      * identity facets allowed to differ between arms ([allowed]) and pinned comparison control values ([controls]).
+     * A request adds each arm's [expected] revision and values and the [cohort]; [gaps] name what it leaves
+     * unverifiable.
      */
     internal data class Declaration(
         val arms: List<String>,
@@ -66,38 +79,46 @@ internal object PairedAudit {
         val allowed: Set<String> = emptySet(),
         val controls: Map<String, String> = emptyMap(),
         val rows: Int? = null,
+        val expected: Map<String, ArmExpectation> = emptyMap(),
+        val cohort: Cohort? = null,
+        val gaps: List<String> = emptyList(),
     )
 
     fun run(args: List<String>): PairedAuditReport {
         val options = options(args)
         fun file(name: String) = options[name]?.single()?.let(::File)
-        val request = file("request")?.let { Json.parseToJsonElement(it.readText()).jsonObject }
-        val declared = request?.let(::declaration)
-        val arms = options["arms"]?.flatMap { it.split(',') }?.filter(String::isNotBlank) ?: declared?.arms
-        val declaration = Declaration(
-            arms = requireNotNull(arms) { "declare arms with --request or --arms" },
-            treatments = declared?.treatments.orEmpty() + options["treatment"].orEmpty(),
-            allowed = declared?.allowed.orEmpty() + options["allow"].orEmpty(),
-            controls = options["control"].orEmpty().associate { it.substringBefore('=') to it.substringAfter('=') },
-            rows = options["rows"]?.single()?.toInt(),
-        )
-        val execution = file("execution")?.let { Json.parseToJsonElement(it.readText()).jsonArray }
         val job = file("job")?.let { Json.parseToJsonElement(it.readText()).jsonObject }
+        val request = file("request")?.let { Json.parseToJsonElement(it.readText()).jsonObject }
+            ?.let { it["experiment"] as? JsonObject ?: it } ?: job?.get("experiment") as? JsonObject
+        val plans = file("plans")?.listFiles().orEmpty().mapNotNull { plan ->
+            PLAN.matchEntire(plan.name)?.let { it.groupValues[1].toInt() to DeclaredExperiment.plan(plan.readText()) }
+        }.toMap()
+        val revisions = options["revision"].orEmpty().associate { it.substringBefore('=') to it.substringAfter('=') }
+        val declared = request?.let { DeclaredExperiment.declaration(it, plans, revisions) }
+        require(declared != null || (plans.isEmpty() && revisions.isEmpty())) {
+            "--plans and --revision need a request"
+        }
+        val arms = options["arms"]?.flatMap { it.split(',') }?.filter(String::isNotBlank)
+        require(arms == null || declared == null || arms == declared.arms) { "--arms contradicts the request's arms" }
+        val declaration = (declared ?: Declaration(requireNotNull(arms) { "declare arms with --request or --arms" }))
+            .let { base ->
+                base.copy(
+                    treatments = base.treatments + options["treatment"].orEmpty(),
+                    allowed = base.allowed + options["allow"].orEmpty(),
+                    controls = options["control"].orEmpty()
+                        .associate { it.substringBefore('=') to it.substringAfter('=') },
+                    rows = options["rows"]?.single()?.toInt(),
+                )
+            }
+        val execution = file("execution")?.let { Json.parseToJsonElement(it.readText()).jsonArray }
+        val files = file("files")?.let { Json.parseToJsonElement(it.readText()).jsonArray }
+        val prepared = files?.let(DeclaredExperiment::prepared)
         val cases = requireNotNull(file("cases")) { "--cases lab-cases.jsonl is required" }
-        return cases.bufferedReader().use { audit(it, declaration, execution, job) }
-    }
-
-    /** Arms, treatment keys and revision freedom declared by a lab experiment request's `configs`. */
-    fun declaration(request: JsonObject): Declaration {
-        require("grid" !in request) { "grid requests need explicit --arms and --treatment" }
-        val configs = request.getValue("configs").jsonArray.map { it.jsonObject }
-        val refs = configs.mapNotNull { text(it, "ref") }.distinct()
-        return Declaration(
-            arms = configs.map { requireNotNull(text(it, "label")) { "request config without label" } },
-            treatments = configs.flatMap { it.keys }.filter { it.startsWith(PARAMETER) }
-                .map { it.removePrefix(PARAMETER) }.toSet(),
-            allowed = if (refs.size > 1) setOf(REVISION) else emptySet(),
-        )
+        val executed = file("executed")?.listFiles().orEmpty().mapNotNull { directory ->
+            val case = directory.resolve("bench-case.json").takeIf(File::isFile) ?: return@mapNotNull null
+            directory.name.toIntOrNull()?.let { it to DeclaredExperiment.case(case.readText()) }
+        }.toMap().takeIf { options.containsKey("executed") }
+        return cases.bufferedReader().use { audit(it, declaration, execution, job, prepared, executed) }
     }
 
     fun audit(
@@ -105,9 +126,11 @@ internal object PairedAudit {
         declaration: Declaration,
         execution: JsonArray? = null,
         job: JsonObject? = null,
+        prepared: Set<String>? = null,
+        executed: Map<Int, BenchCase>? = null,
     ): PairedAuditReport {
         val retained = cases.buffered().lineSequence().filter(String::isNotBlank)
-            .map { parse(Json.parseToJsonElement(it).jsonObject) }.toList()
+            .map { Json.parseToJsonElement(it).jsonObject }.map { parse(it, executed?.get(int(it, "index"))) }.toList()
         val commands = job?.get("commands")?.jsonArray?.map { it.jsonObject }.orEmpty()
         val duplicates = retained.groupingBy { it.index }.eachCount().filterValues { it > 1 }.keys
         val sourceDrift = retained.filter { it.record != null }.groupBy { it.inputs }
@@ -115,12 +138,20 @@ internal object PairedAudit {
         val rows = retained.groupBy { it.rowKey }.map { (key, row) ->
             PairedRows.audit(key, row, declaration, duplicates, sourceDrift, commands)
         }
-        val absent = (declaration.rows ?: rows.size) - rows.size
+        val cohort = declaration.cohort?.takeUnless { it.filtered }
+        val absent = when (cohort) {
+            null -> (declaration.rows ?: rows.size) - rows.size
+            else -> retained.map { it.rowKey }.toSet().let { seen -> cohort.rows.keys.count { it !in seen } }
+        }
         val unretained = commands.map { int(it, "index") }.filter { index -> retained.none { it.index == index } }
         val attempts = execution?.let(PairedCosts::attempts)
         val jobErrors = buildList {
             if (duplicates.isNotEmpty()) add("case indices retained more than once: ${duplicates.sorted()}")
             if (absent < 0) add("${-absent} rows beyond the ${declaration.rows} expected")
+            if (cohort != null && declaration.rows != null && declaration.rows != cohort.rows.size) {
+                add("--rows ${declaration.rows} contradicts the declared cohort of ${cohort.rows.size} rows")
+            }
+            addAll(DeclaredExperiment.errors(declaration, prepared))
             if (unretained.isNotEmpty()) add("commands without a retained case: ${unretained.sorted()}")
             attempts?.errors?.let(::addAll)
             if (attempts != null) {
@@ -132,6 +163,7 @@ internal object PairedAudit {
         }
         val counts = rows.groupingBy { it.state }.eachCount()
         val missing = (counts[RowState.MISSING] ?: 0) + absent.coerceAtLeast(0)
+        val accepted = (counts[RowState.INVALID] ?: 0) == 0 && missing == 0 && jobErrors.isEmpty()
         return PairedAuditReport(
             arms = declaration.arms,
             treatments = declaration.treatments.sorted(),
@@ -140,7 +172,8 @@ internal object PairedAudit {
             censored = counts[RowState.CENSORED] ?: 0,
             invalid = counts[RowState.INVALID] ?: 0,
             missing = missing,
-            accepted = (counts[RowState.INVALID] ?: 0) == 0 && missing == 0 && jobErrors.isEmpty(),
+            accepted = accepted,
+            declared = DeclaredExperiment.coverage(retained, declaration, prepared, executed != null, accepted),
             jobErrors = jobErrors,
             outcomes = declaration.arms.associateWith { arm -> PairedCosts.outcomes(rows, arm) },
             costs = declaration.arms.associateWith { arm -> PairedCosts.costs(rows, arm, commands) },
@@ -150,7 +183,7 @@ internal object PairedAudit {
         )
     }
 
-    private fun parse(line: JsonObject): AuditedCase {
+    private fun parse(line: JsonObject, executed: BenchCase?): AuditedCase {
         val problem = line.getValue("problem").jsonObject
         val case = BenchProtocol.json.decodeFromJsonElement(BenchCase.serializer(), problem.getValue("benchCase"))
         val record = line["record"] as? JsonObject
@@ -177,10 +210,12 @@ internal object PairedAudit {
             status = requireNotNull(text(line, "status")),
             arm = text(line, "arm"),
             rowKey = listOf(pair, seed, case.attributes["repeat"], repeat).joinToString(KEY_SEPARATOR),
+            caseKey = DeclaredExperiment.caseKey(case),
             host = text(line, "host"),
             seeds = listOf(seed, solve?.seed?.toString(), case.attributes["seed"], controls["solverSeed"]),
-            inputs = case.inputs.associate { it.role to it.sha256 },
-            parameters = case.parameters,
+            inputs = (executed ?: case).inputs.associate { it.role to it.sha256 },
+            parameters = (executed ?: case).parameters,
+            executed = executed != null,
             record = solve?.let(::retained),
             recordError = decoded?.exceptionOrNull()?.let { "record is not a solver record: ${it.message}" }
                 ?: if (record == null) "no record" else null,
@@ -238,6 +273,9 @@ internal object PairedAudit {
     internal val ACCEPTED = setOf(RowState.COMPLETE, RowState.CENSORED)
     internal const val REVISION = "revision"
     internal const val KEY_SEPARATOR = "\u0000"
-    private const val PARAMETER = "param."
-    private val OPTIONS = setOf("cases", "request", "execution", "job", "arms", "treatment", "allow", "control", "rows")
+    private val PLAN = Regex("bench-plan-(\\d+)\\.jsonl")
+    private val OPTIONS = setOf(
+        "cases", "request", "execution", "job", "arms", "treatment", "allow", "control", "rows", "plans", "files",
+        "revision", "executed",
+    )
 }
