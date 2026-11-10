@@ -1221,31 +1221,18 @@ class ResumableMinimizeTest {
 
     @Test
     fun `a leaf the LP cannot decide should be passed over instead of ending the search`() {
-        val n = 3
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = n,
-            intDomains = Array(n) { IntDomain(0, 2) },
-            factors = arrayOf<Factor>(
-                Linear(LongArray(n) { 1L }, IntArray(n) { it }, doubleArrayOf(1.0), intArrayOf(0), LinearOp.GE, 5L),
-            ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(10.0),
-        ).bake()
-        val vetoed = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
-        val objective = LinearObjective(
-            intCoefficients = longArrayOf(2L, 3L, 1L),
-            realCoefficients = doubleArrayOf(1.5),
-        )
-        val search = BacktrackSolver(problem, vetoed).resumable(objective, BacktrackParams(randomSeed = 0L))
+        val fixture = UnresolvedRealLeafFixture(true)
+        fixture.acceptProof = { _, _ -> false }
 
-        var terminal: MinimizeResult? = null
-        while (terminal == null) {
-            terminal = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = -1L) { }
+        fixture.solver.resumable(fixture.objective, fixture.params).use { search ->
+            var terminal: MinimizeResult? = null
+            while (terminal == null) {
+                terminal = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = -1L) { }
+            }
+
+            assertIs<MinimizeResult.Unknown>(terminal)
         }
-
-        assertTrue(terminal is MinimizeResult.Unknown && search.stats.lp.standalonePasses.sum > 1.0, "$terminal")
+        fixture.assertVisitedLeaves()
     }
 
     @Test
