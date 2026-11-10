@@ -108,6 +108,7 @@ jobs:
     permissions:
       contents: write
     env:
+      GITHUB_TOKEN: ${{ github.token }}
       RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
       IS_SNAPSHOT: ${{ needs.prepare.outputs.is_snapshot }}
       DRY_RUN: ${{ needs.prepare.outputs.dry_run }}

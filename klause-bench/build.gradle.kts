@@ -1,9 +1,5 @@
+import com.eignex.gradle.LabSdkRepository
 import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.net.URI
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption.ATOMIC_MOVE
-import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.security.MessageDigest
 import java.util.HexFormat
 
@@ -26,56 +22,11 @@ tasks.withType<org.jetbrains.dokka.gradle.tasks.DokkaGenerateTask>().configureEa
 val labMacOs = System.getProperty("os.name").startsWith("Mac")
 val labBenchVersion = providers.gradleProperty("labBenchVersion").getOrElse("0.1.0")
 
-fun verifiedLabSdkRepository(repository: File): File {
-    val assets = listOf(
-        Triple("module", 684339118, "2394bfcd15474a473cdf34827b99cb4a03dc3bdb270ebd705ef2dd2c8298a489"),
-        Triple("jar", 684339109, "53247d50debd77f6c1d7fa314ffa5ddb6c0fe0632c2d482b01c7704afe7beba4"),
-        Triple("pom", 684339115, "a25c59d8bd1520368789459fd42a64bb1a5c376762ea86ca1de6b86e4133f160"),
-    )
-    val directory = repository.resolve("lab-bench-v0.1.0")
-    Files.createDirectories(directory.toPath())
-    fun digest(bytes: ByteArray) = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))
-    for ((extension, asset, checksum) in assets) {
-        val destination = directory.resolve("lab-bench-0.1.0.$extension")
-        if (destination.isFile && destination.length() <= 1048576 && digest(destination.readBytes()) == checksum) continue
-        var failure: Exception? = null
-        for (attempt in 1..3) {
-            try {
-                val connection = URI("https://api.github.com/repos/Eignex/eignex-lab/releases/assets/$asset")
-                    .toURL().openConnection() as HttpURLConnection
-                val bytes = try {
-                    connection.connectTimeout = 10000
-                    connection.readTimeout = 30000
-                    connection.setRequestProperty("Accept", "application/octet-stream")
-                    check(connection.responseCode == 200) { "Lab SDK $extension download returned HTTP ${connection.responseCode}" }
-                    connection.inputStream.use { it.readNBytes(1048577) }
-                } finally {
-                    connection.disconnect()
-                }
-                check(bytes.size <= 1048576 && digest(bytes) == checksum) { "Lab SDK $extension checksum mismatch" }
-                val temporary = Files.createTempFile(directory.toPath(), ".lab-sdk-", ".part")
-                try {
-                    Files.write(temporary, bytes)
-                    Files.move(temporary, destination.toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
-                    logger.lifecycle("Verified lab SDK $extension from the release-asset API")
-                } finally {
-                    Files.deleteIfExists(temporary)
-                }
-                failure = null
-                break
-            } catch (error: Exception) {
-                failure = error
-                logger.warn("Lab SDK $extension download attempt $attempt failed: ${error.message}")
-            }
-        }
-        failure?.let { throw GradleException("Could not stage the checksum-pinned lab SDK $extension", it) }
-    }
-    return repository
-}
-
 val labBenchRepository = providers.gradleProperty("labBenchRepository").orNull?.let { uri(it) } ?: run {
     require(labBenchVersion == "0.1.0") { "A different labBenchVersion requires an explicit labBenchRepository" }
-    verifiedLabSdkRepository(rootDir.resolve(".gradle/lab-bench-sdk")).toURI()
+    LabSdkRepository(downloaded = { logger.lifecycle("Verified lab SDK $it from the release-asset API") })
+        .stage(gradle.gradleUserHomeDir.resolve("caches/eignex/lab-bench-sdk").toPath(), gradle.startParameter.isOffline)
+        .toUri()
 }
 
 repositories {
