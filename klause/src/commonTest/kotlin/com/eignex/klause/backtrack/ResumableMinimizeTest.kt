@@ -855,14 +855,26 @@ class ResumableMinimizeTest {
         )
 
         ResumableMinimize(BacktrackSolver(problem), objective, params, rebindable = true).use { search ->
+            val initialResult = search.runSlice(Cancellation.Never, 1000L, 100000L) {}
             val initial = assertIs<MinimizeResult.Optimal>(
-                search.runSlice(Cancellation.Never, 1000L, 100000L) {},
+                initialResult,
+                if (initialResult == null) {
+                    "initial slice: work=${search.work}, root=${search.stats.lp.rootWorkOps.sum}, " +
+                        "node=${search.stats.lp.workOps.sum}, overhead=${search.stats.lp.overheadOps.sum}, " +
+                        "bound=${search.stats.lp.rootBound}, spent=${search.stats.lp.workAllowanceSpent}"
+                } else null,
             )
             assertEquals(-38.0, initial.objective)
 
             search.rebind(Assumptions.None.withInt(0, 0), 100000L)
+            val restrictedResult = search.runSlice(Cancellation.Never, 1000L, 100000L) {}
             val restricted = assertIs<MinimizeResult.Optimal>(
-                search.runSlice(Cancellation.Never, 1000L, 100000L) {},
+                restrictedResult,
+                if (restrictedResult == null) {
+                    "restricted slice: work=${search.work}, root=${search.stats.lp.rootWorkOps.sum}, " +
+                        "node=${search.stats.lp.workOps.sum}, overhead=${search.stats.lp.overheadOps.sum}, " +
+                        "bound=${search.stats.lp.rootBound}, spent=${search.stats.lp.workAllowanceSpent}"
+                } else null,
             )
             assertEquals(-36.0, restricted.objective)
             assertEquals(0L, restricted.sample.ints[0])
