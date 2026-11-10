@@ -1602,10 +1602,13 @@ Exact dual checks validate the complete input before skipping products with exac
 zero multipliers, right-hand sides or selected endpoints. Skipped entries retain
 their visit charges and cancellation polling; reduced-cost signs, required bound
 sides and source support remain part of the complete check in both fixed-width and
-arbitrary precision. Dual verification checks every required bound side before
+arbitrary precision. Captured authority records whether any structural bound side
+is open. Fully boxed structural models accumulate the objective in the column pass.
+With an open structural side, dual verification checks every required side before
 accumulating right-hand-side and endpoint objective terms. The fixed-width check
-charges bounded storage for selected reduced costs and both checks charge their
-endpoint pass within the same certification allowance.
+charges bounded storage for selected reduced costs; both checks charge their endpoint
+pass within the same certification allowance. The captured applicability flag is
+charged with the input authority.
 
 Claim phases report inclusive certification time, existing charged work and terminal
 refusal, including unsupported authority, missing bound sides, scalar limits, singularity,
