@@ -20,17 +20,19 @@ import kotlin.test.assertTrue
 class FixedWorkSatAdapterTest {
     @Test
     fun `planning pins the declared source and bounds each seed by its emergency deadline`() {
-        val cases = FixedWorkSatSuite.plan(BenchRequest(PARAMETERS))
+        val cases = FixedWorkSatSuite.plan(BenchRequest(PARAMETERS + ("sources" to "$SHA:$PATH,$OTHER_SHA:$OTHER")))
 
-        assertEquals(listOf("1", "3"), cases.map { it.parameters.getValue("seed") })
-        assertTrue(cases.all { it.inputs.single().sha256 == SHA && it.inputs.single().path == PATH })
+        assertEquals(listOf("1", "3", "1", "3"), cases.map { it.parameters.getValue("seed") })
+        assertTrue(cases.all { it.inputs.single().sha256 == it.parameters["sha256"] &&
+            it.inputs.single().path == it.parameters["source-path"] })
         assertTrue(cases.all { it.resources.cpus == 1 && it.resources.timeoutSeconds == 30L + 60L + 60L })
-        assertEquals(2, cases.map { it.attributes.getValue("comparisonKey") }.distinct().size)
+        assertEquals(4, cases.map { it.attributes.getValue("comparisonKey") }.distinct().size)
     }
 
     @ParameterizedTest
     @ValueSource(strings = ["limit=0", "deadline-seconds=901", "unit=nodes", "warmups=1", "measurement=hot",
-        "sha256=ABC", "seeds=1,1", "trace-rows=2000000", "heap-mib=8192", "source-path=../x.cnf", "colour=red"])
+        "sources=ABC:x.cnf", "sources=$SHA:../x.cnf", "sources=$SHA:x.cnf,$OTHER_SHA:x.cnf", "seeds=1,1",
+        "seed=1", "trace-rows=2000000", "heap-mib=8192", "colour=red"])
     fun `planning rejects controls outside the bounded contract`(override: String) {
         val (key, value) = override.split('=', limit = 2)
 
@@ -77,15 +79,17 @@ class FixedWorkSatAdapterTest {
     }
 
     private fun outcome(records: List<JsonObject>, exit: Int?, killed: Boolean) = FixedWorkSatSuite.outcome(
-        "case", FixedWorkSatSuite.Options.parse(PARAMETERS, "seeds"), JsonObject(emptyMap()), null, records, exit, killed,
+        "case", FixedWorkSatSuite.Options.parse(PARAMETERS, planned = false), JsonObject(emptyMap()), null, records, exit, killed,
     )
 
     private fun JsonObject?.flag(key: String): Boolean = requireNotNull(this).getValue(key).jsonPrimitive.boolean
 
     private companion object {
         const val PATH = "offline/tiny.cnf"
-        val SHA = "a".repeat(64)
-        val PARAMETERS = mapOf("source-path" to PATH, "sha256" to SHA, "seeds" to "1,3", "unit" to "conflicts",
+        const val OTHER = "offline/other.cnf"
+        const val SHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        const val OTHER_SHA = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        val PARAMETERS = mapOf("sources" to "$SHA:$PATH", "seeds" to "1,3", "unit" to "conflicts",
             "limit" to "1000", "deadline-seconds" to "30")
         val SOURCE = "p cnf 2 2\n1 2 0\n-1 2 0\n".toByteArray()
     }

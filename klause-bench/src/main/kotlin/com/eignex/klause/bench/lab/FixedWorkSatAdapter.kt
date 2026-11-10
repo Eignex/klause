@@ -46,10 +46,17 @@ fun main(args: Array<String>) {
 internal object FixedWorkSatSuite : BenchSuite {
     override fun describe() = BenchDescriptor("fixed-work-sat", "Fixed-work native SAT trajectory measurements")
 
-    /** Validated request parameters shared by planning and execution. */
+    /** One declared corpus source. */
+    internal data class Source(val path: String, val sha256: String) {
+        init {
+            require(sha256.matches(Regex("[0-9a-f]{64}"))) { "sha256 must be 64 lowercase hex digits" }
+            require(path.isNotBlank() && !path.startsWith("/") && ".." !in path.split('/')) { "Invalid path: $path" }
+        }
+    }
+
+    /** Validated request parameters: `sources` and `seeds` when [planned] is false, one of each in a case. */
     internal data class Options(
-        val sourcePath: String,
-        val sha256: String,
+        val sources: List<Source>,
         val seeds: List<Long>,
         val unit: FixedWorkUnit,
         val limit: Long,
@@ -63,14 +70,21 @@ internal object FixedWorkSatSuite : BenchSuite {
         val processSeconds: Long get() = (warmups + 1L) * deadlineSeconds + PROCESS_MARGIN_SECONDS
 
         companion object {
-            fun parse(parameters: Map<String, String>, seedKey: String): Options {
-                val unknown = parameters.keys - REQUIRED - seedKey - OPTIONAL
-                require(unknown.isEmpty()) { "Unknown parameters: $unknown" }
-                val sha = parameters.getValue("sha256")
-                require(sha.matches(Regex("[0-9a-f]{64}"))) { "sha256 must be 64 lowercase hex digits" }
-                val path = parameters.getValue("source-path")
-                require(path.isNotBlank() && !path.startsWith("/") && ".." !in path.split('/'))
-                val seeds = parameters.getValue(seedKey).split(',').map(String::toLong)
+            fun parse(parameters: Map<String, String>, planned: Boolean): Options {
+                val selection = if (planned) setOf("source-path", "sha256", "seed") else setOf("sources", "seeds")
+                val unknown = parameters.keys - REQUIRED - selection - OPTIONAL
+                require(unknown.isEmpty() && parameters.keys.containsAll(selection)) {
+                    "Parameters must be $REQUIRED and $selection, optionally $OPTIONAL"
+                }
+                val sources = if (planned) {
+                    listOf(Source(parameters.getValue("source-path"), parameters.getValue("sha256")))
+                } else parameters.getValue("sources").split(',').map { entry ->
+                    Source(entry.substringAfter(':'), entry.substringBefore(':'))
+                }
+                require(sources.size in 1..MAX_SOURCES && sources.map { it.path }.distinct().size == sources.size) {
+                    "1 to $MAX_SOURCES distinct sources"
+                }
+                val seeds = parameters.getValue(if (planned) "seed" else "seeds").split(',').map(String::toLong)
                 require(seeds.size in 1..MAX_SEEDS && seeds.distinct().size == seeds.size) { "1 to $MAX_SEEDS seeds" }
                 val limit = parameters.getValue("limit").toLong()
                 require(limit in 1..MAX_LIMIT) { "limit must be in 1..$MAX_LIMIT" }
@@ -88,35 +102,37 @@ internal object FixedWorkSatSuite : BenchSuite {
                 require(rows in 0..MAX_TRACE_ROWS) { "trace-rows must be in 0..$MAX_TRACE_ROWS" }
                 val heap = parameters["heap-mib"]?.toInt() ?: DEFAULT_HEAP_MIB
                 require(heap in MIN_HEAP_MIB..MAX_HEAP_MIB) { "heap-mib must be in $MIN_HEAP_MIB..$MAX_HEAP_MIB" }
-                return Options(path, sha, seeds, FixedWorkUnit.of(parameters.getValue("unit")), limit, deadline,
+                return Options(sources, seeds, FixedWorkUnit.of(parameters.getValue("unit")), limit, deadline,
                     measurement, warmups, recipe, rows, heap)
             }
         }
     }
 
     override fun plan(request: BenchRequest): List<BenchCase> {
-        val options = Options.parse(request.parameters, "seeds")
-        val input = BenchInput(options.sourcePath, BenchInputRoot.CORPUS, "model", options.sha256)
-        return options.seeds.map { seed ->
-            val key = "${options.measurement}/${options.unit.label}-${options.limit}/${options.sourcePath}/seed-$seed"
-            BenchCase("fixed-work-sat/$key", request.parameters - "seeds" + ("seed" to "$seed"),
+        val options = Options.parse(request.parameters, planned = false)
+        return options.sources.flatMap { source -> options.seeds.map { seed ->
+            val key = "${options.measurement}/${options.unit.label}-${options.limit}/${source.path}/seed-$seed"
+            BenchCase("fixed-work-sat/$key",
+                request.parameters - "sources" - "seeds" +
+                    mapOf("source-path" to source.path, "sha256" to source.sha256, "seed" to "$seed"),
                 BenchResources(cpus = 1, memoryMiB = options.heapMiB + NATIVE_HEADROOM_MIB,
                     timeoutSeconds = options.processSeconds + CASE_MARGIN_SECONDS),
-                inputs = listOf(input),
-                attributes = mapOf("suite" to "fixed-work-sat", "problem" to options.sourcePath,
+                inputs = listOf(BenchInput(source.path, BenchInputRoot.CORPUS, "model", source.sha256)),
+                attributes = mapOf("suite" to "fixed-work-sat", "problem" to source.path,
                     "comparisonKey" to key, "pairKey" to key, "seed" to "$seed",
                     "recordSchema" to FixedWorkSatMeasurement.SCHEMA))
-        }
+        } }
     }
 
     override fun run(case: BenchCase, context: BenchContext): BenchResult {
-        val options = Options.parse(case.parameters, "seed")
-        val seed = case.parameters.getValue("seed").toLong()
+        val options = Options.parse(case.parameters, planned = true)
+        val declared = options.sources.single()
+        val seed = options.seeds.single()
         val out = context.outputDirectory
         Files.createDirectories(out)
         val input = case.inputs.single()
-        require(input.root == BenchInputRoot.CORPUS && input.sha256 == options.sha256 &&
-            input.path == options.sourcePath) { "Case input differs from its parameters" }
+        require(input.root == BenchInputRoot.CORPUS && input.sha256 == declared.sha256 &&
+            input.path == declared.path) { "Case input differs from its parameters" }
         LabInputs.verify(case, context)
         val bytes = CorpusFiles.open(LabInputs.path(input, context).toFile()).use { it.readNBytes(MAX_SOURCE_BYTES + 1) }
         require(bytes.size <= MAX_SOURCE_BYTES) { "Source exceeds $MAX_SOURCE_BYTES bytes" }
@@ -293,11 +309,12 @@ internal object FixedWorkSatSuite : BenchSuite {
 
     private fun JsonObject.number(key: String): Long = requireNotNull(long(key)) { "Missing $key" }
 
-    private val REQUIRED = setOf("source-path", "sha256", "unit", "limit", "deadline-seconds")
+    private val REQUIRED = setOf("unit", "limit", "deadline-seconds")
     private val OPTIONAL = setOf("measurement", "warmups", "recipe", "trace-rows", "heap-mib")
     private const val IDENTITY = "identity.json"
     private const val LOG = "measure.log"
     private const val MAX_SEEDS = 8
+    private const val MAX_SOURCES = 8
     private const val MAX_LIMIT = 1_000_000_000L
     private const val MAX_DEADLINE_SECONDS = 900L
     private const val MAX_WARMUPS = 3
