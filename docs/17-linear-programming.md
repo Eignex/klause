@@ -251,6 +251,13 @@ retained model and row scopes; it adds no certification request.
 [Finite guidance](08-search.md#finite-lp-directional-guidance) owns selection and
 history lifetime.
 
+An exact state appending one bound under the same source model copies only the
+changed bound side. The opposite side and unchanged conflict flags remain immutable
+shared data. Tightening can introduce a conflict only at that column, so the state
+combines it with the predecessor's first conflicting column without scanning every
+flag. Retraction and structural edits rebuild their affected sides. Private child
+queries reserve the remaining construction work before creating the state.
+
 A node query that makes pivots but stops on its work allowance before returning a
 point grows the adaptive request within its existing ceiling and remaining
 cumulative allowance. Such queries retain every work charge but do not consume

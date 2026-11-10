@@ -125,8 +125,9 @@ internal class LpExactState internal constructor(
         val entries = model.numVars.toLong() + activeAssertions.size + scopeMarks.size
         val comparisons = 8L * (activeAssertions.size.toLong() + 4L)
         val square = words * words
-        if (square > (Long.MAX_VALUE - 8L * entries - 64L) / comparisons) throw LpProjectionStop()
-        meter.reserve(8L * entries + 64L + comparisons * square,
+        val construction = 8L * entries - 2L * model.numVars + 64L
+        if (square > (Long.MAX_VALUE - construction) / comparisons) throw LpProjectionStop()
+        meter.reserve(construction + comparisons * square,
             128L * entries + 1024L + 64L * words, matrix = false)
         var witness = 0L
         for (assertion in activeAssertions) if (assertion.witness >= witness) {
@@ -148,6 +149,7 @@ internal class LpExactState internal constructor(
         require(scopeMarks.zipWithNext().all { (a, b) -> a <= b })
         require(changed.all { it in 0 until baseModel.numVars } && changed.distinct().size == changed.size)
         val source = previous?.takeIf { it.baseModel.sharesRegion(baseModel) && it.rows === rows }
+        val firstConflict: Int
         if (source == null) {
             trailStorageUnits = activeAssertions.sumOf { it.storageUnits() } + scopeMarks.size
             validateRows()
@@ -158,6 +160,7 @@ internal class LpExactState internal constructor(
             for (assertion in activeAssertions) tighten(assertion)
             model = fullModel()
             inconsistent = BooleanArray(model.numVars) { !model.column(it).bounds.consistent }
+            firstConflict = inconsistent.indexOfFirst { it }
         } else {
             if (source.baseModel.objective !== baseModel.objective) validateRowCosts()
             val shared = sharedPrefix(source.activeAssertions)
@@ -171,11 +174,20 @@ internal class LpExactState internal constructor(
             val touched = HashSet<Int>()
             for (index in shared until source.activeAssertions.size) touched.add(source.activeAssertions[index].column)
             for (index in shared until activeAssertions.size) touched.add(activeAssertions[index].column)
-            lower = if (touched.isEmpty()) source.lower else source.lower.copyOf()
-            upper = if (touched.isEmpty()) source.upper else source.upper.copyOf()
-            for (j in touched) seedDeclared(j)
-            if (touched.isNotEmpty()) {
-                for (assertion in activeAssertions) if (assertion.column in touched) tighten(assertion)
+            val appended = if (source.baseModel === baseModel && shared == source.activeAssertions.size &&
+                activeAssertions.size == shared + 1
+            ) activeAssertions.last() else null
+            if (appended != null) {
+                lower = if (appended.upper) source.lower else source.lower.copyOf()
+                upper = if (appended.upper) source.upper.copyOf() else source.upper
+                tighten(appended)
+            } else {
+                lower = if (touched.isEmpty()) source.lower else source.lower.copyOf()
+                upper = if (touched.isEmpty()) source.upper else source.upper.copyOf()
+                for (j in touched) seedDeclared(j)
+                if (touched.isNotEmpty()) {
+                    for (assertion in activeAssertions) if (assertion.column in touched) tighten(assertion)
+                }
             }
             val region = if (touched.isEmpty()) {
                 source.model
@@ -185,11 +197,23 @@ internal class LpExactState internal constructor(
                 )
             }
             model = if (region.objective === baseModel.objective) region else region.withObjective(baseModel.objective)
-            inconsistent = if (touched.isEmpty()) source.inconsistent else source.inconsistent.copyOf()
-            for (j in touched) inconsistent[j] = !model.column(j).bounds.consistent
+            if (appended != null) {
+                val column = appended.column
+                val invalid = !model.column(column).bounds.consistent
+                inconsistent = if (source.inconsistent[column] == invalid) source.inconsistent
+                    else source.inconsistent.copyOf().also { it[column] = invalid }
+                val previousConflict = source.conflict?.column ?: -1
+                // Tightening one side cannot repair an existing conflict elsewhere.
+                firstConflict = if (!invalid) previousConflict else if (previousConflict < 0) column
+                    else minOf(column, previousConflict)
+            } else {
+                inconsistent = if (touched.isEmpty()) source.inconsistent else source.inconsistent.copyOf()
+                for (j in touched) inconsistent[j] = !model.column(j).bounds.consistent
+                firstConflict = inconsistent.indexOfFirst { it }
+            }
             deriveVectors(source, touched.toIntArray())
         }
-        conflict = inconsistent.indexOfFirst { it }.takeIf { it >= 0 }?.let {
+        conflict = firstConflict.takeIf { it >= 0 }?.let {
             LpBoundConflict(it, requireNotNull(lower[it]), requireNotNull(upper[it]))
         }
     }

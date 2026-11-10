@@ -15,6 +15,102 @@ import kotlin.test.assertTrue
 
 class LpExactStateTest {
     @Test
+    fun `single appended bounds match a fresh exact replay`() {
+        val source = assertNotNull(LpBuilder().apply { repeat(2) { addVar(0L, 10L) } }
+            .build(Sense.MINIMIZE).authoritativeModel())
+        val root = LpExactState(source)
+        val existing = LpBoundAssertion(1, false, ExactLpSide(ExactLpNumber.of(4L)), 1L, 0)
+        val parent = LpExactState(source, listOf(existing), previous = root)
+        val cases = listOf(
+            Triple(0, false, ExactLpSide(ExactLpNumber.of(2L))),
+            Triple(0, true, ExactLpSide(ExactLpNumber.of(8L))),
+            Triple(0, false, ExactLpSide(ExactLpNumber.of(-1L))),
+            Triple(0, true, ExactLpSide(ExactLpNumber.of(11L))),
+            Triple(0, false, ExactLpSide(ExactLpNumber.of(0L), strict = true)),
+            Triple(0, true, ExactLpSide(ExactLpNumber.of(10L), strict = true)),
+            Triple(1, false, ExactLpSide(ExactLpNumber.of(5L))),
+            Triple(1, true, ExactLpSide(ExactLpNumber.of(3L))),
+        )
+        for ((column, upper, side) in cases) {
+            val assertions = parent.assertions + LpBoundAssertion(column, upper, side, 2L, 0)
+
+            val incremental = LpExactState(source, assertions, previous = parent)
+            val fresh = LpExactState(source, assertions)
+
+            for (j in 0 until source.numVars) {
+                assertEquals(fresh.model.column(j), incremental.model.column(j))
+                assertEquals(fresh.activeSide(j, false), incremental.activeSide(j, false))
+                assertEquals(fresh.activeSide(j, true), incremental.activeSide(j, true))
+            }
+            assertEquals(fresh.conflict, incremental.conflict)
+        }
+    }
+
+    @Test
+    fun `probe descendants preserve parent and sibling bounds`() {
+        for (upper in listOf(false, true)) {
+            val source = assertNotNull(LpBuilder().apply {
+                addVar(3L, 9L)
+                addVar(0L, 10L)
+            }.build(Sense.MINIMIZE).authoritativeModel())
+            val parent = LpExactState(source)
+            val parentView = assertNotNull(parent.ownerWorkingModel())
+            val expectedParent = List(2) { parent.model.column(it) }
+            val parentSides = List(2) { listOf(parent.activeSide(it, false), parent.activeSide(it, true)) }
+            val child = assertNotNull(parent.probeBound(0, upper, 6L, LpProjectionMeter()))
+            val childView = assertNotNull(child.ownerWorkingModel())
+            val expectedChild = List(2) { child.model.column(it) }
+            val childSides = List(2) { listOf(child.activeSide(it, false), child.activeSide(it, true)) }
+            val sibling = assertNotNull(parent.probeBound(0, !upper, 6L, LpProjectionMeter()))
+            val siblingView = assertNotNull(sibling.ownerWorkingModel())
+            val expectedSibling = List(2) { sibling.model.column(it) }
+            val siblingSides = List(2) { listOf(sibling.activeSide(it, false), sibling.activeSide(it, true)) }
+
+            val descendant = assertNotNull(child.probeBound(1, !upper, 5L, LpProjectionMeter()))
+            assertNotNull(descendant.ownerWorkingModel())
+
+            assertEquals(expectedParent, List(2) { parent.model.column(it) })
+            assertEquals(expectedChild, List(2) { child.model.column(it) })
+            assertEquals(expectedSibling, List(2) { sibling.model.column(it) })
+            for (j in 0..1) {
+                assertEquals(parentSides[j], listOf(parent.activeSide(j, false), parent.activeSide(j, true)))
+                assertEquals(childSides[j], listOf(child.activeSide(j, false), child.activeSide(j, true)))
+                assertEquals(siblingSides[j], listOf(sibling.activeSide(j, false), sibling.activeSide(j, true)))
+            }
+            assertEquals(0.0, parentView.lowerD(0))
+            assertEquals(6.0, parentView.upperD(0))
+            assertEquals(if (upper) 0.0 else 3.0, childView.lowerD(0))
+            assertEquals(if (upper) 3.0 else 6.0, childView.upperD(0))
+            assertEquals(if (upper) 3.0 else 0.0, siblingView.lowerD(0))
+            assertEquals(if (upper) 6.0 else 3.0, siblingView.upperD(0))
+        }
+    }
+
+    @Test
+    fun `appended conflicts retain the first column and its exact witnesses`() {
+        for (order in listOf(listOf(0, 1), listOf(1, 0))) {
+            val source = assertNotNull(LpBuilder().apply { repeat(2) { addVar(0L, 10L) } }
+                .build(Sense.MINIMIZE).authoritativeModel())
+            var state = LpExactState(source)
+            for (column in order) {
+                val assertion = LpBoundAssertion(column, false,
+                    ExactLpSide(ExactLpNumber.of(11L)), column.toLong(), 0)
+                state = LpExactState(source, state.assertions + assertion, previous = state)
+            }
+            val upper = LpBoundAssertion(0, true, ExactLpSide(ExactLpNumber.of(9L)), 2L, 0)
+
+            val tightened = LpExactState(source, state.assertions + upper, previous = state)
+
+            val conflict = assertNotNull(tightened.conflict)
+            assertEquals(0, conflict.column)
+            assertEquals(0L, conflict.lower.witness)
+            assertEquals(2L, conflict.upper.witness)
+            assertEquals(ExactLpNumber.of(11L), conflict.lower.side.number)
+            assertEquals(ExactLpNumber.of(9L), conflict.upper.side.number)
+        }
+    }
+
+    @Test
     fun `cached owner views should respect cancellation and caller projection isolation`() {
         val source = assertNotNull(LpBuilder().apply { addVar(3L, 9L) }.build(Sense.MINIMIZE).authoritativeModel())
         val state = LpExactState(source)
