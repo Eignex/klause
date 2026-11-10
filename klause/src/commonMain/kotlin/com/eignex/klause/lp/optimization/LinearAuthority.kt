@@ -398,7 +398,7 @@ internal class LinearAuthority(
         val installed = prepared.installedCuts
         val selected = policy.select(checkNotNull(refined.first.cuts).rows,
             refined.second.coordinates, refined.second.costs, refined.second.checkedCuts,
-            point, installed, cancellation)
+            point, installed, cancellation, objectiveSource = source)
         val maskWork = 2L * installed.size + selected.size
         val covered = budget.funding?.availableWork?.let { maskWork <= it } != false
         if (covered) cutCost(maskWork, 0L)
@@ -571,7 +571,7 @@ internal class LinearAuthority(
                 policy.select(checkNotNull(family.cuts).rows, prepared.coordinates, prepared.costs,
                     prepared.checkedCuts, observed.second, pointMask.orEmpty().intersect(prepared.checkedCuts),
                     cancellation, adoptCurrent = baselineMask == null && family === baselineFamily &&
-                        prepared.activeCuts == checkNotNull(family.cuts).rows.size)
+                        prepared.activeCuts == checkNotNull(family.cuts).rows.size, objectiveSource = source)
             }
             if (budget.funding?.exhausted == true || cancellation()) return base
             if (policy.adoptedCurrent) {

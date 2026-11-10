@@ -1927,7 +1927,15 @@ copying public snapshots. Funding preparation traverses the captured premises an
 charges each visited row, coefficient, guard and integer pin; cancellation retains
 the visited prefix's charge. The score combines normalized violation,
 inverse square-root support and objective parallelism. The model-facing cut pool
-and source selector share the greedy parallelism filter. Floating scores guide
+and source selector share the greedy parallelism filter. When a singleton objective
+coordinate occurs in no candidate row, a unique pair of opposite, non-strict,
+unconditional source rows can express its scoring costs in the other coordinates.
+This one-step projection admits at most 128 row entries and 4,096 combined numerator
+and denominator bits per scalar. Row visits, exact pair checks and floating
+projection spend the scoring allowance. Ambiguous, scoped or nonfinite definitions
+keep the raw scoring costs; exhaustion or cancellation retains the installed mask.
+The numerical objective and proof premises retain their original representation.
+Retired installed-row scans omit this objective projection. Floating scores guide
 selection; source inequalities and their derivations remain exact rationals.
 Nonfinite projections supply no score. Each call visits at most 8,192 support
 entries with 65,536 modeled scoring work and 1 MiB modeled allocation, within the

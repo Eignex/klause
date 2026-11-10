@@ -821,6 +821,166 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `explicit objective aliases should rank cuts like their structural objective`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("x upper")),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("y upper")),
+        )
+        for (sign in listOf(1L, -1L)) for (scale in listOf(1L, -3L)) {
+            val coefficients = mapOf(mixedReal to BigFraction.ofLong(scale), y to BigFraction.ofLong(-2 * scale))
+            val rhs = BigFraction.ofLong(3 * scale)
+            val source = SourceProofContext(scope.copy(objective = SourceObjective("cost",
+                if (sign > 0) ObjectiveSense.MINIMIZE else ObjectiveSense.MAXIMIZE)), setOf(x, y, mixedReal), mapOf(
+                "definition upper" to SourcePremise(SourceInequality(coefficients, rhs)),
+                "definition lower" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() },
+                    rhs.negated())),
+            ), mapOf(mixedReal to BigFraction.ofLong(sign)))
+            val coordinates = listOf(x, y, mixedReal)
+            val point = listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.ofLong(5))
+            val aliasCosts = listOf(BigFraction.ZERO, BigFraction.ZERO, BigFraction.ofLong(sign))
+            val directCosts = listOf(BigFraction.ZERO, BigFraction.ofLong(2 * sign), BigFraction.ZERO)
+            val selection = LinearAuthorityPointCuts(SourceLpBudget())
+
+            val raw = LinearAuthorityPointCuts(SourceLpBudget()).select(rows, coordinates, aliasCosts,
+                setOf(0, 1), point, emptySet(), Cancellation.Never)
+            val direct = LinearAuthorityPointCuts(SourceLpBudget()).select(rows, coordinates, directCosts,
+                setOf(0, 1), point, emptySet(), Cancellation.Never, objectiveSource = source)
+            val aliased = selection.select(rows, coordinates, aliasCosts, setOf(0, 1), point,
+                emptySet(), Cancellation.Never, objectiveSource = source)
+
+            assertEquals(setOf(0), raw)
+            assertEquals(setOf(1), direct)
+            assertEquals(direct, aliased)
+            assertEquals(1L, selection.observations["numericalCutSelectionObjectiveProjected"])
+        }
+    }
+
+    @Test
+    fun `unsupported objective definitions should retain raw cut ordering`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("x upper")),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("y upper")),
+        )
+        val boolean = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val huge = assertNotNull(BigFraction.ofDouble(Double.MAX_VALUE)) * BigFraction.ofLong(2)
+        val tiny = assertNotNull(BigFraction.ofDouble(Double.MIN_VALUE))
+        val upper = SourceInequality(mapOf(mixedReal to BigFraction.ONE, y to BigFraction.ofLong(-2)),
+            BigFraction.ofLong(3))
+        val lower = SourceInequality(mapOf(mixedReal to BigFraction.MINUS_ONE, y to BigFraction.ofLong(2)),
+            BigFraction.ofLong(-3))
+        val nonfinite = SourceInequality(mapOf(mixedReal to BigFraction.ONE, y to huge), BigFraction.ZERO)
+        val underflow = SourceInequality(mapOf(mixedReal to BigFraction.ONE, y to tiny), BigFraction.ZERO)
+        val definitions = listOf(
+            mapOf("upper" to SourcePremise(upper)),
+            mapOf("upper" to SourcePremise(upper), "lower" to SourcePremise(
+                SourceInequality(lower.coefficients, lower.rhs, strict = true))),
+            mapOf("upper" to SourcePremise(upper, mapOf(0 to true)),
+                "lower" to SourcePremise(lower, mapOf(0 to true))),
+            mapOf("upper" to SourcePremise(upper, emptyMap(), mapOf(x to BigFraction.ONE)),
+                "lower" to SourcePremise(lower, emptyMap(), mapOf(x to BigFraction.ONE))),
+            mapOf("upper" to SourcePremise(upper), "lower" to SourcePremise(
+                SourceInequality(lower.coefficients, BigFraction.ofLong(-4)))),
+            mapOf("upper" to SourcePremise(upper), "lower" to SourcePremise(lower),
+                "other definition" to SourcePremise(SourceInequality(mapOf(mixedReal to BigFraction.ONE,
+                    x to BigFraction.MINUS_ONE), BigFraction.ZERO))),
+            mapOf("upper" to SourcePremise(nonfinite), "lower" to SourcePremise(SourceInequality(
+                nonfinite.coefficients.mapValues { it.value.negated() }, BigFraction.ZERO))),
+            mapOf("upper" to SourcePremise(underflow), "lower" to SourcePremise(SourceInequality(
+                underflow.coefficients.mapValues { it.value.negated() }, BigFraction.ZERO))),
+        )
+        for (premises in definitions) {
+            val source = SourceProofContext(scope, setOf(x, y, mixedReal, boolean), premises,
+                mapOf(mixedReal to BigFraction.ONE))
+            val selection = LinearAuthorityPointCuts(SourceLpBudget())
+
+            val selected = selection.select(rows, listOf(x, y, mixedReal),
+                listOf(BigFraction.ZERO, BigFraction.ZERO, BigFraction.ONE), setOf(0, 1),
+                listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.ofLong(5)), emptySet(), Cancellation.Never,
+                objectiveSource = source)
+
+            assertEquals(setOf(0), selected)
+            assertEquals(1L, selection.observations["numericalCutSelectionObjectiveProjectionDeclined"])
+            assertNull(selection.observations["numericalCutSelectionObjectiveProjected"])
+        }
+    }
+
+    @Test
+    fun `objective projection should debit its lookup and storage`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("x upper")),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("y upper")),
+        )
+        val source = SourceProofContext(scope, setOf(x, y, mixedReal), mapOf(
+            "upper" to SourcePremise(SourceInequality(mapOf(mixedReal to BigFraction.ONE,
+                y to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "lower" to SourcePremise(SourceInequality(mapOf(mixedReal to BigFraction.MINUS_ONE,
+                y to BigFraction.ofLong(2)), BigFraction.ZERO)),
+        ), mapOf(mixedReal to BigFraction.ONE))
+        val costs = listOf(BigFraction.ZERO, BigFraction.ZERO, BigFraction.ONE)
+        val point = listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.ofLong(2))
+        val rawFunding = SourceLpFunding(100_000L, 1_048_576L).apply { grant(100_000L) }
+        val projectedFunding = SourceLpFunding(100_000L, 1_048_576L).apply { grant(100_000L) }
+        val budget = SourceLpBudget(funding = projectedFunding)
+
+        LinearAuthorityPointCuts(SourceLpBudget(funding = rawFunding)).select(rows, listOf(x, y, mixedReal),
+            costs, setOf(0, 1), point, emptySet(), Cancellation.Never)
+        val selected = LinearAuthorityPointCuts(budget).select(rows, listOf(x, y, mixedReal), costs,
+            setOf(0, 1), point, emptySet(), Cancellation.Never, objectiveSource = source)
+
+        assertEquals(setOf(1), selected)
+        assertTrue(projectedFunding.spent > rawFunding.spent)
+        assertTrue(projectedFunding.allocated > rawFunding.allocated)
+        assertEquals(projectedFunding.spent, budget.measuredPreparationWork)
+        assertTrue(projectedFunding.spent <= 100_000L)
+        assertTrue(projectedFunding.allocated <= 1_048_576L)
+    }
+
+    @Test
+    fun `interrupted objective projection should preserve the installed mask`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("x upper")),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("y upper")),
+        )
+        val source = SourceProofContext(scope, setOf(x, y, mixedReal), mapOf(
+            "upper" to SourcePremise(SourceInequality(mapOf(mixedReal to BigFraction.ONE,
+                y to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "lower" to SourcePremise(SourceInequality(mapOf(mixedReal to BigFraction.MINUS_ONE,
+                y to BigFraction.ofLong(2)), BigFraction.ZERO)),
+        ), mapOf(mixedReal to BigFraction.ONE))
+        for (interruption in listOf("cancellation", "work", "allocation")) {
+            val funding = SourceLpFunding(100_000L, 1_048_576L).apply { grant(100_000L) }
+            val budget = SourceLpBudget(funding = funding)
+            val selection = LinearAuthorityPointCuts(budget)
+            var cancelled = false
+            selection.observeTo { key, _ ->
+                if (key == "numericalCutSelectionObjectiveProjectionAttempts") when (interruption) {
+                    "cancellation" -> cancelled = true
+                    "work" -> funding.charge(funding.remainingWork)
+                    "allocation" -> funding.charge(0L, funding.remainingAllocation)
+                }
+            }
+
+            val selected = selection.select(rows, listOf(x, y, mixedReal),
+                listOf(BigFraction.ZERO, BigFraction.ZERO, BigFraction.ONE), setOf(0, 1),
+                listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.ofLong(2)), setOf(0),
+                Cancellation { cancelled }, objectiveSource = source)
+
+            assertEquals(setOf(0), selected)
+            assertEquals(1L, selection.observations["numericalCutSelectionWorkLimited"])
+            assertNull(selection.observations["numericalCutSelectionObjectiveProjected"])
+            assertTrue(budget.measuredPreparationWork > 0L)
+        }
+    }
+
+    @Test
     fun `checked round progress should let the next point admit a complementary cut`() {
         val rows = listOf(
             LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),

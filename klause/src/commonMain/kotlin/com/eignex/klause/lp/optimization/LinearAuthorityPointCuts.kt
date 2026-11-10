@@ -6,6 +6,8 @@ import com.eignex.klause.lp.cut.selectNonparallelCuts
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceInequality
+import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.magnitudeBitLength
 import kotlin.math.abs
@@ -19,6 +21,9 @@ internal class LinearAuthorityPointCuts(
 ) {
     private data class Scored(
         val id: Int, val values: Map<SourceCoordinate, Double>, val norm: Double, val score: Double,
+    )
+    private data class ScoringObjective(
+        val coefficients: Map<SourceCoordinate, Double>, val normSquared: Double,
     )
     private val counts = linkedMapOf<String, Long>()
     private var onObservation: (String, Long) -> Unit = { _, _ -> }
@@ -90,6 +95,96 @@ internal class LinearAuthorityPointCuts(
             if (!charge(1L + words * words)) return null
             return value.toDouble().takeIf { it.isFinite() && (it != 0.0 || value.isZero) }
         }
+
+        fun opposite(left: BigFraction, right: BigFraction): Boolean {
+            if (!charge(1L)) return false
+            if (left.isZero || right.isZero) return left.isZero && right.isZero
+            val leftWords = (left.num.magnitudeBitLength().toLong() + left.den.magnitudeBitLength() + 63L) / 64L
+            val rightWords = (right.num.magnitudeBitLength().toLong() + right.den.magnitudeBitLength() + 63L) / 64L
+            if (leftWords > 64L || rightWords > 64L ||
+                !charge(1L + leftWords * leftWords + rightWords * rightWords, 128L + rightWords * 16L)) return false
+            return left == right.negated()
+        }
+    }
+
+    private fun scoringObjective(
+        source: SourceProofContext?, rows: List<LinearAuthorityCut>,
+        objective: Map<SourceCoordinate, Double>, meter: Meter,
+    ): ScoringObjective? {
+        if (source == null) return null
+        var coordinate: SourceCoordinate? = null
+        var cost = 0.0
+        for ((id, value) in objective) {
+            if (!meter.charge(1L)) return null
+            if (value != 0.0) {
+                if (coordinate != null) return null
+                coordinate = id
+                cost = value
+            }
+        }
+        val alias = coordinate ?: return null
+        for (row in rows) {
+            if (!meter.charge(1L)) return null
+            if (row.inequality.coefficient(alias) != null) return null
+        }
+        observe("ObjectiveProjectionAttempts")
+        val definition = objectiveDefinition(source, alias, meter)
+        val projected = definition?.let { projectObjective(it, alias, cost, objective, meter) }
+        observe(if (projected == null) "ObjectiveProjectionDeclined" else "ObjectiveProjected")
+        return projected
+    }
+
+    private fun objectiveDefinition(
+        source: SourceProofContext, alias: SourceCoordinate, meter: Meter,
+    ): SourceInequality? {
+        if (!meter.charge(1L, 192L)) return null
+        var first: SourceInequality? = null
+        var second: SourceInequality? = null
+        val complete = source.allPremises { _, premise ->
+            if (!meter.charge(1L)) return@allPremises false
+            val row = premise.inequality
+            when {
+                premise.guardCount != 0 || premise.integerPinCount != 0 || row.strict ||
+                    row.supportSize < 2 || row.coefficient(alias) == null -> true
+                row.supportSize > 128 -> false
+                first == null -> { first = row; true }
+                second == null -> { second = row; true }
+                else -> false
+            }
+        }
+        val row = first ?: return null
+        val other = second ?: return null
+        if (!complete || row.supportSize != other.supportSize || !meter.opposite(row.rhs, other.rhs)) return null
+        return row.takeIf {
+            row.forEachCoefficient { coordinate, value ->
+                meter.charge(1L) && other.coefficient(coordinate)?.let { meter.opposite(value, it) } == true
+            }
+        }
+    }
+
+    private fun projectObjective(
+        row: SourceInequality, alias: SourceCoordinate, cost: Double,
+        objective: Map<SourceCoordinate, Double>, meter: Meter,
+    ): ScoringObjective? {
+        val pivot = meter.scalar(checkNotNull(row.coefficient(alias))) ?: return null
+        val scale = -cost / pivot
+        if (!scale.isFinite() || scale == 0.0 ||
+            !meter.charge(1L, 192L + row.supportSize * 64L)) return null
+        val projected = HashMap<SourceCoordinate, Double>()
+        var normSquared = 0.0
+        val complete = row.forEachCoefficient { coordinate, coefficient ->
+            if (!meter.charge(2L)) return@forEachCoefficient false
+            if (coordinate == alias) return@forEachCoefficient true
+            if (coordinate !in objective) return@forEachCoefficient false
+            val scalar = meter.scalar(coefficient) ?: return@forEachCoefficient false
+            val value = scale * scalar
+            if (!value.isFinite() || value == 0.0) return@forEachCoefficient false
+            projected[coordinate] = value
+            normSquared += value * value
+            normSquared.isFinite()
+        }
+        return if (complete && projected.isNotEmpty() && normSquared > 0.0)
+            ScoringObjective(projected, normSquared) else null
     }
 
     fun select(
@@ -101,6 +196,7 @@ internal class LinearAuthorityPointCuts(
         installed: Set<Int>,
         cancellation: Cancellation,
         adoptCurrent: Boolean = false,
+        objectiveSource: SourceProofContext? = null,
     ): Set<Int> {
         adoptedCurrent = false
         if (rows.isEmpty()) return installed
@@ -175,7 +271,10 @@ internal class LinearAuthorityPointCuts(
                 observe("AdoptedInstalled", rows.size.toLong())
                 return checked.toSet()
             }
-            val objectiveNorm = sqrt(objectiveNormSquared)
+            val projectedObjective = if (retired) null else scoringObjective(objectiveSource, rows, objective, meter)
+            if (meter.limited) return installed
+            val scoringCosts = projectedObjective?.coefficients ?: objective
+            val objectiveNorm = sqrt(projectedObjective?.normSquared ?: objectiveNormSquared)
             val candidates = ArrayList<Scored>()
             val forced = ArrayList<Scored>()
             if (!meter.charge(installed.size.toLong() + inactiveScans.size,
@@ -213,7 +312,7 @@ internal class LinearAuthorityPointCuts(
                     projected?.set(coordinate, scalar)
                     normSquared += scalar * scalar
                     activity += scalar * value
-                    if (!retired) parallel += scalar * (objective[coordinate] ?: 0.0)
+                    if (!retired) parallel += scalar * (scoringCosts[coordinate] ?: 0.0)
                 }
                 val rhs = meter.scalar(row.inequality.rhs)
                 val norm = sqrt(normSquared)
