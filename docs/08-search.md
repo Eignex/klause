@@ -99,9 +99,9 @@ after its native registration and consequence publication have completed. A
 cancellation pause preserves the recipient cursor and resumes delivery before
 lifecycle boundary work or another branch. It registers no duplicate constraint
 and charges no duplicate conflict. Interrupted native registration/publication
-and genuine undecidable propagation still leave the run incomplete. Reseeding
-declines while that delivery is pending. Root reset and engine retirement release
-the retained continuation.
+and genuine undecidable propagation still leave the run incomplete. Automatic
+reseeding declines while that delivery is pending. Explicit query replacement
+discards it through root reset; engine retirement releases it during cleanup.
 
 When cancellation pauses before root-model blocking, the completed model and trail
 remain for the next slice. Resuming blocks that model before exploring another.
