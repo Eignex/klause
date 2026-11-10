@@ -406,7 +406,8 @@ private class FixedReconstructionVerifier(
         val y = multipliers.map { from(it) }
         var value = if (ray) from(BigFraction.ZERO) else from(a.constant)
         for (i in y.indices) {
-            if (y[i].isZero) meter.step() else value = plus(value, times(y[i], from(a.rhs[i])))
+            if (y[i].isZero || a.rhs[i].isZero) meter.step()
+            else value = plus(value, times(y[i], from(a.rhs[i])))
         }
         val reduced = ArrayList<BigFraction>(a.size)
         val selected = ArrayList<ExactSimplexBound>()
@@ -423,7 +424,8 @@ private class FixedReconstructionVerifier(
                     meter.dualRejection = ReconstructionDualRejection(j, upper, big(d))
                     return null
                 }
-                value = plus(value, times(d, from(side.number.value)))
+                if (side.number.value.isZero) meter.step()
+                else value = plus(value, times(d, from(side.number.value)))
                 selected += ExactSimplexBound(j, upper)
                 strict = strict || side.strict
             }
@@ -490,7 +492,8 @@ private class BigReconstructionVerifier(
         val y = multipliers.map { from(it) }
         var value = if (ray) from(BigFraction.ZERO) else from(a.constant)
         for (i in y.indices) {
-            if (y[i].isZero) meter.step() else value = plus(value, times(y[i], from(a.rhs[i])))
+            if (y[i].isZero || a.rhs[i].isZero) meter.step()
+            else value = plus(value, times(y[i], from(a.rhs[i])))
         }
         val reduced = ArrayList<BigFraction>(a.size)
         val selected = ArrayList<ExactSimplexBound>()
@@ -507,7 +510,8 @@ private class BigReconstructionVerifier(
                     meter.dualRejection = ReconstructionDualRejection(j, upper, big(d))
                     return null
                 }
-                value = plus(value, times(d, from(side.number.value)))
+                if (side.number.value.isZero) meter.step()
+                else value = plus(value, times(d, from(side.number.value)))
                 selected += ExactSimplexBound(j, upper)
                 strict = strict || side.strict
             }
