@@ -43,6 +43,11 @@ class SearchRun internal constructor(
     private var pendingModel: AssembledSearchModel? = null
     private var consumedModel = false
     private var terminal: SearchRunEvent? = null
+    internal var recordComponentStops = false
+    internal var componentStop: SearchComponentStop? = null
+        private set
+    internal var componentStopReplayed = false
+        private set
     private var started = false
     private var budgetInterrupted = false
     private val cancellationPoller = SearchCancellationPoller()
@@ -70,19 +75,22 @@ class SearchRun internal constructor(
 
     /** Advance until the next model or terminal verdict. */
     fun next(): SearchRunEvent {
-        terminal?.let { return it }
+        terminal?.let {
+            if (recordComponentStops && it == SearchRunEvent.Indeterminate.Component) componentStopReplayed = true
+            return it
+        }
         if (!started) {
             started = true
-            lifecycle.onStart(session).toEvent()?.let { return it }
+            lifecycle.onStart(session).toEvent(SearchComponentStop.Site.Start)?.let { return it }
         }
-        lifecycle.onResume(session).toEvent()?.let { return it }
+        lifecycle.onResume(session).toEvent(SearchComponentStop.Site.Resume)?.let { return it }
         if (retryingAssertion) {
             if (session.cancelled()) return cancelledAssertion()
             retryingAssertion = false
         }
         pendingModel?.let { model ->
             if (session.cancelled()) {
-                return lifecycle.onCancellation(session).toEvent()
+                return lifecycle.onCancellation(session).toEvent(SearchComponentStop.Site.Cancellation)
                     ?: finish(SearchRunEvent.Indeterminate.Cancelled)
             }
             cancellationPoller.rearm()
@@ -102,19 +110,22 @@ class SearchRun internal constructor(
                     ComponentResult.Consistent -> {
                         frames.clear()
                         consumedModel = true
-                        lifecycle.onModelBlocked(session).toEvent()?.let { return it }
+                        lifecycle.onModelBlocked(session).toEvent(SearchComponentStop.Site.ModelBlocked)
+                            ?.let { return it }
                     }
 
                     is ComponentResult.Conflict -> return finish(SearchRunEvent.Exhausted)
 
-                    ComponentResult.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
+                    ComponentResult.Indeterminate -> return finish(
+                        SearchRunEvent.Indeterminate.Component, SearchComponentStop.Site.ModelBlock,
+                    )
                 }
             }
         }
         while (true) {
             if (cancellationPoller.due()) {
                 if (session.cancelled()) {
-                    return lifecycle.onCancellation(session).toEvent()
+                    return lifecycle.onCancellation(session).toEvent(SearchComponentStop.Site.Cancellation)
                         ?: finish(SearchRunEvent.Indeterminate.Cancelled)
                 }
                 cancellationPoller.rearm()
@@ -139,7 +150,9 @@ class SearchRun internal constructor(
                         SearchLearnedConflictResult.Chronological -> if (!backtrack()) return stopAfterBacktrack()
 
                         SearchLearnedConflictResult.Indeterminate -> {
-                            return finish(SearchRunEvent.Indeterminate.Component)
+                            return finish(
+                                SearchRunEvent.Indeterminate.Component, SearchComponentStop.Site.LearnedConflict,
+                            )
                         }
 
                         is SearchLearnedConflictResult.Backjump -> error("learned conflict cascade did not terminate")
@@ -147,7 +160,9 @@ class SearchRun internal constructor(
                     continue
                 }
 
-                SearchNodeDisposition.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
+                SearchNodeDisposition.Indeterminate -> return finish(
+                    SearchRunEvent.Indeterminate.Component, SearchComponentStop.Site.NodePolicy,
+                )
 
                 // Nothing was decided at this node yet, so the frame stack resumes here unchanged.
                 SearchNodeDisposition.Pause -> return SearchRunEvent.Paused
@@ -195,7 +210,7 @@ class SearchRun internal constructor(
                         if (cancelledDisposition == SearchRunDisposition.Pause) return SearchRunEvent.Paused
                         rememberIndeterminate()
                         if (cancelledDisposition != null) {
-                            return cancelledDisposition.toEvent()
+                            return cancelledDisposition.toEvent(SearchComponentStop.Site.Cancellation)
                                 ?: finish(SearchRunEvent.Indeterminate.Cancelled)
                         }
                         if (!backtrack()) return stopAfterBacktrack(indeterminate = true)
@@ -204,7 +219,7 @@ class SearchRun internal constructor(
 
                 is Alternatives.Branch -> {
                     if (session.consumeCancellationPollRequest() && session.cancelled()) {
-                        return lifecycle.onCancellation(session).toEvent()
+                        return lifecycle.onCancellation(session).toEvent(SearchComponentStop.Site.Cancellation)
                             ?: finish(SearchRunEvent.Indeterminate.Cancelled)
                     }
                     if (alternatives.decisions.isEmpty()) {
@@ -244,7 +259,7 @@ class SearchRun internal constructor(
             SearchModelDisposition.Indeterminate -> {
                 resumeAfterSolution = false
                 lastModel = null
-                return finish(SearchRunEvent.Indeterminate.Component)
+                return finish(SearchRunEvent.Indeterminate.Component, SearchComponentStop.Site.ModelPolicy)
             }
 
             SearchModelDisposition.Skip -> {
@@ -254,7 +269,7 @@ class SearchRun internal constructor(
                 // cut that check short. Such a check costs far more than the nodes the polling cadence
                 // was tuned on, so a skip polls at once rather than after the cadence's next interval.
                 if (session.cancelled()) {
-                    val event = lifecycle.onCancellation(session).toEvent()
+                    val event = lifecycle.onCancellation(session).toEvent(SearchComponentStop.Site.Cancellation)
                         ?: finish(SearchRunEvent.Indeterminate.Cancelled)
                     if (event == SearchRunEvent.Paused) pendingAdvance = true
                     return event
@@ -276,13 +291,14 @@ class SearchRun internal constructor(
                         ComponentResult.Consistent -> {
                             frames.clear()
                             consumedModel = true
-                            lifecycle.onModelBlocked(session).toEvent()?.let { return it }
+                            lifecycle.onModelBlocked(session).toEvent(SearchComponentStop.Site.ModelBlocked)
+                                ?.let { return it }
                         }
 
                         is ComponentResult.Conflict -> return finish(SearchRunEvent.Exhausted)
 
                         ComponentResult.Indeterminate -> return finish(
-                            SearchRunEvent.Indeterminate.Component,
+                            SearchRunEvent.Indeterminate.Component, SearchComponentStop.Site.ModelBlock,
                         )
                     }
                 }
@@ -293,7 +309,8 @@ class SearchRun internal constructor(
 
     private fun stopBeforeModelBlock(): SearchRunEvent? {
         if (modelContinuation != SearchModelContinuation.BlockAtRoot || !session.cancelled()) return null
-        return lifecycle.onCancellation(session).toEvent() ?: finish(SearchRunEvent.Indeterminate.Cancelled)
+        return lifecycle.onCancellation(session).toEvent(SearchComponentStop.Site.Cancellation)
+            ?: finish(SearchRunEvent.Indeterminate.Cancelled)
     }
 
     private fun alternatives(): Alternatives {
@@ -505,9 +522,20 @@ class SearchRun internal constructor(
             ?: SearchStopCause.RepresentationDecline
     }
 
-    private fun finish(event: SearchRunEvent): SearchRunEvent {
-        if (event == SearchRunEvent.Indeterminate.Component && session.executionControls.stopCause == null) {
-            session.executionControls.reportStop(indeterminateCause ?: SearchStopCause.RepresentationDecline)
+    private fun finish(
+        event: SearchRunEvent,
+        site: SearchComponentStop.Site = SearchComponentStop.Site.Coverage,
+    ): SearchRunEvent {
+        if (event == SearchRunEvent.Indeterminate.Component) {
+            val stopCause = session.executionControls.stopCause
+            if (stopCause == null) {
+                session.executionControls.reportStop(indeterminateCause ?: SearchStopCause.RepresentationDecline)
+            }
+            if (recordComponentStops) {
+                componentStop = SearchComponentStop(
+                    site, stopCause, session.cancelled(), sawIndeterminate, session.decisionLevel,
+                )
+            }
         }
         terminal = event
         return event
@@ -515,7 +543,8 @@ class SearchRun internal constructor(
 
     private fun cancelledAssertion(): SearchRunEvent {
         pendingCancellation = false
-        return lifecycle.onCancellation(session).toEvent() ?: finish(SearchRunEvent.Indeterminate.Cancelled)
+        return lifecycle.onCancellation(session).toEvent(SearchComponentStop.Site.Cancellation)
+            ?: finish(SearchRunEvent.Indeterminate.Cancelled)
     }
 
     private fun stopAfterBacktrack(indeterminate: Boolean = false): SearchRunEvent {
@@ -524,12 +553,12 @@ class SearchRun internal constructor(
         // An exhausted frame stack has no pending region for a later slice to resume.
         if (frames.isEmpty() && !budgetInterrupted) return finish(exhausted())
         if (session.cancelled()) {
-            return lifecycle.onCancellation(session).toEvent()
+            return lifecycle.onCancellation(session).toEvent(SearchComponentStop.Site.Cancellation)
                 ?: finish(SearchRunEvent.Indeterminate.Cancelled)
         }
         return when {
             budgetInterrupted -> finish(SearchRunEvent.Indeterminate.Budget)
-            indeterminate -> finish(SearchRunEvent.Indeterminate.Component)
+            indeterminate -> finish(SearchRunEvent.Indeterminate.Component, SearchComponentStop.Site.LeafCheck)
             else -> finish(exhausted())
         }
     }
@@ -541,23 +570,24 @@ class SearchRun internal constructor(
             observer.onRestart(decisionsSinceRestart)
             decisionsSinceRestart = 0L
             params.restart.beginRun()
-            lifecycle.onRestart(session).toEvent()
+            lifecycle.onRestart(session).toEvent(SearchComponentStop.Site.Restart)
         }
 
         is ComponentResult.Conflict -> finish(SearchRunEvent.Exhausted)
 
         ComponentResult.Indeterminate -> if (session.cancelled()) {
-            lifecycle.onCancellation(session).toEvent() ?: finish(SearchRunEvent.Indeterminate.Cancelled)
+            lifecycle.onCancellation(session).toEvent(SearchComponentStop.Site.Cancellation)
+                ?: finish(SearchRunEvent.Indeterminate.Cancelled)
         } else {
-            finish(SearchRunEvent.Indeterminate.Component)
+            finish(SearchRunEvent.Indeterminate.Component, SearchComponentStop.Site.RestartPropagation)
         }
     }
 
-    private fun SearchRunDisposition.toEvent(): SearchRunEvent? = when (this) {
+    private fun SearchRunDisposition.toEvent(site: SearchComponentStop.Site): SearchRunEvent? = when (this) {
         SearchRunDisposition.Continue -> null
         SearchRunDisposition.Exhausted -> finish(exhausted())
         SearchRunDisposition.Pause -> SearchRunEvent.Paused
-        SearchRunDisposition.Indeterminate -> finish(SearchRunEvent.Indeterminate.Component)
+        SearchRunDisposition.Indeterminate -> finish(SearchRunEvent.Indeterminate.Component, site)
     }
 
     internal fun retainBooleanRoot(literal: Int): Boolean {
@@ -590,6 +620,8 @@ class SearchRun internal constructor(
         pendingModel = null
         consumedModel = false
         terminal = null
+        componentStop = null
+        componentStopReplayed = false
         budgetInterrupted = false
         pendingAdvance = false
         pendingCancellation = false

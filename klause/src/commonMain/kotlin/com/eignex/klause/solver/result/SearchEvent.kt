@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.result
 
 import com.eignex.klause.portfolio.PortfolioEvent
+import com.eignex.klause.solver.search.SearchComponentStop
 import com.eignex.klause.solver.search.SearchStopCause
 
 /**
@@ -24,6 +25,10 @@ sealed interface SearchEvent {
         val path: Path,
         /** Native stop visible at return, or null when none was recorded. */
         val stopCause: SearchStopCause?,
+        /** First component terminal, retained across slice rearming when observation is enabled. */
+        val componentStop: SearchComponentStop? = null,
+        /** Whether a later traversal call consumed the cached component terminal. */
+        val componentStopReplayed: Boolean = false,
     ) : SearchEvent {
         /** Native optimization paths that preserve unresolved coverage. */
         enum class Path {
