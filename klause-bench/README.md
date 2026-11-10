@@ -155,8 +155,12 @@ diagnosis; these observations do not retire the rebuilding objective.
 ## Build and run
 
 Gradle stages the checksum-pinned lab SDK through the public GitHub release-asset API using the JDK.
-Verified artifacts are cached in `.gradle/lab-bench-sdk`; each artifact allows three attempts with
-10-second connection and 30-second read timeouts. This dependency resolution needs no external HTTP tool.
+Verified artifacts are cached under `GRADLE_USER_HOME/caches/eignex/lab-bench-sdk`, shared across fresh
+checkouts and protected by a file lock. Checksums are verified before reuse. Transient download failures
+allow three attempts with one- and two-second backoffs, 10-second connection and 30-second read timeouts.
+Rate limits and server retry directives stop automatic retries. CI supplies `GITHUB_TOKEN` to authenticate
+release API requests; credentials are omitted from requests to redirected asset hosts.
+This dependency resolution needs no external HTTP tool. Offline builds require verified cached artifacts.
 An explicit `-PlabBenchRepository=URL` selects another repository. To prepare a local repository with
 the command-line client, run `bash klause-bench/scripts/stage-lab-sdk.sh DIRECTORY` and pass
 `-PlabBenchRepository=file://ABSOLUTE_DIRECTORY` to Gradle.

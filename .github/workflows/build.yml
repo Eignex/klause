@@ -19,6 +19,9 @@ on:
 permissions:
   contents: read
 
+env:
+  GITHUB_TOKEN: ${{ github.token }}
+
 # A newer push supersedes any in-flight run for the same ref.
 concurrency:
   group: build-${{ github.workflow }}-${{ github.ref }}
@@ -61,6 +64,9 @@ jobs:
       # (linuxArm64, macosArm64) are opt-in via -Ptargets.full and build on release.
 
       # Lint runs separately. Native tests have their own job because Kover instruments JVM tests.
+      - name: Verify lab SDK caching and retry policy
+        run: ./gradlew -p buildSrc test
+
       - name: Run JVM tests with coverage
         run: ./gradlew --refresh-dependencies check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test koverXmlReport :klause-cli:installJvmDist :klause:stageLpProfileJvm
 
@@ -80,6 +86,8 @@ jobs:
             klause-cli/build/test-results/
             klause-bench/build/reports/tests/
             klause-bench/build/test-results/
+            buildSrc/build/reports/tests/
+            buildSrc/build/test-results/
           if-no-files-found: ignore
 
       - name: Upload results to Codecov (main only)
