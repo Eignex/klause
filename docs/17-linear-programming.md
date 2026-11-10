@@ -648,6 +648,9 @@ term, preferring the side that retains a negative residual. Exact shifting and
 complementing precede mixed rounding; missing sides and integral shifted right
 sides decline. At most 64 mixed cuts are retained per template. Eligibility and
 decline observations describe only rows visited within the preparation allowance.
+Exact zero endpoint contributions and discarded residuals omit products and
+right-side updates from the arithmetic allowance, retaining endpoint normalization,
+bound validation and cancellation visits.
 The explicit point-selection policy also proposes the complementary available
 continuous sides within the same row, work and scalar limits. Missing opposite
 sides retain their original premise; identical side choices produce one candidate.

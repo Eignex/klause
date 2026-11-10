@@ -33,10 +33,12 @@ internal fun mixedIntegerRounding(
         onArithmetic(bounded(bound.rhs), reciprocal)
         val endpoint = bounded(bound.rhs * reciprocal)
         sides[id] = endpoint to (coefficient > BigFraction.ZERO)
-        onArithmetic(coefficients.getValue(id), endpoint)
-        val contribution = bounded(coefficients.getValue(id) * endpoint)
-        onArithmetic(shifted, contribution)
-        shifted = bounded(shifted - contribution)
+        if (!endpoint.isZero) {
+            onArithmetic(coefficients.getValue(id), endpoint)
+            val contribution = bounded(coefficients.getValue(id) * endpoint)
+            onArithmetic(shifted, contribution)
+            shifted = bounded(shifted - contribution)
+        }
     }
     if (sides.isEmpty() || coefficients.keys.any { it.kind == SourceCoordinate.Kind.Real && it !in sides }) {
         return null
@@ -63,10 +65,12 @@ internal fun mixedIntegerRounding(
             bounded(value * residualScale)
         } else BigFraction.ZERO
         result[id] = rounded
-        onArithmetic(rounded, side.first)
-        val contribution = bounded(rounded * side.first)
-        onArithmetic(rhs, contribution)
-        rhs = bounded(rhs + contribution)
+        if (!rounded.isZero && !side.first.isZero) {
+            onArithmetic(rounded, side.first)
+            val contribution = bounded(rounded * side.first)
+            onArithmetic(rhs, contribution)
+            rhs = bounded(rhs + contribution)
+        }
     }
     return SourceInequality(result, rhs)
 }
