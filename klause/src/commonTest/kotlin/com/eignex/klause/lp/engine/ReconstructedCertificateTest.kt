@@ -199,6 +199,113 @@ class ReconstructedCertificateTest {
     }
 
     @Test
+    fun `zero right hand sides should reduce checked dual work`() {
+        for (weight in listOf(BigFraction.ONE, BigFraction.of(BIG_ONE shl 128, BIG_ONE))) {
+            val results = listOf(0L, 1L).map { rhs ->
+                val model = LpBuilder().apply {
+                    addVar(0L, 1L)
+                    repeat(32) { addRow(intArrayOf(0), longArrayOf(1L), Relation.LE, rhs) }
+                }.build(Sense.MINIMIZE)
+
+                val result = certifyLpBoundOnly(model, DoubleArray(32) { -weight.toDouble() },
+                    ReconstructionLimits(maxAttempts = 0))
+
+                assertEquals(weight * BigFraction.ofLong(-32L * rhs), assertNotNull(result.bound).value)
+                assertEquals((0 until 32).toList(), assertNotNull(result.bound.support).rows.map { it.first })
+                result
+            }
+
+            assertTrue(results[0].metrics.work < results[1].metrics.work)
+        }
+    }
+
+    @Test
+    fun `zero selected endpoints should reduce checked dual work`() {
+        for (cost in listOf(BigFraction.ONE, BigFraction.of(BIG_ONE shl 128, BIG_ONE))) {
+            val results = listOf(BigFraction.ZERO, BigFraction.ONE).map { lower ->
+                val source = ExactLpModel(
+                    listOf(emptyList()),
+                    emptyList(),
+                    listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(lower))))),
+                    emptyList(),
+                    ExactLpObjective(listOf(ExactLpNumber.of(cost))),
+                )
+
+                val result = certifyLpBoundOnly(assertNotNull(LpExactState(source).toWorkingModel()),
+                    doubleArrayOf(), ReconstructionLimits(maxAttempts = 0))
+
+                assertEquals(cost * lower, assertNotNull(result.bound).value)
+                assertEquals(listOf(0), assertNotNull(result.bound.support).sides.map { it.column })
+                result
+            }
+
+            assertTrue(results[0].metrics.work < results[1].metrics.work)
+        }
+    }
+
+    @Test
+    fun `zero selected endpoints should preserve strict source support`() {
+        for (cost in listOf(BigFraction.ONE, BigFraction.of(BIG_ONE shl 128, BIG_ONE))) {
+            val source = ExactLpModel(
+                listOf(emptyList()),
+                emptyList(),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L), strict = true)))),
+                emptyList(),
+                ExactLpObjective(listOf(ExactLpNumber.of(cost))),
+            )
+
+            val result = certifyLpBoundOnly(assertNotNull(LpExactState(source).toWorkingModel()),
+                doubleArrayOf(), ReconstructionLimits(maxAttempts = 0))
+
+            val bound = assertNotNull(result.bound)
+            assertEquals(BigFraction.ZERO, bound.value)
+            assertTrue(assertNotNull(bound.support).sides.single().side.strict)
+        }
+    }
+
+    @Test
+    fun `zero right hand sides should not supply a missing bound side`() {
+        val zero = ExactLpNumber.of(0L)
+        for (weight in listOf(BigFraction.ONE, BigFraction.of(BIG_ONE shl 128, BIG_ONE))) {
+            val source = ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
+                listOf(zero),
+                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(zero, zero)),
+            )
+
+            val result = certifyLpBoundOnly(assertNotNull(LpExactState(source).toWorkingModel()),
+                doubleArrayOf(weight.toDouble()), ReconstructionLimits(maxAttempts = 0))
+
+            assertNull(result.bound)
+            assertEquals(ReconstructionDecline.CANDIDATE, result.metrics.decline)
+            val rejection = assertNotNull(result.metrics.dualRejection)
+            assertEquals(0, rejection.column)
+            assertTrue(rejection.upper)
+        }
+    }
+
+    @Test
+    fun `zero selected endpoints should retain input scalar limits`() {
+        val zero = ExactLpNumber.of(0L)
+        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 128, BIG_ONE))
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(huge)))),
+            emptyList(),
+            ExactLpObjective(listOf(ExactLpNumber.of(1L))),
+        )
+
+        val result = certifyLpBoundOnly(assertNotNull(LpExactState(source).toWorkingModel()), doubleArrayOf(),
+            ReconstructionLimits(maxBits = 128, maxAttempts = 0))
+
+        assertNull(result.bound)
+        assertEquals(ReconstructionDecline.BITS, result.metrics.decline)
+    }
+
+    @Test
     fun `fixed arithmetic overflow should restart the full point from rational authority`() {
         val huge = BigFraction.of(BIG_ONE shl 100, BIG_ONE)
         val one = ExactLpNumber.of(1L)
