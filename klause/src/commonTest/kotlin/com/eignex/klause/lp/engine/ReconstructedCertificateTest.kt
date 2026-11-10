@@ -200,18 +200,25 @@ class ReconstructedCertificateTest {
 
     @Test
     fun `zero right hand sides should reduce checked dual work`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
         for (weight in listOf(BigFraction.ONE, BigFraction.of(BIG_ONE shl 128, BIG_ONE))) {
             val results = listOf(0L, 1L).map { rhs ->
-                val model = LpBuilder().apply {
-                    addVar(0L, 1L)
-                    repeat(32) { addRow(intArrayOf(0), longArrayOf(1L), Relation.LE, rhs) }
-                }.build(Sense.MINIMIZE)
+                val source = ExactLpModel(
+                    listOf(List(32) { ExactLpEntry(it, one) }),
+                    List(32) { ExactLpNumber.of(rhs) },
+                    listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))) +
+                        List(32) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+                    List(32) { ExactLpRow() },
+                    ExactLpObjective(List(33) { zero }),
+                )
 
-                val result = certifyLpBoundOnly(model, DoubleArray(32) { -weight.toDouble() },
-                    ReconstructionLimits(maxAttempts = 0))
+                val result = certifyLpBoundOnly(assertNotNull(LpExactState(source).toWorkingModel()),
+                    DoubleArray(32) { -weight.toDouble() }, ReconstructionLimits(maxAttempts = 0))
 
-                assertEquals(weight * BigFraction.ofLong(-32L * rhs), assertNotNull(result.bound).value)
-                assertEquals((0 until 32).toList(), assertNotNull(result.bound.support).rows.map { it.first })
+                val bound = assertNotNull(result.bound)
+                assertEquals(weight * BigFraction.ofLong(-32L * rhs), bound.value)
+                assertEquals((0 until 32).toList(), assertNotNull(bound.support).rows.map { it.first })
                 result
             }
 
@@ -234,8 +241,9 @@ class ReconstructedCertificateTest {
                 val result = certifyLpBoundOnly(assertNotNull(LpExactState(source).toWorkingModel()),
                     doubleArrayOf(), ReconstructionLimits(maxAttempts = 0))
 
-                assertEquals(cost * lower, assertNotNull(result.bound).value)
-                assertEquals(listOf(0), assertNotNull(result.bound.support).sides.map { it.column })
+                val bound = assertNotNull(result.bound)
+                assertEquals(cost * lower, bound.value)
+                assertEquals(listOf(0), assertNotNull(bound.support).sides.map { it.column })
                 result
             }
 
