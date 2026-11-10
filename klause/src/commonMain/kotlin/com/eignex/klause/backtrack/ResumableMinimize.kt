@@ -893,9 +893,10 @@ internal class ResumableMinimize(
     }
 
     private fun observeIncomplete(path: SearchEvent.BacktrackIncomplete.Path) {
-        params.onEvent?.invoke(SearchEvent.BacktrackIncomplete(
-            path, searchSession.executionControls.stopCause, run.componentStop, run.componentStopReplayed,
-        ))
+        params.onEvent?.let { onEvent ->
+            onEvent(SearchEvent.BacktrackIncomplete(path, searchSession.executionControls.stopCause))
+            run.componentStop?.let { onEvent(SearchEvent.BacktrackComponentStop(it, run.componentStopReplayed)) }
+        }
     }
 
     private fun terminalBudget(): MinimizeResult {

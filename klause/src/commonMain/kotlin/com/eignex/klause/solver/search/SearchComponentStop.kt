@@ -8,7 +8,7 @@ data class SearchComponentStop(
     val stopCause: SearchStopCause?,
     /** Cancellation observed at the terminal boundary. */
     val cancelled: Boolean,
-    /** Whether the traversal retained genuinely unresolved coverage. */
+    /** Whether the traversal recorded unresolved coverage before producing this terminal. */
     val unresolvedCoverage: Boolean,
     /** Shared decision level at the terminal boundary. */
     val decisionLevel: Int,
