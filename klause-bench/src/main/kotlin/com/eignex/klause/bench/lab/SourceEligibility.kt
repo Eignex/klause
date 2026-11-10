@@ -374,9 +374,13 @@ internal object SourceEligibility {
         if (uncovered.isNotEmpty()) {
             add("the manifest declares no complete exposure coverage for ${uncovered.joinToString()}")
         }
-        manifest.gaps.filter { it.collection == null || it.collection in touched }.forEach {
-            add("the manifest records an exposure gap${it.collection?.let { c -> " in $c" }.orEmpty()}: ${it.reason}")
-        }
+        manifest.gaps.filter { it.collection == null || it.collection in touched }.groupBy { it.collection }
+            .forEach { (collection, gaps) ->
+                add(
+                    "the manifest records ${gaps.size} exposure gaps in ${collection ?: "unknown collections"}, " +
+                        "such as: ${gaps.first().reason}",
+                )
+            }
     }
 
     private fun Exposure.match(via: String) = Match(via, inputs, use, outcome, evidence)

@@ -89,6 +89,16 @@ class SourceEligibilityTest {
         assertTrue(report.reasons.single().contains("no complete exposure coverage for miplib2017"), report.reasons[0])
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["miplib2017", ""])
+    fun `a recorded exposure gap leaves a covered source unresolved`(collection: String) {
+        val gap = SourceEligibility.Gap(collection.ifEmpty { null }, "row without hashed inputs")
+        val report = classify(Manifest(coverage = covered, identities = listOf(receipt), gaps = listOf(gap)))
+
+        assertEquals(Status.UNRESOLVED, report.status)
+        assertTrue(report.reasons.single().contains("1 exposure gaps"), report.reasons[0])
+    }
+
     @Test
     fun `a decoded hash declared only by the descriptor is unresolved`() {
         val report = classify(Manifest(coverage = covered))
