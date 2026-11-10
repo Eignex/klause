@@ -1,0 +1,27 @@
+{
+  "main": "com.eignex.klause.bench.lab.FixedWorkSatAdapterKt",
+  "classpath": [
+    "klause-bench/build/install/klause-bench/lib/*"
+  ],
+  "buildTasks": [
+    ":klause-bench:installDist"
+  ],
+  "jvmArgs": [
+    "-Xmx512m",
+    "-XX:ActiveProcessorCount=1",
+    "--enable-native-access=ALL-UNNAMED",
+    "--add-modules=jdk.incubator.vector"
+  ],
+  "runtime": {
+    "java": 25,
+    "tools": [
+      "git"
+    ],
+    "environment": {}
+  },
+  "sourceHistory": "snapshot",
+  "workspaceInputs": [
+    ".git",
+    "klause-bench/build/install"
+  ]
+}
