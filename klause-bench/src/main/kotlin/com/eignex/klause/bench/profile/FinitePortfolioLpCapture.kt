@@ -53,12 +53,23 @@ internal object FinitePortfolioLpCapture {
         val required = setOf("suite", "problem", "sha256", "seed", "handoff")
         require(options.keys.containsAll(required) && (options.keys - required).all {
             it in setOf("timeout-ms", "captures", "cutoff-bits", "capture-worker", "capture-route", "capture-guidance",
-                "portfolio-policy", "portfolio-progress")
+                "portfolio-policy", "portfolio-progress", "capture-mode")
         })
-        val preset = options["portfolio-policy"] ?: "retained"
+        val mode = options["capture-mode"] ?: "portfolio"
+        require(mode in setOf("portfolio", "joint-before"))
+        val preset = options["portfolio-policy"] ?: if (mode == "joint-before") "complete" else "retained"
         require(preset in setOf("ordinary", "retained", "complete")) { "unsupported portfolio policy: $preset" }
         val handoff = options.getValue("handoff").toBooleanStrict()
-        val progress = options["portfolio-progress"]?.toBooleanStrict() ?: true
+        val progress = options["portfolio-progress"]?.toBooleanStrict() ?: (mode == "portfolio")
+        if (mode == "joint-before") {
+            require(handoff && preset == "complete" && !progress)
+            require(options.keys.none { it in setOf("cutoff-bits", "capture-worker", "capture-route",
+                "capture-guidance") })
+            return listOf("companion-integers=true", "companion-active-ms=4000",
+                "companion-after-incumbent=false", "companion-admission=ordinary", "companion-repair=fixed",
+                "source-incumbent-completion=true", "portfolio-progress=false",
+                "portfolio-proof-workers=complete", "portfolio-proof-share=0.5")
+        }
         if (preset == "ordinary") {
             require(!handoff) { "ordinary portfolio policy requires handoff=false" }
             return listOf("portfolio-progress=$progress")
@@ -72,6 +83,10 @@ internal object FinitePortfolioLpCapture {
 
     internal fun inspect(options: Map<String, String>, bytes: ByteArray, out: File) {
         val pairs = parameters(options)
+        if (options["capture-mode"] == "joint-before") {
+            JointRepairLpCapture.inspect(options, bytes, out)
+            return
+        }
         val timeout = options["timeout-ms"]?.toLong() ?: 30_000L
         val limit = options["captures"]?.toInt() ?: 1
         val captureGuidance = options["capture-guidance"]?.toBooleanStrict() ?: false
@@ -339,14 +354,14 @@ internal object FinitePortfolioLpCapture {
         data class Observation(val owner: Int, val capture: Boolean)
     }
 
-    private fun capture(query: Any, stop: Cancellation): ByteArray? {
+    internal fun capture(query: Any, stop: Cancellation): ByteArray? {
         val model = get(query, "Model")
         if ((get(model, "M") as Int) > 4096 ||
             (get(model, "N") as Int).toLong() + (get(model, "M") as Int) > 8192) return null
         return call(query, "captureExactWithin", "finite-portfolio-query", 65_536, 1_048_576, 4096, stop) as ByteArray?
     }
 
-    private fun writeBasis(query: Any, file: File?): String? {
+    internal fun writeBasis(query: Any, file: File?): String? {
         if (file == null) return null
         val model = get(query, "Model")
         if ((get(model, "N") as Int).toLong() + (get(model, "M") as Int) > 8192) return null

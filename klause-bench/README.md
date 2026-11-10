@@ -1789,3 +1789,11 @@ carries an independent proof. Cost scopes stay separate because they nest: CLI C
 CPU, solver elapsed inside command wall time, and worker attempt counters over every row they ran.
 Each case and attempt is counted once, unknown values are counted, and uncommitted attempts keep
 their costs. Benefit thresholds belong to the campaign; an accepted comparison is not a speedup.
+
+`FinitePortfolioLpCapture` accepts `capture-mode=joint-before handoff=true` for a
+bounded direct-owner joint-repair diagnostic through `lab profile`. Supply the
+usual source identity and seed. It uses finite preparation and the existing
+four-second companion grant, captures at most four conditional LPs, and records
+source scope, exact snapshot, basis and typed certificate rejection. Root queries
+do not consume conditional capture capacity. Observer time spends the active grant;
+the diagnostic does not establish full portfolio replay or production performance.
