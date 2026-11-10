@@ -856,7 +856,7 @@ private fun reconstructCandidates(
                     if (goal != ReconstructionGoal.BOUND || current.bound == null) {
                         val vector = reconstructExactVector(y, denominator, meter)
                             ?: if (goal == ReconstructionGoal.BOUND) {
-                                reconstructBoundVector(y, denominator, meter)
+                                reconstructRationalEntries(y, denominator, meter)
                             } else null
                         vector?.let {
                             val candidate = if (goal == ReconstructionGoal.BOUND) {
@@ -867,7 +867,9 @@ private fun reconstructCandidates(
                     }
                 }
                 if (rho != null && current.point == null) {
-                    reconstructExactVector(rho, denominator, meter)?.let {
+                    val vector = reconstructExactVector(rho, denominator, meter)
+                        ?: reconstructRationalEntries(rho, denominator, meter)
+                    vector?.let {
                         current.dual(it, ray = true)
                         if (current.conflict == null) {
                             current.dual(
@@ -917,7 +919,7 @@ private fun reconstructCandidates(
     )
 }
 
-private fun reconstructBoundVector(
+private fun reconstructRationalEntries(
     values: List<BigFraction>,
     denominator: BigInt,
     meter: ReconstructionMeter,
