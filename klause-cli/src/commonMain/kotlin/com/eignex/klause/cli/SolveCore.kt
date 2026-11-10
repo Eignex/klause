@@ -620,12 +620,11 @@ internal fun describeEvent(e: SearchEvent, t: Long, worker: String? = null): Str
     val who = worker?.let { " $it" }.orEmpty()
     return when (e) {
         is SearchEvent.BacktrackIncomplete ->
-            "[$t ms]$who incomplete optimization: path=${e.path} stop=${e.stopCause}" +
-                e.componentStop?.let {
-                    " origin=${it.site} firstStop=${it.stopCause} cancelled=${it.cancelled}" +
-                        " unresolved=${it.unresolvedCoverage} level=${it.decisionLevel}" +
-                        " replayed=${e.componentStopReplayed}"
-                }.orEmpty()
+            "[$t ms]$who incomplete optimization: path=${e.path} stop=${e.stopCause}"
+        is SearchEvent.BacktrackComponentStop -> e.stop.let {
+            "[$t ms]$who component terminal: origin=${it.site} firstStop=${it.stopCause} cancelled=${it.cancelled}" +
+                " unresolved=${it.unresolvedCoverage} level=${it.decisionLevel} replayed=${e.replayed}"
+        }
         is SearchEvent.Restart -> "[$t ms]$who restart #${e.index} after ${e.steps} decisions"
         is SearchEvent.LearnedDbSweep -> "[$t ms]$who learned-DB sweep: kept ${e.kept}, dropped ${e.dropped}"
         is SearchEvent.Incumbent -> "[$t ms]$who incumbent objective ${e.objective}"

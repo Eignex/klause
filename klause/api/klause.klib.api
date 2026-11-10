@@ -5068,6 +5068,22 @@ sealed interface com.eignex.klause.solver.result/SatisfyResult { // com.eignex.k
 }
 
 sealed interface com.eignex.klause.solver.result/SearchEvent { // com.eignex.klause.solver.result/SearchEvent|null[0]
+    final class BacktrackComponentStop : com.eignex.klause.solver.result/SearchEvent { // com.eignex.klause.solver.result/SearchEvent.BacktrackComponentStop|null[0]
+        constructor <init>(com.eignex.klause.solver.search/SearchComponentStop, kotlin/Boolean) // com.eignex.klause.solver.result/SearchEvent.BacktrackComponentStop.<init>|<init>(com.eignex.klause.solver.search.SearchComponentStop;kotlin.Boolean){}[0]
+
+        final val replayed // com.eignex.klause.solver.result/SearchEvent.BacktrackComponentStop.replayed|{}replayed[0]
+            final fun <get-replayed>(): kotlin/Boolean // com.eignex.klause.solver.result/SearchEvent.BacktrackComponentStop.replayed.<get-replayed>|<get-replayed>(){}[0]
+        final val stop // com.eignex.klause.solver.result/SearchEvent.BacktrackComponentStop.stop|{}stop[0]
+            final fun <get-stop>(): com.eignex.klause.solver.search/SearchComponentStop // com.eignex.klause.solver.result/SearchEvent.BacktrackComponentStop.stop.<get-stop>|<get-stop>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.search/SearchComponentStop // com.eignex.klause.solver.result/SearchEvent.BacktrackComponentStop.component1|component1(){}[0]
+        final fun component2(): kotlin/Boolean // com.eignex.klause.solver.result/SearchEvent.BacktrackComponentStop.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.solver.search/SearchComponentStop = ..., kotlin/Boolean = ...): com.eignex.klause.solver.result/SearchEvent.BacktrackComponentStop // com.eignex.klause.solver.result/SearchEvent.BacktrackComponentStop.copy|copy(com.eignex.klause.solver.search.SearchComponentStop;kotlin.Boolean){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/SearchEvent.BacktrackComponentStop.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/SearchEvent.BacktrackComponentStop.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.result/SearchEvent.BacktrackComponentStop.toString|toString(){}[0]
+    }
+
     final class BacktrackIncomplete : com.eignex.klause.solver.result/SearchEvent { // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete|null[0]
         constructor <init>(com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.Path, com.eignex.klause.solver.search/SearchStopCause?) // com.eignex.klause.solver.result/SearchEvent.BacktrackIncomplete.<init>|<init>(com.eignex.klause.solver.result.SearchEvent.BacktrackIncomplete.Path;com.eignex.klause.solver.search.SearchStopCause?){}[0]
 
@@ -18030,6 +18046,52 @@ final class com.eignex.klause.solver.search/SearchComponentSet { // com.eignex.k
 
     final fun session(kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.solver.search/SearchLearnedDbParams = ..., com.eignex.klause.solver.search/SearchAtomRegistry? = ...): com.eignex.klause.solver.search/SearchSession // com.eignex.klause.solver.search/SearchComponentSet.session|session(kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.solver.search.SearchLearnedDbParams;com.eignex.klause.solver.search.SearchAtomRegistry?){}[0]
     final fun session(kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.solver.search/SearchLearnedDbParams = ..., com.eignex.klause.solver.search/SearchAtomRegistry? = ..., com.eignex.klause.solver.search/SearchExecutionControls): com.eignex.klause.solver.search/SearchSession // com.eignex.klause.solver.search/SearchComponentSet.session|session(kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.solver.search.SearchLearnedDbParams;com.eignex.klause.solver.search.SearchAtomRegistry?;com.eignex.klause.solver.search.SearchExecutionControls){}[0]
+}
+
+final class com.eignex.klause.solver.search/SearchComponentStop { // com.eignex.klause.solver.search/SearchComponentStop|null[0]
+    constructor <init>(com.eignex.klause.solver.search/SearchComponentStop.Site, com.eignex.klause.solver.search/SearchStopCause?, kotlin/Boolean, kotlin/Boolean, kotlin/Int) // com.eignex.klause.solver.search/SearchComponentStop.<init>|<init>(com.eignex.klause.solver.search.SearchComponentStop.Site;com.eignex.klause.solver.search.SearchStopCause?;kotlin.Boolean;kotlin.Boolean;kotlin.Int){}[0]
+
+    final val cancelled // com.eignex.klause.solver.search/SearchComponentStop.cancelled|{}cancelled[0]
+        final fun <get-cancelled>(): kotlin/Boolean // com.eignex.klause.solver.search/SearchComponentStop.cancelled.<get-cancelled>|<get-cancelled>(){}[0]
+    final val decisionLevel // com.eignex.klause.solver.search/SearchComponentStop.decisionLevel|{}decisionLevel[0]
+        final fun <get-decisionLevel>(): kotlin/Int // com.eignex.klause.solver.search/SearchComponentStop.decisionLevel.<get-decisionLevel>|<get-decisionLevel>(){}[0]
+    final val site // com.eignex.klause.solver.search/SearchComponentStop.site|{}site[0]
+        final fun <get-site>(): com.eignex.klause.solver.search/SearchComponentStop.Site // com.eignex.klause.solver.search/SearchComponentStop.site.<get-site>|<get-site>(){}[0]
+    final val stopCause // com.eignex.klause.solver.search/SearchComponentStop.stopCause|{}stopCause[0]
+        final fun <get-stopCause>(): com.eignex.klause.solver.search/SearchStopCause? // com.eignex.klause.solver.search/SearchComponentStop.stopCause.<get-stopCause>|<get-stopCause>(){}[0]
+    final val unresolvedCoverage // com.eignex.klause.solver.search/SearchComponentStop.unresolvedCoverage|{}unresolvedCoverage[0]
+        final fun <get-unresolvedCoverage>(): kotlin/Boolean // com.eignex.klause.solver.search/SearchComponentStop.unresolvedCoverage.<get-unresolvedCoverage>|<get-unresolvedCoverage>(){}[0]
+
+    final fun component1(): com.eignex.klause.solver.search/SearchComponentStop.Site // com.eignex.klause.solver.search/SearchComponentStop.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.solver.search/SearchStopCause? // com.eignex.klause.solver.search/SearchComponentStop.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.eignex.klause.solver.search/SearchComponentStop.component3|component3(){}[0]
+    final fun component4(): kotlin/Boolean // com.eignex.klause.solver.search/SearchComponentStop.component4|component4(){}[0]
+    final fun component5(): kotlin/Int // com.eignex.klause.solver.search/SearchComponentStop.component5|component5(){}[0]
+    final fun copy(com.eignex.klause.solver.search/SearchComponentStop.Site = ..., com.eignex.klause.solver.search/SearchStopCause? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ...): com.eignex.klause.solver.search/SearchComponentStop // com.eignex.klause.solver.search/SearchComponentStop.copy|copy(com.eignex.klause.solver.search.SearchComponentStop.Site;com.eignex.klause.solver.search.SearchStopCause?;kotlin.Boolean;kotlin.Boolean;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/SearchComponentStop.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/SearchComponentStop.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.solver.search/SearchComponentStop.toString|toString(){}[0]
+
+    final enum class Site : kotlin/Enum<com.eignex.klause.solver.search/SearchComponentStop.Site> { // com.eignex.klause.solver.search/SearchComponentStop.Site|null[0]
+        enum entry Cancellation // com.eignex.klause.solver.search/SearchComponentStop.Site.Cancellation|null[0]
+        enum entry Coverage // com.eignex.klause.solver.search/SearchComponentStop.Site.Coverage|null[0]
+        enum entry LeafCheck // com.eignex.klause.solver.search/SearchComponentStop.Site.LeafCheck|null[0]
+        enum entry LearnedConflict // com.eignex.klause.solver.search/SearchComponentStop.Site.LearnedConflict|null[0]
+        enum entry ModelBlock // com.eignex.klause.solver.search/SearchComponentStop.Site.ModelBlock|null[0]
+        enum entry ModelBlocked // com.eignex.klause.solver.search/SearchComponentStop.Site.ModelBlocked|null[0]
+        enum entry ModelPolicy // com.eignex.klause.solver.search/SearchComponentStop.Site.ModelPolicy|null[0]
+        enum entry NodePolicy // com.eignex.klause.solver.search/SearchComponentStop.Site.NodePolicy|null[0]
+        enum entry Restart // com.eignex.klause.solver.search/SearchComponentStop.Site.Restart|null[0]
+        enum entry RestartPropagation // com.eignex.klause.solver.search/SearchComponentStop.Site.RestartPropagation|null[0]
+        enum entry Resume // com.eignex.klause.solver.search/SearchComponentStop.Site.Resume|null[0]
+        enum entry Start // com.eignex.klause.solver.search/SearchComponentStop.Site.Start|null[0]
+
+        final val entries // com.eignex.klause.solver.search/SearchComponentStop.Site.entries|#static{}entries[0]
+            final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.search/SearchComponentStop.Site> // com.eignex.klause.solver.search/SearchComponentStop.Site.entries.<get-entries>|<get-entries>#static(){}[0]
+
+        final fun valueOf(kotlin/String): com.eignex.klause.solver.search/SearchComponentStop.Site // com.eignex.klause.solver.search/SearchComponentStop.Site.valueOf|valueOf#static(kotlin.String){}[0]
+        final fun values(): kotlin/Array<com.eignex.klause.solver.search/SearchComponentStop.Site> // com.eignex.klause.solver.search/SearchComponentStop.Site.values|values#static(){}[0]
+    }
 }
 
 final class com.eignex.klause.solver.search/SearchExactAlgebraicRealValue : com.eignex.klause.solver.search/TypedSearchValueKey<com.eignex.klause.arithmetic.polynomial/AlgebraicReal> { // com.eignex.klause.solver.search/SearchExactAlgebraicRealValue|null[0]
