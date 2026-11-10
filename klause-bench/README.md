@@ -1621,6 +1621,58 @@ allocation counters, construction and trial latency, work and assignment checksu
 These library measurements do not establish whole-solver throughput. Compare
 revisions with identical harness sources in ordinary paired lab rows.
 
+## Fixed-work SAT trajectories
+
+`lab/fixed-work-sat.json` measures the direct native backtrack recipe on one
+hash-pinned DIMACS source up to a fixed amount of work. Submit it with
+`deploy/lab run` and one config per revision; each row then holds every arm on one
+machine and attempt. Required parameters:
+
+| Parameter | Meaning |
+|---|---|
+| `source-path`, `sha256` | Corpus path and declared input hash, verified before the solve |
+| `seeds` | One to eight distinct solver seeds, one case each |
+| `unit` | `conflicts` or `decisions` observed through the selectors, or charged handle `work` |
+| `limit` | Fixed-work limit in `unit`, at most 10^9 |
+| `deadline-seconds` | Emergency deadline per invocation, covering preparation and search, at most 900 |
+
+Optional: `measurement=cold|warm` (default `cold`), `warmups=1..3` for `warm`
+(default 1), `recipe` (default `clausal-balanced`), `trace-rows` (default 65,536)
+and `heap-mib` (default 2,048).
+
+Each case verifies the input and writes the plain source, then runs a child JVM with
+one processor, serial GC and a fixed heap. `cold` measures the first solve in that
+JVM; `warm` runs identical invocations first and retains each one. The child parses
+and bakes the source (preparation), then opens, slices and closes the public
+resumable handle (measured interval). Conflict and decision limits stop through the
+search cancellation once the counted event occurs; work limits pass the remaining
+work as the slice budget. Production cleanup, work charging and cancellation run
+unchanged. The parent kills the child past its whole-process ceiling.
+
+`invocations.jsonl` holds one record per invocation. Records retain preparation and
+measured wall, thread CPU, process CPU, allocation, GC and JIT deltas; the limit point's
+wall and thread CPU; `stop` (`limit`, `verdict` or `deadline`); handle work and
+engine counters; and the trajectory. The trajectory folds every pick, commit,
+conflict, restart and learned-database sweep into a 128-bit digest, with checkpoint
+digests at each power of two from 1,024 events and the digest at the limit point.
+Only the measured invocation writes `trace.tsv`, truncated at `trace-rows` and
+flagged as such; the digest still covers every event. Selector conflicts differ from
+the engine's `failures` counter. `identity.json` binds the revision, solver library
+hash, harness and library fingerprints and both input hashes; `runtime.json` records
+the child JVM, options, operating system and processor.
+
+A deadline stop is `interrupted` and not `comparable`; it reports completed work
+and no time metrics. A child without a measured record fails the case and retains
+its completed warmups. Verdicts are native claims without independent source
+validation, and no record qualifies ordinary ten-second performance.
+
+`deploy/lab cases ID --json | scripts/compare-fixed-work.sh CONTROL CANDIDATE`
+pairs arms per row. Rows whose prefix digests agree are `matched` and report
+candidate/control limit-point wall and CPU ratios. Rows with different trajectories
+are `diverged`, with the first differing checkpoint, unless both arms completed with
+a verdict (`completed-diverged`, wall ratio only). Interrupted or missing arms stay
+`incomparable` or `incomplete`. The summary counts each class and cross-host rows.
+
 ## Comparable sweep controls
 
 The status-sweep recipe uses [lab/bench-linux.json](lab/bench-linux.json) and pins
