@@ -170,7 +170,8 @@ class FinitePortfolioLpCaptureTest {
     }
 
     @ParameterizedTest
-    @CsvSource("portfolio-policy,unknown", "portfolio-progress,yes", "handoff,true", "unsupported,true", "inspect-rays,true")
+    @CsvSource("portfolio-policy,unknown", "portfolio-progress,yes", "handoff,true", "unsupported,true",
+        "inspect-rays,true")
     fun `invalid policy requests should fail before corpus resolution`(key: String, value: String) {
         val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
             "seed" to "1", "handoff" to "false", "portfolio-policy" to "ordinary") + (key to value)

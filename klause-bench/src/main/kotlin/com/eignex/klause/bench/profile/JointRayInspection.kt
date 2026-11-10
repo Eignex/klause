@@ -4,6 +4,7 @@ import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.util.Cancellation
 import java.io.File
+import java.lang.Long.parseUnsignedLong
 import java.lang.reflect.InvocationTargetException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -108,13 +109,14 @@ internal object JointRayInspection {
             val method = Class.forName(ENGINE + "ReconstructedCertificateKt").declaredMethods.single {
                 it.name == "reconstructIeee" && it.parameterCount == 2
             }.apply { isAccessible = true }
-            val vector = invoke { method.invoke(null, ray, meter) }
+            val vector = method.invoke(null, ray, meter)
             val current = create("ReconstructionRun", authority, meter)
             run = current
             call(current, "dual", vector, true, false, null)
-        } catch (failure: Throwable) {
-            if (failure.javaClass.simpleName != "ReconstructionStop") throw failure
-            decline = call(failure, "getReason")
+        } catch (failure: InvocationTargetException) {
+            val cause = failure.targetException
+            if (cause.javaClass.simpleName != "ReconstructionStop") throw cause
+            decline = call(cause, "getReason")
         }
         val conflict = run?.let { call(it, "getConflict") } != null
         val metrics = requireNotNull(call(meter, "snapshot", decline))
@@ -144,26 +146,18 @@ internal object JointRayInspection {
     internal fun decodeRay(bits: List<String>, rows: Int): DoubleArray? {
         if (rows !in 1..4096 || bits.size != rows || bits.any { !encoded.matches(it) }) return null
         return DoubleArray(rows) {
-            Double.fromBits(java.lang.Long.parseUnsignedLong(bits[it], 16))
+            Double.fromBits(parseUnsignedLong(bits[it], 16))
         }.takeIf { values -> values.all(Double::isFinite) }
     }
 
     @Suppress("SpreadOperator")
-    private fun create(name: String, vararg args: Any?): Any = invoke {
+    private fun create(name: String, vararg args: Any?): Any =
         Class.forName(ENGINE + name).declaredConstructors.single { it.parameterCount == args.size }
             .apply { isAccessible = true }.newInstance(*args)
-    }
 
     @Suppress("SpreadOperator")
-    private fun call(owner: Any, name: String, vararg args: Any?): Any? = invoke {
+    private fun call(owner: Any, name: String, vararg args: Any?): Any? =
         owner.javaClass.methods.single {
             it.name.substringBefore('$') == name && it.parameterCount == args.size
         }.apply { isAccessible = true }.invoke(owner, *args)
-    }
-
-    private inline fun <T> invoke(block: () -> T): T = try {
-        block()
-    } catch (failure: InvocationTargetException) {
-        throw failure.targetException
-    }
 }
