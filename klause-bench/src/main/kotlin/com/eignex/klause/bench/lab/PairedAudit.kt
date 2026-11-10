@@ -32,7 +32,7 @@ fun main(args: Array<String>) {
 
 /**
  * One retained case row, reduced to the identities, controls, outcomes and costs the audit compares.
- * Statistics and witnesses are not kept, so retained jobs stream in bounded memory.
+ * Statistics, witnesses and runtime file maps are dropped, so a large retained job stays small in memory.
  */
 internal data class AuditedCase(
     val index: Int,
@@ -181,7 +181,7 @@ internal object PairedAudit {
             seeds = listOf(seed, solve?.seed?.toString(), case.attributes["seed"], controls["solverSeed"]),
             inputs = case.inputs.associate { it.role to it.sha256 },
             parameters = case.parameters,
-            record = solve,
+            record = solve?.let(::retained),
             recordError = decoded?.exceptionOrNull()?.let { "record is not a solver record: ${it.message}" }
                 ?: if (record == null) "no record" else null,
             receipt = text(execution, "receiptSha256"),
@@ -193,6 +193,27 @@ internal object PairedAudit {
             adapterCpuSeconds = cpu(adapterResources),
             checkerElapsedMs = check?.let { text(it, "elapsedMs")?.toLongOrNull() },
         )
+    }
+
+    private fun retained(record: SolveRecord): SolveRecord = record.copy(
+        stats = emptyMap(),
+        attribution = emptyList(),
+        finalWitness = null,
+        stderr = null,
+        numericalSemantics = null,
+        buildProvenance = record.buildProvenance?.let { build ->
+            build.copy(
+                distribution = build.distribution.filterKeys(::solverJar),
+                runtime = emptyMap(),
+                runtimeOptions = emptyMap(),
+                harness = emptyMap(),
+            )
+        },
+    )
+
+    /** Solver and CLI implementation jars, whose hashes identify the revision rather than the runtime. */
+    internal fun solverJar(path: String): Boolean = path.substringAfterLast('/').let {
+        (it.startsWith("klause-jvm-") || it.startsWith("klause-cli-jvm-")) && it.endsWith(".jar")
     }
 
     private fun cpu(values: Map<String, String?>?): Double? {

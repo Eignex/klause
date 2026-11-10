@@ -119,7 +119,7 @@ internal object PairedRows {
 
     private fun facets(case: AuditedCase): Map<String, String?> {
         val record = requireNotNull(case.record)
-        val solverJars = record.buildProvenance?.distribution.orEmpty().filterKeys(::solverJar).toSortedMap()
+        val solverJars = record.buildProvenance?.distribution.orEmpty().toSortedMap()
         return record.comparisonControls.mapKeys { (name, _) -> FINGERPRINTS[name] ?: "$CONTROLS$name" } +
             mapOf(REVISION to "${record.gitSha}:$solverJars", "checker" to case.checkPolicy)
     }
@@ -134,10 +134,6 @@ internal object PairedRows {
             }
             if (text(command, "host") != case.host) add("case ${case.index} command ran on another machine")
         }
-    }
-
-    private fun solverJar(path: String): Boolean = path.substringAfterLast('/').let {
-        (it.startsWith("klause-jvm-") || it.startsWith("klause-cli-jvm-")) && it.endsWith(".jar")
     }
 
     private fun String.nullable() = takeUnless { it == "null" }
