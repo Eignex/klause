@@ -975,15 +975,24 @@ indeterminate. [Portfolio admission](12-portfolio.md#witnesses-and-proof-scope) 
 
 ### Finite points
 
-`composedFixpoint` creates a private propagation session for the full Boolean and
-finite integer point and checks the selected original-source relations. The point is
-the session's private root, so incompatible caller pins still refute it. Prepared
-custom providers keep their selected factories and required original checks.
-Pure Boolean clause points use native clause propagation when the selected
-factories permit it, without constructing the general watcher index.
-Cancellation or unavailable required checking returns indeterminate. Every exit
-reports the propagation work through the caller's accounting hook, and no scratch
-state survives a check.
+`FinitePointCheck` checks Boolean and finite integer points against one immutable
+problem and its selected original-source relations. Each point becomes the private
+root of a disposable propagation state, so no point conditions the next. The checker
+builds propagators and occurrence indexes once when every selected propagation
+route is built in. Built-in projections keep their mutable work in the state; a
+custom factory may open a private mechanism for one live state, so those problems
+project afresh for each point. Prepared custom providers keep their selected
+factories and required original checks. Pure Boolean clause points use native clause
+propagation when the selected factories permit it, without constructing the general
+watcher index.
+
+The point must cover every discrete coordinate. Caller pins and deduced restrictions
+are unary, so they are checked directly on the point instead of being seeded into
+propagation, and incompatible pins refute it. The propagated verdict then depends
+only on the coordinates. The checker retains its last decided point and answers an
+equal point from it without propagating. Cancellation or unavailable required
+checking returns indeterminate and is never retained. Every exit reports the
+propagation work through the caller's accounting hook.
 
 Exact point checking also validates integer absolute-value and distinctness
 relations on authoritative arbitrary-width values. `AllDifferent` compares every
@@ -1024,7 +1033,7 @@ certify its own original real relation; see
 
 `finiteWitnessVerifier` combines the finite point check with exact real checking or
 the caller's explicit tolerance policy, checking pins and deduced bounds directly on
-the completed point. A tolerance callback requires complete finite real coordinates
+the completed point. A tolerance callback cut short by cancellation is indeterminate. A tolerance callback requires complete finite real coordinates
 and does not change exact evidence semantics. See
 [model ownership](02-model.md#published-assignments-and-objectives) for coordinate
 lifetimes.
@@ -1035,6 +1044,20 @@ points record whether nominal relations also hold. Tolerance acceptance transfer
 no nominal proof and carries a separate floating-completion permission, withheld at
 zero tolerance. [MPS semantics](05-arithmetic-formats.md#tolerance-publication)
 defines the publication policy.
+
+### Reused validation
+
+An accepted check records a receipt on the immutable `Sample` it checked.
+`finiteWitnessVerifier`, the open-model witness verifier and
+[invocation restriction checks](12-portfolio.md#verification-outcomes) keep receipts. The receipt
+names the identities the check read besides the coordinates: model, objective, proof
+context and tolerance policy. A verifier with the same identities accepts a receipted
+point without repeating source checks. It still checks its own caller restrictions and
+claimed objective, which no receipt covers. Identities are compared by reference, so
+a transformed, rebuilt or structurally equal model needs its own check. A copy with
+equal coordinates keeps its receipts; changed coordinates make a new sample with none.
+Rejected, indeterminate or cancelled checks record nothing, so the next consumer
+checks again. A receipt is in-memory bookkeeping, not a proof.
 
 ### Dependencies
 
