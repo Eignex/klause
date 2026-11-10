@@ -280,11 +280,11 @@ class ReconstructedCertificateTest {
                 listOf(zero),
                 List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
                 listOf(ExactLpRow()),
-                ExactLpObjective(listOf(zero, zero)),
+                ExactLpObjective(listOf(ExactLpNumber.of(weight.negated()), zero)),
             )
 
             val result = certifyLpBoundOnly(assertNotNull(LpExactState(source).toWorkingModel()),
-                doubleArrayOf(weight.toDouble()), ReconstructionLimits(maxAttempts = 0))
+                doubleArrayOf(-weight.toDouble() / 2.0), ReconstructionLimits(maxAttempts = 0))
 
             assertNull(result.bound)
             assertEquals(ReconstructionDecline.CANDIDATE, result.metrics.decline)
