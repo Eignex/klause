@@ -1,15 +1,12 @@
 package com.eignex.klause.bench.lab
 
-import com.eignex.klause.bench.metric.sha256
-import com.eignex.klause.bench.profile.FixedWorkRequest
-import com.eignex.klause.bench.profile.FixedWorkSatMeasurement
-import com.eignex.klause.bench.profile.FixedWorkUnit
-import com.eignex.klause.util.Cancellation
 import com.eignex.lab.bench.BenchRequest
 import com.eignex.lab.bench.BenchStatus
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.Test
@@ -41,7 +38,7 @@ class FixedWorkSatAdapterTest {
 
     @Test
     fun `a killed child without a measured record fails and retains completed warmups`() {
-        val warmup = invoke(measured = false)
+        val warmup = record("warmup", comparable = true)
 
         val result = outcome(listOf(warmup), exit = null, killed = true)
 
@@ -52,7 +49,7 @@ class FixedWorkSatAdapterTest {
 
     @Test
     fun `an interrupted measured invocation reports only completed work metrics`() {
-        val record = invoke(measured = true, deadline = Cancellation { true })
+        val record = record("measured", comparable = false)
 
         val result = outcome(listOf(record), exit = 0, killed = false)
 
@@ -64,7 +61,7 @@ class FixedWorkSatAdapterTest {
 
     @Test
     fun `a comparable measured invocation reports its measured and preparation times`() {
-        val record = invoke(measured = true)
+        val record = record("measured", comparable = true)
 
         val result = outcome(listOf(record), exit = 0, killed = false)
 
@@ -72,10 +69,18 @@ class FixedWorkSatAdapterTest {
         assertTrue(result.metrics.map { it.name }.containsAll(listOf("measuredElapsedMs", "preparationElapsedMs")))
     }
 
-    private fun invoke(measured: Boolean, deadline: Cancellation = Cancellation.Never): JsonObject {
-        val request = FixedWorkRequest("unused", sha256(SOURCE), 1, "clausal-balanced", FixedWorkUnit.CONFLICTS,
-            10, 10_000, 0, 0)
-        return FixedWorkSatMeasurement.invoke(SOURCE, request, 0, measured, null, deadline)
+    private fun record(role: String, comparable: Boolean): JsonObject = buildJsonObject {
+        put("role", role)
+        put("comparable", comparable)
+        put("interrupted", !comparable)
+        put("counters", buildJsonObject { listOf("work", "decisions", "failures").forEach { put(it, 5) } })
+        put("trajectory", buildJsonObject {
+            put("rowsTruncated", false)
+            put("prefix", buildJsonObject { put("digest", "d") })
+        })
+        put("measured", buildJsonObject { put("elapsedNs", 2_000_000) })
+        put("preparation", buildJsonObject { put("elapsedNs", 1_000_000) })
+        put("limitPoint", buildJsonObject { put("reached", false) })
     }
 
     private fun outcome(records: List<JsonObject>, exit: Int?, killed: Boolean) = FixedWorkSatSuite.outcome(
@@ -92,6 +97,5 @@ class FixedWorkSatAdapterTest {
         const val OTHER_SHA = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         val PARAMETERS = mapOf("sources" to "$SHA:$PATH", "seeds" to "1,3", "unit" to "conflicts",
             "limit" to "1000", "deadline-seconds" to "30")
-        val SOURCE = "p cnf 2 2\n1 2 0\n-1 2 0\n".toByteArray()
     }
 }
