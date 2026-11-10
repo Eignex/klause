@@ -118,6 +118,7 @@ class SourceEligibilityTest {
                     """"record":{"feasible":null,"proven":false,"stats":{"unsupported":"x"}}}""",
                 """{"index":2,"status":"FAILED","problem":{"benchCase":{"id":"a",$input}}}""",
                 """{"index":3,"status":"FAILED","problem":{"collection":"miplib2017"}}""",
+                """{"index":4,"status":"DONE","problem":{"collection":""}}""",
             )
             file.writeText(rows.joinToString("\n"))
 
@@ -125,7 +126,7 @@ class SourceEligibilityTest {
 
             assertEquals(listOf("no-witness", "unsuitable", "failed:FAILED"), manifest.exposures.map { it.outcome })
             assertEquals(hash('2'), manifest.exposures.first().inputs.single().plainSha256)
-            assertEquals("miplib2017", manifest.gaps.single().collection)
+            assertEquals(listOf("miplib2017", null), manifest.gaps.map { it.collection })
         } finally {
             file.delete()
         }
