@@ -452,7 +452,9 @@ private class FixedReconstructionVerifier(
             for (index in selected.indices) {
                 meter.step()
                 val cited = selected[index]
-                val side = requireNotNull(if (cited.upper) a.bounds[cited.column].upper else a.bounds[cited.column].lower)
+                val side = requireNotNull(
+                    if (cited.upper) a.bounds[cited.column].upper else a.bounds[cited.column].lower,
+                )
                 if (side.number.value.isZero) meter.step()
                 else value = plus(value, times(selectedReduced[index], from(side.number.value)))
             }
@@ -554,7 +556,9 @@ private class BigReconstructionVerifier(
             }
             for (cited in selected) {
                 meter.step()
-                val side = requireNotNull(if (cited.upper) a.bounds[cited.column].upper else a.bounds[cited.column].lower)
+                val side = requireNotNull(
+                    if (cited.upper) a.bounds[cited.column].upper else a.bounds[cited.column].lower,
+                )
                 if (side.number.value.isZero) meter.step()
                 else value = plus(value, times(reduced[cited.column], from(side.number.value)))
             }
