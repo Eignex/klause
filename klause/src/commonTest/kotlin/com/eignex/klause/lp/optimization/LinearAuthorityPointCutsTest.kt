@@ -556,7 +556,7 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
-    fun `a changed source should discard a paused fractional query`() {
+    fun `a changed scope should discard paused work before a fresh fractional pass`() {
         val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
             setOf(x, y, mixedReal), linkedMapOf(
                 "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
@@ -578,9 +578,12 @@ class LinearAuthorityPointCutsTest {
                 funding.grant(0L)
             }
         })
+        val capture = LinearAuthorityCapture(4, 100_000L, 4_000_000L, Cancellation.Never)
+        capture.observeFractionalAttempt()
         LinearAuthority(budget, retainLp = true, additionalCuts = cuts, aggregateCuts = true,
             fractionalAggregateOrder = true)
             .use { authority ->
+                authority.capture = capture
                 assertTrue(authority.advanceWithPointCuts(source, Cancellation.Never).paused)
 
                 funding.grant(4_000_000L)
@@ -589,7 +592,10 @@ class LinearAuthorityPointCutsTest {
                 val result = authority.advanceWithPointCuts(changed, Cancellation.Never)
 
                 assertFalse(result.paused)
-                assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
+                assertEquals("scope-changed", assertNotNull(capture.fractionalQueryCost).outcome)
+                assertEquals(2L, authority.cutObservations()["numericalCutSelectionFractionalPassAttempts"])
+                assertTrue(budget.operations >= 4)
+                assertEquals(SourceValue.Rational(BigFraction.ONE),
                     (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
                 assertEquals(changed.scope, assertNotNull(result.bound).scope)
                 result.branchGuidance?.let { assertTrue(it.scope === changed.scope) }
