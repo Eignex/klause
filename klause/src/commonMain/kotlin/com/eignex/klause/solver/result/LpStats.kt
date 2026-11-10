@@ -494,6 +494,8 @@ internal fun LpStats.hasActivity(): Boolean =
 internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     var sparseTrial: Map<String, Long> = emptyMap()
     private val phases = LinkedHashMap<String, LpPhaseStats>()
+    private val directionalOutcomes = LinkedHashMap<String, Long>()
+    private var directionalCalls = 0L
     private var templatePreparationSeen = false
     private var templateAssemblySeen = false
     private var templateNanos = 0L
@@ -580,8 +582,14 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     }
 
     private fun phaseSnapshot(): Map<String, LpPhaseStats> {
-        if (!templatePreparationSeen && !templateAssemblySeen) return phases.toMap()
+        if (!templatePreparationSeen && !templateAssemblySeen && directionalCalls == 0L) return phases.toMap()
         return phases.toMutableMap().apply {
+            if (directionalCalls != 0L) {
+                val key = "DIRECTIONAL_BRANCH_NODE"
+                put(key, getValue(key).mergedWith(LpPhaseStats(
+                    calls = directionalCalls, outcomes = directionalOutcomes.toMap(),
+                )))
+            }
             if (templatePreparationSeen) {
                 val outcomes = buildMap {
                     if (templateDeclined != 0L) put("DECLINED", templateDeclined)
@@ -621,10 +629,12 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         }
     }
 
+    fun directionalBranchCount(outcome: String): Long = directionalOutcomes[outcome] ?: 0L
+
     fun observeDirectionalBranch(outcome: String) {
-        val key = "DIRECTIONAL_BRANCH_NODE"
-        val delta = LpPhaseStats(calls = 1L, outcomes = mapOf(outcome to 1L))
-        phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
+        if (directionalCalls == 0L) phases.getOrPut("DIRECTIONAL_BRANCH_NODE") { LpPhaseStats() }
+        directionalCalls++
+        directionalOutcomes[outcome] = (directionalOutcomes[outcome] ?: 0L) + 1L
     }
 
     fun observePrimalPhase(stage: String, outcome: String, nanos: Long, work: Long = 0L) {
