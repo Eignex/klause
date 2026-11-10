@@ -12,6 +12,26 @@ import kotlin.test.assertTrue
 
 class NativeCapIndexTest {
     @Test
+    fun `abort after logical retirement should preserve live candidate handles`() {
+        val rows = Rows()
+        repeat(8) { rows.add(9 + it) }
+        rows.retireHook = { rows.cancelled = true }
+        rows.attempt(2)
+        val alive = rows.survivors()
+        assertEquals(7, alive.size)
+        rows.retireHook = {}
+        rows.cancelled = false
+        rows.budget = ReclamationPreparation(100_000L, 1_048_576L, { false }, {})
+
+        val completion = rows.index.abort(rows.budget, rows.policy)
+
+        assertEquals(NativeCapIndex.Completion.Aborted, completion)
+        assertEquals(alive, rows.survivors())
+        assertEquals(alive, rows.candidates.toIntArray().sorted())
+        assertTrue(rows.classified.none { it })
+    }
+
+    @Test
     fun `completed untracked retirement preparation should not repay its work`() {
         val rows = Rows()
         val first = ReclamationPreparation(1L, 64L, { false }, {})

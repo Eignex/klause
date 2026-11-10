@@ -316,7 +316,7 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                 Stage.Retire -> {
                     budget.visit(8L)
                     budget.visit(0L)
-                    pendingKeep = policy.alive(pending) && !policy.retire(pending)
+                    pendingKeep = policy.alive(pending) && (aborting || !policy.retire(pending))
                     stage = Stage.Remove
                     changed()
                 }
@@ -328,8 +328,8 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                     if (heapSize > 0) candidates[0] = candidates[heapSize]
                     pending = -1
                     sift = 0
-                    afterSift = Stage.Select
-                    stage = if (heapSize == 0) Stage.Select else Stage.Down
+                    afterSift = if (aborting) Stage.Restore else Stage.Select
+                    stage = if (aborting || heapSize == 0) afterSift else Stage.Down
                     changed()
                 }
                 Stage.Restore -> {
@@ -412,10 +412,11 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
             budget.visit(8L)
             budget.visit(0L)
             if (insertPending && pending >= 0) read--
-            pending = -1
+            if (stage != Stage.Retire && stage != Stage.Remove) pending = -1
             insertPending = false
             aborting = true
-            if (stage != Stage.Finalize && stage != Stage.TrimPool) stage = Stage.Restore
+            if (stage != Stage.Finalize && stage != Stage.TrimPool &&
+                stage != Stage.Retire && stage != Stage.Remove) stage = Stage.Restore
             changed()
         }
         return advance(Int.MAX_VALUE, NativeCapConfiguration(tiered, glue, mid), budget, policy)

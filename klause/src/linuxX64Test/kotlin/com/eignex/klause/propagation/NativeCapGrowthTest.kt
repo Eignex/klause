@@ -5,6 +5,7 @@ import com.eignex.klause.ir.Problem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 internal class NativeCapGrowthTest {
@@ -26,7 +27,10 @@ internal class NativeCapGrowthTest {
             }
             assertEquals(32, session.activeLearnedClauseCount)
             assertFalse(session.nativeCapWindowPending)
-            repeat(cap - 31) { index -> session.addLearnedClause(clause, cap + 8 - index) }
+            val state = session.explanationState
+            repeat(cap - 31) { index -> state.addLearnedClause(clause, cap + 8 - index) }
+            assertNull(state.runToFixpoint(allFactors = false))
+            assertTrue((0..2).all { session.boolValue(it) == null })
 
             var grants = 0
             var maximumWork = 0L
