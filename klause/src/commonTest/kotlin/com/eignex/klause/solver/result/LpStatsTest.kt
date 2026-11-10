@@ -19,6 +19,48 @@ import kotlin.test.assertTrue
 
 class LpStatsTest {
     @Test
+    fun `unobserved directional branches have no phase or counts`() {
+        val sink = LpStatsSink()
+
+        val snapshot = sink.snapshot()
+
+        assertFalse(snapshot.phases.containsKey("DIRECTIONAL_BRANCH_NODE"))
+        assertEquals(0L, sink.directionalBranchCount("UP"))
+    }
+
+    @Test
+    fun `directional branch counters agree with snapshot totals`() {
+        for (route in LpRoute.entries) {
+            val sink = LpStatsSink(route)
+            for (outcome in listOf("UP", "DOWN", "UP", "RESET")) sink.observeDirectionalBranch(outcome)
+
+            val phase = sink.snapshot().phases.getValue("DIRECTIONAL_BRANCH_NODE")
+
+            assertEquals(LpPhaseStats(calls = 4L, outcomes = mapOf("UP" to 2L, "DOWN" to 1L,
+                "RESET" to 1L)), phase)
+            for ((outcome, count) in phase.outcomes) assertEquals(count, sink.directionalBranchCount(outcome))
+            assertEquals(0L, sink.directionalBranchCount("MISSING"))
+        }
+    }
+
+    @Test
+    fun `directional branch snapshots retain counts after later observations`() {
+        val sink = LpStatsSink()
+        sink.observeDirectionalBranch("UP")
+        sink.observeDirectionalBranch("UP")
+        val before = sink.snapshot()
+
+        sink.observeDirectionalBranch("DOWN")
+        sink.observeDirectionalBranch("UP")
+        val after = sink.snapshot()
+
+        assertEquals(LpPhaseStats(calls = 2L, outcomes = mapOf("UP" to 2L)),
+            before.phases.getValue("DIRECTIONAL_BRANCH_NODE"))
+        assertEquals(LpPhaseStats(calls = 4L, outcomes = mapOf("UP" to 3L, "DOWN" to 1L)),
+            after.phases.getValue("DIRECTIONAL_BRANCH_NODE"))
+    }
+
+    @Test
     fun `template preparation should retain declined work on its owning route`() {
         val sink = LpStatsSink(LpRoute.ROOT)
         sink.observeTemplatePreparation(7L, 11L, prepared = true, factorsReused = 2,
