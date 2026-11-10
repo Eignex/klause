@@ -1837,3 +1837,7 @@ source scope, exact snapshot, basis and typed certificate rejection. Results req
 matching LP owner and model revisions. Root queries
 do not consume conditional capture capacity. Observer time spends the active grant;
 the diagnostic does not establish full portfolio replay or production performance.
+Completed infeasible candidates retain up to 4096 original ray entries as exact
+IEEE-754 hexadecimal bits and the optional infeasible basis. Ray capture requires
+the solver's exact solved-state identity to match the captured LP state. These
+candidates carry no certificate or source-verdict authority.

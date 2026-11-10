@@ -23,6 +23,10 @@ import com.eignex.klause.util.Cancellation
 import java.io.File
 import java.util.IdentityHashMap
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -123,6 +127,7 @@ internal object JointRepairLpCapture {
         val seen = IdentityHashMap<Any, Boolean>()
         var missingSide = false
         var rejectionCondition: Int? = null
+        var rejectionRayCapture: String? = null
         try {
             while (!active() && call(owner, "getExhausted") != true && !missingSide) {
                 val offer: (Sample, Any?) -> Unit = { _, _ -> }
@@ -138,6 +143,12 @@ internal object JointRepairLpCapture {
                     if (id != null) {
                         val state = stateIdentity(session, owners)
                         val matched = states[id] == state.toString()
+                        val started = System.nanoTime()
+                        val rayCapture = if (matched && !active() &&
+                            call(guide, "getTermination").toString() == "INFEASIBLE_CANDIDATE") {
+                            captureRay(session, id, requireNotNull(scope), state, out)
+                        } else null
+                        observerNs += System.nanoTime() - started
                         out.resolve("guidance.jsonl").appendText(buildJsonObject {
                             put("phase", call(guide, "getPhase").toString())
                             put("termination", call(guide, "getTermination").toString())
@@ -149,6 +160,7 @@ internal object JointRepairLpCapture {
                             put("conditionId", id)
                             put("stateIdentity", state)
                             put("captureStateMatched", matched)
+                            put("rayCaptureSha256", rayCapture)
                             rejection?.let { missing ->
                                 put("dualRejection", buildJsonObject {
                                     put("column", call(missing, "getColumn") as Int)
@@ -159,7 +171,10 @@ internal object JointRepairLpCapture {
                             put("missingBoundSide", rejection != null)
                         }.toString() + "\n")
                         missingSide = rejection != null && matched
-                        if (missingSide) rejectionCondition = id
+                        if (missingSide) {
+                            rejectionCondition = id
+                            rejectionRayCapture = rayCapture
+                        }
                     }
                 }
             }
@@ -186,6 +201,7 @@ internal object JointRepairLpCapture {
                 put("rejectionCaptureAvailable", rejectionCondition?.let {
                     out.resolve("conditional-$it.klexact").isFile
                 } == true)
+                put("rejectionRayCaptureAvailable", rejectionRayCapture != null)
                 put("stats", NumericalResidualProfile.json(call(owner, "getStats")))
                 put("sourceVerdictClaim", false)
                 put("fullPortfolioReplayQualified", false)
@@ -195,6 +211,47 @@ internal object JointRepairLpCapture {
             (search as AutoCloseable).close()
             (owner as AutoCloseable).close()
         }
+    }
+
+    private fun captureRay(session: Any, id: Int, scope: SourceScope, state: JsonObject, out: File): String? {
+        val target = out.resolve("conditional-$id-ray.json")
+        if (target.exists()) return null
+        val snapshot = out.resolve("conditional-$id.klexact").takeIf { it.isFile } ?: return null
+        val owner = requireNotNull(field(session, "owner"))
+        val current = requireNotNull(call(owner, "getState"))
+        val solver = field(owner, "solver") ?: return null
+        if (call(solver, "getSolvedExactState") !== current) return null
+        val model = requireNotNull(call(current, "getModel"))
+        val rows = call(model, "getM") as Int
+        val columns = call(model, "getN") as Int
+        if (columns.toLong() + rows > 8192) return null
+        val bits = rayBits(call(solver, "getInfeasibleRay") as DoubleArray?, rows) ?: return null
+        val basis = call(solver, "getInfeasibleBasis")?.takeIf {
+            (call(it, "getBasicVars") as IntArray).size == rows &&
+                (call(it, "getStatus") as Array<*>).size == columns + rows
+        }
+        val payload = buildJsonObject {
+            put("conditionId", id)
+            put("scope", NumericalFrontierSnapshot.scope(scope))
+            put("stateIdentity", state)
+            put("solvedStateMatched", true)
+            put("snapshotSha256", sha256(snapshot.readBytes()))
+            put("candidateOrientation", "engine-original")
+            put("rayEncoding", "ieee754-binary64-hex")
+            put("rayBits", JsonArray(bits.map(::JsonPrimitive)))
+            put("infeasibleBasis", FinitePortfolioLpCapture.basisMetadata(basis) ?: JsonNull)
+            put("infeasibleRow", call(solver, "getInfeasibleRow") as Int)
+            put("sourceVerdictClaim", false)
+            put("certificateClaim", false)
+        }.toString().encodeToByteArray()
+        if (payload.size > 1_048_576) return null
+        target.writeBytes(payload)
+        return sha256(payload)
+    }
+
+    internal fun rayBits(ray: DoubleArray?, rows: Int): List<String>? {
+        if (rows !in 1..4096 || ray == null || ray.size != rows || ray.any { !it.isFinite() }) return null
+        return ray.map { java.lang.Long.toHexString(it.toRawBits()).padStart(16, '0') }
     }
 
     internal class ConditionWindow(private val limit: Int) {

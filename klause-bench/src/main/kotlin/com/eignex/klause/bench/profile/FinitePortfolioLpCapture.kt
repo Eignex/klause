@@ -365,14 +365,17 @@ internal object FinitePortfolioLpCapture {
         if (file == null) return null
         val model = get(query, "Model")
         if ((get(model, "N") as Int).toLong() + (get(model, "M") as Int) > 8192) return null
-        val basis = call(query, "captureBasis")
-        val text = if (basis == null) JsonNull.toString() else buildJsonObject {
-            put("headings", JsonArray((get(basis, "BasicVars") as IntArray).map(::JsonPrimitive)))
-            put("statuses", JsonArray((get(basis, "Status") as Array<*>).map { JsonPrimitive(it.toString()) }))
-            put("captureEligible", get(basis, "CaptureEligible") as Boolean)
-        }.toString()
+        val text = (basisMetadata(call(query, "captureBasis")) ?: JsonNull).toString()
         file.writeText(text)
         return sha256(text.encodeToByteArray())
+    }
+
+    internal fun basisMetadata(basis: Any?): JsonObject? = basis?.let { value ->
+        buildJsonObject {
+            put("headings", JsonArray((get(value, "BasicVars") as IntArray).map(::JsonPrimitive)))
+            put("statuses", JsonArray((get(value, "Status") as Array<*>).map { JsonPrimitive(it.toString()) }))
+            put("captureEligible", get(value, "CaptureEligible") as Boolean)
+        }
     }
 
     private fun get(owner: Any, name: String): Any = requireNotNull(call(owner, "get$name"))
