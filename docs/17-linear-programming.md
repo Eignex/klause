@@ -1602,7 +1602,10 @@ Exact dual checks validate the complete input before skipping products with exac
 zero multipliers, right-hand sides or selected endpoints. Skipped entries retain
 their visit charges and cancellation polling; reduced-cost signs, required bound
 sides and source support remain part of the complete check in both fixed-width and
-arbitrary precision.
+arbitrary precision. Dual verification checks every required bound side before
+accumulating right-hand-side and endpoint objective terms. The fixed-width check
+charges bounded storage for selected reduced costs and both checks charge their
+endpoint pass within the same certification allowance.
 
 Claim phases report inclusive certification time, existing charged work and terminal
 refusal, including unsupported authority, missing bound sides, scalar limits, singularity,
