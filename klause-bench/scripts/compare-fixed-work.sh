@@ -56,7 +56,8 @@ jq -s -c --arg control "$1" --arg candidate "$2" '
           {class: "incomparable", reasons: [
             (if .control.comparable | not then "control-\(.control.stop // "missing")" else empty end),
             (if .candidate.comparable | not then "candidate-\(.candidate.stop // "missing")" else empty end)]}
-        elif .control.prefixDigest != null and .control.prefixDigest == .candidate.prefixDigest then
+        elif (.control.prefixDigest != null and .control.prefixDigest == .candidate.prefixDigest) or
+             (.control.stop == "verdict" and .candidate.stop == "verdict" and .control.digest == .candidate.digest) then
           {class: "matched", elapsedRatio: ratio(.control.timeNs; .candidate.timeNs),
            cpuRatio: ratio(.control.cpuNs; .candidate.cpuNs)}
         elif .control.stop == "verdict" and .candidate.stop == "verdict" then

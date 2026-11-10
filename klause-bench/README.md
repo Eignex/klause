@@ -1667,11 +1667,14 @@ its completed warmups. Verdicts are native claims without independent source
 validation, and no record qualifies ordinary ten-second performance.
 
 `deploy/lab cases ID --json | scripts/compare-fixed-work.sh CONTROL CANDIDATE`
-pairs arms per row. Rows whose prefix digests agree are `matched` and report
-candidate/control limit-point wall and CPU ratios. Rows with different trajectories
+pairs arms per row. Rows whose prefix digests agree, or whose arms reach a verdict
+with equal full digests, are `matched` and report candidate/control wall and CPU
+ratios at the limit point or verdict. Rows with different trajectories
 are `diverged`, with the first differing checkpoint, unless both arms completed with
 a verdict (`completed-diverged`, wall ratio only). Interrupted or missing arms stay
 `incomparable` or `incomplete`. The summary counts each class and cross-host rows.
+Seeds need not change the trajectory; compare digests across seeds before counting
+them as independent samples.
 
 ## Comparable sweep controls
 
