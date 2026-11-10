@@ -211,6 +211,7 @@ internal object JointRepairLpCapture {
             (search as AutoCloseable).close()
             (owner as AutoCloseable).close()
         }
+        if (options["inspect-rays"] == "true") JointRayInspection.inspect(out, stop)
     }
 
     private fun captureRay(session: Any, id: Int, scope: SourceScope, state: JsonObject, out: File): String? {

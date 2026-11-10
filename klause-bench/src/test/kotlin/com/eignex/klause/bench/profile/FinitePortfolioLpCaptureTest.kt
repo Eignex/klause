@@ -158,7 +158,8 @@ class FinitePortfolioLpCaptureTest {
     }
 
     @ParameterizedTest
-    @CsvSource("handoff,false", "portfolio-policy,retained", "portfolio-progress,true", "capture-worker,any")
+    @CsvSource("handoff,false", "portfolio-policy,retained", "portfolio-progress,true", "capture-worker,any",
+        "inspect-rays,unknown")
     fun `joint capture should reject incompatible controls before corpus resolution`(key: String, value: String) {
         val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
             "seed" to "1", "handoff" to "true", "capture-mode" to "joint-before") + (key to value)
@@ -169,7 +170,7 @@ class FinitePortfolioLpCaptureTest {
     }
 
     @ParameterizedTest
-    @CsvSource("portfolio-policy,unknown", "portfolio-progress,yes", "handoff,true", "unsupported,true")
+    @CsvSource("portfolio-policy,unknown", "portfolio-progress,yes", "handoff,true", "unsupported,true", "inspect-rays,true")
     fun `invalid policy requests should fail before corpus resolution`(key: String, value: String) {
         val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
             "seed" to "1", "handoff" to "false", "portfolio-policy" to "ordinary") + (key to value)
@@ -177,5 +178,17 @@ class FinitePortfolioLpCaptureTest {
         assertFailsWith<IllegalArgumentException> {
             FinitePortfolioLpCapture.main(options.map { (name, setting) -> "$name=$setting" }.toTypedArray())
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `ray inspection should preserve producer parameters`(enabled: Boolean) {
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "true", "capture-mode" to "joint-before")
+        val expected = FinitePortfolioLpCapture.parameters(options)
+
+        val parameters = FinitePortfolioLpCapture.parameters(options + ("inspect-rays" to enabled.toString()))
+
+        assertEquals(expected, parameters)
     }
 }
