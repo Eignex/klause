@@ -301,8 +301,8 @@ matching invocation or an equal condition adds no obligation, and an invocation'
 check covers its own source condition. The point records each satisfied set as a
 [receipt](07-presolve.md#reused-validation), so a later consumer checks only the
 restrictions it adds. `PortfolioEvidence` supplies its worker's and its own
-restrictions to that one check and runs no separate pass. An unbounded completion
-checks its point once, together with its certificate.
+restrictions to that one check and runs no separate pass. A completion's point passes
+witness admission first, and its proof check reuses the receipts that admission recorded.
 
 Native enforcement, source checks and receipts have different scopes. A worker's
 own propagation or theory search enforces the relations it owns. The portfolio
