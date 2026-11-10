@@ -1841,3 +1841,10 @@ Completed infeasible candidates retain up to 4096 original ray entries as exact
 IEEE-754 hexadecimal bits and the optional infeasible basis. Ray capture requires
 the solver's exact solved-state identity to match the captured LP state. These
 candidates carry no certificate or source-verdict authority.
+Set `inspect-rays=true` to check each original and negated ray separately after
+producer retirement. The existing kernel verifier gets a fresh meter per candidate,
+with at most 2,000,000 work and 64 MiB modeled allocation; each captured LP projection
+has the same separate limits. At most four rays and eight candidate checks run inside
+the containing timeout. Inspection preserves the four-second producer grant and
+reports native conditional-kernel outcomes without source publication or independent
+proof authority.

@@ -53,10 +53,13 @@ internal object FinitePortfolioLpCapture {
         val required = setOf("suite", "problem", "sha256", "seed", "handoff")
         require(options.keys.containsAll(required) && (options.keys - required).all {
             it in setOf("timeout-ms", "captures", "cutoff-bits", "capture-worker", "capture-route", "capture-guidance",
-                "portfolio-policy", "portfolio-progress", "capture-mode")
+                "portfolio-policy", "portfolio-progress", "capture-mode", "inspect-rays")
         })
         val mode = options["capture-mode"] ?: "portfolio"
         require(mode in setOf("portfolio", "joint-before"))
+        if ("inspect-rays" in options) {
+            require(mode == "joint-before" && options["inspect-rays"] in setOf("true", "false"))
+        }
         val preset = options["portfolio-policy"] ?: if (mode == "joint-before") "complete" else "retained"
         require(preset in setOf("ordinary", "retained", "complete")) { "unsupported portfolio policy: $preset" }
         val handoff = options.getValue("handoff").toBooleanStrict()
