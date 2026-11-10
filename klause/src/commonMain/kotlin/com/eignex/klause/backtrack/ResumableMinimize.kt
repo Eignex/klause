@@ -64,8 +64,6 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchDecisionBudget
 import com.eignex.klause.solver.search.SearchInvocationResources
-import com.eignex.klause.solver.search.SearchLearnedConflict
-import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchModelContinuation
 import com.eignex.klause.solver.search.SearchModelDisposition
 import com.eignex.klause.solver.search.SearchModelPolicy
@@ -149,7 +147,8 @@ internal class ResumableMinimize(
     private val hasPreparation = preparationBudget != null
     override val canReseed: Boolean
         get() = !preparationPending && clausePrimal?.isDone != false && !rootRoundingPending && !rootLayoutPending &&
-            pendingRealLeaf == null && pendingRealResult == null
+            pendingRealLeaf == null && pendingRealResult == null &&
+            (!::run.isInitialized || !run.learnedPropagationPending)
     override val canContinuePreparation: Boolean get() = clausePrimal?.isDone == false
     private var initialCandidate = initialCandidate
     private var initialPoolVersion = 0L
@@ -586,7 +585,9 @@ internal class ResumableMinimize(
         done?.let { return it }
         check(!closed) { "search is closed" }
         globalToken = baseCancellation.lifetimeCancellation() or global
-        publishClausePrimalCandidate()?.let { onIncumbent(it.withSourceSemantics(problem.semantics)) }
+        if (!run.learnedPropagationPending) {
+            publishClausePrimalCandidate()?.let { onIncumbent(it.withSourceSemantics(problem.semantics)) }
+        }
         if (!rootIsExhausted) {
             val admitted = slice.begin(sliceMillis, sliceNodes)
             repaidWork = slice.repaidWork
@@ -693,6 +694,7 @@ internal class ResumableMinimize(
     fun rebind(assumptions: Assumptions, decisionBudget: Long) {
         check(rebindable) { "search is not rebindable" }
         check(!closed) { "search is closed" }
+        check(!run.learnedPropagationPending) { "learned propagation is pending" }
         globalToken = baseCancellation.lifetimeCancellation()
         slice.begin(Long.MAX_VALUE, -1L)
         val pending = pendingRealLeaf
@@ -748,6 +750,10 @@ internal class ResumableMinimize(
             check(!closed) { "search is closed" }
             if (rootIsExhausted) return terminal(terminalExhausted(rootExhausted))
             if (pendingRealLeaf != null || pendingRealResult != null) return traversalEvent()
+            if (run.learnedPropagationPending) {
+                if (treeBudgetExhausted) return terminal(terminalBudget())
+                return traversalEvent()
+            }
             if (!clausePrimalStarted) {
                 clausePrimalStarted = true
                 if (!rebindable && initialCandidate == null && externalCutoff() == Double.POSITIVE_INFINITY) {
@@ -1455,70 +1461,9 @@ internal class ResumableMinimize(
                 !session.learnedConstraintSatisfied(learned)
             ) {
                 sink.lp.observeBackjump()
-                SearchNodeDisposition.Backjump(LpLearnedConflict(learned))
+                SearchNodeDisposition.Backjump(LpLearnedConflict(learned, cp))
             } else {
                 SearchNodeDisposition.Prune
-            }
-        }
-    }
-
-    /** Adapts an asserting LP Farkas consequence to the shared traversal's native backjump contract. */
-    private inner class LpLearnedConflict(private val learned: LearnedConstraint) : SearchLearnedConflict {
-        override val decisionLevel: Int get() = cp.sharedLevelForNative(learned.backjumpLevel)
-        override val lbd: Int get() = learned.lbd
-        override val guardLiterals: IntArray get() = learned.guardLiterals
-        override val decisionLevels: IntArray get() = learned.decisionLevels
-
-        override fun apply(session: com.eignex.klause.solver.search.SearchSession): SearchLearnedConflictResult {
-            if (!learned.asserting || learned.isContradiction) {
-                return SearchLearnedConflictResult.Chronological
-            }
-            val result = when (learned) {
-                is com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned -> {
-                    this@ResumableMinimize.session.addLearnedClause(Clause(learned.literals), learned.lbd)
-                }
-
-                is com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedPb -> {
-                    this@ResumableMinimize.session.addLearnedPb(
-                        learned.weights,
-                        learned.literals,
-                        learned.degree,
-                        learned.lbd,
-                    )
-                }
-
-                is com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedIntegerRow -> {
-                    this@ResumableMinimize.session.addLearnedIntegerRow(learned)
-                }
-            }
-            return when (result) {
-                is PropagationResult.Implied -> {
-                    // The clause stays in the CP database; see the note in CpSearchComponent.
-                    when (cp.import(result, session)) {
-                        ComponentResult.Consistent -> when (session.propagate()) {
-                            ComponentResult.Consistent -> SearchLearnedConflictResult.Resume
-                            is ComponentResult.Conflict -> SearchLearnedConflictResult.Chronological
-                            ComponentResult.Indeterminate -> SearchLearnedConflictResult.Indeterminate
-                        }
-
-                        is ComponentResult.Conflict -> SearchLearnedConflictResult.Chronological
-
-                        ComponentResult.Indeterminate -> SearchLearnedConflictResult.Indeterminate
-                    }
-                }
-
-                is PropagationResult.Unsat -> {
-                    val next = cp.mappedLearnedConstraint(result.learnedClause as? LearnedConstraint)
-                    when {
-                        next == null -> SearchLearnedConflictResult.Chronological
-
-                        next.backjumpLevel == 0 && next.isContradiction -> {
-                            SearchLearnedConflictResult.Exhausted
-                        }
-
-                        else -> SearchLearnedConflictResult.Backjump(LpLearnedConflict(next))
-                    }
-                }
             }
         }
     }

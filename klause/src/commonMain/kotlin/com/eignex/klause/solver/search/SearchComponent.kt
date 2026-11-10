@@ -215,6 +215,12 @@ interface SearchLearnedConflict {
     fun apply(session: SearchSession): SearchLearnedConflictResult
 }
 
+// Only shared propagation remains: native registration and consequence publication have completed.
+internal interface SearchPendingLearnedPropagation {
+    val propagationPending: Boolean
+    fun continuePropagation(session: SearchSession): ComponentResult
+}
+
 /** Result of applying a [SearchLearnedConflict]. */
 sealed interface SearchLearnedConflictResult {
     /** The consequence was asserted and propagated. */
@@ -322,7 +328,7 @@ interface SearchRunLifecycle {
     /** Called once before the first branch of a run. */
     fun onStart(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Continue
 
-    /** Called at every [SearchRun.next] entry after [onStart]. */
+    /** Called on [SearchRun.next] entry after retained shared propagation completes. */
     fun onResume(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Continue
 
     /** Called after the session has returned to root during a restart. */
