@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Audits a retained paired lab job read-only: paired-audit.sh --cases lab-cases.jsonl [--request request.json]
-# [--execution execution.json] [--job job.json] [--arms a,b] [--treatment key] [--allow facet]
-# [--control key=value] [--rows n]. Build the bench first with ./gradlew :klause-bench:installDist.
+# [--execution execution.json] [--job job.json] [--plans preparation/] [--executed cases/] [--files files.json]
+# [--revision arm=sha] [--arms a,b] [--treatment key] [--allow facet] [--control key=value] [--rows n].
+# Exits 0 when verified, 1 for an invalid or missing row, 2 for bad input, 3 when only partly verified.
+# Build the bench first with ./gradlew :klause-bench:installDist.
 set -euo pipefail
 lib="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/build/install/klause-bench/lib"
 [[ -d "$lib" ]] || { echo "paired-audit: $lib missing; run ./gradlew :klause-bench:installDist" >&2; exit 2; }

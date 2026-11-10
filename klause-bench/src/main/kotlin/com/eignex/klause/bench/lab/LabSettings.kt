@@ -81,7 +81,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
     )
 
     fun caseParameters(engine: String, seed: Long, control: String = ""): Map<String, String> =
-        parameters.filterKeys { it.startsWith("param.") || it in setOf("lp", "presolve", "exact", "verbose") } + mapOf(
+        parameters.filterKeys(::passedThrough) + mapOf(
             "input-only" to inputOnly.toString(),
             "engine" to engine,
             "seed" to seed.toString(),
@@ -106,6 +106,9 @@ internal data class LabSettings(val parameters: Map<String, String>) {
         }
 
     companion object {
+        /** Request parameters the planner copies verbatim into every case's parameters. */
+        internal fun passedThrough(key: String): Boolean = key.startsWith("param.") || key in PASSED_THROUGH
+
         internal fun runtimeTags(
             os: String = System.getProperty("os.name"),
             arch: String = System.getProperty("os.arch"),
@@ -123,6 +126,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
             return setOf("platform:$platform", "arch:$architecture")
         }
 
+        private val PASSED_THROUGH = setOf("lp", "presolve", "exact", "verbose")
         val SELECTORS = setOf("suite", "set", "name", "category", "tag", "kind", "per-family", "seed", "max", "balance")
         private val OPTIONS = setOf(
             "input-only", "selections", "engines", "solver-seeds", "repeats", "cpus", "memory-mib", "timeout-ms", "lp",
