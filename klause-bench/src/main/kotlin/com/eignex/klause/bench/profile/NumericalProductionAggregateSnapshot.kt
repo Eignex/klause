@@ -260,6 +260,6 @@ internal class NumericalProductionAggregateSnapshot(private val stop: Cancellati
             })
         }
         return snapshot to (checked?.first == SourceEvidenceCheck.Checked &&
-            checked?.second == SourceEvidenceCheck.Checked && !stop())
+            checked.second == SourceEvidenceCheck.Checked && !stop())
     }
 }

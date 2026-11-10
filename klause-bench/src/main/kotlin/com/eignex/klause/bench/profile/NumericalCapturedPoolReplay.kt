@@ -69,6 +69,11 @@ internal class NumericalCapturedPoolReplay(private val stop: Cancellation) {
                 put("freshOwner", true)
                 put("commonDefinitions", true)
                 put("importCostsIncluded", true)
+                put("chargedTotalsReadAfterOwnerClose", true)
+                put("observationsIncludeOwnerClose", false)
+                put("observations", buildJsonObject {
+                    for ((name, count) in field(result, "observations") as Map<String, Long>) put(name, count)
+                })
                 put("maximumOperations", 1)
                 put("maximumWork", 20_000_000L)
                 put("maximumModeledAllocation", 67_108_864L)
