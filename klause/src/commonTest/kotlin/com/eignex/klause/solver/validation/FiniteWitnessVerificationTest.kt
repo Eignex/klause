@@ -3,9 +3,11 @@ package com.eignex.klause.solver.validation
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -13,6 +15,7 @@ import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class FiniteWitnessVerificationTest {
@@ -97,4 +100,80 @@ class FiniteWitnessVerificationTest {
         assertIs<Verification.Accepted<*, *>>(accepted)
         assertIs<Verification.Rejected>(rejected)
     }
+
+    @Test
+    fun `a point accepted under the same model and policy should not be checked again`() {
+        var checks = 0
+        val tolerance: (Sample) -> Boolean = { checks++; true }
+        val model = realModel()
+        val point = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
+        finiteWitnessVerifier(model, null, toleranceCheck = tolerance).verify(Candidate(point, null))
+
+        val result = finiteWitnessVerifier(model, null, toleranceCheck = tolerance).verify(Candidate(point, null))
+
+        assertIs<Verification.Accepted<*, *>>(result)
+        assertEquals(1, checks)
+    }
+
+    @Test
+    fun `another tolerance policy should check an accepted point again`() {
+        var checks = 0
+        val model = realModel()
+        val point = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
+        finiteWitnessVerifier(model, null, toleranceCheck = { checks++; true }).verify(Candidate(point, null))
+
+        finiteWitnessVerifier(model, null, toleranceCheck = { checks++; true }).verify(Candidate(point, null))
+
+        assertEquals(2, checks)
+    }
+
+    @Test
+    fun `changed coordinates should not inherit an accepted check`() {
+        var checks = 0
+        val tolerance: (Sample) -> Boolean = { checks++; true }
+        val model = realModel()
+        val point = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
+        val verifier = finiteWitnessVerifier(model, null, toleranceCheck = tolerance)
+        verifier.verify(Candidate(point, null))
+
+        verifier.verify(Candidate(point.copy(reals = doubleArrayOf(0.25)), null))
+
+        assertEquals(2, checks)
+    }
+
+    @Test
+    fun `a reused point should still be checked against consumer restrictions`() {
+        val model = Problem(0, 2, Array(2) { IntDomain(0, 10) },
+            arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 10))).bake()
+        val point = Sample(BooleanArray(0), longArrayOf(3, 7))
+        val points = FinitePointCheck(model)
+        finiteWitnessVerifier(model, null, Assumptions.None, points = points).verify(Candidate(point, null))
+
+        val result = finiteWitnessVerifier(model, null, Assumptions.None.withInt(0, 4), points = points)
+            .verify(Candidate(point, null))
+
+        assertIs<Verification.Rejected>(result)
+    }
+
+    @Test
+    fun `a tolerance check cut short by cancellation should stay indeterminate and be repeated`() {
+        var checks = 0
+        var cancelled = false
+        val tolerance: (Sample) -> Boolean = { checks++; cancelled = checks == 1; true }
+        val model = realModel()
+        val point = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
+        val interrupted = finiteWitnessVerifier(model, null, Cancellation { cancelled }, tolerance)
+            .verify(Candidate(point, null))
+
+        val repeated = finiteWitnessVerifier(model, null, toleranceCheck = tolerance).verify(Candidate(point, null))
+
+        assertIs<Verification.Indeterminate>(interrupted)
+        assertIs<Verification.Accepted<*, *>>(repeated)
+        assertEquals(2, checks)
+    }
+
+    private fun realModel() = Problem(
+        0, 0, emptyArray(), emptyList<Factor>(),
+        numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+    ).bake()
 }

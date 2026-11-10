@@ -29,7 +29,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.FiniteFactorEnforcement
 import com.eignex.klause.solver.search.FiniteFactorEnforcer
 import com.eignex.klause.solver.search.SearchCandidateHints
-import com.eignex.klause.solver.validation.composedFixpoint
+import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.PolynomialSearchComponent
 import com.eignex.klause.theory.qfnra.PolynomialTheoryInvocation
@@ -52,6 +52,7 @@ internal class PolynomialWorkerAdapter(
         model.finite.bake(selected.forEngineView(model.finite), this.cancellation)
     } ?: model.finite.bake(this.cancellation)
     private val enforcingFactors = model.finiteEnforcingFactors
+    private val pointCheck = FinitePointCheck(finite, enforcingFactors)
     private val fixed = if (params.assumptions.isEmpty && params.assumptions.deductions.isEmpty) {
         finite.fixedDiscreteSample()
     } else {
@@ -107,8 +108,7 @@ internal class PolynomialWorkerAdapter(
     private var refutedCondition: PolynomialCondition? = null
 
     private val candidateCompletion = CandidateCompletion { candidate, stop ->
-        when (composedFixpoint(finite, Candidate(candidate, Unit), cancellation or stop, params.assumptions,
-            enforcingPeers = enforcingFactors)) {
+        when (pointCheck.check(Candidate(candidate, Unit), cancellation or stop, params.assumptions)) {
             is Verification.Rejected -> return@CandidateCompletion Completion.Refuted(work = 1)
             is Verification.Indeterminate -> return@CandidateCompletion Completion.Undecided(work = 1)
             is Verification.Accepted -> Unit

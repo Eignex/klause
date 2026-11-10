@@ -8,6 +8,7 @@ import com.eignex.klause.ir.indices
 import com.eignex.klause.ir.randomValue
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
+import com.eignex.klause.solver.incumbent.WitnessReceipts
 import com.eignex.util.arrays.emptyDoubleArray
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BigInt
@@ -178,6 +179,7 @@ class Sample private constructor(
     val numIntVars: Int get() = exactInts?.size ?: integerValues.size
 
     internal var witnessCertificate: EvidenceCertificate? = null
+    internal val receipts = WitnessReceipts()
     private var capturedSemantics: EffectiveSourceSemantics? = null
     private var capturedFrame: Any? = null
 
@@ -269,6 +271,7 @@ class Sample private constructor(
             algebraicReals == this.algebraicReals && symbolicReals == this.symbolicReals
         ) {
             it.witnessCertificate = witnessCertificate
+            receipts.copyInto(it.receipts)
             it.capturedSemantics = capturedSemantics
             it.capturedFrame = capturedFrame
         }
@@ -297,6 +300,10 @@ class Sample private constructor(
         31 * (31 * (31 * (31 * (31 * booleanValues.contentHashCode() + integerValues.contentHashCode()) +
             (exactInts?.hashCode() ?: 0)) + approximateReals.contentHashCode()) +
             (exactReals?.hashCode() ?: 0)) + (algebraicReals?.hashCode() ?: 0) + 31 * (symbolicReals?.hashCode() ?: 0)
+
+    internal fun sameDiscreteCoordinates(other: Sample): Boolean = this === other ||
+        (booleanValues.contentEquals(other.booleanValues) && integerValues.contentEquals(other.integerValues) &&
+            exactInts == other.exactInts)
 
     /** Authoritative integer coordinate, widened on demand for finite samples. */
     fun exactIntValue(id: Int): BigInt = exactInts?.get(id) ?: bigIntOf(integerValues[id])

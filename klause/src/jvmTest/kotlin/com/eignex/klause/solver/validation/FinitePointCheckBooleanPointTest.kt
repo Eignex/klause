@@ -13,7 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertIs
 
 @RunWith(Parameterized::class)
-class ComposedFixpointBooleanPointTest(private val point: String, private val feasible: Boolean) {
+class FinitePointCheckBooleanPointTest(private val point: String, private val feasible: Boolean) {
     @Test
     fun `complete Boolean points should satisfy every original clause`() {
         val model = Problem(3, 0, emptyArray(), arrayOf(
@@ -23,7 +23,7 @@ class ComposedFixpointBooleanPointTest(private val point: String, private val fe
         )).bake()
         val candidate = Candidate(Sample(BooleanArray(3) { point[it] == '1' }, longArrayOf()), Unit)
 
-        val result = composedFixpoint(model, candidate, Cancellation.Never)
+        val result = FinitePointCheck(model).check(candidate, Cancellation.Never)
 
         if (feasible) assertIs<Verification.Accepted<*, *>>(result)
         else assertIs<Verification.Rejected>(result)

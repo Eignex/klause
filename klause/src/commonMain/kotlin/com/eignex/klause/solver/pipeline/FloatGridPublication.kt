@@ -68,7 +68,9 @@ internal class FloatGridPublication(
         nativeSourceResult: SolveResult? = null,
         nativeSourceMinimum: MinimizeResult? = null,
     ): FiniteSolveResult {
-        if (native is FiniteSolveOutcome.Completed) native.bestSample?.let(::onSample)
+        // A checked native best already stands or failed to improve, so checking it again publishes nothing.
+        if (native is FiniteSolveOutcome.Completed) native.bestSample
+            ?.takeUnless { it === lastChecked && binding.objective != null }?.let(::onSample)
         val qualified = if (native is FiniteSolveOutcome.Completed) {
             FiniteSolveOutcome.Completed(
                 when {

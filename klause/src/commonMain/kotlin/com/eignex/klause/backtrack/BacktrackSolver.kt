@@ -37,7 +37,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsoundnessException
-import com.eignex.klause.solver.validation.composedFixpoint
+import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
@@ -67,6 +67,9 @@ class BacktrackSolver internal constructor(
     Optimizer<BacktrackParams>,
     ResumableOptimizer<BacktrackParams>,
     ResumableSolver<BacktrackParams> {
+
+    // Leaf models and heuristic proposals of every query share one checker over the immutable baked problem.
+    internal val pointCheck: FinitePointCheck by lazy { FinitePointCheck(problem) }
 
     /** Solve a baked problem with production LP dependencies. */
     constructor(problem: BakedProblem) : this(problem, LpSolveContext.Production)
@@ -304,7 +307,7 @@ class BacktrackSolver internal constructor(
             // cut short refutes nothing, so the leaf stands rather than losing a model found in time.
             is SearchOutcome.Found -> {
                 val candidate = Candidate(outcome.sample, Unit)
-                when (val verdict = composedFixpoint(problem, candidate, cancellation, assumptions)) {
+                when (val verdict = pointCheck.check(candidate, cancellation, assumptions)) {
                     is Verification.Rejected -> throw UnsoundnessException(
                         "backtrack reported a model its constraints refute: ${verdict.reason}",
                     )
