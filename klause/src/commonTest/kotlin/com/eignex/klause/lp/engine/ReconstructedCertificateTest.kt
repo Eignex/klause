@@ -295,6 +295,32 @@ class ReconstructedCertificateTest {
     }
 
     @Test
+    fun `missing bound sides should reject before unrelated endpoint arithmetic`() {
+        val zero = ExactLpNumber.of(0L)
+        for ((bits, limit) in listOf(70 to 128, 130 to 192)) {
+            val weight = ExactLpNumber.of(BigFraction.of(BIG_ONE shl bits, BIG_ONE) + BigFraction.ONE)
+            val source = ExactLpModel(
+                List(2) { emptyList() },
+                emptyList(),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(weight))),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
+                emptyList(),
+                ExactLpObjective(listOf(weight, ExactLpNumber.of(-1L))),
+            )
+
+            val result = certifyLpBoundOnly(assertNotNull(LpExactState(source).toWorkingModel()), doubleArrayOf(),
+                ReconstructionLimits(maxBits = limit, maxAttempts = 0))
+
+            assertNull(result.bound)
+            assertEquals(ReconstructionDecline.CANDIDATE, result.metrics.decline)
+            val rejection = assertNotNull(result.metrics.dualRejection)
+            assertEquals(1, rejection.column)
+            assertTrue(rejection.upper)
+            assertEquals(BigFraction.MINUS_ONE, rejection.reduced)
+        }
+    }
+
+    @Test
     fun `zero selected endpoints should retain input scalar limits`() {
         val zero = ExactLpNumber.of(0L)
         val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 128, BIG_ONE))

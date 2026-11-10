@@ -383,6 +383,32 @@ class LpBoundCertificationTest {
     }
 
     @Test
+    fun `missing bound sides should reject before unrelated right hand side arithmetic`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = assertNotNull(LpExactState(ExactLpModel(
+            listOf(List(3) { ExactLpEntry(it, ExactLpNumber.of(1L)) }),
+            listOf(1L, 3L, 5L).map { ExactLpNumber.of(BigFraction.ofLong((1L shl 61) - it).reciprocal()) },
+            List(4) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+            List(3) { ExactLpRow() },
+            ExactLpObjective(listOf(ExactLpNumber.of(-1L), zero, zero, zero)),
+        )).toWorkingModel())
+        val cases = listOf(-0.125 to 128, -Double.fromBits((1023L - 130L) shl 52) to 256)
+
+        for ((multiplier, bits) in cases) {
+            val result = certifyLpBoundOnly(source, DoubleArray(3) { multiplier },
+                ReconstructionLimits(maxBits = bits, maxAttempts = 0))
+
+            assertNull(result.bound)
+            assertEquals(ReconstructionDecline.CANDIDATE, result.metrics.decline)
+            val rejection = assertNotNull(result.metrics.dualRejection)
+            assertEquals(0, rejection.column)
+            assertTrue(rejection.upper)
+            assertEquals(BigFraction.MINUS_ONE - exactDouble(multiplier) * BigFraction.ofLong(3L),
+                rejection.reduced)
+        }
+    }
+
+    @Test
     fun `missing bound side should retain the exact reduced cost obstruction`() {
         val result = certifyLpBoundOnly(model(upper = null, coefficient = 3L, rhs = 1L),
             doubleArrayOf(-1.0 / 3.0), ReconstructionLimits(maxAttempts = 0))
