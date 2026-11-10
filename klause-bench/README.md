@@ -1794,6 +1794,7 @@ their costs. Benefit thresholds belong to the campaign; an accepted comparison i
 bounded direct-owner joint-repair diagnostic through `lab profile`. Supply the
 usual source identity and seed. It uses finite preparation and the existing
 four-second companion grant, captures at most four conditional LPs, and records
-source scope, exact snapshot, basis and typed certificate rejection. Root queries
+source scope, exact snapshot, basis and typed certificate rejection. Results require
+matching LP owner and model revisions. Root queries
 do not consume conditional capture capacity. Observer time spends the active grant;
 the diagnostic does not establish full portfolio replay or production performance.

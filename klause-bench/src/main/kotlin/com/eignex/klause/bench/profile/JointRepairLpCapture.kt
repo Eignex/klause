@@ -77,16 +77,20 @@ internal object JointRepairLpCapture {
         val budget = requireNotNull(field(owner, "budget"))
         val defaults = requireNotNull(call(budget, "getContext"))
         val scopes = HashMap<SourceScope, Int>()
+        val states = HashMap<Int, String>()
+        val owners = IdentityHashMap<Any, Int>()
         var observerNs = 0L
         val observe: (Any) -> Unit = { query ->
             val lp = field(authority, "lp")
             val session = lp?.let { field(it, "session") }
             val currentScope = session?.let { field(it, "query") }?.let { field(it, "scope") } as SourceScope?
             val selected = currentScope.takeIf { field(owner, "pending") != null }
-            window.observe(selected) { id ->
+            val state = session?.let { stateIdentity(it, owners) }
+            window.observe(selected, state?.toString().orEmpty()) { id ->
                 val started = System.nanoTime()
                 val invocationContext = field(requireNotNull(field(owner, "query")), "context") as SourceProofContext
                 scopes[requireNotNull(currentScope)] = id
+                states[id] = requireNotNull(state).toString()
                 val payload = FinitePortfolioLpCapture.capture(query, stop)
                 payload?.let { out.resolve("conditional-$id.klexact").writeBytes(it) }
                 val basis = FinitePortfolioLpCapture.writeBasis(query,
@@ -95,6 +99,7 @@ internal object JointRepairLpCapture {
                     put("condition", NumericalResidualProfile.json(field(owner, "pending")))
                     put("scope", NumericalFrontierSnapshot.scope(requireNotNull(currentScope)))
                     put("conditionScope", NumericalFrontierSnapshot.scope(invocationContext.scope))
+                    put("stateIdentity", state)
                     put("route", call(query, "getRoute").toString())
                     put("sourceSha256", sha256(bytes))
                     put("captureSha256", payload?.let(::sha256))
@@ -131,6 +136,8 @@ internal object JointRepairLpCapture {
                     val scope = field(session, "query")?.let { field(it, "scope") } as SourceScope?
                     val id = scopes[scope]
                     if (id != null) {
+                        val state = stateIdentity(session, owners)
+                        val matched = states[id] == state.toString()
                         out.resolve("guidance.jsonl").appendText(buildJsonObject {
                             put("phase", call(guide, "getPhase").toString())
                             put("termination", call(guide, "getTermination").toString())
@@ -140,6 +147,8 @@ internal object JointRepairLpCapture {
                             put("certificateMetrics", NumericalResidualProfile.json(metrics))
                             put("scope", NumericalFrontierSnapshot.scope(requireNotNull(scope)))
                             put("conditionId", id)
+                            put("stateIdentity", state)
+                            put("captureStateMatched", matched)
                             rejection?.let { missing ->
                                 put("dualRejection", buildJsonObject {
                                     put("column", call(missing, "getColumn") as Int)
@@ -149,7 +158,7 @@ internal object JointRepairLpCapture {
                             }
                             put("missingBoundSide", rejection != null)
                         }.toString() + "\n")
-                        missingSide = rejection != null
+                        missingSide = rejection != null && matched
                         if (missingSide) rejectionCondition = id
                     }
                 }
@@ -168,10 +177,11 @@ internal object JointRepairLpCapture {
                 put("activeLimitMs", 4000)
                 put("sourceLpWorkLimit", params.sourceLpWorkLimit)
                 put("sourceLpAllocationLimit", params.sourceLpAllocationLimit)
-                put("capturedConditions", window.size)
+                put("capturedSnapshots", window.size)
                 put("captureObserverNs", observerNs)
                 put("observerTimeInsideActiveLimit", true)
                 put("missingBoundSideObserved", missingSide)
+                put("resultRequiresMatchingCaptureState", true)
                 put("rejectionCondition", rejectionCondition)
                 put("rejectionCaptureAvailable", rejectionCondition?.let {
                     out.resolve("conditional-$it.klexact").isFile
@@ -189,15 +199,29 @@ internal object JointRepairLpCapture {
 
     internal class ConditionWindow(private val limit: Int) {
         init { require(limit in 1..4) }
-        private val conditions = IdentityHashMap<Any, Int>()
-        val size: Int get() = conditions.size
+        private val conditions = IdentityHashMap<Any, String>()
+        var size: Int = 0
+            private set
 
-        fun observe(condition: Any?, capture: (Int) -> Unit) {
-            if (condition == null || condition in conditions || size >= limit) return
-            val id = size
-            conditions[condition] = id
+        fun observe(condition: Any?, version: String = "", capture: (Int) -> Unit) {
+            if (condition == null || conditions[condition] == version || size >= limit) return
+            val id = size++
+            conditions[condition] = version
             capture(id)
         }
+    }
+
+    private fun stateIdentity(session: Any, owners: IdentityHashMap<Any, Int>) = buildJsonObject {
+        val owner = requireNotNull(field(session, "owner"))
+        val state = requireNotNull(call(owner, "getState"))
+        val id = owners[owner] ?: owners.size.also { owners[owner] = it }
+        put("owner", id)
+        for (part in listOf("Matrix", "Bound", "Objective", "Pop", "Row")) {
+            put(part.lowercase() + "Revision", call(state, "get${part}Revision") as Long)
+        }
+        val model = requireNotNull(call(state, "getModel"))
+        put("rows", call(model, "getM") as Int)
+        put("columns", call(model, "getN") as Int)
     }
 
     private fun field(owner: Any, name: String): Any? =
