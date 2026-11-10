@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.arrays.emptyIntArray
@@ -24,6 +25,9 @@ internal class JointRepairNeighborhood private constructor(
     }
     private var seeds = inputs?.toList() ?: (0 until integers).toList()
     private var rankedSeeds: List<Int>? = null
+    private var refutedPin: Pair<Int, BigFraction>? = null
+    var refutationSeeds: Long = 0
+        private set
     var selectedIntegers: Long = 0
         private set
     var visitedEntries: Long = 0
@@ -31,10 +35,33 @@ internal class JointRepairNeighborhood private constructor(
 
     fun guide(point: Map<SourceCoordinate, Double>) {
         rankedSeeds = null
+        clearRefutation()
         seeds = seeds.sortedByDescending { id ->
             val value = point[SourceCoordinate(SourceCoordinate.Kind.Integer, id)]
             if (value == null || !value.isFinite()) 0.0 else abs(value - round(value))
         }
+    }
+
+    fun clearRefutation() { refutedPin = null }
+
+    fun guideRefutation(assumptions: Set<SourceDerivation.Assumption>, condition: ExactNeighborhoodCondition,
+        budget: SourceLpBudget, token: Cancellation): Boolean {
+        clearRefutation()
+        val funding = budget.funding ?: return false
+        for (assumption in assumptions) {
+            if (token() || funding.availableWork <= 1L || funding.remainingAllocation <= 64L) return false
+            budget.observe(preparation = 1L)
+            funding.charge(0L, 64L)
+            val coordinate = assumption.coordinate
+            if (coordinate.kind != SourceCoordinate.Kind.Integer || coordinate.id !in 0 until integers ||
+                eligible?.get(coordinate.id) == false) continue
+            val value = condition.lower[coordinate.id] ?: continue
+            if (condition.upper[coordinate.id] != value) continue
+            if (token() || funding.paused) return false
+            refutedPin = coordinate.id to value
+            return true
+        }
+        return false
     }
 
     fun guide(hint: LinearRepairGuidance.Hint?, centers: List<BigFraction>,
@@ -76,8 +103,10 @@ internal class JointRepairNeighborhood private constructor(
         radius: BigFraction, cutoff: BigFraction?,
     ): ExactNeighborhoodCondition {
         val order = rankedSeeds ?: seeds
+        val preferred = refutedPin?.takeIf { (id, value) -> centers[id] == value && cutoff == null }
+        clearRefutation()
         val freed = if (round == 0L || order.isEmpty()) emptySet() else {
-            val seed = order[((round - 1) % order.size).toInt()]
+            val seed = preferred?.first?.also { refutationSeeds++ } ?: order[((round - 1) % order.size).toInt()]
             connected(seed, minOf(inputs?.size ?: integers, maxOf(2, count), MAX_FREE_INTEGERS))
         }
         selectedIntegers += freed.size

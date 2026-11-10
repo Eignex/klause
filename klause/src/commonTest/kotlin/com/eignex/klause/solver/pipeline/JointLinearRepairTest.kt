@@ -43,6 +43,47 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `refuted root pins should guide a checked first point within two repair attempts`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(LongArray(6), LongArray(6) { 1 }, null, null),
+            factors = (List(3) { id ->
+                listOf(
+                    Linear(intArrayOf(id), doubleArrayOf(1.0), intArrayOf(id), doubleArrayOf(-1.0),
+                        LinearOp.LE, 0.5),
+                    Linear(intArrayOf(id), doubleArrayOf(-1.0), intArrayOf(id), doubleArrayOf(-1.0),
+                        LinearOp.LE, -0.5),
+                )
+            }.flatten() + List(3) { id ->
+                Linear(intArrayOf(1, 1), intArrayOf(3 + id, 3 + (id + 1) % 3), LinearOp.GE, 1)
+            }).toTypedArray(), numRealVars = 3,
+            realLower = DoubleArray(3), realUpper = DoubleArray(3) { 1.0 })
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1, 1, 1),
+            realCoefficients = DoubleArray(3) { 1.0 })
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        for (completion in listOf(false, true)) {
+            val params = TheoryParams(sourceIncumbentCompletion = completion, sourceCuts = false, maxFlips = 2)
+            JointLinearRepair(model, source, objective, params).use { repair ->
+                repair.search(adaptive = false).use { search ->
+                    var done = false
+                    repeat(64) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+
+                    val result = search.minimizeResult(TerminationReason.BudgetExhausted)
+
+                    assertTrue(done)
+                    if (completion) {
+                        val completed = assertIs<MinimizeResult.WithSample>(result)
+                        assertEquals(3.5, completed.objective)
+                        val evidence = SourceEvidence(source.scope, SourceClaim.Witness(completed.sample),
+                            SourceDerivation.SourceWitness)
+                        assertEquals(SourceEvidenceCheck.Checked,
+                            SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence))
+                    } else assertIs<MinimizeResult.Unknown>(result)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `a delayed first neighborhood should improve from the newer checked center`() {
         for (sign in listOf(1L, -1L)) {
             val model = Problem(0,

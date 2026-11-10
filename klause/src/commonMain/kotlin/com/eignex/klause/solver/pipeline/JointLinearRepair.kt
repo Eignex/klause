@@ -7,6 +7,7 @@ import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.optimization.LinearAuthority
+import com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest
 import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
@@ -117,6 +118,7 @@ internal class JointLinearRepair(
         completeSearchStages = observations() + mapOf(
             "jointRepairSelectedIntegers" to (selection?.selectedIntegers ?: 0),
             "jointRepairConnectivityVisits" to (selection?.visitedEntries ?: 0),
+            "jointRepairRefutationSeeds" to (selection?.refutationSeeds ?: 0),
             "jointRepairPreparationEntries" to preparationWork,
             "jointRepairLpPreparations" to authority.preparations,
             "jointRepairLpReuses" to authority.reuses,
@@ -287,7 +289,10 @@ internal class JointLinearRepair(
                     observe("jointRepairSourceInputProposals")
                     minOf(count, 2)
                 } else count
-                if (pooled != null) onIncumbentUse?.invoke()
+                if (pooled != null) {
+                    selection?.clearRefutation()
+                    onIncumbentUse?.invoke()
+                }
                 // A checked center needs no all-pinned rounded-root bootstrap.
                 val proposalRound = if (pooled != null && completion != null)
                     round.coerceAtMost(Long.MAX_VALUE - 1) + 1 else round
@@ -469,10 +474,17 @@ internal class JointLinearRepair(
             pending = condition
             if (onComparison != null) conditionSequence++
             compare("query", "opened", cutoff = condition.cutoff)
-            query = LinearAuthorityInvocation(source.atScope(source.scope.copy(condition = bounds)),
+            val querySource = source.atScope(source.scope.copy(condition = bounds))
+            val refutationGuidance = completion != null && anchor == null && preparedCenter == null &&
+                condition.cutoff == null
+            query = LinearAuthorityInvocation(querySource,
                 params.copy(sourceIncumbentCompletion = false),
                 external = { externalIncumbent() ?: anchor }, state = state, borrowedAuthority = authority,
-                boundOrdered = boundOrdered, guidance = true, funding = funding)
+                boundOrdered = boundOrdered, guidance = true, funding = funding,
+                onNumericalFeedback = if (refutationGuidance) { feedback ->
+                    guideRefutation(condition, querySource, feedback)
+                } else null,
+                feedbackRequest = if (refutationGuidance) LinearAuthorityFeedbackRequest(refutation = true) else null)
             val freed = (sourceIntegers?.size ?: model.numIntVars) - pinnedIntegers
             queryFreedIntegers = freed
             if (condition === guidedProposal) observe("jointRepairSharedGuidanceQueries")
@@ -556,6 +568,17 @@ internal class JointLinearRepair(
             result.incumbent, result.bound)
     }
 
+    private fun guideRefutation(condition: ExactNeighborhoodCondition, querySource: SourceProofContext,
+        feedback: SourceNumericalFeedbackResult) {
+        if (feedback !is SourceNumericalFeedbackResult.Available ||
+            !feedback.compatible(querySource, null) || feedback.query.refutation == null) return
+        val support = sourceNumericalRefutationSupport(feedback, funding, stop)
+        if (support is SourceNumericalSupportResult.Available &&
+            selection?.guideRefutation(support.assumptions, condition, budget, stop) == true) {
+            observe("jointRepairRefutationGuidance")
+        }
+    }
+
     private fun retire() {
         val observations = queryObservations(authority.cutObservations().keys)
         for ((key, value) in observations) stages[key] = combine(key, stages[key] ?: 0, value)
@@ -585,6 +608,7 @@ internal class JointLinearRepair(
         enlargedTrialProposal = null
         checkedTrialCenter = null
         guidedProposal = null
+        selection?.clearRefutation()
         queryFreedIntegers = 0
         val resources = SearchInvocationResources()
         resources.own(authority)
