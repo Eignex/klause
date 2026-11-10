@@ -211,7 +211,8 @@ internal class Alns(
             cancellation: Cancellation,
             claimed: Double? = null,
         ): Boolean {
-            val checked = finiteWitnessVerifier(seedProblem, objective, assumptions, cancellation, toleranceCheck, points)
+            val checked = finiteWitnessVerifier(seedProblem, objective, assumptions, cancellation,
+                toleranceCheck, points)
                 .verify(Candidate(sample, claimed))
             if (checked !is Verification.Accepted || cancellation()) return false
             if (!objective.evaluate(sample).isFinite()) return false
