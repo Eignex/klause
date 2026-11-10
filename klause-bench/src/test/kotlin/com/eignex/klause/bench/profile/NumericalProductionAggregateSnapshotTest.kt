@@ -12,7 +12,7 @@ class NumericalProductionAggregateSnapshotTest {
     @Test
     fun `finite rational points should use the rounded production projection`() {
         val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-        val point = mapOf(x to BigFraction.ofLong(49) / BigFraction.ofLong(20))
+        val point = mapOf(x to BigFraction.ofLong(49) * BigFraction.ofLong(20).reciprocal())
 
         val projected = NumericalProductionAggregateSnapshot(Cancellation.Never).project(point)
 
