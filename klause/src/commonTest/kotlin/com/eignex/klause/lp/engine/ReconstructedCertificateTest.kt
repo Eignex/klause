@@ -302,7 +302,7 @@ class ReconstructedCertificateTest {
             val source = ExactLpModel(
                 List(2) { emptyList() },
                 emptyList(),
-                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(weight))),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(weight), ExactLpSide(weight))),
                     ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
                 emptyList(),
                 ExactLpObjective(listOf(weight, ExactLpNumber.of(-1L))),
