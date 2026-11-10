@@ -6,6 +6,7 @@ import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.LpClaim
+import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -70,6 +71,10 @@ internal class LinearAuthority(
         cutLifecycle.shared("${metrics.phase.name}_Calls", 1L)
         cutLifecycle.shared("${metrics.phase.name}_Work", metrics.work)
         cutLifecycle.shared("${metrics.phase.name}_${metrics.outcome}", 1L)
+        if (metrics.phase == LpSolvePhase.BOUND_RECONSTRUCTION_INPUT ||
+            metrics.phase == LpSolvePhase.BOUND_CERTIFICATE) {
+            cutLifecycle.shared("${metrics.phase.name}_Nanos", metrics.nanos)
+        }
         if (metrics.phase.name.startsWith("CLAIM_")) {
             val key = "Certification" + metrics.phase.name
             observePrimal(key + "Calls")

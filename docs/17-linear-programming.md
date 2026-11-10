@@ -1622,7 +1622,12 @@ arbitrary precision.
 Claim phases report inclusive certification time, existing charged work and terminal
 refusal, including unsupported authority, missing bound sides, scalar limits, singularity,
 resource stops and policy refusal. These work totals overlap the certifier ledger and
-must not be added to it. Separate consumption observations count accepted leaf packages
+must not be added to it. Bound reconstruction reports its validation and exact-input
+capture prefix, including stopped prefixes, through the optional phase observer. Its
+work and time are subsets of the inclusive bound certificate phase; vector
+reconstruction, dual arithmetic and support follow it. Source optimization retains
+these input and inclusive bound times beside the existing per-recipe work counters.
+Separate consumption observations count accepted leaf packages
 and actual bound or conflict pruning; a successful check alone is not consumption.
 Source optimization records deterministic claim work and outcomes in its existing stage
 diagnostics; its source budget reports inclusive active time.
