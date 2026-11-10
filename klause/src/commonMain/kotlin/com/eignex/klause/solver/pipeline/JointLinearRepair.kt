@@ -125,6 +125,7 @@ internal class JointLinearRepair(
             "jointRepairSelectedIntegers" to (selection?.selectedIntegers ?: 0),
             "jointRepairConnectivityVisits" to (selection?.visitedEntries ?: 0),
             "jointRepairRefutationSeeds" to (selection?.refutationSeeds ?: 0),
+            "jointRepairAdditionalRefutationSeeds" to (selection?.additionalRefutationSeeds ?: 0),
             "jointRepairPreparationEntries" to preparationWork,
             "jointRepairLpPreparations" to authority.preparations,
             "jointRepairLpReuses" to authority.reuses,
@@ -193,6 +194,7 @@ internal class JointLinearRepair(
             return null
         }
         compare("center", "checked", completed = value, cutoff = cutoff)
+        selection?.clearRefutation()
         refutedConditions.clear()
         return CheckedCenter(sample, value)
     }
@@ -559,6 +561,7 @@ internal class JointLinearRepair(
             retire()
             if (checked == SourceEvidenceCheck.Checked && originalChecked) {
                 anchor = sample
+                selection?.clearRefutation()
                 refutedConditions.clear()
                 observe("jointRepairCheckedIncumbents")
                 return JointRepairAttempt(ExactNeighborhoodResult.Witness(sample),

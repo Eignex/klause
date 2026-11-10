@@ -1895,11 +1895,16 @@ uses the selection round's existing funded retention and carries no proof author
 the strengthened bound and selected rows retain their own result channels. This
 requests no additional LP query and changes no generation allowance.
 Before its first checked incumbent, completion-enabled joint repair can seed its
-next connected neighborhood with an integer pin cited by a refuted root query.
+next neighborhood with integer pins cited by refuted root queries.
 Refutation-only feedback and bounded support projection debit the containing source
-funding. One eligible pin and its exact value survive for one proposal; a changed
-pin value, cutoff or checked incumbent discards that hint. Branch-local, unavailable
-and unsupported feedback supplies no seed. This is advisory ordering: the refutation
+funding. At most four recent eligible pins and their exact values survive across
+proposals. Distinct cited roots reserve places within the existing free-variable
+width; connectivity fills any remaining places. Retention and every lookup debit
+the containing funding without granting numerical work. Changed Boolean pins,
+cited values, cutoffs and checked centers discard the advice. Exhausted lookup or
+an exact repeated-refutation hit also discards it. Boolean snapshots and scalar
+widths are bounded. Branch-local, unavailable and unsupported feedback supplies
+no new seed. This is advisory ordering: the refutation
 keeps its complete scope, and every discovered point still needs full source checking.
 Each joint owner retains at most four completed pre-incumbent regional refutations.
 Its source, semantics and objective stay fixed; exact keys snapshot every Boolean

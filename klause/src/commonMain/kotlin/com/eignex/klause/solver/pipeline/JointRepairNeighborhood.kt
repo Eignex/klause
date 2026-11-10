@@ -25,8 +25,13 @@ internal class JointRepairNeighborhood private constructor(
     }
     private var seeds = inputs?.toList() ?: (0 until integers).toList()
     private var rankedSeeds: List<Int>? = null
-    private var refutedPin: Pair<Int, BigFraction>? = null
+    private val refutedPins = ArrayDeque<Pair<Int, BigFraction>>()
+    private var refutationBools: Map<Int, Boolean>? = null
+    private var refutationBudget: SourceLpBudget? = null
+    private var refutationToken: Cancellation = Cancellation.Never
     var refutationSeeds: Long = 0
+        private set
+    var additionalRefutationSeeds: Long = 0
         private set
     var selectedIntegers: Long = 0
         private set
@@ -42,14 +47,22 @@ internal class JointRepairNeighborhood private constructor(
         }
     }
 
-    fun clearRefutation() { refutedPin = null }
+    fun clearRefutation() {
+        refutedPins.clear()
+        refutationBools = null
+        refutationBudget = null
+        refutationToken = Cancellation.Never
+    }
 
     fun guideRefutation(assumptions: Set<SourceDerivation.Assumption>, condition: ExactNeighborhoodCondition,
         budget: SourceLpBudget, token: Cancellation): Boolean {
-        clearRefutation()
-        val funding = budget.funding ?: return false
+        val funding = budget.funding
+        if (funding == null || condition.cutoff != null || condition.bools.size > MAX_REFUTATION_BOOLEANS) {
+            clearRefutation()
+            return false
+        }
         for (assumption in assumptions) {
-            if (token() || funding.availableWork <= 1L || funding.remainingAllocation <= 64L) return false
+            if (token() || funding.availableWork <= 1L || funding.remainingAllocation <= 64L) break
             budget.observe(preparation = 1L)
             funding.charge(0L, 64L)
             val coordinate = assumption.coordinate
@@ -57,11 +70,61 @@ internal class JointRepairNeighborhood private constructor(
                 eligible?.get(coordinate.id) == false) continue
             val value = condition.lower[coordinate.id] ?: continue
             if (condition.upper[coordinate.id] != value) continue
-            if (token() || funding.paused) return false
-            refutedPin = coordinate.id to value
+            val bits = value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength()
+            if (bits > MAX_GUIDANCE_SCALAR_BITS || !payRefutation(budget, token,
+                    1L + condition.bools.size + MAX_REFUTED_PINS * (1L + bits),
+                    128L + 64L * condition.bools.size)) break
+            if (refutationBudget !== budget || refutationBools != condition.bools ||
+                refutedPins.any { it.first == coordinate.id && it.second != value }) clearRefutation()
+            refutedPins.removeAll { it.first == coordinate.id }
+            if (refutedPins.size == MAX_REFUTED_PINS) refutedPins.removeFirst()
+            refutedPins.addLast(coordinate.id to value)
+            refutationBools = refutationBools ?: condition.bools.toMap()
+            refutationBudget = budget
+            refutationToken = token
             return true
         }
+        clearRefutation()
         return false
+    }
+
+    private fun payRefutation(budget: SourceLpBudget, token: Cancellation, work: Long, bytes: Long): Boolean {
+        val funding = budget.funding ?: return false
+        if (token() || funding.remainingWork <= work || funding.remainingAllocation <= bytes) return false
+        // Advisory metadata spends the containing ledger without renewing a numerical query grant.
+        budget.observe(preparation = work)
+        funding.charge(0L, bytes)
+        return !token() && !funding.exhausted
+    }
+
+    private fun refutationRoots(centers: List<BigFraction>, bools: BooleanArray, cutoff: BigFraction?): List<Int> {
+        val context = refutationBools ?: return emptyList()
+        val budget = refutationBudget ?: return emptyList()
+        val token = refutationToken
+        if (cutoff != null || !payRefutation(budget, token, 1L + context.size + refutedPins.size, 64L) ||
+            context.any { (id, value) -> id !in bools.indices || bools[id] != value }) {
+            clearRefutation()
+            return emptyList()
+        }
+        var work = 1L
+        for ((id, value) in refutedPins) {
+            if (token() || id !in centers.indices) {
+                clearRefutation()
+                return emptyList()
+            }
+            val center = centers[id]
+            val bits = center.num.magnitudeBitLength().toLong() + center.den.magnitudeBitLength()
+            if (bits > MAX_GUIDANCE_SCALAR_BITS) {
+                clearRefutation()
+                return emptyList()
+            }
+            work += 1L + bits + value.num.magnitudeBitLength() + value.den.magnitudeBitLength()
+        }
+        if (!payRefutation(budget, token, work, 256L) || refutedPins.any { (id, value) -> centers[id] != value }) {
+            clearRefutation()
+            return emptyList()
+        }
+        return refutedPins.reversed().map { it.first }
     }
 
     fun guide(hint: LinearRepairGuidance.Hint?, centers: List<BigFraction>,
@@ -103,11 +166,15 @@ internal class JointRepairNeighborhood private constructor(
         radius: BigFraction, cutoff: BigFraction?,
     ): ExactNeighborhoodCondition {
         val order = rankedSeeds ?: seeds
-        val preferred = refutedPin?.takeIf { (id, value) -> centers[id] == value && cutoff == null }
-        clearRefutation()
         val freed = if (round == 0L || order.isEmpty()) emptySet() else {
-            val seed = preferred?.first?.also { refutationSeeds++ } ?: order[((round - 1) % order.size).toInt()]
-            connected(seed, minOf(inputs?.size ?: integers, maxOf(2, count), MAX_FREE_INTEGERS))
+            val width = minOf(inputs?.size ?: integers, maxOf(2, count), MAX_FREE_INTEGERS)
+            val preferred = refutationRoots(centers, bools, cutoff).take(width)
+            val roots = preferred.ifEmpty { listOf(order[((round - 1) % order.size).toInt()]) }
+            if (preferred.isNotEmpty()) {
+                refutationSeeds++
+                additionalRefutationSeeds += preferred.size - 1
+            }
+            connected(roots, width)
         }
         selectedIntegers += freed.size
         val pins = (inputs?.asIterable() ?: (0 until integers)).filter { it !in freed }.associateWith { centers[it] }
@@ -115,11 +182,11 @@ internal class JointRepairNeighborhood private constructor(
         return ExactNeighborhoodCondition(bools.indices.associateWith { bools[it] }, pins, pins, cutoff)
     }
 
-    private fun connected(seed: Int, count: Int): Set<Int> {
-        val selected = linkedSetOf(seed)
-        val seenColumns = IntHashSet().also { it.add(seed) }
+    private fun connected(roots: List<Int>, count: Int): Set<Int> {
+        val selected = roots.toCollection(linkedSetOf())
+        val seenColumns = IntHashSet().also { seen -> roots.forEach { seen.add(it) } }
         val seenRows = IntHashSet()
-        val queue = IntArrayDeque().also { it.addLast(seed) }
+        val queue = IntArrayDeque().also { queue -> roots.forEach { queue.addLast(it) } }
         var visits = 0
         while (queue.isNotEmpty() && selected.size < count && visits < MAX_SELECTION_VISITS) {
             val column = queue.removeFirst()
@@ -193,3 +260,5 @@ private const val MAX_FREE_INTEGERS = 32
 private const val MAX_SELECTION_VISITS = 8192
 private const val MAX_INDEX_ENTRIES = 1_048_576
 private const val MAX_GUIDANCE_SCALAR_BITS = 4096
+private const val MAX_REFUTED_PINS = 4
+private const val MAX_REFUTATION_BOOLEANS = 4096
