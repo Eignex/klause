@@ -1185,7 +1185,9 @@ installed. It retains the actual immutable generation contexts for query zero an
 query N within the existing archive allowance, then invokes the production cached
 source-pair kernel in a private diagnostic cache: current ordering at zero,
 fractional ordering at N. Each call has 65,536 generation work and 1 MiB modeled
-allocation; point projection has the same separate per-point ceilings. Both native
+allocation; point projection has the same separate per-point ceilings.
+The projection follows production's finite rounded `Double` conversion and records
+the original rational point separately from the projected values. Both native
 consequence checks share 100,000 proof polls and 16 MiB modeled proof reservation.
 `production-aggregates.jsonl` records scopes, generation-context identity,
 preparation/discovery counters, candidates, checks and release. Missing retained

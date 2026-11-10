@@ -96,17 +96,9 @@ internal class NumericalProductionAggregateSnapshot(private val stop: Cancellati
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun point(journal: Any, query: Int): Point? {
-        val record = (field(journal, "retained") as List<Any>).singleOrNull { field(it, "id") == query }
-            ?: return null
-        if (field(record, "state") != "completed") return null
-        val generation = journal.javaClass.getDeclaredMethod("generationContext", Int::class.javaPrimitiveType)
-            .invoke(journal, query) as SourceProofContext? ?: return null
-        require(generation.scope == field(record, "generationScope"))
-        val exact = field(record, "point") as Map<SourceCoordinate, BigFraction>? ?: return null
+    fun project(exact: Map<SourceCoordinate, BigFraction>): Map<SourceCoordinate, Double>? {
         if (exact.size > 8192) return null
-        val bytes = 128L + exact.size * 96L
+        val bytes = 128L + exact.size * 192L
         if (bytes > 1_048_576L || bytes > 2_097_152L - projectionAllocation) return null
         projectionAllocation += bytes
         var work = 0L
@@ -119,13 +111,28 @@ internal class NumericalProductionAggregateSnapshot(private val stop: Cancellati
             work += cost
             projectionWork += cost
             val number = value.toDouble()
-            if (!number.isFinite() || BigFraction.ofDouble(number) != value) return null
+            if (!number.isFinite()) return null
             floating[coordinate] = number
         }
+        return floating
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun point(journal: Any, query: Int): Point? {
+        val record = (field(journal, "retained") as List<Any>).singleOrNull { field(it, "id") == query }
+            ?: return null
+        if (field(record, "state") != "completed") return null
+        val generation = journal.javaClass.getDeclaredMethod("generationContext", Int::class.javaPrimitiveType)
+            .invoke(journal, query) as SourceProofContext? ?: return null
+        require(generation.scope == field(record, "generationScope"))
+        val exact = field(record, "point") as Map<SourceCoordinate, BigFraction>? ?: return null
+        val beforeWork = projectionWork
+        val beforeAllocation = projectionAllocation
+        val floating = project(exact) ?: return null
         val cuts = field(record, "cuts") as List<Any>
         if (cuts.size > 64) return null
         return Point(query, generation, field(record, "numeric") as SourceProofContext, exact, floating, cuts,
-            work, bytes)
+            projectionWork - beforeWork, projectionAllocation - beforeAllocation)
     }
 
     @Suppress("LongMethod")
@@ -175,6 +182,9 @@ internal class NumericalProductionAggregateSnapshot(private val stop: Cancellati
                     put("generationSystem", system(point.generation))
                     put("verificationSystem", system(point.verification))
                     put("point", coefficients(point.exact))
+                    put("projectedPoint", coefficients(point.floating.mapValues {
+                        checkNotNull(BigFraction.ofDouble(it.value))
+                    }))
                     put("retainedPoolRows", point.cuts.size)
                     put("maximumCandidates", if (fractional) 64 - point.cuts.size else 64)
                     put("maximumGenerationWork", 65_536L)
