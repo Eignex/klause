@@ -29,8 +29,11 @@ internal fun finiteWitnessVerifier(
     cancellation: Cancellation = Cancellation.Never,
     toleranceCheck: ((Sample) -> Boolean)? = null,
     points: FinitePointCheck = FinitePointCheck(problem),
-): CandidateVerifier<Sample, Double?> = CandidateVerifier { candidate ->
-    verifyFiniteWitness(problem, objective, assumptions, cancellation, toleranceCheck, points, candidate)
+): CandidateVerifier<Sample, Double?> {
+    require(points.checksAllOf(problem)) { "point checker does not cover this problem" }
+    return CandidateVerifier { candidate ->
+        verifyFiniteWitness(problem, objective, assumptions, cancellation, toleranceCheck, points, candidate)
+    }
 }
 
 private fun verifyFiniteWitness(

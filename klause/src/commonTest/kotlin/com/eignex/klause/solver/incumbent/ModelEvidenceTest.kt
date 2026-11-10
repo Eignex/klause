@@ -12,6 +12,7 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -229,6 +230,37 @@ class ModelEvidenceTest {
         verifier.verify(evidence, restrictions = WitnessRestrictions(producer))
 
         val checked = verifier.verify(evidence, restrictions = WitnessRestrictions(producer, consumer = consumer))
+
+        assertIs<Verification.Rejected>(checked)
+    }
+
+    @Test
+    fun `verify should not repeat a restriction check the point already passed`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(1, 3)), emptyArray())
+        val model = ModelIdentity.of(source)
+        val producer = EngineInvocation(source.prepareExecutionPlan(), model,
+            executionAssumptions = Assumptions.None.withIntHole(0, 3))
+        val evidence = ModelEvidence.Witness(model, Candidate(Sample(booleanArrayOf(), longArrayOf(1)), Unit))
+        val verifier = ModelEvidenceVerifier<Sample, Unit>(model, CandidateVerifier.trusting())
+        verifier.verify(evidence, restrictions = WitnessRestrictions(producer))
+
+        val checked = verifier.verify(evidence, cancellation = Cancellation { true },
+            restrictions = WitnessRestrictions(producer))
+
+        assertIs<Verification.Accepted<*, *>>(checked)
+    }
+
+    @Test
+    fun `verify should repeat a restriction check that cancellation interrupted`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(1, 3)), emptyArray())
+        val model = ModelIdentity.of(source)
+        val producer = EngineInvocation(source.prepareExecutionPlan(), model,
+            executionAssumptions = Assumptions.None.withIntHole(0, 1))
+        val evidence = ModelEvidence.Witness(model, Candidate(Sample(booleanArrayOf(), longArrayOf(1)), Unit))
+        val verifier = ModelEvidenceVerifier<Sample, Unit>(model, CandidateVerifier.trusting())
+        verifier.verify(evidence, cancellation = Cancellation { true }, restrictions = WitnessRestrictions(producer))
+
+        val checked = verifier.verify(evidence, restrictions = WitnessRestrictions(producer))
 
         assertIs<Verification.Rejected>(checked)
     }
