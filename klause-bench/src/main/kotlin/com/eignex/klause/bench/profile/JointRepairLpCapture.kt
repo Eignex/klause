@@ -128,7 +128,7 @@ internal object JointRepairLpCapture {
                 if (guide != null && seen.put(guide, true) == null) {
                     val metrics = call(guide, "getCertificateMetrics")
                     val rejection = metrics?.let { call(it, "getDualRejection") }
-                    val scope = session?.let { field(it, "query") }?.let { field(it, "scope") } as SourceScope?
+                    val scope = field(session, "query")?.let { field(it, "scope") } as SourceScope?
                     val id = scopes[scope]
                     if (id != null) {
                         out.resolve("guidance.jsonl").appendText(buildJsonObject {
