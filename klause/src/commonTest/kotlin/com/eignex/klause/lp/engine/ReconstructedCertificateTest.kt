@@ -380,6 +380,81 @@ class ReconstructedCertificateTest {
     }
 
     @Test
+    fun `independent ray denominators should recover a checked contradiction`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(-65521L)),
+                ExactLpEntry(1, ExactLpNumber.of(65497L)))),
+            listOf(ExactLpNumber.of(-65521L), zero),
+            listOf(ExactLpColumn(ExactLpBounds())) +
+                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+            List(2) { ExactLpRow() },
+            ExactLpObjective(List(3) { zero }),
+        )
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        for (orientation in listOf(1.0, -1.0)) {
+            val ray = doubleArrayOf(-orientation / 65521.0, -orientation / 65497.0)
+            val binary = reconstructCertificate(model, ray = ray, limits = ReconstructionLimits(maxAttempts = 0))
+
+            val result = reconstructCertificate(model, ray = ray, limits = ReconstructionLimits(maxAttempts = 1))
+
+            assertNull(binary.conflict)
+            val proof = assertNotNull(result.conflict)
+            assertEquals(listOf(0, 1), proof.rows.toList())
+            assertEquals(listOf(BigFraction.of(BIG_ONE, bigIntOf(65521)),
+                BigFraction.of(BIG_ONE, bigIntOf(65497))), proof.multipliers)
+            assertNotNull(result.conflictSupport)
+            assertNotNull(result.metrics.vectorRejection)
+            assertNull(result.metrics.decline)
+        }
+    }
+
+    @Test
+    fun `reconstructed ray entries should not refute a feasible boundary`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(-65521L)),
+                ExactLpEntry(1, ExactLpNumber.of(65497L)))),
+            listOf(ExactLpNumber.of(-65521L), ExactLpNumber.of(65497L)),
+            listOf(ExactLpColumn(ExactLpBounds())) +
+                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+            List(2) { ExactLpRow() },
+            ExactLpObjective(List(3) { zero }),
+        )
+
+        val result = reconstructCertificate(assertNotNull(LpExactState(source).toWorkingModel()),
+            ray = doubleArrayOf(-1.0 / 65521.0, -1.0 / 65497.0),
+            limits = ReconstructionLimits(maxAttempts = 1))
+
+        assertNull(result.conflict)
+        assertNotNull(result.metrics.vectorRejection)
+        assertEquals(ReconstructionDecline.CANDIDATE, result.metrics.decline)
+    }
+
+    @Test
+    fun `ray reconstruction should retain the containing work allowance`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(-65521L)),
+                ExactLpEntry(1, ExactLpNumber.of(65497L)))),
+            listOf(ExactLpNumber.of(-65521L), zero),
+            listOf(ExactLpColumn(ExactLpBounds())) +
+                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+            List(2) { ExactLpRow() },
+            ExactLpObjective(List(3) { zero }),
+        )
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        val ray = doubleArrayOf(-1.0 / 65521.0, -1.0 / 65497.0)
+        val binary = reconstructCertificate(model, ray = ray, limits = ReconstructionLimits(maxAttempts = 0))
+
+        val result = reconstructCertificate(model, ray = ray,
+            limits = ReconstructionLimits(maxWork = binary.metrics.work, maxAttempts = 1))
+
+        assertNull(result.conflict)
+        assertEquals(ReconstructionDecline.WORK, result.metrics.decline)
+    }
+
+    @Test
     fun `strict selected support should contradict at zero surplus`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
