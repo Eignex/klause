@@ -688,7 +688,7 @@ internal class NativeSatState(private val state: PropagationState) {
                             defaultCapIndex = null
                         } else {
                             var reserved = true
-                            if (active.bootstrapping) {
+                            if (active.bootstrapping && !capRanking.hasPending) {
                                 try { active.reservePages(budget) }
                                 catch (_: ReclamationPreparation.Deferred) {
                                     reserved = false

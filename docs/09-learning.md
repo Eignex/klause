@@ -603,7 +603,8 @@ ordinary authority.
 
 Four primitive FIFO queues share an owned page pool. Bootstrap reserves pages in
 resumable atomic transactions while the generic owner continues selection within
-the same grant. A published page releases its completed atomic work reservation;
+the same grant. A pending generic window continues before bootstrap reserves
+further pages. A published page releases its completed atomic work reservation;
 its charged work and scratch reservation remain consumed for the grant. Pending
 atomic operations retain their conservative funding. A completed generic window
 yields its candidate array before the incremental owner begins classification.
