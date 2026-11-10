@@ -11,11 +11,11 @@ class JointRepairLpCaptureTest {
         val second = Any()
         val captured = ArrayList<Int>()
 
-        window.observe(null, captured::add)
-        window.observe(first, captured::add)
-        window.observe(first, captured::add)
-        window.observe(second, captured::add)
-        window.observe(Any(), captured::add)
+        window.observe(null, capture = captured::add)
+        window.observe(first, capture = captured::add)
+        window.observe(first, capture = captured::add)
+        window.observe(second, capture = captured::add)
+        window.observe(Any(), capture = captured::add)
 
         assertEquals(listOf(0, 1), captured)
         assertEquals(2, window.size)
@@ -28,9 +28,24 @@ class JointRepairLpCaptureTest {
         val first = String(charArrayOf('x'))
         val second = String(charArrayOf('x'))
 
-        window.observe(first, captured::add)
-        window.observe(second, captured::add)
+        window.observe(first, capture = captured::add)
+        window.observe(second, capture = captured::add)
 
         assertEquals(listOf(0, 1), captured)
     }
+    @Test
+    fun `changed model versions should retain a fresh snapshot within the capture cap`() {
+        val window = JointRepairLpCapture.ConditionWindow(2)
+        val condition = Any()
+        val captured = ArrayList<Int>()
+
+        window.observe(condition, "first", capture = captured::add)
+        window.observe(condition, "first", capture = captured::add)
+        window.observe(condition, "second", capture = captured::add)
+        window.observe(condition, "third", capture = captured::add)
+
+        assertEquals(listOf(0, 1), captured)
+        assertEquals(2, window.size)
+    }
+
 }
