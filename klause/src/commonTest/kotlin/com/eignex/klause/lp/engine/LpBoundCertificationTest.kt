@@ -522,6 +522,57 @@ class LpBoundCertificationTest {
     }
 
     @Test
+    fun `bound input observation should preserve the certificate and containing work`() {
+        val phases = ArrayList<LpPhaseMetrics>()
+        val observer = object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+            override fun observePhase(metrics: LpPhaseMetrics) { phases += metrics }
+        }
+        val unobserved = certifyLpBoundOnly(model(), doubleArrayOf(-1.0), ReconstructionLimits())
+
+        val observed = certifyLpBoundOnly(model(), doubleArrayOf(-1.0), ReconstructionLimits(), observer = observer)
+
+        assertEquals(assertNotNull(unobserved.bound).value, assertNotNull(observed.bound).value)
+        assertEquals(unobserved.metrics, observed.metrics)
+        val input = phases.single { it.phase == LpSolvePhase.BOUND_RECONSTRUCTION_INPUT }
+        val containing = phases.single { it.phase == LpSolvePhase.BOUND_CERTIFICATE }
+        assertEquals("CAPTURED", input.outcome)
+        assertTrue(input.work > 0L && input.work < containing.work)
+        assertTrue(input.nanos <= containing.nanos)
+        assertEquals(observed.metrics.work, containing.work)
+    }
+
+    @Test
+    fun `stopped bound input observation should retain the paid prefix`() {
+        val cases = listOf(
+            Triple(ReconstructionLimits(maxWork = 8L), -1.0, ReconstructionDecline.WORK),
+            Triple(ReconstructionLimits(), Double.NaN, ReconstructionDecline.NONFINITE),
+        )
+        for ((limits, dual, decline) in cases) {
+            val phases = ArrayList<LpPhaseMetrics>()
+            val observer = object : LpCertificationObserver {
+                override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+                override fun observeExactInput(accepted: Boolean) = Unit
+                override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+                override fun observePhase(metrics: LpPhaseMetrics) { phases += metrics }
+            }
+            val unobserved = certifyLpBoundOnly(model(), doubleArrayOf(dual), limits)
+
+            val observed = certifyLpBoundOnly(model(), doubleArrayOf(dual), limits, observer = observer)
+
+            assertNull(observed.bound)
+            assertEquals(decline, observed.metrics.decline)
+            assertEquals(unobserved.metrics, observed.metrics)
+            val input = phases.single { it.phase == LpSolvePhase.BOUND_RECONSTRUCTION_INPUT }
+            assertEquals("DECLINED", input.outcome)
+            assertTrue(input.work > 0L)
+            assertEquals(observed.metrics.work, input.work)
+        }
+    }
+
+    @Test
     fun `integer bound checking should certify current authority without a primal`() {
         val source = model()
 
