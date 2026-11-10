@@ -12,6 +12,7 @@ import com.eignex.klause.bench.source.CorpusIndex
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.nio.file.Files
 import kotlin.test.Test
@@ -103,6 +104,31 @@ class SourceEligibilityTest {
 
         assertEquals(Status.UNRESOLVED, report.status)
         assertTrue(report.reasons.single().contains("conflicting decoded identities"), report.reasons[0])
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "relation, ''",
+        "blank-outcome, exposure 0 needs use, outcome and evidence",
+        "repeated-role, exposure 0 repeats an input role",
+    )
+    fun `manifest validation rejects incomplete exposure records`(entry: String, expected: String) {
+        val model = """{"path":"miplib2017/a.mps.zst","packedSha256":"${hash('1')}"}"""
+        val other = """{"path":"miplib2017/b.mps.zst","packedSha256":"${hash('3')}"}"""
+        val body = when (entry) {
+            "relation" -> """"relations":[{"members":[$model,$other],"kind":"family","reason":"recorded"}]"""
+            "blank-outcome" -> """"exposures":[{"inputs":[$model],"use":"screen","outcome":"","evidence":"job 5"}]"""
+            else -> """"exposures":[{"inputs":[$model,$other],"use":"screen","outcome":"x","evidence":"job 5"}]"""
+        }
+        val text = """{"schema":"${SourceEligibility.SCHEMA}",$body}"""
+
+        val failure = runCatching { SourceEligibility.manifest(text) }.exceptionOrNull()
+
+        if (expected.isEmpty()) {
+            assertEquals(null, failure)
+        } else {
+            assertTrue(failure?.message.orEmpty().contains(expected), failure?.message)
+        }
     }
 
     @Test

@@ -174,7 +174,7 @@ internal object SourceEligibility {
                 if (relation.members.size < 2 || relation.kind.isBlank() || relation.reason.isBlank()) {
                     add("relation $index needs at least two members, a kind and a reason")
                 }
-                addAll(identityViolations("relation $index", relation.members))
+                addAll(identityViolations("relation $index", relation.members, oneSource = false))
             }
             manifest.gaps.filter { it.reason.isBlank() }.forEach { add("gap for '${it.collection}' needs a reason") }
         }
@@ -182,7 +182,7 @@ internal object SourceEligibility {
         return manifest
     }
 
-    private fun identityViolations(where: String, inputs: List<Identity>): List<String> = buildList {
+    private fun identityViolations(where: String, inputs: List<Identity>, oneSource: Boolean = true) = buildList {
         if (inputs.isEmpty()) add("$where lists no inputs")
         for (input in inputs) {
             if (input.path.isBlank() || input.path.startsWith('/')) {
@@ -193,7 +193,7 @@ internal object SourceEligibility {
                 add("$where: ${input.path} hash '$it' is not a lowercase 64-digit SHA-256")
             }
         }
-        if (inputs.map { it.role }.distinct().size != inputs.size) add("$where repeats an input role")
+        if (oneSource && inputs.map { it.role }.distinct().size != inputs.size) add("$where repeats an input role")
     }
 
     /** The frozen `cases` templates in [element]: a template array, a bench request, an experiment or a stored job. */
