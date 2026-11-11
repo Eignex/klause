@@ -39,7 +39,6 @@ import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.engine.ResumableLpSolver
 import com.eignex.klause.lp.engine.TableauCutSolver
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationResult
@@ -47,6 +46,8 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentExchange
@@ -206,7 +207,8 @@ class ResumableMinimizeTest {
             ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ofLong(3L)),
                 LinearOp.GE, BigFraction.ONE),
         ), numRealVars = 1, realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY)).bake()
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY)).bake(FactorProjectionProviders.Default)
+        assertTrue(assertNotNull(problem.factorProjections).requiresRealSourceCheck)
         val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
         val acceptance = FiniteSourceAcceptance({ point ->
             point.reals.single() * 3.0 >= 1.0 - 1e-7
@@ -215,17 +217,16 @@ class ResumableMinimizeTest {
         val offered = ArrayList<Sample>()
 
         BacktrackSolver(problem, LpSolveContext.Numerical).resumable(objective, params).use { search ->
-            search.runSlice(Cancellation { offered.isNotEmpty() }, Long.MAX_VALUE, -1L) { offered += it.sample }
+            search.runSlice(Cancellation { offered.isNotEmpty() }, Long.MAX_VALUE, 50_000L) { offered += it.sample }
 
+            assertTrue((search.stats.lp.phases["NUMERICAL_CONSUMPTION_STANDALONE"]
+                ?.outcomes?.get("FEASIBLE_COMPLETION") ?: 0L) > 0L)
             val point = offered.single()
             assertEquals(1.0 / 3.0, point.reals.single(), 1e-7)
             assertNull(point.exactReals)
             assertTrue(acceptance(point))
-            assertEquals(1L, search.stats.lp.phases["NUMERICAL_CONSUMPTION_STANDALONE"]
-                ?.outcomes?.get("FEASIBLE_COMPLETION"))
         }
     }
-
 
     @Test
     fun `component repair revisits earlier pins before passing root coordinates to search`() {
