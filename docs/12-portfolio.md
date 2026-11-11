@@ -138,6 +138,10 @@ query's time. `finiteCompanionAdmissionDeclined` records an unfunded initial pai
 no query reports zero capture attempts. Final invocation accounting reads these
 shared counters once; worker summaries do not duplicate the capture.
 
+Finite numerical factories can withhold shared assignments independently of
+completion. The shared incumbent exchange, scalar bounds, admission and lifetimes
+retain their configured policies.
+
 `source-incumbent-completion=true` lets the numerical and joint-repair companions
 use an approximate incumbent's Boolean and finite integer coordinates as advisory
 pins. Approximate real coordinates guide rational reconstruction without carrying
@@ -257,9 +261,11 @@ Reseeding a handle does not remove its worker.
 
 ## Witnesses and proof scope
 
-Finite workers' points are engine results and enter the pool as published. Arithmetic
-points pass [source validation](07-presolve.md#source-witness-validation) where their
-engine does not enforce the source exactly. Claims need the authority below.
+Finite workers' points are engine results and enter the pool as published. A private
+protected-coordinate view solves a differently presolved model, so its lifted point is
+checked against the canonical model. Arithmetic points pass
+[source validation](07-presolve.md#source-witness-validation) where their engine does
+not enforce the source exactly. Claims need the authority below.
 
 ### Publication identity
 

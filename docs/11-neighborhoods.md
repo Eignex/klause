@@ -333,9 +333,10 @@ decline without partial freedoms. Selection retains only bounded diagnostics;
 it has no resumable cursor and does not renew an interrupted allowance.
 
 Before and during its bootstrap, ALNS checks a supplied assignment and the latest
-verified shared incumbent. A candidate must cover all coordinates, satisfy the
-current model and assumptions and pass the shared source witness checker; ALNS
-re-evaluates it against its own objective. An interrupted check leaves the candidate
+shared incumbent. A supplied assignment must cover all coordinates, satisfy the
+current model and assumptions and pass the shared source witness checker. A shared
+incumbent is an engine result and is checked only against the current assumptions.
+ALNS re-evaluates either against its own objective. An interrupted check leaves the candidate
 eligible for a later slice, adoption closes the bootstrap handles once, and seed
 acquisition renews no allowance. Imported samples carry no worker state or proof
 authority.
