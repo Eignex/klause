@@ -217,7 +217,8 @@ class SharedPolynomialModelTest {
 
     @Test
     fun `finite witness checks should share one completed bake`() {
-        val model = emptyPolynomialModel()
+        val model = assertNotNull(Problem(0, 0, emptyArray(), emptyArray())
+            .preparePolynomialExecutionPlan(PolynomialRealFormula.Constant(true)).polynomialModel)
 
         val first = model.finitePointCheck(null, Cancellation.Never)
 
@@ -226,7 +227,8 @@ class SharedPolynomialModelTest {
 
     @Test
     fun `another finite projection should bake its own witness checker`() {
-        val model = emptyPolynomialModel()
+        val model = assertNotNull(Problem(0, 0, emptyArray(), emptyArray())
+            .preparePolynomialExecutionPlan(PolynomialRealFormula.Constant(true)).polynomialModel)
         val first = model.finitePointCheck(null, Cancellation.Never)
 
         val other = model.finitePointCheck(FactorProjectionProviders().prepare(model.finite), Cancellation.Never)
@@ -236,12 +238,10 @@ class SharedPolynomialModelTest {
 
     @Test
     fun `a bake cut short by cancellation should not be retained`() {
-        val model = emptyPolynomialModel()
+        val model = assertNotNull(Problem(0, 0, emptyArray(), emptyArray())
+            .preparePolynomialExecutionPlan(PolynomialRealFormula.Constant(true)).polynomialModel)
         val interrupted = model.finitePointCheck(null, Cancellation { true })
 
         assertNotSame(interrupted, model.finitePointCheck(null, Cancellation.Never))
     }
-
-    private fun emptyPolynomialModel() = assertNotNull(Problem(0, 0, emptyArray(), emptyArray())
-        .preparePolynomialExecutionPlan(PolynomialRealFormula.Constant(true)).polynomialModel)
 }

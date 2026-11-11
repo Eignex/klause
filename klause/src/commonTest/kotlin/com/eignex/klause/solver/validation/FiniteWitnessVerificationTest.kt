@@ -105,7 +105,8 @@ class FiniteWitnessVerificationTest {
     fun `a point accepted under the same model and policy should not be checked again`() {
         var checks = 0
         val tolerance: (Sample) -> Boolean = { checks++; true }
-        val model = realModel()
+        val model = Problem(0, 0, emptyArray(), emptyList<Factor>(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
         val point = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
         finiteWitnessVerifier(model, null, toleranceCheck = tolerance).verify(Candidate(point, null))
 
@@ -118,7 +119,8 @@ class FiniteWitnessVerificationTest {
     @Test
     fun `another tolerance policy should check an accepted point again`() {
         var checks = 0
-        val model = realModel()
+        val model = Problem(0, 0, emptyArray(), emptyList<Factor>(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
         val point = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
         finiteWitnessVerifier(model, null, toleranceCheck = { checks++; true }).verify(Candidate(point, null))
 
@@ -131,7 +133,8 @@ class FiniteWitnessVerificationTest {
     fun `changed coordinates should not inherit an accepted check`() {
         var checks = 0
         val tolerance: (Sample) -> Boolean = { checks++; true }
-        val model = realModel()
+        val model = Problem(0, 0, emptyArray(), emptyList<Factor>(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
         val point = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
         val verifier = finiteWitnessVerifier(model, null, toleranceCheck = tolerance)
         verifier.verify(Candidate(point, null))
@@ -160,7 +163,8 @@ class FiniteWitnessVerificationTest {
         var checks = 0
         var cancelled = false
         val tolerance: (Sample) -> Boolean = { checks++; cancelled = checks == 1; true }
-        val model = realModel()
+        val model = Problem(0, 0, emptyArray(), emptyList<Factor>(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
         val point = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
         val interrupted = finiteWitnessVerifier(model, null, Cancellation { cancelled }, tolerance)
             .verify(Candidate(point, null))
@@ -172,20 +176,46 @@ class FiniteWitnessVerificationTest {
         assertEquals(2, checks)
     }
 
-    private fun realModel() = Problem(
-        0, 0, emptyArray(), emptyList<Factor>(),
-        numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
-    ).bake()
-
     @Test
     fun `another model should check an accepted point again`() {
         var checks = 0
         val tolerance: (Sample) -> Boolean = { checks++; true }
         val point = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
-        finiteWitnessVerifier(realModel(), null, toleranceCheck = tolerance).verify(Candidate(point, null))
+        val (first, second) = List(2) {
+            Problem(0, 0, emptyArray(), emptyList<Factor>(), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        }
+        finiteWitnessVerifier(first, null, toleranceCheck = tolerance).verify(Candidate(point, null))
 
-        finiteWitnessVerifier(realModel(), null, toleranceCheck = tolerance).verify(Candidate(point, null))
+        finiteWitnessVerifier(second, null, toleranceCheck = tolerance).verify(Candidate(point, null))
 
         assertEquals(2, checks)
+    }
+
+    @Test
+    fun `an equal coordinate copy should keep an accepted check`() {
+        var checks = 0
+        val tolerance: (Sample) -> Boolean = { checks++; true }
+        val model = Problem(0, 0, emptyArray(), emptyList<Factor>(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val point = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
+        finiteWitnessVerifier(model, null, toleranceCheck = tolerance).verify(Candidate(point, null))
+
+        finiteWitnessVerifier(model, null, toleranceCheck = tolerance).verify(Candidate(point.copy(), null))
+
+        assertEquals(1, checks)
+    }
+
+    @Test
+    fun `integer models should share an accepted check across tolerance policies`() {
+        val model = Problem(0, 2, Array(2) { IntDomain(0, 10) },
+            arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 10))).bake()
+        val point = Sample(BooleanArray(0), longArrayOf(3, 7))
+        finiteWitnessVerifier(model, null, toleranceCheck = { true }).verify(Candidate(point, null))
+
+        val reused = finiteWitnessVerifier(model, null, Cancellation { true }, toleranceCheck = { false })
+            .verify(Candidate(point, null))
+
+        assertIs<Verification.Accepted<*, *>>(reused)
     }
 }
