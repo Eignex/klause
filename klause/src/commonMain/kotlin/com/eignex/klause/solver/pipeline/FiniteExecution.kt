@@ -402,6 +402,7 @@ internal class FiniteExecutionRequest(
     val objectiveCoordinates: ObjectiveCoordinateView? = null,
     val onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
     val onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
+    val onPortfolioJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
 )
 
 /** Streaming hooks owned by a rendering frontend. */
@@ -511,6 +512,7 @@ internal fun FinitePipeline.solve(
     numericalCompanions: TheoryParams? = null,
     onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
     onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
+    onPortfolioJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
 ): FiniteSolveResult {
     require(request.engine == FiniteEngine.FIXED || lpSolveContext == LpSolveContext.Production) {
         "custom LP dependencies require the fixed finite route"
@@ -662,6 +664,7 @@ internal fun FinitePipeline.solve(
             lpSolveContext = lpSolveContext,
             onPortfolioLpQuery = onPortfolioLpQuery,
             onPortfolioGuidance = onPortfolioGuidance,
+            onPortfolioJointRepair = onPortfolioJointRepair,
             toleranceCheck = if (gridPublication == null) {
                 sourceCheck?.let { check ->
                     FiniteSourceAcceptance({ check(preparation.reconstruct(it)) }, check.permitsToleranceOptimum(),
@@ -1254,6 +1257,7 @@ private fun executePortfolio(
         numericalCompletion = request.executionOptions.numericalCompletion,
         onLpQuery = request.onPortfolioLpQuery,
         onGuidance = request.onPortfolioGuidance,
+        onJointRepair = request.onPortfolioJointRepair,
         numericalCompanions = request.numericalCompanionParams,
         sourceHints = request.sourceInvocation?.let { invocation ->
             { strategies ->

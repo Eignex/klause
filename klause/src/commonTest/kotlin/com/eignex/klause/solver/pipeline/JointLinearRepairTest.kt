@@ -43,6 +43,39 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `ordinary proposals should correlate refutation support and selected roots`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 1), null, null),
+            factors = Array(2) { id ->
+                Linear(intArrayOf(id), doubleArrayOf(1.0), intArrayOf(id), doubleArrayOf(-1.0), LinearOp.EQ, 0.0)
+            }, numRealVars = 2, realLower = DoubleArray(2) { 0.5 }, realUpper = DoubleArray(2) { 1.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(2) { 1.0 })
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val records = mutableListOf<JointRepairObservation>()
+        val params = TheoryParams(sourceIncumbentCompletion = true, sourceCuts = false, maxFlips = 4)
+
+        JointLinearRepair(model, source, objective, params, onObservation = records::add).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(64) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+                assertIs<MinimizeResult.WithSample>(search.minimizeResult(TerminationReason.BudgetExhausted))
+            }
+        }
+
+        val proposals = records.filter { it.phase == "proposal" }
+        assertTrue(proposals.size >= 3)
+        assertEquals(2, proposals.first().operator)
+        assertEquals(0L, proposals.first().proposalRound)
+        assertTrue(proposals.first().freed.isEmpty())
+        assertTrue(proposals.any { it.refutationRoots.size == 2 && it.freed.size == 2 })
+        assertTrue(records.any { it.phase == "feedback" && it.disposition == "jointRepairRefutationGuidance" && it.support.isNotEmpty() })
+        assertTrue(records.any { it.phase == "result" && it.disposition == "checked-source-witness" })
+        for (feedback in records.filter { it.phase == "feedback" && it.support.isNotEmpty() }) {
+            assertTrue(records.any { it.phase == "query" && it.proposal == feedback.proposal && it.query == feedback.query })
+        }
+    }
+
+    @Test
     fun `persistent refutation roots should complete independent pin groups within the fixed width`() {
         val model = Problem(0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 1), null, null),

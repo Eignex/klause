@@ -95,6 +95,7 @@ internal class FiniteNumericalCompanions private constructor(
     private val afterImprovement: Boolean = false,
     private val adaptiveRepair: Boolean = false,
     private val onComparison: ((SearchEvent.CompanionComparison) -> Unit)? = null,
+    private val onObservation: ((Long, JointRepairObservation) -> Unit)? = null,
 ) {
     class Preparation(val companions: FiniteNumericalCompanions?, val elapsedNanos: Long)
 
@@ -179,6 +180,7 @@ internal class FiniteNumericalCompanions private constructor(
             sharedCompletions = completionSharing,
             repairGuidance = repairGuidance,
             incumbentCompletionCheck = incumbentCompletionCheck,
+            onObservation = onObservation?.let { report -> { observation -> report(slot.seed, observation) } },
             onComparison = onComparison?.let { report -> { comparison ->
                 val pool = incumbents.exchange.current()
                 val candidate = comparison.candidateValue
@@ -257,9 +259,10 @@ internal class FiniteNumericalCompanions private constructor(
             cancellation: Cancellation, cost: WorkerConstructionCost, admission: FiniteCompanionAdmission,
             incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)?,
             afterImprovement: Boolean = false, adaptiveRepair: Boolean = false,
-            onComparison: ((SearchEvent.CompanionComparison) -> Unit)? = null): FiniteNumericalCompanions =
+            onComparison: ((SearchEvent.CompanionComparison) -> Unit)? = null,
+            onObservation: ((Long, JointRepairObservation) -> Unit)? = null): FiniteNumericalCompanions =
             FiniteNumericalCompanions(model, objective, null, params, cancellation, cost, true,
-                incumbentCompletionCheck, admission, afterImprovement, adaptiveRepair, onComparison)
+                incumbentCompletionCheck, admission, afterImprovement, adaptiveRepair, onComparison, onObservation)
 
         fun prepare(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
             cancellation: Cancellation, cost: WorkerConstructionCost,
@@ -268,12 +271,14 @@ internal class FiniteNumericalCompanions private constructor(
             clock: TimeSource = TimeSource.Monotonic,
             adaptiveRepair: Boolean = false,
             onComparison: ((SearchEvent.CompanionComparison) -> Unit)? = null,
+            onObservation: ((Long, JointRepairObservation) -> Unit)? = null,
         ): Preparation {
             val started = clock.markNow()
             val context = captureContext(model, objective, cancellation)
             val companions = context?.let {
                 FiniteNumericalCompanions(model, objective, it, params, cancellation, cost, afterIncumbent,
-                    incumbentCompletionCheck, adaptiveRepair = adaptiveRepair, onComparison = onComparison)
+                    incumbentCompletionCheck, adaptiveRepair = adaptiveRepair, onComparison = onComparison,
+                    onObservation = onObservation)
             }
             return Preparation(companions, started.elapsedNow().inWholeNanoseconds)
         }
