@@ -621,6 +621,33 @@ class SolverInvocationTest {
         assertNotNull(r.timeToFirstFeasibleMs)
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["MINIZINC", "PB_COMPETITION", "SMT_LIB"])
+    fun `numerical result metadata should retain authority and original objective units`(dialect: String) {
+        val mode = SolverInvocation.Dialect.valueOf(dialect)
+        val prefix = when (mode) {
+            SolverInvocation.Dialect.MINIZINC -> "% "
+            SolverInvocation.Dialect.PB_COMPETITION -> "c "
+            SolverInvocation.Dialect.SMT_LIB -> "; "
+        }
+        val metadata = linkedMapOf(
+            "lpDeductionAuthority" to "numerical",
+            "numericalObjectiveTolerance" to "1.0E-6",
+            "numericalObjectiveBoundDirection" to "lower",
+            "numericalObjectiveBound" to "3.25",
+            "numericalRelativeGap" to "0.125",
+            "optimizationStatus" to "tolerance-optimum",
+        )
+        val stdout = metadata.entries.joinToString("\n") { prefix + it.key + "=" + it.value } + "\n"
+
+        val result = SolverInvocation.invoke(listOf("fake"), mode,
+            startProcess = { FakeProcess("".byteInputStream(), stdout = stdout) })
+
+        metadata.forEach { (key, value) -> assertEquals(value, result.stats[key], key) }
+        assertNull(result.feasible)
+        assertFalse(result.proven)
+    }
+
     @Test
     fun `plain SMT sat should provide no optimality proof`() {
         val r = SolverInvocation.invoke(listOf("sh", "-c", "echo sat"), SolverInvocation.Dialect.SMT_LIB)
