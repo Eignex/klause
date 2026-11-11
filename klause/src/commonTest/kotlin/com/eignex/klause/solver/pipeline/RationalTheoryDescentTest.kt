@@ -7,6 +7,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -143,7 +144,7 @@ class RationalTheoryDescentTest {
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
         )
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
-        val descent = RationalTheoryDescent(source, objective, TheoryParams())
+        val descent = RationalTheoryDescent(source, objective, TheoryParams(lpMode = LpCertificationMode.EXACT))
 
         val result = descent.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _ -> } }
 

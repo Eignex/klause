@@ -906,7 +906,7 @@ class LinearAuthorityInvocationTest {
             mapOf(real to BigFraction.ONE),
         )
 
-        val result = LinearAuthorityInvocation(source, TheoryParams()).use {
+        val result = LinearAuthorityInvocation(source, TheoryParams(lpMode = LpCertificationMode.EXACT)).use {
             it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
         }
 

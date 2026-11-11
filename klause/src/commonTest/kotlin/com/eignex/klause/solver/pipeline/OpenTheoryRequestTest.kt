@@ -7,6 +7,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -40,7 +41,9 @@ class OpenTheoryRequestTest {
         )
         val request = OpenTheoryRequest(model, LinearObjective(realCoefficients = doubleArrayOf(1.0)))
 
-        val result = assertIs<OpenTheoryExecution.Optimize>(OpenTheoryPipeline.execute(request)).result
+        val result = assertIs<OpenTheoryExecution.Optimize>(
+            OpenTheoryPipeline.execute(request, TheoryParams(lpMode = LpCertificationMode.EXACT)),
+        ).result
 
         assertIs<OpenTheoryOptimum.Unbounded>(result)
         val ray = assertIs<SourceClaim.Ray>(assertNotNull(result.linearResult?.terminal).claim)
