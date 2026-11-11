@@ -12,15 +12,15 @@ fragments and strategy limits.
 Complete workers can certify refutations, bounds and optima. Procedure completeness
 is a separate property: a sound incomplete procedure may prove individual instances,
 while even a complete procedure can stop under resource limits. Local search supplies
-checked witnesses and incumbents; its failure never refutes the source.
+witnesses and incumbents; its failure never refutes the source.
 
 | Claim | Required authority |
 |---|---|
 | SAT or feasible incumbent | A complete assignment from an engine that enforces the source, checked against it only where no engine does |
 | UNSAT or infeasible | A completed sound refutation covering the source scope |
-| Optimal | A checked feasible assignment and a matching bound or exhaustive proof |
+| Optimal | A feasible assignment and a matching bound or exhaustive proof |
 | Unbounded | A source-valid proof of unlimited objective improvement; a feasible point alone is insufficient |
-| Best found | A checked feasible incumbent without an optimum proof |
+| Best found | A feasible incumbent without an optimum proof |
 | UNKNOWN | No definitive claim; retain the unsupported, cancellation or resource cause |
 
 A zero heuristic score, a relaxation candidate or satisfaction of an approximated
@@ -48,13 +48,10 @@ coordinates. Frontends parse, lower and render; they never invoke concrete theor
 
 ## Independently checkable proof files
 
-Klause checks supported claims in memory through
-[portfolio certificates](12-portfolio.md#witnesses-and-proof-scope),
-[LP certification](17-linear-programming.md#lp-certification) and
-[source derivations](13-evidence.md). It does not export a proof of an entire
-source solve for a separate checker. In-memory engine attestations and checked
-original-source derivations have distinct authority; neither a reduced-model
-label nor a checked witness supplies a missing refutation or bound derivation.
+Klause [certifies LP results](17-linear-programming.md#lp-certification) and checks
+captured [source derivations](13-evidence.md) in memory, but exports no proof of a
+whole solve for a separate checker. Engine attestations and checked derivations have
+distinct authority, and no witness supplies a missing refutation or bound derivation.
 
 ## System architecture
 
@@ -70,7 +67,7 @@ A solve passes through four stages:
    source setup chooses finite, arithmetic or composed execution.
 3. Complete and heuristic workers run with private mutable state under the
    containing [resource allowance](06-sessions.md#resource-allowances).
-4. Source checks and scoped evidence admit publications; the frontend renders them.
+4. Scoped evidence admits publications; the frontend renders them.
 
 Part III follows those stages. Part IV describes arithmetic services and Part V
 the numerical mechanisms beneath them.
@@ -120,7 +117,7 @@ Packages below are under `com.eignex.klause` in
 | `theory.qfnia` | Sound incomplete nonlinear integer search | Neutral polynomial data and exact real completion; no finite domains |
 | `theory.qfnra` | Complete polynomial-real decision | Neutral polynomial formulas and the exact kernel; no finite domains |
 | `theory.transcendental` | Sound incomplete real function checks and relaxations | Neutral function formulas and numerical kernels; no finite domains |
-| `solver.validation` | Source coordinate checks and composed fixpoint verification | No orchestration or concrete theories |
+| `solver.validation` | Source coordinate checks for points no engine enforced | No orchestration or concrete theories |
 | `solver.pipeline` | Source routing and one verdict surface | Selects theory once; frontends render assignments |
 | `solver.search` | Component protocol, decisions, traversal, retraction, learning and complete checks | No concrete theory, LP, propagation or backtracking dependencies |
 

@@ -157,10 +157,9 @@ preferences; unknown variables keep their ordinary fallback values. Guides witho
 known fractional targets keep their direct handoff. The private probe prepares its
 partition against its own root domains. After greedy directions decline, its bounded
 repair can revisit an earlier pin within that component while retaining completed
-earlier components and pending alternatives across slices. Every completed proposal still needs
-the ordinary source acceptance check. Its existing backtracking completes the assignment,
-and complete source checks retain publication authority. This transfer carries no
-LP point, bound or proof authority into a leaf. Before its first incumbent, a retained
+earlier components and pending alternatives across slices. A completed proposal only
+steers values; backtracking completes the assignment, and only that leaf becomes an
+incumbent. This transfer carries no LP point, bound or proof authority into a leaf. Before its first incumbent, a retained
 integer guide can keep decisions within one declared factor component of the
 undetermined columns at a time. Its preparation precedes additional node LP queries
 under the same funded allowance. A ready guide lets CP seek its first incumbent
@@ -282,14 +281,14 @@ linear completion owner reuses the point of its last numerical check, and the op
 `openHintFlips` provider indexes source clauses and prefers the polarity that breaks
 fewer of them. Index construction is bounded and charged to the opening token; see
 [native arithmetic allowances](06-sessions.md#native-arithmetic-allowances).
-Solution-guided LP bounding may also order values by verified peer incumbents until
+Solution-guided LP bounding may also order values by peer incumbents until
 its first local witness. Hints supply no incumbent, pruning or publication authority.
 
 A non-restarting retained complete optimization worker with an external cutoff reads
-the current pooled assignment at its first root and revalidates it before using it
-as a local incumbent. A witness equal to the containing portfolio's cutoff
+the current pooled assignment at its first root and adopts it as a local incumbent
+once it satisfies the worker's own pins. A witness equal to the containing portfolio's cutoff
 can seed that worker's incumbent and objective propagation at its first root; it
-need not improve the containing portfolio again. Invalid assignments and assignments
+need not improve the containing portfolio again. Assignments violating those pins or
 above the cutoff do not seed it. This starting witness supplies bounds without
 priming solution guidance or earning incumbent progress. Restarting workers retain
 their discovery and root-primal startup path. Rebindable neighborhood searches retain strict
@@ -716,9 +715,9 @@ skipped.
 
 ### Complete finite checks
 
-Complete points pass [source validation](07-presolve.md#source-witness-validation)
-under a private full-assignment fixpoint. Partial or inert deduction needs a complete
-original checker or enforcing arithmetic peer; unavailable checking leaves the leaf
+A leaf is complete when propagation reaches a fixpoint with every coordinate fixed. A
+relation with partial or inert deduction needs its complete original checker or an
+enforcing arithmetic peer at that leaf; an unavailable check leaves the leaf
 indeterminate.
 
 #### Custom factor publication checks

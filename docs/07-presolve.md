@@ -970,10 +970,8 @@ allowance and retains an already checked publication if later work stops.
 `solver.validation` checks coordinates that no engine enforced against original source
 obligations: caller-supplied starting points, relations an engine cannot propagate or
 score, transformed float-grid points and arithmetic completions. Integer search trusts
-its own propagation and does not re-derive its leaves. Acceptance checks the point;
-rejection refutes only the point; unavailable or interrupted checking is
-indeterminate. [Portfolio admission](12-portfolio.md#witnesses-and-proof-scope) and
-[evidence](13-evidence.md) separately check identity, restrictions and claim scope.
+its own propagation and does not re-derive its leaves. A rejection refutes only the
+point, and an interrupted check is indeterminate.
 
 ### Finite points
 
@@ -984,9 +982,8 @@ propagators and occurrence indexes are shared across a checker's points. Prepare
 custom providers keep their selected factories and required original checks.
 Pure Boolean clause points use native clause propagation when the selected
 factories permit it, without constructing the general watcher index.
-Cancellation or unavailable required checking returns indeterminate. Every exit
-reports the propagation work through the caller's accounting hook, and no scratch
-state survives a check.
+Cancellation or an unavailable required check returns indeterminate, and every exit
+reports its propagation work to the caller.
 
 Exact point checking also validates integer absolute-value and distinctness
 relations on authoritative arbitrary-width values. `AllDifferent` compares every
