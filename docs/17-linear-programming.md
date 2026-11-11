@@ -1918,6 +1918,19 @@ distinguish an exhausted containing owner from a paused numerical query grant.
 Support limits identify context lookups, proof traversal, result collection
 or derivation depth.
 These finite counters carry no proof authority and change no admission allowance.
+`source-refutation-center-step=true` opts completion-enabled joint repair into a
+bounded advisory center move before its first checked incumbent. A compatible
+root refutation can suggest one legal integer step away from a cited bound side.
+Only completion of that exact queried region makes the suggestion available to
+the neighborhood owner; paused, imported, branch-local and cutoff-only outcomes
+withhold it. The owner checks unchanged pins and Boolean context before updating
+its private center. Advice tied to the previous center is discarded. Checked
+pooled centers and discovered incumbents retain their existing authority. This
+move spends cumulative source funding without renewing numerical grants, changes
+no free-variable width and opens no extra query. Visits are bounded to 4,096 entries
+and scalars to 4,096 bits. Changed centers keep full exact condition keys; no
+refutation is applied at a weakened scope. A proposed center is not an incumbent,
+and every discovered point still requires original-source publication checking.
 A private finite-request observer can capture actual joint proposals without enabling
 portfolio progress. It records the scheduling operator and round, requested and
 effective counts, exact eligible integer centers and condition pins, actual free
