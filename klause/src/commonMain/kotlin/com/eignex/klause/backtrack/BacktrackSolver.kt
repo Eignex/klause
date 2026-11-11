@@ -61,7 +61,7 @@ import kotlin.time.ComparableTimeMark
  */
 class BacktrackSolver internal constructor(
     override val problem: BakedProblem,
-    internal val lpSolveContext: LpSolveContext,
+    private val lpSolveContext: LpSolveContext?,
     private val nativeProjection: PropagationProblem? = null,
 ) : Solver<BacktrackParams>,
     Optimizer<BacktrackParams>,
@@ -72,10 +72,13 @@ class BacktrackSolver internal constructor(
     internal val pointCheck: FinitePointCheck by lazy { FinitePointCheck(problem) }
 
     /** Solve a baked problem with production LP dependencies. */
-    constructor(problem: BakedProblem) : this(problem, LpSolveContext.Production)
+    constructor(problem: BakedProblem) : this(problem, null)
 
     internal constructor(problem: BakedProblem, nativeProjection: PropagationProblem) :
-        this(problem, LpSolveContext.Production, nativeProjection)
+        this(problem, null, nativeProjection)
+
+    internal fun lpContext(params: BacktrackParams): LpSolveContext =
+        lpSolveContext ?: LpSolveContext.forMode(params.lpMode)
 
     internal fun propagationProjection(nativeSat: Boolean, model: BakedProblem = problem): PropagationProblem =
         if (nativeSat && nativeProjection?.isNativeSatEligible == true && nativeProjection.problem === model) {
@@ -277,7 +280,7 @@ class BacktrackSolver internal constructor(
         }
         val sink = SolveStatsSink(backend = "backtrack")
         sink.start()
-        return CpSatisfactionTraversal(problem, params, sink, lpSolveContext, singleModel = true).use { traversal ->
+        return CpSatisfactionTraversal(problem, params, sink, lpContext(params), singleModel = true).use { traversal ->
             val outcome = checkNotNull(traversal.next()) { "an unsliced traversal never pauses" }
             verdictOf(outcome, params.assumptions, params.cancellation, sink)
         }
@@ -378,7 +381,7 @@ class BacktrackSolver internal constructor(
     }
 
     private fun solveOnce(params: BacktrackParams): SolveResult =
-        CpSatisfactionTraversal(problem, params, null, lpSolveContext).use { traversal ->
+        CpSatisfactionTraversal(problem, params, null, lpContext(params)).use { traversal ->
             when (val outcome = checkNotNull(traversal.next()) { "an unsliced traversal never pauses" }) {
                 is SearchOutcome.Found -> SolveResult.Sat(outcome.sample)
 
@@ -413,7 +416,7 @@ class BacktrackSolver internal constructor(
         val window = ArrayDeque<Sample>()
         return PullSearchStream(
             pull = {
-                val cursor = traversal ?: CpSatisfactionTraversal(problem, params, null, lpSolveContext)
+                val cursor = traversal ?: CpSatisfactionTraversal(problem, params, null, lpContext(params))
                     .also { traversal = it }
                 var accepted: Sample? = null
                 var ended = false

@@ -477,7 +477,7 @@ private fun executeCapturedSource(
                 finite.cancellation or Cancellation { finite.deadlineExceeded() },
                 finite.toleranceCheck == null,
             )
-            val result = FinitePipeline.solve(finite, callbacks.finite, LpSolveContext.Production,
+            val result = FinitePipeline.solve(finite, callbacks.finite, LpSolveContext.forMode(finite.lpMode),
                 if (invocation.requestsFiniteNumericalCompanions) request.theory.boundTo(invocation) else null,
                 request.onPortfolioLpQuery, request.onPortfolioGuidance, request.onPortfolioJointRepair)
             SourceExecutionResult.Finite(invocation, result)

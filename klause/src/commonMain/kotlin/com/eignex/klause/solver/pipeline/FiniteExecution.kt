@@ -17,6 +17,7 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.lp.engine.LpQueryObservation
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
@@ -111,6 +112,8 @@ class FiniteSolveRequest(
      * check accepts it; `null` keeps exact semantics.
      */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
+    /** LP deduction authority captured before model preparation and worker construction. */
+    val lpMode: LpCertificationMode = LpCertificationMode.NUMERICAL,
 ) {
     private var capturedSourceControls: SourceFiniteControls? = null
     internal val sourceControls: SourceFiniteControls? get() = capturedSourceControls
@@ -137,6 +140,7 @@ class FiniteSolveRequest(
         deadlineExceeded = { controls.cancellation.deadline()?.hasPassedNow() == true },
         onEvent = null,
         onPortfolioEvent = null,
+        lpMode = (controls as? SourceFiniteControls.Backtrack)?.params?.lpMode ?: LpCertificationMode.NUMERICAL,
     ) {
         require(shape.sourceInvocation?.source?.originalSource is Problem &&
             operation in setOf(ExecutionOperation.SATISFY, ExecutionOperation.OPTIMIZE)
@@ -188,6 +192,7 @@ class FiniteSolveRequest(
         onPortfolioFault: ((ArmFault) -> Unit)? = null,
         prepareOnly: Boolean = false,
         toleranceCheck: ((Sample) -> Boolean)? = null,
+        lpMode: LpCertificationMode = LpCertificationMode.NUMERICAL,
     ) : this(
         shape = shape,
         engine = engine,
@@ -213,6 +218,7 @@ class FiniteSolveRequest(
         onPortfolioFault = onPortfolioFault,
         prepareOnly = prepareOnly,
         toleranceCheck = toleranceCheck,
+        lpMode = lpMode,
     )
 }
 
@@ -498,11 +504,11 @@ private fun FiniteExecutionResult.withCompleteSearch(value: Boolean): FiniteExec
 
 /** Prepare the canonical finite model and optional heuristic view, then execute the selected engine route. */
 fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteSolveCallbacks): FiniteSolveResult =
-    solve(request, callbacks, LpSolveContext.Production)
+    solve(request, callbacks, LpSolveContext.forMode(request.lpMode))
 
 internal fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteSolveCallbacks,
     numericalCompanions: TheoryParams): FiniteSolveResult =
-    solve(request, callbacks, LpSolveContext.Production, numericalCompanions)
+    solve(request, callbacks, LpSolveContext.forMode(request.lpMode), numericalCompanions)
 
 /** Execute the fixed finite route with per-invocation LP dependencies. */
 internal fun FinitePipeline.solve(
@@ -514,7 +520,7 @@ internal fun FinitePipeline.solve(
     onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     onPortfolioJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
 ): FiniteSolveResult {
-    require(request.engine == FiniteEngine.FIXED || lpSolveContext == LpSolveContext.Production) {
+    require(request.engine == FiniteEngine.FIXED || lpSolveContext == LpSolveContext.forMode(request.lpMode)) {
         "custom LP dependencies require the fixed finite route"
     }
     request.shape.sourceInvocation?.freezeExecution()

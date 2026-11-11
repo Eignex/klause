@@ -19,6 +19,7 @@ import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.hasDefaultNumericalSettings
 import com.eignex.klause.lp.cut.CutExchange
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
@@ -474,6 +475,8 @@ data class BacktrackParams(
     val rootProbeBinaryGate: Boolean = false,
     /** Explore one global batch, then prefer learned neighborhoods in Boolean General states without root signals. */
     val rootProbeGeneralGate: Boolean = false,
+    /** LP deduction authority; independent of continuous source acceptance and its tolerances. */
+    val lpMode: LpCertificationMode = LpCertificationMode.NUMERICAL,
 ) : SolverParams {
     init {
         require(rootRebuildCaptureVisits in 0..1_048_576) { "rebuild capture visits must be in 0..1048576" }
@@ -509,7 +512,7 @@ data class BacktrackParams(
 
     /** The LP-bounding runtime's slice of these params (see [LpParams]) — what `LpEngine` consumes. */
     fun lpParams(): LpParams =
-        LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed, zeroObjectivePricing)
+        LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed, zeroObjectivePricing, lpMode)
 
     private companion object {
         private fun merge(a: Assumptions, b: Assumptions): Assumptions = a.mergedWith(b)

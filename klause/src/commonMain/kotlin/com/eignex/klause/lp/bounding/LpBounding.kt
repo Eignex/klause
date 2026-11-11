@@ -1791,7 +1791,7 @@ private fun LpEngine.recordRootQueryBound(relaxation: LpRelaxation, result: Floa
     if (!params.cancellation()) recordRootLowerBound(projectCertifiedLowerBound(relaxation, lower))
 }
 
-private fun LpEngine.projectCertifiedLowerBound(
+internal fun LpEngine.projectCertifiedLowerBound(
     relaxation: LpRelaxation,
     lower: Double?,
     root: Boolean = true,

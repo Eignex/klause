@@ -56,7 +56,7 @@ internal class ResumableSatisfaction(
         solver.problem,
         params,
         sink,
-        solver.lpSolveContext,
+        solver.lpContext(params),
         propagationCancellation = cancelledWhen({ globalToken.deadline() }, { globalToken.workScheduled() }) {
             globalToken()
         },

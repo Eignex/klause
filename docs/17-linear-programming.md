@@ -15,6 +15,11 @@ Numerical bounds and conflicts retain their current working-model identity and
 carry no exact certificate or exact support. Their work debits the consuming LP
 allowance, including refused attempts. Exact computation admission precedes the
 certificate producer; a numerical policy invokes no exact root certifier.
+`LpCertificationMode` is captured independently in caller policy, finite requests,
+search parameters and LP parameters. Explicit diagnostic solve contexts retain
+their own dependencies. Root shaving, redundancy and implication probes use the
+selected authority and the remaining root grant; their integer source objectives
+are rounded before their bounds are consumed.
 Standalone and retained solves carry numerical packages separately from their exact
 verdict and proof fields. A numerical point requires the caller's source-acceptance
 predicate; a numerical optimum also requires its objective to meet the lower bound

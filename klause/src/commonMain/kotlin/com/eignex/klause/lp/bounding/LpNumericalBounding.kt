@@ -41,10 +41,13 @@ internal fun LpEngine.numericalConflict(
     model: LpModel,
     ray: DoubleArray,
     cancellation: Cancellation,
+    root: Boolean = false,
 ): Boolean {
-    val timer = LpPhaseTimer(sink.lp.certificationObserver(LpRoute.NODE), LpSolvePhase.NUMERICAL_CONFLICT)
-    val checked = floatingInfeasibilityMargin(model, ray, numericalNodeWorkRemaining(), cancellation)
-    noteNumericalWork(checked.work)
+    val timer = LpPhaseTimer(sink.lp.certificationObserver(if (root) LpRoute.ROOT else LpRoute.NODE),
+        LpSolvePhase.NUMERICAL_CONFLICT)
+    val remaining = if (root) retainedRootRemainingWork() else numericalNodeWorkRemaining()
+    val checked = floatingInfeasibilityMargin(model, ray, remaining, cancellation)
+    noteNumericalWork(checked.work, root)
     timer.finish(checked.stop?.name ?: if (checked.infeasible) "ACCEPTED" else "REFUSED", checked.work)
     return checked.infeasible && !cancellation()
 }
@@ -95,8 +98,8 @@ internal fun LpEngine.applyNumericalBound(
     return true
 }
 
-internal fun LpEngine.observeNumericalConsumption(outcome: String) {
-    sink.lp.certificationObserver(LpRoute.NODE)
+internal fun LpEngine.observeNumericalConsumption(outcome: String, root: Boolean = false) {
+    sink.lp.certificationObserver(if (root) LpRoute.ROOT else LpRoute.NODE)
         .observePhase(LpPhaseMetrics(LpSolvePhase.NUMERICAL_CONSUMPTION, outcome, 0L))
 }
 

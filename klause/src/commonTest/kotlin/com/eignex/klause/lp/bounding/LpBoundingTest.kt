@@ -16,6 +16,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
@@ -62,6 +63,22 @@ class LpBoundingTest {
     )
 
     private val sumObjective = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
+
+    @Test
+    fun `public search parameters should select numerical or exact LP deductions`() {
+        for (mode in LpCertificationMode.entries) {
+            val result = BacktrackSolver(triangle().bake()).minimize(sumObjective,
+                BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true), lpMode = mode))
+
+            assertIs<MinimizeResult.Optimal>(result)
+            assertEquals(3.0, result.objectiveValue)
+            val numerical = result.stats.lp.phases.keys.any { it.startsWith("NUMERICAL_BOUND_") }
+            val exact = result.stats.lp.integerCertify.attempts.sum +
+                result.stats.lp.safeObjectiveLowerBound.attempts.sum
+            assertEquals(mode == LpCertificationMode.NUMERICAL, numerical)
+            assertEquals(mode == LpCertificationMode.EXACT, exact > 0.0)
+        }
+    }
 
     @Test
     fun `numerical node bounds should preserve the coupled optimum without exact certifiers`() {

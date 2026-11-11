@@ -5,7 +5,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpSolver
-import com.eignex.klause.lp.engine.acceptNullable
+import com.eignex.klause.lp.engine.computeNullable
 import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
 import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.lp.engine.newTableauCutSolver
@@ -208,6 +208,10 @@ private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: Cancellati
         }
     }
     result ?: return null
+    if (solveContext.certificationPolicy.numericalDeductions) {
+        val lower = numericalObjectiveBound(relaxation.model, result.duals, token, root = true)?.value ?: return null
+        return projectCertifiedLowerBound(relaxation, lower, cancellation = token).takeIf(Double::isFinite)?.let(::ceil)
+    }
     val lower = certifiedTightObjectiveLowerBound(
         relaxation.model,
         result.duals,
@@ -246,6 +250,10 @@ private fun LpEngine.safeMinNoBake(coeffs: LongArray, token: Cancellation): Doub
         }
     }
     result ?: return null
+    if (solveContext.certificationPolicy.numericalDeductions) {
+        val lower = numericalObjectiveBound(relaxation.model, result.duals, token, root = true)?.value ?: return null
+        return projectCertifiedLowerBound(relaxation, lower, cancellation = token).takeIf(Double::isFinite)?.let(::ceil)
+    }
     val lower = certifiedTightObjectiveLowerBound(
         relaxation.model,
         result.duals,
@@ -348,10 +356,14 @@ internal fun LpEngine.rootLpInfeasibleNoBake(token: Cancellation): Boolean {
         }
         if (result != null) return@use false
         val floatRay = simplex.infeasibleRay ?: return@use false
-        solveContext.certificationPolicy.acceptNullable(
-            LpCertifier.EXACT_FARKAS,
-            integerFarkasRay(model, floatRay, observer = rootCertificationObserver()),
-        ) != null
+        if (solveContext.certificationPolicy.numericalDeductions) {
+            val conflict = numericalConflict(model, floatRay, token, root = true)
+            if (conflict) observeNumericalConsumption("ROOT_CONFLICT", root = true)
+            return@use conflict
+        }
+        solveContext.certificationPolicy.computeNullable(LpCertifier.EXACT_FARKAS) {
+            integerFarkasRay(model, floatRay, observer = rootCertificationObserver())
+        } != null
     }
 }
 
