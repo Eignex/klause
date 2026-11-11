@@ -142,12 +142,9 @@ modeled ownership.
 Minimization retains its first-run position while a private LP root layout prepares
 across slices. Paid construction stays in the worker's cumulative work, and a pause
 starts neither numerical consultation nor tree traversal. Incumbent revalidation
-precedes that work and runs through the solver's retained
-[point checker](07-presolve.md#finite-points), including its selected original-source
-checks. Its propagation spends the same live slice allowance, including rejected or
-interrupted checks, and moves once into the cumulative ledger when the check ends. A
-retained verdict answers an unchanged point without propagating; incomplete checking
-supplies no witness.
+precedes that work. Its private propagation visits spend the same live slice allowance,
+including construction, rejected or interrupted checks and retirement. Retired visits
+transfer once into the cumulative ledger; incomplete checking supplies no witness.
 The search and its preparation wrapper report an unfinished root
 layout as pending private preparation. Construction completion, cancellation and retirement follow the
 [LP ownership contract](17-linear-programming.md#root-preparation).

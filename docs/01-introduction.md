@@ -27,23 +27,6 @@ A zero heuristic score, a relaxation candidate or satisfaction of an approximate
 model never justifies an exact claim. Approximation and configured tolerance have
 separate contracts in [input semantics](03-input-semantics.md).
 
-These claims rest on four kinds of authority with different scopes:
-
-- **Native enforcement.** A complete engine's propagation or theory search enforces
-  the relations it owns, and its completed run attests refutations and bounds.
-- **Source checks.** A witness is checked against the original relations under
-  their declared semantics, in exact rational arithmetic or within a configured
-  tolerance. An accepted check is
-  [reused](07-presolve.md#reused-validation) for the unchanged point under the
-  same model, objective and policy; only new restrictions are checked again.
-- **Numerical certification.** An LP result prunes or supports a claim only after
-  its [exact certificate check](17-linear-programming.md#lp-certification).
-- **Source derivations.** Captured refutations and bounds are rechecked against
-  original premises by the [derivation verifier](13-evidence.md).
-
-Tolerance acceptance and tolerance terminal claims are numerical: they describe
-the configured tolerance, not exact satisfaction or an exact optimum.
-
 ## Model and execution
 
 A source model retains declarations, high-level factor relations, an objective and

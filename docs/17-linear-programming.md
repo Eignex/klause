@@ -1581,14 +1581,7 @@ their built-in descriptors.
 
 Certification checks numerical proposals against the exact active model. Different
 claims need different evidence packages; a floating optimum or failed check cannot
-prune or prove a result. Uncertified floating results only order search and seed
-heuristics, whose points pass the ordinary
-[source witness checks](07-presolve.md#source-witness-validation). A certificate
-establishes its claim for the exact active model as an in-memory attestation; only a
-[captured derivation](13-evidence.md) is rechecked against original premises.
-Configured tolerance acceptance is numerical source semantics, not exact
-certification; see [MPS semantics](05-arithmetic-formats.md#tolerance-publication).
-[LpSolve](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpSolve.kt)
+prune or prove a result. [LpSolve](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpSolve.kt)
 owns these checks.
 
 ### Proof packages

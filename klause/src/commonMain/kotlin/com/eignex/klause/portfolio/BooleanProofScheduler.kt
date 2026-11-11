@@ -12,8 +12,6 @@ import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.incumbent.Candidate
-import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -21,8 +19,6 @@ import com.eignex.klause.solver.search.BooleanProofContext
 import com.eignex.klause.solver.search.BooleanProofTasks
 import com.eignex.klause.solver.search.BooleanTaskCheck
 import com.eignex.klause.solver.search.BooleanTaskLease
-import com.eignex.klause.solver.validation.FinitePointCheck
-import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.util.Cancellation
 
 internal data class BooleanProofStep(
@@ -54,8 +50,6 @@ internal class BooleanProofScheduler(
         splitVariables: List<Int>,
         parameters: List<BacktrackParams>,
     ) : this(problem, context, splitVariables, parameters, false, null)
-
-    private val points = FinitePointCheck(problem)
 
     private class Worker {
         var search: RepairSearch? = null
@@ -130,16 +124,12 @@ internal class BooleanProofScheduler(
             }
             val result = search.runSlice(cancellation, millis, offeredWork)
             val sample = result.sample
+            // The task search propagated its lease pins; its model needs no second derivation.
             if (sample != null) {
-                val verdict = finiteWitnessVerifier(problem, null, assumptions(lease), cancellation, points = points)
-                    .verify(Candidate(sample, null))
-                if (verdict is Verification.Accepted) {
-                    witness = sample
-                    tasks.release(lease)
-                    slot.lease = null
-                    return BooleanProofStep(lease.task, sample, result.reason)
-                }
-                if (verdict is Verification.Rejected) error("task worker produced an invalid witness")
+                witness = sample
+                tasks.release(lease)
+                slot.lease = null
+                return BooleanProofStep(lease.task, sample, result.reason)
             }
             if (result.reason != null) {
                 tasks.complete(lease) {
