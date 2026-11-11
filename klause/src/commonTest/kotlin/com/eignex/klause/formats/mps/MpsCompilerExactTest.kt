@@ -27,7 +27,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class MpsExactSourceTest {
+class MpsCompilerExactTest {
     @Test
     fun `decimal cancellation should admit the original source witness`() {
         val source = Mps.parse(

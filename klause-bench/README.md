@@ -1456,7 +1456,7 @@ source mapping, retained state, setup dimensions, numerical resource limits and
 explicit decline reasons. Capture dimensions are setup estimates, not measured RSS.
 Use source-matched current default, binary-gate and expanded-gate controls with identical preparation,
 seeds and containing budgets. Preserve qualified binary sources as admission
-controls and the broad numerical-first recipe as a separate allocation control.
+controls.
 
 Compare independently checked feasibility and original objectives, routing and
 construction time, worker initialization/segments/active-time retirement, source LP

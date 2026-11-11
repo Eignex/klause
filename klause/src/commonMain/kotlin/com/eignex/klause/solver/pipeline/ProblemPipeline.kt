@@ -224,7 +224,7 @@ internal fun Problem.pipelineRoute(
     routePureRealToTheory: Boolean = true,
 ): SourceProblemRoute = pipelineRouteObserved(
     objective, maximize, routePureRealToTheory, boundCancellation, onLpStats,
-    requiresExactObjectiveRoute(objective, preparationCancellation),
+    false,
     projections.providers, projections, polynomialCancellation = polynomialCancellation,
     preparationCancellation = preparationCancellation,
 )
@@ -252,7 +252,8 @@ private fun Problem.pipelineRouteObserved(
     preparationCancellation: Cancellation = boundCancellation,
 ): SourceProblemRoute {
     val selection = projectionCapture ?: providers.prepare(this)
-    if (!routeLinearToTheory && nativeFiniteSource(selection, preparationCancellation)) {
+    val exactSourceObjective = routeLinearToTheory || requiresExactObjectiveRoute(objective, preparationCancellation)
+    if (!exactSourceObjective && nativeFiniteSource(selection, preparationCancellation)) {
         onLpStats?.invoke(LpStatsSink(LpRoute.STANDALONE).snapshot())
         val prepared = prepareExecutionPlan(
             this,
@@ -291,12 +292,15 @@ private fun Problem.pipelineRouteObserved(
         is BoundedRouting.Proved -> bounded.problem
     }
     val finiteIntegerRanges = routed.hasFiniteIntegerRanges()
+    // Proved bounds decide whether a finite objective range exists, as they do for the finite lane itself.
+    val exactObjective = if (routed === this) exactSourceObjective else
+        routeLinearToTheory || routed.requiresExactObjectiveRoute(objective, preparationCancellation)
     val projections = selection.forEngineView(routed)
     val reuseInitial = initial != null && routed === this && initial.factorProjections === projections &&
         initial.objective === objective && initial.maximize == maximize
     val stopped = reuseInitial && preparationCancellation()
     val preparationStop = if (stopped) Cancellation { true } or preparationCancellation else preparationCancellation
-    val nativeFiniteAfterBounds = !routeLinearToTheory &&
+    val nativeFiniteAfterBounds = !exactObjective &&
         routed.nativeFiniteSource(projections, preparationStop)
     val finiteCompletion = nativeFiniteAfterBounds || (
         finiteIntegerRanges &&
@@ -339,7 +343,7 @@ private fun Problem.pipelineRouteObserved(
         is PreparedExecution.Transcendental -> error("factor source requires polynomial execution")
     }
     val arithmeticRoute = arithmeticExecution.ownership.theoryPipeline
-    val preferExact = routeLinearToTheory &&
+    val preferExact = exactObjective &&
         (arithmeticRoute == ProblemPipeline.EXACT_LRA || arithmeticRoute == ProblemPipeline.EXACT_LIRA)
     val preferFinite = finiteIntegerRanges && !preferExact &&
         (!routePureRealToTheory || arithmeticRoute != ProblemPipeline.EXACT_LRA) &&

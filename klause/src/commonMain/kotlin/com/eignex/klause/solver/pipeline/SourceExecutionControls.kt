@@ -42,6 +42,12 @@ internal fun bindSourceExecutionControls(
     val kind = SourceSetup.executionKind(invocation)
     val preparation = reader.presolve(presolveConfig ?: PresolveConfig.DEFAULT)
     val prepareOnly = reader[ExecutionOption.dryRunPresolve] == true
+    // A linear source qualifies native results in its own units; only its finite lowering has a preparation view.
+    if (prepareOnly && invocation.source.formula is AttachedSourceFormula.Linear &&
+        kind != SourceExecutionKind.FINITE
+    ) {
+        pipelineConfigError("dry-run-presolve requires finite execution of a linear source")
+    }
     policy.validate(kind, invocation.request.engine, preparation.requested, prepareOnly, preparation.config,
         invocation.canonicalPolynomial)
     val resolvedPresolve = preparation.config.takeIf { presolveConfig != null || preparation.requested }

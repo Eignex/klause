@@ -63,7 +63,7 @@ retraction removes their authority. Objectives over integer backings use an exac
 positive multiplier when it fits, and an auxiliary equality otherwise; rendering
 undoes either exactly.
 Wide coefficients admit exact positive row normalization for the numerical LP, and
-nonfinite or underflowing projections decline numerical execution without
+a source with a nonfinite or underflowing projection declines before routing, without
 switching to an arithmetic theory. An infeasible constant row stays an explicit
 contradiction.
 
@@ -116,10 +116,10 @@ splits: each fractional endpoint splits at its floor, and a branch optimum or
 refutation counts only once every sibling has certified coverage. A source-valid
 improving ray needs an integral feasible base and an integral recession step, so
 an unbounded relaxation alone never proves MIP unboundedness. Unresolved indicator
-triggers split into the regions below, at and above their integer value. Rows the
-authority cannot represent, and branches it declines, fall back to the theory.
-LS and ALNS use [joint linear repair](11-neighborhoods.md#joint-linear-repair),
-publishing checked incumbents without global bounds or terminal claims.
+triggers split into the regions below, at and above their integer value. When the
+authority declines, the theory keeps searching for checked incumbents but makes no
+terminal claim. Satisfaction goes to the theory directly. Explicit LS and ALNS use the open theory's exact-coordinate
+neighborhoods, publishing checked incumbents without global bounds or terminal claims.
 
 Every candidate is checked against original rows, bounds, indicators and
 integrality before publication, with its objective recomputed from original

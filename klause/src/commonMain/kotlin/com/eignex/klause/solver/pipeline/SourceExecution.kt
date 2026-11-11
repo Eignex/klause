@@ -14,7 +14,6 @@ import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.effortStats
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
@@ -541,7 +540,7 @@ private fun executeCapturedSource(
             invocation,
             executeSourceHeuristic(
                 invocation,
-                route.preparedPlan,
+                route.preparedPlan.linearWorkingPlan(),
                 request.theory.boundTo(invocation),
                 request.cores,
                 callbacks,

@@ -98,7 +98,7 @@ class SourceExecutionPolicyApplicabilityTest(private val sourceText: String?) {
         ))
         val options = ExecutionOptions(ExecutionOption.dryRunPresolve(true))
 
-        if (SourceSetup.executionKind(invocation) == SourceExecutionKind.LINEAR) {
+        if (SourceSetup.executionKind(invocation) == SourceExecutionKind.LINEAR && sourceText != null) {
             assertEquals(true, SourceExecutionRequest(invocation, options).prepareOnly)
         } else {
             assertFailsWith<PipelineConfigException> { SourceExecutionRequest(invocation, options) }

@@ -131,7 +131,7 @@ internal fun presolveWorkFor(budgetMs: Long): Long = if (budgetMs > Long.MAX_VAL
 /**
  * Consumes and removes `open-bound-proof` from [CommonOptions.engineParams], so engines
  * do not reject the CLI-owned key. Disabling the proof retains open traversal even
- * when the proof could close its bounds. MPS uses numerical traversal; SMT-LIB retains its theory route.
+ * when the proof could close its bounds.
  */
 internal fun CommonOptions.takeOpenBoundProof(): Boolean {
     val entries = engineParams.filter { it.startsWith("$OPEN_BOUND_PROOF_KEY=") }

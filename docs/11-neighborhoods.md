@@ -228,7 +228,7 @@ windows carry no proof authority.
 
 ### Joint linear repair
 
-Explicit numerical linear local search and ALNS use `JointLinearRepair` with the
+Finite numerical companions of a linear source use `JointLinearRepair` with the
 same retained neighborhood driver. A source LP point guides the initial integer
 rounding and orders fractional seed coordinates. With enabled incumbent completion,
 a checked external center supplies initial integer coordinates and the first

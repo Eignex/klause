@@ -741,21 +741,6 @@ final enum class com.eignex.klause.solver.pipeline/LinearSourceConclusion : kotl
     final fun values(): kotlin/Array<com.eignex.klause.solver.pipeline/LinearSourceConclusion> // com.eignex.klause.solver.pipeline/LinearSourceConclusion.values|values#static(){}[0]
 }
 
-final enum class com.eignex.klause.solver.pipeline/LinearTraversal : kotlin/Enum<com.eignex.klause.solver.pipeline/LinearTraversal> { // com.eignex.klause.solver.pipeline/LinearTraversal|null[0]
-    enum entry AUTOMATIC // com.eignex.klause.solver.pipeline/LinearTraversal.AUTOMATIC|null[0]
-    enum entry FINITE_COMPANIONS // com.eignex.klause.solver.pipeline/LinearTraversal.FINITE_COMPANIONS|null[0]
-    enum entry NUMERICAL // com.eignex.klause.solver.pipeline/LinearTraversal.NUMERICAL|null[0]
-    enum entry NUMERICAL_COMPANIONS // com.eignex.klause.solver.pipeline/LinearTraversal.NUMERICAL_COMPANIONS|null[0]
-    enum entry NUMERICAL_COMPANIONS_INDEPENDENT // com.eignex.klause.solver.pipeline/LinearTraversal.NUMERICAL_COMPANIONS_INDEPENDENT|null[0]
-    enum entry NUMERICAL_FRONTIER // com.eignex.klause.solver.pipeline/LinearTraversal.NUMERICAL_FRONTIER|null[0]
-
-    final val entries // com.eignex.klause.solver.pipeline/LinearTraversal.entries|#static{}entries[0]
-        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.pipeline/LinearTraversal> // com.eignex.klause.solver.pipeline/LinearTraversal.entries.<get-entries>|<get-entries>#static(){}[0]
-
-    final fun valueOf(kotlin/String): com.eignex.klause.solver.pipeline/LinearTraversal // com.eignex.klause.solver.pipeline/LinearTraversal.valueOf|valueOf#static(kotlin.String){}[0]
-    final fun values(): kotlin/Array<com.eignex.klause.solver.pipeline/LinearTraversal> // com.eignex.klause.solver.pipeline/LinearTraversal.values|values#static(){}[0]
-}
-
 final enum class com.eignex.klause.solver.pipeline/OpenBranching : kotlin/Enum<com.eignex.klause.solver.pipeline/OpenBranching> { // com.eignex.klause.solver.pipeline/OpenBranching|null[0]
     enum entry Activity // com.eignex.klause.solver.pipeline/OpenBranching.Activity|null[0]
     enum entry Automatic // com.eignex.klause.solver.pipeline/OpenBranching.Automatic|null[0]
@@ -790,7 +775,6 @@ final enum class com.eignex.klause.solver.pipeline/PreparedExecutionKind : kotli
     enum entry DECLINED // com.eignex.klause.solver.pipeline/PreparedExecutionKind.DECLINED|null[0]
     enum entry FINITE_LINEAR // com.eignex.klause.solver.pipeline/PreparedExecutionKind.FINITE_LINEAR|null[0]
     enum entry NONLINEAR_INTEGER // com.eignex.klause.solver.pipeline/PreparedExecutionKind.NONLINEAR_INTEGER|null[0]
-    enum entry NUMERICAL // com.eignex.klause.solver.pipeline/PreparedExecutionKind.NUMERICAL|null[0]
     enum entry POLYNOMIAL // com.eignex.klause.solver.pipeline/PreparedExecutionKind.POLYNOMIAL|null[0]
     enum entry TRANSCENDENTAL // com.eignex.klause.solver.pipeline/PreparedExecutionKind.TRANSCENDENTAL|null[0]
 
@@ -848,7 +832,6 @@ final enum class com.eignex.klause.solver.pipeline/SourceExecutionKind : kotlin/
     enum entry HEURISTIC // com.eignex.klause.solver.pipeline/SourceExecutionKind.HEURISTIC|null[0]
     enum entry LINEAR // com.eignex.klause.solver.pipeline/SourceExecutionKind.LINEAR|null[0]
     enum entry NONLINEAR_INTEGER // com.eignex.klause.solver.pipeline/SourceExecutionKind.NONLINEAR_INTEGER|null[0]
-    enum entry NUMERICAL // com.eignex.klause.solver.pipeline/SourceExecutionKind.NUMERICAL|null[0]
     enum entry POLYNOMIAL // com.eignex.klause.solver.pipeline/SourceExecutionKind.POLYNOMIAL|null[0]
     enum entry REFUTED // com.eignex.klause.solver.pipeline/SourceExecutionKind.REFUTED|null[0]
 
@@ -14642,14 +14625,6 @@ final class com.eignex.klause.solver.evidence/SourceTransformation { // com.eign
         final fun <get-target>(): com.eignex.klause.solver.evidence/SourceScope // com.eignex.klause.solver.evidence/SourceTransformation.target.<get-target>|<get-target>(){}[0]
 }
 
-final class com.eignex.klause.solver.evidence/SourceTransformationVerifier { // com.eignex.klause.solver.evidence/SourceTransformationVerifier|null[0]
-    constructor <init>(com.eignex.klause.solver.evidence/SourceProofContext, com.eignex.klause.solver.evidence/SourceProofContext, kotlin/Int = ..., kotlin/Int = ...) // com.eignex.klause.solver.evidence/SourceTransformationVerifier.<init>|<init>(com.eignex.klause.solver.evidence.SourceProofContext;com.eignex.klause.solver.evidence.SourceProofContext;kotlin.Int;kotlin.Int){}[0]
-
-    final fun objective(com.eignex.klause.solver.evidence/SourceTransformation, com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.evidence/SourceEvidenceCheck // com.eignex.klause.solver.evidence/SourceTransformationVerifier.objective|objective(com.eignex.klause.solver.evidence.SourceTransformation;com.eignex.klause.util.Cancellation){}[0]
-    final fun refutation(com.eignex.klause.solver.evidence/SourceTransformation, com.eignex.klause.solver.evidence/SourceEvidence, com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.evidence/SourceEvidenceCheck // com.eignex.klause.solver.evidence/SourceTransformationVerifier.refutation|refutation(com.eignex.klause.solver.evidence.SourceTransformation;com.eignex.klause.solver.evidence.SourceEvidence;com.eignex.klause.util.Cancellation){}[0]
-    final fun verify(com.eignex.klause.solver.evidence/SourceTransformation, com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.evidence/SourceEvidenceCheck // com.eignex.klause.solver.evidence/SourceTransformationVerifier.verify|verify(com.eignex.klause.solver.evidence.SourceTransformation;com.eignex.klause.util.Cancellation){}[0]
-}
-
 final class com.eignex.klause.solver.objective/LinearObjective : com.eignex.klause.solver.objective/Objective { // com.eignex.klause.solver.objective/LinearObjective|null[0]
     constructor <init>(kotlin/LongArray = ..., kotlin/LongArray = ..., kotlin/Long = ..., kotlin/DoubleArray = ...) // com.eignex.klause.solver.objective/LinearObjective.<init>|<init>(kotlin.LongArray;kotlin.LongArray;kotlin.Long;kotlin.DoubleArray){}[0]
 
@@ -15205,19 +15180,6 @@ final class com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest { //
         final fun <get-problem>(): com.eignex.klause.ir/NonlinearIntegerProblem // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest.problem.<get-problem>|<get-problem>(){}[0]
 }
 
-final class com.eignex.klause.solver.pipeline/NumericalLinearRequest { // com.eignex.klause.solver.pipeline/NumericalLinearRequest|null[0]
-    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., com.eignex.klause.util/Cancellation = ...) // com.eignex.klause.solver.pipeline/NumericalLinearRequest.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;com.eignex.klause.util.Cancellation){}[0]
-
-    final val maximize // com.eignex.klause.solver.pipeline/NumericalLinearRequest.maximize|{}maximize[0]
-        final fun <get-maximize>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/NumericalLinearRequest.maximize.<get-maximize>|<get-maximize>(){}[0]
-    final val objective // com.eignex.klause.solver.pipeline/NumericalLinearRequest.objective|{}objective[0]
-        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.solver.pipeline/NumericalLinearRequest.objective.<get-objective>|<get-objective>(){}[0]
-
-    final fun finiteRoute(kotlin/Function1<com.eignex.klause.solver.result/LpStats, kotlin/Unit> = ...): com.eignex.klause.solver.pipeline/SourceProblemRoute? // com.eignex.klause.solver.pipeline/NumericalLinearRequest.finiteRoute|finiteRoute(kotlin.Function1<com.eignex.klause.solver.result.LpStats,kotlin.Unit>){}[0]
-    final fun numericalRowsSupported(com.eignex.klause.util/Cancellation = ...): kotlin/Boolean // com.eignex.klause.solver.pipeline/NumericalLinearRequest.numericalRowsSupported|numericalRowsSupported(com.eignex.klause.util.Cancellation){}[0]
-    final fun solve(com.eignex.klause.solver.pipeline/TheoryParams = ..., kotlin/Boolean = ..., kotlin/Function2<com.eignex.klause.solver/Sample, com.eignex.klause.simplex.exact/BigFraction, kotlin/Unit> = ...): com.eignex.klause.solver.result/LinearOptimizationResult // com.eignex.klause.solver.pipeline/NumericalLinearRequest.solve|solve(com.eignex.klause.solver.pipeline.TheoryParams;kotlin.Boolean;kotlin.Function2<com.eignex.klause.solver.Sample,com.eignex.klause.simplex.exact.BigFraction,kotlin.Unit>){}[0]
-}
-
 final class com.eignex.klause.solver.pipeline/OpenPreparation { // com.eignex.klause.solver.pipeline/OpenPreparation|null[0]
     final val closedSides // com.eignex.klause.solver.pipeline/OpenPreparation.closedSides|{}closedSides[0]
         final fun <get-closedSides>(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenPreparation.closedSides.<get-closedSides>|<get-closedSides>(){}[0]
@@ -15711,7 +15673,6 @@ final class com.eignex.klause.solver.pipeline/SourceIncumbentPublication { // co
 
 final class com.eignex.klause.solver.pipeline/SourceSetupRequest { // com.eignex.klause.solver.pipeline/SourceSetupRequest|null[0]
     constructor <init>(com.eignex.klause.solver.pipeline/SourceAttachment, com.eignex.klause.solver.pipeline/ExecutionOperation, com.eignex.klause.solver.pipeline/FiniteEngine, com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., com.eignex.klause.solver/FactorProjectionProviders = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...) // com.eignex.klause.solver.pipeline/SourceSetupRequest.<init>|<init>(com.eignex.klause.solver.pipeline.SourceAttachment;com.eignex.klause.solver.pipeline.ExecutionOperation;com.eignex.klause.solver.pipeline.FiniteEngine;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;com.eignex.klause.solver.FactorProjectionProviders;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
-    constructor <init>(com.eignex.klause.solver.pipeline/SourceAttachment, com.eignex.klause.solver.pipeline/ExecutionOperation, com.eignex.klause.solver.pipeline/FiniteEngine, com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., com.eignex.klause.solver/FactorProjectionProviders = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.solver.pipeline/LinearTraversal) // com.eignex.klause.solver.pipeline/SourceSetupRequest.<init>|<init>(com.eignex.klause.solver.pipeline.SourceAttachment;com.eignex.klause.solver.pipeline.ExecutionOperation;com.eignex.klause.solver.pipeline.FiniteEngine;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;com.eignex.klause.solver.FactorProjectionProviders;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation;com.eignex.klause.solver.pipeline.LinearTraversal){}[0]
     constructor <init>(com.eignex.klause.solver.pipeline/SourceAttachment, com.eignex.klause.solver.pipeline/FiniteEngine, com.eignex.klause.ir/QuadraticObjectiveSpec, com.eignex.klause.ir/ObjectiveSense = ..., com.eignex.klause.solver/FactorProjectionProviders = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...) // com.eignex.klause.solver.pipeline/SourceSetupRequest.<init>|<init>(com.eignex.klause.solver.pipeline.SourceAttachment;com.eignex.klause.solver.pipeline.FiniteEngine;com.eignex.klause.ir.QuadraticObjectiveSpec;com.eignex.klause.ir.ObjectiveSense;com.eignex.klause.solver.FactorProjectionProviders;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
 
     final val boundCancellation // com.eignex.klause.solver.pipeline/SourceSetupRequest.boundCancellation|{}boundCancellation[0]
@@ -15720,8 +15681,6 @@ final class com.eignex.klause.solver.pipeline/SourceSetupRequest { // com.eignex
         final fun <get-cancellation>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/SourceSetupRequest.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
     final val engine // com.eignex.klause.solver.pipeline/SourceSetupRequest.engine|{}engine[0]
         final fun <get-engine>(): com.eignex.klause.solver.pipeline/FiniteEngine // com.eignex.klause.solver.pipeline/SourceSetupRequest.engine.<get-engine>|<get-engine>(){}[0]
-    final val linearTraversal // com.eignex.klause.solver.pipeline/SourceSetupRequest.linearTraversal|{}linearTraversal[0]
-        final fun <get-linearTraversal>(): com.eignex.klause.solver.pipeline/LinearTraversal // com.eignex.klause.solver.pipeline/SourceSetupRequest.linearTraversal.<get-linearTraversal>|<get-linearTraversal>(){}[0]
     final val maximize // com.eignex.klause.solver.pipeline/SourceSetupRequest.maximize|{}maximize[0]
         final fun <get-maximize>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceSetupRequest.maximize.<get-maximize>|<get-maximize>(){}[0]
     final val objective // com.eignex.klause.solver.pipeline/SourceSetupRequest.objective|{}objective[0]
@@ -19065,11 +19024,6 @@ sealed class com.eignex.klause.solver.pipeline/SourceExecutionResult : com.eigne
     final class Linear : com.eignex.klause.solver.pipeline/SourceExecutionResult { // com.eignex.klause.solver.pipeline/SourceExecutionResult.Linear|null[0]
         final val result // com.eignex.klause.solver.pipeline/SourceExecutionResult.Linear.result|{}result[0]
             final fun <get-result>(): com.eignex.klause.solver.pipeline/OpenTheoryExecution // com.eignex.klause.solver.pipeline/SourceExecutionResult.Linear.result.<get-result>|<get-result>(){}[0]
-    }
-
-    final class Numerical : com.eignex.klause.solver.pipeline/SourceExecutionResult { // com.eignex.klause.solver.pipeline/SourceExecutionResult.Numerical|null[0]
-        final val result // com.eignex.klause.solver.pipeline/SourceExecutionResult.Numerical.result|{}result[0]
-            final fun <get-result>(): com.eignex.klause.solver.result/LinearOptimizationResult // com.eignex.klause.solver.pipeline/SourceExecutionResult.Numerical.result.<get-result>|<get-result>(){}[0]
     }
 
     final class Polynomial : com.eignex.klause.solver.pipeline/SourceExecutionResult { // com.eignex.klause.solver.pipeline/SourceExecutionResult.Polynomial|null[0]
