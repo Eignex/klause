@@ -994,6 +994,16 @@ equal point from it without propagating. Cancellation or unavailable required
 checking returns indeterminate and is never retained. Every exit reports the
 propagation work through the caller's accounting hook.
 
+Owners that check many points against one problem retain one checker. These are
+backtracking leaves and proposals, LP tree search, core-guided search, ALNS seeds,
+Boolean proof tasks, polynomial and quadratic completion, float-grid publication and
+portfolio verifiers. Local search bakes the view of its unscored factors once when
+its baked integer domains are closed: its candidates already lie inside them. Open
+declarations, and the discrete part of an open-model witness, get singleton domains
+for each point instead, so no check invents a bound or expands an open domain. A
+bake cut short by cancellation keeps sound but weaker root deductions and is not
+retained.
+
 Exact point checking also validates integer absolute-value and distinctness
 relations on authoritative arbitrary-width values. `AllDifferent` compares every
 present position, preserving presence-literal polarity and exempt values, and
