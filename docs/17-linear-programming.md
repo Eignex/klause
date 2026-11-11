@@ -202,6 +202,12 @@ invoking their safe-bound or integer certifiers; a skipped computation emits no
 certifier work observation.
 Rejecting a completed certificate does not erase the work that produced it.
 
+Floating Lagrangian bounds use outward-rounded sums and products over the current
+numerical projection, then map to minimized source objective units. An open side
+or a probe cap cannot supply a finite minimizing endpoint. Evaluation returns its
+visited work and refusal reason after cancellation, work exhaustion or numerical
+failure. This result is separate from exact source certificates.
+
 Optional simplex diagnostics retain bounded progress observations per numerical
 invocation. A retained invocation replaces its completed observations while
 compatible factors remain owned by the scoped solver. A paused invocation keeps
