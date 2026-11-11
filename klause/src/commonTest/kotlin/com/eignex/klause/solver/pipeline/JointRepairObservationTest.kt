@@ -100,7 +100,8 @@ class JointRepairObservationTest {
     fun `cancelled capture should withhold metadata without charging work`() {
         val funding = SourceLpFunding(1_000_000, 1_000_000)
         val records = mutableListOf<JointRepairObservation>()
-        val capture = JointRepairObservationCapture(SourceLpBudget(funding = funding), Cancellation { true }, records::add)
+        val capture = JointRepairObservationCapture(
+            SourceLpBudget(funding = funding), Cancellation { true }, records::add)
 
         capture.event(1, 1, "query", "opened")
 

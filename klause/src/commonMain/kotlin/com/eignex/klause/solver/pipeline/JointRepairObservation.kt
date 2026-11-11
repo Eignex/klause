@@ -157,7 +157,8 @@ internal class JointRepairObservationCapture(
     }
 
     fun feedback(proposal: Long, query: Long, disposition: String,
-        assumptions: Set<SourceDerivation.Assumption>?, condition: ExactNeighborhoodCondition, integers: Int) = capture {
+        assumptions: Set<SourceDerivation.Assumption>?, condition: ExactNeighborhoodCondition,
+        integers: Int) = capture {
         val support = mutableListOf<JointRepairObservedBound>()
         for (assumption in assumptions.orEmpty()) {
             if (!entry()) return@capture null
