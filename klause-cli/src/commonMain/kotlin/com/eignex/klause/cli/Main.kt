@@ -23,7 +23,7 @@ internal val MODES: List<CliMode> = listOf(MiniZincMode, Xcsp3Mode, SmtLibMode, 
 
 /** Parse args once, select the front-end mode, load the instance and run the shared driver. */
 fun main(args: Array<String>) {
-    val code = runCli(args)
+    val code = runCli(args, observeCpu = true)
     if (code != EXIT_OK) exitProcess(code)
 }
 
@@ -37,8 +37,10 @@ private const val EXIT_UNSOUND = 3
  * Runs the CLI and reports boundary errors as exit codes and stderr diagnostics.
  * The error boundary is observable without terminating the process.
  */
-internal fun runCli(args: Array<String>): Int = try {
-    run(args)
+internal fun runCli(args: Array<String>): Int = runCli(args, observeCpu = false)
+
+private fun runCli(args: Array<String>, observeCpu: Boolean): Int = try {
+    run(args, observeCpu)
     EXIT_OK
 } catch (e: CliUsageException) {
     printErrorLine("klause-cli: ${e.message}")
@@ -67,7 +69,7 @@ internal fun runCli(args: Array<String>): Int = try {
     EXIT_ERROR
 }
 
-private fun run(args: Array<String>) {
+private fun run(args: Array<String>, observeCpu: Boolean) {
     val common = CommonOptions()
     // One parse over the union of common + every mode's flags. Each mode's flags mutate that
     // mode's own session; only the finally selected session is used, so mode flag names must be
@@ -102,22 +104,25 @@ private fun run(args: Array<String>) {
     // Anchor the `-t` budget once, before parsing/baking, so the bake and the solve share one
     // deadline instead of each restarting the clock.
     common.deadlineAtMs = common.timeLimitMs?.let { nowMillis() + it }
-    common.startDebugStatistics(processProperty("klause.debug") == "true")
-    val mode = pickMode(common, path)
-    val session = sessions.getValue(mode)
-    // Peak heap has to be watched from before the parse, since ingest is what the dry-run measures and
-    // the sampler cannot see backwards. Started only for that diagnostic, never on a solve path.
-    if (EngineParams(common.engineParams).bool("dry-run-presolve") == true) startHeapPeakSampler()
-    common.resetInvocationStatistics()
-    val loadStart = nowMillis()
-    val solvable = session.load(path, common)
-    common.loadElapsedMs = nowMillis() - loadStart
-    val comment = when (mode) {
-        MiniZincMode -> "%"
-        SmtLibMode -> ";"
-        else -> "c"
+    val loadAndSolve = {
+        common.startDebugStatistics(processProperty("klause.debug") == "true")
+        val mode = pickMode(common, path)
+        val session = sessions.getValue(mode)
+        // Peak heap has to be watched from before the parse, since ingest is what the dry-run measures and
+        // the sampler cannot see backwards. Started only for that diagnostic, never on a solve path.
+        if (EngineParams(common.engineParams).bool("dry-run-presolve") == true) startHeapPeakSampler()
+        common.resetInvocationStatistics()
+        val loadStart = nowMillis()
+        val solvable = session.load(path, common)
+        common.loadElapsedMs = nowMillis() - loadStart
+        val comment = when (mode) {
+            MiniZincMode -> "%"
+            SmtLibMode -> ";"
+            else -> "c"
+        }
+        SolveCore.solve(solvable, common, session.output(common).sourceQualified(common.sourceSemantics, comment))
     }
-    SolveCore.solve(solvable, common, session.output(common).sourceQualified(common.sourceSemantics, comment))
+    if (observeCpu) captureCliCpu(loadAndSolve) else loadAndSolve()
 }
 
 private const val USAGE =
