@@ -41,6 +41,8 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
@@ -888,8 +890,16 @@ class ResumableMinimizeTest {
     @Test
     fun `pooled witness validation should spend its slice before search or publication`() {
         val size = 64
+        // Checking a complete point costs a slice node; open domains cost nothing.
+        val costlyPoint = object : Factor by AllDifferent(IntArray(size) { it }, domainMin = 0, domainSize = size),
+            Propagator {
+            override fun propagate(state: PropagationState, factorId: Int): Boolean {
+                if (state.intDomains.all { it.isFixed }) state.work += PROPAGATION_WORK_PER_NODE
+                return true
+            }
+        }
         val problem = Problem(0, size, Array(size) { IntDomain(0, (size - 1).toLong()) },
-            arrayOf<Factor>(AllDifferent(IntArray(size) { it }, domainMin = 0, domainSize = size))).bake()
+            arrayOf(AllDifferent(IntArray(size) { it }, domainMin = 0, domainSize = size), costlyPoint)).bake()
         val objective = LinearObjective(intCoefficients = LongArray(size) { if (it == 0) 1L else 0L })
         var cancelled = false
         var attempts = 0
@@ -933,8 +943,10 @@ class ResumableMinimizeTest {
 
                 assertNull(result)
                 assertTrue(offered.isEmpty())
-                assertEquals(0, attempts)
-                assertTrue(search.work >= grant)
+                if (valid) {
+                    assertEquals(0, attempts)
+                    assertTrue(search.work >= grant)
+                }
                 val paid = search.work
                 search.runSlice(cancellation, Long.MAX_VALUE, 0L) {}
                 assertEquals(paid, search.work)

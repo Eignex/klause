@@ -53,6 +53,7 @@ internal class FinitePointCheck(private val problem: Problem, private val enforc
         cancellation: Cancellation,
         assumptions: Assumptions = Assumptions.None,
         onWork: (Long) -> Unit = {},
+        liveWork: ((() -> Long) -> Unit)? = null,
     ): Verification<Sample, V> {
         val sample = candidate.assignment
         val unchecked = when {
@@ -74,7 +75,7 @@ internal class FinitePointCheck(private val problem: Problem, private val enforc
             onWork(0L)
             return previous.reason?.let { Verification.Rejected(it) } ?: Verification.Accepted(candidate)
         }
-        return propagate(candidate, cancellation, onWork).also { verdict ->
+        return propagate(candidate, cancellation, onWork, liveWork).also { verdict ->
             when (verdict) {
                 is Verification.Accepted -> decided.store(DecidedPoint(sample, null))
                 is Verification.Rejected -> decided.store(DecidedPoint(sample, verdict.reason))
@@ -89,6 +90,7 @@ internal class FinitePointCheck(private val problem: Problem, private val enforc
         candidate: Candidate<Sample, V>,
         cancellation: Cancellation,
         onWork: (Long) -> Unit,
+        liveWork: ((() -> Long) -> Unit)?,
     ): Verification<Sample, V> {
         val sample = candidate.assignment
         val root = finite != null && problem.numRealVars == 0 &&
@@ -102,9 +104,9 @@ internal class FinitePointCheck(private val problem: Problem, private val enforc
             null
         }
         val session = if (point != null) {
-            PropagationSession.forPointCheck(projection(), point, cancellation)
+            PropagationSession.forPointCheck(projection(), point, cancellation, liveWork)
         } else {
-            PropagationSession(projection(), cancellation)
+            PropagationSession(projection(), cancellation, onPropagationWork = liveWork)
         }
         try {
             if (session.isUnsatAtRoot) return Verification.Rejected("root propagation refutes the assignment")

@@ -36,6 +36,12 @@ internal class UnscoredCandidateCheck(
         (0 until problem.numIntVars).all { problem.intBounds.hasLower(it) && problem.intBounds.hasUpper(it) }
     private var retained: FinitePointCheck? = null
 
+    private fun withinDeclared(source: Problem, candidate: Sample): Boolean = (0 until source.numIntVars).all { id ->
+        val value = candidate.intValue(id)
+        value >= source.intBounds.lower(id) && value <= source.intBounds.upper(id) &&
+            source.intDomainOrNull(id)?.let { value in it } != false
+    }
+
     private fun retainedCheck(source: Problem, cancellation: Cancellation): FinitePointCheck {
         retained?.let { return it }
         val baked = uncheckedSelection?.let { source.bake(it.forEngineView(source), cancellation) }
@@ -47,8 +53,9 @@ internal class UnscoredCandidateCheck(
     fun check(candidate: Sample, assumptions: Assumptions, cancellation: Cancellation): Completion {
         val source = unchecked ?: return Completion.Witness(candidate)
         if (cancellation()) return Completion.Undecided()
-        val points = if (reusable) retainedCheck(source, cancellation) else {
-            // Singleton integer declarations avoid materializing an open source domain.
+        val points = if (reusable && withinDeclared(source, candidate)) retainedCheck(source, cancellation) else {
+            // Singleton integer declarations avoid materializing an open source domain, and leave a value outside
+            // the declared domains to the factors alone.
             val point = source.withIntDomains(Array(source.numIntVars) {
                 IntDomain(candidate.intValue(it), candidate.intValue(it))
             })
