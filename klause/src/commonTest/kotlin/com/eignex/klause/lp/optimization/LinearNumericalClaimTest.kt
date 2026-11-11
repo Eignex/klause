@@ -27,7 +27,7 @@ class LinearNumericalClaimTest {
                 objective = SourceObjective("x", sense))
             val source = SourceProofContext(scope, setOf(x), emptyMap(), mapOf(x to BigFraction.ONE))
             val claim = assertNotNull(LinearNumericalClaim.create(source, 2.0, false, budget, Cancellation.Never))
-            val sign = if (sense == ObjectiveSense.MINIMIZE) -1.0 else 1.0
+            val sign = if (sense == ObjectiveSense.MINIMIZE) 1.0 else -1.0
 
             val near = claim.reaches(assertNotNull(BigFraction.ofDouble(2.0 + sign * 0.0000001)))
             val far = claim.reaches(assertNotNull(BigFraction.ofDouble(2.0 + sign * 0.00001)))
