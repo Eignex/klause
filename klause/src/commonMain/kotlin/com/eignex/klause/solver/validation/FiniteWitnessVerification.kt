@@ -62,12 +62,13 @@ private fun verifyFiniteWitness(
     ) {
         return Verification.Rejected("assignment does not cover finite real coordinates")
     }
-    val receipt = FiniteWitnessReceipt(problem, objective, toleranceCheck)
-    if (sample.receipts.covers(receipt)) {
+    // The tolerance callback is read only for real coordinates, so integer models share receipts across policies.
+    val receipt = FiniteWitnessReceipt(problem, objective, toleranceCheck.takeIf { problem.numRealVars > 0 })
+    if (sample.hasReceipt(receipt)) {
         checkPointRestrictions(sample, assumptions, cancellation)?.let { return it }
     } else {
         checkSourceObligations(problem, sample, assumptions, cancellation, toleranceCheck, points)?.let { return it }
-        if (!cancellation()) sample.receipts.record(receipt)
+        if (!cancellation()) sample.recordReceipt(receipt)
     }
     if (claimed != null && !claimed.isFinite()) {
         return Verification.Rejected("non-finite objective $claimed")

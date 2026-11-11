@@ -695,7 +695,7 @@ private fun openWitnessVerifier(
     }
     if (claimed?.isNaN() == true) return@CandidateVerifier Verification.Rejected("objective is NaN")
     val receipt = OpenWitnessReceipt(model, objective, context)
-    if (!sample.receipts.covers(receipt)) {
+    if (!sample.hasReceipt(receipt)) {
         val checked = when {
             context != null -> context.linearWitnessVerifier(cancellation).verify(candidate)
             model.factors.any { it is ExactSearchRow } || sample.exactInts?.any { !it.fitsLong() } == true -> {
@@ -712,7 +712,7 @@ private fun openWitnessVerifier(
         when (checked) {
             is Verification.Rejected -> return@CandidateVerifier checked
             is Verification.Indeterminate -> return@CandidateVerifier checked
-            is Verification.Accepted -> if (!cancellation()) sample.receipts.record(receipt)
+            is Verification.Accepted -> if (!cancellation()) sample.recordReceipt(receipt)
         }
     }
     if (context != null || objective == null || claimed == null) {

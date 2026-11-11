@@ -1125,6 +1125,8 @@ internal class ResumableMinimize(
             if (token()) return null
             return recordIfImproving(accepted, objective.evaluate(accepted), startingWitness = !rebindable)
         } finally {
+            // A check that threw before reporting its work still charges what the live supplier observed.
+            initialValidationPropagationWork?.let { proposalPropagationWork += it() }
             initialValidationPropagationWork = null
         }
     }

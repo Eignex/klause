@@ -320,17 +320,17 @@ internal fun checkWitnessRestrictions(
     }
     for (binding in bindings) {
         val receipt = InvocationReceipt(binding)
-        if (sample.receipts.covers(receipt)) continue
+        if (sample.hasReceipt(receipt)) continue
         val checked = binding.checkWitness(sample, cancellation)
         if (checked != SourceEvidenceCheck.Checked) return checked
-        if (!cancellation()) sample.receipts.record(receipt)
+        if (!cancellation()) sample.recordReceipt(receipt)
     }
     for (condition in bare) {
         val receipt = ConditionReceipt(condition)
-        if (sample.receipts.covers(receipt)) continue
+        if (sample.hasReceipt(receipt)) continue
         val checked = condition.checkWitness(sample, cancellation)
         if (checked != SourceEvidenceCheck.Checked) return checked
-        if (!cancellation()) sample.receipts.record(receipt)
+        if (!cancellation()) sample.recordReceipt(receipt)
     }
     return SourceEvidenceCheck.Checked
 }
