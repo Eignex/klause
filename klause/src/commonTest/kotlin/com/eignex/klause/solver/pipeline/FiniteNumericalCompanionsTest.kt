@@ -8,9 +8,10 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
-import com.eignex.klause.portfolio.PortfolioScenario
+import com.eignex.klause.portfolio.PortfolioLifecycleKind
 import com.eignex.klause.portfolio.PortfolioProgress
 import com.eignex.klause.portfolio.PortfolioRewardPolicy
+import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -34,6 +35,47 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
 class FiniteNumericalCompanionsTest {
+    @Test
+    fun `point delivery should control imported seeds for both companions`() {
+        val model = Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 1, 2, 3), LinearOp.GE, 0),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1))
+        val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+        val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1)
+        val cost = finiteNumericalCompanionEligibility(model, PortfolioScenario.sequential(Kind.COP),
+            objective, params).requirements.construction
+        val center = Sample(BooleanArray(0), LongArray(4) { 1 }, doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+
+        for (sharePoints in listOf(false, true)) for (arm in 0..1) {
+            val events = mutableListOf<PortfolioLifecycleKind>()
+            val companions = assertNotNull(FiniteNumericalCompanions.prepare(model, objective, params,
+                Cancellation.Never, cost, incumbentCompletionCheck = { _, _, _ -> true }).companions)
+            companions.incumbents.exchange.offer(center, BigFraction.ofLong(4))
+
+            PortfolioInvocationResources(2, 1, 0, Cancellation.Never, null).use { resources ->
+                companions.factories(plan, 0, sharePoints).elementAt(arm)
+                    .materialize(plan, resources.slots[arm]).use { worker ->
+                        worker.onLifecycle = { kind, _ -> events += kind }
+                        assertNotNull(worker.newResumableSearch(companions.incumbents::bound)).use { search ->
+                            repeat(4) {
+                                if (!search.isDone) search.runSlice(Cancellation.Never, 1_000, 5_000) { }
+                            }
+                        }
+                    }
+            }
+
+            assertEquals(sharePoints, PortfolioLifecycleKind.INCUMBENT_IMPORTED in events)
+            if (!sharePoints) {
+                assertFalse(PortfolioLifecycleKind.INCUMBENT_READ in events)
+                assertFalse(PortfolioLifecycleKind.INCUMBENT_CONSUMED in events)
+            }
+            assertEquals(4.0, companions.incumbents.bound())
+            assertSame(center, companions.incumbents.exchange.current()?.assignment)
+        }
+    }
+
     @Test
     fun `quiet companion workers should report proposals without comparison logging`() {
         val model = Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf(

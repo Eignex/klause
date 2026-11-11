@@ -8,8 +8,8 @@ refutation or optimum proof.
 
 Optional phase timing partitions active preparation, seeding, selection,
 application, publication and other time. Publication includes synchronous offers
-to the verified incumbent exchange and its verifier, including deferred checks at
-a portfolio query boundary. Pauses in the result consumer
+to the incumbent exchange, including deferred checks at a portfolio query
+boundary. Pauses in the result consumer
 remain outside active time.
 Scoring telemetry counts picks that unwind on cooperative cancellation and their
 elapsed nanoseconds, including probe restoration. This time is a subset of active

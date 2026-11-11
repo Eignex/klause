@@ -169,7 +169,7 @@ internal fun LpEngine.lpRoundingProbe(
                         }
                     }
                 }
-                if (sample == null && !attempt.fixpointCancelled && !attempt.probeCancelled) {
+                if (sample == null && !attempt.fixpointCancelled && !attempt.probeCancelled && !cancellation()) {
                     completeDirection(rounding)
                 }
                 if (attempt.fixpointCancelled || attempt.probeCancelled || cancellation()) {

@@ -54,6 +54,29 @@ class ObjectiveCoordinateViewTest {
     }
 
     @Test
+    fun `private proposals should be checked against canonical constraints and objective`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 5)), emptyArray())
+        val canonical = Problem(0, 1, arrayOf(IntDomain(0, 5)),
+            listOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.GE, 2))).bake()
+        val privateProblem = source.bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(2))
+        val preparation = FinitePipelinePreparation(canonical, objective, { it }, null).also {
+            it.sourceMapping = SourceMapping(source, canonical, TransformationGuarantees.IDENTITY)
+        }
+        val coordinates = FinitePipelinePreparation(privateProblem,
+            LinearObjective(intCoefficients = longArrayOf(1)), { it }, null).also {
+            it.sourceMapping = SourceMapping(source, privateProblem, TransformationGuarantees.IDENTITY)
+        }
+        val view = assertNotNull(ObjectiveCoordinateView.create(preparation, coordinates, null, Cancellation.Never))
+
+        for ((value, expected) in listOf(0L to null, 3L to 6.0)) {
+            val result = view.proposal(Sample(booleanArrayOf(), longArrayOf(value)))
+
+            assertEquals(expected, result?.objective)
+        }
+    }
+
+    @Test
     fun `equal sized models should not establish a common source mapping`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 5)), emptyArray())
         val foreign = Problem(0, 1, arrayOf(IntDomain(0, 5)), emptyArray())
