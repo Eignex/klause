@@ -261,45 +261,41 @@ Reseeding a handle does not remove its worker.
 
 ## Witnesses and proof scope
 
-[Source validation](07-presolve.md#source-witness-validation) checks coordinates.
-Portfolio admission additionally checks publication identity, invocation conditions
-and the authority required by the claim.
+Finite workers' points are engine results and enter the pool as published. Arithmetic
+points pass [source validation](07-presolve.md#source-witness-validation) where their
+engine does not enforce the source exactly. Claims need the authority below.
 
 ### Publication identity
 
 Portfolio evidence names its source model and objective. These are opaque in-memory
-identities: a fresh or transformed model needs its own check, even if structurally
+identities: a fresh or transformed model is another identity, even if structurally
 equivalent. Source arm materialization installs one immutable `SourceWorkerBinding`
 before scheduler admission, capturing model and objective identity, source scope,
 the producer invocation, a separate containing sharing invocation and proof
 authority. Producer conditions cannot justify unconditional imports into siblings,
 and a completed binding cannot promote witness-only authority.
 
-Every worker kind — finite, linear, polynomial, nonlinear integer and quadratic —
-publishes its actual prepared invocation, execution assumptions, owned point and
-objective value. Finite workers' points enter the pool as engine results. A
-native arithmetic publication from a private invocation is checked against the
-containing invocation's pins, which its producer did not enforce. A model or kind label
-cannot replace the checked point, and a shared point keeps its producing publication
-instead of acquiring another worker's identity.
+Every worker publishes its prepared invocation, execution assumptions, owned point and
+objective value. A native arithmetic publication from a private invocation is checked
+against the containing invocation's pins, which its producer did not enforce. A shared
+point keeps its producing publication instead of acquiring another worker's identity.
 
 ### Owned assignments
 
 Incumbents carry immutable source coordinates in `Sample`, including exact integers
 and reals. The source objective orders them independently of native minimized cutoff
-units. Changing coordinates or projecting a warm start discards acceptance and
-requires a fresh check; [model ownership](02-model.md#published-assignments-and-objectives)
-defines buffer lifetimes.
+units. Changing coordinates makes a new sample;
+[model ownership](02-model.md#published-assignments-and-objectives) defines buffer
+lifetimes.
 
 ### Verification outcomes
 
-Verification preserves three outcomes. Accepted witnesses may become incumbents;
-rejected proposals quarantine their producer without proving the model infeasible;
-indeterminate checks publish nothing and do not count as a fault. Arithmetic witnesses
-with uncertified real coordinates require a complete source-row check or the configured
-source tolerance check.
+An arithmetic witness check has three outcomes. Accepted witnesses may become
+incumbents; rejected ones quarantine their producer without proving the model
+infeasible; indeterminate checks publish nothing. Uncertified real coordinates need a
+complete source-row check or the configured source tolerance check.
 
-Open theory execution publishes `SourceIncumbentPublication` after verified
+Open theory execution publishes `SourceIncumbentPublication` after
 installation, carrying the source sample, exact original-direction `SourceValue` and
 invocation version. Callbacks run under the schedule lock.
 
@@ -324,23 +320,22 @@ scheduler did not admit cannot finish the source.
 
 Built-in shared channels belong to the same model and objective. Workers reject
 foreign pools; objective and variable bound imports require matching certificates.
-The incumbent exchange runs the source witness checker before installing a cutoff,
-including for direct engine publications. The low-level portfolio API also
+The incumbent exchange installs only a finite, strictly improving objective. The low-level portfolio API also
 supports caller-trusted unbound workers with an explicit witness checker. Learned
 clauses are exchanged only when at least two backtrack workers exist.
 
 `portfolio-publications=segment` coalesces private local-search offers within one
 query of a curated single-core mixed finite integer optimization with a containing
 deadline. It retains one immutable candidate, ranked by the worker's canonical
-objective, and checks that candidate at the query boundary before sharing it.
-Failed queries discard pending offers; expiration before or during verification
-withholds installation. Direct public exchange offers retain immediate checking.
+objective, and offers it at the query boundary. Failed queries discard pending
+offers; expiration before installation withholds it. Direct public exchange offers
+install immediately.
 Explicit pools, parallel execution and work-driven schedules reject this policy;
 the default is `immediate`. Private-coordinate workers and ALNS retain their own
-publication paths. Query time includes deferred verification, also reported in the
-LS publication phase and incumbent sharing time; these overlapping measures must
-not be added. `ArmSchedule.sharing.incumbents` and CLI `incumbent*` arm fields report
-offers, coalescing, checks, outcomes and dropped pending points. Exports count
+publication paths. Query time includes the deferred offer, also reported in the LS
+publication phase and incumbent sharing time; these overlapping measures must not be
+added. `ArmSchedule.sharing.incumbents` and CLI `incumbent*` arm fields report offers,
+coalescing, outcomes and dropped pending points. Exports count
 installed incumbents rather than queued offers. No candidate queue or rejected-point
 history survives the query.
 
@@ -724,8 +719,7 @@ remain in containing-run accounting.
 diagnostic schedule with a containing charged-work limit. `PortfolioDiagnostics`
 provides the same control to low-level callers. Selection retains seeded reward
 sampling and stable arm order, but minimum shares, feasibility coverage and retained
-proof coverage use charged work. Candidate checks run at every improving proposal;
-auxiliary preparation and search retire by work. Deferred core search uses a work
+proof coverage use charged work. Auxiliary preparation and search retire by work. Deferred core search uses a work
 allowance. Numerical companions and parallel execution reject this mode.
 ALNS operator selection and inner repair seeds derive from its worker seed.
 
@@ -733,8 +727,8 @@ Each segment offers the smaller of its work allowance and the containing remaind
 Initialization work reported by a retained handle is included. A zero-work return
 charges its offered allowance, bounding private preparation and unsuccessful pauses
 that expose no finer counter; this reservation is explicit in the trace. Each
-coordinator verification request charges one additional unit, including rejected or
-indeterminate checks. This logical price is separate from measured verification time.
+coordinator admission request charges one additional unit, separate from measured
+time.
 Atomic work may overspend. An uncounted, non-resumable worker is rejected. Work limits preserve
 incomplete results and do not establish exhaustion.
 
@@ -1073,11 +1067,11 @@ counterfactual value order. Its preference flag describes configured precedence,
 not proof that a saved value changed a decision; exact cutoff context is unavailable.
 Oversized exact local objectives and opaque theory decision payloads are withheld.
 
-At its first root, a non-restarting retained CP worker with a shared cutoff revalidates
-the current pooled assignment as a starting incumbent. An equal-cutoff witness can
+At its first root, a non-restarting retained CP worker with a shared cutoff adopts the
+current pooled assignment as a starting incumbent once it satisfies the worker's pins. An equal-cutoff witness can
 supply local objective propagation without priming guidance or earning progress.
 Restarting workers retain their discovery and root-primal startup path. Pool membership
-alone supplies no authority; source validation and conditional proof admission still apply.
+supplies no proof authority.
 
 ## Worker recipes
 

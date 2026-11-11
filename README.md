@@ -29,7 +29,7 @@ Klause is built for applications that ask many questions of the same model, not 
 
 Typical uses are constraint-aware test and fuzz input generation, configuration synthesis, scheduling and assignment, and long-running services that re-solve and re-sample one model.
 
-Complete search, local search, LP relaxations and arithmetic theories all work on that same model, alone or together in a portfolio. Each engine enforces the original model itself; separate checks run only where nothing enforces a claim, such as LP certificates and relations an engine cannot propagate.
+Complete search, local search, LP relaxations and arithmetic theories all work on that same model, alone or together in a portfolio. Each engine enforces the original model itself.
 
 It reads FlatZinc, XCSP3, SMT-LIB, MPS, DIMACS, OPB/WBO and WCNF, and MiniZinc models through the included solver integration. Any model, whether built in Kotlin or read from a file, saves to and loads from JSON without loss.
 
@@ -45,7 +45,7 @@ It reads FlatZinc, XCSP3, SMT-LIB, MPS, DIMACS, OPB/WBO and WCNF, and MiniZinc m
 
 ## Compared with other solvers
 
-Specialised solvers are mature and usually faster on problems squarely in their own domain. Klause trades some of that speed for breadth and checked results. It bundles no native solver library, so it runs wherever Kotlin Multiplatform does.
+Specialised solvers are mature and usually faster on problems squarely in their own domain. Klause trades some of that speed for breadth. It bundles no native solver library, so it runs wherever Kotlin Multiplatform does.
 
 - CP-SAT works over Booleans and integers; Klause also handles reals, unbounded integers and nonlinear arithmetic in the same model.
 - Z3 decides logical theories; Klause adds optimization, global constraints and local search while still deciding linear integer and real arithmetic exactly.
@@ -54,9 +54,9 @@ Specialised solvers are mature and usually faster on problems squarely in their 
 ## Limitations
 
 - On large MIPs, hard SAT instances or SMT benchmarks, established solvers are usually much faster.
-- Nonlinear integer and transcendental arithmetic are incomplete: Klause can find and check solutions, but may stop with an unknown result instead of a proof. Nonconvex quadratic objectives get no global optimality claim when a branch stays unresolved.
+- Nonlinear integer and transcendental arithmetic are incomplete: Klause can find solutions but may stop with an unknown result instead of a proof. Nonconvex quadratic objectives get no global optimality claim when a branch stays unresolved.
 - SMT-LIB support covers quantifier-free arithmetic only. Bit-vectors, arrays, strings, quantifiers, uninterpreted functions and incremental solving are rejected.
-- Proofs are checked in memory, but Klause cannot yet export proof files for an independent checker.
+- Klause cannot yet export proof files for an independent checker.
 - Not every kind of model has every search style yet; local search and portfolio coverage still have gaps.
 
 ## Documentation
