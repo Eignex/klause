@@ -319,6 +319,17 @@ internal object FinitePortfolioLpCapture {
                                 "64 records, 16384 entries, 1048576 modeled bytes, 4096 scalar bits")
                             val finite = (result as? SourceExecutionResult.Finite)?.result?.outcome
                                 as? FiniteSolveOutcome.Completed
+                            if (captureJoint) {
+                                put("sourceSha256", sourceHash)
+                                put("captureMode", "ordinary-finite-joint")
+                                put("completeSearchAdmitted", (result as? SourceExecutionResult.Finite)
+                                    ?.result?.completeSearchAdmitted)
+                                put("stages", buildJsonObject {
+                                    finite?.stats?.smt?.completeSearchStages.orEmpty()
+                                        .forEach { (key, value) -> put(key, value) }
+                                })
+                                put("portfolio", NumericalResidualProfile.json(finite?.stats?.portfolio))
+                            }
                             put("jointCaptureCounters", buildJsonObject {
                                 finite?.stats?.smt?.completeSearchStages.orEmpty()
                                     .filterKeys { "Observation" in it }.forEach { (key, value) -> put(key, value) }
