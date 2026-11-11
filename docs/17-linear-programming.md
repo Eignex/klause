@@ -1601,7 +1601,8 @@ Lagrangian `L(y)` from the float duals in binary64, lowers it by that summation'
 rounding and by the largest effect of reduced costs within `FLOAT_EVIDENCE_TOLERANCE`
 that it takes as zero, and accepts such a reduced cost on an open side. It supplies
 node pruning, objective propagation, reduced-cost fixing with their reasons, root
-bounds shared with peers, and shaving. `floatFarkasRay` accepts a dual-unbounded ray
+bounds shared with peers, and shaving; fixing also tries the objective box (zero
+multipliers) and half the duals. `floatFarkasRay` accepts a dual-unbounded ray
 whose binary64 Farkas margin exceeds the tolerance times the terms' size; it backs
 infeasibility pruning, learned conflicts and presolve root infeasibility. Mixed row
 projections, strict-row solves and component bounds have no numerical form and are
@@ -1629,8 +1630,8 @@ them into [source derivations](13-evidence.md) without adding model
 dependencies to the engine. `LpCertificationPolicy` is the immutable acceptance
 seam: certifiers always compute and report their observations, and the policy
 decides which results may be used. A source check grants no permission to accept a
-floating optimum. Planned: exact certification applies only under `--exact`; by default LP
-deductions use floating results within tolerances, keeping safe-bound pruning, with SMT always exact.
+floating optimum. Finite deductions consult no certifier unless exact certification is
+selected ([numerical and exact deductions](#numerical-and-exact-deductions)); open theories always certify.
 
 Model-facing solves state an explicit claim: bound, contradiction, feasible completion or
 attained optimum. Bound requests use dual-only reconstruction without primal recovery;
