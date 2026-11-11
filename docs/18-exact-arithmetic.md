@@ -8,7 +8,8 @@ and charge work to the containing token.
 ## Exact quadratic certificates
 
 `arithmetic.quadratic` checks rational evidence for bounds, attainment, approach
-paths and improving rays. It reads only `simplex.exact` and `util`. Its model
+paths and improving rays. Its exact operations read only `simplex.exact` and `util`;
+floating candidate generation also uses Koblas. Its model
 denotes `constant + linear^T x + x^T Hessian x / 2` with an exactly symmetric
 Hessian; callers own conversion from the
 [source objective](02-model.md#quadratic-objective-representation), mappings and
@@ -17,7 +18,11 @@ direction.
 ### Candidate generation
 
 `QuadraticCandidates` uses floating penalty-gradient iterations only to propose
-active rows. Selected rows and all equality rows form an exact rational KKT system;
+active rows. Owned primitive buffers retain the Hessian, rows, point and gradient.
+Koblas dot and AXPY calls process slices of at most 256 entries, charging and polling
+each entry before its slice executes. Nonfinite inputs or iterates decline the
+proposal. Reduction rounding can change selected rows; it has no certificate
+authority. Selected rows and all equality rows form an exact rational KKT system;
 rank-revealing elimination rejects inconsistent systems and fixes free coordinates
 to zero in singular ones. A proposed anchor still requires the checks below, and
 its work is not refunded when certification fails.
