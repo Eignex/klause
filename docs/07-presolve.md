@@ -998,9 +998,10 @@ Owners that check many points against one problem retain one checker. These are
 backtracking leaves and proposals, LP tree search, core-guided search, ALNS seeds,
 Boolean proof tasks, polynomial and quadratic completion, float-grid publication and
 portfolio verifiers. Local search bakes the view of its unscored factors once when
-its baked integer domains are closed: its candidates already lie inside them. Open
-declarations, and the discrete part of an open-model witness, get singleton domains
-for each point instead, so no check invents a bound or expands an open domain. A
+its baked integer domains are closed. A candidate outside those declared domains,
+open declarations, and the discrete part of an open-model witness get singleton
+domains for each point instead, so the factors alone decide the point and no check
+invents a bound or expands an open domain. A
 bake cut short by cancellation keeps sound but weaker root deductions and is not
 retained.
 
