@@ -347,8 +347,10 @@ history and pending comparisons. Restart and assumption reseeding clear history.
 Ordinary sibling retraction preserves compatible observations and the immediate
 parent split; a skipped child cannot borrow a deeper descendant's objective.
 Directions expire after 256 node visits without a sample. At most 8,192 variable
-histories and 128 ancestor splits are retained; bookkeeping charges the existing LP
-work allowance and creates no extra LP query. Invocation close releases the scope.
+histories and 128 ancestor splits are retained. Ancestor records use depth-indexed
+slots allocated on the first usable split; trimming clears removed references and
+counts only live records. Bookkeeping charges the existing LP work allowance and
+creates no extra LP query. Invocation close releases the scope.
 
 ### Leaf-completed columns
 
