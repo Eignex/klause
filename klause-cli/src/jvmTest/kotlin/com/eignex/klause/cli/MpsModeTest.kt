@@ -15,10 +15,6 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.SourceExecutionKind
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.executionKind
-import com.eignex.klause.solver.result.LpStats
-import com.eignex.klause.solver.result.RunStats
-import com.eignex.klause.solver.result.SolveStats
-import com.eignex.kumulant.stat.summary.SumResult
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import java.io.ByteArrayOutputStream
@@ -518,14 +514,14 @@ class MpsModeTest {
             assertTrue("s OPTIMUM FOUND" in text.lines(), text)
             if (flags.isEmpty()) assertTrue("optimizationStatus=tolerance-optimum" in text, text)
             assertTrue("o 0" in text.lines(), text)
-            assertTrue("c frontendRoutingOutcome=native-formula" in text.lines(), text)
-            assertTrue("c reportedBackend=numerical-mip" in text.lines(), text)
+            assertTrue("c frontendRoutingOutcome=open" in text.lines(), text)
+            assertTrue("c reportedBackend=linear-authority" in text.lines(), text)
             assertFalse("declaredTheoryRoute=" in text, text)
         }
     }
 
     @Test
-    fun `nonzero underflow should decline numerical MPS under either certification policy`() {
+    fun `nonzero underflow should decline MPS under either certification policy`() {
         val source = File.createTempFile("mps-underflow-numerical", ".mps").apply {
             writeText(
                 "ROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R 1e-400\n" +
@@ -644,8 +640,8 @@ class MpsModeTest {
             assertTrue("s OPTIMUM FOUND" in text.lines(), text)
             assertTrue("o 0" in text.lines(), text)
             assertTrue("v I=0 X=0" in text.lines(), text)
-            assertTrue("c frontendRoutingOutcome=native-formula" in text.lines(), text)
-            assertTrue("reportedBackend=numerical-mip" in text, text)
+            assertTrue("c frontendRoutingOutcome=open" in text.lines(), text)
+            assertTrue("reportedBackend=linear-authority" in text, text)
             assertFalse("declaredTheoryRoute=" in text, text)
         }
     }

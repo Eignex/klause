@@ -37,6 +37,7 @@ internal fun OpenTheoryRequest.linearAuthorityContext(cancellation: Cancellation
             ObjectiveSense.MINIMIZE
         },
         cancellation,
+        numericalIndicators = true,
     )
 }
 

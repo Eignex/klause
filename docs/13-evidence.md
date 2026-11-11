@@ -138,24 +138,10 @@ scope or restrictions. `PreparedSourcePlan.sourceResultCapture` uses the plan's
 original IR, explicit pins and objective direction; narrowed execution bounds are
 not original premises.
 
-`LpSourceEvidenceCapture` converts exact LP dual and Farkas coefficients into
-original-premise combinations. Structural coordinates keep their declarations and
-shifts, slack coordinates keep exact row images, and every endpoint needs a
-compatible original premise or invocation citation. Maximization capture negates the
-minimized value into the original upper bound. Missing cut or lowering
-justifications, foreign integer certificates and interrupted capture stay
-unavailable, and the resulting claim still requires original-context verification.
-
 ## Transformations
 
 [Presolve](07-presolve.md) can attach typed justifications to each mapping stage, so
 a claim about the reduced model can be carried back to the original.
-
-`SourceTransformationVerifier` requires a total coordinate image, original-source
-justifications for substituted premises and restrictions, and integral images of
-target integers. Objective adjustments also require positive scale, matching
-direction and checked equalities. A verified affine projection transfers only a proof
-using its covered premises.
 
 Completed mapping capture keeps the reduced package, including worker imports, and
 every stage in `SourceResultEvidence.mappings`. Reconstruction checks the original

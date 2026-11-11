@@ -21,8 +21,8 @@ schema frontend. The next two chapters cover file formats.
 Formats declare their defaults as
 [typed source semantics](02-model.md#typed-source-semantics) that caller overrides
 replace before lowering; [source setup](19-api.md#source-setup) consumes them.
-MPS attaches its original linear snapshot to the same setup and selects numerical
-execution under its captured certification policy.
+MPS attaches its original linear snapshot to the same setup, which routes its lowered
+model like any other source and qualifies results under its captured certification policy.
 
 | Source | Numeric authority |
 |---|---|
@@ -55,8 +55,7 @@ selected route. Supported linear and polynomial sources keep the same constraint
 and objective across those strategies. SMT-LIB can fall back to open local search
 for an unsupported fragment, supplying witnesses without a completeness claim;
 exact FlatZinc declines unsupported open fragments. MPS keeps finite search for
-bounded integer choices and numerical branch-and-bound for surviving open
-integers. That open numerical route declines LS and ALNS (see
+bounded integer choices and the exact linear theory for surviving open integers (see
 [MPS semantics](05-arithmetic-formats.md#routing-and-result-strength)).
 
 ## Solving coverage

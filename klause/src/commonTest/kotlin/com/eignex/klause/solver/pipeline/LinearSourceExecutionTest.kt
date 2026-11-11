@@ -1,6 +1,8 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.formats.mps.Mps
+import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.ir.LinearSourceIndicator
 import com.eignex.klause.ir.LinearSourceObjective
 import com.eignex.klause.ir.LinearSourceProblem
@@ -9,6 +11,7 @@ import com.eignex.klause.ir.LinearSourceTerm
 import com.eignex.klause.ir.LinearSourceVariable
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
@@ -92,7 +95,7 @@ class LinearSourceExecutionTest {
     }
 
     @Test
-    fun `nonzero numerical underflow should be refuted by the exact linear theory`() {
+    fun `nonzero numerical underflow should decline the linear source`() {
         val tiny = SemanticRational.of(BIG_ONE, parseBigInt("1" + "0".repeat(400)))
         for (tolerance in listOf(SourceTolerance(), SourceTolerance(
             absolute = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000)),
@@ -106,15 +109,15 @@ class LinearSourceExecutionTest {
                 SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance).resolve(),
             )
             val invocation = SourceSetup.prepare(SourceSetupRequest(
-                SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
+                SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
             ))
 
             val result = SourceSetup.execute(SourceExecutionRequest(invocation,
                 finiteRequest = { error("a wide source row cannot construct a finite consumer") }))
 
             assertEquals(SourceExecutionKind.LINEAR, SourceSetup.executionKind(invocation))
-            assertIs<SourceExecutionResult.Linear>(result)
-            assertEquals(LinearSourceConclusion.UNSATISFIABLE, assertNotNull(result.linearSource).nativeConclusion)
+            assertEquals(TerminationReason.Unsupported, assertIs<SourceExecutionResult.Declined>(result).reason)
+            assertEquals(LinearSourceConclusion.UNKNOWN, assertNotNull(result.linearSource).conclusion)
         }
     }
 
@@ -823,5 +826,55 @@ class LinearSourceExecutionTest {
         assertFalse(outcome.nativeClaimsUnrestricted)
         assertTrue(outcome.conclusion != LinearSourceConclusion.UNSATISFIABLE)
         assertSame(source, outcome.source)
+    }
+
+    @Test
+    fun `an unbounded relaxation should not override open integer infeasibility`() {
+        val result = openMpsResult(
+            "ROWS\n N COST\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R 2\n M1 'MARKER' 'INTEND'\n" +
+                " X COST 1\nRHS\n RHS R 1\nBOUNDS\n FR B I\n FR B X\nENDATA\n",
+        )
+
+        val outcome = assertNotNull(result.linearSource)
+        assertEquals(LinearSourceConclusion.UNSATISFIABLE, outcome.conclusion)
+        assertNull(outcome.incumbent)
+    }
+
+    @Test
+    fun `an open MIP ray should keep a checked integral base`() {
+        val result = openMpsResult(
+            "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R 1\n M1 'MARKER' 'INTEND'\n" +
+                " X COST 1 R 1\nBOUNDS\n LI B I 0\n FR B X\nENDATA\n",
+        )
+
+        val native = assertIs<OpenTheoryExecution.Optimize>(assertIs<SourceExecutionResult.Linear>(result).result)
+        assertIs<SourceClaim.Ray>(assertNotNull(assertNotNull(native.result.linearResult).terminal).claim)
+        assertNotNull(assertNotNull(result.linearSource).incumbent)
+    }
+
+    @Test
+    fun `open integer guards should keep the inactive regions around their trigger`() {
+        for ((bounds, trigger) in listOf("LI B I 0" to 0L, "FR B I" to 0L, "LI B I 1" to 1L)) {
+            val result = openMpsResult(
+                "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 0\n M1 'MARKER' 'INTEND'\n" +
+                    " X COST 1 R 1\nRHS\n RHS R 2\nBOUNDS\n $bounds\n LO B X 0\nINDICATORS\n IF R I $trigger\nENDATA\n",
+            )
+
+            val outcome = assertNotNull(result.linearSource)
+            assertEquals(LinearSourceConclusion.OPTIMAL, outcome.conclusion, bounds)
+            val witness = assertNotNull(outcome.incumbent)
+            assertEquals(BigFraction.ZERO, witness.objective, bounds)
+            assertTrue(witness.values[0] != BigFraction.ofLong(trigger), bounds)
+        }
+    }
+
+    private fun openMpsResult(text: String): SourceExecutionResult {
+        val source = checkNotNull(Mps.parse(text).toLinearSourceProblem(
+            SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+        ))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED))
+        return SourceSetup.execute(SourceExecutionRequest(invocation,
+            finiteRequest = { error("an open source has no finite consumer") }))
     }
 }

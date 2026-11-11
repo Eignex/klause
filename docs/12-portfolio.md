@@ -527,27 +527,12 @@ the completion routes and their invocation lifetimes.
 MPS finite invocations complete continuous columns through numerical residual LP
 completion, and the configured source tolerance callback reaches every worker kind.
 Exact MPS invocations supply no tolerance callback, so a floating completion cannot
-acquire exact authority through sharing. Open numerical fallback admits complete
-numerical workers whose typed terminals pass the same invocation and evidence checks;
-numerical workers keep open declarations in arithmetic state.
-
-The opt-in numerical companion recipe adds admitted finite search and joint linear
-repair to a retained numerical frontier. Finite admission uses proved source bounds
-and unchanged working coordinates; a declined finite projection leaves the other
-workers available. Each worker owns its traversal, LP state and cumulative quota
-under the containing portfolio deadline and decision/move allowance. Joint repair
-uses the same cut layout at its root and in retained queries.
+acquire exact authority through sharing.
 
 Companions publish witnesses only, rechecking their complete coordinates against
-the captured affine source before publication. The frontier imports accepted
-incumbents for scoped dominance closure. Finite search reads conservative minimized
-incumbent cutoffs. Its existing floor channel accepts source-checked frontier
-bounds for an ascending unit integer objective without an offset; other objective
-forms retain their numerical bounds. Joint repair can center a fresh proposal on a
-checked pooled incumbent;
-pending proposals keep their scope until completion. Global proofs remain numerical
-derivations with complete sibling coverage. The independent companion recipe keeps
-the same workers and quotas while withholding incumbent and bound imports.
+the captured affine source before publication. Joint repair can center a fresh
+proposal on a checked pooled incumbent; pending proposals keep their scope until
+completion.
 
 The automatic linear-source finite companion policy keeps the ordinary finite recipes, arm identities,
 seeds, sharing channels and completion authority. It appends numerical frontier and
@@ -632,8 +617,6 @@ authority. Finite workers' ordinary terminal admission remains available through
 Companion statistics distinguish active-time retirement and checked completions.
 `jointRepairPublicationChecks`, `jointRepairPublicationNs` and
 `jointRepairPublicationPauses` identify completed-point verification effort.
-The numerical-first recipe separately records its finite worker's actual native
-optimum, refutation or cutoff exhaustion before withholding its proof authority.
 
 ## Scheduling
 
