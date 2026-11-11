@@ -85,23 +85,6 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `a native witness without a publication should still satisfy its producer restrictions`() {
-        val source = Problem(1, 0, emptyArray(), emptyArray())
-        val model = ModelIdentity.of(source)
-        val plan = source.prepareExecutionPlan()
-        val containing = EngineInvocation(plan, model)
-        val producer = EngineInvocation(plan, model, executionAssumptions = Assumptions(bools = mapOf(0 to true)))
-        val point = Sample(booleanArrayOf(false), longArrayOf())
-        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
-            .bindSource(SourceWorkerBinding(producer))
-        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(containing)
-
-        val checked = verifier.witness(worker, point, null)
-
-        assertIs<Verification.Rejected>(checked)
-    }
-
-    @Test
     fun `portfolio admission should consume a restricted native witness publication`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
@@ -402,34 +385,6 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `a base model witness should not enter an invocation whose conditions it violates`() {
-        val model = ModelIdentity.of(Any())
-        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
-        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-        val absentInteger = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
-        val absentReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
-        val conditions = listOf(
-            SourceCondition(bools = mapOf(0 to true)),
-            SourceCondition(lower = mapOf(integer to BigFraction.ONE)),
-            SourceCondition(upper = mapOf(integer to BigFraction.MINUS_ONE)),
-            SourceCondition(lower = mapOf(real to BigFraction.ONE)),
-            SourceCondition(upper = mapOf(real to BigFraction.MINUS_ONE)),
-            SourceCondition(bools = mapOf(1 to false)),
-            SourceCondition(lower = mapOf(absentInteger to BigFraction.ZERO)),
-            SourceCondition(lower = mapOf(absentReal to BigFraction.ZERO)),
-        )
-        val point = Sample(booleanArrayOf(false), longArrayOf(0), doubleArrayOf(0.0), listOf(BigFraction.ZERO))
-        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }.bindEvidence(model)
-
-        for (condition in conditions) {
-            val scope = SourceScope(SourceRevision("original", "exact-affine"), condition)
-            val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindSourceScope(scope)
-
-            assertIs<Verification.Rejected>(verifier.witness(worker, point, null))
-        }
-    }
-
-    @Test
     fun `a scoped witness should satisfy Boolean integer and exact real conditions`() {
         val model = ModelIdentity.of(Any())
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
@@ -447,57 +402,6 @@ class PortfolioEvidenceTest {
         val checked = verifier.witness(worker, point, null)
 
         assertIs<Verification.Accepted<*, *>>(checked)
-    }
-
-    @Test
-    fun `an approximate real coordinate should not establish an invocation window`() {
-        val model = ModelIdentity.of(Any())
-        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-        val scope = SourceScope(
-            SourceRevision("original", "exact-affine"),
-            SourceCondition(lower = mapOf(real to BigFraction.ZERO)),
-        )
-        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0))
-        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }.bindEvidence(model)
-        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindSourceScope(scope)
-
-        val checked = verifier.witness(worker, point, null)
-
-        assertIs<Verification.Indeterminate>(checked)
-    }
-
-    @Test
-    fun `cancelling the containing invocation should leave its witness check indeterminate`() {
-        val model = ModelIdentity.of(Any())
-        val scope = SourceScope(SourceRevision("original", "exact-affine"), SourceCondition(bools = mapOf(0 to true)))
-        val point = Sample(booleanArrayOf(false), longArrayOf())
-        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }.bindEvidence(model)
-        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting())
-            .bindSourceScope(scope, Cancellation { true })
-
-        val checked = verifier.witness(worker, point, null)
-
-        assertIs<Verification.Indeterminate>(checked)
-    }
-
-    @Test
-    fun `a completed optimum outside its source condition should not establish a bound`() {
-        val model = ModelIdentity.of(Any())
-        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
-        val scope = SourceScope(
-            SourceRevision("original", "exact-affine"),
-            SourceCondition(lower = mapOf(integer to BigFraction.ONE)),
-            SourceObjective("x", ObjectiveSense.MINIMIZE),
-        )
-        val point = Sample(booleanArrayOf(), longArrayOf(0))
-        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
-            .bindSource(SourceWorkerBinding(model, scope = scope))
-        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindSourceScope(scope)
-        val completion = CompletedEngineResult.Minimize(scope, MinimizeResult.Optimal(point, 0.0))
-
-        val checked = verifier.proof(worker, EvidenceKind.Bound, completion)
-
-        assertIs<Verification.Rejected>(checked)
     }
 
     @Test

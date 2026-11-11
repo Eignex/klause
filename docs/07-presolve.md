@@ -967,17 +967,20 @@ allowance and retains an already checked publication if later work stops.
 
 ## Source witness validation
 
-`solver.validation` checks proposed coordinates against original source obligations,
-independently of the engine's transformed view. Acceptance checks the point;
+`solver.validation` checks coordinates that no engine enforced against original source
+obligations: caller-supplied starting points, relations an engine cannot propagate or
+score, transformed float-grid points and arithmetic completions. Integer search trusts
+its own propagation and does not re-derive its leaves. Acceptance checks the point;
 rejection refutes only the point; unavailable or interrupted checking is
 indeterminate. [Portfolio admission](12-portfolio.md#witnesses-and-proof-scope) and
 [evidence](13-evidence.md) separately check identity, restrictions and claim scope.
 
 ### Finite points
 
-`composedFixpoint` creates a private propagation session for the full Boolean and
-finite integer point and checks the selected original-source relations. The point is
-the session's private root, so incompatible caller pins still refute it. Prepared
+`FinitePointCheck` makes the full Boolean and finite integer point the private root of
+a disposable propagation state and checks the selected original-source relations.
+Caller pins and deduced restrictions are checked on the point itself. Built-in
+propagators and occurrence indexes are shared across a checker's points. Prepared
 custom providers keep their selected factories and required original checks.
 Pure Boolean clause points use native clause propagation when the selected
 factories permit it, without constructing the general watcher index.

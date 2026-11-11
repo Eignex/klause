@@ -282,27 +282,6 @@ class BacktrackSolverTest {
     }
 
     @Test
-    fun `a leaf violating a factor should fail as unsound`() {
-        // A selector that stops before any column is fixed stands in for an engine defect that reads an open
-        // node as a solved leaf: the minima it reports put both columns of the AllDifferent at 0.
-        val stopsEarly = object : VariableSelector {
-            override fun pick(session: PropagationSession, rng: Random): VarRef? = null
-
-            override fun fresh(): VariableSelector = this
-        }
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = Array(2) { IntDomain(0, 1) },
-            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 2)),
-        )
-
-        val solver = BacktrackSolver(problem.bake())
-
-        assertFailsWith<UnsoundnessException> { solver.solve(BacktrackParams(variableSelector = stopsEarly)) }
-    }
-
-    @Test
     fun `unsat core should capture chained propagation through intermediate factors`() {
         val p = Problem(
             numBoolVars = 3,
