@@ -130,5 +130,6 @@ internal data class LpSolveContext(
 ) {
     companion object {
         val Production = LpSolveContext()
+        val Numerical = LpSolveContext(certificationPolicy = NumericalLpCertificationPolicy)
     }
 }

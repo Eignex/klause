@@ -414,6 +414,9 @@ internal fun certifyLpResult(
     sparsePointRecovery: Boolean = false,
     claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
 ): CertifiedLpResult {
+    if (LpCertifier.entries.none(policy::canCompute)) {
+        return CertifiedLpResult(result, null, null, null, null, false, { null })
+    }
     val observation = observer as? LpClaimObservation ?: observer?.let { LpClaimObservation(claim, it) }
     val pairing = observer?.let { LpRejectionPairing() }
     var completed = false
@@ -947,7 +950,7 @@ private fun certifyLpResultWithin(
             val duals = it.duals.copyOf()
             val compute: () -> Double? = {
                 snapshot?.let { frozen ->
-                    policy.acceptNullable(LpCertifier.SAFE_OBJECTIVE, safeObjectiveLowerBound(frozen, duals))
+                    policy.computeNullable(LpCertifier.SAFE_OBJECTIVE) { safeObjectiveLowerBound(frozen, duals) }
                 }
             }
             compute
@@ -973,6 +976,7 @@ internal fun certifyLpBound(
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
 ): CertifiedLpBound? {
+    if (!policy.canCompute(LpCertifier.INTEGER)) return null
     if (duals.size != model.m || !model.finiteExactInput()) return null
     if (!model.hasContinuous && model.probeClampedLo.none { it } && model.probeClampedHi.none { it }) {
         val certificate = policy.acceptNullable(LpCertifier.INTEGER, integerCertify(model, duals, observer = observer))
