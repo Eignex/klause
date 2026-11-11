@@ -273,8 +273,9 @@ and a completed binding cannot promote witness-only authority.
 
 Every worker kind — finite, linear, polynomial, nonlinear integer and quadratic —
 publishes its actual prepared invocation, execution assumptions, owned point and
-objective value. Pool admission checks the containing invocation, the point and both
-producer and consumer conditions after a native witness check. A model or kind label
+objective value. Finite workers' points enter the pool as engine results. A
+native arithmetic publication from a private invocation is checked against the
+containing invocation's pins, which its producer did not enforce. A model or kind label
 cannot replace the checked point, and a shared point keeps its producing publication
 instead of acquiring another worker's identity.
 
@@ -290,10 +291,9 @@ defines buffer lifetimes.
 
 Verification preserves three outcomes. Accepted witnesses may become incumbents;
 rejected proposals quarantine their producer without proving the model infeasible;
-indeterminate checks publish nothing and do not count as a fault. Finite fixpoint
-cancellation stays indeterminate. Uncertified real coordinates require a complete
-source-row check or the configured source tolerance check, and scoped admission
-checks the containing invocation's pins and windows first.
+indeterminate checks publish nothing and do not count as a fault. Arithmetic witnesses
+with uncertified real coordinates require a complete source-row check or the configured
+source tolerance check.
 
 Open theory execution publishes `SourceIncumbentPublication` after verified
 installation, carrying the source sample, exact original-direction `SourceValue` and

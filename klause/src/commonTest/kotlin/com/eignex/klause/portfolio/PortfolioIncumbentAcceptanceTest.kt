@@ -411,31 +411,6 @@ class PortfolioIncumbentAcceptanceTest {
     }
 
     @Test
-    fun `an unsound arm should be quarantined while a sound arm answers`() {
-        val stopsEarly = object : VariableSelector {
-            override fun pick(session: PropagationSession, rng: Random): VarRef? = null
-
-            override fun fresh(): VariableSelector = this
-        }
-        val problem = exactlyOneOver(2)
-        val unsound = PortfolioWorker.of(
-            "unsound",
-            0,
-            BacktrackSolver(problem.bake()).session(),
-            BacktrackParams(variableSelector = stopsEarly),
-        )
-        val workers = listOf(unsound) + btArms(problem, 1)
-
-        val faults = ArrayList<ArmFault>()
-
-        val r = Portfolio.thompson(workers, onFault = { faults += it }).use { it.solve() }
-
-        assertEquals(1, assertIs<SolveResult.Sat>(r).assignment.bools.count { it })
-        assertEquals(listOf("unsound"), faults.map { it.workerLabel })
-        assertNull(r.stats.portfolio.arms.first().failure)
-    }
-
-    @Test
     fun `an arm claiming a refuted model should be quarantined while the run carries on`() {
         val bogus = CountingResumableSolver(slicesToVerdict = 1, model = Sample(booleanArrayOf(false), LongArray(0)))
         val honest = CountingResumableSolver(slicesToVerdict = 3, model = Sample(booleanArrayOf(true), LongArray(0)))

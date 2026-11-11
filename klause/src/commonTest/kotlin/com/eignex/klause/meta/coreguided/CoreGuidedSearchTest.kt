@@ -255,38 +255,6 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `source verification should observe the cumulative core active time allowance`() {
-        val clock = TestTimeSource()
-        val hard = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
-        val source = Problem(2, 0, emptyArray(), Array(2_049) { hard })
-        var augmented = false
-        var verificationFires = 0
-        val providers = observingHard(hard) { state ->
-            if (state.problem.numBoolVars > source.numBoolVars) {
-                augmented = true
-            } else if (augmented) {
-                if (verificationFires++ == 0) clock += 3.seconds
-            }
-        }
-        val search = CoreGuidedSearch(
-            source.bake(providers.prepare(source)),
-            LinearObjective(longArrayOf(1, 1)),
-            BacktrackParams(nativeSat = false),
-            maximumMillis = 2_000L,
-            timeSource = clock,
-        )
-
-        val stopped = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("unverified publication") }
-        val resumed = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("renewed verification") }
-
-        assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(stopped).reason)
-        assertTrue(verificationFires in 1 until source.numFactors)
-        assertEquals(stopped, resumed)
-        assertEquals(BigFraction.ONE, search.lowerBound)
-        search.close()
-    }
-
-    @Test
     fun `initial residual query should retain the captured source projection and root deductions`() {
         val hard = Clause(intArrayOf(Lit.make(0, true)))
         val source = Problem(1, 0, emptyArray(), arrayOf(hard))

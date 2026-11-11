@@ -196,10 +196,12 @@ internal class Alns(
             val fresh = exchange?.current()
             if (fresh != null && fresh.version > seenVersion) {
                 // Pooled incumbents are engine results; only this worker's own pins are a new obligation.
-                if (fresh.assignment !== current && fresh.objective.isFinite() && improves(fresh.assignment, best) &&
-                    checkPointRestrictions(fresh.assignment, assumptions, cancellation) == null
+                val point = fresh.assignment
+                if (point !== current && point.numBoolVars == problem.numBoolVars &&
+                    point.numIntVars == problem.numIntVars && fresh.objective.isFinite() && improves(point, best) &&
+                    checkPointRestrictions(point, assumptions, cancellation) == null
                 ) {
-                    best = fresh.assignment
+                    best = point
                 }
                 if (!cancellation()) seenVersion = fresh.version
             }
