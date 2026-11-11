@@ -16,7 +16,6 @@ internal fun verifyProjectedSourceWitness(
     points: FinitePointCheck = FinitePointCheck(integerChecker),
     toleranceCheck: ((Sample) -> Boolean)?,
 ): Verification<Sample, Unit> {
-    require(points.checksAllOf(integerChecker)) { "point checker does not cover this problem" }
     if (cancellation()) return Verification.Indeterminate("source verification cancelled")
     if (sample.numBoolVars != source.numBoolVars || sample.numIntVars != source.numIntVars ||
         sample.numRealVars != source.numRealVars

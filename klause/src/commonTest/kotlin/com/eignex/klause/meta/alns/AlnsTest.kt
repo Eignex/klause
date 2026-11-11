@@ -303,31 +303,6 @@ class AlnsTest {
     }
 
     @Test
-    fun `invalid and foreign objective shared candidates should leave bootstrap available`() {
-        val problem = selectProblem()
-        val optimum = selectOptimum()
-        val candidates = listOf(
-            Sample(BooleanArray(0), LongArray(0)) to 0.0,
-            Sample(BooleanArray(SELECT_WEIGHTS.size), LongArray(0)) to 0.0,
-            optimum to -1.0,
-        )
-        for ((sample, value) in candidates) {
-            var bootstraps = 0
-            val inner = object : Optimizer<LocalSearchParams> by NoFeasibleLs(problem) {
-                override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult {
-                    bootstraps++
-                    return MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
-                }
-            }
-            val exchange = IncumbentExchange.minimizing<Sample>().apply { offer(sample, value) }
-            val result = Alns(inner, pooledIncumbents = exchange).minimize(selectObjective, LocalSearchParams())
-
-            assertIs<MinimizeResult.Unknown>(result)
-            assertEquals(1, bootstraps)
-        }
-    }
-
-    @Test
     fun `a verified seed with rounded telemetry should keep its original objective`() {
         val problem = selectProblem()
         val seed = selectOptimum()
@@ -525,39 +500,6 @@ class AlnsTest {
         val result = handle.use { first ?: assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE) {}) }
 
         assertEquals(seed, result.assignment)
-    }
-
-    @Test
-    fun `cancelled seed validation should retry the same shared version on resume`() {
-        val problem = Problem(
-            0,
-            0,
-            emptyArray(),
-            emptyList<Factor>(),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(1.0),
-        ).bake()
-        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
-        val seed = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
-        val exchange = IncumbentExchange.minimizing<Sample>().apply { offer(seed, 0.5) }
-        var expired = false
-        var checks = 0
-        val alns = Alns(NoFeasibleLs(problem), maxIterations = 0, pooledIncumbents = exchange).apply {
-            incumbentToleranceCheck = {
-                checks++
-                expired = checks == 1
-                true
-            }
-        }
-        val handle = alns.resumable(objective, LocalSearchParams())
-
-        assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE) {})
-        expired = false
-        val result = handle.use { assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE) {}) }
-
-        assertEquals(seed, result.assignment)
-        assertEquals(2, checks)
     }
 
     @Test

@@ -465,10 +465,9 @@ class PropagationSession private constructor(
         // Point pins belong to a disposable verification root over a shareable projection, never a search root.
         fun forPointCheck(
             projection: PropagationProblem, point: Assumptions, cancellation: Cancellation,
-            onPropagationWork: ((() -> Long) -> Unit)? = null,
         ): PropagationSession = PropagationSession(
             projection.problem, cancellation, PROPAGATION_CANCEL_FLOOR, true, false, projection,
-            initialAssumptions = point, onPropagationWork = onPropagationWork,
+            initialAssumptions = point,
         )
 
         fun preparation(

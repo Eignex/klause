@@ -37,7 +37,6 @@ import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.solver.incumbent.WitnessCheckKey
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
@@ -694,30 +693,23 @@ private fun openWitnessVerifier(
         }
     }
     if (claimed?.isNaN() == true) return@CandidateVerifier Verification.Rejected("objective is NaN")
-    val receipt = OpenWitnessReceipt(model, objective, context)
-    if (!sample.hasReceipt(receipt)) {
-        val checked = when {
-            context != null -> context.linearWitnessVerifier(cancellation).verify(candidate)
-            model.factors.any { it is ExactSearchRow } || sample.exactInts?.any { !it.fitsLong() } == true -> {
-                val sourceObjective = objective ?: LinearObjective()
-                val source = model.absSourceWitnessContext(sourceObjective, cancellation)
-                    ?: model.linearAuthorityContext(sourceObjective, ObjectiveSense.MINIMIZE, cancellation)
-                    ?: return@CandidateVerifier Verification.Indeterminate(
-                        "exact original-source witness check unavailable",
-                    )
-                source.linearWitnessVerifier(cancellation).verify(candidate)
-            }
-            else -> verifyOpenWitness(model, sample, cancellation, projection())
-        }
-        when (checked) {
-            is Verification.Rejected -> return@CandidateVerifier checked
-            is Verification.Indeterminate -> return@CandidateVerifier checked
-            is Verification.Accepted -> if (!cancellation()) sample.recordReceipt(receipt)
-        }
+    if (context != null) return@CandidateVerifier context.linearWitnessVerifier(cancellation).verify(candidate)
+    val checked = if (model.factors.any { it is ExactSearchRow } ||
+        sample.exactInts?.any { !it.fitsLong() } == true
+    ) {
+        val source = model.absSourceWitnessContext(objective ?: LinearObjective(), cancellation)
+            ?: model.linearAuthorityContext(objective ?: LinearObjective(), ObjectiveSense.MINIMIZE, cancellation)
+            ?: return@CandidateVerifier Verification.Indeterminate("exact original-source witness check unavailable")
+        source.linearWitnessVerifier(cancellation).verify(candidate)
+    } else {
+        verifyOpenWitness(model, sample, cancellation, projection())
     }
-    if (context != null || objective == null || claimed == null) {
-        return@CandidateVerifier Verification.Accepted(candidate)
+    when (checked) {
+        is Verification.Rejected -> return@CandidateVerifier checked
+        is Verification.Indeterminate -> return@CandidateVerifier checked
+        is Verification.Accepted -> Unit
     }
+    if (objective == null || claimed == null) return@CandidateVerifier Verification.Accepted(candidate)
     val exact = objective.evaluateExact(sample)
     val value = exact.toDouble()
     val agrees = if (objective.realCoefficientValues.any { it != 0.0 }) {
@@ -757,14 +749,4 @@ internal fun inWindows(sample: Sample, searchModel: LocalSearchModel): Sample {
     }
     if ((0 until sample.numIntVars).all { domains[it].contains(sample.intValue(it)) }) return sample
     return sample.copy(ints = LongArray(domains.size) { domains[it].clamp(sample.intValue(it)) })
-}
-
-// A source witness check reads the model, objective and proof context identities besides the coordinates.
-private class OpenWitnessReceipt(
-    private val model: Problem,
-    private val objective: LinearObjective?,
-    private val context: SourceProofContext?,
-) : WitnessCheckKey {
-    override fun sameCheck(other: WitnessCheckKey): Boolean = other is OpenWitnessReceipt && model === other.model &&
-        objective === other.objective && context === other.context
 }

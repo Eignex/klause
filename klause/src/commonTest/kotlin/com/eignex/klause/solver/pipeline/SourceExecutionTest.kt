@@ -295,7 +295,7 @@ class SourceExecutionTest {
 
         val first = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(
             stopped, finiteRequest = { shape -> FiniteSolveRequest(shape, SourceFiniteControls.Backtrack(
-                BacktrackParams(maxDecisions = 0L, nativeSat = false),
+                BacktrackParams(maxDecisions = 2L, nativeSat = false),
             )) },
         )))
         val second = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(

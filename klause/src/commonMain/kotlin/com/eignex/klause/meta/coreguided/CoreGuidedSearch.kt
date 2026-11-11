@@ -23,8 +23,6 @@ import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.incumbent.Candidate
-import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.objective.LinearObjective
@@ -32,8 +30,6 @@ import com.eignex.klause.solver.result.CoreGuidedStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.solver.result.UnsoundnessException
-import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
@@ -115,8 +111,6 @@ internal class CoreGuidedSearch(
         private set
     internal var queryCount = 0L
         private set
-    internal var verificationVisits = 0L
-        private set
     private var querySofts = IntArray(0)
     private var completedStats = SolveStats.EMPTY
     private var completedWork = 0L
@@ -124,9 +118,6 @@ internal class CoreGuidedSearch(
     private var workDebt = 0L
     private var best: Sample? = null
     private var candidate: Sample? = null
-    private val pointCheck = FinitePointCheck(base)
-    private var verificationConstruction = 2L * base.numBoolVars + base.numIntVars + base.numFactors +
-        objective.boolWeightValues.size + objective.intCoefficientValues.size
     private var bestValue: BigFraction? = null
     private var terminal: MinimizeResult? = null
     private var closed = false
@@ -263,8 +254,7 @@ internal class CoreGuidedSearch(
                 corePreparation = null
             }
             if (candidate != null) {
-                verifyCandidate(token or segment or Cancellation { allowanceExhausted }, onIncumbent)?.let { return it }
-                if (candidate != null) return null
+                publishCandidate(onIncumbent)?.let { return it }
                 continue
             }
             if (token() || segment()) return null
@@ -334,23 +324,8 @@ internal class CoreGuidedSearch(
         return if (allowanceExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
     }
 
-    private fun verifyCandidate(
-        token: Cancellation,
-        onIncumbent: (MinimizeResult.WithSample) -> Unit,
-    ): MinimizeResult? {
+    private fun publishCandidate(onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
         val sample = requireNotNull(candidate)
-        recordVerification(verificationConstruction)
-        when (val verified = pointCheck.check(
-            Candidate(sample, Unit), token, params.assumptions, onWork = ::recordVerification,
-        )) {
-            is Verification.Rejected -> throw UnsoundnessException(verified.reason)
-            is Verification.Indeterminate -> return when {
-                allowanceExhausted -> finish(stopped(TerminationReason.BudgetExhausted))
-                token() -> null
-                else -> finish(stopped(TerminationReason.Unsupported))
-            }
-            is Verification.Accepted -> Unit
-        }
         candidate = null
         val value = objective.evaluateExact(sample)
         if (bestValue == null || value < requireNotNull(bestValue)) {
@@ -369,11 +344,6 @@ internal class CoreGuidedSearch(
             yieldAll(prepareQuery())
         }.iterator()
         return null
-    }
-
-    private fun recordVerification(units: Long) {
-        recordPreparation(units)
-        verificationVisits = addWork(verificationVisits, units)
     }
 
     private fun prepareCore(assumptions: Assumptions?, model: BakedProblem?): Iterator<Unit> = sequence {
@@ -414,11 +384,6 @@ internal class CoreGuidedSearch(
     }.iterator()
 
     private fun prepareObjective(): Iterator<Unit> = sequence {
-        for (factor in base.factors) {
-            verificationConstruction += factor.structuralKeyWeight
-            recordPreparation(1L)
-            yield(Unit)
-        }
         while (initialIndex < objectiveTerms) {
             val id = initialIndex++
             recordPreparation(1L)

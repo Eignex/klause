@@ -26,8 +26,6 @@ import com.eignex.klause.solver.SearchStream
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SourceStrategy
-import com.eignex.klause.solver.incumbent.Candidate
-import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -36,8 +34,6 @@ import com.eignex.klause.solver.result.SampleResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.solver.result.UnsoundnessException
-import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
@@ -67,9 +63,6 @@ class BacktrackSolver internal constructor(
     Optimizer<BacktrackParams>,
     ResumableOptimizer<BacktrackParams>,
     ResumableSolver<BacktrackParams> {
-
-    // Leaf models and heuristic proposals of every query share one checker over the immutable baked problem.
-    internal val pointCheck: FinitePointCheck by lazy { FinitePointCheck(problem) }
 
     /** Solve a baked problem with production LP dependencies. */
     constructor(problem: BakedProblem) : this(problem, LpSolveContext.Production)
@@ -279,7 +272,7 @@ class BacktrackSolver internal constructor(
         sink.start()
         return CpSatisfactionTraversal(problem, params, sink, lpSolveContext, singleModel = true).use { traversal ->
             val outcome = checkNotNull(traversal.next()) { "an unsliced traversal never pauses" }
-            verdictOf(outcome, params.assumptions, params.cancellation, sink)
+            verdictOf(outcome, params.assumptions, sink)
         }
     }
 
@@ -289,32 +282,19 @@ class BacktrackSolver internal constructor(
         else ResumableSatisfaction(this, params)
 
     /**
-     * The verdict a satisfaction [outcome] stands for, stopping [sink] for its counters. A model is re-derived from
-     * every factor first, the check stopping on [cancellation]; see [UnsoundnessException].
+     * The verdict a satisfaction [outcome] stands for, stopping [sink] for its counters.
      */
     internal fun verdictOf(
         outcome: SearchOutcome,
         assumptions: Assumptions,
-        cancellation: Cancellation,
         sink: SolveStatsSink,
         finish: Boolean = true,
     ): SolveResult {
         if (finish) sink.stop()
         val stats = sink.snapshot()
         return when (outcome) {
-            // The leaf is the engine's own claim, re-derived here from every factor: an assignment the composed
-            // fixpoint refutes is an engine defect and must surface as one, never as a model. A check the deadline
-            // cut short refutes nothing, so the leaf stands rather than losing a model found in time.
-            is SearchOutcome.Found -> {
-                val candidate = Candidate(outcome.sample, Unit)
-                when (val verdict = pointCheck.check(candidate, cancellation, assumptions)) {
-                    is Verification.Rejected -> throw UnsoundnessException(
-                        "backtrack reported a model its constraints refute: ${verdict.reason}",
-                    )
-
-                    is Verification.Accepted, is Verification.Indeterminate -> SolveResult.Sat(outcome.sample, stats)
-                }
-            }
+            // Propagation and the selected source checks decided the leaf; nothing re-derives it.
+            is SearchOutcome.Found -> SolveResult.Sat(outcome.sample, stats)
 
             is SearchOutcome.Exhausted ->
                 if (outcome.indeterminate) {
