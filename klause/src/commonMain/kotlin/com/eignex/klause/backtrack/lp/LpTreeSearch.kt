@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.exactSourceObjective
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpFractionalBranch
+import com.eignex.klause.lp.bounding.objectiveLowerBound
 import com.eignex.klause.lp.bounding.solveNode
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CrashBasisAttempt
@@ -16,7 +17,6 @@ import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.acceptNullable
 import com.eignex.klause.lp.engine.ceilLong
-import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
 import com.eignex.klause.lp.engine.exactPointWitness
 import com.eignex.klause.lp.engine.triangularCrashBasis
 import com.eignex.klause.lp.relaxation.LeafRealResult
@@ -163,12 +163,8 @@ internal fun LpEngine.lbTreeSearch(
                         val model = node.model
                         val result = node.float
                         val lower = result?.let { candidate ->
-                            certifiedTightObjectiveLowerBound(
-                                model,
-                                candidate.duals,
-                                rootCertificationObserver(),
-                                solveContext.certificationPolicy,
-                            )?.let { BigFraction.ofDouble(it) }?.plus(BigFraction.ofLong(relaxation.objectiveConstant))
+                            objectiveLowerBound(model, candidate.duals, rootCertificationObserver())
+                                ?.let { BigFraction.ofDouble(it) }?.plus(BigFraction.ofLong(relaxation.objectiveConstant))
                         }
                         if (lower != null && bestExact?.let { lower >= it } == true) return SearchNodeDisposition.Prune
                         val witness = result?.let { candidate ->

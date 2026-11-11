@@ -151,6 +151,7 @@ object PresolvePipeline {
         randomSeed: Long? = null,
         projections: PreparedFactorProjections? = null,
         sourcePreparation: LpSourcePreparation = LpSourcePreparation.ADMITTED,
+        exactLp: Boolean = true,
     ): PresolveOutcome {
         val problem = prepared.source
         val sourceProblem = prepared.problem
@@ -203,6 +204,7 @@ object PresolvePipeline {
                 lpRootInfeasibleReporting(
                     sourceProblem, objective, LpPlan(bounding = true, sourcePreparation = sourcePreparation), token,
                     zeroObjectivePricing, randomSeed, projections = sourceProjections,
+                    exactLp = exactLp,
                 ).also { if (it.infeasible) observation.preparationRefuted() }
             } else {
                 observation?.outcome = PresolveInvocationOutcome.ELIGIBILITY_SKIP
@@ -240,6 +242,7 @@ object PresolvePipeline {
                     sourceProblem, objective, LpPlan(bounding = true, sourcePreparation = sourcePreparation), token,
                     zeroObjectivePricing, randomSeed,
                     minimumSpan = sourceProblem.settings.largeSpanThreshold, projections = sourceProjections,
+                    exactLp = exactLp,
                 )
             }
         } else {
@@ -358,6 +361,7 @@ object PresolvePipeline {
                         cancellation,
                         zeroObjectivePricing,
                         randomSeed,
+                        exactLp = exactLp,
                     ).also { result ->
                         presolveBudget?.activeInvocation?.let { invocation ->
                             invocation.narrowedColumns = result.report.boundsShaved

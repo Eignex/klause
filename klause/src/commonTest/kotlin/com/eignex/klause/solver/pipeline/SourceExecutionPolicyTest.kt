@@ -1,7 +1,14 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpTechnique
@@ -175,5 +182,31 @@ class SourceExecutionPolicyTest {
         assertEquals(2, finite.presolveConfig.maxRounds)
         assertFalse(finite.explicitPresolveConfig)
         assertEquals(null, finite.executionOptions.reader()[ExecutionOption.presolveMaxRounds])
+    }
+
+    @Test
+    fun `finite requests should certify LP deductions exactly only when exact is requested`() {
+        for (exact in listOf(false, true)) {
+            val shape = FiniteSolveShape(Problem(0, 0, emptyArray(), emptyArray()), false, false, null, null, null, null)
+
+            val request = SourceExecutionPolicy(exactLp = exact).finiteRequest(shape, FiniteEngine.BACKTRACK)
+
+            assertEquals(!exact, request.lpSolveContext.numericalDeductions)
+        }
+    }
+
+    @Test
+    fun `a zero source tolerance should certify LP deductions exactly`() {
+        val source = Problem(
+            0, 1, arrayOf(IntDomain(0, 3)), arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)),
+            semantics = SourceSemantics(SourceFormat.IR, feasibilityTolerance = SourceTolerance()).resolve(),
+        )
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(SourceAttachment(source), ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK),
+        )
+
+        val request = SourceExecutionPolicy().finiteRequest(invocation.finiteShape(), FiniteEngine.BACKTRACK)
+
+        assertFalse(request.lpSolveContext.numericalDeductions)
     }
 }

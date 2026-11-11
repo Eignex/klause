@@ -909,7 +909,8 @@ finite-owned.
 The finite pipeline runs pre-bake LP bound tightening when a factor couples two
 nonfixed integer columns whose spans exceed the large-span threshold, or couples a
 wide integer column to a continuous one. It queries at most 64 columns, widest
-first, and every accepted tightening requires the LP bound certificate.
+first, and every accepted tightening requires an LP bound
+([numerical or exact](17-linear-programming.md#numerical-and-exact-deductions)).
 
 ### Binary integer channels
 

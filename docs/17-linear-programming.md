@@ -1,9 +1,11 @@
 # 17. Linear programming
 
 Finite relaxations, mixed-integer models and [linear theories](15-linear-arithmetic.md)
-share one floating revised simplex with exact certification. Model-facing adapters
-assemble source-aware rows; the engine solves and certifies them; consumers interpret
-the result in source coordinates. Shared search owns integer and Boolean alternatives.
+share one floating revised simplex. Open theories always certify its results exactly;
+finite search and presolve accept them within tolerances unless exact certification is
+requested ([numerical and exact deductions](#numerical-and-exact-deductions)). Model-facing
+adapters assemble source-aware rows; the engine solves and certifies them; consumers
+interpret the result in source coordinates. Shared search owns integer and Boolean alternatives.
 LP feasibility alone establishes no integrality.
 
 ## Boundaries
@@ -238,7 +240,7 @@ reconstruction recovers the selected tuples; an LP point alone supplies no witne
 
 [LpPropagator](../klause/src/commonMain/kotlin/com/eignex/klause/lp/bounding/LpPropagator.kt)
 maps source decisions to bound assertions, retracts through the trail and supplies
-certified bounds, fixings and Farkas conflicts under an effort governor. Farkas
+bounds, fixings and Farkas conflicts under an effort governor. Farkas
 explanations cite the selected bound witnesses and all contributing row premises;
 every learned literal is false at the conflict and implied by the cited antecedents.
 One integer or disjunction leaf cannot refute its sibling branches.
@@ -1582,9 +1584,29 @@ their built-in descriptors.
 ## LP certification
 
 Certification checks numerical proposals against the exact active model. Different
-claims need different evidence packages; a floating optimum or failed check cannot
-prune or prove a result. [LpSolve](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpSolve.kt)
+claims need different evidence packages; where certification is required, a floating
+optimum or failed check cannot prune or prove a result.
+[LpSolve](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpSolve.kt)
 owns these checks.
+
+### Numerical and exact deductions
+
+`LpSolveContext.numericalDeductions` selects how finite search and presolve consume
+LP results. The finite pipeline sets it unless `--exact` is given or the source declares
+zero feasibility tolerance. Open theories, source LP optimization and real leaf
+completion never read it; leaf witnesses follow the source tolerance.
+
+Numerical deductions compute no certificate. `FloatDeductionCertificate` sums the
+Lagrangian `L(y)` from the float duals in binary64, lowers it by that summation's
+rounding and by the largest effect of reduced costs within `FLOAT_EVIDENCE_TOLERANCE`
+that it takes as zero, and accepts such a reduced cost on an open side. It supplies
+node pruning, objective propagation, reduced-cost fixing with their reasons, root
+bounds shared with peers, and shaving. `floatFarkasRay` accepts a dual-unbounded ray
+whose binary64 Farkas margin exceeds the tolerance times the terms' size; it backs
+infeasibility pruning, learned conflicts and presolve root infeasibility. Mixed row
+projections, strict-row solves and component bounds have no numerical form and are
+skipped. Optimality, infeasibility and bound claims resting on these deductions are
+numerical. Under exact certification every deduction uses the packages below.
 
 ### Proof packages
 
@@ -1671,8 +1693,8 @@ a nonpositive reduced cost.
 
 The integer variant rounds the duals to integer multipliers at a capped
 power-of-two scale and accumulates in Int128; nonfinite duals or overflow decline.
-An integral objective lattice lets the bound be ceiled. Node bounding takes the
-tighter of the accepted safe and integer bounds. Variable bounds use the same
+An integral objective lattice lets the bound be ceiled. Under exact certification, node
+bounding takes the tighter of the accepted safe and integer bounds. Variable bounds use the same
 argument with a single-column objective.
 
 ### Certification mechanisms
@@ -1776,7 +1798,7 @@ onto integral coordinates, citing the supporting side of every other term and
 cancelling single continuous columns through paired rows or singleton equalities.
 
 Certificate identity binds deductions to their exact state, so pop, bound changes
-and objective edits prevent reuse. Node bounding prunes with the strongest
+and objective edits prevent reuse. Exact node bounding prunes with the strongest
 completed certificate; when none completes, an accepted safe objective bound still
 supports pruning. These operations share one allowance: 128-bit scalar admission,
 250,000 work units and 16 MiB of metered allocation.

@@ -111,6 +111,8 @@ class FiniteSolveRequest(
      * check accepts it; `null` keeps exact semantics.
      */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
+    /** Whether finite-lane LP deductions require exact certificates; float results within tolerances otherwise. */
+    val exactLp: Boolean = false,
 ) {
     private var capturedSourceControls: SourceFiniteControls? = null
     internal val sourceControls: SourceFiniteControls? get() = capturedSourceControls
@@ -159,6 +161,11 @@ class FiniteSolveRequest(
         ) { "enumeration needs its captured source operation" }
     }
 
+    /** Finite LP dependencies: exact certification when requested or when the source admits zero tolerance. */
+    internal val lpSolveContext: LpSolveContext get() = LpSolveContext.finite(
+        exactLp || shape.sourceInvocation?.source?.semantics?.effective?.feasibilityTolerance?.isExact == true,
+    )
+
     /** Captured frontend `key=value` parameters; empty for directly typed options. */
     val engineParams: List<String> get() = executionOptions.originalPairs.toList()
 
@@ -188,6 +195,7 @@ class FiniteSolveRequest(
         onPortfolioFault: ((ArmFault) -> Unit)? = null,
         prepareOnly: Boolean = false,
         toleranceCheck: ((Sample) -> Boolean)? = null,
+        exactLp: Boolean = false,
     ) : this(
         shape = shape,
         engine = engine,
@@ -213,6 +221,7 @@ class FiniteSolveRequest(
         onPortfolioFault = onPortfolioFault,
         prepareOnly = prepareOnly,
         toleranceCheck = toleranceCheck,
+        exactLp = exactLp,
     )
 }
 
@@ -498,11 +507,11 @@ private fun FiniteExecutionResult.withCompleteSearch(value: Boolean): FiniteExec
 
 /** Prepare the canonical finite model and optional heuristic view, then execute the selected engine route. */
 fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteSolveCallbacks): FiniteSolveResult =
-    solve(request, callbacks, LpSolveContext.Production)
+    solve(request, callbacks, request.lpSolveContext)
 
 internal fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteSolveCallbacks,
     numericalCompanions: TheoryParams): FiniteSolveResult =
-    solve(request, callbacks, LpSolveContext.Production, numericalCompanions)
+    solve(request, callbacks, request.lpSolveContext, numericalCompanions)
 
 /** Execute the fixed finite route with per-invocation LP dependencies. */
 internal fun FinitePipeline.solve(
@@ -514,7 +523,7 @@ internal fun FinitePipeline.solve(
     onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     onPortfolioJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
 ): FiniteSolveResult {
-    require(request.engine == FiniteEngine.FIXED || lpSolveContext == LpSolveContext.Production) {
+    require(request.engine == FiniteEngine.FIXED || lpSolveContext == request.lpSolveContext) {
         "custom LP dependencies require the fixed finite route"
     }
     request.shape.sourceInvocation?.freezeExecution()
@@ -732,6 +741,7 @@ private fun FiniteSolveRequest.preparationRequest(
         } else stop,
         presolveBudget = presolveBudget, zeroObjectivePricing = zeroObjectivePricing, randomSeed = randomSeed,
         sourcePreparation = sourcePreparation,
+        exactLp = !lpSolveContext.numericalDeductions,
     )
 }
 
@@ -1228,7 +1238,7 @@ private fun executePortfolio(
     }
     val profile = ProblemProfile.of(request.problem, request.optimize)
     val baseScenario = clausalDefaultScenario(
-        plan.scenario,
+        plan.scenario.copy(exactLp = !request.lpSolveContext.numericalDeductions),
         profile,
         request.defaultArms,
         explicitArms = request.executionOptions.explicitArms,

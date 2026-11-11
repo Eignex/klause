@@ -127,8 +127,16 @@ internal data class LpSolveContext(
     val startArbitraryPrecision: Boolean = false,
     val preserveOverflowCheckpoint: Boolean = true,
     val onQuery: ((LpQueryObservation) -> Unit)? = null,
+    /**
+     * Finite-lane LP deductions consume float results within tolerances instead of exact certificates. Only the
+     * finite pipeline sets it; the open theories and leaf completion never read it.
+     */
+    val numericalDeductions: Boolean = false,
 ) {
     companion object {
         val Production = LpSolveContext()
+
+        /** The finite-lane context: exact certification only when [exact] is requested. */
+        fun finite(exact: Boolean): LpSolveContext = if (exact) Production else LpSolveContext(numericalDeductions = true)
     }
 }

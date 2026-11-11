@@ -289,7 +289,7 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         listOf("--exact"),
         false,
         FlagGroup.KLAUSE,
-        help = "require continuous floats and zero source feasibility tolerance where applicable",
+        help = "certify LP deductions exactly; continuous floats and zero source tolerance where applicable",
     ) { o.exact = true },
     FlagSpec(
         listOf("-a", "--all-solutions"),

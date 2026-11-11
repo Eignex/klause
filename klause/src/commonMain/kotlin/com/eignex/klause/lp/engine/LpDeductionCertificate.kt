@@ -38,6 +38,13 @@ internal interface LpDeductionCertificate {
         return cost * BigFraction.ofLong(steps) <= gap
     }
 
+    /** Whether column [col] may move [steps] from its minimizing endpoint within the objective [gap]. */
+    fun permitsMovementWithin(col: Int, steps: Long, gap: BigFraction): Boolean {
+        val reduced = exactReducedCost(col)
+        val cost = if (reduced.signum() < 0) reduced.negated() else reduced
+        return cost * BigFraction.ofLong(steps) <= gap
+    }
+
     fun fixStepsForGap(col: Int, gap: BigFraction): Long? {
         val reduced = exactReducedCost(col)
         if (reduced.isZero) return null
