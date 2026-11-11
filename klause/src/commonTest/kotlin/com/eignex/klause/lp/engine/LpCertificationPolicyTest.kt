@@ -49,8 +49,8 @@ class LpCertificationPolicyTest {
                 error("certifier was invoked")
             }
 
-            override fun observeExactInput(accepted: Boolean) {}
-            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) {}
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
         }
 
         val result = certifiedTightObjectiveLowerBound(model, doubleArrayOf(), observer, policy)
