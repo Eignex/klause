@@ -675,6 +675,7 @@ internal class JointLinearRepair(
             }
             is SourceNumericalSupportResult.Unavailable -> {
                 observe("jointRepairRefutationSupport${support.reason}")
+                support.limitStage?.let { observe("jointRepairRefutationSupportLimit$it") }
                 if (support.reason == SourceNumericalSupportResult.Reason.Funding) {
                     observe(if (funding.exhausted) "jointRepairRefutationOwnerExhausted"
                         else "jointRepairRefutationGrantPaused")

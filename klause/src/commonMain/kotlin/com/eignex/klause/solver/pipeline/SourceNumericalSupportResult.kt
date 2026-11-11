@@ -19,9 +19,11 @@ internal sealed interface SourceNumericalSupportResult {
     data class Unavailable(
         val feedback: SourceNumericalFeedbackResult.Available,
         val reason: Reason,
+        val limitStage: LimitStage? = null,
     ) : SourceNumericalSupportResult
 
     enum class Reason { Unrequested, NoRefutation, Unsupported, Limit, Cancelled, Funding }
+    enum class LimitStage { Context, Traversal, Result, Depth }
 }
 
 // This visits captured proof references for ranking; it neither reduces nor verifies a proof scope.
@@ -45,13 +47,18 @@ internal fun sourceNumericalRefutationSupport(
     val assumptions = linkedSetOf<SourceDerivation.Assumption>()
     var remaining = 4096
     var failure = SourceNumericalSupportResult.Reason.Unsupported
-    fun spend(entries: Int): Boolean {
+    var limitStage: SourceNumericalSupportResult.LimitStage? = null
+    fun spend(entries: Int, stage: SourceNumericalSupportResult.LimitStage =
+        SourceNumericalSupportResult.LimitStage.Traversal): Boolean {
         funding.charge(entries.toLong(), entries * 64L)
         remaining -= entries
         failure = when {
             cancellation() -> SourceNumericalSupportResult.Reason.Cancelled
             funding.paused -> SourceNumericalSupportResult.Reason.Funding
-            remaining < 0 -> SourceNumericalSupportResult.Reason.Limit
+            remaining < 0 -> {
+                limitStage = stage
+                SourceNumericalSupportResult.Reason.Limit
+            }
             else -> return true
         }
         return false
@@ -60,8 +67,9 @@ internal fun sourceNumericalRefutationSupport(
     val numeric = query.numeric.premises
     val lower = feedback.scope.condition.lower
     val upper = feedback.scope.condition.upper
-    if (!spend(original.size + numeric.size + lower.size + upper.size)) {
-        return SourceNumericalSupportResult.Unavailable(feedback, failure)
+    if (!spend(original.size + numeric.size + lower.size + upper.size,
+            SourceNumericalSupportResult.LimitStage.Context)) {
+        return SourceNumericalSupportResult.Unavailable(feedback, failure, limitStage)
     }
     fun add(values: Collection<SourceCoordinate>): Boolean {
         if (!spend(values.size)) return false
@@ -72,6 +80,7 @@ internal fun sourceNumericalRefutationSupport(
         if (!spend(1)) return false
         if (depth >= 64) {
             failure = SourceNumericalSupportResult.Reason.Limit
+            limitStage = SourceNumericalSupportResult.LimitStage.Depth
             return false
         }
         return when (proof) {
@@ -101,8 +110,9 @@ internal fun sourceNumericalRefutationSupport(
     }
     if (evidence.claim != SourceClaim.Refutation || evidence.scope != feedback.scope || !spend(1) ||
         !add(feedback.scope.condition.bools.keys.map { SourceCoordinate(SourceCoordinate.Kind.Boolean, it) }) ||
-        !visit(evidence.derivation, 0) || !spend(coordinates.size + premises.size + assumptions.size)) {
-        return SourceNumericalSupportResult.Unavailable(feedback, failure)
+        !visit(evidence.derivation, 0) || !spend(coordinates.size + premises.size + assumptions.size,
+            SourceNumericalSupportResult.LimitStage.Result)) {
+        return SourceNumericalSupportResult.Unavailable(feedback, failure, limitStage)
     }
     return SourceNumericalSupportResult.Available(feedback, coordinates.toSet(), premises.toSet(), assumptions.toSet())
 }
