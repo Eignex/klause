@@ -261,6 +261,7 @@ class BacktrackSolver internal constructor(
               luby:        ${params.lubyRestartBase ?: "off"}
               max-learned: ${params.maxLearnedClauses ?: "unbounded"}
               lp:          $lp
+              lp-mode:     ${params.lpMode.name.lowercase()}
               lp-pricing:  ${params.zeroObjectivePricing.name.lowercase().replace('_', '-')}
         """.trimIndent()
     }

@@ -11,6 +11,7 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.bounding.hasDefaultNumericalSettings
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.lp.engine.LpQueryObservation
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
@@ -43,23 +44,27 @@ internal class BacktrackWorkerConfig(
     private val coreRefinement: CoreRefinementMode = CoreRefinementMode.NONE,
     private val onLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
     private val onGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
+    private val lpMode: LpCertificationMode? = null,
 ) : WorkerConfig {
 
     fun withToleranceCheck(check: (Sample) -> Boolean): BacktrackWorkerConfig =
-        BacktrackWorkerConfig(recipe, zeroObjectivePricing, check, coreRefinement, onLpQuery, onGuidance)
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, check, coreRefinement, onLpQuery, onGuidance, lpMode)
+
+    fun withLpMode(mode: LpCertificationMode): BacktrackWorkerConfig =
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery, onGuidance, mode)
 
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
         BacktrackWorkerConfig(recipe.spending(budget), zeroObjectivePricing, toleranceCheck, coreRefinement,
-            onLpQuery, onGuidance)
+            onLpQuery, onGuidance, lpMode)
 
     override fun withCoreRefinement(mode: CoreRefinementMode): BacktrackWorkerConfig =
-        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, mode, onLpQuery, onGuidance)
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, mode, onLpQuery, onGuidance, lpMode)
 
     fun withLpQueryObserver(observer: (String, Double?, LpQueryObservation) -> Unit): BacktrackWorkerConfig =
-        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, observer, onGuidance)
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, observer, onGuidance, lpMode)
 
     fun withGuidanceObserver(observer: (String, PooledGuidanceObservation) -> Unit): BacktrackWorkerConfig =
-        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery, observer)
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery, observer, lpMode)
 
     override val label: String get() = recipe.label
 
@@ -88,7 +93,8 @@ internal class BacktrackWorkerConfig(
         val workerLabel = "bt/${recipe.label}"
         val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(workerLabel, e) } }
         var params = recipe.build(seed + 1000L + index, workerEvent)
-        params = params.copy(zeroObjectivePricing = zeroObjectivePricing, toleranceCheck = toleranceCheck)
+        params = params.copy(zeroObjectivePricing = zeroObjectivePricing, toleranceCheck = toleranceCheck,
+            lpMode = lpMode ?: params.lpMode)
         onGuidance?.let { observe ->
             val previous = params.branchObserver
             params = params.copy(branchObserver = object : PooledGuidanceObserver {

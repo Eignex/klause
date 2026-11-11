@@ -11,6 +11,8 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.ObjectiveGuidance
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
+import com.eignex.klause.lp.engine.LpCertificationMode
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.Sample
@@ -38,6 +40,7 @@ internal class LocalSearchWorkerConfig private constructor(
     private val numericalCompletion: Boolean,
     private val toleranceCheck: ((Sample) -> Boolean)?,
     private val bufferedPublications: Boolean,
+    private val lpMode: LpCertificationMode = LpCertificationMode.NUMERICAL,
 ) :
     WorkerConfig {
 
@@ -52,29 +55,33 @@ internal class LocalSearchWorkerConfig private constructor(
 
     fun withBufferedPublications(): LocalSearchWorkerConfig =
         LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset,
-            numericalCompletion, toleranceCheck, true)
+            numericalCompletion, toleranceCheck, true, lpMode)
 
     fun withToleranceCheck(check: (Sample) -> Boolean): LocalSearchWorkerConfig =
         LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset,
-            numericalCompletion, check, bufferedPublications)
+            numericalCompletion, check, bufferedPublications, lpMode)
+
+    fun withLpMode(mode: LpCertificationMode): LocalSearchWorkerConfig =
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset,
+            numericalCompletion, toleranceCheck, bufferedPublications, mode)
 
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
         LocalSearchWorkerConfig(recipe, budget, reportResiduals, reportPhaseTimes, seedOffset,
-            numericalCompletion, toleranceCheck, bufferedPublications)
+            numericalCompletion, toleranceCheck, bufferedPublications, lpMode)
 
     fun withNumericalCompletion(): LocalSearchWorkerConfig =
         LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset, true,
-            toleranceCheck, bufferedPublications)
+            toleranceCheck, bufferedPublications, lpMode)
 
     override val label: String get() = recipe.label
 
     override fun withLsResiduals(): LocalSearchWorkerConfig =
         LocalSearchWorkerConfig(recipe, nodeBudget, true, reportPhaseTimes, seedOffset,
-            numericalCompletion, toleranceCheck, bufferedPublications)
+            numericalCompletion, toleranceCheck, bufferedPublications, lpMode)
 
     override fun withLsPhaseTimes(): LocalSearchWorkerConfig =
         LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, true, seedOffset,
-            numericalCompletion, toleranceCheck, bufferedPublications)
+            numericalCompletion, toleranceCheck, bufferedPublications, lpMode)
 
     internal fun materializeObjectiveCoordinates(
         view: ObjectiveCoordinateView,
@@ -144,7 +151,8 @@ internal class LocalSearchWorkerConfig private constructor(
             perMoveInvariants = sweep != null && recipe.perMoveInvariants,
             seedImplicitOnRestart = recipe.seedImplicitOnRestart,
             // Floating scores guide candidates; the residual LP retains the configured source guarantee.
-            completion = if (problem.numRealVars > 0) LeafRealCompletion(problem, objective, toleranceCheck) else null,
+            completion = if (problem.numRealVars > 0) LeafRealCompletion(problem, objective, toleranceCheck,
+                context = LpSolveContext.forMode(lpMode)) else null,
         ).apply {
             objectiveBound = boundHandle
             if (effectiveProblem === problem) {

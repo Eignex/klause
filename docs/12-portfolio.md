@@ -22,6 +22,12 @@ construction; explicit `arms`, `ls` or `bt` settings take precedence. Native
 arithmetic routes reject finite-only explicit policy instead of ignoring it. Recipe
 defaults carry no witness or proof authority.
 
+The finite request carries its LP certification mode independently of recipe edits
+and source tolerance semantics. Backtrack workers, ALNS bootstrap and repairs, and
+local-search continuous completion use that selection. Worker configuration copies
+preserve it without changing curated applicability or proof-coverage admission.
+Explicit fixed-route annotations keep their selected mode unless the caller overrides it.
+
 Named recipe pools retain the selected worker count and repeat their recipes across
 the slots. `bt-arm=X` selects the backtrack recipe; `arms=1` with the `cp` engine
 selects one worker. An explicit pool with one recipe can therefore have several

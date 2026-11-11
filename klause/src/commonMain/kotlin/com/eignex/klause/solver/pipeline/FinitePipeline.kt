@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.portfolio.EngineMix
@@ -74,6 +75,8 @@ class FinitePipelineRequest(
     val transformObjective: Boolean = true,
     /** Source-template policy shared by finite presolve and the consuming LP engines. */
     val sourcePreparation: LpSourcePreparation = LpSourcePreparation.ADMITTED,
+    /** LP deduction authority used throughout finite preparation and root harvest. */
+    val lpMode: LpCertificationMode = LpCertificationMode.NUMERICAL,
 ) {
     /** Finite projection data selected by [preparedPlan]. */
     val componentPlan: ComponentPlan = requireNotNull(preparedPlan.execution.finiteLinear) {
@@ -191,6 +194,7 @@ object FinitePipeline {
             request.randomSeed,
             plan.factorProjections,
             request.sourcePreparation,
+            request.lpMode,
         )
         val bakedModel = if (outcome.stats.infeasible) {
             outcome.problem

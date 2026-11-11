@@ -6,6 +6,7 @@ import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.EngineMix
@@ -41,6 +42,8 @@ class PortfolioPlanRequest(
     val annotationArm: BacktrackParams?,
     /** Source tolerance semantics for every arm's continuous completion; see [BacktrackParams.toleranceCheck]. */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
+    /** LP deduction authority shared by preparation and every worker. */
+    val lpMode: LpCertificationMode = LpCertificationMode.NUMERICAL,
 ) {
     /** Frontend parameter strings these options were parsed from; empty for directly typed options. */
     val engineParams: List<String> get() = executionOptions.originalPairs.toList()
@@ -58,6 +61,7 @@ class PortfolioPlanRequest(
         nodeBudget: NodeBudget?,
         annotationArm: BacktrackParams?,
         toleranceCheck: ((Sample) -> Boolean)? = null,
+        lpMode: LpCertificationMode = LpCertificationMode.NUMERICAL,
     ) : this(
         engine = engine,
         optimize = optimize,
@@ -70,6 +74,7 @@ class PortfolioPlanRequest(
         nodeBudget = nodeBudget,
         annotationArm = annotationArm,
         toleranceCheck = toleranceCheck,
+        lpMode = lpMode,
     )
 }
 
@@ -95,6 +100,8 @@ sealed class PortfolioPlan {
         val kind: Kind,
         /** Zero-objective LP pricing rendered for every resolved arm. */
         val zeroObjectivePricing: LpZeroObjectivePricing,
+        /** LP deduction authority rendered for every resolved arm. */
+        val lpMode: LpCertificationMode = LpCertificationMode.NUMERICAL,
     ) : PortfolioPlan()
 }
 
@@ -118,6 +125,8 @@ class FixedBacktrackPlanRequest(
     val zeroObjectivePricing: LpZeroObjectivePricing,
     /** Optional engine event sink supplied by the frontend. */
     val onEvent: ((SearchEvent) -> Unit)?,
+    /** Caller override of the annotation's LP authority; null preserves its selection. */
+    val lpMode: LpCertificationMode? = null,
 ) {
     /** Frontend parameter strings these options were parsed from; empty for directly typed options. */
     val engineParams: List<String> get() = executionOptions.originalPairs.toList()
@@ -133,6 +142,7 @@ class FixedBacktrackPlanRequest(
         lpConfig: LpConfig,
         zeroObjectivePricing: LpZeroObjectivePricing,
         onEvent: ((SearchEvent) -> Unit)?,
+        lpMode: LpCertificationMode? = null,
     ) : this(
         annotatedParams = annotatedParams,
         executionOptions = ExecutionOptions.parse(engineParams),
@@ -143,6 +153,7 @@ class FixedBacktrackPlanRequest(
         lpConfig = lpConfig,
         zeroObjectivePricing = zeroObjectivePricing,
         onEvent = onEvent,
+        lpMode = lpMode,
     )
 }
 
@@ -170,6 +181,7 @@ fun FinitePipeline.planFixedBacktrack(request: FixedBacktrackPlanRequest): Fixed
             onEvent = request.onEvent,
             lpConfig = request.lpConfig,
             zeroObjectivePricing = request.zeroObjectivePricing,
+            lpMode = request.lpMode ?: base.lpMode,
         ),
         engineParams,
         allowSelectors = annotation == null,
@@ -199,7 +211,7 @@ fun FinitePipeline.planPortfolio(request: PortfolioPlanRequest): PortfolioPlan {
         val rebuilt = bt.edit != null || request.nodeBudget != null
         val listed = bt.pool ?: if (rebuilt) BacktrackCatalog.factories(kind) else null
         val pool = listed?.map { factory -> { factory().editing(bt.edit).spending(request.nodeBudget) } }
-        return PortfolioPlan.BacktrackDryRun(pool, kind, request.zeroObjectivePricing)
+        return PortfolioPlan.BacktrackDryRun(pool, kind, request.zeroObjectivePricing, request.lpMode)
     }
 
     return PortfolioPlan.Execute(
@@ -219,7 +231,8 @@ fun FinitePipeline.planPortfolio(request: PortfolioPlanRequest): PortfolioPlan {
             annotationArm = request.annotationArm?.copy(
                 nodeBudget = request.nodeBudget,
                 zeroObjectivePricing = request.zeroObjectivePricing,
+                lpMode = request.lpMode,
             ),
-        ).copy(toleranceCheck = request.toleranceCheck),
+        ).copy(toleranceCheck = request.toleranceCheck, lpMode = request.lpMode),
     )
 }

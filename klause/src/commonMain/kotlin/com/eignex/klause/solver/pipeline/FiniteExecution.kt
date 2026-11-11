@@ -409,7 +409,11 @@ internal class FiniteExecutionRequest(
     val onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
     val onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     val onPortfolioJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
-)
+) {
+    val lpMode: LpCertificationMode get() = if (lpSolveContext.certificationPolicy.numericalDeductions) {
+        LpCertificationMode.NUMERICAL
+    } else LpCertificationMode.EXACT
+}
 
 /** Streaming hooks owned by a rendering frontend. */
 private class FiniteExecutionCallbacks(
@@ -738,6 +742,7 @@ private fun FiniteSolveRequest.preparationRequest(
         } else stop,
         presolveBudget = presolveBudget, zeroObjectivePricing = zeroObjectivePricing, randomSeed = randomSeed,
         sourcePreparation = sourcePreparation,
+        lpMode = lpMode,
     )
 }
 
@@ -877,7 +882,8 @@ private fun executeSourceFinite(
         )
         is SourceFiniteControls.LocalSearch -> LocalSearchSolver(
             request.problem,
-            completion = if (request.problem.numRealVars > 0) LeafRealCompletion(request.problem, null) else null,
+            completion = if (request.problem.numRealVars > 0)
+                LeafRealCompletion(request.problem, null, null, context = request.lpSolveContext) else null,
         ).solve(controls.params.copy(cancellation = controls.cancellation or request.cancellation))
     }
     val sample = (solved as? SolveResult.Sat)?.assignment
@@ -908,7 +914,8 @@ private fun executeSourceMinimum(
         )
         is SourceFiniteControls.LocalSearch -> LocalSearchSolver(
             request.problem,
-            completion = if (request.problem.numRealVars > 0) LeafRealCompletion(request.problem, objective) else null,
+            completion = if (request.problem.numRealVars > 0)
+                LeafRealCompletion(request.problem, objective, null, context = request.lpSolveContext) else null,
         ).minimize(objective, controls.params.copy(cancellation = controls.cancellation or request.cancellation))
     }
     val sample = result.assignment
@@ -948,6 +955,7 @@ private fun executeFixed(request: FiniteExecutionRequest, callbacks: FiniteExecu
             lpConfig = request.lpConfig,
             zeroObjectivePricing = request.zeroObjectivePricing,
             onEvent = request.onEvent,
+            lpMode = request.lpMode,
         ),
     )
     val solver = BacktrackSolver(request.problem, request.lpSolveContext)
@@ -1203,6 +1211,7 @@ private fun executePortfolio(
                 request.problem.numIntVars,
             ),
             toleranceCheck = request.toleranceCheck,
+            lpMode = request.lpMode,
         ),
     )
     if (proofCoverageConfigured && (plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
@@ -1228,7 +1237,7 @@ private fun executePortfolio(
         is PortfolioPlan.LocalSearchDryRun -> return localSearchDryRun(plan.pool)
 
         is PortfolioPlan.BacktrackDryRun ->
-            return backtrackDryRun(request.problem, plan.pool, plan.kind, plan.zeroObjectivePricing)
+            return backtrackDryRun(request.problem, plan.pool, plan.kind, plan.zeroObjectivePricing, plan.lpMode)
 
         is PortfolioPlan.Execute -> Unit
     }
@@ -1401,6 +1410,7 @@ private fun backtrackDryRun(
     pool: List<() -> BacktrackRecipe>?,
     kind: Kind,
     zeroObjectivePricing: LpZeroObjectivePricing,
+    lpMode: LpCertificationMode,
 ): FiniteExecutionResult.DryRun {
     val recipes = pool?.map { it() } ?: BacktrackCatalog.ranked(kind)
     val solver = BacktrackSolver(problem)
@@ -1410,7 +1420,7 @@ private fun backtrackDryRun(
             for (recipe in recipes) {
                 add("  ${recipe.label}:")
                 solver.describe(
-                    recipe.build(0L, null).copy(zeroObjectivePricing = zeroObjectivePricing),
+                    recipe.build(0L, null).copy(zeroObjectivePricing = zeroObjectivePricing, lpMode = lpMode),
                 ).lines().forEach { add("    $it") }
             }
         },

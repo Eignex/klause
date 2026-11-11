@@ -17,7 +17,8 @@ allowance, including refused attempts. Exact computation admission precedes the
 certificate producer; a numerical policy invokes no exact root certifier.
 `LpCertificationMode` is captured independently in caller policy, finite requests,
 search parameters and LP parameters. Explicit diagnostic solve contexts retain
-their own dependencies. Root shaving, redundancy and implication probes use the
+their own dependencies. Pre-bake checks, harvest and portfolio workers carry the
+captured mode without substituting recipe pools or heuristic edits. Root shaving, redundancy and implication probes use the
 selected authority and the remaining root grant; their integer source objectives
 are rounded before their bounds are consumed.
 Standalone and retained solves carry numerical packages separately from their exact
