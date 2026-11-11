@@ -1396,6 +1396,10 @@ allocation, debits their cumulative source funding, and retains completed compon
 across funding pauses for an unchanged query and guide. Every
 recovered point requires a fresh complete original-source witness check. Frontier
 leaves and joint repair consume those checked incumbents through the same authority.
+Ordinary numerical bound and conflict phases debit the source floating-work ledger
+before observer publication, including cancelled deductions. Retained root guidance
+debits the same work in its session; replaying a completed guide adds no fresh
+deduction charge.
 After feasibility recovery passes the source check, the authority can refine the
 continuous objective with the exact discrete coordinates substituted into the
 active rows. Refinement uses the original working objective direction and scale,

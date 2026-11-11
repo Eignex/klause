@@ -7,14 +7,68 @@ import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LinearAuthorityLpTest {
+    @Test
+    fun `numerical deduction work should reach source funding before phase publication`() {
+        val funding = SourceLpFunding(100_000L, 64L * 1024L * 1024L).also { it.grant(100_000L) }
+        val budget = SourceLpBudget(funding = funding, solveContext = { LpSolveContext.Numerical })
+        var numericalWork = 0L
+        var publishedWork = 0L
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ofLong(-2)),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ofLong(3)),
+        )
+
+        val result = LinearAuthorityLp(budget, onPhase = {
+            if (it.phase == LpSolvePhase.NUMERICAL_BOUND) {
+                numericalWork += it.work
+                publishedWork = budget.measuredFloatWork
+            }
+        }).use { it.solve(rows, listOf(BigFraction.ONE), BigFraction.ZERO, Cancellation.Never) }
+
+        assertEquals(2.0, assertNotNull(result?.result?.numerical?.bound).value)
+        assertTrue(numericalWork > 0L)
+        assertEquals(numericalWork, publishedWork)
+        assertTrue(funding.spent >= numericalWork)
+    }
+
+    @Test
+    fun `cancelled numerical publication should retain its deduction work`() {
+        val funding = SourceLpFunding(100_000L, 64L * 1024L * 1024L).also { it.grant(100_000L) }
+        val budget = SourceLpBudget(funding = funding, solveContext = { LpSolveContext.Numerical })
+        var cancelled = false
+        var numericalWork = 0L
+        var chargedWhenCancelled = 0L
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ofLong(-2)),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ofLong(3)),
+        )
+
+        val result = LinearAuthorityLp(budget, onPhase = {
+            if (it.phase == LpSolvePhase.NUMERICAL_BOUND) {
+                numericalWork += it.work
+                chargedWhenCancelled = budget.measuredFloatWork
+                cancelled = true
+            }
+        }).use { it.solve(rows, listOf(BigFraction.ONE), BigFraction.ZERO, Cancellation { cancelled }) }
+
+        assertNull(result)
+        assertTrue(numericalWork > 0L)
+        assertEquals(numericalWork, chargedWhenCancelled)
+        assertTrue(budget.measuredFloatWork >= chargedWhenCancelled)
+    }
+
     @Test
     fun `completed floating separation should use only the source coordinate prefix`() {
         val funding = SourceLpFunding(1024L, 4096L).also { it.grant(1024L) }
