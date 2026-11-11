@@ -538,9 +538,20 @@ internal class FloatDeductionCertificate private constructor(
     }
 
     companion object {
-        /** The certificate [y] supports on [model], or null when a reduced cost meets a side no row bounds. */
-        @Suppress("ReturnCount", "CyclomaticComplexMethod")
-        fun of(model: LpModel, y: DoubleArray): FloatDeductionCertificate? {
+        /**
+         * The certificate [y] supports on [model], or null when a reduced cost meets a side no row bounds. [observer]
+         * sees the outcome as a node deduction phase.
+         */
+        fun of(model: LpModel, y: DoubleArray, observer: LpCertificationObserver? = null): FloatDeductionCertificate? {
+            val timer = LpPhaseTimer(observer, LpSolvePhase.NODE_DEDUCTION)
+            val declined = arrayOf("INPUT")
+            return build(model, y, declined).also {
+                timer.finish(if (it != null) "FLOAT_COMPLETE" else "FLOAT_${declined[0]}")
+            }
+        }
+
+        @Suppress("ReturnCount", "CyclomaticComplexMethod", "LongMethod")
+        private fun build(model: LpModel, y: DoubleArray, declined: Array<String>): FloatDeductionCertificate? {
             if (y.size != model.m || !model.finiteExactInput()) return null
             val view = FloatEvidenceModel(model)
             val scale = view.scale
@@ -560,6 +571,7 @@ internal class FloatDeductionCertificate private constructor(
             // An open side is priced at the tightest bound one row implies; that row and both finite sides of every
             // column in it are cited, which covers every premise the implied bound reads.
             fun implied(j: Int, lowSide: Boolean): Double? {
+                declined[0] = if (j >= view.n) "OPEN_SLACK" else "OPEN_COLUMN"
                 val (bound, row) = rows.value.impliedBy(j, lowSide) ?: return null
                 citedRows[row] = true
                 val columns = rows.value.columnsOf(row)
@@ -593,6 +605,7 @@ internal class FloatDeductionCertificate private constructor(
             val source = model.objectiveD(value - margin)
             val lowerBound = source - 2 * UNIT_ROUNDOFF * abs(source) -
                 INTEGRAL_SLACK - INTEGRAL_SLACK_RELATIVE * abs(source)
+            declined[0] = "NONFINITE"
             if (!lowerBound.isFinite()) return null
             return FloatDeductionCertificate(model, duals, reduced, sides, citedRows, lowerBound)
         }
