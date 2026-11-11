@@ -1006,8 +1006,7 @@ internal class ResumableMinimize(
         if (!::brancher.isInitialized || proposal.numBoolVars != problem.numBoolVars ||
             proposal.numIntVars != problem.numIntVars
         ) return false
-        lpEngine.guideRootValues(proposal.bools, proposal.ints)
-        brancher.importPooledSolution(proposal, guideValues = true, preferValues = true)
+        brancher.importPooledSolution(proposal, guideValues = true, replay = true)
         return true
     }
 
@@ -1486,7 +1485,7 @@ internal class ResumableMinimize(
             val local = incumbents.current()
             if (params.valueSelector is SolutionGuided && (local != null || lpEngine.params.lpPlan.bounding)) {
                 pooledIncumbents?.poll()?.takeIf { local == null || it.objective < local.objective.display }?.let {
-                    brancher.importPooledSolution(it.assignment, guideValues = true, preferValues = local == null)
+                    brancher.importPooledSolution(it.assignment, guideValues = true, replay = local == null)
                     params.branchObserver.observeGuidance(PooledGuidanceKind.IMPORT) {
                         PooledGuidanceObservation(PooledGuidanceKind.IMPORT, local == null, "resume",
                             it.version, it.objective, local?.objective?.display,

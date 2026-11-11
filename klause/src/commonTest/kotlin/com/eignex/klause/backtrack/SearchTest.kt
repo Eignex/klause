@@ -8,11 +8,13 @@ import com.eignex.klause.backtrack.selector.boundsMidpoint
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBranchAttemptObserver
@@ -180,5 +182,32 @@ class SearchTest {
         assertNotNull(session.intDomain(0).spanOrNull())
         val out = splitIntAlternatives(session, VarRef.IntVar(0), preferred = 0L).first()
         assertEquals(SearchDecision.IntAtMost(0, 0L), out)
+    }
+
+    @Test
+    fun `a replayed point should lead integer and Boolean value order under any selector`() {
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, randomSeed = 0L)
+        val integer = BacktrackBrancher(PropagationSession(problemOf(IntDomain(0, 10))), params, sink = null,
+            restart = RestartSchedule.from(params))
+        val bool = BacktrackBrancher(PropagationSession(Problem(1, 0, emptyArray(), emptyArray())), params,
+            sink = null, restart = RestartSchedule.from(params))
+
+        integer.importPooledSolution(Sample(booleanArrayOf(), longArrayOf(7L)), replay = true)
+        bool.importPooledSolution(Sample(booleanArrayOf(true), longArrayOf()), replay = true)
+
+        assertEquals(SearchDecision.IntAtMost(0, 7L), integer.nextBranch(SearchSession(emptyList()))?.first())
+        assertEquals(SearchDecision.Bool(Lit.make(0, true)), bool.nextBranch(SearchSession(emptyList()))?.first())
+    }
+
+    @Test
+    fun `a conflict should end point replay`() {
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, randomSeed = 0L)
+        val brancher = BacktrackBrancher(PropagationSession(problemOf(IntDomain(0, 10))), params, sink = null,
+            restart = RestartSchedule.from(params))
+        brancher.importPooledSolution(Sample(booleanArrayOf(), longArrayOf(7L)), replay = true)
+
+        brancher.onConflict(null)
+
+        assertEquals(SearchDecision.IntAtMost(0, 0L), brancher.nextBranch(SearchSession(emptyList()))?.first())
     }
 }

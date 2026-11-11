@@ -735,7 +735,8 @@ internal class BacktrackBrancher(
     private val onEvent = params.onEvent
     private val branchObserver = params.branchObserver
     private var restartCount = 0L
-    private var preferImportedSolution = false
+    // A replayed point leads every value order, restarts included, until a conflict shows propagation disagrees.
+    private var hint: Sample? = null
 
     init {
         session.completeAtLeaves(leafColumns)
@@ -762,9 +763,7 @@ internal class BacktrackBrancher(
             variable,
             phase.applyPhase(variable, values.values(session, variable, rng), rng),
         )
-        val ordered = if (preferImportedSolution && values is SolutionGuided) {
-            values.guide(session, variable, preferred)
-        } else preferred
+        val ordered = hint?.let { replayFirst(variable, preferred, it) } ?: preferred
         val alternatives = when (variable) {
             is VarRef.Bool -> ordered.map { value ->
                 require(value == 0L || value == 1L) { "Boolean selector produced $value" }
@@ -788,10 +787,19 @@ internal class BacktrackBrancher(
         is VarRef.IntVar -> session.needsIntDecision(variable.varId)
     }
 
+    private fun replayFirst(variable: VarRef, order: Sequence<Long>, point: Sample): Sequence<Long> {
+        val value = when (variable) {
+            is VarRef.Bool -> if (point.boolValue(variable.varId)) 1L else 0L
+            is VarRef.IntVar -> point.intValue(variable.varId).takeIf { it in session.intDomain(variable.varId) }
+                ?: return order
+        }
+        return sequenceOf(value) + order.filter { it != value }
+    }
+
     override fun onAttempt(decision: SearchDecision, context: SearchContext) {
         branchObserver?.onAttempt(decision, context)
         branchObserver.observeGuidance(PooledGuidanceKind.ATTEMPT) {
-            PooledGuidanceObservation(PooledGuidanceKind.ATTEMPT, preferImportedSolution,
+            PooledGuidanceObservation(PooledGuidanceKind.ATTEMPT, hint != null,
                 decision = decision.guidanceText(), level = context.decisionLevel)
         }
     }
@@ -800,7 +808,7 @@ internal class BacktrackBrancher(
         branching.onCommit(decision, decisionLevel)
         branchObserver?.onCommit(decision, decisionLevel)
         branchObserver.observeGuidance(PooledGuidanceKind.COMMIT) {
-            PooledGuidanceObservation(PooledGuidanceKind.COMMIT, preferImportedSolution,
+            PooledGuidanceObservation(PooledGuidanceKind.COMMIT, hint != null,
                 decision = decision.guidanceText(), level = decisionLevel)
         }
         val (variable, value) = decision.asSelectorDecision() ?: return
@@ -813,6 +821,7 @@ internal class BacktrackBrancher(
 
     override fun onConflict(decision: SearchDecision?) {
         sink?.search?.observeFail()
+        hint = null
         val (variable, value) = decision?.asSelectorDecision() ?: return
         val conflict = nativeConflict()
         if (conflict == null) variables.onConflict(variable) else variables.onConflict(variable, conflict)
@@ -822,6 +831,7 @@ internal class BacktrackBrancher(
 
     fun onCascadeConflict(conflict: PropagationResult.Unsat) {
         sink?.search?.observeFail()
+        hint = null
         variables.onConflict(null, BranchingConflict(conflict.conflictBools, conflict.conflictInts))
         phase.onConflictTick()
     }
@@ -853,19 +863,19 @@ internal class BacktrackBrancher(
 
     fun onSolution(sample: Sample) {
         branchObserver.observeGuidance(PooledGuidanceKind.LOCAL) {
-            PooledGuidanceObservation(PooledGuidanceKind.LOCAL, preferImportedSolution)
+            PooledGuidanceObservation(PooledGuidanceKind.LOCAL, hint != null)
         }
-        preferImportedSolution = false
+        hint = null
         variables.onSolution(sample)
         values.onSolution(sample)
         phase.onSolution(sample)
     }
 
-    fun importPooledSolution(sample: Sample, guideValues: Boolean = false, preferValues: Boolean = false) {
-        if (guideValues && values is SolutionGuided) {
-            values.onSolution(sample)
-            preferImportedSolution = preferValues
-        }
+    fun importPooledSolution(sample: Sample, guideValues: Boolean = false, replay: Boolean = false) {
+        if (guideValues && values is SolutionGuided) values.onSolution(sample)
+        if (replay && sample.numBoolVars == session.problem.numBoolVars &&
+            sample.numIntVars == session.problem.numIntVars
+        ) hint = sample
         phase.onSolution(sample)
     }
 

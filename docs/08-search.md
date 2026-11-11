@@ -145,10 +145,9 @@ starts neither numerical consultation nor tree traversal. A pooled or previous i
 an engine result; before that work it is checked only against this run's own pins.
 LP rounding and the feasibility pump pin every variable through the arm's own propagation, so a
 pinned point that the leaf checks accept is a search leaf; after this run's pins and real completion
-it becomes an incumbent. A clause-walk point never passes that propagation, so it only sets the root
-value order and saved phases.
-Planned: a complete hint (clause-walk point, pooled incumbent or ALNS seed) is replayed as integer
-and Boolean value guidance whatever value selector the arm uses.
+it becomes an incumbent. A clause-walk point never passes that propagation, so it only guides: the brancher
+puts its values first under any value selector until a decision it led conflicts or
+a solution is found.
 The search and its preparation wrapper report an unfinished root
 layout as pending private preparation. Construction completion, cancellation and retirement follow the
 [LP ownership contract](17-linear-programming.md#root-preparation).
@@ -284,8 +283,8 @@ linear completion owner reuses the point of its last numerical check, and the op
 `openHintFlips` provider indexes source clauses and prefers the polarity that breaks
 fewer of them. Index construction is bounded and charged to the opening token; see
 [native arithmetic allowances](06-sessions.md#native-arithmetic-allowances).
-Solution-guided LP bounding may also order values by peer incumbents until
-its first local witness. Hints supply no incumbent, pruning or publication authority.
+Solution-guided LP bounding may also replay a peer incumbent's values until its
+first local witness or conflict. Hints supply no incumbent, pruning or publication authority.
 
 A non-restarting retained complete optimization worker with an external cutoff reads
 the current pooled assignment at its first root and adopts it as a local incumbent

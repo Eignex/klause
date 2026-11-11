@@ -33,12 +33,6 @@ class SolutionGuided(private val base: ValueSelector) : ValueSelector {
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> =
         guide(session, varRef) { base.values(session, varRef, rng) }
 
-    internal fun guide(
-        session: PropagationSession,
-        varRef: VarRef,
-        fallback: Sequence<Long>,
-    ): Sequence<Long> = guide(session, varRef) { fallback }
-
     private inline fun guide(
         session: PropagationSession,
         varRef: VarRef,
