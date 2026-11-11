@@ -1,15 +1,12 @@
 package com.eignex.klause.solver.incumbent
 
 import com.eignex.klause.ir.SourceSemanticsOwner
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceClaim
-import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
-import com.eignex.klause.solver.evidence.checkWitness
 import com.eignex.klause.solver.evidence.matchSourceClaims
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
@@ -181,7 +178,7 @@ internal class ModelEvidenceVerifier<A, V>(
 ) {
     fun verify(
         evidence: ModelEvidence<A, V>, scope: SourceScope? = null, invocation: EngineInvocation? = null,
-        cancellation: Cancellation = Cancellation.Never, restrictions: WitnessRestrictions? = null,
+        cancellation: Cancellation = Cancellation.Never,
     ): Verification<ModelEvidence<A, V>, Unit> {
         if (!model.matches(evidence.model)) {
             return Verification.Rejected("evidence belongs to a different model or objective")
@@ -260,14 +257,10 @@ internal class ModelEvidenceVerifier<A, V>(
             if (completedPoint != null && !completedPoint.equals(candidate.assignment)) {
                 return Verification.Rejected("published point differs from the actual engine completion")
             }
-            if (witnessPublication != null || restrictions != null) {
-                val point = candidate.assignment as? Sample
-                    ?: return Verification.Indeterminate("restricted witness has no source coordinates")
-                val consumer = restrictions?.consumer ?: invocation
-                val checked = checkWitnessRestrictions(point,
-                    listOf(witnessPublication?.invocation, restrictions?.producer, consumer),
-                    listOf(restrictions?.producerCondition, restrictions?.consumerCondition), cancellation)
-                when (checked) {
+            // The producer enforced its own pins; a private invocation may lack some of the consumer's.
+            val consumer = invocation
+            if (witnessPublication != null && consumer != null && !witnessPublication.invocation.enforces(consumer)) {
+                when (val checked = consumer.checkWitness(witnessPublication.sample, cancellation)) {
                     SourceEvidenceCheck.Checked -> Unit
                     is SourceEvidenceCheck.Rejected -> return Verification.Rejected(checked.reason)
                     is SourceEvidenceCheck.Unavailable -> return Verification.Indeterminate(checked.reason)
@@ -283,54 +276,3 @@ internal class ModelEvidenceVerifier<A, V>(
     }
 }
 
-/** Restrictions a witness must satisfy besides its native publication: its producer's and its consumer's. */
-internal class WitnessRestrictions(
-    val producer: EngineInvocation? = null,
-    val producerCondition: SourceCondition? = null,
-    val consumer: EngineInvocation? = null,
-    val consumerCondition: SourceCondition? = null,
-)
-
-private class InvocationReceipt(private val invocation: EngineInvocation) : WitnessCheckKey {
-    override fun sameCheck(other: WitnessCheckKey): Boolean =
-        other is InvocationReceipt && invocation.matches(other.invocation)
-}
-
-private class ConditionReceipt(private val condition: SourceCondition) : WitnessCheckKey {
-    override fun sameCheck(other: WitnessCheckKey): Boolean = other is ConditionReceipt && condition == other.condition
-}
-
-/*
- * Checks each distinct restriction set once. A matching invocation or an equal condition adds no obligation, an
- * invocation's check covers its own source condition, and a point keeps the restrictions it already satisfied.
- */
-internal fun checkWitnessRestrictions(
-    sample: Sample,
-    invocations: List<EngineInvocation?>,
-    conditions: List<SourceCondition?>,
-    cancellation: Cancellation,
-): SourceEvidenceCheck {
-    val bindings = ArrayList<EngineInvocation>()
-    for (binding in invocations) if (binding != null && bindings.none { it.matches(binding) }) bindings.add(binding)
-    val bare = ArrayList<SourceCondition>()
-    for (condition in conditions) {
-        if (condition != null && bindings.none { it.sourceCondition == condition } && condition !in bare) {
-            bare.add(condition)
-        }
-    }
-    for (binding in bindings) {
-        val receipt = InvocationReceipt(binding)
-        if (sample.hasReceipt(receipt)) continue
-        val checked = binding.checkWitness(sample, cancellation)
-        if (checked != SourceEvidenceCheck.Checked) return checked
-        if (!cancellation()) sample.recordReceipt(receipt)
-    }
-    for (condition in bare) {
-        val receipt = ConditionReceipt(condition)
-        if (sample.hasReceipt(receipt)) continue
-        val checked = condition.checkWitness(sample, cancellation)
-        if (checked != SourceEvidenceCheck.Checked) return checked
-        if (!cancellation()) sample.recordReceipt(receipt)
-    }
-    return SourceEvidenceCheck.Checked
-}

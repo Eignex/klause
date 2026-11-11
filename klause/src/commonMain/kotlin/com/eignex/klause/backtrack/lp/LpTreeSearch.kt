@@ -1,6 +1,5 @@
 package com.eignex.klause.backtrack.lp
 
-import com.eignex.klause.backtrack.ComposedSampleVerifier
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.exactSourceObjective
 import com.eignex.klause.lp.bounding.LpEngine
@@ -22,7 +21,6 @@ import com.eignex.klause.lp.engine.exactPointWitness
 import com.eignex.klause.lp.engine.triangularCrashBasis
 import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.lp.relaxation.LeafRealSolver
-import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
@@ -30,8 +28,6 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.incumbent.Candidate
-import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.SearchComponentSet
@@ -42,7 +38,6 @@ import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSolveParams
-import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.BIG_ONE
 
@@ -55,7 +50,6 @@ internal fun LpEngine.lbTreeSearch(
     assumptions: Assumptions = Assumptions.None,
     toleranceCheck: ((Sample) -> Boolean)? = null,
     complete: ((Sample, Cancellation, Long) -> LeafRealResult)? = null,
-    accept: ((Sample) -> Sample?)? = null,
     nodeBudget: NodeBudget? = null,
 ): LpTreeSeed? {
     if (lpRelaxer == null || cancellation() || params.cancellation()) return null
@@ -83,9 +77,6 @@ internal fun LpEngine.lbTreeSearch(
         override fun workMeter() = stop.workMeter()
     }
     val dive = forObjective(objective, token, rootProbe = true)
-    val pointCheck = FinitePointCheck(problem)
-    val verifier = ComposedSampleVerifier(problem, objective, token, assumptions,
-        { primalPropagationWork += it }, toleranceCheck, pointCheck)
     try {
         return dive.use {
             val leafSolver = if (problem.numRealVars > 0 && complete == null) {
@@ -104,16 +95,14 @@ internal fun LpEngine.lbTreeSearch(
                 var bestValue: BigFraction? = null
                 var best: Sample? = null
                 val tried = HashSet<String>()
-                fun offer(discrete: Sample, discreteChecked: Boolean): Boolean {
+                // A leaf of this tree passed its own propagation; only its real columns still need the exact LP.
+                fun offer(discrete: Sample): Boolean {
                     if (token()) return false
                     var sample = discrete
                     if (problem.numRealVars > 0) {
                         primalPropagationWork += problem.numIntVars.toLong() + problem.numBoolVars
                         val key = discrete.ints.joinToString(",") + ";" + discrete.bools.joinToString(",")
                         if (!tried.add(key) || token()) return false
-                        if (!discreteChecked && pointCheck.check(Candidate(sample, Unit), token,
-                                assumptions, { primalPropagationWork += it }) !is Verification.Accepted
-                        ) return false
                         val rootWork = rootPrimalWorkBudget(sink.lp.standaloneWork)
                         val offered = nodeQueryWorkBudget()
                         val work = when {
@@ -133,18 +122,13 @@ internal fun LpEngine.lbTreeSearch(
                         sample = sample.copy(reals = leaf.reals, exactReals = leaf.exactReals)
                     }
                     if (token()) return false
-                    val accepted = if (accept != null) accept(sample) else {
-                        val checked = verifier.verify(Candidate(sample, objective.evaluate(sample)))
-                        if (checked is Verification.Accepted) checked.candidate.assignment else null
-                    } ?: return false
-                    if (token()) return false
-                    val value = exactSourceObjective(objective, accepted, toleranceCheck) ?: return false
-                    if (problem.numRealVars == 0 || accepted.exactReals != null) {
+                    val value = exactSourceObjective(objective, sample, toleranceCheck) ?: return false
+                    if (problem.numRealVars == 0 || sample.exactReals != null) {
                         if (bestExact?.let { value < it } != false) bestExact = value
                     }
                     if (bestValue?.let { value < it } == false) return false
                     bestValue = value
-                    best = accepted
+                    best = sample
                     return true
                 }
                 var expansions = 0
@@ -202,13 +186,6 @@ internal fun LpEngine.lbTreeSearch(
                         } else null
                         if (point == null) return SearchNodeDisposition.Expand
                         dive.noteNodeOverhead(point.size.toLong())
-                        if (problem.numRealVars > 0) {
-                            primalPropagationWork += problem.numIntVars.toLong() + problem.numBoolVars
-                            val candidate = relaxation.treeDiscretePoint(point, session)
-                            if (candidate != null && offer(candidate, discreteChecked = false)) {
-                                return SearchNodeDisposition.Indeterminate
-                            }
-                        }
                         targets = relaxation.colVarId.indices.mapNotNull { column ->
                             val variable = relaxation.colVarId[column]
                             if (variable < 0 || relaxation.colIsBool[column]) {
@@ -252,7 +229,7 @@ internal fun LpEngine.lbTreeSearch(
                 while (!token()) {
                     val next = run.next()
                     if (next !is SearchRunEvent.Satisfied) break
-                    offer(requireNotNull(next.model.valueOf(cp.assignmentKey)), discreteChecked = true)
+                    offer(requireNotNull(next.model.valueOf(cp.assignmentKey)))
                 }
                 best?.let(::LpTreeSeed)
             }
@@ -271,35 +248,6 @@ private fun LpFractionalBranch.nearestIntegerAlternatives(): List<SearchDecision
     return if (BigFraction.ofLong(upper) - value < value - BigFraction.ofLong(lower)) {
         listOf(up, down)
     } else listOf(down, up)
-}
-
-private fun LpRelaxation.treeDiscretePoint(point: List<BigFraction>, session: PropagationSession): Sample? {
-    val problem = session.problem
-    val bools = BooleanArray(problem.numBoolVars)
-    for (variable in bools.indices) {
-        val fixed = session.boolValue(variable)
-        if (fixed != null) {
-            bools[variable] = fixed
-            continue
-        }
-        val column = boolColOf.getOrElse(variable) { -1 }
-        if (column < 0) continue
-        bools[variable] = when (point.getOrNull(column) ?: return null) {
-            BigFraction.ZERO -> false
-            BigFraction.ONE -> true
-            else -> return null
-        }
-    }
-    val ints = LongArray(problem.numIntVars)
-    for (variable in ints.indices) {
-        val domain = session.intDomain(variable)
-        val column = intColOf.getOrElse(variable) { -1 }
-        val value = if (domain.valueCount == 1L || column < 0) domain.min
-        else ExactLpNumber.of(point.getOrNull(column) ?: return null).legacyLong() ?: return null
-        if (!domain.contains(value)) return null
-        ints[variable] = value
-    }
-    return Sample(bools, ints)
 }
 
 internal class LpRootNodeResult(val model: LpModel, val float: FloatLpResult?)

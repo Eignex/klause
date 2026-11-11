@@ -479,39 +479,7 @@ class ResumableMinimizeRealLeafTest {
     }
 
     @Test
-    fun `mixed root rounding should admit source-checked float coordinates without native completion`() {
-        val fixture = UnresolvedRealLeafFixture(true)
-        fixture.acceptProof = { _, _ -> false }
-        val params = fixture.params.copy(
-            maxDecisions = 0L,
-            objectiveBoundSupplier = { 1.0 },
-            toleranceCheck = { sample ->
-                sample.numRealVars == 1 && sample.reals.single() in 0.0..1.0 &&
-                    sample.ints.single() + 2.0 * sample.reals.single() == 2.0
-            },
-            lpPlan = fixture.params.lpPlan.copy(bounding = true, probe = true, rootCutHarvest = false),
-        )
-        val offered = ArrayList<Sample>()
-        val nodesAtPublication = ArrayList<Double>()
-
-        fixture.solver.resumable(fixture.objective, params).use { search ->
-            search.runSlice(Cancellation.Never, 1000L, 100_000L) {
-                offered += it.sample
-                nodesAtPublication += search.stats.search.nodes.sum
-            }
-        }
-
-        val sample = offered.single()
-        assertEquals(0.5, fixture.objective.evaluate(sample))
-        assertEquals(2.0, sample.ints.single() + 2.0 * sample.reals.single())
-        assertNull(sample.exactReals)
-        assertEquals(0, fixture.visited)
-        assertEquals(listOf(0.0), nodesAtPublication)
-        assertEquals(fixture.opened, fixture.closed)
-    }
-
-    @Test
-    fun `declined float coordinates should retain the discrete real completion fallback`() {
+    fun `mixed tolerance rounding should complete its reals before any decision`() {
         val problem = Problem(
             0,
             1,

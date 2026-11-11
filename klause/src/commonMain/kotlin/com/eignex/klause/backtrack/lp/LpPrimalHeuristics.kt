@@ -20,12 +20,12 @@ import com.eignex.klause.lp.relaxation.LpPreparationTemplates
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.lp.relaxation.SessionDomains
-import com.eignex.klause.lp.relaxation.floatReals
 import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.collections.IntArrayList
@@ -41,7 +41,6 @@ internal fun LpEngine.lpRoundingProbe(
     objective: LinearObjective,
     cancellation: Cancellation,
     initial: Sample? = null,
-    toleranceReals: Boolean = false,
     accept: (Sample) -> Sample? = { it },
 ): Sample? {
     requireOpen()
@@ -112,9 +111,6 @@ internal fun LpEngine.lpRoundingProbe(
                 it.objective === objective && it.relaxation === relaxation && it.knownColumns == null
             }?.primal ?: result.primal
         }
-        val reals = if (toleranceReals && problem.numRealVars > 0 && knownColumns == null) {
-            relaxation.floatReals(primal, problem)
-        } else null
         val seed = initial?.takeIf {
             it.numIntVars == problem.numIntVars && it.numBoolVars == problem.numBoolVars
         }
@@ -141,7 +137,7 @@ internal fun LpEngine.lpRoundingProbe(
                 LpRounding.DOWN -> guidance.roundingComplete = true
             }
         }
-        fun propose(rounding: LpRounding, seed: Sample? = null, reals: DoubleArray? = null): Sample? {
+        fun propose(rounding: LpRounding, seed: Sample? = null): Sample? {
             if (cancellation()) {
                 rootRoundingInterrupted = true
                 return null
@@ -173,7 +169,7 @@ internal fun LpEngine.lpRoundingProbe(
                         }
                     }
                 }
-                if (sample == null && !attempt.fixpointCancelled && !attempt.probeCancelled) {
+                if (sample == null && !attempt.fixpointCancelled && !attempt.probeCancelled && !cancellation()) {
                     completeDirection(rounding)
                 }
                 if (attempt.fixpointCancelled || attempt.probeCancelled || cancellation()) {
@@ -189,7 +185,7 @@ internal fun LpEngine.lpRoundingProbe(
                     completeDirection(rounding)
                     return null
                 }
-                val accepted = accept(if (reals == null) sample else sample.copy(reals = reals))
+                val accepted = accept(sample)
                 if (discrete && accepted == null) {
                     if (cancellation()) {
                         rootRoundingInterrupted = true
@@ -234,7 +230,7 @@ internal fun LpEngine.lpRoundingProbe(
             } else guidance?.roundingComplete = true
             return accepted
         }
-        fun roundings(reals: DoubleArray?): Sample? {
+        fun roundings(): Sample? {
             if (discrete) {
                 if (directed) guidance?.componentRounding?.let { return proposeComponents(it) }
                 var rounding = LpRounding.NEAREST
@@ -252,21 +248,17 @@ internal fun LpEngine.lpRoundingProbe(
                     guidance?.rounding = rounding
                 }
             }
-            propose(LpRounding.NEAREST, reals = reals)?.let { return it }
+            propose(LpRounding.NEAREST)?.let { return it }
             if (problem.numRealVars > 0) {
                 if (seed != null) {
-                    propose(LpRounding.NEAREST, seed, reals)?.let { return it }
+                    propose(LpRounding.NEAREST, seed)?.let { return it }
                 }
-                propose(LpRounding.UP, reals = reals)?.let { return it }
-                propose(LpRounding.DOWN, reals = reals)?.let { return it }
+                propose(LpRounding.UP)?.let { return it }
+                propose(LpRounding.DOWN)?.let { return it }
             }
             return null
         }
-        if (reals != null) {
-            roundings(reals)?.let { return it }
-            seen.clear()
-        }
-        return roundings(null)
+        return roundings()
     } finally {
         primalPropagationWork += session.work - previousWork
         if (cancellation()) rootRoundingInterrupted = true
@@ -290,8 +282,9 @@ internal fun LpEngine.lpRoundingProbe(
 /**
  * Pin every variable toward the value [targetOf] gives its LP column — the LP point for the rounding
  * probe, the rounded target for the feasibility pump — most-confident first and with the two-sided
- * fallback of [pinIntTowardLp], then snapshot. Every variable ends pinned to a single value, so a
- * non-null result covers the discrete assignment; null when a variable conflicts both ways.
+ * fallback of [pinIntTowardLp]. Every variable ends pinned to a single value, so a non-null result is a
+ * search leaf of the discrete assignment ([pinnedLeaf]); null when a variable conflicts both ways or a
+ * leaf check refuses it.
  * Continuous feasibility remains the caller's completion duty.
  */
 internal fun LpEngine.pinToward(
@@ -326,8 +319,12 @@ internal fun LpEngine.pinToward(
         val fallback = session.probeBool(b, !first) ?: return null
         if (fallback is PropagationResult.Unsat) return null
     }
-    return snapshotAssignment(session)
+    return pinnedLeaf(session)
 }
+
+/** The pinned assignment when the session's leaf checks accept it, as they would a leaf the search reached. */
+internal fun pinnedLeaf(session: PropagationSession): Sample? =
+    if (session.checkSelectedProjection() == ComponentCheck.Feasible) snapshotAssignment(session) else null
 
 /** Pin [v] to the rounded LP value (or [lo] when it has no LP column), falling back to the other side
  *  of the LP value on a conflict. A conflicting pin reverts to its pre-pin state for the fallback;
@@ -371,8 +368,8 @@ internal fun pinIntTowardLp(
  * rounding, then retrying the rounding. The distance objective is exact (linear) over variables whose
  * rounded target sits at a declared bound — every Boolean and any integer rounded to its bound — and
  * omits interior integer targets, whose `|x − t|` is not linear; this only steers the search, never
- * affects soundness (a returned [Sample] is a fully-pinned, propagation-feasible assignment the caller
- * still re-evaluates). Stops at the first rounding admitted by [accept] or the round cap. A repeated rounding
+ * affects soundness (a returned [Sample] is a [pinnedLeaf]). Stops at the first rounding admitted by
+ * [accept] or the round cap. A repeated rounding
  * (cycle) triggers a perturbation ([perturbRounding]) — flip the most-fractional
  * coordinates and keep pumping — up to [PUMP_MAX_RESTARTS] times before giving up. Re-solves prefer the
  * primal pass ([LpSolver.solvePrimal], phase-1 included) and fall back to the dual
@@ -448,8 +445,7 @@ private fun pumpKey(intTarget: LongArray, boolTarget: BooleanArray): String =
  * pump rounding **in place** — a Boolean flips its bit, an integer rounds the other way (toward the LP
  * value, clamped to its domain) — so a cycled pump escapes to a fresh rounding. When no coordinate is
  * fractional, a random sample of live coordinates flips instead. Pure steering: the pump
- * only proposes roundings that [pinToward] re-realizes and the caller re-evaluates, so this never
- * affects soundness.
+ * only proposes roundings that [pinToward] re-realizes as leaves, so this never affects soundness.
  */
 private fun LpEngine.perturbRounding(
     relaxation: LpRelaxation,

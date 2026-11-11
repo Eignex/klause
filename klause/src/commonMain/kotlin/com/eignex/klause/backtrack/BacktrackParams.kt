@@ -300,8 +300,9 @@ data class BacktrackParams(
      * restart the engine adopts a not-yet-seen incumbent as solution-phasing hints (see [solutionPhasing]) so
      * its stable phase dives toward the globally-good assignment instead of only its own. Value hints
      * reorder trials (out-of-domain integers are clamped) without supplying pruning authority.
-     * Non-restarting retained optimization with [objectiveBoundSupplier] separately revalidates the current
-     * assignment at its first root as a starting proof bound, without priming guidance or earning progress.
+     * Incumbents from this source are engine results. Non-restarting retained optimization with
+     * [objectiveBoundSupplier] adopts the current assignment at its first root, once it satisfies this run's pins,
+     * as a starting proof bound, without priming guidance or earning progress.
      * After its first discovered incumbent,
      * [SolutionGuided] value selection
      * adopts better pooled incumbents when optimization resumes, without restarting traversal.

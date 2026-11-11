@@ -1,7 +1,7 @@
 package com.eignex.klause.backtrack.lp
 
-import com.eignex.klause.backtrack.ComposedSampleVerifier
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -29,14 +29,21 @@ import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpSourcePreparation
+import com.eignex.klause.propagation.NoPropagator
+import com.eignex.klause.propagation.PropagationProjection
+import com.eignex.klause.propagation.PropagationProjectionProvider
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.AssignmentCheckCapability
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.VarRef
+import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.random.Random
@@ -267,8 +274,8 @@ class LpPrimalHeuristicsTest {
             val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
 
             assertEquals(listOf(1L, 1L, 1L, 1L, 1L, 0L, 0L, 0L), sample.ints.toList())
-            val verifier = ComposedSampleVerifier(problem, objective, Cancellation.Never)
-            assertIs<Verification.Accepted<Sample, Double>>(
+            val verifier = finiteWitnessVerifier(problem.bake(), objective)
+            assertIs<Verification.Accepted<*, *>>(
                 verifier.verify(Candidate(sample, objective.evaluate(sample))),
             )
             assertTrue(factory.calls.isEmpty())
@@ -338,8 +345,8 @@ class LpPrimalHeuristicsTest {
 
                 assertEquals(2L, sample.ints[0])
                 assertEquals(2L, sample.ints[width])
-                assertIs<Verification.Accepted<Sample, Double>>(
-                    ComposedSampleVerifier(problem, objective, Cancellation.Never)
+                assertIs<Verification.Accepted<*, *>>(
+                    finiteWitnessVerifier(problem.bake(), objective)
                         .verify(Candidate(sample, objective.evaluate(sample))),
                 )
                 assertTrue(engine.primalPropagationWork - before < 200_000L)
@@ -441,8 +448,8 @@ class LpPrimalHeuristicsTest {
 
             assertEquals(2L, sample.ints[0])
             assertEquals(2L, sample.ints[4])
-            assertIs<Verification.Accepted<Sample, Double>>(
-                ComposedSampleVerifier(problem, objective, Cancellation.Never)
+            assertIs<Verification.Accepted<*, *>>(
+                finiteWitnessVerifier(problem.bake(), objective)
                     .verify(Candidate(sample, objective.evaluate(sample))),
             )
             assertEquals(prefix.work, engine.primalPropagationWork)
@@ -504,8 +511,8 @@ class LpPrimalHeuristicsTest {
 
             assertEquals(2L, sample.ints[0])
             assertEquals(2L, sample.ints[4])
-            assertIs<Verification.Accepted<Sample, Double>>(
-                ComposedSampleVerifier(problem, objective, Cancellation.Never)
+            assertIs<Verification.Accepted<*, *>>(
+                finiteWitnessVerifier(problem.bake(), objective)
                     .verify(Candidate(sample, objective.evaluate(sample))),
             )
             assertEquals(prefix.work, engine.primalPropagationWork)
@@ -1701,16 +1708,39 @@ class LpPrimalHeuristicsTest {
                 LpParams(lpPlan = LpPlan(bounding = true, probe = true, lbTreeSearch = true)),
                 SolveStatsSink(backend = "lp-proposal-test"),
             )
-            val verifier = ComposedSampleVerifier(problem, objective, Cancellation.Never)
+            val verifier = finiteWitnessVerifier(problem.bake(), objective)
             for ((name, produce) in producers) {
                 val proposal = engine.produce(objective, Cancellation.Never) ?: continue
                 produced[name] = produced.getValue(name) + 1
-                assertIs<Verification.Accepted<Sample, Double>>(
+                assertIs<Verification.Accepted<*, *>>(
                     verifier.verify(Candidate(proposal, objective.evaluate(proposal))),
                     "$name proposed an assignment the composed model refuses",
                 )
             }
         }
         assertTrue(produced.values.all { it > 0 }, "a producer seeded nothing to verify: $produced")
+    }
+
+    @Test
+    fun `pinned leaves should obey the session inert relation checks`() {
+        val providers = FactorProjectionProviders(
+            propagation = PropagationProjectionProvider {
+                PropagationProjection(
+                    PropagationCapability.INERT,
+                    AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                    "Original source certification enforces the clause.",
+                ) { NoPropagator }
+            },
+        )
+        val problem = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake(providers)
+        for ((first, admitted) in listOf(false to false, true to true)) {
+            val session = PropagationSession(problem, Cancellation.Never)
+            session.pinBool(0, first)
+            session.pinBool(1, false)
+
+            val leaf = pinnedLeaf(session)
+
+            assertEquals(admitted, leaf != null)
+        }
     }
 }

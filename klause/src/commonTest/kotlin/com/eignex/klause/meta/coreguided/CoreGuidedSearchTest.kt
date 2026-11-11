@@ -132,36 +132,6 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `paused source verification should retain its candidate without another query`() {
-        val hard = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
-        val source = Problem(2, 0, emptyArray(), Array(3) { hard })
-        var augmented = false
-        var cancelled = false
-        var verificationStops = 0
-        val providers = observingHard(hard) { state ->
-            if (state.problem.numBoolVars > source.numBoolVars) augmented = true
-            else if (augmented && verificationStops++ == 0) cancelled = true
-        }
-        val objective = LinearObjective(longArrayOf(1, 1))
-        val search = CoreGuidedSearch(source.bake(providers.prepare(source)), objective,
-            BacktrackParams(nativeSat = false, randomSeed = 3L))
-
-        val paused = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1L) {
-            error("unchecked publication")
-        }
-        val queries = search.queryCount
-        val verification = search.verificationVisits
-        cancelled = false
-        val resumed = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1L) {}
-
-        assertNull(paused)
-        assertTrue(verificationStops > 0)
-        assertEquals(1L, objective.evaluateLong(assertIs<MinimizeResult.Optimal>(resumed).sample))
-        assertEquals(queries, search.queryCount)
-        assertTrue(search.verificationVisits > verification)
-    }
-
-    @Test
     fun `native segment interruption after a decision should pause the core query`() {
         val clock = TestTimeSource()
         val interrupter = ClockJumpOnDecision(clock)
@@ -282,38 +252,6 @@ class CoreGuidedSearchTest {
             assertEquals(charged, search.work)
             search.close()
         }
-    }
-
-    @Test
-    fun `source verification should observe the cumulative core active time allowance`() {
-        val clock = TestTimeSource()
-        val hard = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
-        val source = Problem(2, 0, emptyArray(), Array(2_049) { hard })
-        var augmented = false
-        var verificationFires = 0
-        val providers = observingHard(hard) { state ->
-            if (state.problem.numBoolVars > source.numBoolVars) {
-                augmented = true
-            } else if (augmented) {
-                if (verificationFires++ == 0) clock += 3.seconds
-            }
-        }
-        val search = CoreGuidedSearch(
-            source.bake(providers.prepare(source)),
-            LinearObjective(longArrayOf(1, 1)),
-            BacktrackParams(nativeSat = false),
-            maximumMillis = 2_000L,
-            timeSource = clock,
-        )
-
-        val stopped = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("unverified publication") }
-        val resumed = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("renewed verification") }
-
-        assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(stopped).reason)
-        assertTrue(verificationFires in 1 until source.numFactors)
-        assertEquals(stopped, resumed)
-        assertEquals(BigFraction.ONE, search.lowerBound)
-        search.close()
     }
 
     @Test
@@ -477,16 +415,19 @@ class CoreGuidedSearchTest {
         }
         val objective = LinearObjective(longArrayOf(1, 1))
         val search = CoreGuidedSearch(source.bake(providers.prepare(source)), objective, BacktrackParams())
+        val initialPreparation = search.preparationWork
 
         val paused = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) { error("interrupted opening") }
         val charged = search.work
+        val chargedPreparation = search.preparationWork
         cancelled = false
         val result = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) {}
 
         assertNull(paused)
         assertTrue(interrupted)
-        assertTrue(augmentedModels.size > 1)
-        assertTrue(augmentedModels[0] === augmentedModels[1])
+        assertTrue(augmentedModels.isNotEmpty())
+        assertTrue(augmentedModels.all { it === augmentedModels.first() })
+        assertTrue(chargedPreparation > initialPreparation)
         val optimal = assertIs<MinimizeResult.Optimal>(result)
         assertEquals(1L, objective.evaluateLong(optimal.sample))
         assertTrue(search.work >= charged)

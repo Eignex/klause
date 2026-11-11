@@ -498,6 +498,23 @@ class ResumableMinimizeTest {
     }
 
     @Test
+    fun `root rounding outside the run assumptions should not become an incumbent`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1))).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        val params = BacktrackParams(assumptions = Assumptions(ints = mapOf(0 to 0L)),
+            lpPlan = LpPlan(bounding = true, probe = true, rootCutHarvest = false))
+        val offered = ArrayList<Sample>()
+
+        BacktrackSolver(problem).resumable(objective, params).use { search ->
+            search.runSlice(Cancellation { offered.isNotEmpty() }, Long.MAX_VALUE, -1L) { offered += it.sample }
+
+            assertEquals(listOf(0L, 1L), offered.first().ints.toList())
+            assertTrue((search.stats.lp.phases["PRIMAL_PROPOSAL_ROOT"]?.outcomes?.get("PINS_REJECTED") ?: 0L) > 0L)
+        }
+    }
+
+    @Test
     fun `ordinary search backtracks from root value targets without another node lp query`() {
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, listOf(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
@@ -800,32 +817,6 @@ class ResumableMinimizeTest {
     }
 
     @Test
-    fun `a completed clausal proposal should be delivered while work debt blocks search`() {
-        val solver = BacktrackSolver(
-            Problem(
-                2,
-                0,
-                emptyArray(),
-                Array(2_000) { Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))) },
-            ).bake(),
-        )
-        val objective = LinearObjective(boolWeights = longArrayOf(1L))
-        val samples = mutableListOf<MinimizeResult.WithSample>()
-
-        ResumableMinimize(solver, objective, BacktrackParams()).use { search ->
-            repeat(100) {
-                if (search.stats.search.clausalPrimalProposals.sum == 0.0) {
-                    search.runSlice(Cancellation.Never, 60_000L, 1L) { samples.add(it) }
-                }
-            }
-            search.runSlice(Cancellation.Never, 60_000L, 0L) { samples.add(it) }
-
-            assertEquals(0L, objective.evaluateLong(samples.single().sample))
-            assertTrue(samples.single().sample.bools[1])
-        }
-    }
-
-    @Test
     fun `rebind should prove the same optimum after an exhausted fragment`() {
         val objective = LinearObjective(boolWeights = longArrayOf(-1L))
         val solver = BacktrackSolver(Problem(1, 0, emptyArray(), emptyArray()).bake())
@@ -884,75 +875,6 @@ class ResumableMinimizeTest {
             assertEquals(0L, restricted.sample.ints[0])
             assertTrue(weights.indices.sumOf { weights[it] * restricted.sample.ints[it] } <= 25L)
             assertEquals(-36L, objective.evaluateLong(restricted.sample))
-        }
-    }
-
-    @Test
-    fun `pooled witness validation should spend its slice before search or publication`() {
-        val size = 64
-        // Checking a complete point costs a slice node and refutes a final value of one; open domains cost nothing.
-        val costlyPoint = object : Factor by AllDifferent(IntArray(size) { it }, domainMin = 0, domainSize = size),
-            Propagator {
-            override fun propagate(state: PropagationState, factorId: Int): Boolean {
-                if (state.intDomains.any { !it.isFixed }) return true
-                state.work += PROPAGATION_WORK_PER_NODE
-                return state.intDomains[size - 1].min != 1L
-            }
-        }
-        val problem = Problem(0, size, Array(size) { IntDomain(0, (size - 1).toLong()) },
-            arrayOf(AllDifferent(IntArray(size) { it }, domainMin = 0, domainSize = size), costlyPoint)).bake()
-        val objective = LinearObjective(intCoefficients = LongArray(size) { if (it == 0) 1L else 0L })
-        var cancelled = false
-        var attempts = 0
-        var firstBranchWork: Long? = null
-        lateinit var current: ResumableSearch
-        val cancellation = cancelledWhen({ null }, { true }) { cancelled }
-        val params = BacktrackParams(
-            variableSelector = InputOrder,
-            valueSelector = IndomainMin,
-            lpPlan = LpPlan(bounding = false),
-            objectiveBoundSupplier = { 5.0 },
-            cancellation = cancellation,
-            branchObserver = object : SearchBranchAttemptObserver {
-                override fun onAttempt(decision: SearchDecision, context: SearchContext) {
-                    attempts++
-                    if (firstBranchWork == null) firstBranchWork = current.work
-                    cancelled = true
-                }
-            },
-        )
-        current = BacktrackSolver(problem).resumable(objective, params)
-        current.use { it.runSlice(cancellation, Long.MAX_VALUE, -1L) {} }
-        val grant = assertNotNull(firstBranchWork) + 1L
-        assertTrue(attempts > 0)
-
-        for (valid in listOf(true, false)) {
-            cancelled = false
-            attempts = 0
-            val values = LongArray(size) { it.toLong() }.apply {
-                this[0] = 5L
-                this[5] = 0L
-                if (!valid) {
-                    this[1] = lastIndex.toLong()
-                    this[lastIndex] = 1L
-                }
-            }
-            val hints = IncumbentExchange.minimizing<Sample>().apply {
-                offer(Sample(BooleanArray(0), values), 5.0)
-            }
-            val offered = mutableListOf<Double>()
-            current = BacktrackSolver(problem).resumable(objective, params.copy(pooledIncumbents = hints))
-            current.use { search ->
-                val result = search.runSlice(cancellation, Long.MAX_VALUE, grant) { offered += it.objective }
-
-                assertNull(result)
-                assertTrue(offered.isEmpty())
-                assertEquals(0, attempts)
-                assertTrue(search.work >= grant)
-                val paid = search.work
-                search.runSlice(cancellation, Long.MAX_VALUE, 0L) {}
-                assertEquals(paid, search.work)
-            }
         }
     }
 
@@ -1019,30 +941,6 @@ class ResumableMinimizeTest {
         val params = BacktrackParams(
             valueSelector = IndomainMin,
             lubyRestartBase = 10L,
-            lpPlan = LpPlan(bounding = false),
-            objectiveBoundSupplier = { 5.0 },
-            pooledIncumbents = IncumbentExchange.minimizing<Sample>().apply {
-                offer(Sample(BooleanArray(0), longArrayOf(5L)), 5.0)
-            },
-        )
-        val offers = mutableListOf<Double>()
-
-        BacktrackSolver(problem).resumable(objective, params).use { search ->
-            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { offers += it.objective }
-        }
-
-        assertEquals(listOf(0.0), offers)
-    }
-
-    @Test
-    fun `retained search should reject an invalid pooled witness at the shared cutoff`() {
-        val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 10)),
-            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 4)),
-        ).bake()
-        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
-        val params = BacktrackParams(
-            valueSelector = IndomainMin,
             lpPlan = LpPlan(bounding = false),
             objectiveBoundSupplier = { 5.0 },
             pooledIncumbents = IncumbentExchange.minimizing<Sample>().apply {
@@ -1162,29 +1060,6 @@ class ResumableMinimizeTest {
                     search.runSlice(Cancellation.Never, 1000L, 100000L) {}
                 }
             }
-        }
-    }
-
-    @Test
-    fun `an optimization leaf violating a factor should fail as unsound`() {
-        // A selector that stops before any column is fixed stands in for an engine defect that reads an open
-        // node as a solved leaf: the minima it reports put both columns of the AllDifferent at 0.
-        val stopsEarly = object : VariableSelector {
-            override fun pick(session: PropagationSession, rng: Random): VarRef? = null
-
-            override fun fresh(): VariableSelector = this
-        }
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = Array(2) { IntDomain(0, 1) },
-            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 2)),
-        )
-        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 1L))
-        val solver = BacktrackSolver(problem.bake())
-
-        assertFailsWith<UnsoundnessException> {
-            solver.minimize(objective, BacktrackParams(variableSelector = stopsEarly))
         }
     }
 

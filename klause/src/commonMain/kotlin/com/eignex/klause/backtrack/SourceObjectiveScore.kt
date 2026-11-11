@@ -1,7 +1,6 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
@@ -9,9 +8,7 @@ import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.solver.validation.FiniteSourceAcceptance
-import com.eignex.klause.util.Cancellation
 import kotlin.math.nextDown
 import kotlin.math.nextUp
 
@@ -137,52 +134,5 @@ internal fun minimizingSampleExchange(
             }
         },
     )
-}
-
-/**
- * Finite composed verification of an untrusted proposal: re-derive the assignment's feasibility from
- * the whole factor set instead of trusting the producer that built it.
- *
- * A heuristic proposes from its own partial view — a relaxation, a rounding, a dive under branch
- * decisions — and its notion of feasible is its own. This pins every Boolean and integer variable of a
- * disposable session to the proposed value and requires the composed fixpoint to survive: a wipeout refutes
- * that one proposal (never the model), and a fixpoint cut short by [cancellation] decides nothing, so
- * it reports [Verification.Indeterminate] rather than pass a half-propagated state off as feasible.
- *
- * The claimed objective is re-evaluated from the assignment too, so the exchange weighs an improvement
- * the verifier computed rather than one the producer asserted.
- *
- * The composed model is the finite one, so this decides the Boolean and integer columns. LP-only
- * continuous columns live outside it: [sampleAdmission] requires the values a leaf's residual LP
- * certified to be attached already, and nothing here re-derives them.
- */
-internal class ComposedSampleVerifier(
-    private val problem: Problem,
-    private val objective: LinearObjective,
-    private val cancellation: Cancellation,
-    private val assumptions: Assumptions = Assumptions.None,
-    private val onWork: (Long) -> Unit = {},
-    toleranceCheck: ((Sample) -> Boolean)? = null,
-    private val pointCheck: FinitePointCheck = FinitePointCheck(problem),
-) : CandidateVerifier<Sample, Double> {
-
-    private val admission = sampleAdmission(problem, toleranceCheck)
-
-    override fun verify(candidate: Candidate<Sample, Double>): Verification<Sample, Double> {
-        val admitted = admission.verify(candidate)
-        if (admitted !is Verification.Accepted) return admitted
-        val sample = candidate.assignment
-        if (sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) {
-            return Verification.Rejected(
-                "assignment covers ${sample.numBoolVars}/${sample.numIntVars} of the " +
-                    "${problem.numBoolVars}/${problem.numIntVars} discrete variables",
-            )
-        }
-        val evaluated = objective.evaluate(sample)
-        if (evaluated != candidate.objective) {
-            return Verification.Rejected("objective is $evaluated, not the claimed ${candidate.objective}")
-        }
-        return pointCheck.check(candidate, cancellation, assumptions, onWork)
-    }
 }
 

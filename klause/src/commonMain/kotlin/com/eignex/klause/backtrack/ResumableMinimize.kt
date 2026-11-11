@@ -28,7 +28,6 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
-import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.baked
@@ -39,7 +38,6 @@ import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SliceWorkAccounting
-import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.IncumbentSubscription
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.incumbent.Verification
@@ -52,7 +50,6 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsatCore
-import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.FiniteFactorEnforcer
@@ -77,7 +74,7 @@ import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.search.completedSearchSample
-import com.eignex.klause.solver.validation.FinitePointCheck
+import com.eignex.klause.solver.validation.checkPointRestrictions
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
@@ -97,10 +94,9 @@ internal sealed interface StepEvent {
 }
 
 /**
- * Cap on one LP proposal's composed verification, composed with the run's own token rather than
- * standing in for it — verification must stop at a cancellation or a slice boundary like everything
- * else the engine does. This bounds the case that token cannot: a solve with budget left to spare
- * whose fixpoint over a fully-fixed assignment runs away inside one propagator.
+ * Cap on admitting a pooled or previous candidate (its pin check and real completion), composed with the
+ * run's own token rather than standing in for it, so admission still stops at a cancellation or a slice
+ * boundary. It bounds the case that token cannot: a run with budget to spare whose completion runs away.
  */
 private val LP_VERIFY_BUDGET = 100.milliseconds
 
@@ -141,7 +137,6 @@ internal class ResumableMinimize(
     private val sink: SolveStatsSink = SolveStatsSink(backend = "backtrack"),
     private val deferredInstallation: Boolean = false,
 ) : ResumableSearch, ReseedGuard, SliceWorkAccounting {
-    private val pointCheck = if (problem === solver.problem) solver.pointCheck else FinitePointCheck(problem)
     override var repaidWork: Long = 0L
         private set
     private val hasPreparation = preparationBudget != null
@@ -179,8 +174,6 @@ internal class ResumableMinimize(
     private val startMark = TimeSource.Monotonic.markNow()
 
     // The allowance includes LP and propagation work so costly nodes consume proportionally more of a slice.
-    private var proposalPropagationWork = 0L
-    private var initialValidationPropagationWork: (() -> Long)? = null
     private var clausePrimal: MonotoneClausePrimal? = null
     private var clausePrimalStarted = false
     private var clausePrimalCandidate: Sample? = null
@@ -190,8 +183,7 @@ internal class ResumableMinimize(
         { (if (::lpEngine.isInitialized) lpEngine.totalSolveWork() else 0L) + sink.lp.standaloneWork },
         {
             (if (::cp.isInitialized) session.work else preparedSession?.work ?: 0L) +
-                (if (::lpEngine.isInitialized) lpEngine.primalPropagationWork else 0L) + proposalPropagationWork +
-                (initialValidationPropagationWork?.invoke() ?: 0L)
+                (if (::lpEngine.isInitialized) lpEngine.primalPropagationWork else 0L)
         },
         preparationBudget,
         ownsWorkDebt = ownsWorkDebt,
@@ -586,9 +578,7 @@ internal class ResumableMinimize(
         done?.let { return it }
         check(!closed) { "search is closed" }
         globalToken = baseCancellation.lifetimeCancellation() or global
-        if (!run.learnedPropagationPending) {
-            publishClausePrimalCandidate()?.let { onIncumbent(it.withSourceSemantics(problem.semantics)) }
-        }
+        if (!run.learnedPropagationPending) guideByClausePrimalCandidate()
         if (!rootIsExhausted) {
             val admitted = slice.begin(sliceMillis, sliceNodes)
             repaidWork = slice.repaidWork
@@ -779,9 +769,7 @@ internal class ResumableMinimize(
                     sink.search.clausalPrimalInfeasible = primal.infeasible
                     sink.search.clausalPrimalIncomplete = primal.incomplete
                 }
-                publishClausePrimalCandidate()?.let {
-                    return StepEvent.Incumbent(it.withSourceSemantics(problem.semantics))
-                }
+                guideByClausePrimalCandidate()
                 if (!primal.isDone && pausable && sliceCancelled()) return StepEvent.Paused
                 if (primal.isDone) primal.close()
             }
@@ -1007,70 +995,20 @@ internal class ResumableMinimize(
         return MinimizeResult.BestFound(sample, score.display, TerminationReason.BudgetExhausted, sink.snapshot())
     }
 
-    /**
-     * Publish an LP primal heuristic's [proposal]: the LP heuristics propose from the relaxation's view
-     * of the model, so what they hand back is untrusted here however carefully they built it, and
-     * [ComposedSampleVerifier] re-derives its feasibility and its objective from the whole factor set
-     * before the exchange weighs it. Null unless this call installed a new incumbent — a refuted
-     * proposal is one bad rounding and an undecided one a fixpoint the budget cut short, and neither says
-     * anything about the model, so both simply leave the search to find its own first solution.
-     *
-     * Verification runs under the run's token capped by [LP_VERIFY_BUDGET], so a cancellation or a
-     * slice boundary stops it where it stops the rest of the engine.
-     */
-    private fun publishLpProposal(proposal: Sample): MinimizeResult.WithSample? {
-        val accepted = verifiedLpProposal(proposal) ?: return null
-        return recordIfImproving(accepted.assignment, accepted.objective)
-    }
-
-    private fun publishClausePrimalCandidate(): MinimizeResult.WithSample? {
-        val proposal = clausePrimalCandidate ?: return null
+    private fun guideByClausePrimalCandidate() {
+        val proposal = clausePrimalCandidate ?: return
         clausePrimalCandidate = null
-        val accepted = verifiedLpProposal(proposal, runEndToken()) ?: return null
-        val published = recordIfImproving(accepted.assignment, accepted.objective) ?: return null
-        sink.search.clausalPrimalAccepted++
-        return published
+        if (guideBy(proposal)) sink.search.clausalPrimalAccepted++
     }
 
-    private fun verifiedLpProposal(
-        proposal: Sample,
-        cancellation: Cancellation = params.cancellation,
-        onDecline: ((String) -> Unit)? = null,
-    ): Candidate<Sample, Double>? {
-        fun decline(outcome: String): Candidate<Sample, Double>? {
-            onDecline?.invoke(outcome)
-            return null
-        }
-        if (params.componentFactory != null) return decline("EXTRA_COMPONENTS")
-        if (cancellation()) return decline("CANCELLED")
-        if (proposal.numBoolVars != problem.numBoolVars || proposal.numIntVars != problem.numIntVars) {
-            return decline("INVALID_COORDINATES")
-        }
-        val onWork: (Long) -> Unit = { proposalPropagationWork += it }
-        val sample = if (problem.numRealVars > 0 && proposal.numRealVars == 0) {
-            val discrete = pointCheck.check(Candidate(proposal, Unit), cancellation, params.assumptions, onWork)
-            if (discrete !is Verification.Accepted) {
-                return decline(if (discrete is Verification.Rejected) "DISCRETE_REJECTED" else "DISCRETE_INDETERMINATE")
-            }
-            if (cancellation()) return decline("CANCELLED")
-            val real = completeLeaf(proposal, cancellation)
-            if (real.verdict !in listOf(LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.TOLERANCE_OPTIMUM)) {
-                return decline("REAL_${real.verdict.name}")
-            }
-            proposal.copy(reals = real.reals, exactReals = real.exactReals)
-        } else proposal
-        val budget = if (cancellation.workScheduled()) cancellation else
-            cancellation or Cancellation.after(LP_VERIFY_BUDGET)
-        if (budget()) return decline("CANCELLED")
-        val verifier = ComposedSampleVerifier(problem, objective, budget,
-            params.assumptions, onWork, params.toleranceCheck, pointCheck)
-        val verdict = verifier.verify(Candidate(sample, objective.evaluate(sample)))
-        if (budget()) return decline("CANCELLED")
-        return when (verdict) {
-            is Verification.Accepted -> verdict.candidate
-            is Verification.Rejected -> decline("VERIFICATION_REJECTED")
-            is Verification.Indeterminate -> decline("VERIFICATION_INDETERMINATE")
-        }
+    // A clause-walk point never passed this arm's propagation, so it only steers the next branches.
+    private fun guideBy(proposal: Sample): Boolean {
+        if (!::brancher.isInitialized || proposal.numBoolVars != problem.numBoolVars ||
+            proposal.numIntVars != problem.numIntVars
+        ) return false
+        lpEngine.guideRootValues(proposal.bools, proposal.ints)
+        brancher.importPooledSolution(proposal, guideValues = true, preferValues = true)
+        return true
     }
 
     /**
@@ -1089,46 +1027,43 @@ internal class ResumableMinimize(
     private fun revalidateInitialCandidate(): MinimizeResult.WithSample? {
         val sample = initialCandidate ?: return null
         initialCandidate = null
-        if (params.componentFactory != null) return null
         val token = if (params.cancellation.workScheduled()) params.cancellation else
             params.cancellation or Cancellation.after(LP_VERIFY_BUDGET)
-        if (token() || sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) return null
-        try {
-            // The live supplier meters the slice while the check runs; the final work moves to the proposal total.
-            val checked = pointCheck.check(Candidate(sample, Unit), token, params.assumptions,
-                onWork = { work ->
-                    initialValidationPropagationWork = null
-                    proposalPropagationWork += work
-                },
-                liveWork = { initialValidationPropagationWork = it })
-            if (checked !is Verification.Accepted || token()) return null
-            val accepted = if (problem.numRealVars == 0) {
-                sample
-            } else {
-                val real = completeLeaf(sample, token)
-                if (real.verdict !in listOf(
-                        LpVerdict.FEASIBLE,
-                        LpVerdict.ATTAINED_OPTIMUM,
-                        LpVerdict.TOLERANCE_OPTIMUM,
-                        LpVerdict.UNBOUNDED,
-                    )
-                ) {
-                    return null
-                }
-                val completed = sample.copy(reals = real.reals, exactReals = real.exactReals)
-                if (real.verdict == LpVerdict.UNBOUNDED) {
-                    if (!token()) unboundedLeaf = completed to checkNotNull(real.direction)
-                    return null
-                }
-                completed
-            }
-            if (token()) return null
-            return recordIfImproving(accepted, objective.evaluate(accepted), startingWitness = !rebindable)
-        } finally {
-            // A check that threw before reporting its work still charges what the live supplier observed.
-            initialValidationPropagationWork?.let { proposalPropagationWork += it() }
-            initialValidationPropagationWork = null
+        val accepted = engineLeaf(sample, token) ?: return null
+        return recordIfImproving(accepted, objective.evaluate(accepted), startingWitness = !rebindable)
+    }
+
+    /**
+     * [sample] as a leaf of this run when an engine already propagated its discrete part outside this run's
+     * assumptions: only those pins and the real completion remain. A checked ray is kept in [unboundedLeaf].
+     * Null, with the reason given to [onDecline], when either refuses it or [token] stops it.
+     */
+    private fun engineLeaf(sample: Sample, token: Cancellation, onDecline: (String) -> Unit = {}): Sample? {
+        fun decline(outcome: String): Sample? {
+            onDecline(if (token()) "CANCELLED" else outcome)
+            return null
         }
+        if (params.componentFactory != null) return decline("EXTRA_COMPONENTS")
+        if (token()) return decline("CANCELLED")
+        if (sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) {
+            return decline("INVALID_COORDINATES")
+        }
+        if (checkPointRestrictions(sample, params.assumptions, token) != null) return decline("PINS_REJECTED")
+        val leaf = if (problem.numRealVars == 0) sample else {
+            val real = completeLeaf(sample, token)
+            val completed = sample.copy(reals = real.reals, exactReals = real.exactReals)
+            when (real.verdict) {
+                LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.TOLERANCE_OPTIMUM -> completed
+
+                LpVerdict.UNBOUNDED -> {
+                    if (!token()) unboundedLeaf = completed to checkNotNull(real.direction)
+                    return decline("REAL_UNBOUNDED")
+                }
+
+                else -> return decline("REAL_${real.verdict.name}")
+            }
+        }
+        return if (token()) decline("CANCELLED") else leaf
     }
 
     private fun firstRunWorkBody(): MinimizeResult.WithSample? {
@@ -1201,9 +1136,7 @@ internal class ResumableMinimize(
         if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null && params.componentFactory == null) {
             val before = lpEngine.primalSearchWork
             val seed = lpEngine.lbTreeSearch(objective, rootToken, params.assumptions, params.toleranceCheck,
-                complete = ::completeLeaf,
-                accept = { verifiedLpProposal(it, rootToken)?.assignment },
-                nodeBudget = params.nodeBudget)
+                complete = ::completeLeaf, nodeBudget = params.nodeBudget)
             treeBudgetExhausted = lpEngine.primalSearchWork > before && params.nodeBudget?.exhausted() == true
             if (seed != null && !params.cancellation()) {
                 recordIfImproving(seed.sample, objective.evaluate(seed.sample))?.let { return it }
@@ -1220,43 +1153,27 @@ internal class ResumableMinimize(
             return null
         }
         if (handoffRootTargets(rootToken)) return null
+        var installed: MinimizeResult.WithSample? = null
+        // A rounding is a leaf of this arm's propagation; the first one to improve the incumbent stops the heuristic.
         fun accept(proposal: Sample): Sample? {
             val started = TimeSource.Monotonic.markNow()
-            var outcome = "FAILED"
+            var outcome = "IMPROVING"
             try {
-                val accepted = verifiedLpProposal(proposal, rootToken) { outcome = it } ?: return null
-                if (externalCutoff().isNaN()) {
-                    outcome = "INVALID_CUTOFF"
-                    return null
-                }
-                val exact = exactSourceObjective(objective, accepted.assignment, completionToleranceCheck())
-                val standing = incumbents.current()?.objective
-                val improvesLocal = if (exact != null && standing?.exact != null) {
-                    exact < standing.exact
-                } else accepted.objective < bestObj
-                val improving = improvesLocal && beatsExternalCutoff(exact, accepted.objective)
-                outcome = when {
-                    !improving -> "NON_IMPROVING"
-                    rootToken() -> "CANCELLED"
-                    else -> "IMPROVING"
-                }
-                return accepted.assignment.takeIf { outcome == "IMPROVING" }
+                val leaf = engineLeaf(proposal, rootToken) { outcome = it } ?: return null
+                installed = recordIfImproving(leaf, objective.evaluate(leaf))
+                if (installed == null) outcome = if (rootToken()) "CANCELLED" else "NON_IMPROVING"
+                return leaf.takeIf { installed != null }
             } finally {
                 sink.lp.observePrimalPhase("PRIMAL_PROPOSAL", outcome, started.elapsedNow().inWholeNanoseconds)
             }
         }
-        val rounded = lpEngine.lpRoundingProbe(objective, rootToken,
-            initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null,
-            toleranceReals = params.toleranceCheck != null,
-            accept = ::accept)
+        val initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null
+        val rounded = lpEngine.lpRoundingProbe(objective, rootToken, initial = initial, accept = ::accept)
         rootRoundingPending = rounded == null && canResumeRootRounding()
         if (rootRoundingPending) return null
         lpEngine.rootRoundingWarmStart = null
-        val seed = rounded ?: lpEngine.lpFeasibilityPump(objective, rootToken,
-            initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null,
-            accept = ::accept)
-        if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
-        return null
+        if (rounded == null) lpEngine.lpFeasibilityPump(objective, rootToken, initial = initial, accept = ::accept)
+        return installed
     }
 
     private fun handoffRootTargets(rootToken: Cancellation): Boolean {
@@ -1463,17 +1380,6 @@ internal class ResumableMinimize(
             context: SearchContext,
         ): SearchModelDisposition {
             val sample = model.valueOf(completedSearchSample) ?: checkNotNull(model.valueOf(cp.assignmentKey))
-            // The leaf is the engine's own claim, re-derived here from every factor before it can become an
-            // incumbent: an assignment the composed fixpoint refutes is an engine defect, never a solution. A check
-            // the deadline cut short refutes nothing, so the leaf stands.
-            if (pendingRealLeaf == null && pendingRealResult == null) {
-                val verdict = pointCheck.check(Candidate(sample, Unit), params.cancellation, params.assumptions)
-                if (verdict is Verification.Rejected) {
-                    throw UnsoundnessException(
-                        "backtrack reached an optimization leaf its constraints refute: ${verdict.reason}",
-                    )
-                }
-            }
             // What this leaf left open, apart from the run-wide record in sawIndeterminateLeaf.
             var unresolved = false
             var incomplete = false
