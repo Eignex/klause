@@ -29,16 +29,20 @@ class LinearSupportBranchingTest {
         point, listOf(cut), emptyMap(), null, null, "bound-unavailable")
 
     @Test
-    fun `tight cut support should rank the more fractional integer coordinate`() {
-        val funding = SourceLpFunding(1_000L, 10_000L).apply { grant(1_000L) }
-        val branching = LinearSupportBranching(funding, SourceNumericalFeedback(funding, Cancellation.Never))
+    fun `admitted tight cut support should rank the more fractional integer coordinate`() {
+        for (checked in listOf(false, true)) {
+            val funding = SourceLpFunding(1_000L, 10_000L).apply { grant(1_000L) }
+            val branching = LinearSupportBranching(funding, SourceNumericalFeedback(funding, Cancellation.Never))
+            val admitted = query.copy(cuts = listOf(cut.copy(checked = checked, admitted = true,
+                numerical = !checked)), numericalCuts = !checked)
 
-        val selected = branching.select(SourceNumericalFeedbackResult.Available(query, null),
-            point.toList(), Cancellation.Never)
+            val selected = branching.select(SourceNumericalFeedbackResult.Available(admitted, null),
+                point.toList(), Cancellation.Never)
 
-        assertEquals(y to point.getValue(y), selected)
-        assertEquals(1L, branching.selections)
-        assertTrue(funding.spent > 0L)
+            assertEquals(y to point.getValue(y), selected)
+            assertEquals(1L, branching.selections)
+            assertTrue(funding.spent > 0L)
+        }
     }
 
     @Test
@@ -73,12 +77,12 @@ class LinearSupportBranchingTest {
     }
 
     @Test
-    fun `uninstalled inactive unchecked and slack cuts should preserve source order`() {
+    fun `uninstalled inactive unadmitted and slack cuts should preserve source order`() {
         val funding = SourceLpFunding(1_000L, 10_000L).apply { grant(1_000L) }
         val branching = LinearSupportBranching(funding, SourceNumericalFeedback(funding, Cancellation.Never))
 
         for (ignored in listOf(cut.copy(installed = false), cut.copy(ownerActive = false),
-            cut.copy(checked = false), cut.copy(violation = BigFraction.MINUS_ONE))) {
+            cut.copy(checked = false, admitted = false), cut.copy(violation = BigFraction.MINUS_ONE))) {
             val selected = branching.select(SourceNumericalFeedbackResult.Available(query.copy(cuts = listOf(ignored)),
                 null), point.toList(), Cancellation.Never)
 
