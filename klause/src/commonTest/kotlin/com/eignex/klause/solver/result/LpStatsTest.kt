@@ -19,6 +19,18 @@ import kotlin.test.assertTrue
 
 class LpStatsTest {
     @Test
+    fun `standalone numerical deductions should retain refused work in their work ledger`() {
+        val sink = LpStatsSink()
+        val observer = sink.certificationObserver(LpRoute.STANDALONE)
+
+        observer.observePhase(LpPhaseMetrics(LpSolvePhase.NUMERICAL_BOUND, "ACCEPTED", 0L, work = 5L))
+        observer.observePhase(LpPhaseMetrics(LpSolvePhase.NUMERICAL_CONFLICT, "WORK", 0L, work = 7L))
+
+        assertEquals(12L, sink.standaloneWork)
+        assertEquals(12L, sink.snapshot().standaloneWorkOps.sum)
+    }
+
+    @Test
     fun `unobserved directional branches have no phase or counts`() {
         val sink = LpStatsSink()
 
