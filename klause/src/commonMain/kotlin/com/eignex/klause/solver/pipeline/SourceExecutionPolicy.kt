@@ -22,6 +22,8 @@ class SourceExecutionPolicy(
     val zeroObjectivePricing: LpZeroObjectivePricing? = null,
     /** Whether the caller explicitly selected a presolve emphasis override. */
     val explicitPresolve: Boolean = false,
+    /** Whether finite-lane LP deductions require exact certificates rather than float results within tolerances. */
+    val exactLp: Boolean = false,
 ) {
     /** Requested optional LP ceiling, including per-technique overrides. */
     val lpCeiling: LpConfig? = lpCeiling?.let {
@@ -78,6 +80,7 @@ class SourceExecutionPolicy(
             zeroObjectivePricing ?: LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget,
             solveBudgetMillis.takeIf { engine == FiniteEngine.FIXED }, allSolutions, solutionCap,
             deadlineExceeded, onEvent, onPortfolioEvent, onPortfolioFault, preparationOnly, toleranceCheck,
+            exactLp,
         )
     }
 

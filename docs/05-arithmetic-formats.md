@@ -35,7 +35,8 @@ defaults.
 
 MPS defaults to `SourceTolerance(absolute=1/10000000, relative=1/10000000)`. Each
 component can be replaced independently, including by zero, which requires exact
-checks and certificates. `--exact` sets the tolerance to zero. The CLI captures one
+checks and certificates, including exact finite LP certification. `--exact` sets the
+tolerance to zero. The CLI captures one
 [linear source snapshot](#source-correspondence) and registers it with the common
 invocation, which owns preparation, validation and result qualification. Slack and
 rendered objectives stay in source units when working rows are scaled.
@@ -91,8 +92,9 @@ and restricted acceptance filters cannot supply these native completion claims.
 `optimizationStatus=tolerance-optimum` identifies numerical optimality. An exact
 point alone does not establish an exact optimum. `attained-optimum` requires an
 exact source bound attained by the point, including an independently checked bound
-over the accepted set. `LinearSourceOutcome.numericalClaims` records whether terminal
-statuses use numerical tolerance policy, and output identifies that scope.
+over the accepted set; a native finite optimum supplies one only under exact LP
+certification. `LinearSourceOutcome.numericalClaims` records whether terminal statuses
+use numerical tolerance policy, and output identifies that scope.
 
 Zero tolerance, including `--exact`, requires exact original-source certification.
 Native proof metadata retains its nominal-source or working-model scope when no

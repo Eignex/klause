@@ -613,6 +613,20 @@ class LpBoundingTest {
         assertTrue(lp.pivots.sum > 0.0)
     }
 
+    @Test
+    fun `node bounding should compute exact certificates only under exact certification`() {
+        val (problem, objective) = infeasibleNodeProblem()
+        val params = BacktrackParams(randomSeed = 7L, lpPlan = LpPlan(bounding = true))
+        for (exact in listOf(false, true)) {
+            val result = BacktrackSolver(problem.bake(), LpSolveContext.finite(exact)).minimize(objective, params)
+
+            val lp = result.stats.lp
+            assertTrue(lp.infeasible.sum > 0.0)
+            assertEquals(exact, lp.exactFarkasRay.attempts.sum > 0.0)
+            assertIs<MinimizeResult.Infeasible>(result)
+        }
+    }
+
     private fun reuseProblem(): Pair<Problem, LinearObjective> {
         val rng = Random(4242)
         val n = 14

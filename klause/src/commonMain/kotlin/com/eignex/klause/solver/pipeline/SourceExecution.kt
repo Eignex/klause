@@ -9,7 +9,6 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.lp.engine.LpQueryObservation
-import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.effortStats
@@ -463,7 +462,7 @@ private fun executeCapturedSource(
                 finite.cancellation or Cancellation { finite.deadlineExceeded() },
                 finite.toleranceCheck == null,
             )
-            val result = FinitePipeline.solve(finite, callbacks.finite, LpSolveContext.Production,
+            val result = FinitePipeline.solve(finite, callbacks.finite, finite.lpSolveContext,
                 if (invocation.requestsFiniteNumericalCompanions) request.theory.boundTo(invocation) else null,
                 request.onPortfolioLpQuery, request.onPortfolioGuidance, request.onPortfolioJointRepair)
             SourceExecutionResult.Finite(invocation, result)

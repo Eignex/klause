@@ -434,7 +434,7 @@ internal object SolveCore {
         }
         return SourceExecutionPolicy(
             ceiling(common.lp), ceiling(defaultLp()), arms,
-            common.lpPricing.takeIf { common.lpPricingExplicit }, explicitPresolve,
+            common.lpPricing.takeIf { common.lpPricingExplicit }, explicitPresolve, exactLp = common.exact,
         )
     }
 

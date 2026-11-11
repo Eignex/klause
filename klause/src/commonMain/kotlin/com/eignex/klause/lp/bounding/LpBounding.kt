@@ -14,6 +14,7 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.FarkasRoute
+import com.eignex.klause.lp.engine.FloatDeductionCertificate
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
@@ -44,6 +45,7 @@ import com.eignex.klause.lp.engine.exactConstant
 import com.eignex.klause.lp.engine.exactCost
 import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.finiteExactInput
+import com.eignex.klause.lp.engine.floatFarkasRay
 import com.eignex.klause.lp.engine.floorLong
 import com.eignex.klause.lp.engine.hasIntegralObjective
 import com.eignex.klause.lp.engine.lowerBoundDouble
@@ -358,15 +360,7 @@ private fun LpEngine.solveSelectedCuts(
     }
     if (lpCounterResults.read(tightened.model, solveContext.certificationPolicy)?.witness != null) return previous
     val floatRay = attempt.first.infeasibleRay ?: return previous
-    val ray = solveContext.certificationPolicy.acceptNullable(
-        LpCertifier.EXACT_FARKAS,
-        certifyLpFarkas(tightened.model.alsoCharged(this), floatRay, onRoute = {
-            sink.lp.observeFarkasRoute(
-                it == FarkasRoute.RECONSTRUCTED, it == FarkasRoute.EXACT_BASIS,
-                it == FarkasRoute.ROUNDED, it == FarkasRoute.NONE,
-            )
-        }, observer = sink.lp.certificationObserver(LpRoute.NODE)),
-    ) ?: return previous
+    val ray = infeasibilityRay(tightened.model, floatRay, sink) ?: return previous
     sink.lp.observeInfeasiblePrune()
     observeCutRayUse(tightened, ray)
     LpClaim.CONTRADICTION.consumed(sink.lp.certificationObserver(LpRoute.NODE))
@@ -453,17 +447,7 @@ internal fun LpEngine.sparseSafePrune(
             val gatedRay = filter.simplex.infeasibleRay?.copyOf()
             if (gatedRay != null && !cancellation()) {
                 for (i in 0 until gatedModel.m) if (!filter.enforced[i]) gatedRay[i] = 0.0
-                val ray = solveContext.certificationPolicy.acceptNullable(
-                    LpCertifier.EXACT_FARKAS,
-                    certifyLpFarkas(gatedModel.alsoCharged(this), gatedRay, onRoute = {
-                        sink.lp.observeFarkasRoute(
-                            it == FarkasRoute.RECONSTRUCTED,
-                            it == FarkasRoute.EXACT_BASIS,
-                            it == FarkasRoute.ROUNDED,
-                            it == FarkasRoute.NONE,
-                        )
-                    }, observer = sink.lp.certificationObserver(LpRoute.NODE)),
-                )
+                val ray = infeasibilityRay(gatedModel, gatedRay, sink)
                 if (ray != null) {
                     sink.lp.observeInfeasiblePrune()
                     LpClaim.CONTRADICTION.consumed(sink.lp.certificationObserver(LpRoute.NODE))
@@ -495,7 +479,7 @@ internal fun LpEngine.sparseSafePrune(
             spread.rowRatio,
         )
     }
-    if (model.rowStrict.any { it }) {
+    if (!numericalDeductions && model.rowStrict.any { it }) {
         strictSourcePrune(relaxation, session, bound, sink, cancellation, learn)?.let { return it }
     }
     val attempted = solveNode(model, warm, cancellation)
@@ -530,24 +514,9 @@ internal fun LpEngine.sparseSafePrune(
             return LpNodeOutcome(false, null)
         }
         // Infeasibility prune: a dual-unbounded termination is only a *candidate* infeasibility —
-        // confirm it with an exact Farkas certificate before pruning (the float ray alone is not sound).
-        // Any other failure (non-convergence / singular) keeps the node.
-        val floatRay = simplex.infeasibleRay
-        val ray = if (floatRay != null) {
-            solveContext.certificationPolicy.acceptNullable(
-                LpCertifier.EXACT_FARKAS,
-                certifyLpFarkas(model.alsoCharged(this), floatRay, onRoute = {
-                    sink.lp.observeFarkasRoute(
-                        it == FarkasRoute.RECONSTRUCTED,
-                        it == FarkasRoute.EXACT_BASIS,
-                        it == FarkasRoute.ROUNDED,
-                        it == FarkasRoute.NONE,
-                    )
-                }, observer = sink.lp.certificationObserver(LpRoute.NODE)),
-            )
-        } else {
-            null
-        }
+        // confirm its ray before pruning ([infeasibilityRay]). Any other failure (non-convergence /
+        // singular) keeps the node.
+        val ray = simplex.infeasibleRay?.let { infeasibilityRay(model, it, sink) }
         if (ray != null) {
             observeCutRayUse(relaxation, ray)
             sink.lp.observeInfeasiblePrune()
@@ -564,7 +533,8 @@ internal fun LpEngine.sparseSafePrune(
     sink.lp.observeLuFill(result.luMaxFill, result.luMaxDensity, result.luMaxDim)
     // The scoped owner carries appended-row bases itself; the hint is only for external fresh solves.
     var optimalBasis: Basis? = result.basis
-    val rowMeter = if (problem.numRealVars > 0 &&
+    // Row projections exist only as exact certificates.
+    val rowMeter = if (!numericalDeductions && problem.numRealVars > 0 &&
         (problem.numIntVars > 0 || problem.numBoolVars > 0)
     ) MixedCertificateMeter(cancellation) else null
     val canPrune = bound.isFinite()
@@ -655,15 +625,18 @@ internal fun LpEngine.sparseSafePrune(
             }
         }
     }
-    // The exact basis-certificate backs the prune bound, the learnable objective-bound reason and the
-    // reduced-cost fixing. Compute it once when any of them needs it; a singular/unbounded certify
-    // yields null and each falls back to its cheap certificate-less path, which is sound.
+    // The certificate backs the prune bound, the learnable objective-bound reason and the reduced-cost fixing.
+    // An exact one is computed once when any of them needs it; a singular/unbounded certify yields null and
+    // each falls back to its cheap certificate-less path, which is sound. A numerical one is the bound itself.
     if (cancellation()) return LpNodeOutcome(false, null)
     hints?.recordPoint(boundRel, boundRes)
     if (cancellation()) return LpNodeOutcome(false, null)
     activateCutAttribution(boundRel)
     val additionalCertificates = ArrayList<LpDeductionCertificate>(2)
-    val cert = if ((learn && canPropagate) || canFix) {
+    val numerical = if (numericalDeductions) FloatDeductionCertificate.of(boundRel.model, boundRes.duals) else null
+    val cert = if (numericalDeductions) {
+        numerical
+    } else if ((learn && canPropagate) || canFix) {
         val observer = sink.lp.certificationObserver(LpRoute.NODE)
         val componentObserver = object : LpCertificationObserver by observer {
             override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
@@ -726,13 +699,14 @@ internal fun LpEngine.sparseSafePrune(
     }
     // Neither the float safe bound nor the certificate's integer-multiplier bound dominates the other,
     // so the prune decides on the tighter of the two rather than on the float bound alone.
-    val lower = certifiedTightObjectiveLowerBound(
+    val lower = if (numericalDeductions) numerical?.lowerBound else certifiedTightObjectiveLowerBound(
         boundRel.model.alsoCharged(this),
         boundRes.duals,
         cert,
         sink.lp.certificationObserver(LpRoute.NODE),
         solveContext.certificationPolicy,
-    ) ?: run {
+    )
+    if (lower == null) {
         val prune = rowMeter != null &&
             applyMixedRowBounds(boundRel, session, sink, learn, cancellation, rowMeter, relaxer) { optimalBasis = null }
         return LpNodeOutcome(prune, if (prune) null else optimalBasis)
@@ -829,7 +803,7 @@ private fun LpEngine.pruneWithComponentBound(
     cancellation: Cancellation,
 ): Boolean {
     val component = solver as? ComponentLpSolverCapability ?: return false
-    if (!cutoff.isFinite() || cancellation()) return false
+    if (!cutoff.isFinite() || cancellation() || numericalDeductions) return false
     noteNodeOverhead(relaxation.model.extent() * LpNodeOverhead.EXACT)
     if (lpWorkAllowanceSpent() || cancellation()) return false
     val observer = sink.lp.certificationObserver(LpRoute.NODE)
@@ -1102,9 +1076,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
         }
         if (distance != null && distance >= 0L) {
             val permitted = if (rationalGap != null) {
-                val reduced = cert.exactReducedCost(col)
-                val cost = if (sign < 0) reduced.negated() else reduced
-                cost * BigFraction.ofLong(distance) <= rationalGap
+                cert.permitsMovementWithin(col, distance, rationalGap)
             } else {
                 cert.permitsMovement(col, distance, checkNotNull(integralCutoff), sourceConstant)
             }
@@ -1394,11 +1366,8 @@ internal fun LpEngine.sparseCertifiedPrune(
     // Both bounds are sound for any duals and neither dominates, so the larger wins: the
     // integer-multiplier bound carries no rounding margin, the float one never declines. A null (neither
     // available) keeps the node.
-    val lb = certifiedTightObjectiveLowerBound(
-        relaxation.model.alsoCharged(this),
-        result.duals,
-        sink.lp.certificationObserver(LpRoute.NODE),
-        solveContext.certificationPolicy,
+    val lb = objectiveLowerBound(
+        relaxation.model, result.duals, sink.lp.certificationObserver(LpRoute.NODE), charged = true,
     )
         ?: return LpNodeOutcome(false, null)
     val cutoff = sourceObjectiveCutoff(relaxation, bound) ?: return LpNodeOutcome(false, null)
@@ -1600,12 +1569,7 @@ private fun LpEngine.standaloneRootLpRelaxationBound(
             if (retainedRootEnabled) {
                 retainedRootLowerBound(relaxation.model, it, cancellation)
             } else {
-                certifiedTightObjectiveLowerBound(
-                    relaxation.model,
-                    it.duals,
-                    rootCertificationObserver(),
-                    solveContext.certificationPolicy,
-                )
+                objectiveLowerBound(relaxation.model, it.duals, rootCertificationObserver())
             }
         }
         retainRootPrimalGuidance(relaxation, result, cancellation)
@@ -1666,6 +1630,7 @@ private fun LpEngine.checkRetainedRootBound(
     limits: ReconstructionLimits,
     cancellation: Cancellation,
 ): BigFraction? {
+    if (numericalDeductions) return FloatDeductionCertificate.of(model, duals)?.lowerBound?.let(BigFraction::ofDouble)
     val observer = rootCertificationObserver()
     val integer = if (model.exactState != null) {
         certifyLpIntegerBoundOnly(model, duals, limits, cancellation, observer, solveContext.certificationPolicy)
@@ -1683,11 +1648,8 @@ private fun LpEngine.checkRetainedRootBound(
 
 private fun LpEngine.recordRootQueryBound(relaxation: LpRelaxation, result: FloatLpResult) {
     if (!measuresRootQueries) return
-    val lower = certifiedTightObjectiveLowerBound(
-        relaxation.model.alsoCharged(this),
-        result.duals,
-        sink.lp.certificationObserver(LpRoute.NODE),
-        solveContext.certificationPolicy,
+    val lower = objectiveLowerBound(
+        relaxation.model, result.duals, sink.lp.certificationObserver(LpRoute.NODE), charged = true,
     )
     if (!params.cancellation()) recordRootLowerBound(projectCertifiedLowerBound(relaxation, lower))
 }
@@ -1946,3 +1908,36 @@ private const val STRICT_FILTER_EPS = 1e-7
 /** [this] model, with an exact pass over it charged to [engine]: the certificates below work in rationals. */
 private fun LpModel.alsoCharged(engine: LpEngine): LpModel =
     also { engine.noteNodeOverhead(extent() * LpNodeOverhead.EXACT) }
+
+/** Whether this engine's deductions consume float results within tolerances rather than exact certificates. */
+internal val LpEngine.numericalDeductions: Boolean get() = solveContext.numericalDeductions
+
+/** A lower bound on [model]'s source objective under [duals]: numerical within tolerances, else certified. */
+internal fun LpEngine.objectiveLowerBound(
+    model: LpModel,
+    duals: DoubleArray,
+    observer: LpCertificationObserver?,
+    charged: Boolean = false,
+): Double? = if (numericalDeductions) {
+    FloatDeductionCertificate.of(model, duals)?.lowerBound
+} else {
+    certifiedTightObjectiveLowerBound(
+        if (charged) model.alsoCharged(this) else model, duals, observer, solveContext.certificationPolicy,
+    )
+}
+
+/** The infeasibility proof [floatRay] supports on [model]: numerical within tolerances, else an exact Farkas ray. */
+internal fun LpEngine.infeasibilityRay(model: LpModel, floatRay: DoubleArray, sink: SolveStatsSink): LongArray? {
+    if (numericalDeductions) return floatFarkasRay(model, floatRay)
+    return solveContext.certificationPolicy.acceptNullable(
+        LpCertifier.EXACT_FARKAS,
+        certifyLpFarkas(model.alsoCharged(this), floatRay, onRoute = {
+            sink.lp.observeFarkasRoute(
+                it == FarkasRoute.RECONSTRUCTED,
+                it == FarkasRoute.EXACT_BASIS,
+                it == FarkasRoute.ROUNDED,
+                it == FarkasRoute.NONE,
+            )
+        }, observer = sink.lp.certificationObserver(LpRoute.NODE)),
+    )
+}

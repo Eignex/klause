@@ -444,7 +444,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `a complete finite portfolio should retain an original integer optimum certificate`() {
+    fun `a complete finite portfolio optimum should be attained only under exact LP certification`() {
         val source = File.createTempFile("mps-finite-optimum-certificate", ".mps").apply {
             writeText(
                 "OBJSENSE\n MAX\nROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
@@ -453,14 +453,16 @@ class MpsModeTest {
             deleteOnExit()
         }
 
-        val text = capture {
-            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "--param", "node-limit=100", source.absolutePath)))
-        }
+        for (exact in listOf(false, true)) {
+            val flags = listOf("-e", "cp", "-p", "1", "--param", "node-limit=100") +
+                if (exact) listOf("--exact") else emptyList()
+            val text = capture { assertEquals(0, runCli((flags + source.absolutePath).toTypedArray())) }
 
-        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
-        assertTrue("o 2" in text.lines(), text)
-        assertTrue("v I=2" in text.lines(), text)
-        assertTrue("c optimizationStatus=attained-optimum" in text.lines(), text)
+            assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+            assertTrue("o 2" in text.lines(), text)
+            val status = if (exact) "attained-optimum" else "tolerance-optimum"
+            assertTrue("c optimizationStatus=$status" in text.lines(), text)
+        }
     }
 
     @Test

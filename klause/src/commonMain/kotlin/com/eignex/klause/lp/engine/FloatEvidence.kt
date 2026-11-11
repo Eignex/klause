@@ -5,7 +5,10 @@ import com.eignex.util.numbers.negate
 import com.eignex.util.numbers.signum
 import com.eignex.util.numbers.times
 import kotlin.math.abs
+import kotlin.math.floor
 import kotlin.math.max
+import kotlin.math.nextUp
+import kotlin.math.sign
 
 /** Primal and dual feasibility tolerance of float LP evidence. */
 internal const val FLOAT_EVIDENCE_TOLERANCE: Double = 1e-7
@@ -431,14 +434,22 @@ private class FloatEvidenceModel(val model: LpModel) {
     fun rhs(row: Int): Double = source?.rhs(row)?.approximation ?: model.rhsD(row)
     fun origin(column: Int): Double = source?.column(column)?.origin?.approximation ?: model.loShiftD(column)
     fun fixed(column: Int): Boolean = model.fixed(column)
-    fun lower(column: Int): Double = if (model.hasFiniteLower(column)) {
+    // A probe endpoint stands in for an open side.
+    fun lower(column: Int): Double = if (model.hasFiniteLower(column) && !probeClamped(column, model.probeClampedLo)) {
         model.lowerD(column)
     } else {
         Double.NEGATIVE_INFINITY
     }
     fun upper(column: Int): Double = source?.let {
         it.column(column).bounds.upper?.number?.approximation ?: Double.POSITIVE_INFINITY
-    } ?: if (model.hasFiniteUpper(column)) model.upperD(column) else Double.POSITIVE_INFINITY
+    } ?: if (model.hasFiniteUpper(column) && !probeClamped(column, model.probeClampedHi)) {
+        model.upperD(column)
+    } else {
+        Double.POSITIVE_INFINITY
+    }
+
+    private fun probeClamped(column: Int, clamped: BooleanArray): Boolean =
+        source == null && column < n && clamped[column]
 
     inline fun forEachInColumn(column: Int, action: (Int, Double) -> Unit) {
         val exact = model.exactState?.model
@@ -449,3 +460,186 @@ private class FloatEvidenceModel(val model: LpModel) {
         }
     }
 }
+
+/**
+ * Lagrangian deduction data read from float duals, for finite-lane deductions accepted numerically
+ * ([LpSolveContext.numericalDeductions]). `L(y) = y·rhs + Σⱼ min_{[lⱼ,uⱼ]} dⱼ·zⱼ` bounds the objective for any
+ * multipliers; here it is summed in binary64 and lowered by that summation's rounding. A reduced cost within
+ * [FLOAT_EVIDENCE_TOLERANCE] counts as zero: on a finite box its largest effect lowers the bound too, on an open
+ * side it is accepted, and its column is cited by no reason. Reduced costs are in source objective units.
+ */
+internal class FloatDeductionCertificate private constructor(
+    private val model: LpModel,
+    private val duals: DoubleArray,
+    private val reduced: DoubleArray,
+    /** The source objective bound [exactObjectiveBound] states. */
+    val lowerBound: Double,
+) : LpDeductionCertificate {
+    private val bound by lazy { checkNotNull(BigFraction.ofDouble(lowerBound)) }
+
+    override fun belongsTo(model: LpModel, observer: LpCertificationObserver?): Boolean = model === this.model
+    override fun exactMultipliers(): List<BigFraction> = duals.map { checkNotNull(BigFraction.ofDouble(it)) }
+    override fun exactMultiplier(row: Int): BigFraction = checkNotNull(BigFraction.ofDouble(duals[row]))
+    override fun exactReducedCost(col: Int): BigFraction = checkNotNull(BigFraction.ofDouble(reduced[col]))
+    override fun exactObjectiveBound(): BigFraction = bound
+    override fun dualNonzeroRow(row: Int): Boolean = duals[row] != 0.0
+    override fun reducedCostSign(col: Int): Int = sign(reduced[col]).toInt()
+    override fun objectiveBoundCeil(extraConstant: Long): Long? = (bound + BigFraction.ofLong(extraConstant)).ceilLong()
+    override fun improvingGapNonNegative(improvingMax: Long, sourceConstant: Long): Boolean =
+        gap(improvingMax.toDouble(), sourceConstant) >= 0.0
+    override fun rationalFixingWork(col: Int, cutoff: BigFraction): Long = 0L
+    override fun permitsMovement(col: Int, steps: Long, cutoff: Long, sourceConstant: Long): Boolean =
+        abs(reduced[col]) * steps <= gap(cutoff.toDouble(), sourceConstant)
+    override fun permitsMovementWithin(col: Int, steps: Long, gap: BigFraction): Boolean =
+        abs(reduced[col]) * steps <= gap.toDouble()
+    override fun fixStepsForGap(col: Int, gap: BigFraction): Long? = steps(col, gap.toDouble())
+    override fun fixStepsAtCutoff(col: Int, cutoff: BigFraction, sourceConstant: Long): Long? =
+        steps(col, gap(cutoff.toDouble(), sourceConstant))
+    override fun fixSteps(col: Int, improvingMax: Long, sourceConstant: Long): Long? =
+        steps(col, gap(improvingMax.toDouble(), sourceConstant))
+
+    // Widened by the rounding of the conversions and the subtraction, so a fixing never moves past the cutoff.
+    private fun gap(cutoff: Double, sourceConstant: Long): Double {
+        val constant = sourceConstant.toDouble()
+        return cutoff - constant - lowerBound + 4 * UNIT_ROUNDOFF * (abs(cutoff) + abs(constant) + abs(lowerBound))
+    }
+
+    private fun steps(col: Int, gap: Double): Long? {
+        val cost = abs(reduced[col])
+        if (cost == 0.0 || !(gap >= 0.0)) return null
+        val steps = floor((gap / cost).nextUp())
+        return if (steps < Long.MAX_VALUE.toDouble()) steps.toLong() else null
+    }
+
+    companion object {
+        /** The certificate [y] supports on [model], or null when a non-negligible reduced cost meets an open side. */
+        @Suppress("ReturnCount", "CyclomaticComplexMethod")
+        fun of(model: LpModel, y: DoubleArray): FloatDeductionCertificate? {
+            if (y.size != model.m || !model.finiteExactInput()) return null
+            val view = FloatEvidenceModel(model)
+            val scale = view.scale
+            if (!(scale > 0.0) || !scale.isFinite()) return null
+            val duals = repairedDuals(view, y) ?: return null
+            var value = view.constant
+            var magnitude = abs(value)
+            for (i in 0 until view.m) {
+                value += duals[i] * view.rhs(i)
+                magnitude += abs(duals[i] * view.rhs(i))
+            }
+            var margin = 0.0
+            val reduced = DoubleArray(view.numVars)
+            for (j in 0 until view.numVars) {
+                val (d, error) = reducedCost(view, duals, j)
+                val lower = view.lower(j)
+                val upper = view.upper(j)
+                if (abs(d) <= FLOAT_EVIDENCE_TOLERANCE) {
+                    val reach = max(abs(lower), abs(upper))
+                    if (reach.isFinite()) margin += (abs(d) + error) * reach
+                    continue
+                }
+                val side = if (d > 0.0) lower else upper
+                if (!side.isFinite()) return null
+                value += d * side
+                magnitude += abs(d * side)
+                margin += error * abs(side)
+                reduced[j] = d / scale
+            }
+            margin += (view.numVars + view.m + 4) * UNIT_ROUNDOFF * magnitude
+            val source = model.objectiveD(value - margin)
+            val lowerBound = source - 2 * UNIT_ROUNDOFF * abs(source)
+            return if (lowerBound.isFinite()) FloatDeductionCertificate(model, duals, reduced, lowerBound) else null
+        }
+    }
+}
+
+// Duals at noise level are dropped, and a one-sided slack's dual moves to its cost so the slack prices nothing:
+// any multipliers bound the objective, and these keep the bound finite and the cited rows few.
+private fun repairedDuals(view: FloatEvidenceModel, y: DoubleArray): DoubleArray? {
+    var largest = 0.0
+    for (value in y) {
+        if (!value.isFinite()) return null
+        largest = max(largest, abs(value))
+    }
+    return DoubleArray(view.m) { i ->
+        val slack = view.n + i
+        val cost = view.cost(slack)
+        val dual = if (abs(y[i]) <= NEGLIGIBLE_DUAL * largest) 0.0 else y[i]
+        val open = (view.lower(slack) == Double.NEGATIVE_INFINITY && dual < cost) ||
+            (view.upper(slack) == Double.POSITIVE_INFINITY && dual > cost)
+        if (open) cost else dual
+    }
+}
+
+// Column j's reduced cost under [y], with the rounding its summation can carry.
+private fun reducedCost(view: FloatEvidenceModel, y: DoubleArray, j: Int): Pair<Double, Double> {
+    var d = view.cost(j)
+    var magnitude = abs(d)
+    var terms = 1
+    if (j >= view.n) {
+        d -= y[j - view.n]
+        magnitude += abs(y[j - view.n])
+        terms++
+    } else {
+        view.forEachInColumn(j) { row, a ->
+            d -= y[row] * a
+            magnitude += abs(y[row] * a)
+            terms++
+        }
+    }
+    return d to (terms + 4) * UNIT_ROUNDOFF * magnitude
+}
+
+/**
+ * [ray] oriented and rounded to integer multipliers when, summed in binary64, it shows the rows of [model] cannot
+ * hold inside its box with a margin of [FLOAT_EVIDENCE_TOLERANCE] times the terms' size: `ρ·rhs > Σⱼ max(ρ·Aⱼ·zⱼ)`.
+ * The numerical counterpart of [certifyLpFarkas]; ray entries within the tolerance of the largest count as zero.
+ */
+@Suppress("ReturnCount", "CyclomaticComplexMethod")
+internal fun floatFarkasRay(model: LpModel, ray: DoubleArray): LongArray? {
+    if (ray.size != model.m || !model.finiteExactInput()) return null
+    val view = FloatEvidenceModel(model)
+    var largest = 0.0
+    for (value in ray) {
+        if (!value.isFinite()) return null
+        largest = max(largest, abs(value))
+    }
+    if (largest == 0.0) return null
+    var activity = 0.0
+    var magnitude = 0.0
+    for (i in 0 until view.m) {
+        activity += ray[i] * view.rhs(i)
+        magnitude += abs(ray[i] * view.rhs(i))
+    }
+    // The greatest and least of ρ·A·z over the box, with how many open sides each meets.
+    var most = 0.0
+    var least = 0.0
+    var mostOpen = false
+    var leastOpen = false
+    var ignored = 0.0
+    for (j in 0 until view.numVars) {
+        var r = 0.0
+        if (j >= view.n) r = ray[j - view.n] else view.forEachInColumn(j) { row, a -> r += ray[row] * a }
+        val lower = view.lower(j)
+        val upper = view.upper(j)
+        if (abs(r) <= FLOAT_EVIDENCE_TOLERANCE * largest) {
+            val reach = max(abs(lower), abs(upper))
+            if (reach.isFinite()) ignored += abs(r) * reach
+            continue
+        }
+        val high = r * (if (r > 0.0) upper else lower)
+        val low = r * (if (r > 0.0) lower else upper)
+        if (high.isFinite()) most += high else mostOpen = true
+        if (low.isFinite()) least += low else leastOpen = true
+        magnitude += max(if (high.isFinite()) abs(high) else 0.0, if (low.isFinite()) abs(low) else 0.0)
+    }
+    val margin = FLOAT_EVIDENCE_TOLERANCE * magnitude + ignored
+    val oriented = when {
+        !mostOpen && activity - most > margin -> ray
+        !leastOpen && least - activity > margin -> DoubleArray(ray.size) { -ray[it] }
+        else -> return null
+    }
+    return roundDuals(model, oriented)?.mult
+}
+
+// Duals this far below the largest carry no information a binary64 basis solve can resolve.
+private const val NEGLIGIBLE_DUAL: Double = 1e-15

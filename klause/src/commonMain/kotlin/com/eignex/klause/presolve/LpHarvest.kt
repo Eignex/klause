@@ -13,6 +13,7 @@ import com.eignex.klause.lp.bounding.rootLpInfeasibleNoBake
 import com.eignex.klause.lp.bounding.rootRelaxationSize
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.PreparedFactorProjections
@@ -99,6 +100,7 @@ internal fun lpRootInfeasibleReporting(
     zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     randomSeed: Long? = null,
     projections: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
+    exactLp: Boolean = true,
 ): LpRootInfeasibleResult {
     val sink = SolveStatsSink(backend = "lp-root-feasibility", lpProbeRoute = LpRoute.ROOT)
     val infeasible = LpEngine(
@@ -111,6 +113,7 @@ internal fun lpRootInfeasibleReporting(
             randomSeed = randomSeed,
         ),
         sink,
+        LpSolveContext.finite(exactLp),
         projections = projections,
     ).rootLpInfeasibleNoBake(cancellation)
     return LpRootInfeasibleResult(infeasible, sink.snapshot().lp)
@@ -148,6 +151,7 @@ internal fun lpRootBoundsReporting(
     randomSeed: Long? = null,
     minimumSpan: Long = 0L,
     projections: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
+    exactLp: Boolean = true,
 ): LpRootBoundsResult {
     val sink = SolveStatsSink(backend = "lp-obbt", lpProbeRoute = LpRoute.ROOT)
     val engine = LpEngine(
@@ -160,6 +164,7 @@ internal fun lpRootBoundsReporting(
             randomSeed = randomSeed,
         ),
         sink,
+        LpSolveContext.finite(exactLp),
         projections = projections,
     )
     val shaved = engine.rootLpBoundsNoBake(cancellation, minimumSpan)
@@ -193,6 +198,7 @@ fun lpHarvestReporting(
     cancellation: Cancellation = Cancellation.Never,
     zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     randomSeed: Long? = null,
+    exactLp: Boolean = true,
 ): LpHarvestResult {
     // The token must reach the simplex itself, not just the probe loops below: one primal phase-1 on a
     // large relaxation runs far past the presolve budget, and the engine polls only the `cancellation`
@@ -208,6 +214,7 @@ fun lpHarvestReporting(
             randomSeed = randomSeed,
         ),
         sink,
+        LpSolveContext.finite(exactLp),
         eagerSourcePreparation = true,
     )
     if (engine.lpRelaxer == null) return LpHarvestResult(problem, LpHarvestReport(), sink.snapshot().lp)
