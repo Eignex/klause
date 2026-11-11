@@ -122,7 +122,10 @@ private fun run(args: Array<String>, observeCpu: Boolean) {
         }
         SolveCore.solve(solvable, common, session.output(common).sourceQualified(common.sourceSemantics, comment))
     }
-    if (observeCpu) captureCliCpu(loadAndSolve) else loadAndSolve()
+    val observeSolve = observeCpu && common.engineParams.none {
+        it.startsWith("dry-run-solver=") || it.startsWith("dry-run-presolve=")
+    }
+    if (observeSolve) captureCliCpu(loadAndSolve) else loadAndSolve()
 }
 
 private const val USAGE =
