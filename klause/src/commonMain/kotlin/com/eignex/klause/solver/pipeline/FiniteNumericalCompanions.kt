@@ -230,9 +230,11 @@ internal class FiniteNumericalCompanions private constructor(
                 }, observeExternalIncumbents = true, sharedCompletions = completionSharing,
                 incumbentCompletionCheck = incumbentCompletionCheck, repairGuidance = repairGuidance)
             private var result: MinimizeResult? = null
+            private var completionOutcome: String? = null
             private var closed = false
             override val isDone: Boolean get() = result != null
-            override val stats get() = search.stats
+            override val stats get() = completionOutcome?.let { numericalCompletionStats(search.stats, it) }
+                ?: search.stats
             override val work: Long get() = search.work
 
             override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
@@ -245,7 +247,9 @@ internal class FiniteNumericalCompanions private constructor(
                 val original = LinearOptimizationResult(context.scope, finished.terminal, finished.bound,
                     finished.incumbent, finished.value, finished.reason, finished.stats, context.semantics,
                     finished.numerical)
-                result = finiteNumericalCompletion(original, context, global or limits.cancellation or limits.timeout)
+                result = finiteNumericalCompletion(original, context, global or limits.cancellation or limits.timeout) {
+                    completionOutcome = it
+                }
                 return result
             }
 
@@ -302,15 +306,17 @@ internal class FiniteNumericalCompanions private constructor(
 }
 
 internal fun finiteNumericalCompletion(result: LinearOptimizationResult, context: SourceProofContext,
-    cancellation: Cancellation): MinimizeResult {
+    cancellation: Cancellation, onNumericalCompletion: (String) -> Unit = {}): MinimizeResult {
     val numerical = result.numerical
     if (result.terminal == null && !cancellation() && numerical?.claim?.isFor(context) == true) {
         if (numerical.infeasible && result.incumbent == null) {
+            onNumericalCompletion("SOURCE_REFUTATION")
             return MinimizeResult.Infeasible(stats = numericalCompletionStats(result.stats, "SOURCE_REFUTATION"))
         }
         val point = result.incumbent
         val value = result.value
         if (numerical.optimal && point != null && value != null && !numerical.contradicts(value)) {
+            onNumericalCompletion("SOURCE_OPTIMUM")
             return MinimizeResult.Optimal(point, value.toDouble(),
                 numericalCompletionStats(result.stats, "SOURCE_OPTIMUM"))
         }
