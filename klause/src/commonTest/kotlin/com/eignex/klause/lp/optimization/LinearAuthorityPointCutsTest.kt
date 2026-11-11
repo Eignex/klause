@@ -852,7 +852,7 @@ class LinearAuthorityPointCutsTest {
                 SourceEvidenceVerifier(context.withLinearAuthority()).verify(bound))
         }
 
-        assertEquals(listOf(SourceValue.Rational(BigFraction.ofLong(41)),
+        assertEquals<List<SourceValue>>(listOf(SourceValue.Rational(BigFraction.ofLong(41)),
             SourceValue.Rational(BigFraction.ofLong(101))), bounds)
     }
 
