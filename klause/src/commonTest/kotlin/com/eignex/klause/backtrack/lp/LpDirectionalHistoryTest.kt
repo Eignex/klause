@@ -9,6 +9,38 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `sparse ancestor records retain exact counts across depth trimming`() {
+        for (operation in listOf("branch", "commit", "clear")) {
+            val history = LpDirectionalHistory({})
+            history.beginNode(0)
+            history.record(1.0)
+            history.branch(VarRef.Bool(4), 0.5)
+            history.commit(SearchDecision.Bool(8), 1)
+            history.beginNode(1)
+            history.record(2.0)
+            for ((level, variable) in listOf(0 to 0, 3 to 1, 5 to 2)) {
+                history.beginNode(level)
+                history.record(10.0 + level)
+                history.branch(VarRef.Bool(variable), 0.5)
+            }
+
+            when (operation) {
+                "branch" -> {
+                    history.beginNode(2)
+                    history.record(12.0)
+                    history.branch(VarRef.Bool(3), 0.5)
+                }
+                "commit" -> history.commit(SearchDecision.Bool(2), 4)
+                else -> history.clear()
+            }
+
+            val retained = if (operation in listOf("branch", "commit")) 2 else 0
+            assertEquals(retained + if (operation == "clear") 0 else 1, history.retainedEntries, operation)
+        }
+    }
+
+
+    @Test
     fun `unusable observations do not satisfy two sided sample availability`() {
         for (value in listOf(9.0, Double.NaN, Double.POSITIVE_INFINITY)) {
             val history = LpDirectionalHistory({})

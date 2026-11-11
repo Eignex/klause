@@ -19,7 +19,9 @@ internal class LpDirectionalHistory(
     private class Pending(val parent: Parent, val up: Boolean, val distance: Double, val depth: Int)
 
     private val gains = HashMap<VarRef, Gains>()
-    private val parents = HashMap<Int, Parent>()
+    private var parents: Array<Parent?>? = null
+    private var parentCount = 0
+    private var parentLimit = 0
     private var pending: Pending? = null
     private var stamp = 0L
     private var depth = 0
@@ -34,13 +36,13 @@ internal class LpDirectionalHistory(
         if (pending?.depth != level) pending = null
     }
 
-    val retainedEntries: Int get() = gains.size + parents.size
+    val retainedEntries: Int get() = gains.size + parentCount
 
     val hasTwoSidedSamples: Boolean get() = upSamples >= RELIABILITY && downSamples >= RELIABILITY
 
     fun clear(report: Boolean = true) {
         gains.clear()
-        parents.clear()
+        trimParents(0)
         pending = null
         objective = Double.NaN
         upSamples = 0
@@ -70,17 +72,33 @@ internal class LpDirectionalHistory(
     }
 
     fun branch(variable: VarRef, value: Double) {
-        parents.keys.removeAll { it >= depth }
-        if (depth >= MAX_DEPTH || !objective.isFinite() || !value.isFinite()) return
+        trimParents(depth)
+        if (depth !in 0 until MAX_DEPTH || !objective.isFinite() || !value.isFinite()) return
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return
-        parents[depth] = Parent(objective, variable, value)
+        val records = parents ?: arrayOfNulls<Parent>(MAX_DEPTH).also { parents = it }
+        records[depth] = Parent(objective, variable, value)
+        parentCount++
+        parentLimit = depth + 1
+    }
+
+    private fun trimParents(firstRemoved: Int) {
+        if (firstRemoved >= parentLimit) return
+        val records = parents ?: return
+        val start = firstRemoved.coerceAtLeast(0)
+        for (index in start until parentLimit) {
+            if (records[index] != null) {
+                records[index] = null
+                parentCount--
+            }
+        }
+        parentLimit = start
     }
 
     fun commit(decision: SearchDecision, level: Int) {
-        parents.keys.removeAll { it >= level }
+        trimParents(level)
         pending = null
-        val parent = parents[level - 1] ?: return
+        val parent = parents?.getOrNull(level - 1) ?: return
         val floor = floor(parent.value)
         val up = when (decision) {
             is SearchDecision.Bool -> {
