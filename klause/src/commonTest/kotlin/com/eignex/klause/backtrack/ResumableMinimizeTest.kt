@@ -229,6 +229,27 @@ class ResumableMinimizeTest {
     }
 
     @Test
+    fun `a rejected numerical completion should not offer a witness`() {
+        val problem = Problem(0, 0, emptyArray(), arrayOf<Factor>(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ofLong(3L)),
+                LinearOp.GE, BigFraction.ONE),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY)).bake(FactorProjectionProviders.Default)
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
+        var checks = 0
+        val acceptance = FiniteSourceAcceptance({ checks++; false }, true)
+        val params = BacktrackParams(toleranceCheck = acceptance, lpPlan = LpPlan(componentSplit = false))
+        val offered = ArrayList<Sample>()
+
+        BacktrackSolver(problem, LpSolveContext.Numerical).resumable(objective, params).use { search ->
+            search.runSlice(Cancellation.Never, Long.MAX_VALUE, 50_000L) { offered += it.sample }
+        }
+
+        assertTrue(checks > 0)
+        assertTrue(offered.isEmpty())
+    }
+
+    @Test
     fun `component repair revisits earlier pins before passing root coordinates to search`() {
         val problem = Problem(0, 8, Array(8) { IntDomain(0, if (it % 4 == 0) 2 else 1) },
             (0 until 2).flatMap { group ->

@@ -1275,7 +1275,9 @@ ordinary numerical traversal under its remaining cumulative funding.
 Finite leaf completion consumes numerical results separately from exact proof
 packages. A numerical conflict belongs to its current working model and cites
 the active source factors; learned finite reasons also retain live bounds and row
-premises. A numerical point must pass the caller's source acceptance. Without
+premises. A numerical point must pass the caller's source acceptance. Configured
+source acceptance also applies to a numerical feasible completion without an
+optimum bound; this leaves leaf optimality and unboundedness unproved. Without
 tolerance acceptance, its binary-rational source coordinates must pass the retained
 arithmetic witness check. This check certifies neither a bound nor an optimum and
 does not invoke exact LP recovery or continuation. A refused point stays unknown.

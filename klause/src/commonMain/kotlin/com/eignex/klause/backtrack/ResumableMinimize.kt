@@ -321,7 +321,8 @@ internal class ResumableMinimize(
             )
         ) return result
         val completed = sample.copy(reals = result.reals, exactReals = result.exactReals)
-        val tolerated = result.verdict == LpVerdict.TOLERANCE_OPTIMUM &&
+        val tolerated = (result.verdict == LpVerdict.TOLERANCE_OPTIMUM ||
+            result.numerical && result.verdict == LpVerdict.FEASIBLE) &&
             completionToleranceCheck()?.invoke(completed) == true
         return if (tolerated || verifyRealCoordinates(problem, completed) is Verification.Accepted) result
         else LeafRealResult(LpVerdict.INDETERMINATE, doubleArrayOf())
