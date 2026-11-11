@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.presolve.PresolveBudget
@@ -22,6 +23,8 @@ class SourceExecutionPolicy(
     val zeroObjectivePricing: LpZeroObjectivePricing? = null,
     /** Whether the caller explicitly selected a presolve emphasis override. */
     val explicitPresolve: Boolean = false,
+    /** Requested LP deduction authority, absent when the caller uses the library default. */
+    val lpMode: LpCertificationMode? = null,
 ) {
     /** Requested optional LP ceiling, including per-technique overrides. */
     val lpCeiling: LpConfig? = lpCeiling?.let {
@@ -78,6 +81,7 @@ class SourceExecutionPolicy(
             zeroObjectivePricing ?: LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget,
             solveBudgetMillis.takeIf { engine == FiniteEngine.FIXED }, allSolutions, solutionCap,
             deadlineExceeded, onEvent, onPortfolioEvent, onPortfolioFault, preparationOnly, toleranceCheck,
+            lpMode ?: LpCertificationMode.NUMERICAL,
         )
     }
 

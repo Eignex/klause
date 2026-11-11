@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.LpTechnique
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.EngineMix
@@ -22,6 +23,54 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class PortfolioPlanTest {
+    @Test
+    fun `LP authority should preserve curated portfolio policy`() {
+        for (mode in LpCertificationMode.entries) {
+            val plan = FinitePipeline.planPortfolio(PortfolioPlanRequest(
+                engine = FiniteEngine.MIXED,
+                optimize = true,
+                cores = 1,
+                executionOptions = ExecutionOptions.parse(emptyList()),
+                randomSeed = 17L,
+                defaultArms = 6,
+                lpCeiling = LpConfig.AGGRESSIVE,
+                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+                nodeBudget = null,
+                annotationArm = BacktrackParams(),
+                lpMode = mode,
+            ))
+            val scenario = assertIs<PortfolioPlan.Execute>(plan).scenario
+
+            assertEquals(mode, scenario.lpMode)
+            assertEquals(mode, scenario.annotationArm?.lpMode)
+            assertEquals(null, scenario.btEdit)
+            assertEquals(null, scenario.btPool)
+            assertEquals(null, scenario.lsPool)
+            assertFalse(scenario.explicitArms)
+        }
+    }
+
+    @Test
+    fun `fixed LP authority should preserve annotations unless the caller overrides it`() {
+        for (mode in listOf(null) + LpCertificationMode.entries) {
+            val plan = FinitePipeline.planFixedBacktrack(FixedBacktrackPlanRequest(
+                annotatedParams = BacktrackParams(lpMode = LpCertificationMode.EXACT),
+                executionOptions = ExecutionOptions.parse(emptyList()),
+                randomSeed = 17L,
+                cancellation = Cancellation.Never,
+                nodeBudget = null,
+                solveBudgetMillis = null,
+                lpConfig = LpConfig.AGGRESSIVE,
+                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+                onEvent = null,
+                lpMode = mode,
+            ))
+
+            assertEquals(mode ?: LpCertificationMode.EXACT, plan.params.lpMode)
+            assertFalse(plan.params.lpPlan.branching)
+        }
+    }
+
     @Test
     fun `root maintenance policy should resolve without editing backtrack recipes`() {
         for (requested in listOf(null, false, true)) {

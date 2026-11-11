@@ -134,7 +134,7 @@ internal fun BacktrackSolver.driveSearch(
     params: BacktrackParams,
     sink: SolveStatsSink? = null,
 ): Sequence<SearchOutcome> = sequence {
-    val traversal = CpSatisfactionTraversal(problem, params, sink, lpSolveContext)
+    val traversal = CpSatisfactionTraversal(problem, params, sink, lpContext(params))
     while (true) {
         val outcome = try {
             checkNotNull(traversal.next()) { "an unsliced traversal never pauses" }

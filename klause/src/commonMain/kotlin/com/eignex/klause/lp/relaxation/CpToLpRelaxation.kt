@@ -43,6 +43,9 @@ import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpClaim
+import com.eignex.klause.lp.engine.LpPhaseMetrics
+import com.eignex.klause.lp.engine.LpPhaseTimer
+import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.LpColumnId
 import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpModel
@@ -70,7 +73,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.selectedFactorProjections
-import com.eignex.klause.solver.validation.floatingOptimumAcceptance
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.encodingSourceRealCount
 import com.eignex.klause.theory.finiteLinearModel
@@ -409,6 +411,8 @@ internal fun leafRealFeasibility(
     // Bound the residual-LP solve by the search deadline: on a continuous-heavy model a single leaf LP is a
     // large factorization, so an unbounded solve could outlast the whole budget. A solve cut short returns
     // INDETERMINATE, degrading the leaf to `unknown` — never an unsound SAT/UNSAT.
+    val acceptance = LeafRealAcceptance(relaxation, problem, sample, toleranceCheck, cancellation,
+        context.certificationPolicy.numericalDeductions)
     val certified = solveAndCertify(
         relaxation.model,
         cancellation = cancellation,
@@ -416,15 +420,13 @@ internal fun leafRealFeasibility(
         observer = sink?.certificationObserver(LpRoute.STANDALONE),
         context = context,
         pricing = pricing,
-        floatAccept = toleranceCheck.floatingOptimumAcceptance()?.let { check ->
-            { result -> check(sample.copy(reals = relaxation.floatReals(result.primal, problem))) }
-        },
+        floatAccept = acceptance.predicate,
         floatOffset = relaxation.objectiveConstant.toDouble(),
         claim = if (objective == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM,
     )
-    return relaxation.leafResult(certified, problem, objective, sample, sink)
+    return relaxation.leafResult(certified, problem, objective, sample, sink, acceptance, cancellation)
         .checkedEncoding(encoded, sample, cancellation)
-        .also { it.observeConsumption(sink) }
+        .observedConsumption(sink, cancellation)
 }
 
 internal fun LpRelaxation.leafResult(
@@ -433,8 +435,19 @@ internal fun LpRelaxation.leafResult(
     objective: LinearObjective?,
     sample: Sample,
     sink: LpStatsSink?,
+    acceptance: LeafRealAcceptance,
+    cancellation: Cancellation,
 ): LeafRealResult {
     certified.float?.let { sink?.observeComponentSplit(it.blocks) }
+    if (cancellation()) return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
+    certified.numerical?.let {
+        val timer = if (it.recession != null) {
+            LpPhaseTimer(sink?.certificationObserver(LpRoute.STANDALONE), LpSolvePhase.SOURCE_RECESSION_ACCEPTANCE)
+        } else null
+        val result = acceptance.leafResult(it, objective)
+        timer?.finish(result.verdict.name)
+        return result
+    }
     if (problem.factors.any { it is ContinuousProduct && it.finiteChoices?.hasGuards != true } &&
         certified.verdict != LpVerdict.INFEASIBLE) {
         return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
@@ -502,7 +515,7 @@ internal fun LpRelaxation.exactLeafResult(
  * The continuous part of an LP recession [direction], summing each split variable's `x⁺ − x⁻` columns, or null
  * when it moves a discrete column. A real variable no column carries does not move.
  */
-private fun LpRelaxation.realDirection(direction: List<BigFraction>, problem: Problem): List<BigFraction>? {
+internal fun LpRelaxation.realDirection(direction: List<BigFraction>, problem: Problem): List<BigFraction>? {
     val ray = MutableList(problem.numRealVars) { BigFraction.ZERO }
     for (col in direction.indices) {
         val r = colRealId.getOrElse(col) { -1 }
@@ -566,6 +579,8 @@ internal class LeafRealResult(
     val refutingFactors: IntArray = emptyIntArray(),
     // A private numerical proposal; only an original-source point check may give it witness authority.
     val uncertifiedReals: DoubleArray? = null,
+    /** LP authority is numerical even when the source arithmetic check retained exact point coordinates. */
+    val numerical: Boolean = false,
 )
 
 /**
@@ -1964,7 +1979,7 @@ internal fun LeafRealResult.checkedEncoding(
     sample: Sample,
     cancellation: Cancellation,
 ): LeafRealResult {
-    if (exactReals == null || verdict == LpVerdict.INFEASIBLE) return this
+    if (numerical || exactReals == null || verdict == LpVerdict.INFEASIBLE) return this
     val point = sample.copy(reals = reals, exactReals = exactReals)
     if (encoded.encodingSourceRealCount != encoded.numRealVars) {
         return if (privateLinearCompletion(encoded, point, cancellation) == true) this
@@ -1980,7 +1995,17 @@ internal fun LeafRealResult.observeConsumption(sink: LpStatsSink?) {
         LpVerdict.INFEASIBLE -> LpClaim.CONTRADICTION
         LpVerdict.FEASIBLE, LpVerdict.UNBOUNDED -> LpClaim.FEASIBLE_COMPLETION
         LpVerdict.ATTAINED_OPTIMUM -> LpClaim.ATTAINED_OPTIMUM
+        LpVerdict.TOLERANCE_OPTIMUM -> if (numerical) LpClaim.ATTAINED_OPTIMUM else null
         else -> null
     }
-    claim?.consumed(sink?.certificationObserver(LpRoute.STANDALONE))
+    val observer = sink?.certificationObserver(LpRoute.STANDALONE)
+    if (numerical && claim != null) {
+        observer?.observePhase(LpPhaseMetrics(LpSolvePhase.NUMERICAL_CONSUMPTION, claim.name, 0L))
+    } else claim?.consumed(observer)
+}
+
+internal fun LeafRealResult.observedConsumption(sink: LpStatsSink?, cancellation: Cancellation): LeafRealResult {
+    if (cancellation()) return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
+    observeConsumption(sink)
+    return if (cancellation()) LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray()) else this
 }

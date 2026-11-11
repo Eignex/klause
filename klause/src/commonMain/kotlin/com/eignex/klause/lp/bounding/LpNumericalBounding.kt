@@ -9,6 +9,7 @@ import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.ceilLong
 import com.eignex.klause.lp.engine.floatingInfeasibilityMargin
 import com.eignex.klause.lp.engine.floatingObjectiveLowerBound
+import com.eignex.klause.lp.engine.hasIntegralObjectiveDefinition
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationResult
@@ -41,10 +42,13 @@ internal fun LpEngine.numericalConflict(
     model: LpModel,
     ray: DoubleArray,
     cancellation: Cancellation,
+    root: Boolean = false,
 ): Boolean {
-    val timer = LpPhaseTimer(sink.lp.certificationObserver(LpRoute.NODE), LpSolvePhase.NUMERICAL_CONFLICT)
-    val checked = floatingInfeasibilityMargin(model, ray, numericalNodeWorkRemaining(), cancellation)
-    noteNumericalWork(checked.work)
+    val timer = LpPhaseTimer(sink.lp.certificationObserver(if (root) LpRoute.ROOT else LpRoute.NODE),
+        LpSolvePhase.NUMERICAL_CONFLICT)
+    val remaining = if (root) retainedRootRemainingWork() else numericalNodeWorkRemaining()
+    val checked = floatingInfeasibilityMargin(model, ray, remaining, cancellation)
+    noteNumericalWork(checked.work, root)
     timer.finish(checked.stop?.name ?: if (checked.infeasible) "ACCEPTED" else "REFUSED", checked.work)
     return checked.infeasible && !cancellation()
 }
@@ -65,11 +69,11 @@ internal fun LpEngine.applyNumericalBound(
     if (mappingWork > numericalNodeWorkRemaining()) return false
     noteNumericalWork(mappingWork)
     if (cancellation()) return false
-    val constant = relaxation.objectiveConstant.toDouble()
-    val magnitude = maxOf(1.0, abs(lower.value + constant), if (bound.isFinite()) abs(bound) else 0.0)
+    val magnitude = maxOf(1.0, abs(lower.value))
     val adjusted = (lower.value - FLOAT_EVIDENCE_TOLERANCE * magnitude).nextDown()
     val full = BigFraction.ofDouble(adjusted)?.plus(BigFraction.ofLong(relaxation.objectiveConstant)) ?: return false
     val range = sourceObjectiveRange(relaxation)
+    if (range == null && relaxation.model.hasIntegralObjectiveDefinition()) return false
     val integral = if (range != null) full.ceilLong()?.let(BigFraction::ofLong) ?: full else full
     val cutoff = when {
         !bound.isFinite() -> null
@@ -95,8 +99,8 @@ internal fun LpEngine.applyNumericalBound(
     return true
 }
 
-internal fun LpEngine.observeNumericalConsumption(outcome: String) {
-    sink.lp.certificationObserver(LpRoute.NODE)
+internal fun LpEngine.observeNumericalConsumption(outcome: String, root: Boolean = false) {
+    sink.lp.certificationObserver(if (root) LpRoute.ROOT else LpRoute.NODE)
         .observePhase(LpPhaseMetrics(LpSolvePhase.NUMERICAL_CONSUMPTION, outcome, 0L))
 }
 

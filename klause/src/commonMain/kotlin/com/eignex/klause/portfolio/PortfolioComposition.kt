@@ -11,6 +11,7 @@ import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpTechnique
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.meta.coreguided.CoreRefinementMode
 import com.eignex.klause.propagation.BakedProblem
@@ -172,6 +173,8 @@ data class PortfolioScenario(
     val sharingMemoryBytes: Long? = null,
     /** Apply bounded root defaults to eligible curated satisfaction recipes. */
     val rootMaintenance: Boolean = true,
+    /** Caller-selected LP authority; null preserves each explicit recipe's selection. */
+    val lpMode: LpCertificationMode? = null,
 ) {
     init {
         require(sharingMemoryWork >= 0L && sharingMemoryScratch >= 0) { "sharing memory limits must be nonnegative" }
@@ -277,12 +280,24 @@ internal object PortfolioComposition {
         facts: ProblemFacts = ProblemFacts.assumed(scenario.kind),
     ): List<WorkerConfig> {
         val arms = composeArms(scenario, facts)
-        val check = scenario.toleranceCheck ?: return arms
+        val check = scenario.toleranceCheck
+        val mode = scenario.lpMode
+        if (check == null && mode == null) return arms
         return arms.map {
             when (it) {
-                is BacktrackWorkerConfig -> it.withToleranceCheck(check)
-                is LocalSearchWorkerConfig -> it.withToleranceCheck(check)
-                is AlnsWorkerConfig -> it.withToleranceCheck(check)
+                is BacktrackWorkerConfig -> {
+                    val configured = if (mode == null) it else it.withLpMode(mode)
+                    if (check == null) configured else configured.withToleranceCheck(check)
+                }
+                is LocalSearchWorkerConfig -> {
+                    val configured = if (mode == null) it else it.withLpMode(mode)
+                    if (check == null) configured else configured.withToleranceCheck(check)
+                }
+                is AlnsWorkerConfig -> {
+                    val configured = if (mode == null) it else it.withLpMode(mode)
+                    if (check == null) configured else configured.withToleranceCheck(check)
+                }
+                is CoreGuidedWorkerConfig -> if (mode == null) it else it.withLpMode(mode)
                 else -> it
             }
         }

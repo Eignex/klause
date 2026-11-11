@@ -9,6 +9,7 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.schedule.Geometric
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.meta.alns.Alns
 import com.eignex.klause.meta.alns.BacktrackRepair
 import com.eignex.klause.propagation.BakedProblem
@@ -58,6 +59,7 @@ internal class AlnsWorkerConfig private constructor(
     private val sharingMemoryWork: Long = 32_768L,
     private val sharingMemoryScratch: Int = 4_096,
     private val sharingMemoryBytes: Long? = null,
+    private val lpMode: LpCertificationMode = LpCertificationMode.NUMERICAL,
 ) :
     WorkerConfig {
     constructor(
@@ -69,31 +71,37 @@ internal class AlnsWorkerConfig private constructor(
     fun withToleranceCheck(check: (Sample) -> Boolean): AlnsWorkerConfig =
         AlnsWorkerConfig(
             profile, nodeBudget, numericalCompletion, check,
-            workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
+            workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes, lpMode,
         )
 
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
         AlnsWorkerConfig(
             profile, budget, numericalCompletion, toleranceCheck,
-            workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
+            workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes, lpMode,
         )
 
     fun withNumericalCompletion(): AlnsWorkerConfig =
         AlnsWorkerConfig(
             profile, nodeBudget, true, toleranceCheck,
-            workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
+            workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes, lpMode,
         )
 
     fun withWorkScheduling(): AlnsWorkerConfig =
         AlnsWorkerConfig(
             profile, nodeBudget, numericalCompletion, toleranceCheck,
-            true, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
+            true, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes, lpMode,
         )
 
     fun withSharingMemory(enabled: Boolean, work: Long, scratch: Int, bytes: Long? = null): AlnsWorkerConfig =
         AlnsWorkerConfig(
             profile, nodeBudget, numericalCompletion, toleranceCheck,
-            workScheduled, enabled, work, scratch, bytes,
+            workScheduled, enabled, work, scratch, bytes, lpMode,
+        )
+
+    fun withLpMode(mode: LpCertificationMode): AlnsWorkerConfig =
+        AlnsWorkerConfig(
+            profile, nodeBudget, numericalCompletion, toleranceCheck,
+            workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes, mode,
         )
 
     override val label: String get() = "alns-${profile.label}"
@@ -129,7 +137,8 @@ internal class AlnsWorkerConfig private constructor(
                 definitionalSweep = definitionalSweep,
                 perMoveInvariants = definitionalSweep != null,
                 completion = if (numericalCompletion && problem.numRealVars > 0)
-                    LeafRealCompletion(problem, objective, toleranceCheck) else null,
+                    LeafRealCompletion(problem, objective, toleranceCheck, mode = lpMode)
+                else null,
             ).apply {
                 matchedPools?.localSearchProjection?.let { engine.projection = it }
                 matchedPools?.localSearchInvariants?.let { engine.invariantNetwork = it }
@@ -142,6 +151,7 @@ internal class AlnsWorkerConfig private constructor(
                     shareGlobalNogoods = false, meter = meter),
                 nodeBudget = nodeBudget,
                 toleranceCheck = toleranceCheck,
+                lpMode = lpMode,
             ),
             minDestroyFraction = profile.minDestroyFraction,
             maxDestroyFraction = profile.maxDestroyFraction,

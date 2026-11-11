@@ -52,22 +52,24 @@ class LpNumericalBoundingTest {
 
     @Test
     fun `an integral numerical lower bound should prune an equal incumbent`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(2, 10)), emptyArray())
-        val session = PropagationSession(problem)
-        val model = LpBuilder().apply { addVar(2L, 10L, cost = 1L) }.build(Sense.MINIMIZE)
-        val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false), 0L,
-            intArrayOf(0), intArrayOf())
-        val sink = SolveStatsSink(backend = "numerical-bound")
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1L)), LpParams(), sink,
-            LpSolveContext.Numerical).use { engine ->
-            val lower = assertNotNull(engine.numericalObjectiveBound(model, doubleArrayOf(), Cancellation.Never))
+        for (constant in listOf(0L, 1_000_000_000_000L, -1_000_000_000_000L)) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(2, 10)), emptyArray())
+            val session = PropagationSession(problem)
+            val model = LpBuilder().apply { addVar(2L, 10L, cost = 1L) }.build(Sense.MINIMIZE)
+            val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false), constant,
+                intArrayOf(0), intArrayOf())
+            val sink = SolveStatsSink(backend = "numerical-bound")
+            LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1L), constant = constant), LpParams(), sink,
+                LpSolveContext.Numerical).use { engine ->
+                val lower = assertNotNull(engine.numericalObjectiveBound(model, doubleArrayOf(), Cancellation.Never))
 
-            val pruned = engine.applyNumericalBound(relaxation, lower, 2.0, session,
-                -1, true, Cancellation.Never, false)
+                val pruned = engine.applyNumericalBound(relaxation, lower, (constant + 2L).toDouble(), session,
+                    -1, true, Cancellation.Never, false)
 
-            assertTrue(pruned)
-            assertEquals(1L, sink.lp.snapshot().phases.getValue("NUMERICAL_CONSUMPTION_NODE")
-                .outcomes.getValue("BOUND_PRUNE"))
+                assertTrue(pruned)
+                assertEquals(1L, sink.lp.snapshot().phases.getValue("NUMERICAL_CONSUMPTION_NODE")
+                    .outcomes.getValue("BOUND_PRUNE"))
+            }
         }
     }
 

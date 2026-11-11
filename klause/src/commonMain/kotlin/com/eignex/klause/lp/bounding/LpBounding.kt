@@ -46,6 +46,7 @@ import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.finiteExactInput
 import com.eignex.klause.lp.engine.floorLong
 import com.eignex.klause.lp.engine.hasIntegralObjective
+import com.eignex.klause.lp.engine.hasIntegralObjectiveDefinition
 import com.eignex.klause.lp.engine.lowerBoundDouble
 import com.eignex.klause.lp.engine.lpConditioning
 import com.eignex.klause.lp.engine.mixedRowBounds
@@ -1791,29 +1792,34 @@ private fun LpEngine.recordRootQueryBound(relaxation: LpRelaxation, result: Floa
     if (!params.cancellation()) recordRootLowerBound(projectCertifiedLowerBound(relaxation, lower))
 }
 
-private fun LpEngine.projectCertifiedLowerBound(
+internal fun LpEngine.projectCertifiedLowerBound(
     relaxation: LpRelaxation,
     lower: Double?,
     root: Boolean = true,
     cancellation: Cancellation = params.cancellation,
 ): Double {
-    if (solveContext.certificationPolicy.numericalDeductions) {
+    val numerical = solveContext.certificationPolicy.numericalDeductions
+    if (numerical) {
         val remaining = if (root) retainedRootRemainingWork() else numericalNodeWorkRemaining()
-        if (remaining < 8L) return Double.NaN
-        noteNumericalWork(8L, root)
+        val mappingWork = 8L * (relaxation.model.numVars.toLong() + relaxation.model.n) + 16L
+        if (remaining < mappingWork) return Double.NaN
+        noteNumericalWork(mappingWork, root)
         if (cancellation()) return Double.NaN
     }
     val full = lower?.let { BigFraction.ofDouble(it) }?.plus(BigFraction.ofLong(relaxation.objectiveConstant))
     val projected = full?.lowerBoundDouble() ?: return Double.NaN
-    if (solveContext.certificationPolicy.numericalDeductions) {
-        return (projected - com.eignex.klause.lp.engine.FLOAT_EVIDENCE_TOLERANCE * maxOf(1.0, abs(projected)))
-            .nextDown()
-    }
-    val integral = relaxation.model.hasIntegralObjective()
+    val integral = if (numerical) relaxation.model.hasIntegralObjectiveDefinition()
+        else relaxation.model.hasIntegralObjective()
+    val sourceRange = if (integral) sourceObjectiveRange(relaxation) else null
+    if (cancellation()) return Double.NaN
+    val combined = if (numerical && sourceRange != null) {
+        val floor = BigFraction.ofLong(sourceRange.first).lowerBoundDouble() ?: return Double.NaN
+        maxOf(projected, floor)
+    } else projected
     return when {
-        integral && sourceObjectiveRange(relaxation) == null -> Double.NaN
-        integral && abs(projected) >= EXACT_INTEGER_DOUBLE_LIMIT -> projected.nextDown()
-        else -> projected
+        integral && sourceRange == null -> Double.NaN
+        integral && abs(combined) >= EXACT_INTEGER_DOUBLE_LIMIT -> combined.nextDown()
+        else -> combined
     }
 }
 
