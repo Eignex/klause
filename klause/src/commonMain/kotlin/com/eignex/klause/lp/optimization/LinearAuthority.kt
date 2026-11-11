@@ -907,13 +907,19 @@ internal class LinearAuthority(
             val upper = source.scope.condition.upper[coordinate]
             (lower == null || threshold + BigFraction.ONE > lower) && (upper == null || threshold < upper)
         }
-        val candidate = if (allFractions.isEmpty()) {
-            val proposed = sample(source, coordinates, point)
-            val witness = SourceEvidence(source.scope, SourceClaim.Witness(proposed), SourceDerivation.SourceWitness)
-            proposed.takeIf {
-                SourceEvidenceVerifier(prepared.context).verify(witness, cancellation) == SourceEvidenceCheck.Checked
+        fun witness(values: List<BigFraction>): Sample? {
+            val proposed = sample(source, coordinates, values)
+            val evidence = SourceEvidence(source.scope, SourceClaim.Witness(proposed), SourceDerivation.SourceWitness)
+            return proposed.takeIf {
+                SourceEvidenceVerifier(prepared.context).verify(evidence, cancellation) == SourceEvidenceCheck.Checked
             }
-        } else null
+        }
+        var candidate = if (allFractions.isEmpty()) witness(point) else null
+        if (candidate == null && allFractions.isEmpty() && !cancellation()) {
+            val proposed = proposeLinearPrimal(coordinates, point, prepared.rows, prepared.inactive,
+                budget, cancellation, ::observePrimal)
+            candidate = proposed?.takeUnless { it == point }?.let(::witness)
+        }
         return LinearAuthorityResult(incumbent = candidate, split = fractions.firstOrNull()?.floorSplit(),
             fractional = fractions, numerical = claim)
     }

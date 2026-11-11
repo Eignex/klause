@@ -1,5 +1,8 @@
 package com.eignex.klause.lp.optimization
 
+import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SourceLpFunding
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.SourceCoordinate
@@ -10,10 +13,72 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class LinearPrimalRecoveryTest {
     private val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
     private val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+
+    @Test
+    fun `numerical proposals should preserve a feasible IEEE real point`() {
+        val dyadic = assertNotNull(BigFraction.ofDouble(0.1))
+        val funding = SourceLpFunding(100_000L, 1_000_000L).apply { grant(100_000L) }
+        val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical }, funding = funding)
+        val rows = listOf(ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO))
+
+        val point = proposeLinearPrimal(listOf(real), listOf(dyadic), rows, emptySet(), budget,
+            Cancellation.Never, observe = { _, _ -> })
+
+        assertEquals(listOf(dyadic), point)
+        assertEquals(0, budget.operations)
+    }
+
+    @Test
+    fun `numerical proposals should preserve wide integers while repairing refused real coordinates`() {
+        val third = BigFraction.ofLong(3).reciprocal()
+        val wide = BigFraction.ofLong(9007199254740993L)
+        val funding = SourceLpFunding(100_000L, 1_000_000L).apply { grant(100_000L) }
+        val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical }, funding = funding)
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), third),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), third.negated()),
+        )
+        val guess = listOf(assertNotNull(BigFraction.ofDouble(1.0 / 3.0)), wide)
+
+        val point = proposeLinearPrimal(listOf(real, integer), guess, rows, emptySet(), budget,
+            Cancellation.Never, observe = { _, _ -> })
+
+        assertEquals(listOf(third, wide), point)
+        assertEquals(0, budget.operations)
+    }
+
+    @Test
+    fun `stopped numerical proposals should retain visited work and reservations`() {
+        val funding = SourceLpFunding(100_000L, 1_000_000L).apply { grant(5L) }
+        val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical }, funding = funding)
+        val rows = listOf(ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ONE))
+
+        val point = proposeLinearPrimal(listOf(real), listOf(BigFraction.ZERO), rows, emptySet(), budget,
+            Cancellation.Never, observe = { _, _ -> })
+
+        assertNull(point)
+        assertTrue(funding.spent in 1L..5L)
+        assertTrue(funding.allocated > 0L)
+        assertEquals(funding.spent, budget.measuredPreparationWork)
+    }
+
+    @Test
+    fun `unfunded numerical proposals should decline without reserving source work or allocation`() {
+        val funding = SourceLpFunding(0L, 1_000_000L)
+        val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical }, funding = funding)
+
+        val point = proposeLinearPrimal(listOf(real), listOf(BigFraction.ZERO), emptyList(), emptySet(), budget,
+            Cancellation.Never, observe = { _, _ -> })
+
+        assertNull(point)
+        assertEquals(0L, funding.spent)
+        assertEquals(0L, funding.allocated)
+    }
 
     @Test
     fun `an exhausted recovery allowance should retire a preceding component pause`() {

@@ -122,6 +122,11 @@ exact terminals and bounds. Numerical completion reports infeasibility or incumb
 optimality within the objective tolerance; finite numerical gaps use the context's
 original objective direction and units. Partial snapshots retain the bound without
 a completion status. Witness-only callers omit both exact and numerical deductions.
+Numerical source residual completion proposes floating coordinates before small
+rational real-coordinate replacements. Its existing bounded recovery preserves
+discrete coordinates, charges the containing source allowance and checks the scoped
+arithmetic rows. Retained original-source checks still own witness admission; a
+proposed point creates no exact LP evidence or basis certification.
 Numerical portfolio completion retains the runtime model, objective, source namespace
 and original condition identity. Consumer pins and retained arithmetic witness checks
 remain in force. A numerical refutation cannot coexist with an accepted incumbent,

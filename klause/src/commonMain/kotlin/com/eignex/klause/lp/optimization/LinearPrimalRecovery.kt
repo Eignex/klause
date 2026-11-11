@@ -1,10 +1,12 @@
 package com.eignex.klause.lp.optimization
 
+import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.engine.reconstructRational
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntIndexedCollection
 import com.eignex.util.numbers.BIG_ONE
@@ -24,6 +26,37 @@ internal class LinearPrimalRecoveryProgress {
     val completed = mutableMapOf<Int, List<BigFraction>>()
 }
 
+internal fun proposeLinearPrimal(
+    coordinates: List<SourceCoordinate>, point: List<BigFraction>, rows: List<ExactRationalInequality>,
+    inactive: Set<Int>, budget: SourceLpBudget, cancellation: Cancellation, observe: (String, Long) -> Unit,
+): List<BigFraction>? {
+    val funding = budget.funding
+    if (cancellation() || coordinates.size > 4096 || funding?.paused == true ||
+        !budget.context.certificationPolicy.numericalDeductions) return null
+    val progress = LinearPrimalRecoveryProgress()
+    var stopped = false
+    val meter = WorkMeter { units ->
+        if (funding != null && units > funding.availableWork) {
+            progress.work -= units
+            stopped = true
+            throw LinearPrimalStop("WorkLimit")
+        }
+        budget.observe(preparation = units)
+    }
+    val token = object : Cancellation {
+        override fun isCancelled() = stopped || cancellation() || funding?.paused == true
+        override fun deadline() = cancellation.deadline()
+        override fun workMeter(): WorkMeter = meter
+    }
+    val limits = LinearPrimalRecoveryLimits(work = minOf(2_000_000L, funding?.availableWork ?: 2_000_000L),
+        allocation = minOf(64L * 1024L * 1024L, funding?.remainingAllocation ?: 64L * 1024L * 1024L))
+    return recoverLinearPrimal(coordinates, point, rows, inactive, token,
+        complete = { _, _, _ -> null }, observe = { stage, count ->
+            if (stage == "PrimalRecoveryAllocation") funding?.charge(0L, count)
+            observe(stage.replace("PrimalRecovery", "NumericalPoint"), count)
+        }, limits = limits, progress = progress, preserveFeasiblePoint = true)
+}
+
 // Recovered coordinates remain proposals; the original-source checker owns witness admission.
 internal fun recoverLinearPrimal(
     coordinates: List<SourceCoordinate>,
@@ -35,6 +68,7 @@ internal fun recoverLinearPrimal(
     observe: (String, Long) -> Unit,
     limits: LinearPrimalRecoveryLimits = LinearPrimalRecoveryLimits(),
     progress: LinearPrimalRecoveryProgress = LinearPrimalRecoveryProgress(),
+    preserveFeasiblePoint: Boolean = false,
 ): List<BigFraction>? {
     progress.pending = false
     val initialWork = progress.work
@@ -73,6 +107,10 @@ internal fun recoverLinearPrimal(
                 }
             }
             active += row
+        }
+        if (preserveFeasiblePoint && meter.satisfies(point, active)) {
+            observe("PrimalRecoveryOriginal", 1L)
+            return point
         }
         val reconstructed = point.mapIndexed { id, value ->
             meter.reserve(1L, 32L)
