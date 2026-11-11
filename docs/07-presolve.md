@@ -1064,7 +1064,8 @@ An accepted check records a receipt on the immutable `Sample` it checked.
 A witness receipt names the identities its check read besides the coordinates: model,
 objective, proof context and tolerance policy. A verifier with the same identities
 accepts a receipted point without repeating source checks. It still checks its own
-caller restrictions and claimed objective, which no receipt covers. Witness receipts
+caller restrictions, and the claimed objective wherever it checks one; no receipt
+covers either. Witness receipts
 compare these identities by reference, so a transformed, rebuilt or structurally equal
 model needs its own check. A restriction receipt names a matching invocation or an
 equal source condition, whose check reads nothing else. A copy with
