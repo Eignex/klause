@@ -331,8 +331,11 @@ is impossible. Passing that prerequisite still requires the variable's own recen
 samples; it grants no score or authority. History reset clears the prerequisite.
 Selection rechecks that the fractional point and optimum belong to the same current
 relaxation and exact state, and declines on cancellation or stale information. A
-nomination retains only its variable, point and solve stamp. Comparison and
-changed-proposal observations remain separate from the actual variable and matching
+nomination retains only its variable, point and solve stamp. Proposal and
+baseline roles share one immutable candidate when they name the same variable.
+Clearing an already-empty nomination leaves its state untouched; transient selection
+flags still clear. Comparison and changed-proposal observations remain separate from
+the actual variable and matching
 adjacent split committed by search; replacement, retraction and retirement discard
 an unconsumed nomination.
 Disabled directional gains collect no history or retained model scope and charge no

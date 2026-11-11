@@ -19,6 +19,7 @@ internal class LpPassiveVariableChoice(
     val nominatedVariable: VarRef? get() = nomination?.variable
 
     fun clear() {
+        if (nomination == null && !changed && !branched) return
         nomination = null
         changed = false
         branched = false
