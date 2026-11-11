@@ -663,6 +663,12 @@ definitions with independently chosen nearer continuous endpoints. Exact premise
 still authorize every row. The replacement shares the original generation's work
 limit and retains the source-row template; unavailable preparation leaves its prior
 candidates intact. Each immutable template attempts this preparation once.
+Point-directed separation can use a completed floating LP's source-coordinate
+prefix when no exact point is available. Converting its represented binary values
+spends the containing source allowance and prepays bounded storage; cancellation,
+nonfinite coordinates or insufficient funding withhold the entire hint. Logical
+columns are excluded. The hint supplies neither source feasibility, an incumbent
+nor certificate authority, and does not populate the exact-point capture.
 Point scoring admits at most one additional checked cut at each usable point.
 An addition waits for its completed selected query before enabling another scan
 at the next point. Only a strictly stronger checked bound, a checked incumbent or

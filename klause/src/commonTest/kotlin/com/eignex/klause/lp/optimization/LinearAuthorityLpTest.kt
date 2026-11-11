@@ -1,14 +1,94 @@
 package com.eignex.klause.lp.optimization
 
+import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SourceLpFunding
+import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class LinearAuthorityLpTest {
+    @Test
+    fun `completed floating separation should use only the source coordinate prefix`() {
+        val funding = SourceLpFunding(1024L, 4096L).also { it.grant(1024L) }
+        val lp = LinearAuthorityLp(SourceLpBudget(funding = funding))
+        val result = FloatLpResult(Basis(intArrayOf(), emptyArray()), 0.0, doubleArrayOf(),
+            doubleArrayOf(0.5, -1.0, Double.NaN))
+
+        val point = lp.separationPoint(result, 2, Cancellation.Never)
+
+        assertEquals(listOf(BigFraction.ofLong(2).reciprocal(), BigFraction.MINUS_ONE), point)
+        assertTrue(funding.spent > 0L)
+        assertTrue(funding.allocated > 0L)
+        lp.close()
+    }
+
+    @Test
+    fun `unfinished floating solves should supply no separation point`() {
+        val funding = SourceLpFunding(1024L, 4096L).also { it.grant(1024L) }
+        val lp = LinearAuthorityLp(SourceLpBudget(funding = funding))
+        val result = FloatLpResult(Basis(intArrayOf(), emptyArray()), 0.0, doubleArrayOf(),
+            doubleArrayOf(0.5), optimal = false)
+
+        val point = lp.separationPoint(result, 1, Cancellation.Never)
+
+        assertNull(point)
+        lp.close()
+    }
+
+    @Test
+    fun `nonfinite source coordinates should withhold the entire separation point`() {
+        for (value in listOf(Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)) {
+            val funding = SourceLpFunding(1024L, 4096L).also { it.grant(1024L) }
+            val lp = LinearAuthorityLp(SourceLpBudget(funding = funding))
+            val result = FloatLpResult(Basis(intArrayOf(), emptyArray()), 0.0, doubleArrayOf(),
+                doubleArrayOf(0.5, value))
+
+            val point = lp.separationPoint(result, 2, Cancellation.Never)
+
+            assertNull(point)
+            lp.close()
+        }
+    }
+
+    @Test
+    fun `floating separation should require containing work and allocation funding`() {
+        for (funding in listOf(null, SourceLpFunding(0L, 4096L), SourceLpFunding(1024L, 0L))) {
+            funding?.grant(1024L)
+            val lp = LinearAuthorityLp(SourceLpBudget(funding = funding))
+            val result = FloatLpResult(Basis(intArrayOf(), emptyArray()), 0.0, doubleArrayOf(), doubleArrayOf(0.5))
+
+            val point = lp.separationPoint(result, 1, Cancellation.Never)
+
+            assertNull(point)
+            lp.close()
+        }
+    }
+
+    @Test
+    fun `cancelled floating separation should retain its costs without publishing a point`() {
+        var cancelled = false
+        val funding = SourceLpFunding(1024L, 4096L).also { it.grant(1024L) }
+        val lp = LinearAuthorityLp(SourceLpBudget(funding = funding, onWork = {
+            if (it.preparationWork > 1L) cancelled = true
+        }))
+        val result = FloatLpResult(Basis(intArrayOf(), emptyArray()), 0.0, doubleArrayOf(), doubleArrayOf(0.5, 0.75))
+
+        val point = lp.separationPoint(result, 2, Cancellation { cancelled })
+
+        assertNull(point)
+        assertTrue(funding.spent > 0L)
+        assertTrue(funding.allocated > 0L)
+        lp.close()
+    }
+
     @Test
     fun `advice outside a present side should use its exact endpoint`() {
         val lower = ExactLpSide(ExactLpNumber.of(0L))

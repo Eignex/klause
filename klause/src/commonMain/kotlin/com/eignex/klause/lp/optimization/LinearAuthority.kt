@@ -665,6 +665,7 @@ internal class LinearAuthority(
             ?: return LinearAuthorityResult(paused = budget.funding?.paused == true)
         pointListener?.let { listener ->
             val point = guide?.point ?: solved.result.exactPrimal?.take(coordinates.size)
+                ?: lp.separationPoint(solved.result.float, coordinates.size, cancellation)
             if (point != null && point.size == coordinates.size) listener(prepared, point)
         }
         if (capture?.accepting == true && capturedPoint == null && capturedQuery === prepared) {
