@@ -68,6 +68,9 @@ internal object LinearAuthorityAggregateCuts {
         var eligibilityKnown = true
         var retainedContinuationUsed = false
         try {
+            // Reserve binding work so a stopped generation can retain its funded prefix.
+            meter.reserve(maximumCandidates.toLong())
+            observe("AggregateBindingWorkReserved", maximumCandidates.toLong())
             meter.reserve(source.premiseCount.toLong(), 512L)
             val rows = ArrayList<ProbeRow>()
             val integerRows = if (point == null) null else {
@@ -220,6 +223,7 @@ internal object LinearAuthorityAggregateCuts {
         } catch (stop: AggregateStop) {
             observe("AggregatePair${stop.reason}", 1L)
         }
+        for (cut in candidates) cut.bindGeneratedSource(source)
         return candidates.toList()
     }
 

@@ -143,6 +143,7 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
 
     @Suppress("UNCHECKED_CAST")
     private fun query(record: Any): JsonObject {
+        val numericalCuts = field(record, "numericalCuts") as Boolean
         val context = field(record, "context") as SourceProofContext
         val numeric = field(record, "numeric") as SourceProofContext
         return buildJsonObject {
@@ -188,13 +189,16 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
                     put("installed", field(cut, "installed") as Boolean)
                     put("ownerActive", field(cut, "ownerActive") as Boolean)
                     put("checkedAtQuery", field(cut, "checked") as Boolean)
+                    put("admittedAtQuery", field(cut, "admitted") as Boolean)
+                    put("numericalAtQuery", field(cut, "numerical") as Boolean)
                     put("violation", (field(cut, "violation") as BigFraction?)?.toString())
                     put("coefficients", coefficients(row.coefficients))
                     put("rhs", row.rhs.toString())
                     put("strict", row.strict)
                     put("derivation", proof(derivation))
-                    put("freshNativeCheck", SourceEvidenceVerifier(numeric).verify(SourceEvidence(numeric.scope,
-                        SourceClaim.Consequence(row), derivation), stop).toString())
+                    put("freshNativeCheck", if (numericalCuts) "NOT_REQUESTED_NUMERICAL" else
+                        SourceEvidenceVerifier(numeric).verify(SourceEvidence(numeric.scope,
+                            SourceClaim.Consequence(row), derivation), stop).toString())
                 }) }
             })
             for (name in listOf("bound", "refutation", "siblingBound")) {

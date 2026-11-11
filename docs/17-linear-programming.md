@@ -745,8 +745,8 @@ comparison vectors. Their point projection, activity checks and age state still
 debit the scoring and containing source allowances.
 Retired unselected candidates
 are omitted from proof replay as well as scoring. Masked-query reuse distinguishes
-whether unselected candidates are checked; installed cuts retain fresh source
-verification under the current scope.
+whether unselected candidates are checked; installed cuts retain fresh scope-valid
+admission under the selected LP mode.
 Managed current masks and fully checked selected families retain unselected and
 retired row definitions as inactive numerical rows. A completed scoring scan with
 an installed or newly selected cut can retain the candidate layout within the
@@ -762,12 +762,21 @@ allowance.
 Preparation visits at most 65,536 modeled row/support operations with
 4,096-bit input, denominator and intermediate scalar limits. Cut definitions and source-row ownership
 stay in the retained template, ahead of changing invocation-bound rows. Every
-query rechecks active cuts against the exact numeric source context under one
-shared 100,000-step proof allowance and premise view; inactive
-Boolean guards or integer pins disable their source rows and dependent cuts.
+query resolves active source ownership; inactive Boolean guards or integer pins
+disable their source rows and dependent cuts. Exact mode checks the retained
+derivations against the numeric source context under one shared 100,000-step
+proof allowance. In numerical mode, native generators bind retained cuts to their
+immutable numeric definitions and generation restrictions. Admission checks that
+binding and a funded original-or-stronger scope implication without invoking the
+exact cut verifier. Generation prepays retained binding work, including a prefix
+retained after an interrupted attempt. Supplied or replayed cuts without a native
+binding decline numerical admission. Template reuse preserves source semantics
+and checker identity as well as linear data.
 A cut with several source owners requires every owner to be active. Retraction
-restores those activation masks. Unverified cuts remain inactive and require an
-identity row layout. `source-cuts=false` disables this separation in numerical
+restores those activation masks. Unadmitted cuts remain inactive and require an
+identity row layout. Captures distinguish numerical admission from exact checked
+cuts; numerical snapshot emission does not request a fresh exact cut check.
+`source-cuts=false` disables this separation in numerical
 frontier traversal. LP certificates cite the nested source rounding
 derivation, and final source checking repeats Boolean substitution independently.
 Numeric views without Boolean coordinates retain immutable premise rows; their
@@ -857,8 +866,9 @@ retained rows debit the same containing generation and source funding. A shared
 immutable-generation index supplies stated integer endpoints to both recipe kinds.
 An established invocation bound can replace a missing or weaker stated endpoint.
 It contributes a typed bound assumption rather than an original-source premise or
-row owner. Every cut verification resolves that assumption in the current scope;
-retracting the bound withholds the cut. Scoped endpoint comparison, storage and
+row owner. Exact cut verification resolves that assumption in the current scope;
+numerical bindings retain its generation restriction. Retracting a required bound
+withholds the cut. Scoped endpoint comparison, storage and
 publication spend the same generation allowance.
 It traverses the same consumer-owned premises and retains endpoints only for coordinates
 requested by completed aggregates. A fully funded scan records both present and

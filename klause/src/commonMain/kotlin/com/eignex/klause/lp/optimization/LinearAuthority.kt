@@ -108,6 +108,8 @@ internal class LinearAuthority(
     private var pointRound: PointRound? = null
     private var cutPreparationWork = 0L
     private var cutVerificationWork = 0L
+    private var cutScreeningWork = 0L
+    private val numericalCuts: Boolean get() = budget.context.certificationPolicy.numericalDeductions
     private var retainedCutPeak = 0L
     private var activeCutPeak = 0L
     private val cutEligibility = linkedMapOf<String, Long>()
@@ -116,6 +118,7 @@ internal class LinearAuthority(
     fun cutObservations(): Map<String, Long> = mapOf(
         "numericalCutPreparationWork" to cutPreparationWork,
         "numericalCutVerificationWork" to cutVerificationWork,
+        "numericalCutScreeningWork" to cutScreeningWork,
         "numericalMaxRetainedCuts" to retainedCutPeak,
         "numericalMaxActiveCuts" to activeCutPeak,
         "numericalMaxRetainedMixedCuts" to retainedMixedCutPeak,
@@ -173,7 +176,7 @@ internal class LinearAuthority(
         var pending = pointRound?.takeIf {
             it.query.matches(source, cuts = true, cutMask = it.query.cutMask,
                 checkUnselectedCuts = it.query.checkUnselectedCuts,
-                retainMaskedCuts = it.query.retainMaskedCuts)
+                retainMaskedCuts = it.query.retainMaskedCuts, numericalCuts = numericalCuts)
         }
         if (pending == null) {
             pointRound = null
@@ -203,7 +206,7 @@ internal class LinearAuthority(
             if (family.cuts == null ||
                 !prepared.matches(source, cuts = true, cutMask = baselineMask,
                     checkUnselectedCuts = checkUnselectedCuts(baselineMask),
-                    retainMaskedCuts = retainMaskedCuts(baselineMask))) {
+                    retainMaskedCuts = retainMaskedCuts(baselineMask), numericalCuts = numericalCuts)) {
                 policy.observe("PointUnavailable")
                 return base
             }
@@ -239,7 +242,7 @@ internal class LinearAuthority(
             }
             val selected = cutLifecycle.containing("POINT_SELECTION") {
                 policy.select(checkNotNull(family.cuts).rows, prepared.coordinates, prepared.costs,
-                    prepared.checkedCuts, observed.second, pointMask.orEmpty().intersect(prepared.checkedCuts),
+                    prepared.admittedCuts, observed.second, pointMask.orEmpty().intersect(prepared.admittedCuts),
                     cancellation, adoptCurrent = baselineMask == null && family === baselineFamily &&
                         prepared.activeCuts == checkNotNull(family.cuts).rows.size)
             }
@@ -351,7 +354,7 @@ internal class LinearAuthority(
         val before = original.cuts?.rows ?: return false
         val after = refined.cuts?.rows ?: return false
         if (before.size > 64 || before.size != after.size || query.activeCuts != before.size ||
-            query.checkedCuts.size != before.size || cancellation()) return false
+            query.admittedCuts.size != before.size || cancellation()) return false
         pointPolicy?.observe("PreparationReuseChecks")
         var work = 0L
         fun charge(amount: Long, allocation: Long = 0L): Boolean {
@@ -372,7 +375,7 @@ internal class LinearAuthority(
             val left = before[index]
             val right = after[index]
             if (!charge(1L + left.owners.size + right.owners.size + left.inequality.supportSize, 64L)) return false
-            if (index !in query.checkedCuts || left.owner != right.owner || left.owners != right.owners ||
+            if (index !in query.admittedCuts || left.owner != right.owner || left.owners != right.owners ||
                 left.family != right.family || left.mixed != right.mixed ||
                 left.inequality.strict != right.inequality.strict) return false
             val first = left.inequality.coefficients
@@ -547,7 +550,12 @@ internal class LinearAuthority(
             }
         }, cutMask = cutMask, onCut = cutLifecycle::observe,
             checkUnselectedCuts = checkUnselectedCuts(cutMask),
-            retainMaskedCuts = retainMaskedCuts(cutMask))?.also {
+            retainMaskedCuts = retainMaskedCuts(cutMask), budget = budget, onNumericalCutWork = { work ->
+                cutScreeningWork += work
+                for (family in prepared?.cuts?.rows.orEmpty().mapTo(HashSet()) { it.family }) {
+                    cutLifecycle.observe(family, "NumericalScreeningWork", work)
+                }
+            })?.also {
             cutLifecycle.families = it.cutFamilies.values.toSet()
             activeCutPeak = maxOf(activeCutPeak, it.activeCuts.toLong())
             activeMixedCutPeak = maxOf(activeMixedCutPeak, it.activeMixedCuts.toLong())
@@ -597,7 +605,8 @@ internal class LinearAuthority(
         cutMask: Set<Int>? = null,
     ): LinearAuthorityResult {
         val cached = if (retainLp || guidance) query?.takeIf {
-            it.matches(source, cuts, cutMask, checkUnselectedCuts(cutMask), retainMaskedCuts(cutMask))
+            it.matches(source, cuts, cutMask, checkUnselectedCuts(cutMask), retainMaskedCuts(cutMask),
+                numericalCuts = numericalCuts)
         } else null
         val prepared = cached ?: prepareQuery(source, cancellation, cuts, cutMask)?.also {
             if (retainLp || guidance) query = it

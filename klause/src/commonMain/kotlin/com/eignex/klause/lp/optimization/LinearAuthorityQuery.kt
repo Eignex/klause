@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.optimization
 
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -32,6 +33,8 @@ internal class LinearAuthorityQuery private constructor(
     val cutMask: Set<Int>?,
     val checkUnselectedCuts: Boolean,
     val checkedCuts: Set<Int>,
+    val admittedCuts: Set<Int>,
+    val numericalCuts: Boolean,
     val installedCuts: Set<Int>,
     val cutFamilies: Map<Int, CutFamily>,
     val retainMaskedCuts: Boolean,
@@ -45,7 +48,9 @@ internal class LinearAuthorityQuery private constructor(
         other: SourceProofContext, cuts: Boolean = false, cutMask: Set<Int>? = null,
         checkUnselectedCuts: Boolean = true,
         retainMaskedCuts: Boolean = false,
+        numericalCuts: Boolean = this.numericalCuts,
     ): Boolean = this.cuts == cuts && this.cutMask == cutMask &&
+        this.numericalCuts == numericalCuts &&
         this.checkUnselectedCuts == checkUnselectedCuts && this.retainMaskedCuts == retainMaskedCuts &&
         (source === other ||
         (source.scope == other.scope &&
@@ -63,6 +68,8 @@ internal class LinearAuthorityQuery private constructor(
             onCut: (CutFamily, String, Long) -> Unit = { _, _, _ -> },
             checkUnselectedCuts: Boolean = true,
             retainMaskedCuts: Boolean = false,
+            budget: SourceLpBudget? = null,
+            onNumericalCutWork: (Long) -> Unit = {},
         ): LinearAuthorityQuery? {
             val coordinates = template?.coordinates ?: source.numericCoordinates()
             val numeric = template?.numeric ?: source.numericContext()
@@ -93,7 +100,8 @@ internal class LinearAuthorityQuery private constructor(
                 (checkUnselectedCuts || cutMask == null || id in cutMask) &&
                     cuts[id].owners.none { it in inactive }
             }
-            val checks = if (active.isEmpty()) emptyList() else {
+            val numerical = budget?.context?.certificationPolicy?.numericalDeductions == true
+            val checks = if (active.isEmpty() || numerical) emptyList() else {
                 SourceEvidenceVerifier(numeric.atScope(source.scope), maximumSteps = maximumCutProofSteps)
                     .verifyAll(active.map { id ->
                         val cut = cuts[id]
@@ -104,7 +112,16 @@ internal class LinearAuthorityQuery private constructor(
                     })
             }
             onCutWork(cutVerificationWork)
-            val accepted = active.indices.filter { checks[it] == SourceEvidenceCheck.Checked }
+            val accepted = if (numerical) {
+                val containing = checkNotNull(budget)
+                val before = containing.measuredPreparationWork
+                try {
+                    val binding = numeric.atScope(source.scope)
+                    active.filterTo(HashSet()) { cuts[it].admitsNumerically(binding, containing, cancellation) }
+                } finally {
+                    onNumericalCutWork(containing.measuredPreparationWork - before)
+                }
+            } else active.indices.filter { checks[it] == SourceEvidenceCheck.Checked }
                 .mapTo(HashSet()) { active[it] }
             val cutFamilies = HashMap<Int, CutFamily>()
             for ((id, cut) in cuts.withIndex()) {
@@ -112,7 +129,7 @@ internal class LinearAuthorityQuery private constructor(
                 onCut(cut.family, when {
                     !checkUnselectedCuts && cutMask != null && id !in cutMask -> "RETIRED_CANDIDATE"
                     id !in active -> "INACTIVE_PREMISE"
-                    id !in accepted -> "VERIFICATION_DECLINED"
+                    id !in accepted -> if (numerical) "NUMERICAL_ADMISSION_DECLINED" else "VERIFICATION_DECLINED"
                     cutMask != null && id !in cutMask -> "UNSELECTED"
                     else -> "INSTALLED"
                 }, 1L)
@@ -146,10 +163,12 @@ internal class LinearAuthorityQuery private constructor(
             val sign = if (source.scope.objective?.sense == ObjectiveSense.MINIMIZE) BigFraction.ONE
                 else BigFraction.MINUS_ONE
             val costs = coordinates.map { sign * (numeric.objective[it] ?: BigFraction.ZERO) }
+            val admitted = accepted.toSet()
             return LinearAuthorityQuery(source, coordinates, cited, rows, inactive,
                 unconditional && (inactive.isEmpty() || retainMaskedCuts),
                 costs, numeric.objectiveConstant * sign, sign, template?.cuts != null, activeCuts, activeMixedCuts,
-                cutMask?.toSet(), checkUnselectedCuts, accepted.toSet(),
+                cutMask?.toSet(), checkUnselectedCuts, if (numerical) emptySet() else admitted,
+                admitted, numerical,
                 accepted.filterTo(HashSet()) { cutMask == null || it in cutMask },
                 cutFamilies.toMap(), retainMaskedCuts)
         }

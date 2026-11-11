@@ -73,7 +73,8 @@ internal class LinearAuthorityTemplate private constructor(
 
     fun matches(other: SourceProofContext): Boolean = source.scope.revision == other.scope.revision &&
         source.scope.objective == other.scope.objective &&
-        source.scope.condition.bools == other.scope.condition.bools && source.hasSameLinearData(other)
+        source.scope.condition.bools == other.scope.condition.bools && source.hasSameLinearData(other) &&
+        source.semantics == other.semantics && source.semanticsChecker === other.semanticsChecker
 
     companion object {
         fun prepare(

@@ -20,7 +20,7 @@ internal data class LinearAuthorityFeedbackRequest(
     val cuts: Cuts = Cuts.None,
     val refutation: Boolean = false,
 ) {
-    // Installed keeps installed, checked cuts with active owners and evaluates their violations on demand.
+    // Installed keeps admitted cuts with active owners and evaluates their violations on demand.
     enum class Cuts { None, Installed, All }
 
     operator fun plus(other: LinearAuthorityFeedbackRequest) = LinearAuthorityFeedbackRequest(
@@ -52,6 +52,8 @@ internal data class LinearAuthorityCapturedCut(
     val owners: Set<Int> = setOf(owner),
     val family: CutFamily? = null,
     val mixed: Boolean = false,
+    val admitted: Boolean = checked,
+    val numerical: Boolean = false,
 )
 
 internal data class LinearAuthorityCapturedQuery(
@@ -74,6 +76,7 @@ internal data class LinearAuthorityCapturedQuery(
     val boundDisposition: String = "unknown",
     val projection: LinearAuthorityFeedbackRequest = LinearAuthorityFeedbackRequest.Full,
     val generationScope: SourceScope? = null,
+    val numericalCuts: Boolean = false,
 )
 
 // Source values and derivations are immutable; numerical owners, queries and their buffers never escape.
@@ -335,7 +338,7 @@ internal class LinearAuthorityCapture(
         val ids = when (projection.cuts) {
             LinearAuthorityFeedbackRequest.Cuts.All -> definitions.indices.toList()
             LinearAuthorityFeedbackRequest.Cuts.Installed -> if (query == null) emptyList() else
-                query.installedCuts.filter { it in definitions.indices && it in query.checkedCuts }.sorted()
+                query.installedCuts.filter { it in definitions.indices && it in query.admittedCuts }.sorted()
             LinearAuthorityFeedbackRequest.Cuts.None -> emptyList()
         }
         for (id in ids) {
@@ -352,7 +355,9 @@ internal class LinearAuthorityCapture(
             }
             candidates += LinearAuthorityCapturedCut(id, cut.owner, cut.inequality, cut.derivation,
                 query != null && id in query.installedCuts, ownerActive,
-                query != null && id in query.checkedCuts, violation, cut.owners, cut.family, cut.mixed)
+                query != null && id in query.checkedCuts, violation, cut.owners, cut.family, cut.mixed,
+                admitted = query != null && id in query.admittedCuts,
+                numerical = query?.numericalCuts == true && id in query.admittedCuts)
         }
         val refutation = result.evidence?.takeIf { it.claim == SourceClaim.Refutation }
         val retainedRefutation = refutation?.takeIf { projection.refutation }
@@ -373,7 +378,7 @@ internal class LinearAuthorityCapture(
                 point == null && !pointWithheld -> "point-unavailable"
                 result.bound == null -> "bound-unavailable"
                 else -> "completed"
-            }, projection = projection, generationScope = generationScope)
+            }, projection = projection, generationScope = generationScope, numericalCuts = query?.numericalCuts == true)
         if (archive) {
             retained += captured
             recordedAttempt = attempted
