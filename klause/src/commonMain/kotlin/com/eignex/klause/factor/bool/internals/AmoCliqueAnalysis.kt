@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.arrays.argsortBy
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.MutableIntIntMap
 import com.eignex.util.collections.MutableIntObjectMap
@@ -55,7 +56,7 @@ private fun pbKnapsackClique(pb: PseudoBoolean): Set<Int>? {
     if (!permitsLongPseudoBoolean(pb.constants)) return null
     if (pb.op != PbOp.LE && pb.op != PbOp.EQ) return null
     if (pb.literals.size < 2 || pb.bound < 0) return null
-    val order = pb.weights.indices.sortedBy { pb.weights[it] } // ascending weight
+    val order = argsortBy(pb.weights.size) { a, b -> pb.weights[a].compareTo(pb.weights[b]) }
     for (i in order) if (pb.weights[i] <= 0) return null
     // The suffix from the first index whose pair-sum with its neighbour exceeds the bound is a clique:
     // its two smallest members already exceed b, so every pair does too.

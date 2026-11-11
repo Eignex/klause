@@ -5,6 +5,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.boundLiteral
 import com.eignex.klause.propagation.domainAt
 import com.eignex.klause.propagation.lazyReason
+import com.eignex.util.arrays.argsortBy
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
@@ -206,8 +207,8 @@ internal fun computeBoundsAllDifferent(lo: LongArray, hi: LongArray, newLo: Long
 
 private fun raiseMins(lo: LongArray, hi: LongArray, outLo: LongArray): Boolean {
     val n = lo.size
-    val minsorted = (0 until n).sortedBy { lo[it] }.toIntArray()
-    val maxsorted = (0 until n).sortedBy { hi[it] }.toIntArray()
+    val minsorted = argsortBy(n) { a, b -> lo[a].compareTo(lo[b]) }
+    val maxsorted = argsortBy(n) { a, b -> hi[a].compareTo(hi[b]) }
 
     // `bounds` holds the distinct interval endpoints (values, Long); `minrank`/`maxrank` index into
     // it, and `t`/`h` are union-find pointer chains over those indices — all small Ints.

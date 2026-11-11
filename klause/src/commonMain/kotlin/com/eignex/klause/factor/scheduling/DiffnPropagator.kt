@@ -8,6 +8,7 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.boundLiteral
 import com.eignex.klause.propagation.domainAt
 import com.eignex.klause.propagation.lazyReason
+import com.eignex.util.arrays.argsortBy
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.LongArrayList
@@ -296,7 +297,7 @@ internal class DiffnPropagator(
         // Scan [oMin, oMax] for an origin not covered by any forbidden interval.
         val oMin = state.intDomains[opos[i]].min
         val oMax = state.intDomains[opos[i]].max
-        val order = (0 until lows.size).sortedBy { lows[it] }
+        val order = argsortBy(lows.size) { a, b -> lows[a].compareTo(lows[b]) }
         var cursor = oMin
         for (idx in order) {
             val a = lows[idx]

@@ -9,6 +9,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.util.arrays.argsortBy
 
 /** LS invariant for [Diffn]: maintains the overlapping-pair count, with affected-pair deltas. */
 internal class DiffnInvariant(
@@ -291,7 +292,9 @@ internal class DiffnInvariant(
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
         if (n == 0) return false
         var prevRight = Long.MIN_VALUE
-        val order = (0 until n).sortedBy { state.rootDomains[xs[it]].min }
+        val order = argsortBy(n) { a, b ->
+            state.rootDomains[xs[a]].min.compareTo(state.rootDomains[xs[b]].min)
+        }
         for (i in order) {
             val xv = xs[i]
             val w = rw(state, i, -1, 0L)
