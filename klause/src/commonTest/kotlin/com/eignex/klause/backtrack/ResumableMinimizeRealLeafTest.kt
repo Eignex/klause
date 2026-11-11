@@ -4,12 +4,15 @@ import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.formats.mps.Mps
-import com.eignex.klause.formats.mps.toExactSourceProblem
+import com.eignex.klause.formats.mps.checkMpsWitness
+import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
@@ -843,7 +846,10 @@ class ResumableMinimizeRealLeafTest {
                         " X COST 10 R 2\nRHS\n RHS R 2 COST -3\nBOUNDS\n" +
                         " BV B I\n LO B X 0.25\n UP B X 1.25\nENDATA",
                 )
-                val compiled = if (exact) source.toExactSourceProblem() else source.toProblem()
+                val overrides =
+                    if (exact) SemanticOverrides(feasibilityTolerance = SourceTolerance()) else SemanticOverrides()
+                val compiled = source.toProblem(semanticOverrides = overrides)
+                val linear = assertNotNull(source.toLinearSourceProblem(overrides))
                 val sourceObjective = assertNotNull(compiled.objective).toLinearObjective()
                 val objective = if (compiled.maximize) sourceObjective.negated() else sourceObjective
                 val offered = ArrayList<Sample>()
@@ -853,7 +859,14 @@ class ResumableMinimizeRealLeafTest {
                         null
                     } else {
                         { sample ->
-                            compiled.withinTolerance(sample.ints, sample.reals)
+                            val values = compiled.columns.mapNotNull { column ->
+                                if (column.real) {
+                                    BigFraction.ofDouble(sample.reals[column.id])
+                                } else {
+                                    BigFraction.ofLong(sample.ints[column.id])
+                                }
+                            }
+                            linear.checkMpsWitness(values) != null
                         }
                     },
                     lpPlan = LpPlan(bounding = true, probe = false, lbTreeSearch = true, rootCutHarvest = false),
@@ -866,7 +879,9 @@ class ResumableMinimizeRealLeafTest {
 
                 val sample = offered.single()
                 val reals = sample.exactReals ?: sample.reals.map { assertNotNull(BigFraction.ofDouble(it)) }
-                val witness = compiled.sourceWitness(sample.ints, reals)
+                val witness = assertNotNull(linear.checkMpsWitness(compiled.columns.map {
+                    if (it.real) reals[it.id] else BigFraction.ofLong(sample.ints[it.id])
+                }))
                 assertEquals(if (compiled.maximize) "13" else "9", witness.objective.toString())
                 assertEquals(
                     if (compiled.maximize) listOf("0", "1") else listOf("1", "1/2"),

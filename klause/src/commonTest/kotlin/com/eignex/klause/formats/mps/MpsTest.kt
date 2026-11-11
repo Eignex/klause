@@ -1,6 +1,8 @@
 package com.eignex.klause.formats.mps
 
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.perCharSource
 import com.eignex.util.io.CharSource
@@ -8,6 +10,7 @@ import com.eignex.util.io.StringCharSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -166,9 +169,11 @@ class MpsTest {
     fun `unchanged copies should retain exact sums with overflowing projections`() {
         val parsed = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1e308\n X COST 1e308\nENDATA")
 
-        val compiled = parsed.copy(name = "copy").toExactSourceProblem()
+        val source = assertNotNull(parsed.copy(name = "copy").toLinearSourceProblem(
+            SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+        ))
 
-        val witness = compiled.sourceWitness(listOf(BigFraction.ONE))
+        val witness = assertNotNull(source.checkMpsWitness(listOf(BigFraction.ONE)))
 
         assertEquals("2" + "0".repeat(308), witness.objective.toString())
     }

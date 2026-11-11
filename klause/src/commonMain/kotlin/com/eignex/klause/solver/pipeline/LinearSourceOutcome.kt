@@ -262,8 +262,6 @@ internal fun executeLinearSource(
             }
         }
 
-        is SourceExecutionResult.Numerical -> linear(result.result)
-
         is SourceExecutionResult.Linear -> when (val execution = result.result) {
             is OpenTheoryExecution.Satisfy -> when (val solved = execution.result) {
                 is OpenTheoryResult.Sat -> {
@@ -383,7 +381,8 @@ internal fun executeLinearSource(
         else -> LinearSourceConclusion.UNKNOWN
     }
     val bound = when (result) {
-        is SourceExecutionResult.Numerical -> prepared.qualifyBound(result.result.bound, nativeClaimsUnrestricted)
+        is SourceExecutionResult.Linear -> (result.result as? OpenTheoryExecution.Optimize)?.result?.linearResult?.bound
+            ?.let { prepared.qualifyBound(it, nativeClaimsUnrestricted) }
         is SourceExecutionResult.Finite -> result.result.nativeObjectiveBound?.let {
             prepared.qualifyBound(it.evidence, nativeClaimsUnrestricted, it)
         }
@@ -399,7 +398,6 @@ internal fun executeLinearSource(
         is SourceExecutionResult.Prepared -> result
         is SourceExecutionResult.Finite -> SourceExecutionResult.Finite(invocation, result.result, snapshot)
         is SourceExecutionResult.Linear -> SourceExecutionResult.Linear(invocation, result.result, snapshot)
-        is SourceExecutionResult.Numerical -> SourceExecutionResult.Numerical(invocation, result.result, snapshot)
         is SourceExecutionResult.Refuted -> SourceExecutionResult.Refuted(invocation, snapshot)
         is SourceExecutionResult.Declined -> SourceExecutionResult.Declined(invocation, result.reason, snapshot)
         is SourceExecutionResult.Polynomial -> SourceExecutionResult.Polynomial(invocation, result.result, snapshot)

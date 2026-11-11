@@ -26,6 +26,8 @@ import com.eignex.util.numbers.BIG_ONE
 import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
+import java.math.BigDecimal
+import java.math.BigInteger
 import kotlin.math.ceil
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.Json
@@ -110,7 +112,7 @@ internal object RepairOwnerReplay {
             val entry = Json.parseToJsonElement(line).jsonObject
             val saved = entry.getValue("center").jsonObject
             val reals = saved["exactReals"]?.jsonArray?.map {
-                MpsResidualObjective.rational(it.jsonPrimitive.content)
+                rational(it.jsonPrimitive.content)
             }.orEmpty()
             require(reals.size == problem.numRealVars)
             val center = Sample(saved.getValue("bools").jsonArray.map { it.jsonPrimitive.content.toBooleanStrict() }
@@ -576,4 +578,12 @@ internal object RepairOwnerReplay {
 
     private fun call(owner: Any, name: String, vararg args: Any?): Any? =
         NumericalResidualProfile.call(owner, name, *args)
+
+    private fun rational(text: String): BigFraction {
+        val parts = text.split('/')
+        if (parts.size == 2) return BigFraction.of(parts[0].toBigInteger(), parts[1].toBigInteger())
+        val value = BigDecimal(text)
+        return if (value.scale() < 0) BigFraction.of(value.toBigIntegerExact(), BigInteger.ONE) else
+            BigFraction.of(value.unscaledValue(), BigInteger.TEN.pow(value.scale()))
+    }
 }

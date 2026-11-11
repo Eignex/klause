@@ -3,7 +3,11 @@ package com.eignex.klause.bench.profile
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.formats.mps.Mps
-import com.eignex.klause.formats.mps.toExactSourceProblem
+import com.eignex.klause.formats.mps.checkMpsWitness
+import com.eignex.klause.formats.mps.toLinearSourceProblem
+import com.eignex.klause.formats.mps.toProblem
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.toLinearObjective
@@ -19,7 +23,10 @@ internal fun libraryCaller(options: Map<String, String>) {
     val seed = options.getValue("seed").toLong()
     val started = Monotonic.markNow()
     val stop = Cancellation.after(timeout.milliseconds)
-    val compiled = Mps.parse(Base64.decode(options.getValue("source64")).decodeToString()).toExactSourceProblem()
+    val parsed = Mps.parse(Base64.decode(options.getValue("source64")).decodeToString())
+    val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+    val compiled = parsed.toProblem(semanticOverrides = exact)
+    val source = requireNotNull(parsed.toLinearSourceProblem(exact, stop))
     require(compiled.sourceExact) { "Library caller requires an exact original-source working view" }
     val sourceObjective = requireNotNull(compiled.objective).toLinearObjective()
     val objective = if (compiled.maximize) sourceObjective.negated() else sourceObjective
@@ -36,7 +43,8 @@ internal fun libraryCaller(options: Map<String, String>) {
                     ?: BigFraction.ofLong(sample.ints[column.id])
             }
         }
-        compiled.sourceWitness(coordinates, stop).also { require(it.exact) }
+        requireNotNull(source.checkMpsWitness(coordinates, stop)) { "source witness rejected or cancelled" }
+            .also { require(it.exact) }
     }
     println("c libraryCaller=BacktrackSolver(baked).minimize")
     println("c libraryControls=satOptimized maxInstructions=1000 seed=$seed timeoutMs=$timeout")

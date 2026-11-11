@@ -8511,8 +8511,6 @@ final class com.eignex.klause.formats.mps/MpsCompiled : com.eignex.klause.ir/Sou
         final fun <get-sourceDifference>(): kotlin/String? // com.eignex.klause.formats.mps/MpsCompiled.sourceDifference.<get-sourceDifference>|<get-sourceDifference>(){}[0]
     final val sourceExact // com.eignex.klause.formats.mps/MpsCompiled.sourceExact|{}sourceExact[0]
         final fun <get-sourceExact>(): kotlin/Boolean // com.eignex.klause.formats.mps/MpsCompiled.sourceExact.<get-sourceExact>|<get-sourceExact>(){}[0]
-    final val toleranceDifference // com.eignex.klause.formats.mps/MpsCompiled.toleranceDifference|{}toleranceDifference[0]
-        final fun <get-toleranceDifference>(): kotlin/String? // com.eignex.klause.formats.mps/MpsCompiled.toleranceDifference.<get-toleranceDifference>|<get-toleranceDifference>(){}[0]
 
     final fun component1(): com.eignex.klause.ir/Problem // com.eignex.klause.formats.mps/MpsCompiled.component1|component1(){}[0]
     final fun component2(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.formats.mps/MpsCompiled.component2|component2(){}[0]
@@ -8522,15 +8520,8 @@ final class com.eignex.klause.formats.mps/MpsCompiled : com.eignex.klause.ir/Sou
     final fun component6(): kotlin/Int // com.eignex.klause.formats.mps/MpsCompiled.component6|component6(){}[0]
     final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.ir/LinearObjectiveSpec? = ..., kotlin/Boolean = ..., kotlin.collections/List<com.eignex.klause.formats.mps/MpsColumn> = ..., kotlin/Long = ..., kotlin/Int = ...): com.eignex.klause.formats.mps/MpsCompiled // com.eignex.klause.formats.mps/MpsCompiled.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.Boolean;kotlin.collections.List<com.eignex.klause.formats.mps.MpsColumn>;kotlin.Long;kotlin.Int){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.mps/MpsCompiled.equals|equals(kotlin.Any?){}[0]
-    final fun exactClaimsCoverTolerance(com.eignex.klause.util/Cancellation = ...): kotlin/Boolean // com.eignex.klause.formats.mps/MpsCompiled.exactClaimsCoverTolerance|exactClaimsCoverTolerance(com.eignex.klause.util.Cancellation){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats.mps/MpsCompiled.hashCode|hashCode(){}[0]
-    final fun sourceObjective(kotlin/LongArray, kotlin/DoubleArray): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.formats.mps/MpsCompiled.sourceObjective|sourceObjective(kotlin.LongArray;kotlin.DoubleArray){}[0]
-    final fun sourceWitness(kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.util/Cancellation = ...): com.eignex.klause.formats.mps/MpsSourceWitness // com.eignex.klause.formats.mps/MpsCompiled.sourceWitness|sourceWitness(kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.util.Cancellation){}[0]
-    final fun sourceWitness(kotlin/LongArray, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>?): com.eignex.klause.formats.mps/MpsSourceWitness // com.eignex.klause.formats.mps/MpsCompiled.sourceWitness|sourceWitness(kotlin.LongArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>?){}[0]
-    final fun sourceWitnessOrNull(kotlin/LongArray, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>?, kotlin/Int): com.eignex.klause.formats.mps/MpsSourceWitness? // com.eignex.klause.formats.mps/MpsCompiled.sourceWitnessOrNull|sourceWitnessOrNull(kotlin.LongArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>?;kotlin.Int){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.mps/MpsCompiled.toString|toString(){}[0]
-    final fun toleranceObjectiveBound(com.eignex.klause.util/Cancellation = ...): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.formats.mps/MpsCompiled.toleranceObjectiveBound|toleranceObjectiveBound(com.eignex.klause.util.Cancellation){}[0]
-    final fun withinTolerance(kotlin/LongArray, kotlin/DoubleArray, com.eignex.klause.util/Cancellation = ...): kotlin/Boolean // com.eignex.klause.formats.mps/MpsCompiled.withinTolerance|withinTolerance(kotlin.LongArray;kotlin.DoubleArray;com.eignex.klause.util.Cancellation){}[0]
 }
 
 final class com.eignex.klause.formats.mps/MpsConstraint { // com.eignex.klause.formats.mps/MpsConstraint|null[0]
@@ -8632,25 +8623,6 @@ final class com.eignex.klause.formats.mps/MpsObjective { // com.eignex.klause.fo
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.mps/MpsObjective.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats.mps/MpsObjective.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.mps/MpsObjective.toString|toString(){}[0]
-}
-
-final class com.eignex.klause.formats.mps/MpsSourceWitness { // com.eignex.klause.formats.mps/MpsSourceWitness|null[0]
-    constructor <init>(kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.simplex.exact/BigFraction, kotlin/Boolean = ...) // com.eignex.klause.formats.mps/MpsSourceWitness.<init>|<init>(kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.simplex.exact.BigFraction;kotlin.Boolean){}[0]
-
-    final val exact // com.eignex.klause.formats.mps/MpsSourceWitness.exact|{}exact[0]
-        final fun <get-exact>(): kotlin/Boolean // com.eignex.klause.formats.mps/MpsSourceWitness.exact.<get-exact>|<get-exact>(){}[0]
-    final val objective // com.eignex.klause.formats.mps/MpsSourceWitness.objective|{}objective[0]
-        final fun <get-objective>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.formats.mps/MpsSourceWitness.objective.<get-objective>|<get-objective>(){}[0]
-    final val values // com.eignex.klause.formats.mps/MpsSourceWitness.values|{}values[0]
-        final fun <get-values>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.formats.mps/MpsSourceWitness.values.<get-values>|<get-values>(){}[0]
-
-    final fun component1(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.formats.mps/MpsSourceWitness.component1|component1(){}[0]
-    final fun component2(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.formats.mps/MpsSourceWitness.component2|component2(){}[0]
-    final fun component3(): kotlin/Boolean // com.eignex.klause.formats.mps/MpsSourceWitness.component3|component3(){}[0]
-    final fun copy(kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> = ..., com.eignex.klause.simplex.exact/BigFraction = ..., kotlin/Boolean = ...): com.eignex.klause.formats.mps/MpsSourceWitness // com.eignex.klause.formats.mps/MpsSourceWitness.copy|copy(kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.simplex.exact.BigFraction;kotlin.Boolean){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.mps/MpsSourceWitness.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.eignex.klause.formats.mps/MpsSourceWitness.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.eignex.klause.formats.mps/MpsSourceWitness.toString|toString(){}[0]
 }
 
 final class com.eignex.klause.formats.mps/MpsVar { // com.eignex.klause.formats.mps/MpsVar|null[0]
@@ -19551,8 +19523,6 @@ final const val com.eignex.klause.config/DEFAULT_UNBOUNDED_INT_LO // com.eignex.
     final fun <get-DEFAULT_UNBOUNDED_INT_LO>(): kotlin/Long // com.eignex.klause.config/DEFAULT_UNBOUNDED_INT_LO.<get-DEFAULT_UNBOUNDED_INT_LO>|<get-DEFAULT_UNBOUNDED_INT_LO>(){}[0]
 final const val com.eignex.klause.config/MINIZINC_UNBOUNDED_DEFAULT // com.eignex.klause.config/MINIZINC_UNBOUNDED_DEFAULT|{}MINIZINC_UNBOUNDED_DEFAULT[0]
     final fun <get-MINIZINC_UNBOUNDED_DEFAULT>(): kotlin/Long // com.eignex.klause.config/MINIZINC_UNBOUNDED_DEFAULT.<get-MINIZINC_UNBOUNDED_DEFAULT>|<get-MINIZINC_UNBOUNDED_DEFAULT>(){}[0]
-final const val com.eignex.klause.formats.mps/MPS_TOLERANCE // com.eignex.klause.formats.mps/MPS_TOLERANCE|{}MPS_TOLERANCE[0]
-    final fun <get-MPS_TOLERANCE>(): kotlin/Double // com.eignex.klause.formats.mps/MPS_TOLERANCE.<get-MPS_TOLERANCE>|<get-MPS_TOLERANCE>(){}[0]
 final const val com.eignex.klause.solver.pipeline/NODE_LIMIT_KEY // com.eignex.klause.solver.pipeline/NODE_LIMIT_KEY|{}NODE_LIMIT_KEY[0]
     final fun <get-NODE_LIMIT_KEY>(): kotlin/String // com.eignex.klause.solver.pipeline/NODE_LIMIT_KEY.<get-NODE_LIMIT_KEY>|<get-NODE_LIMIT_KEY>(){}[0]
 
@@ -19606,7 +19576,6 @@ final fun (com.eignex.klause.formats.flatzinc/FlatZincProgram).com.eignex.klause
 final fun (com.eignex.klause.formats.flatzinc/FlatZincProgram).com.eignex.klause.formats.flatzinc/prepareSourceExecution(com.eignex.klause.solver.pipeline/SourceSetupRequest, kotlin/Function1<com.eignex.klause.solver.result/LpStats, kotlin/Unit>): com.eignex.klause.solver.pipeline/PreparedSourceInvocation // com.eignex.klause.formats.flatzinc/prepareSourceExecution|prepareSourceExecution@com.eignex.klause.formats.flatzinc.FlatZincProgram(com.eignex.klause.solver.pipeline.SourceSetupRequest;kotlin.Function1<com.eignex.klause.solver.result.LpStats,kotlin.Unit>){}[0]
 final fun (com.eignex.klause.formats.flatzinc/FlatZincProgram).com.eignex.klause.formats.flatzinc/sourceAttachment(): com.eignex.klause.solver.pipeline/SourceAttachment // com.eignex.klause.formats.flatzinc/sourceAttachment|sourceAttachment@com.eignex.klause.formats.flatzinc.FlatZincProgram(){}[0]
 final fun (com.eignex.klause.formats.flatzinc/FlatZincSearchHints).com.eignex.klause.formats.flatzinc/toSearchHints(): com.eignex.klause.ir/SearchHints // com.eignex.klause.formats.flatzinc/toSearchHints|toSearchHints@com.eignex.klause.formats.flatzinc.FlatZincSearchHints(){}[0]
-final fun (com.eignex.klause.formats.mps/MpsModel).com.eignex.klause.formats.mps/toExactSourceProblem(com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.formats.mps/MpsCompiled // com.eignex.klause.formats.mps/toExactSourceProblem|toExactSourceProblem@com.eignex.klause.formats.mps.MpsModel(com.eignex.klause.ir.ProblemSettings;com.eignex.klause.ir.SemanticOverrides){}[0]
 final fun (com.eignex.klause.formats.mps/MpsModel).com.eignex.klause.formats.mps/toLinearSourceProblem(com.eignex.klause.ir/SemanticOverrides = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.ir/LinearSourceProblem? // com.eignex.klause.formats.mps/toLinearSourceProblem|toLinearSourceProblem@com.eignex.klause.formats.mps.MpsModel(com.eignex.klause.ir.SemanticOverrides;com.eignex.klause.util.Cancellation){}[0]
 final fun (com.eignex.klause.formats.mps/MpsModel).com.eignex.klause.formats.mps/toProblem(com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.formats.mps/MpsCompiled // com.eignex.klause.formats.mps/toProblem|toProblem@com.eignex.klause.formats.mps.MpsModel(com.eignex.klause.ir.ProblemSettings;com.eignex.klause.ir.SemanticOverrides){}[0]
 final fun (com.eignex.klause.formats.opb/OpbDocument).com.eignex.klause.formats.opb/toProblem(com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.formats.opb/OpbProblem // com.eignex.klause.formats.opb/toProblem|toProblem@com.eignex.klause.formats.opb.OpbDocument(com.eignex.klause.ir.ProblemSettings;com.eignex.klause.ir.SemanticOverrides){}[0]

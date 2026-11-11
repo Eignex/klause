@@ -2,6 +2,8 @@ package com.eignex.klause.formats.mps
 
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.solver.pipeline.IntVariableOwner
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
@@ -26,7 +28,7 @@ class MpsCompilerRoutingTest {
                 "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST $objective R 1\n" +
                     " M1 'MARKER' 'INTEND'\n X R $coefficient\nRHS\n RHS R 0.1\n" +
                     "BOUNDS\n LI B I 0\n UI B I 1\n LO B X 0\n UP B X 1\n" + indicator + "ENDATA",
-            ).toExactSourceProblem()
+            ).toProblem(semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()))
 
             val route = compiled.model.pipelineRoute()
 

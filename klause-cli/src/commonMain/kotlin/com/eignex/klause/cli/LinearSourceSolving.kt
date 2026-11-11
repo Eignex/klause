@@ -157,8 +157,6 @@ internal fun printFiniteLinearSourcePreparation(problem: Problem) {
 }
 
 private fun SourceExecutionResult.linearSourceStats(): SolveStats = when (this) {
-    is SourceExecutionResult.Numerical -> result.stats
-
     is SourceExecutionResult.Finite -> (result.outcome as? FiniteSolveOutcome.Completed)?.stats ?: SolveStats.EMPTY
 
     is SourceExecutionResult.Linear -> when (val execution = result) {
@@ -177,8 +175,6 @@ private fun SourceExecutionResult.linearSourceStats(): SolveStats = when (this) 
 }
 
 private fun SourceExecutionResult.linearSourceReason(): TerminationReason? = when (this) {
-    is SourceExecutionResult.Numerical -> result.reason
-
     is SourceExecutionResult.Declined -> reason
 
     is SourceExecutionResult.Linear -> when (val execution = result) {

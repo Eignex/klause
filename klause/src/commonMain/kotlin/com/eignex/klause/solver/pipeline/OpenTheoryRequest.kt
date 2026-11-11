@@ -101,6 +101,14 @@ class OpenTheoryRequest internal constructor(
         linearContext,
     )
 
+    internal fun withPreparedPlan(
+        plan: PreparedSourcePlan,
+        context: SourceProofContext? = linearContext,
+    ): OpenTheoryRequest = OpenTheoryRequest(
+        model, objective, maximize, componentPlan, presolveConfig, solutionSetSensitive, presolveCancellation,
+        presolveBudget, plan, context,
+    )
+
     /** Bind the source owner's complete exact affine premises, objective and original-coordinate semantics. */
     fun withLinearAuthority(context: SourceProofContext): OpenTheoryRequest {
         require(objective != null && context.affineObjectiveAvailable)

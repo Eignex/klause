@@ -8,7 +8,9 @@ import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.mps.Mps
-import com.eignex.klause.formats.mps.toExactSourceProblem
+import com.eignex.klause.formats.mps.checkMpsWitness
+import com.eignex.klause.formats.mps.toLinearSourceProblem
+import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
@@ -19,7 +21,9 @@ import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SourceIntId
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.BuiltInScoringProjectionProvider
 import com.eignex.klause.localsearch.NoInvariant
@@ -642,12 +646,13 @@ class EncoderRoutingTest {
 
     @Test
     fun `decimal MPS source checks should retain finite integer ownership`() {
-        val compiled = Mps.parse(
+        val parsed = Mps.parse(
             "ROWS\n N COST\n E LINK\n E FIX\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
                 " X LINK 0.1\n M1 'MARKER' 'INTEND'\n R LINK -0.3\n R FIX 1\n" +
                 "RHS\n B LINK 0\n B FIX 1\nBOUNDS\n LI B X 0\n UI B X 4\n FR B R\nENDATA",
-        ).toExactSourceProblem()
-        val source = compiled.model
+        )
+        val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+        val source = parsed.toProblem(semanticOverrides = exact).model
         val plan = source.prepareExecutionPlan()
         val ownership = assertNotNull(plan.componentPlan)
         val request = OpenTheoryRequest(source, componentPlan = ownership, preparedPlan = plan)
@@ -659,7 +664,8 @@ class EncoderRoutingTest {
         assertEquals(IntVariableOwner.CP, ownership.intOwner(0))
         assertEquals(
             listOf(BigFraction.ofLong(3), BigFraction.ONE),
-            compiled.sourceWitness(listOf(BigFraction.ofLong(3), BigFraction.ONE)).values,
+            assertNotNull(assertNotNull(parsed.toLinearSourceProblem(exact))
+                .checkMpsWitness(listOf(BigFraction.ofLong(3), BigFraction.ONE))).values,
         )
     }
 

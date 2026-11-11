@@ -4,11 +4,15 @@ import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.formats.mps.Mps
-import com.eignex.klause.formats.mps.toExactSourceProblem
+import com.eignex.klause.formats.mps.checkMpsWitness
+import com.eignex.klause.formats.mps.toLinearSourceProblem
+import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
@@ -83,12 +87,15 @@ class BacktrackSolverRepairTest {
     @Test
     fun `exact repair should preserve scaled source direction across sibling reseeding`() {
         for (sense in listOf("MIN", "MAX")) {
-            val compiled = Mps.parse(
+            val parsed = Mps.parse(
                 "NAME SCALED\nOBJSENSE\n $sense\nROWS\n N COST\n E R\nCOLUMNS\n" +
                     " M0 'MARKER' 'INTORG'\n I COST 0.1 R 1\n M1 'MARKER' 'INTEND'\n" +
                     " X R 3\nRHS\n RHS R 1 COST -0.2\nBOUNDS\n" +
                     " BV B I\n LO B X 0\n UP B X 1\nENDATA",
-            ).toExactSourceProblem()
+            )
+            val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+            val compiled = parsed.toProblem(semanticOverrides = exact)
+            val source = assertNotNull(parsed.toLinearSourceProblem(exact))
             val sourceObjective = assertNotNull(compiled.objective).toLinearObjective()
             val objective = if (compiled.maximize) sourceObjective.negated() else sourceObjective
             val epsilon = BigFraction.ofLong(1L shl 60).reciprocal()
@@ -102,11 +109,15 @@ class BacktrackSolverRepairTest {
                 repair.beginExact(Assumptions(ints = mapOf(0 to second)), 100L, cutoff, Cancellation.Never)
                 val b = assertNotNull(repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L).sample)
 
+                val (aValues, bValues) = listOf(a, b).map { sample ->
+                    val reals = assertNotNull(sample.exactReals)
+                    compiled.columns.map { if (it.real) reals[it.id] else BigFraction.ofLong(sample.ints[it.id]) }
+                }
                 assertEquals(10L, compiled.objectiveScale)
                 assertEquals(if (compiled.maximize) "3/10" else "1/5",
-                    compiled.sourceWitness(a.ints, assertNotNull(a.exactReals)).objective.toString())
+                    assertNotNull(source.checkMpsWitness(aValues)).objective.toString())
                 assertEquals(if (compiled.maximize) "1/5" else "3/10",
-                    compiled.sourceWitness(b.ints, assertNotNull(b.exactReals)).objective.toString())
+                    assertNotNull(source.checkMpsWitness(bValues)).objective.toString())
             }
         }
     }

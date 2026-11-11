@@ -42,12 +42,9 @@ internal class RationalTheoryDescent(
         params.cancellation or params.timeout,
     ),
     private val publicationInvocation: EngineInvocation? = null,
-    private val numericalOnly: Boolean = false,
-    private val boundOrdered: Boolean = false,
     private val external: () -> Pair<Sample, BigFraction>? = { null },
 ) : ResumableSearch {
     init {
-        require(!numericalOnly || context != null) { "numerical traversal requires its captured source context" }
         require(
             publicationInvocation == null ||
                 (
@@ -65,8 +62,7 @@ internal class RationalTheoryDescent(
 
     private val state = OpenTheorySolveState(params)
     private var linear = context?.let {
-        LinearAuthorityInvocation(it, params, external = { external()?.first }, state = state,
-            boundOrdered = boundOrdered)
+        LinearAuthorityInvocation(it, params, external = { external()?.first }, state = state)
     }
     private var proofDeclined = false
     private var checkedIncumbent: Sample? = null
@@ -139,7 +135,7 @@ internal class RationalTheoryDescent(
                 sourceContext.semantics,
             )
             linearResult = authority
-            if (!numericalOnly && authority.terminal == null &&
+            if (authority.terminal == null &&
                 authority.reason == TerminationReason.Unsupported && sourceContext.affineObjectiveAvailable &&
                 sourceContext.linearCoordinatesSupported()
             ) {
@@ -302,7 +298,7 @@ internal class RationalTheoryDescent(
             LinearObjective(),
             ObjectiveSense.MINIMIZE,
             cancellation,
-            numericalIndicators = numericalOnly,
+            numericalIndicators = true,
         )?.also { witnessContext = it } ?: return
         val evidence = SourceEvidence(original.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)
         if (SourceEvidenceVerifier(original.withLinearAuthority()).verify(evidence, cancellation) !=

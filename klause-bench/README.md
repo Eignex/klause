@@ -75,21 +75,6 @@ observations without retaining LP queries. The preference flag describes configu
 precedence; it does not compare a counterfactual value order. Last-read scalar cutoffs
 are separate from exact cutoff context, which this observer does not capture.
 
-`MpsProofFrontier selection=true` exports a captured template's actual
-`generationScope` separately from the query's current verification scope.
-Missing generation provenance stays unavailable.
-With `selection=true aggregate-probe=true`, `aggregate-query=ID` restricts post-solve
-inspection to one retained query. `aggregate-work` and `aggregate-allocation` set
-the inspection's cumulative modeled work and byte allowances, including proof checks; they
-default to 20,000,000 and 67,108,864 and cannot exceed those ceilings.
-The summary reports selected and examined queries separately. A missing query or a
-stopped inspection establishes no absence of useful candidates. Atomic work can
-overspend an allowance; its cost remains recorded. Inspection grants
-are separate from solver grants, and inspection does not change the running policy.
-Imported proof records retain their original scope, consequence or bound payload,
-and nested derivation. Depth and cancellation limits mark withheld proofs
-unavailable.
-
 `satcomp-xor-v1` selects 17 hash-pinned graph-parity CNFs from the SAT Competition,
 including original and camouflaged encodings.
 
@@ -537,10 +522,11 @@ point checks do not certify Native optimality or infeasibility claims.
 
 `lab/library-lp-jvm.json` and `lab/library-lp-native.json` qualify the public baked
 `BacktrackSolver` library consumer separately from CLI source routing. The caller
-parses original MPS bytes with `toExactSourceProblem`, uses production LP dependencies
-and the `satOptimized` preset with 1000 instructions, and checks the returned point
-in original named coordinates before rendering it for the independent lab checker.
-It reports feasible points without upgrading solver statuses to source proofs.
+parses original MPS bytes with `toProblem` under zero feasibility tolerance, uses
+production LP dependencies and the `satOptimized` preset with 1000 instructions, and
+checks the returned point with `checkMpsWitness` in original named coordinates before
+rendering it for the independent lab checker. It reports feasible points without
+upgrading solver statuses to source proofs.
 The subprocess includes parsing, exact lowering, baking, solving and source checking;
 the adapter also records source verification, runtime hashing and output decoding.
 Platform series, executable/library identities and runtime controls remain separate.
@@ -1186,35 +1172,10 @@ endpoint independently from the point. Its generation shares the original
 and any resulting owner replacement retain their containing source/recipe costs.
 `PointPreparationUnavailable` does not establish complete ineligibility.
 
-`MpsProofFrontier selection=true replay=true` compares disabled, originally
-installed and all-captured masks over the first four captured scope/pool pairs
-that contain cut definitions. Each mask gets two fresh owners, one operation,
-20,000,000 work and 64 MiB modeled allocation, within a ten-second inspection cap.
-`selection-replays.jsonl` retains the captured IDs, family tags, fresh native checks
-and any import decline. Replaying imports the captured pool without generation;
-these diagnostic controls establish neither throughput nor independent proof.
-
-`MpsProofFrontier point-producer=true` invokes the production point-directed
-aggregate producer at every retained completed point, including branch points.
-Each generation retains its 65,536-work and 1 MiB modeled allocation limits;
-projection and fresh native consequence checks have separate reported costs.
-The inspection shares a 20-second, 20,000,000-work and 64 MiB containing cap.
-`point-producer.jsonl` retains candidates, scopes, limits and native checks.
-It installs no rows and performs no LP query; accepted consequences alone do not
-establish strict separation, bound strengthening, later pruning or independent proof.
-
 The generated-aggregate replay includes the ordinary opt-in producer's bounded
 source-pair indexing and discovery. Keep this cost separate from replaying supplied
 diagnostic proposals. `AggregatePair*` reports coverage, attempts and limiting
 stages; a partial generation establishes no general absence of useful cuts.
-`MpsProofFrontier certificateState=true` records retained completed guidance's
-certificate refusal, exact-basis repair dimensions and charged work/allocation in
-`certificate-state.json`, including the rejected basis proposal's column, side and
-exact reduced cost separately from later candidates. This optional post-solve observation issues no query and
-shares the existing capture deadline; scalar strings are capped at 4,096 characters.
-Missing state or a stopped inspection remains unavailable. Its owner scope can
-precede the current frontier leaf. It supplies no certificate authority, independent
-check, performance gain or original tolerant-source claim.
 With both aggregate and point selection enabled, an empty individual-cut family
 installs the bounded aggregate family in the initial CURRENT query. A fully checked
 family of at most 64 rows enters aging while retaining that query. With individual
@@ -1490,8 +1451,7 @@ companions on the ordinary finite route. `false` retains the binary-only gate.
 Both settings capture `admission` lines with fragment, objective, proof authority,
 source mapping, retained state, setup dimensions, numerical resource limits and
 explicit decline reasons. Capture dimensions are setup estimates, not measured RSS.
-Use source-matched current default, binary-gate, expanded-gate and direct
-`param.linear-traversal=numerical-frontier` controls with identical preparation,
+Use source-matched current default, binary-gate and expanded-gate controls with identical preparation,
 seeds and containing budgets. Preserve qualified binary sources as admission
 controls and the broad numerical-first recipe as a separate allocation control.
 

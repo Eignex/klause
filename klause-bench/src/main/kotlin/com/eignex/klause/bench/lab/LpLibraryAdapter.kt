@@ -127,7 +127,7 @@ internal object LpLibrarySuite : BenchSuite {
         ), comparisonControls = KlauseLabSuite.comparisonControls(case) + mapOf(
             "series" to "lp-public-library-v1-$runtime", "caller" to "baked-backtrack", "runtime" to runtime,
             "libraryPreset" to "satOptimized", "maxInstructions" to "1000",
-            "sourceLowering" to "toExactSourceProblem",
+            "sourceLowering" to "toProblem-exact-tolerance",
             "deadlinePolicy" to "public-library-inclusive-v1",
             "runtimeFingerprint" to ComparisonProvenance.runtimeFingerprint(runtimeBuild),
             "harnessFingerprint" to identities.harnessFingerprint,

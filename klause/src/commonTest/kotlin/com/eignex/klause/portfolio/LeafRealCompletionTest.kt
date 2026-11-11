@@ -3,6 +3,8 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.formats.mps.Mps
+import com.eignex.klause.formats.mps.checkMpsWitness
+import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -134,11 +136,13 @@ class LeafRealCompletionTest {
 
     @Test
     fun `numerical completion should retain CP source tolerance when exact certification is unavailable`() {
-        val source = Mps.parse(
+        val parsed = Mps.parse(
             "ROWS\n N COST\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R 1\n" +
                 " M1 'MARKER' 'INTEND'\n X COST 0.1 R 3\nRHS\n RHS R 1\n" +
                 "BOUNDS\n BV B I\n UP B X 1\nENDATA\n",
-        ).toProblem()
+        )
+        val source = parsed.toProblem()
+        val linear = assertNotNull(parsed.toLinearSourceProblem())
         val objective = source.objective?.toLinearObjective()
         val sample = Sample(
             booleanArrayOf(),
@@ -147,7 +151,12 @@ class LeafRealCompletionTest {
             List(source.model.numRealVars) { BigFraction.ONE },
         )
         val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
-        val check: (Sample) -> Boolean = { source.withinTolerance(it.ints, it.reals) }
+        val values: (LongArray, DoubleArray) -> List<BigFraction> = { ints, reals ->
+            source.columns.mapNotNull {
+                if (it.real) BigFraction.ofDouble(reals[it.id]) else BigFraction.ofLong(ints[it.id])
+            }
+        }
+        val check: (Sample) -> Boolean = { linear.checkMpsWitness(values(it.ints, it.reals)) != null }
 
         val cp = leafRealFeasibility(source.model, objective, sample, context = context, toleranceCheck = check)
         val completion = LeafRealCompletion(source.model, objective, check, context)
@@ -159,8 +168,8 @@ class LeafRealCompletionTest {
         assertTrue(check(witness.sample))
         assertNull(witness.sample.exactReals)
         assertEquals(
-            source.sourceObjective(sample.ints, cp.reals),
-            source.sourceObjective(witness.sample.ints, witness.sample.reals),
+            linear.checkMpsWitness(values(sample.ints, cp.reals))?.objective,
+            linear.checkMpsWitness(values(witness.sample.ints, witness.sample.reals))?.objective,
         )
         assertTrue(witness.work > 0L)
         assertEquals(List(source.model.numRealVars) { BigFraction.ONE }, sample.exactReals)
@@ -212,13 +221,19 @@ class LeafRealCompletionTest {
 
     @Test
     fun `indicator pins should retain original objective direction under exact and tolerance completion`() {
-        val source = Mps.parse(
+        val parsed = Mps.parse(
             "OBJSENSE\n MAX\nROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
                 " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R 1\nRHS\n RHS R 0.2\n" +
                 "BOUNDS\n BV B I\n UP B X 1\nINDICATORS\n IF R I 1\nENDATA\n",
-        ).toProblem()
+        )
+        val source = parsed.toProblem()
+        val linear = assertNotNull(parsed.toLinearSourceProblem())
         val objective = source.objective!!.toLinearObjective().negated()
-        val check: (Sample) -> Boolean = { source.withinTolerance(it.ints, it.reals) }
+        val check: (Sample) -> Boolean = { sample ->
+            linear.checkMpsWitness(source.columns.mapNotNull {
+                if (it.real) BigFraction.ofDouble(sample.reals[it.id]) else BigFraction.ofLong(sample.ints[it.id])
+            }) != null
+        }
 
         for (tolerance in listOf(false, true)) {
             for (pin in listOf(0L, 1L, 0L)) {
@@ -236,9 +251,13 @@ class LeafRealCompletionTest {
                 if (tolerance) {
                     assertNull(witness.exactReals)
                 } else {
+                    val reals = assertNotNull(witness.exactReals)
+                    val values = source.columns.map {
+                        if (it.real) reals[it.id] else BigFraction.ofLong(witness.ints[it.id])
+                    }
                     assertEquals(
                         if (pin == 0L) BigFraction.ONE else BigFraction.ofLong(5L).reciprocal(),
-                        source.sourceWitness(witness.ints, witness.exactReals).objective,
+                        assertNotNull(linear.checkMpsWitness(values)).objective,
                     )
                 }
             }

@@ -2,6 +2,8 @@ package com.eignex.klause.formats.mps
 
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.simplex.exact.BigFraction
@@ -19,9 +21,10 @@ import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MpsExactSourceTest {
@@ -31,9 +34,11 @@ class MpsExactSourceTest {
             "ROWS\n N COST\n E ROW\nCOLUMNS\n X ROW 0.1\n X ROW 0.2\n" +
                 " Y ROW -0.3\nRHS\n R ROW 0\nBOUNDS\n FR B X\n FR B Y\nENDATA",
         )
-        val compiled = source.toExactSourceProblem()
+        val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+        val compiled = source.toProblem(semanticOverrides = exact)
 
-        val witness = compiled.sourceWitness(listOf(BigFraction.ONE, BigFraction.ONE))
+        val witness = assertNotNull(assertNotNull(source.toLinearSourceProblem(exact))
+            .checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ONE)))
 
         assertEquals(listOf(BigFraction.ONE, BigFraction.ONE), witness.values)
         assertTrue(compiled.sourceExact)
@@ -51,42 +56,48 @@ class MpsExactSourceTest {
                 "BOUNDS\n LO B X 0.1\nENDATA",
         )
         val value = BigFraction.of(bigIntOf(30000001), bigIntOf(10000000))
-        val tolerance = source.toProblem()
-        val exact = source.toExactSourceProblem()
+        val tolerance = assertNotNull(source.toLinearSourceProblem())
+        val exact = assertNotNull(source.toLinearSourceProblem(
+            SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+        ))
 
-        assertTrue(tolerance.sourceExact)
-        assertFalse(tolerance.sourceWitness(listOf(value)).exact)
-        assertFailsWith<MpsLoweringException> { exact.sourceWitness(listOf(value)) }
+        assertTrue(source.toProblem().sourceExact)
+        assertFalse(assertNotNull(tolerance.checkMpsWitness(listOf(value))).exact)
+        assertNull(exact.checkMpsWitness(listOf(value)))
     }
 
     @Test
     fun `decimal real bounds should remain exact source rows`() {
-        val compiled = Mps.parse(
+        val source = Mps.parse(
             "ROWS\n N COST\nCOLUMNS\n X COST 0\nBOUNDS\n LO B X 0.1\n UP B X 0.2\nENDATA",
-        ).toExactSourceProblem()
+        )
+        val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+        val compiled = source.toProblem(semanticOverrides = exact)
+        val linear = assertNotNull(source.toLinearSourceProblem(exact))
         val tenth = BigFraction.of(BIG_ONE, bigIntOf(10))
 
-        compiled.sourceWitness(listOf(tenth))
+        assertNotNull(linear.checkMpsWitness(listOf(tenth)))
 
         assertEquals(Double.NEGATIVE_INFINITY, compiled.model.realLower[0])
         assertEquals(Double.POSITIVE_INFINITY, compiled.model.realUpper[0])
-        assertFailsWith<MpsLoweringException> {
-            compiled.sourceWitness(listOf(tenth - BigFraction.of(BIG_ONE, bigIntOf(100000000))))
-        }
+        assertNull(linear.checkMpsWitness(listOf(tenth - BigFraction.of(BIG_ONE, bigIntOf(100000000)))))
     }
 
     @Test
     fun `wide integral bounds should retain original source values`() {
-        val compiled = Mps.parse(
+        val source = Mps.parse(
             "ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X COST 0\n" +
                 " M1 'MARKER' 'INTEND'\nBOUNDS\n LO B X 9223372036854775809\nENDATA",
-        ).toExactSourceProblem()
+        )
+        val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+        val compiled = source.toProblem(semanticOverrides = exact)
+        val linear = assertNotNull(source.toLinearSourceProblem(exact))
         val value = BigFraction.of(parseBigInt("9223372036854775809"), BIG_ONE)
 
-        compiled.sourceWitness(listOf(value))
+        assertNotNull(linear.checkMpsWitness(listOf(value)))
 
         assertTrue(compiled.model.intBounds.isOpenLower(0))
-        assertFailsWith<MpsLoweringException> { compiled.sourceWitness(listOf(value - BigFraction.ONE)) }
+        assertNull(linear.checkMpsWitness(listOf(value - BigFraction.ONE)))
     }
 
     @Test
@@ -95,15 +106,17 @@ class MpsExactSourceTest {
             "ROWS\n N COST\nCOLUMNS\n X COST 0.1\n Y COST 0.2\n" +
                 "RHS\n R COST -0.3\nBOUNDS\n FR B X\n FR B Y\nENDATA",
         )
-        val compiled = source.toExactSourceProblem()
+        val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+        val compiled = source.toProblem(semanticOverrides = exact)
         val values = listOf(BigFraction.ONE, BigFraction.ofLong(2))
 
-        val witness = compiled.sourceWitness(values)
+        val witness = assertNotNull(assertNotNull(source.toLinearSourceProblem(exact)).checkMpsWitness(values))
 
-        assertEquals(BigFraction.of(bigIntOf(8), bigIntOf(10)), witness.objective)
+        val objective = assertNotNull(witness.objective)
+        assertEquals(BigFraction.of(bigIntOf(8), bigIntOf(10)), objective)
         val row = compiled.model.factors.last().linearRows.single()
         val constants = row.constants as IntegralConstants
-        val coordinates = values + witness.objective
+        val coordinates = values + objective
         val activity = (0 until row.size).fold(BigFraction.ZERO) { sum, index ->
             sum + BigFraction.of(constants.exactCoeff(index), BIG_ONE) * coordinates[Term.realVar(row.ref(index))]
         }
@@ -118,9 +131,11 @@ class MpsExactSourceTest {
                 "ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST $coefficient\n" +
                     " M1 'MARKER' 'INTEND'\nBOUNDS\n FX B I 1\nENDATA",
             )
-            val compiled = source.toExactSourceProblem()
+            val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+            val compiled = source.toProblem(semanticOverrides = exact)
 
-            val witness = compiled.sourceWitness(listOf(BigFraction.ONE))
+            val witness = assertNotNull(assertNotNull(source.toLinearSourceProblem(exact))
+                .checkMpsWitness(listOf(BigFraction.ONE)))
             val retained = checkNotNull(compiled.objective)
             val workingValue = BigFraction.ofLong(retained.intCoefficients.single() + retained.constant)
             val originalValue = workingValue * BigFraction.ofLong(compiled.objectiveScale).reciprocal()
@@ -133,10 +148,12 @@ class MpsExactSourceTest {
     @Test
     fun `exact source capture should survive mutations of parser arrays`() {
         val source = Mps.parse("ROWS\n N COST\n E ROW\nCOLUMNS\n X ROW 0.1\nRHS\n R ROW 0.3\nENDATA")
-        val compiled = source.toExactSourceProblem()
+        val linear = assertNotNull(source.toLinearSourceProblem(
+            SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+        ))
         source.constraints.single().coeffs[0] = 1.0
 
-        val witness = compiled.sourceWitness(listOf(BigFraction.ofLong(3)))
+        val witness = assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ofLong(3))))
 
         assertEquals(listOf(BigFraction.ofLong(3)), witness.values)
     }
@@ -146,7 +163,9 @@ class MpsExactSourceTest {
         val text = "ROWS\n E R\nCOLUMNS\n" +
             (0 until 100).joinToString("\n") { " X$it R 0.0000000000000000001" } +
             "\nRHS\n RHS R 0.00000000000000001\nENDATA"
-        val compiled = Mps.parse(text).toExactSourceProblem()
+        val source = Mps.parse(text)
+        val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+        val compiled = source.toProblem(semanticOverrides = exact)
 
         val execution = OpenTheoryPipeline.execute(
             OpenTheoryRequest(compiled.model),
@@ -156,12 +175,12 @@ class MpsExactSourceTest {
         val sat = assertIs<OpenTheoryResult.Sat>(
             assertIs<OpenTheoryExecution.Satisfy>(execution).result,
         )
-        compiled.sourceWitness(
+        assertNotNull(assertNotNull(source.toLinearSourceProblem(exact)).checkMpsWitness(
             compiled.columns.map { column ->
                 val parts = sat.assignment.realValue(column.id).split('/')
                 BigFraction.of(parseBigInt(parts[0]), parts.getOrNull(1)?.let(::parseBigInt) ?: BIG_ONE)
             },
-        )
+        ))
     }
 
     @Test
@@ -170,7 +189,7 @@ class MpsExactSourceTest {
             val source = Mps.parse(
                 "ROWS\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R 0.1\n" +
                     " M1 'MARKER' 'INTEND'\nRHS\n RHS R 0.15\nBOUNDS\n FR B I\nENDATA",
-            ).toExactSourceProblem()
+            ).toProblem(semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()))
 
             val execution = OpenTheoryPipeline.execute(
                 OpenTheoryRequest(source.model),
@@ -188,7 +207,7 @@ class MpsExactSourceTest {
             val source = Mps.parse(
                 "ROWS\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R 0.1\n" +
                     " M1 'MARKER' 'INTEND'\nRHS\n RHS R 0.15\nBOUNDS\n FR B I\nENDATA",
-            ).toExactSourceProblem()
+            ).toProblem(semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()))
 
             val execution = OpenTheoryPipeline.execute(
                 OpenTheoryRequest(source.model),
@@ -204,11 +223,13 @@ class MpsExactSourceTest {
     @Test
     fun `exact arithmetic strategies should publish original decimal mixed witnesses`() {
         for (engine in FiniteEngine.entries) {
-            val source = Mps.parse(
+            val parsed = Mps.parse(
                 "ROWS\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R 0.1\n" +
                     " M1 'MARKER' 'INTEND'\n X R 0.2\nRHS\n RHS R 0.3\n" +
                     "BOUNDS\n FR B I\n FR B X\nENDATA",
-            ).toExactSourceProblem()
+            )
+            val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+            val source = parsed.toProblem(semanticOverrides = exact)
 
             val execution = OpenTheoryPipeline.execute(
                 OpenTheoryRequest(source.model),
@@ -222,7 +243,7 @@ class MpsExactSourceTest {
                 val parts = text.split('/')
                 BigFraction.of(parseBigInt(parts[0]), parts.getOrNull(1)?.let(::parseBigInt) ?: BIG_ONE)
             }
-            source.sourceWitness(values)
+            assertNotNull(assertNotNull(parsed.toLinearSourceProblem(exact)).checkMpsWitness(values), "$engine")
         }
     }
 
@@ -230,7 +251,7 @@ class MpsExactSourceTest {
     fun `cancelled exact source searches should publish no terminal proof`() {
         for (engine in FiniteEngine.entries) {
             val source = Mps.parse("ROWS\n E R\nCOLUMNS\n X R 0.1\nRHS\n RHS R 0.3\nENDATA")
-                .toExactSourceProblem()
+                .toProblem(semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()))
 
             val execution = OpenTheoryPipeline.execute(
                 OpenTheoryRequest(source.model),
@@ -245,10 +266,12 @@ class MpsExactSourceTest {
 
     @Test
     fun `integral objectives should retain exact source recession checks`() {
-        val source = Mps.parse(
+        val parsed = Mps.parse(
             "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST -1 R -0.1\n" +
                 " M1 'MARKER' 'INTEND'\n X R 1\nBOUNDS\n LI B I 0\nENDATA",
-        ).toExactSourceProblem()
+        )
+        val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+        val source = parsed.toProblem(semanticOverrides = exact)
 
         val execution = OpenTheoryPipeline.execute(
             OpenTheoryRequest(
@@ -268,14 +291,19 @@ class MpsExactSourceTest {
             val parts = text.split('/')
             BigFraction.of(parseBigInt(parts[0]), parts.getOrNull(1)?.let(::parseBigInt) ?: BIG_ONE)
         }
-        assertEquals(source.sourceWitness(values).objective, unbounded.value)
+        assertEquals(
+            assertNotNull(assertNotNull(parsed.toLinearSourceProblem(exact)).checkMpsWitness(values)).objective,
+            unbounded.value,
+        )
     }
 
     @Test
     fun `a declared constant source objective should retain its optimum`() {
-        val source = Mps.parse(
+        val parsed = Mps.parse(
             "ROWS\n N COST\n E R\nCOLUMNS\n X R 0.1\nRHS\n RHS R 0.3 COST 3\nENDATA",
-        ).toExactSourceProblem()
+        )
+        val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+        val source = parsed.toProblem(semanticOverrides = exact)
 
         val execution = OpenTheoryPipeline.execute(
             OpenTheoryRequest(
@@ -286,6 +314,10 @@ class MpsExactSourceTest {
         )
 
         val optimal = assertIs<OpenTheoryOptimum.Optimal>(assertIs<OpenTheoryExecution.Optimize>(execution).result)
-        assertEquals(source.sourceWitness(listOf(BigFraction.ofLong(3))).objective, optimal.value)
+        assertEquals(
+            assertNotNull(assertNotNull(parsed.toLinearSourceProblem(exact))
+                .checkMpsWitness(listOf(BigFraction.ofLong(3)))).objective,
+            optimal.value,
+        )
     }
 }

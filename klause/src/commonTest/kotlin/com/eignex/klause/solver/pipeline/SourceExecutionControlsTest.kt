@@ -153,8 +153,7 @@ class SourceExecutionControlsTest {
         val source = SourceAttachment(
             LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()), ProblemSettings(),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
-            linearTraversal = LinearTraversal.NUMERICAL_FRONTIER))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY, FiniteEngine.FIXED))
         for ((options, expected) in listOf(emptyList<String>() to false,
             listOf("source-incumbent-completion=true") to true)) {
             val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
@@ -186,7 +185,6 @@ class SourceExecutionControlsTest {
         )
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
-            linearTraversal = LinearTraversal.NUMERICAL_FRONTIER,
         ))
         for ((options, expected) in listOf(emptyList<String>() to false,
             listOf("source-refutation-resolution=true") to true)) {
@@ -203,7 +201,6 @@ class SourceExecutionControlsTest {
         )
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
-            linearTraversal = LinearTraversal.NUMERICAL_FRONTIER,
         ))
         for ((options, expected) in listOf(emptyList<String>() to false,
             listOf("source-refutation-propagation=true") to true)) {
@@ -214,12 +211,11 @@ class SourceExecutionControlsTest {
     }
 
     @Test
-    fun `point cut selection should bind to numerical execution`() {
+    fun `point cut selection should bind to open linear execution`() {
         val source = SourceAttachment(
             LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()), ProblemSettings(),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
-            linearTraversal = LinearTraversal.NUMERICAL_FRONTIER))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY, FiniteEngine.FIXED))
 
         val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf("source-point-cuts=true")))
 
@@ -227,13 +223,12 @@ class SourceExecutionControlsTest {
     }
 
     @Test
-    fun `cut support branching should bind to numerical execution only when enabled`() {
+    fun `cut support branching should bind to open linear execution only when enabled`() {
         val source = SourceAttachment(
             LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()), ProblemSettings(),
         )
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
-            linearTraversal = LinearTraversal.NUMERICAL_FRONTIER,
         ))
         for ((options, expected) in listOf(emptyList<String>() to false,
             listOf("source-cut-branching=true") to true, listOf("source-cut-branching=false") to false)) {
@@ -250,7 +245,6 @@ class SourceExecutionControlsTest {
         )
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
-            linearTraversal = LinearTraversal.NUMERICAL_FRONTIER,
         ))
         for ((options, expected) in listOf(emptyList<String>() to false,
             listOf("source-aggregate-cuts=true") to true)) {
@@ -261,13 +255,12 @@ class SourceExecutionControlsTest {
     }
 
     @Test
-    fun `source cut control should bind to numerical execution`() {
+    fun `source cut control should bind to open linear execution`() {
         val source = SourceAttachment(
             LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()), ProblemSettings(),
         )
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
-            linearTraversal = LinearTraversal.NUMERICAL_FRONTIER,
         ))
 
         val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf("source-cuts=false")))

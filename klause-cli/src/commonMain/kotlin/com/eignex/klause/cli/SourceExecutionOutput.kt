@@ -106,30 +106,6 @@ internal fun solveCapturedSource(
             )
         }
 
-        is SourceExecutionResult.Numerical -> {
-            val outcome = result.result
-            if (solvable.optimize) {
-                reportLinearOptimization(
-                    outcome, { rendering.render(OpenTheoryAssignment.Sampled(it)) }, reporting, publication,
-                    common.statistics, solvable.routingElapsedMs, complete, solvable.routingLpStats,
-                )
-            } else {
-                reporting.onVerdictContext(VerdictContext(terminationReason = outcome.reason))
-                val point = outcome.incumbent
-                if (point != null) reporting.onSolution(rendering.render(OpenTheoryAssignment.Sampled(point)), null)
-                reporting.onComplete(when {
-                    point != null -> Verdict.SATISFIABLE
-                    outcome.terminal?.claim == com.eignex.klause.solver.evidence.SourceClaim.Refutation ->
-                        Verdict.UNSATISFIABLE
-                    else -> Verdict.UNKNOWN
-                })
-                if (common.statistics) reporting.onStatistics(
-                    outcome.stats, outcome.stats.run.wallMs + solvable.routingElapsedMs,
-                    if (point == null) 0L else 1L,
-                )
-            }
-        }
-
         is SourceExecutionResult.Quadratic -> reportQuadraticOptimization(
             result.result,
             { rendering.render(polynomialAssignment(it)) },

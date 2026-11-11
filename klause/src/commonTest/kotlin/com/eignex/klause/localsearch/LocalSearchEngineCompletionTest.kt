@@ -4,12 +4,15 @@ import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.formats.mps.Mps
-import com.eignex.klause.formats.mps.toExactSourceProblem
+import com.eignex.klause.formats.mps.checkMpsWitness
+import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.Term
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
@@ -506,7 +509,9 @@ class LocalSearchEngineCompletionTest {
             ENDATA
             """.trimIndent(),
         )
-        for (source in listOf(parsed.toProblem(), parsed.toExactSourceProblem())) {
+        for (overrides in listOf(SemanticOverrides(), SemanticOverrides(feasibilityTolerance = SourceTolerance()))) {
+            val source = parsed.toProblem(semanticOverrides = overrides)
+            val linear = assertNotNull(parsed.toLinearSourceProblem(overrides))
             val objective = checkNotNull(source.objective).toLinearObjective()
             val search = LocalSearchEngine(
                 LocalSearchModel.of(source.model.bake()),
@@ -523,8 +528,12 @@ class LocalSearchEngineCompletionTest {
             ).last()
 
             val best = assertIs<MinimizeResult.BestFound>(result)
-            val checked = source.sourceWitness(best.sample.ints, best.sample.exactReals)
-            assertEquals(BigFraction.ofLong(10), source.sourceWitness(initial.ints, listOf(BigFraction.ONE)).objective)
+            val reals = assertNotNull(best.sample.exactReals)
+            val checked = assertNotNull(linear.checkMpsWitness(source.columns.map {
+                if (it.real) reals[it.id] else BigFraction.ofLong(best.sample.ints[it.id])
+            }))
+            assertEquals(BigFraction.ofLong(10),
+                assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ZERO, BigFraction.ONE))).objective)
             assertEquals(BigFraction.ONE, checked.objective)
             assertEquals(listOf(BigFraction.ONE, BigFraction.ZERO), checked.values)
         }

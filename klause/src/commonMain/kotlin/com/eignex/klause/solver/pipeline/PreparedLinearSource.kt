@@ -37,44 +37,21 @@ internal fun prepareLinearSource(
     val acceptedBound = if (covers || source.objective == null) null else qualification?.objectiveBound()
     if (stop()) return interrupted()
     val prepared = PreparedLinearSource(view, objective, covers, acceptedBound)
-    val maximize = source.objective?.sense == ObjectiveSense.MAXIMIZE
-    val companions = request.linearTraversal == LinearTraversal.NUMERICAL_COMPANIONS ||
-        request.linearTraversal == LinearTraversal.NUMERICAL_COMPANIONS_INDEPENDENT
-    val native = NumericalLinearRequest(view.model, objective, maximize, stop,
-        boundOrdered = request.linearTraversal == LinearTraversal.NUMERICAL_FRONTIER || companions)
-    val route = if (companions) {
-        val finite = native.finiteRoute(request.boundCancellation or stop, onLpStats ?: {})
-        if (finite == SourceProblemRoute.Refuted) {
-            finite
-        } else {
-            val companion = (finite as? SourceProblemRoute.Finite)?.problem?.takeUnless {
-                it.requiresExactObjectiveRoute(objective, stop)
-            }
-            SourceProblemRoute.NativeFormula(NativeSourceExecution.Numerical(
-                native.withCompanions(companion,
-                    sharing = request.linearTraversal == LinearTraversal.NUMERICAL_COMPANIONS),
-                view.numericalPlan(objective)))
-        }
-    } else if (request.linearTraversal in setOf(LinearTraversal.AUTOMATIC, LinearTraversal.FINITE_COMPANIONS) &&
-        native.numericalRowsSupported(stop)) {
-        val finite = native.finiteRoute(request.boundCancellation or stop, onLpStats ?: {})
-        if (finite is SourceProblemRoute.Finite && finite.problem.requiresExactObjectiveRoute(objective, stop)) {
-            SourceProblemRoute.NativeFormula(NativeSourceExecution.Numerical(native, view.numericalPlan(objective)))
-        } else {
-            finite ?: SourceProblemRoute.NativeFormula(
-            NativeSourceExecution.Numerical(native, view.numericalPlan(objective)),
-        )
-        }
-    } else {
-        SourceProblemRoute.NativeFormula(
-            NativeSourceExecution.Numerical(native, view.numericalPlan(objective)),
-        )
-    }
+    val sense = source.objective?.sense ?: ObjectiveSense.MINIMIZE
+    // The lowered view takes the same route as any factor source; the source overlay only qualifies its claims.
+    // Purely continuous rows keep the finite LP lane, whose certified tolerance owns their decimal claims.
+    val route = view.model.pipelineRoute(request.providers.prepare(view.model), objective,
+        sense == ObjectiveSense.MAXIMIZE, request.boundCancellation or stop, stop, onLpStats = onLpStats,
+        routePureRealToTheory = false)
     if (stop()) return interrupted()
-    return PreparedSourceInvocation(request, prepared.bind(route), stop, prepared)
+    return PreparedSourceInvocation(request, prepared.bind(route, sense, stop), stop, prepared)
 }
 
-private fun PreparedLinearSource.bind(route: SourceProblemRoute): SourceProblemRoute {
+private fun PreparedLinearSource.bind(
+    route: SourceProblemRoute,
+    sense: ObjectiveSense,
+    stop: Cancellation,
+): SourceProblemRoute {
     fun bound(plan: PreparedSourcePlan): PreparedSourcePlan =
         plan.withLinearSource(view.source, view.sourceIntegerCoordinates, view.sourceRealCoordinates, objective)
     return when (route) {
@@ -82,13 +59,11 @@ private fun PreparedLinearSource.bind(route: SourceProblemRoute): SourceProblemR
 
         is SourceProblemRoute.OpenTheory -> {
             val original = route.request
-            SourceProblemRoute.OpenTheory(
-                OpenTheoryRequest(
-                    original.model, original.objective, original.maximize, original.componentPlan,
-                    original.presolveConfig, original.solutionSetSensitive, original.presolveCancellation,
-                    original.presolveBudget, bound(original.preparedPlan), original.linearContext,
-                ),
-            )
+            // Indicator rows keep the LP authority their numerical relaxation supports.
+            val context = original.linearContext ?: objective?.let {
+                view.model.linearAuthorityContext(it, sense, stop, numericalIndicators = true)
+            }
+            SourceProblemRoute.OpenTheory(original.withPreparedPlan(bound(original.preparedPlan), context))
         }
 
         is SourceProblemRoute.PolynomialTheory -> route.copy(
@@ -102,41 +77,4 @@ private fun PreparedLinearSource.bind(route: SourceProblemRoute): SourceProblemR
 
         is SourceProblemRoute.NativeFormula, SourceProblemRoute.Refuted -> route
     }
-}
-
-private fun LinearSourceView.numericalPlan(objective: LinearObjective?): PreparedSourcePlan {
-    val complete = ComponentStrategySupport(
-        ProcedureCompleteness.WITNESS_SEARCH,
-        setOf(
-            ExecutionClaimAuthority.WITNESS,
-            ExecutionClaimAuthority.REFUTATION,
-            ExecutionClaimAuthority.OBJECTIVE_BOUND,
-            ExecutionClaimAuthority.OPTIMALITY,
-            ExecutionClaimAuthority.UNBOUNDEDNESS,
-        ),
-    )
-    val heuristic = ComponentStrategySupport(
-        if (model.numBoolVars == 0) ProcedureCompleteness.WITNESS_SEARCH else ProcedureCompleteness.UNAVAILABLE,
-        if (model.numBoolVars == 0) setOf(ExecutionClaimAuthority.WITNESS) else emptySet(),
-        if (model.numBoolVars == 0) emptyList() else
-            listOf(ExecutionDecline(ExecutionDeclineCause.HEURISTIC_PROJECTION, "linear-numerical")),
-    )
-    return PreparedSourcePlan(
-        source,
-        PreparedExecution.Numerical(source, model),
-        listOf(
-            ExecutionComponentDescriptor(
-                "linear-numerical",
-                ComponentResponsibility.COMPLETION,
-                model.factors.indices.toList(),
-                (0 until model.numIntVars).toList(),
-                (0 until model.numRealVars).toList(),
-                execution = ComponentExecutionContract(complete, heuristic),
-            ),
-        ),
-        0,
-        model.numIntVars,
-        model.numRealVars,
-        operations = setOf(ExecutionOperation.SATISFY, ExecutionOperation.OPTIMIZE),
-    ).withLinearSource(source, sourceIntegerCoordinates, sourceRealCoordinates, objective)
 }

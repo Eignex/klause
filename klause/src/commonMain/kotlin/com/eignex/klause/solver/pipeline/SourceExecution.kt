@@ -42,9 +42,6 @@ enum class SourceExecutionKind {
 
     /** Exact real functions with their native source and resource diagnostics. */
     FUNCTIONS,
-
-    /** Numerical linear traversal retaining its native bound and certificate payload. */
-    NUMERICAL,
 }
 
 /** Original objective captured by this source operation. */
@@ -318,14 +315,6 @@ sealed class SourceExecutionResult protected constructor(
         linearSource: LinearSourceOutcome? = null,
     ) : SourceExecutionResult(invocation, linearSource)
 
-    /** Numerical traversal's full native source certificate, values, bounds and interruption cause. */
-    class Numerical internal constructor(
-        invocation: PreparedSourceInvocation,
-        /** Unmodified native numerical result. */
-        val result: LinearOptimizationResult,
-        linearSource: LinearSourceOutcome? = null,
-    ) : SourceExecutionResult(invocation, linearSource)
-
     /** Polynomial source satisfaction and native resource telemetry. */
     class Polynomial internal constructor(
         invocation: PreparedSourceInvocation,
@@ -369,8 +358,6 @@ sealed class SourceExecutionResult protected constructor(
 fun SourceSetup.executionKind(invocation: PreparedSourceInvocation): SourceExecutionKind =
     when (val route = invocation.engineRoute) {
         is SourceProblemRoute.NativeFormula -> when (route.execution) {
-            is NativeSourceExecution.Numerical -> SourceExecutionKind.NUMERICAL
-
             is NativeSourceExecution.IntegerPolynomial -> SourceExecutionKind.NONLINEAR_INTEGER
 
             is NativeSourceExecution.Functions -> SourceExecutionKind.FUNCTIONS
@@ -378,7 +365,7 @@ fun SourceSetup.executionKind(invocation: PreparedSourceInvocation): SourceExecu
             is NativeSourceExecution.Polynomial -> SourceExecutionKind.POLYNOMIAL
 
             null -> when (invocation.source.formula) {
-                is AttachedSourceFormula.Linear -> SourceExecutionKind.NUMERICAL
+                is AttachedSourceFormula.Linear -> SourceExecutionKind.LINEAR
                 is AttachedSourceFormula.IntegerPolynomial -> SourceExecutionKind.NONLINEAR_INTEGER
                 is AttachedSourceFormula.Functions -> SourceExecutionKind.FUNCTIONS
                 is AttachedSourceFormula.Polynomial, null -> SourceExecutionKind.POLYNOMIAL
@@ -485,10 +472,13 @@ private fun executeCapturedSource(
 
         is SourceProblemRoute.OpenTheory -> {
             val params = request.theory.boundTo(invocation)
+            // Native workers own the lowered view; the linear source stays with the invocation to qualify claims.
+            val native = if (invocation.linearSource == null) route.request else
+                route.request.withPreparedPlan(route.preparedPlan.linearWorkingPlan())
             val result = if (kind == SourceExecutionKind.HEURISTIC) {
-                executeSourceHeuristic(invocation, route.preparedPlan, params, request.cores, callbacks)
+                executeSourceHeuristic(invocation, native.preparedPlan, params, request.cores, callbacks)
             } else {
-                val prepared = route.request.withPresolve(
+                val prepared = native.withPresolve(
                     request.presolveConfig ?: route.request.presolveConfig,
                     cancellation = route.request.presolveCancellation or request.presolveCancellation or
                         invocation.cancellation,

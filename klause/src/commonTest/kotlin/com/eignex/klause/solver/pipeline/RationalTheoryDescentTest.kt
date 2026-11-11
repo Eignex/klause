@@ -435,13 +435,4 @@ class RationalTheoryDescentTest {
         )
     }
 
-    @Test
-    fun `numerical traversal should reject a missing source context before search`() {
-        val source = Problem(0, 0, emptyArray(), emptyArray())
-
-        assertFailsWith<IllegalArgumentException> {
-            RationalTheoryDescent(source, LinearObjective(), TheoryParams(), context = null, numericalOnly = true)
-        }
-    }
-
 }

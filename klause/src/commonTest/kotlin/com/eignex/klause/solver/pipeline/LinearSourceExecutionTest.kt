@@ -50,23 +50,21 @@ class LinearSourceExecutionTest {
                 lower = SemanticRational.of(BIG_ONE, bigIntOf(2)))),
             LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
         )
-        for (traversal in listOf(LinearTraversal.AUTOMATIC, LinearTraversal.FINITE_COMPANIONS)) {
-            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-                ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, linearTraversal = traversal))
-            assertIs<SourceProblemRoute.Finite>(invocation.route)
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
+        assertIs<SourceProblemRoute.Finite>(invocation.route)
 
-            val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(invocation,
-                ExecutionOptions(ExecutionOption.sourceLpWorkLimit(0)), presolveConfig = PresolveConfig.NONE)))
+        val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(invocation,
+            ExecutionOptions(ExecutionOption.sourceLpWorkLimit(0)), presolveConfig = PresolveConfig.NONE)))
 
-            assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
-            assertEquals(BigFraction.ZERO, result.linearSource?.incumbent?.objective)
-            val completed = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
-            assertEquals(0L, completed.stats.smt.completeSearchStages?.get("finiteNumericalCompanionOptimal"))
-        }
+        assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
+        assertEquals(BigFraction.ZERO, result.linearSource?.incumbent?.objective)
+        val completed = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
+        assertEquals(0L, completed.stats.smt.completeSearchStages?.get("finiteNumericalCompanionOptimal"))
     }
 
     @Test
-    fun `automatic and explicit finite companions should consume checked numerical completion`() {
+    fun `linear source finite companions should consume checked numerical completion`() {
         for (sense in ObjectiveSense.entries) {
             val source = LinearSourceProblem(
                 listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
@@ -77,166 +75,24 @@ class LinearSourceExecutionTest {
                 LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE),
                     LinearSourceTerm(1, SemanticRational.ONE)), sense = sense),
             )
-            for (traversal in listOf(LinearTraversal.AUTOMATIC, LinearTraversal.FINITE_COMPANIONS)) {
-                val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-                    ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
-                    maximize = sense == ObjectiveSense.MAXIMIZE, linearTraversal = traversal))
-
-                val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(
-                    invocation, ExecutionOptions(), presolveConfig = PresolveConfig.NONE)))
-
-                assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
-                val expected = if (sense == ObjectiveSense.MAXIMIZE) BigFraction.ofLong(2)
-                    else BigFraction.of(BIG_ONE, bigIntOf(2))
-                assertEquals(expected, result.linearSource?.incumbent?.objective)
-                val completed = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
-                assertEquals(1L, completed.stats.smt.completeSearchStages?.get("finiteNumericalCompanionOptimal"))
-            }
-        }
-    }
-
-    @Test
-    fun `finite companions should import only floors expressed in their receiver units`() {
-        for ((weight, offset) in listOf(1L to 0L, 5L to 7L)) {
-            val source = LinearSourceProblem(
-                listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ofLong(2)),
-                    LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE)),
-                listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE),
-                    LinearSourceTerm(1, SemanticRational.ONE)),
-                    lower = SemanticRational.of(bigIntOf(3), bigIntOf(2)))),
-                LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ofLong(weight))),
-                    SemanticRational.ofLong(offset)),
-            )
-            val invocation = SourceSetup.prepare(SourceSetupRequest(
-                SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
-                linearTraversal = LinearTraversal.NUMERICAL_COMPANIONS))
-
-            val result = assertIs<SourceExecutionResult.Numerical>(SourceSetup.execute(SourceExecutionRequest(
-                invocation, theory = TheoryParams(maxLeaves = 3, maxFlips = 0), presolveConfig = PresolveConfig.NONE)))
-
-            assertEquals(BigFraction.ofLong(weight + offset), assertNotNull(result.linearSource?.incumbent).objective)
-            val reads = result.result.stats.smt.completeSearchStages.orEmpty()["finiteCompanionBoundReads"] ?: 0L
-            if (weight == 1L && offset == 0L) assertTrue(reads > 0L) else assertEquals(0L, reads)
-        }
-    }
-
-    @Test
-    fun `companion admission should retain a root refutation without numerical funding`() {
-        val source = LinearSourceProblem(
-            listOf(LinearSourceVariable("x", true)),
-            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE)),
-                lower = SemanticRational.ONE, upper = SemanticRational.ofLong(-1))),
-        )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()), ExecutionOperation.SATISFY, FiniteEngine.MIXED,
-            linearTraversal = LinearTraversal.NUMERICAL_COMPANIONS))
-
-        val result = SourceSetup.execute(SourceExecutionRequest(invocation,
-            ExecutionOptions(ExecutionOption.sourceLpWorkLimit(0))))
-
-        assertEquals(LinearSourceConclusion.UNSATISFIABLE, assertNotNull(result.linearSource).conclusion)
-    }
-
-    @Test
-    fun `a finite companion should supply an original source incumbent after numerical funding stops`() {
-        val cases = ObjectiveSense.entries.flatMap { sense ->
-            listOf(LinearTraversal.NUMERICAL_COMPANIONS, LinearTraversal.NUMERICAL_COMPANIONS_INDEPENDENT)
-                .map { sense to it }
-        }
-        for ((sense, traversal) in cases) {
-            val source = LinearSourceProblem(
-                listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE)),
-                emptyList(), LinearSourceObjective(
-                    listOf(LinearSourceTerm(0, SemanticRational.of(BIG_ONE, bigIntOf(2)))),
-                    SemanticRational.of(bigIntOf(3), bigIntOf(10)), sense),
-            )
-            val invocation = SourceSetup.prepare(SourceSetupRequest(
-                SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
-                maximize = sense == ObjectiveSense.MAXIMIZE,
-                linearTraversal = traversal))
-
-            val result = assertIs<SourceExecutionResult.Numerical>(SourceSetup.execute(SourceExecutionRequest(
-                invocation, ExecutionOptions(ExecutionOption.sourceLpWorkLimit(0), ExecutionOption.maxFlips(0)))))
-
-            val expected = BigFraction.of(bigIntOf(if (sense == ObjectiveSense.MAXIMIZE) 8L else 3L), bigIntOf(10))
-            assertEquals(expected, assertNotNull(result.linearSource?.incumbent).objective)
-            assertEquals(LinearSourceConclusion.SATISFIABLE, result.linearSource.conclusion)
-            assertNull(result.result.terminal)
-        }
-    }
-
-    @Test
-    fun `numerical frontier policy should consume bounded integer sibling coverage`() {
-        val source = LinearSourceProblem(
-            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE)),
-            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ofLong(3))),
-                lower = SemanticRational.ONE)),
-            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
-        )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
-            linearTraversal = LinearTraversal.NUMERICAL_FRONTIER,
-        ))
-
-        val result = assertIs<SourceExecutionResult.Numerical>(SourceSetup.execute(SourceExecutionRequest(invocation)))
-
-        assertEquals(SourceValue.Rational(BigFraction.ONE),
-            assertIs<SourceClaim.Optimal>(assertNotNull(result.result.terminal).claim).value)
-        assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
-    }
-
-    @Test
-    fun `numerical heuristic strategies should publish checked mixed source points without terminal claims`() {
-        val source = LinearSourceProblem(
-            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
-                LinearSourceVariable("y", true, SemanticRational.ZERO, SemanticRational.ONE),
-                LinearSourceVariable("r", false, SemanticRational.of(BIG_ONE, bigIntOf(4)), SemanticRational.ONE)),
-            listOf(0, 1).map { integer ->
-                LinearSourceRow(listOf(LinearSourceTerm(integer, SemanticRational.ONE),
-                    LinearSourceTerm(2, SemanticRational.ofLong(-2))),
-                    lower = SemanticRational.ZERO, upper = SemanticRational.ZERO)
-            },
-            LinearSourceObjective(listOf(LinearSourceTerm(2, SemanticRational.ONE))),
-        )
-        for (engine in listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
             val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-                ExecutionOperation.OPTIMIZE, engine, linearTraversal = LinearTraversal.NUMERICAL))
+                ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
+                maximize = sense == ObjectiveSense.MAXIMIZE))
 
-            val result = assertIs<SourceExecutionResult.Numerical>(SourceSetup.execute(
-                SourceExecutionRequest(invocation, theory = TheoryParams(maxFlips = 3))))
+            val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(
+                invocation, ExecutionOptions(), presolveConfig = PresolveConfig.NONE)))
 
-            val outcome = assertNotNull(result.linearSource)
-            assertEquals(LinearSourceConclusion.SATISFIABLE, outcome.conclusion)
-            assertEquals(BigFraction.ofLong(2).reciprocal(), outcome.incumbent?.objective)
-            assertNull(result.result.terminal)
-            assertNull(result.result.bound)
-            assertTrue(result.result.stats.ls.completions.sum > 0)
+            assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
+            val expected = if (sense == ObjectiveSense.MAXIMIZE) BigFraction.ofLong(2)
+                else BigFraction.of(BIG_ONE, bigIntOf(2))
+            assertEquals(expected, result.linearSource?.incumbent?.objective)
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
+            assertEquals(1L, completed.stats.smt.completeSearchStages?.get("finiteNumericalCompanionOptimal"))
         }
     }
 
     @Test
-    fun `an interrupted bounded numerical split should withhold terminal authority`() {
-        val source = LinearSourceProblem(
-            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE)),
-            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ofLong(3))),
-                lower = SemanticRational.ONE)),
-            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
-        )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
-            linearTraversal = LinearTraversal.NUMERICAL,
-        ))
-
-        val result = assertIs<SourceExecutionResult.Numerical>(SourceSetup.execute(SourceExecutionRequest(invocation,
-            ExecutionOptions(ExecutionOption.maxDecisions(0)))))
-
-        assertNull(result.result.terminal)
-        assertEquals(TerminationReason.BudgetExhausted, result.result.reason)
-        assertEquals(LinearSourceConclusion.UNKNOWN, result.linearSource?.conclusion)
-    }
-
-    @Test
-    fun `nonzero numerical underflow should retain an unsupported numerical result`() {
+    fun `nonzero numerical underflow should be refuted by the exact linear theory`() {
         val tiny = SemanticRational.of(BIG_ONE, parseBigInt("1" + "0".repeat(400)))
         for (tolerance in listOf(SourceTolerance(), SourceTolerance(
             absolute = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000)),
@@ -250,19 +106,15 @@ class LinearSourceExecutionTest {
                 SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance).resolve(),
             )
             val invocation = SourceSetup.prepare(SourceSetupRequest(
-                SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
+                SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
             ))
 
             val result = SourceSetup.execute(SourceExecutionRequest(invocation,
-                finiteRequest = { error("an unsupported numerical source cannot construct a finite consumer") }))
+                finiteRequest = { error("a wide source row cannot construct a finite consumer") }))
 
-            assertEquals(SourceExecutionKind.NUMERICAL, SourceSetup.executionKind(invocation))
-            val native = assertIs<SourceExecutionResult.Numerical>(result).result
-            assertEquals(TerminationReason.Unsupported, native.reason)
-            assertNull(native.terminal)
-            assertNull(native.incumbent)
-            assertNull(native.bound)
-            assertEquals(LinearSourceConclusion.UNKNOWN, assertNotNull(result.linearSource).conclusion)
+            assertEquals(SourceExecutionKind.LINEAR, SourceSetup.executionKind(invocation))
+            assertIs<SourceExecutionResult.Linear>(result)
+            assertEquals(LinearSourceConclusion.UNSATISFIABLE, assertNotNull(result.linearSource).nativeConclusion)
         }
     }
 
@@ -341,7 +193,7 @@ class LinearSourceExecutionTest {
     }
 
     @Test
-    fun `declining optional bound closure should retain required numerical source execution`() {
+    fun `declining optional bound closure should retain open linear source execution`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("n", true, SemanticRational.ZERO)),
             listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE)),
@@ -357,7 +209,7 @@ class LinearSourceExecutionTest {
         val result = SourceSetup.execute(SourceExecutionRequest(invocation,
             finiteRequest = { error("declined closure installed finite execution") }))
 
-        assertIs<SourceExecutionResult.Numerical>(result)
+        assertIs<SourceExecutionResult.Linear>(result)
         val outcome = assertNotNull(result.linearSource)
         assertEquals(LinearSourceConclusion.OPTIMAL, outcome.conclusion)
         assertEquals(BigFraction.ofLong(5), outcome.incumbent?.objective)
@@ -469,7 +321,7 @@ class LinearSourceExecutionTest {
     }
 
     @Test
-    fun `open numerical maximization should retain scaled native costs and original exact units`() {
+    fun `open linear maximization should retain scaled native costs and original exact units`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("n", true)),
             listOf(
@@ -501,7 +353,7 @@ class LinearSourceExecutionTest {
         val points = mutableListOf<LinearSourceWitness>()
         val nativeValues = mutableListOf<SourceValue>()
 
-        val result = assertIs<SourceExecutionResult.Numerical>(
+        val result = assertIs<SourceExecutionResult.Linear>(
             SourceSetup.execute(
                 SourceExecutionRequest(invocation, finiteRequest = { error("open source has no finite consumer") }),
                 SourceExecutionCallbacks(
@@ -518,9 +370,10 @@ class LinearSourceExecutionTest {
         assertSame(source, assertNotNull(invocation.preparedPlan).originalSource)
         assertEquals(0, assertNotNull(invocation.preparedPlan).sourceRealCount)
         assertEquals(BigFraction.ofLong(10), outcome.objectiveScale)
-        assertEquals(BigFraction.ofLong(31), result.result.value)
+        val native = assertNotNull(assertIs<OpenTheoryExecution.Optimize>(result.result).result.linearResult)
+        assertEquals(BigFraction.ofLong(31), native.value)
         assertEquals(BigFraction.ofLong(31), assertIs<SourceValue.Rational>(nativeValues.last()).value)
-        assertIs<SourceClaim.Optimal>(assertNotNull(result.result.terminal).claim)
+        assertIs<SourceClaim.Optimal>(assertNotNull(native.terminal).claim)
         assertEquals(BigFraction.ofLong(31) * BigFraction.ofLong(10).reciprocal(), points.last().objective)
         assertEquals(points.last().objective, outcome.incumbent?.objective)
         assertEquals(LinearSourceConclusion.OPTIMAL, outcome.conclusion)
@@ -554,10 +407,11 @@ class LinearSourceExecutionTest {
             ),
         )
 
-        val result = assertIs<SourceExecutionResult.Numerical>(SourceSetup.execute(SourceExecutionRequest(invocation)))
+        val result = assertIs<SourceExecutionResult.Linear>(SourceSetup.execute(SourceExecutionRequest(invocation)))
 
         val outcome = assertNotNull(result.linearSource)
-        assertIs<SourceClaim.Optimal>(assertNotNull(result.result.terminal).claim)
+        val native = assertNotNull(assertIs<OpenTheoryExecution.Optimize>(result.result).result.linearResult)
+        assertIs<SourceClaim.Optimal>(assertNotNull(native.terminal).claim)
         assertEquals(LinearSourceConclusion.OPTIMAL, outcome.nativeConclusion)
         assertEquals(LinearSourceConclusion.OPTIMAL, outcome.conclusion)
         assertFalse(outcome.claimsCoverTolerance)
