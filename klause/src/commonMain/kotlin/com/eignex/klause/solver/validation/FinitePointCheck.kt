@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalAtomicApi::class)
-
 package com.eignex.klause.solver.validation
 
 import com.eignex.klause.ir.Problem
@@ -15,19 +13,15 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.fitsLong
-import kotlin.concurrent.atomics.AtomicReference
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /*
- * Checks points against one immutable [problem]: each point becomes the private root of a disposable propagation
- * state, so incompatible caller pins still refute it, and the selected original-source relations are checked on
- * the composed fixpoint. A wipeout refutes the point; a fixpoint cut short by cancellation decides nothing.
+ * Checks points that no engine enforced against one immutable [problem]: each point becomes the private root of a
+ * disposable propagation state and the selected original-source relations are checked on the composed fixpoint.
+ * A wipeout refutes the point; a fixpoint cut short by cancellation decides nothing.
  *
  * Propagators and occurrence indexes are built once per checker when every selected route is built in, since
  * built-in projections keep their mutable work in the state. A custom factory may open a private mechanism for
- * one live state, so those problems project afresh for each point. The last decided point is retained: the
- * problem is immutable and restrictions are checked on the point itself, so the same discrete coordinates get the
- * same propagated verdict under any restrictions. An interrupted check is never retained.
+ * one live state, so those problems project afresh for each point.
  */
 internal class FinitePointCheck(private val problem: Problem, private val enforcingPeers: Set<Int> = emptySet()) {
     private val finite = problem as? BakedProblem
@@ -41,11 +35,6 @@ internal class FinitePointCheck(private val problem: Problem, private val enforc
         }
     }
 
-    private val decided = AtomicReference<DecidedPoint?>(null)
-
-    // Whether a verdict covers every selected relation of [model], so a caller may key its result on [model].
-    fun checksAllOf(model: Problem): Boolean = model === problem && enforcingPeers.isEmpty()
-
     private fun projection(): PropagationProblem = shared ?: PropagationProblem(problem)
 
     fun <V> check(
@@ -53,46 +42,20 @@ internal class FinitePointCheck(private val problem: Problem, private val enforc
         cancellation: Cancellation,
         assumptions: Assumptions = Assumptions.None,
         onWork: (Long) -> Unit = {},
-        liveWork: ((() -> Long) -> Unit)? = null,
     ): Verification<Sample, V> {
         val sample = candidate.assignment
         val unchecked = when {
             sample.numBoolVars < problem.numBoolVars || sample.numIntVars < problem.numIntVars ->
                 Verification.Rejected("assignment does not cover the model's discrete variables")
-
             sample.exactInts?.any { !it.fitsLong() } == true ->
                 Verification.Indeterminate("a finite checker cannot verify wide integer coordinates")
-
-            // Unary pins and restrictions add nothing a point covering every discrete coordinate does not
-            // already fix, so they are checked on the point and the propagated verdict holds under any of them.
+            // Unary pins and restrictions add nothing a point covering every discrete coordinate does not fix.
             else -> checkPointRestrictions(sample, assumptions, cancellation)
         }
         if (unchecked != null) {
             onWork(0L)
             return unchecked
         }
-        decided.load()?.takeIf { it.sample.sameDiscreteCoordinates(sample) }?.let { previous ->
-            onWork(0L)
-            return previous.reason?.let { Verification.Rejected(it) } ?: Verification.Accepted(candidate)
-        }
-        return propagate(candidate, cancellation, onWork, liveWork).also { verdict ->
-            when (verdict) {
-                is Verification.Accepted -> decided.store(DecidedPoint(sample, null))
-                is Verification.Rejected -> decided.store(DecidedPoint(sample, verdict.reason))
-                is Verification.Indeterminate -> Unit
-            }
-        }
-    }
-
-    private class DecidedPoint(val sample: Sample, val reason: String?)
-
-    private fun <V> propagate(
-        candidate: Candidate<Sample, V>,
-        cancellation: Cancellation,
-        onWork: (Long) -> Unit,
-        liveWork: ((() -> Long) -> Unit)?,
-    ): Verification<Sample, V> {
-        val sample = candidate.assignment
         val root = finite != null && problem.numRealVars == 0 &&
             sample.numBoolVars == problem.numBoolVars && sample.numIntVars == problem.numIntVars
         val point = if (root) {
@@ -100,14 +63,9 @@ internal class FinitePointCheck(private val problem: Problem, private val enforc
                 onWork(0L)
                 return Verification.Indeterminate("point preparation cancelled")
             }
-        } else {
-            null
-        }
-        val session = if (point != null) {
-            PropagationSession.forPointCheck(projection(), point, cancellation, liveWork)
-        } else {
-            PropagationSession(projection(), cancellation, onPropagationWork = liveWork)
-        }
+        } else null
+        val session = if (point != null) PropagationSession.forPointCheck(projection(), point, cancellation)
+        else PropagationSession(projection(), cancellation)
         try {
             if (session.isUnsatAtRoot) return Verification.Rejected("root propagation refutes the assignment")
             if (session.fixpointCancelled || cancellation()) return Verification.Indeterminate("propagation cancelled")
@@ -116,9 +74,7 @@ internal class FinitePointCheck(private val problem: Problem, private val enforc
             if (session.fixpointCancelled || cancellation()) return Verification.Indeterminate("propagation cancelled")
             return when (session.checkSelectedProjection(checks = checks)) {
                 ComponentCheck.Feasible -> Verification.Accepted(candidate)
-
                 is ComponentCheck.Infeasible -> Verification.Rejected("original source check refutes the assignment")
-
                 ComponentCheck.Indeterminate ->
                     Verification.Indeterminate("original source check is unavailable or cancelled")
             }

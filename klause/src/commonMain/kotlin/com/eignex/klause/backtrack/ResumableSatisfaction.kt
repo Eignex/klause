@@ -151,7 +151,7 @@ internal class ResumableSatisfaction(
                 return null
             }
             return solver.verdictOf(
-                outcome, assumptions, Cancellation { globalToken() }, sink, finish = !rebindable,
+                outcome, assumptions, sink, finish = !rebindable,
             ).also {
                 done = it
                 if (!rebindable) close()

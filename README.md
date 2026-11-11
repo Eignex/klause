@@ -29,28 +29,19 @@ Klause is built for applications that ask many questions of the same model, not 
 
 Typical uses are constraint-aware test and fuzz input generation, configuration synthesis, scheduling and assignment, and long-running services that re-solve and re-sample one model.
 
-Complete search, local search, LP relaxations and arithmetic theories all work on that same model, alone or together in a portfolio. What backs each kind of result is set out under [What results guarantee](#what-results-guarantee).
+Complete search, local search, LP relaxations and arithmetic theories all work on that same model, alone or together in a portfolio. Each engine enforces the original model itself; separate checks run only where nothing enforces a claim, such as LP certificates and relations an engine cannot propagate.
 
 It reads FlatZinc, XCSP3, SMT-LIB, MPS, DIMACS, OPB/WBO and WCNF, and MiniZinc models through the included solver integration. Any model, whether built in Kotlin or read from a file, saves to and loads from JSON without loss.
-
-## What results guarantee
-
-- Solutions are checked against the original model, not the solver's transformed view. Finite engines enforce Boolean and integer constraints by propagation, and the final point is checked again against the original relations. Real coordinates are checked in exact rational arithmetic, or within the tolerance a source declares, such as MPS feasibility tolerances.
-- A point that already passed the same check, for the same model, objective and tolerance policy, is not checked again when it moves between workers. Only restrictions the new consumer adds are checked. Changed coordinates or a transformed model get a fresh check.
-- An interrupted check proves nothing. A portfolio publishes nothing from it. A standalone complete search keeps a leaf whose recheck the deadline cut short, and that leaf rests on the engine's own propagation alone.
-- Bounds, optima and infeasibility rest on a completed engine run (exhaustive search, propagation, conflict learning) or on an LP certificate checked in exact rational arithmetic. These are in-memory attestations of the engine that produced them.
-- Under a configured tolerance, optimality and infeasibility are numerical claims about that tolerance, not exact proofs.
-- Where an exact derivation of a bound or refutation is captured, it is rechecked against the original source in memory. No claim is checked by an independent external checker.
 
 ## The LP engine
 
 - Klause has its own revised simplex written in Kotlin: a floating-point dual simplex with Devex pricing, sparse LU factorization and Forrest-Tomlin updates.
 - The LP lives inside search. Bound changes and backtracking update the same warm basis instead of starting a new solve at every node.
-- The heavy work runs in floating point, and exact rational arithmetic is spent only on certification. An LP result is checked exactly before it prunes a node or supports a claim, whether it is a feasible point, an objective bound, an infeasibility proof or an unbounded ray. A result that fails the check is never used as a proof, and an uncertified floating result only guides branching and heuristics.
+- The heavy work runs in floating point, and exact rational arithmetic is spent only on certification. Every LP result is checked exactly before it counts, whether it is a feasible point, an objective bound, an infeasibility proof or an unbounded ray, and a result that fails the check is never used as a proof.
 - The same engine carries integer and continuous columns, so it serves MIP, CP relaxations and SMT real arithmetic, and works alongside propagation and local search.
 - LP bounds and conflicts are explained by the source constraints, so they feed conflict learning the same way propagation does.
 - Strict inequalities are handled exactly, as SMT linear arithmetic requires.
-- Exact mode extends this to floating-point formats. FlatZinc floats are solved by exact theory search instead of a grid, MPS models are solved with zero tolerance, and every reported point satisfies the source constraints exactly. Without it, MPS points are checked within the model's configured tolerance.
+- Exact mode extends this to floating-point formats. FlatZinc floats are solved by exact theory search instead of a grid, MPS models are solved with zero tolerance, and every reported point satisfies the source constraints exactly.
 
 ## Compared with other solvers
 
@@ -58,14 +49,14 @@ Specialised solvers are mature and usually faster on problems squarely in their 
 
 - CP-SAT works over Booleans and integers; Klause also handles reals, unbounded integers and nonlinear arithmetic in the same model.
 - Z3 decides logical theories; Klause adds optimization, global constraints and local search while still deciding linear integer and real arithmetic exactly.
-- Gurobi and HiGHS accept floating-point results within tolerances; Klause solves in floating point too, but certifies LP proofs in exact arithmetic and checks every published point against the original model, exactly or within the tolerance the source declares.
+- Gurobi and HiGHS accept floating-point results within tolerances; Klause solves in floating point too but certifies LP results in exact arithmetic before they prune or prove anything.
 
 ## Limitations
 
 - On large MIPs, hard SAT instances or SMT benchmarks, established solvers are usually much faster.
 - Nonlinear integer and transcendental arithmetic are incomplete: Klause can find and check solutions, but may stop with an unknown result instead of a proof. Nonconvex quadratic objectives get no global optimality claim when a branch stays unresolved.
 - SMT-LIB support covers quantifier-free arithmetic only. Bit-vectors, arrays, strings, quantifiers, uninterpreted functions and incremental solving are rejected.
-- Proofs are checked in memory, and only where an exact derivation is captured; other refutations and bounds rest on the completed engine run. Klause cannot yet export proof files for an independent checker.
+- Proofs are checked in memory, but Klause cannot yet export proof files for an independent checker.
 - Not every kind of model has every search style yet; local search and portfolio coverage still have gaps.
 
 ## Documentation

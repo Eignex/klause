@@ -9,11 +9,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Publication
-import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,7 +19,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IncumbentCandidatesTest {
-
     private val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
 
     private fun problem(numRealVars: Int = 0) = Problem(
@@ -40,99 +36,6 @@ class IncumbentCandidatesTest {
 
     private fun sample(b0: Boolean, x0: Long, x1: Long, reals: DoubleArray = DoubleArray(0)) =
         Sample(booleanArrayOf(b0), longArrayOf(x0, x1), reals)
-
-    private fun verifier(problem: Problem, cancellation: Cancellation = Cancellation.Never) =
-        ComposedSampleVerifier(problem, objective, cancellation)
-
-    private fun verify(problem: Problem, sample: Sample, objectiveValue: Double = objective.evaluate(sample)) =
-        verifier(problem).verify(Candidate(sample, objectiveValue))
-
-    @Test
-    fun `a proposal the composed model satisfies should be accepted`() {
-        val proposal = sample(b0 = true, x0 = 1, x1 = 2)
-        val accepted = assertIs<Verification.Accepted<Sample, Double>>(verify(problem(), proposal))
-        assertEquals(3.0, accepted.candidate.objective)
-    }
-
-    @Test
-    fun `a proposal an integer factor refutes should be rejected`() {
-        val rejected = assertIs<Verification.Rejected>(verify(problem(), sample(b0 = true, x0 = 3, x1 = 3)))
-        assertTrue(rejected.reason.startsWith("int "), rejected.reason)
-    }
-
-    @Test
-    fun `a proposal a Boolean factor refutes should be rejected`() {
-        val rejected = assertIs<Verification.Rejected>(verify(problem(), sample(b0 = false, x0 = 1, x1 = 2)))
-        assertEquals("bool 0 = false conflicts", rejected.reason)
-    }
-
-    @Test
-    fun `a value outside its declared domain should be rejected`() {
-        assertIs<Verification.Rejected>(verify(problem(), sample(b0 = true, x0 = 9, x1 = 0)))
-    }
-
-    @Test
-    fun `an objective the assignment does not carry should be rejected`() {
-        val rejected = assertIs<Verification.Rejected>(
-            verify(problem(), sample(b0 = true, x0 = 1, x1 = 2), objectiveValue = -100.0),
-        )
-        assertEquals("objective is 3.0, not the claimed -100.0", rejected.reason)
-    }
-
-    @Test
-    fun `an assignment missing a discrete variable should be rejected`() {
-        val short = Sample(booleanArrayOf(true), longArrayOf(1), DoubleArray(0))
-        assertIs<Verification.Rejected>(verify(problem(), short, objectiveValue = objective.evaluate(short)))
-    }
-
-    @Test
-    fun `a cancelled fixpoint should leave the proposal undecided`() {
-        val verdict = verifier(problem(), Cancellation { true })
-            .verify(Candidate(sample(b0 = true, x0 = 1, x1 = 2), 3.0))
-        assertIs<Verification.Indeterminate>(verdict, "an unfinished fixpoint decides nothing either way")
-    }
-
-    @Test
-    fun `proposal verification should reject a value outside caller assumptions`() {
-        val proposal = sample(b0 = true, x0 = 1, x1 = 2)
-        val verifier = ComposedSampleVerifier(
-            problem(),
-            objective,
-            Cancellation.Never,
-            assumptions = Assumptions(ints = mapOf(0 to 2L)),
-        )
-
-        assertIs<Verification.Rejected>(verifier.verify(Candidate(proposal, 3.0)))
-    }
-
-    @Test
-    fun `proposal verification should charge propagation for accepted and rejected assignments`() {
-        for (x0 in listOf(1L, 3L)) {
-            var work = 0L
-            val proposal = sample(b0 = true, x0 = x0, x1 = 2)
-            val verifier = ComposedSampleVerifier(problem(), objective, Cancellation.Never, onWork = { work += it })
-
-            verifier.verify(Candidate(proposal, objective.evaluate(proposal)))
-
-            assertTrue(work > 0L)
-        }
-    }
-
-    @Test
-    fun `a proposal without certified real values should be rejected`() {
-        val withReals = problem(numRealVars = 1)
-        assertIs<Verification.Rejected>(verify(withReals, sample(b0 = true, x0 = 1, x1 = 2)))
-        assertIs<Verification.Rejected>(
-            verify(withReals, sample(b0 = true, x0 = 1, x1 = 2, reals = doubleArrayOf(0.5))),
-        )
-        val certified = Sample(
-            booleanArrayOf(true),
-            longArrayOf(1, 2),
-            doubleArrayOf(0.5),
-            listOf(BigFraction.ofLong(2).reciprocal()),
-        )
-        assertIs<Verification.Accepted<Sample, Double>>(verify(withReals, certified))
-    }
 
     @Test
     fun `a non-finite objective should never become an incumbent`() {

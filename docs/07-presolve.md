@@ -975,35 +975,15 @@ indeterminate. [Portfolio admission](12-portfolio.md#witnesses-and-proof-scope) 
 
 ### Finite points
 
-`FinitePointCheck` checks Boolean and finite integer points against one immutable
-problem and its selected original-source relations. Each point becomes the private
-root of a disposable propagation state, so no point conditions the next. The checker
-builds propagators and occurrence indexes once when every selected propagation
-route is built in. Built-in projections keep their mutable work in the state; a
-custom factory may open a private mechanism for one live state, so those problems
-project afresh for each point. Prepared custom providers keep their selected
-factories and required original checks. Pure Boolean clause points use native clause
-propagation when the selected factories permit it, without constructing the general
-watcher index.
-
-The point must cover every discrete coordinate. Caller pins and deduced restrictions
-are unary, so they are checked directly on the point instead of being seeded into
-propagation, and incompatible pins refute it. The propagated verdict then depends
-only on the coordinates. The checker retains its last decided point and answers an
-equal point from it without propagating. Cancellation or unavailable required
-checking returns indeterminate and is never retained. Every exit reports the
-propagation work through the caller's accounting hook.
-
-Owners that check many points against one problem retain one checker. These are
-backtracking leaves and proposals, LP tree search, core-guided search, ALNS seeds,
-Boolean proof tasks, polynomial and quadratic completion, float-grid publication and
-portfolio verifiers. Local search bakes the view of its unscored factors once when
-its baked integer domains are closed. A candidate outside those declared domains,
-open declarations, and the discrete part of an open-model witness get singleton
-domains for each point instead, so the factors alone decide the point and no check
-invents a bound or expands an open domain. A
-bake cut short by cancellation keeps sound but weaker root deductions and is not
-retained.
+`composedFixpoint` creates a private propagation session for the full Boolean and
+finite integer point and checks the selected original-source relations. The point is
+the session's private root, so incompatible caller pins still refute it. Prepared
+custom providers keep their selected factories and required original checks.
+Pure Boolean clause points use native clause propagation when the selected
+factories permit it, without constructing the general watcher index.
+Cancellation or unavailable required checking returns indeterminate. Every exit
+reports the propagation work through the caller's accounting hook, and no scratch
+state survives a check.
 
 Exact point checking also validates integer absolute-value and distinctness
 relations on authoritative arbitrary-width values. `AllDifferent` compares every
@@ -1045,8 +1025,7 @@ certify its own original real relation; see
 `finiteWitnessVerifier` combines the finite point check with exact real checking or
 the caller's explicit tolerance policy, checking pins and deduced bounds directly on
 the completed point. A tolerance callback requires complete finite real coordinates
-and does not change exact evidence semantics; one cut short by cancellation is
-indeterminate. See
+and does not change exact evidence semantics. See
 [model ownership](02-model.md#published-assignments-and-objectives) for coordinate
 lifetimes.
 
@@ -1056,23 +1035,6 @@ points record whether nominal relations also hold. Tolerance acceptance transfer
 no nominal proof and carries a separate floating-completion permission, withheld at
 zero tolerance. [MPS semantics](05-arithmetic-formats.md#tolerance-publication)
 defines the publication policy.
-
-### Reused validation
-
-An accepted check records a receipt on the immutable `Sample` it checked.
-`finiteWitnessVerifier`, the open-model witness verifier and
-[invocation restriction checks](12-portfolio.md#verification-outcomes) keep receipts.
-A witness receipt names the identities its check read besides the coordinates: model,
-objective, proof context and tolerance policy. A verifier with the same identities
-accepts a receipted point without repeating source checks. It still checks its own
-caller restrictions, and the claimed objective wherever it checks one; no receipt
-covers either. Witness receipts
-compare these identities by reference, so a transformed, rebuilt or structurally equal
-model needs its own check. A restriction receipt names a matching invocation or an
-equal source condition, whose check reads nothing else. A copy with
-equal coordinates keeps its receipts; changed coordinates make a new sample with none.
-Rejected, indeterminate or cancelled checks record nothing, so the next consumer
-checks again. A receipt is in-memory bookkeeping, not a proof.
 
 ### Dependencies
 

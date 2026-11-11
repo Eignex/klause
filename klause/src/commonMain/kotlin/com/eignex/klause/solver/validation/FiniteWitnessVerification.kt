@@ -8,7 +8,6 @@ import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.solver.incumbent.WitnessCheckKey
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.math.abs
@@ -28,9 +27,8 @@ internal fun finiteWitnessVerifier(
     assumptions: Assumptions,
     cancellation: Cancellation = Cancellation.Never,
     toleranceCheck: ((Sample) -> Boolean)? = null,
-    points: FinitePointCheck = FinitePointCheck(problem),
 ): CandidateVerifier<Sample, Double?> {
-    require(points.checksAllOf(problem)) { "point checker does not cover this problem" }
+    val points = FinitePointCheck(problem)
     return CandidateVerifier { candidate ->
         verifyFiniteWitness(problem, objective, assumptions, cancellation, toleranceCheck, points, candidate)
     }
@@ -62,14 +60,7 @@ private fun verifyFiniteWitness(
     ) {
         return Verification.Rejected("assignment does not cover finite real coordinates")
     }
-    // The tolerance callback is read only for real coordinates, so integer models share receipts across policies.
-    val receipt = FiniteWitnessReceipt(problem, objective, toleranceCheck.takeIf { problem.numRealVars > 0 })
-    if (sample.hasReceipt(receipt)) {
-        checkPointRestrictions(sample, assumptions, cancellation)?.let { return it }
-    } else {
-        checkSourceObligations(problem, sample, assumptions, cancellation, toleranceCheck, points)?.let { return it }
-        if (!cancellation()) sample.recordReceipt(receipt)
-    }
+    checkSourceObligations(problem, sample, assumptions, cancellation, toleranceCheck, points)?.let { return it }
     if (claimed != null && !claimed.isFinite()) {
         return Verification.Rejected("non-finite objective $claimed")
     }
@@ -111,17 +102,4 @@ private fun checkSourceObligations(
         }
     }
     return null
-}
-
-/*
- * Everything a finite source check reads besides the coordinates and the caller's restrictions, which are checked
- * on the point for every consumer. Identities, not structure: a transformed or rebuilt model needs its own check.
- */
-private class FiniteWitnessReceipt(
-    private val problem: BakedProblem,
-    private val objective: LinearObjective?,
-    private val tolerance: ((Sample) -> Boolean)?,
-) : WitnessCheckKey {
-    override fun sameCheck(other: WitnessCheckKey): Boolean = other is FiniteWitnessReceipt &&
-        problem === other.problem && objective === other.objective && tolerance === other.tolerance
 }
