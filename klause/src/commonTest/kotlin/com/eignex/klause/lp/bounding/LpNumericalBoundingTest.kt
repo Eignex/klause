@@ -130,7 +130,7 @@ class LpNumericalBoundingTest {
             LpSolveContext.Numerical).use { engine ->
             val reason = assertNotNull(engine.numericalPremiseClause(relaxation, session, Cancellation.Never))
 
-            assertTrue(session.boundLeLit(0, 2L, positive = true) in reason)
+            assertTrue(session.boundGeLit(0, 3L, positive = false) in reason)
             assertTrue(session.boundLeLit(1, 7L, positive = false) in reason)
         }
     }

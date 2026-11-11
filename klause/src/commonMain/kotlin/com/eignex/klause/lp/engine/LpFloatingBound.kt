@@ -168,7 +168,11 @@ private fun floatingLagrangianLowerBound(
             return meter.refuse(LpFloatingBoundStop.NON_FINITE)
         }
         if (!meter.visit()) return meter.refuse(LpFloatingBoundStop.WORK)
-        bound = if (bound == 0.0) 0.0 else (bound / scale).nextDown()
+        bound = when {
+            bound == 0.0 -> 0.0
+            scale == 1.0 -> bound
+            else -> (bound / scale).nextDown()
+        }
         bound = arithmetic.sumLower(bound, constant)
     }
     if (!bound.isFinite()) return meter.refuse(LpFloatingBoundStop.NON_FINITE)
