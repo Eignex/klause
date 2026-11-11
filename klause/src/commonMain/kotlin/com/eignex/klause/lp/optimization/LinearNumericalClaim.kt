@@ -34,7 +34,7 @@ internal class LinearNumericalClaim private constructor(
         val value = bound ?: return false
         val standing = incumbent.toDouble()
         if (!standing.isFinite()) return false
-        val slack = FLOAT_EVIDENCE_TOLERANCE * maxOf(1.0, abs(value), abs(standing))
+        val slack = FLOAT_EVIDENCE_TOLERANCE * maxOf(1.0, abs(standing))
         return when (scope.objective?.sense) {
             ObjectiveSense.MINIMIZE -> value >= standing - slack
             ObjectiveSense.MAXIMIZE -> value <= standing + slack

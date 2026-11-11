@@ -19,6 +19,25 @@ import kotlin.test.assertTrue
 
 class LinearNumericalClaimTest {
     @Test
+    fun `numerical bounds should close only within the declared objective tolerance`() {
+        val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical })
+        for (sense in listOf(ObjectiveSense.MINIMIZE, ObjectiveSense.MAXIMIZE)) {
+            val scope = SourceScope(SourceRevision("numeric-tolerance", "linear"),
+                objective = SourceObjective("x", sense))
+            val source = SourceProofContext(scope, setOf(x), emptyMap(), mapOf(x to BigFraction.ONE))
+            val claim = assertNotNull(LinearNumericalClaim.create(source, 2.0, false, budget, Cancellation.Never))
+            val sign = if (sense == ObjectiveSense.MINIMIZE) -1.0 else 1.0
+
+            val near = claim.reaches(assertNotNull(BigFraction.ofDouble(2.0 + sign * 0.0000001)))
+            val far = claim.reaches(assertNotNull(BigFraction.ofDouble(2.0 + sign * 0.00001)))
+
+            assertTrue(near)
+            assertFalse(far)
+        }
+    }
+
+    @Test
     fun `a numerical bound should apply only under its original or stronger restrictions`() {
         val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val scope = SourceScope(SourceRevision("numeric-scope", "linear"),
