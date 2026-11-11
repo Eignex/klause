@@ -132,7 +132,7 @@ internal fun bindSourceExecutionControls(
         ),
         alnsIterations = iterations,
     )
-    val linear = kind in setOf(SourceExecutionKind.LINEAR, SourceExecutionKind.HEURISTIC, SourceExecutionKind.NUMERICAL)
+    val linear = kind in setOf(SourceExecutionKind.LINEAR, SourceExecutionKind.HEURISTIC)
     val theory = if (linear) {
         val defaults = TheoryParams()
         TheoryParams(

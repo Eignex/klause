@@ -38,9 +38,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
-internal val PreparedSourceInvocation.requestsFiniteNumericalCompanions: Boolean get() =
-    request.linearTraversal == LinearTraversal.FINITE_COMPANIONS ||
-        (request.linearTraversal == LinearTraversal.AUTOMATIC && linearSource != null)
+internal val PreparedSourceInvocation.requestsFiniteNumericalCompanions: Boolean get() = linearSource != null
 
 internal fun finiteNumericalCompanionEligibility(
     problem: BakedProblem,

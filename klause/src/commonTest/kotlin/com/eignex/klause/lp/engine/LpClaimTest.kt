@@ -2,6 +2,8 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.formats.mps.Mps
+import com.eignex.klause.formats.mps.checkMpsWitness
+import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
@@ -228,10 +230,12 @@ class LpClaimTest {
     @Test
     fun `unchanged real leaves should consume a compatible checked optimum`() {
         for (arbitrary in listOf(false, true)) {
-            val compiled = Mps.parse(
+            val parsed = Mps.parse(
                 "NAME CLAIM\nROWS\n N COST\n E ROW\nCOLUMNS\n X COST 1 ROW 2\n" +
                     "RHS\n R ROW 3\nBOUNDS\n UP B X 10\nENDATA",
-            ).toProblem()
+            )
+            val compiled = parsed.toProblem()
+            val source = assertNotNull(parsed.toLinearSourceProblem())
             val problem = compiled.model
             val objective = assertNotNull(compiled.objective).toLinearObjective()
             val sink = LpStatsSink(LpRoute.STANDALONE)
@@ -242,8 +246,10 @@ class LpClaimTest {
                 repeat(2) {
                     val result = owner.solve(sample)
                     assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+                    val reals = assertNotNull(result.exactReals)
                     assertEquals(BigFraction.ofLong(3L) * BigFraction.ofLong(2L).reciprocal(),
-                        compiled.sourceWitness(sample.ints, assertNotNull(result.exactReals)).values.single())
+                        assertNotNull(source.checkMpsWitness(listOf(reals[compiled.columns.single().id])))
+                            .values.single())
                 }
             }
 

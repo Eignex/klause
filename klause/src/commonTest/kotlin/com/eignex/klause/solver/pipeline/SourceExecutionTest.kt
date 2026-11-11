@@ -262,7 +262,7 @@ class SourceExecutionTest {
             SourceExecutionKind.NONLINEAR_INTEGER to "(declare-const x Int) (assert (= (* x x) 2))",
             SourceExecutionKind.FUNCTIONS to "(declare-const x Real) (assert (= (sin x) 0))",
         ).map { (kind, text) -> kind to SmtLib.parse(text).source } +
-            (SourceExecutionKind.NUMERICAL to SourceAttachment(
+            (SourceExecutionKind.LINEAR to SourceAttachment(
                 LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
             ))
         for ((kind, source) in sources) {

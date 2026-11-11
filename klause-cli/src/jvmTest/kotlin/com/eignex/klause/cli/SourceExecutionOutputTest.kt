@@ -123,15 +123,15 @@ class SourceExecutionOutputTest {
     }
 
     @Test
-    fun `numerical satisfaction should publish a witness without an objective`() {
+    fun `open linear satisfaction should publish a witness without an objective`() {
         val source = SourceAttachment(
             LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
         )
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
         ))
-        assertEquals(SourceExecutionKind.NUMERICAL, SourceSetup.executionKind(invocation))
-        val solvable = preparedSourceSolvable(invocation, { error("numerical source is not finite") }, { "point" })
+        assertEquals(SourceExecutionKind.LINEAR, SourceSetup.executionKind(invocation))
+        val solvable = preparedSourceSolvable(invocation, { error("open source is not finite") }, { "point" })
         val common = CommonOptions().apply { engine = "cp" }
         val points = mutableListOf<String>()
         var completed: Verdict? = null

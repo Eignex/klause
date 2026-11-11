@@ -54,9 +54,7 @@ internal fun cliInvocationStats(common: CommonOptions, rendering: SourceRenderin
                     (rendering.invocation.route as SourceProblemRoute.OpenTheory)
                         .request.route.name.lowercase()
 
-                kind in setOf(
-                    SourceExecutionKind.HEURISTIC, SourceExecutionKind.REFUTED, SourceExecutionKind.NUMERICAL,
-                ) -> null
+                kind in setOf(SourceExecutionKind.HEURISTIC, SourceExecutionKind.REFUTED) -> null
 
                 kind == SourceExecutionKind.FUNCTIONS -> "transcendental"
 
@@ -91,7 +89,6 @@ private fun SourceRendering.ExactSource.nativePipelineName(kind: SourceExecution
     if (kind == SourceExecutionKind.LINEAR) return "open-theory"
     if (kind == SourceExecutionKind.HEURISTIC) return "open-local-search"
     if (kind == SourceExecutionKind.REFUTED) return "refuted"
-    if (kind == SourceExecutionKind.NUMERICAL) return "numerical-mip"
     if (invocation.operation == ExecutionOperation.OPTIMIZE && kind != SourceExecutionKind.FUNCTIONS) {
         return if (kind == SourceExecutionKind.NONLINEAR_INTEGER) "quadratic-integer" else "quadratic-polynomial"
     }

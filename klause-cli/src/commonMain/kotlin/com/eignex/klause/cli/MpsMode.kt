@@ -140,19 +140,8 @@ private fun checkedIntegralMpsSource(
 
 /** MPS output protocol (PB-competition-style `s`/`o`/`v`). */
 internal class MpsOutput(
-    private val objectiveScale: Long = 1L,
-    private val sourceExact: Boolean = true,
-    private val sourceDifference: String? = null,
-    private val sourceObjective: () -> BigFraction? = { null },
-    // An infeasibility or unboundedness proof covers the lowered model only, so it needs the source exactly.
-    private val proofExact: Boolean = sourceExact,
-    private val sourceWitnessAccepted: () -> Boolean = { true },
     private val exactSourceWitness: () -> Boolean? = { null },
-    private val sourceArithmeticValue: ((SourceValue) -> SourceValue?)? = null,
-    private val exactSourceOptimum: () -> Boolean? = exactSourceWitness,
     private val effectiveDeclarations: Boolean = false,
-    private val claimsCoverTolerance: Boolean = true,
-    private val acceptedObjectiveBound: BigFraction? = null,
 ) : BufferedBestOutput() {
     private var bestObjective: Long? = null
     private var linearSource: LinearSourceOutcome? = null
@@ -168,8 +157,6 @@ internal class MpsOutput(
         } else qualified.nativeConclusion == LinearSourceConclusion.OPTIMAL
     }
 
-    override fun acceptsSourceWitness(): Boolean = sourceWitnessAccepted()
-
     override fun onSolutionObjective(objective: Long?) {
         if (objective != null) bestObjective = objective
     }
@@ -177,18 +164,11 @@ internal class MpsOutput(
     override val commentPrefix: String = "c"
     override val streamObjective: Boolean = true
 
-    override fun formatObjective(objective: Long): String =
-        sourceObjective()?.let(::exactMpsNumber) ?: scaledDecimal(objective, objectiveScale)
+    override fun formatObjective(objective: Long): String = objective.toString()
 
-    /** Print the checked source objective when available; otherwise undo the solver's scale. */
-    override fun formatContinuousObjective(objective: Double): String =
-        sourceObjective()?.let(::exactMpsNumber) ?: scaledDecimal(objective, objectiveScale)
+    override fun formatContinuousObjective(objective: Double): String = wholeOrDecimal(objective)
 
-    override fun formatExactObjective(objective: BigFraction): String =
-        exactMpsNumber(sourceObjective() ?: (objective * BigFraction.ofLong(objectiveScale).reciprocal()))
-
-    override fun arithmeticSourceValue(objective: SourceValue): SourceValue? =
-        if (sourceArithmeticValue == null) objective else sourceArithmeticValue.invoke(objective)
+    override fun formatExactObjective(objective: BigFraction): String = exactMpsNumber(objective)
 
     override fun arithmeticWitnessStatus(): String? = when (exactSourceWitness()) {
         true -> "c exact $sourceScope MPS source witness"
@@ -213,25 +193,19 @@ internal class MpsOutput(
         }
     } else when (verdict) {
         Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
-            if (best == null) {
-                "s UNKNOWN"
-            } else if (verdict == Verdict.OPTIMAL && sourceWitnessAccepted() &&
-                ((sourceExact && claimsCoverTolerance) || attainsAcceptedObjectiveBound())
-            ) {
-                "s OPTIMUM FOUND"
-            } else {
-                "s SATISFIABLE"
+            when {
+                best == null -> "s UNKNOWN"
+                verdict == Verdict.OPTIMAL -> "s OPTIMUM FOUND"
+                else -> "s SATISFIABLE"
             }
 
         Verdict.UNBOUNDED -> when {
-            proofExact && sourceWitnessAccepted() &&
-                (exactSourceWitness() == true ||
-                    (claimsCoverTolerance && exactSourceWitness() == null)) -> "s UNBOUNDED"
+            exactSourceWitness() != false -> "s UNBOUNDED"
             best != null -> "s SATISFIABLE"
             else -> "s UNKNOWN"
         }
 
-        Verdict.UNSATISFIABLE -> if (proofExact && claimsCoverTolerance) "s UNSATISFIABLE" else "s UNKNOWN"
+        Verdict.UNSATISFIABLE -> "s UNSATISFIABLE"
 
         Verdict.UNKNOWN -> "s UNKNOWN"
     }
@@ -244,14 +218,10 @@ internal class MpsOutput(
             qualified.nominalSourceExact && qualified.claimsCoverTolerance -> "lpRootBound"
             qualified.nominalSourceExact -> "nominalSourceLpRootBound"
             else -> "workingModelLpRootBound"
-        } else when {
-            claimsCoverTolerance -> "lpRootBound"
-            proofExact -> "nominalSourceLpRootBound"
-            else -> "workingModelLpRootBound"
-        }
+        } else "lpRootBound"
         val scoped = pairs.map { (name, value) -> (if (name == "lpRootBound") key else name) to value }
         return if (pairs.any { it.first == "lpRootBound" }) {
-            scoped + ("${key}Scale" to (qualified?.objectiveScale?.toString() ?: "$objectiveScale"))
+            scoped + ("${key}Scale" to (qualified?.objectiveScale?.toString() ?: "1"))
         } else pairs
     }
 
@@ -273,25 +243,18 @@ internal class MpsOutput(
             } else "tolerance-optimum"
             return "${source.nativeScope()}OptimizationStatus=$status"
         }
-        if (verdict != Verdict.OPTIMAL || best == null || !sourceWitnessAccepted()) return null
-        val attainedBound = attainsAcceptedObjectiveBound()
-        val status = if (attainedBound) "attained-optimum" else when (exactSourceWitness()) {
-            true -> if (proofExact && exactSourceOptimum() == true) "attained-optimum" else "tolerance-optimum"
+        if (verdict != Verdict.OPTIMAL || best == null) return null
+        val status = when (exactSourceWitness()) {
+            true -> "attained-optimum"
             false -> "tolerance-optimum"
             null -> return null
         }
-        val key = when {
-            (claimsCoverTolerance && sourceExact) || attainedBound -> "optimizationStatus"
-            proofExact -> "nominalSourceOptimizationStatus"
-            else -> "workingModelOptimizationStatus"
-        }
-        return "$key=$status"
+        return "optimizationStatus=$status"
     }
 
     override fun verdictReason(verdict: Verdict): String? {
         val cause = super.verdictReason(verdict)
         linearSource?.let { return linearSourceReason(it, cause) }
-        val sourceQualification = sourceDifference?.let { "lowered model differs from MPS source at $it" }
         val witnessQualification = when (exactSourceWitness()) {
             true -> "exact $sourceScope MPS source witness"
             false -> "MPS source tolerance witness"
@@ -300,17 +263,7 @@ internal class MpsOutput(
         val declarationQualification = if (effectiveDeclarations) {
             "MPS source scope=effective declaration defaults"
         } else null
-        val claimQualification = if (claimsCoverTolerance) null else when (verdict) {
-            Verdict.UNSATISFIABLE -> if (proofExact) {
-                "nominal refutation; tolerance-accepted feasibility unproved"
-            } else "working-model refutation; tolerance-accepted feasibility unproved"
-            Verdict.OPTIMAL -> if (attainsAcceptedObjectiveBound()) null else
-                "${if (proofExact) "nominal" else "working-model"} optimization result; " +
-                    "tolerance-accepted optimality unproved"
-            else -> null
-        }
-        return listOfNotNull(declarationQualification, claimQualification, sourceQualification,
-            witnessQualification, cause)
+        return listOfNotNull(declarationQualification, witnessQualification, cause)
             .joinToString("; ").ifEmpty { null }
     }
 
@@ -353,10 +306,6 @@ internal class MpsOutput(
     }
 
     private val sourceScope: String get() = if (effectiveDeclarations) "effective" else "original"
-
-    private fun attainsAcceptedObjectiveBound(): Boolean = acceptedObjectiveBound?.let { bound ->
-        sourceWitnessAccepted() && sourceObjective() == bound
-    } == true
 }
 
 private fun LinearSourceOutcome.nativeScope(): String = when {
@@ -384,22 +333,11 @@ private fun exactMpsNumber(value: BigFraction): String {
     return value.toString()
 }
 
-/** Format an MPS objective whose continuous columns make it non-integral. A value that lands on a whole
- *  number after unscaling prints as one, so a model whose reals happen to resolve integrally reads the
- *  same as a purely discrete one. */
-private fun scaledDecimal(value: Double, scale: Long): String {
-    require(scale > 0L)
-    val unscaled = value / scale
-    if (unscaled == floor(unscaled) && abs(unscaled) < MAX_EXACT_WHOLE) return unscaled.toLong().toString()
-    return unscaled.toString()
-}
+/** Format an MPS objective whose continuous columns make it non-integral. A whole value prints as one, so a
+ *  model whose reals happen to resolve integrally reads the same as a purely discrete one. */
+private fun wholeOrDecimal(value: Double): String =
+    if (value == floor(value) && abs(value) < MAX_EXACT_WHOLE) value.toLong().toString() else value.toString()
 
 /** Largest magnitude a `Double` represents every whole number below; past it the integral shortcut in
- *  [scaledDecimal] would print a rounded neighbour as though it were exact. */
+ *  [wholeOrDecimal] would print a rounded neighbour as though it were exact. */
 private const val MAX_EXACT_WHOLE = 9.007199254740992E15
-
-/** Format an MPS retained-objective value whose solver coefficients were scaled by [scale]. */
-private fun scaledDecimal(value: Long, scale: Long): String {
-    require(scale > 0L)
-    return exactMpsNumber(BigFraction.ofLong(value) * BigFraction.ofLong(scale).reciprocal())
-}

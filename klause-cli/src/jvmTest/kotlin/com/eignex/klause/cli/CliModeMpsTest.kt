@@ -114,15 +114,6 @@ class CliModeMpsTest {
     }
 
     @Test
-    fun `a scaled MPS objective should unscale before printing`() {
-        val output = MpsOutput(objectiveScale = 10L)
-
-        val out = capture { output.onSolution("v x=6.05", objective = 0L, continuousObjective = 60.5) }
-
-        assertTrue("o 6.05" in out, out)
-    }
-
-    @Test
     fun `portfolio telemetry should carry exact discrete and whole continuous objectives`() {
         val output = MpsOutput()
 

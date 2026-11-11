@@ -221,8 +221,9 @@ internal fun Problem.pipelineRoute(
     preparationCancellation: Cancellation,
     polynomialCancellation: Cancellation = preparationCancellation,
     onLpStats: ((LpStats) -> Unit)? = null,
+    routePureRealToTheory: Boolean = true,
 ): SourceProblemRoute = pipelineRouteObserved(
-    objective, maximize, true, boundCancellation, onLpStats,
+    objective, maximize, routePureRealToTheory, boundCancellation, onLpStats,
     requiresExactObjectiveRoute(objective, preparationCancellation),
     projections.providers, projections, polynomialCancellation = polynomialCancellation,
     preparationCancellation = preparationCancellation,
@@ -335,8 +336,7 @@ private fun Problem.pipelineRouteObserved(
             NativeSourceExecution.IntegerPolynomial(NonlinearIntegerTheoryRequest(execution.source, arithmetic)),
         )
 
-        is PreparedExecution.Transcendental, is PreparedExecution.Numerical, is PreparedExecution.NumericalWorking ->
-            error("factor source requires polynomial execution")
+        is PreparedExecution.Transcendental -> error("factor source requires polynomial execution")
     }
     val arithmeticRoute = arithmeticExecution.ownership.theoryPipeline
     val preferExact = routeLinearToTheory &&

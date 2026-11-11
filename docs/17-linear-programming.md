@@ -1860,8 +1860,7 @@ It is disabled by default and declines active-row and refutation-reuse modes;
 finite enumeration and the exact theory's Hermite branch order retain their own
 owners.
 
-`NumericalLinearRequest.solve` serves MPS through the same numerical authority, and
-these adapters never confer source semantics on a rounded or tolerance model.
+These adapters never confer source semantics on a rounded or tolerance model.
 
 Internal numerical selection observations retain completed query scopes, exact
 relaxation coordinates before primal recovery, cited rows and the generating cut

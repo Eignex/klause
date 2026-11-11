@@ -265,21 +265,4 @@ class ExecutionSemanticsTest {
         assertSame(linear, result.linearResult)
     }
 
-    @Test
-    fun `numerical admission should retain source policy before a context is available`() {
-        val source = SmtLib.parse(
-            "(declare-const x Int) (declare-const y Int) (assert (> x y))",
-            semanticOverrides = SemanticOverrides(undeclaredIntegers = BoundsOverride(
-                lower = BoundOverride.Value(2L),
-            )),
-        ).model
-
-        val result = NumericalLinearRequest(source, LinearObjective(intCoefficients = longArrayOf(1, 0)))
-            .solve(TheoryParams(cancellation = Cancellation { true }))
-
-        assertSame(source.semantics, result.semantics)
-        assertNull(result.terminal)
-        assertNull(result.bound)
-    }
-
 }

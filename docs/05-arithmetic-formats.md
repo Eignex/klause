@@ -44,11 +44,9 @@ rendered objectives stay in source units when working rows are scaled.
 
 `MpsModel.toLinearSourceProblem` captures original rational declarations, row sides,
 source terms, integer indicators and the affine objective before engine
-normalization. `MpsCompiled` keeps that representation and delegates point checks
-and tolerance qualification to the shared validator;
-`LinearSourceProblem.checkMpsWitness` exposes the same checker. Both `toProblem` and
-`toExactSourceProblem` delegate to the shared linear lowerer once and build no
-engine matrices themselves.
+normalization. `LinearSourceProblem.checkMpsWitness` checks points against it with the
+shared validator, and `toleranceQualification` qualifies its tolerance. `toProblem`
+delegates to the shared linear lowerer once and builds no engine matrices itself.
 
 The lowered LP may restate continuous coefficients in binary64, and `sourceExact`
 records whether that representation corresponds exactly. The shared lowerer proves
@@ -57,12 +55,13 @@ gives such continuous columns finite integer backings; fractional and guarded
 definitions stay continuous. Column names, witness values and objective units are
 preserved across the mapping, and integer rows keep exact authority beyond `2^53`.
 
-`toExactSourceProblem` keeps parsed decimals in native `ExactLinear` rows, clearing
-denominators without rounding. Real bounds become exact rows and integer columns
-keep integrality. `LinearIndicator` keeps each trigger and enabled comparison;
-numerical rows enabled by a finite pin retain that premise, so retraction removes
-their authority. Objectives over integer backings use an exact positive multiplier
-when it fits, and an auxiliary equality otherwise; rendering undoes either exactly.
+Under zero feasibility tolerance, `toProblem` keeps parsed decimals in native
+`ExactLinear` rows, clearing denominators without rounding. Real bounds become exact
+rows and integer columns keep integrality. `LinearIndicator` keeps each trigger and
+enabled comparison; numerical rows enabled by a finite pin retain that premise, so
+retraction removes their authority. Objectives over integer backings use an exact
+positive multiplier when it fits, and an auxiliary equality otherwise; rendering
+undoes either exactly.
 Wide coefficients admit exact positive row normalization for the numerical LP, and
 nonfinite or underflowing projections decline numerical execution without
 switching to an arithmetic theory. An infeasible constant row stays an explicit
@@ -73,7 +72,7 @@ contradiction.
 Witness checks use the original decimals with exact rational arithmetic. Rows
 permit `max(absolute, relative * max(abs(bound), sum(abs(a(i) * x(i)))))` and
 column bounds `max(absolute, relative * abs(bound))`; integrality stays exact.
-`MpsSourceWitness.exact` records whether the accepted point satisfies every row and
+`LinearSourceWitness.exact` records whether the accepted point satisfies every row and
 bound without slack. Cancellation withholds the point.
 
 For a checked point with at most 4,096 coordinates, rendering may snap residuals
@@ -103,51 +102,35 @@ scope remain visible in both modes.
 
 ## Routing and result strength
 
-MPS selects numerical execution independently of certification policy. Purely
-continuous sources use the finite LP lane with its tolerance guarantee. Bounded
-integer sources keep finite search with numerical completion, and numerical bound
-closure can prove missing integer sides. The prepared plan keeps original
-declarations and objective direction separate from derived bounds and the engine's
-minimized objective.
+MPS lowers its captured source to the same factor model other sources use and
+takes the shared route; the linear source stays attached to qualify claims in
+original units. Purely continuous sources use the finite LP lane with its
+tolerance guarantee. Bounded integer sources keep finite search with numerical
+completion, and numerical bound closure can prove missing integer sides. The
+prepared plan keeps original declarations and objective direction separate from
+derived bounds and the engine's minimized objective.
 
-Open integer declarations keep their missing sides and use LP relaxations with
-exhaustive integer splits: each fractional endpoint splits at its floor, and a
-branch optimum or refutation counts only once every sibling has certified
-coverage. A source-valid improving ray needs an integral feasible base and an
-integral recession step, so an unbounded relaxation alone never proves MIP
-unboundedness. Unresolved indicator triggers split into the regions below, at and
-above their integer value. Representation, resource or certification limits return
-an incomplete result with any checked incumbent and root bound; they never fall
-back to an open theory. Numerical LS and ALNS use
-[joint linear repair](11-neighborhoods.md#joint-linear-repair), publishing checked
-incumbents without global bounds or terminal claims.
+Open integer declarations keep their missing sides and go to the exact linear
+theory. An optimization runs its LP authority first, with exhaustive integer
+splits: each fractional endpoint splits at its floor, and a branch optimum or
+refutation counts only once every sibling has certified coverage. A source-valid
+improving ray needs an integral feasible base and an integral recession step, so
+an unbounded relaxation alone never proves MIP unboundedness. Unresolved indicator
+triggers split into the regions below, at and above their integer value. Rows the
+authority cannot represent, and branches it declines, fall back to the theory.
+LS and ALNS use [joint linear repair](11-neighborhoods.md#joint-linear-repair),
+publishing checked incumbents without global bounds or terminal claims.
 
 Every candidate is checked against original rows, bounds, indicators and
 integrality before publication, with its objective recomputed from original
 numbers. A rejected final witness cannot promote an earlier point to an optimum,
 and a source-inexact proposal supplies no refutation, bound or optimum authority.
-See [MpsCompiler](../klause/src/commonMain/kotlin/com/eignex/klause/formats/mps/MpsCompiler.kt)
+See [PreparedLinearSource](../klause/src/commonMain/kotlin/com/eignex/klause/solver/pipeline/PreparedLinearSource.kt)
 and [MpsMode](../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/MpsMode.kt).
 
-### Linear traversal diagnostics
-
-`SourceSetupRequest.linearTraversal=NUMERICAL` selects the numerical LP/MIP owner
-on the same linear source snapshot, including bounded integer declarations. The
-CLI exposes this diagnostic as `--param linear-traversal=numerical`; `automatic`
-retains normal routing. This choice is independent of the finite worker recipe
-selected by `engine`, keeps the original tolerance and objective, and supplies no
-finite or arithmetic-theory fallback. Numerical traversal retains sibling coverage
-and withholds terminals for interrupted or uncertified leaves.
-
-Automatic routing retains its finite recipes. Eligible sequential mixed optimization pools append
-bounded numerical frontier and joint-repair workers; [portfolios](12-portfolio.md)
-defines their admission and proof transport. `FINITE_COMPANIONS`
-(`--param linear-traversal=finite-companions`) explicitly selects the same policy.
-Other pools retain finite execution, and open declarations retain the numerical fallback.
-
-`NUMERICAL_FRONTIER`, exposed as `--param linear-traversal=numerical-frontier`,
-uses a retained bound-ordered alternative queue. The same source checking and
-tolerance contracts apply to its shared-search and portfolio consumers.
+Sequential mixed optimization pools over a linear source append bounded numerical
+frontier and joint-repair workers; [portfolios](12-portfolio.md) defines their
+admission and proof transport.
 
 ## SMT-LIB source semantics
 

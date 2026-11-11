@@ -8,11 +8,13 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.formats.mps.Mps
-import com.eignex.klause.formats.mps.toExactSourceProblem
+import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.FloatLpResult
@@ -906,7 +908,7 @@ class LpBoundingTest {
                     " M0 'MARKER' 'INTORG'\n I COST 0.125\n M1 'MARKER' 'INTEND'\n X COST 0.5\n" +
                     "RHS\n R COST -0.375\nBOUNDS\n LO B I 0\n UP B I 1\n" +
                     " LO B X 0.25\n UP B X 1.25\nENDATA",
-            ).toExactSourceProblem()
+            ).toProblem(semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()))
             val sourceObjective = assertNotNull(compiled.objective).toLinearObjective()
             val objective = if (compiled.maximize) sourceObjective.negated() else sourceObjective
             val sink = SolveStatsSink(backend = "continuous-original-source")

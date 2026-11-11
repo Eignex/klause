@@ -31,9 +31,6 @@ internal sealed interface AttachedSourceFormula {
 internal sealed interface NativeSourceExecution {
     val preparedPlan: PreparedSourcePlan
 
-    class Numerical(val request: NumericalLinearRequest, override val preparedPlan: PreparedSourcePlan) :
-        NativeSourceExecution
-
     class Polynomial(val request: PolynomialTheoryRequest) : NativeSourceExecution {
         override val preparedPlan: PreparedSourcePlan get() = request.preparedPlan
     }

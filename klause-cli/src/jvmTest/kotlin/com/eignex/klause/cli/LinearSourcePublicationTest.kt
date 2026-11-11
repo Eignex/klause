@@ -16,6 +16,7 @@ import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.LinearSourceConclusion
 import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.util.numbers.BIG_ONE
@@ -49,7 +50,7 @@ class LinearSourcePublicationTest {
     }
 
     @Test
-    fun `numerical maximization should retain native payload beside original published cost`() {
+    fun `open linear maximization should retain native payload beside original published cost`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("n", true)),
             listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ofLong(2))),
@@ -80,7 +81,8 @@ class LinearSourcePublicationTest {
         SolveCore.solve(solvable, common, output)
 
         assertEquals(listOf(BigFraction.ofLong(31) * BigFraction.ofLong(10).reciprocal()), values)
-        assertEquals(BigFraction.ofLong(31), assertIs<SourceExecutionResult.Numerical>(retained).result.value)
+        val native = assertIs<OpenTheoryExecution.Optimize>(assertIs<SourceExecutionResult.Linear>(retained).result)
+        assertEquals(BigFraction.ofLong(31), assertNotNull(native.result.linearResult).value)
         assertEquals(Verdict.OPTIMAL, completed)
     }
 
@@ -114,8 +116,9 @@ class LinearSourcePublicationTest {
         SolveCore.solve(solvable, common, output)
 
         assertEquals(listOf(BigFraction.ofLong(3).reciprocal()), values)
-        val result = assertIs<SourceExecutionResult.Numerical>(retained)
-        assertIs<SourceClaim.Optimal>(assertNotNull(result.result.terminal).claim)
+        val result = assertIs<SourceExecutionResult.Linear>(retained)
+        val native = assertIs<OpenTheoryExecution.Optimize>(result.result).result.linearResult
+        assertIs<SourceClaim.Optimal>(assertNotNull(assertNotNull(native).terminal).claim)
         assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
         assertTrue(assertNotNull(result.linearSource).numericalClaims)
         assertEquals(Verdict.OPTIMAL, completed)

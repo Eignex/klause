@@ -1,12 +1,9 @@
 package com.eignex.klause.formats.mps
 
-import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSettings
-import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
-import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lowering.lowerLinearSource
 import com.eignex.klause.simplex.exact.BigFraction
@@ -14,14 +11,6 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
-
-/** Compile the canonical MPS source through shared exact views, defaulting to zero feasibility slack. */
-fun MpsModel.toExactSourceProblem(
-    settings: ProblemSettings = KlauseConfig.current.problemSettings(),
-    semanticOverrides: SemanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()),
-): MpsCompiled = compileMpsView(
-    checkNotNull(toLinearSourceProblem(semanticOverrides)), settings, allowProjection = false,
-)
 
 internal fun MpsModel.compileMpsView(
     source: LinearSourceProblem,
@@ -60,7 +49,6 @@ internal fun MpsModel.compileMpsView(
     ).withLinearSource(
         source,
         if (view.exact) null else projectionDifference(source) ?: "working projection differs from source numbers",
-        null,
     )
 }
 

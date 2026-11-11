@@ -6,6 +6,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.RealConstants
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.simplex.exact.BigFraction
@@ -14,8 +16,8 @@ import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MpsCompilerLoweringTest {
@@ -131,7 +133,7 @@ class MpsCompilerLoweringTest {
             " UP B Y 9999999999999999999\nENDATA"
         val source = Mps.parse(text)
 
-        val compiled = source.toExactSourceProblem()
+        val compiled = source.toProblem(semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()))
 
         val rows = compiled.model.factors.flatMap { it.linearRows }
         val row = rows.single { it.size == 2 }
@@ -161,16 +163,16 @@ class MpsCompilerLoweringTest {
                 "BOUNDS\n UP B X 99999999999999999999\n UP B Y 100000000000000000000\nENDATA",
         )
         val edge = BigFraction.of(parseBigInt("99999999999999999999"), BIG_ONE)
-        val compiled = source.toExactSourceProblem()
+        val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+        val compiled = source.toProblem(semanticOverrides = exact)
+        val linear = assertNotNull(source.toLinearSourceProblem(exact))
 
-        compiled.sourceWitness(listOf(edge, edge + BigFraction.ofLong(2)))
+        assertNotNull(linear.checkMpsWitness(listOf(edge, edge + BigFraction.ofLong(2))))
 
         val upperRows = compiled.model.factors.flatMap { it.linearRows }
             .filter { it.relation == LinearOp.LE && (it.constants as IntegralConstants).exactBound == edge.num }
         assertEquals(2, upperRows.size)
-        assertFailsWith<MpsLoweringException> {
-            compiled.sourceWitness(listOf(edge + BigFraction.ONE, BigFraction.ZERO))
-        }
+        assertNull(linear.checkMpsWitness(listOf(edge + BigFraction.ONE, BigFraction.ZERO)))
     }
 
     @Test
@@ -189,8 +191,9 @@ class MpsCompilerLoweringTest {
             source.sourceNumbers().variableBounds.single().second?.double?.toRawBits())
         assertEquals((-0.0).toRawBits(), source.sourceNumbers().objectiveConstant.double.toRawBits())
         assertEquals((-0.0).toRawBits(), compiled.model.realUpper[compiled.columns.single().id].toRawBits())
-        assertEquals(BigFraction.ZERO, compiled.sourceWitness(listOf(BigFraction.ZERO)).objective)
-        assertFalse(compiled.withinTolerance(LongArray(0), doubleArrayOf(1.0)))
+        val linear = assertNotNull(source.toLinearSourceProblem())
+        assertEquals(BigFraction.ZERO, assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ZERO))).objective)
+        assertNull(linear.checkMpsWitness(listOf(BigFraction.ONE)))
     }
 
     @Test
@@ -201,7 +204,8 @@ class MpsCompilerLoweringTest {
         )
 
         val compiled = source.toProblem()
-        val witness = compiled.sourceWitness(listOf(BigFraction.ofLong(4)))
+        val witness = assertNotNull(assertNotNull(source.toLinearSourceProblem())
+            .checkMpsWitness(listOf(BigFraction.ofLong(4))))
 
         assertTrue(compiled.maximize)
         assertEquals(2L, compiled.model.intBounds.lower(0))
@@ -240,7 +244,9 @@ class MpsCompilerLoweringTest {
         parsed.objective.coeffs[0] = 7.0
         parsed.constraints[0].coeffs[0] = 9.0
 
-        val compiled = parsed.copy(name = "edited").toProblem()
+        val edited = parsed.copy(name = "edited")
+        val compiled = edited.toProblem()
+        val linear = assertNotNull(edited.toLinearSourceProblem())
 
         val objective = assertNotNull(compiled.objective)
         val auxiliary = objective.realCoefficients.indices.single { objective.realCoefficients[it] != 0.0 }
@@ -257,10 +263,8 @@ class MpsCompilerLoweringTest {
             (0 until definition.size).associate { definition.ref(it) to constants.realCoefficients.at(it) })
         assertEquals(0.0, constants.bound)
         assertEquals(BigFraction.ofLong(7) * BigFraction.ofLong(2).reciprocal(),
-            compiled.sourceWitness(listOf(BigFraction.ofLong(2).reciprocal())).objective)
-        assertFailsWith<MpsLoweringException> {
-            compiled.sourceWitness(listOf(BigFraction.ofLong(3).reciprocal() * BigFraction.ofLong(2)))
-        }
+            assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ofLong(2).reciprocal()))).objective)
+        assertNull(linear.checkMpsWitness(listOf(BigFraction.ofLong(3).reciprocal() * BigFraction.ofLong(2))))
     }
 
     @Test
@@ -276,14 +280,16 @@ class MpsCompilerLoweringTest {
             variables = parsed.variables.reversed(), constraints = parsed.constraints.reversed(),
         )
 
-        val compiled = source.toExactSourceProblem()
+        val linear = assertNotNull(source.toLinearSourceProblem(
+            SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+        ))
 
         val numbers = source.sourceNumbers()
         assertEquals("9007199254740993", numbers.variableBounds[1].second?.fraction.toString())
         assertEquals(BigFraction.ofLong(3), numbers.constraintBounds[0].second?.fraction)
         assertEquals("9007199254740993", numbers.constraintBounds[1].second?.fraction.toString())
         assertEquals("9007199254740993",
-            compiled.sourceWitness(listOf(BigFraction.ZERO, BigFraction.ONE)).objective.toString())
+            assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ZERO, BigFraction.ONE))).objective.toString())
     }
 
     @Test
@@ -310,10 +316,9 @@ class MpsCompilerLoweringTest {
         assertEquals(2.0, compiled.model.realLower[1])
         assertEquals(Double.POSITIVE_INFINITY, compiled.model.realUpper[1])
         assertEquals(1, compiled.model.factors.size)
-        compiled.sourceWitness(listOf(BigFraction.ofLong(-100), BigFraction.ofLong(2)))
-        assertFailsWith<MpsLoweringException> {
-            compiled.sourceWitness(listOf(BigFraction.ZERO, BigFraction.ofLong(8)))
-        }
+        val linear = assertNotNull(source.toLinearSourceProblem())
+        assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ofLong(-100), BigFraction.ofLong(2))))
+        assertNull(linear.checkMpsWitness(listOf(BigFraction.ZERO, BigFraction.ofLong(8))))
     }
 
     @Test
@@ -358,11 +363,10 @@ class MpsCompilerLoweringTest {
             assertEquals("3", factor.row.constants.exactBound.toString())
             assertEquals(LinearOp.LE, factor.row.relation)
         }
-        compiled.sourceWitness(listOf(BigFraction.ofLong(2), BigFraction.ofLong(5)))
+        val linear = assertNotNull(source.toLinearSourceProblem())
+        assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ofLong(2), BigFraction.ofLong(5))))
         for (trigger in listOf(0L, 1L)) {
-            assertFailsWith<MpsLoweringException> {
-                compiled.sourceWitness(listOf(BigFraction.ofLong(trigger), BigFraction.ofLong(4)))
-            }
+            assertNull(linear.checkMpsWitness(listOf(BigFraction.ofLong(trigger), BigFraction.ofLong(4))))
         }
     }
 }

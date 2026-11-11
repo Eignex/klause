@@ -27,8 +27,6 @@ internal sealed interface PreparedExecution {
     class NonlinearInteger(val source: NonlinearIntegerProblem, val projection: FactorPolynomialProjection? = null) :
         PreparedExecution
     class Transcendental(val source: TranscendentalProblem) : PreparedExecution
-    class Numerical(val source: LinearSourceProblem, override val model: Problem) : Factor
-    class NumericalWorking(override val model: Problem) : Factor
     class Declined(val model: Problem, val reason: PreparedPlanDecline, val retained: Factor? = null) :
         PreparedExecution {
         init {
@@ -41,8 +39,6 @@ internal val PreparedExecution.model: Problem? get() = when (this) {
     is PreparedExecution.FiniteLinear -> model
     is PreparedExecution.Polynomial -> completion.source
     is PreparedExecution.Declined -> model
-    is PreparedExecution.Numerical -> model
-    is PreparedExecution.NumericalWorking -> model
     is PreparedExecution.NonlinearInteger -> projection?.model
     is PreparedExecution.Transcendental -> null
 }
@@ -53,7 +49,6 @@ internal val PreparedExecution.finiteLinear: PreparedExecution.FiniteLinear? get
     is PreparedExecution.FiniteLinear -> this
     is PreparedExecution.Declined -> retained as? PreparedExecution.FiniteLinear
     is PreparedExecution.Polynomial, is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
-    is PreparedExecution.Numerical, is PreparedExecution.NumericalWorking -> null
 }
 
 internal val PreparedExecution.polynomial: PreparedExecution.Polynomial? get() = when (this) {
@@ -64,8 +59,6 @@ internal val PreparedExecution.polynomial: PreparedExecution.Polynomial? get() =
     is PreparedExecution.FiniteLinear, is PreparedExecution.NonlinearInteger,
     is PreparedExecution.Transcendental,
     -> null
-
-    is PreparedExecution.Numerical, is PreparedExecution.NumericalWorking -> null
 }
 
 internal val PreparedExecution.kind: PreparedExecutionKind get() = when (this) {
@@ -73,7 +66,6 @@ internal val PreparedExecution.kind: PreparedExecutionKind get() = when (this) {
     is PreparedExecution.Polynomial -> PreparedExecutionKind.POLYNOMIAL
     is PreparedExecution.NonlinearInteger -> PreparedExecutionKind.NONLINEAR_INTEGER
     is PreparedExecution.Transcendental -> PreparedExecutionKind.TRANSCENDENTAL
-    is PreparedExecution.Numerical, is PreparedExecution.NumericalWorking -> PreparedExecutionKind.NUMERICAL
     is PreparedExecution.Declined -> PreparedExecutionKind.DECLINED
 }
 
@@ -85,8 +77,6 @@ internal val PreparedExecution.decline: PreparedPlanDecline? get() = when (this)
     is PreparedExecution.Declined -> reason
 
     is PreparedExecution.Polynomial, is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
-
-    is PreparedExecution.Numerical, is PreparedExecution.NumericalWorking -> null
 }
 
 internal class PreparedSourceStructure(
@@ -137,10 +127,6 @@ internal class PreparedSourceStructure(
             }
 
             is PreparedExecution.Transcendental -> require(originalSource === execution.source)
-
-            is PreparedExecution.Numerical -> require(originalSource === execution.source)
-
-            is PreparedExecution.NumericalWorking -> require(originalSource === execution.model)
 
             else -> Unit
         }
@@ -209,11 +195,6 @@ internal fun legacyPreparedExecution(
     )
 
     PreparedExecutionKind.TRANSCENDENTAL -> PreparedExecution.Transcendental(originalSource as TranscendentalProblem)
-
-    PreparedExecutionKind.NUMERICAL -> PreparedExecution.Numerical(
-        originalSource as LinearSourceProblem,
-        requireNotNull(model),
-    )
 
     PreparedExecutionKind.DECLINED -> if (decline == PreparedPlanDecline.CONTINUOUS_LINEAR_OBJECTIVE &&
         polynomialModel != null

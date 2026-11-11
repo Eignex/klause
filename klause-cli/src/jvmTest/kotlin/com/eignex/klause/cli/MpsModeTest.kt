@@ -104,67 +104,8 @@ class MpsModeTest {
     }
 
     @Test
-    fun `inexact working optima should retain scoped metadata beside accepted source points`() {
-        for (claimsCoverTolerance in listOf(false, true)) {
-            val output = MpsOutput(
-                sourceExact = false,
-                exactSourceWitness = { true },
-                claimsCoverTolerance = claimsCoverTolerance,
-            )
-
-            val text = capture {
-                output.onSolution("v X=1", objective = 1)
-                output.onComplete(Verdict.OPTIMAL)
-            }
-
-            assertTrue("s SATISFIABLE" in text.lines(), text)
-            assertTrue("c workingModelOptimizationStatus=tolerance-optimum" in text.lines(), text)
-            assertTrue("v X=1" in text.lines(), text)
-            assertFalse(text.lines().any { it.startsWith("c optimizationStatus=") }, text)
-        }
-    }
-
-    @Test
-    fun `a checked accepted objective bound should retain attained optimum authority`() {
-        val output = MpsOutput(
-            sourceExact = false,
-            sourceObjective = { BigFraction.ONE },
-            exactSourceWitness = { false },
-            claimsCoverTolerance = false,
-            acceptedObjectiveBound = BigFraction.ONE,
-        )
-
-        val text = capture {
-            output.onExactSolution("v X=1", BigFraction.ONE)
-            output.onComplete(Verdict.OPTIMAL)
-        }
-
-        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
-        assertTrue("c optimizationStatus=attained-optimum" in text.lines(), text)
-        assertTrue("c MPS source tolerance witness" in text.lines(), text)
-        assertFalse("tolerance-accepted optimality unproved" in text, text)
-    }
-
-    @Test
-    fun `a nominal root bound should retain its value and source units under tolerant publication`() {
-        for ((proofExact, key) in listOf(true to "nominalSourceLpRootBound", false to "workingModelLpRootBound")) {
-            val output = MpsOutput(objectiveScale = 3L, proofExact = proofExact, claimsCoverTolerance = false)
-            val stats = SolveStats(
-                run = RunStats(backend = "backtrack"),
-                lp = LpStats(solves = SumResult(1.0), rootBound = -1.23456789),
-            )
-
-            val text = capture { output.onStatistics(stats, 1L, 0L) }
-
-            assertTrue("c $key=-1.23456789" in text.lines(), text)
-            assertTrue("c ${key}Scale=3" in text.lines(), text)
-            assertFalse(text.lines().any { it.startsWith("c lpRootBound=") }, text)
-        }
-    }
-
-    @Test
     fun `an exact nominal unbounded ray should remain valid in the tolerance accepted superset`() {
-        val output = MpsOutput(exactSourceWitness = { true }, claimsCoverTolerance = false)
+        val output = MpsOutput(exactSourceWitness = { true })
 
         val text = capture {
             output.onExactSolution("v X=1", BigFraction.ONE)
@@ -602,7 +543,7 @@ class MpsModeTest {
             }
 
             val invocation = assertIs<SourceRendering.LinearSource>(loaded.rendering).invocation
-            assertEquals(SourceExecutionKind.NUMERICAL, SourceSetup.executionKind(invocation))
+            assertEquals(SourceExecutionKind.LINEAR, SourceSetup.executionKind(invocation))
             assertTrue("s UNKNOWN" in text.lines(), text)
             assertTrue("c solvePipeline=linear-source" in text.lines(), text)
             assertFalse("declaredTheoryRoute=" in text, text)
@@ -915,25 +856,8 @@ class MpsModeTest {
     }
 
     @Test
-    fun `MPS publication should use the checked current source value before duplicate handling`() {
-        var checked: BigFraction? = BigFraction.ONE * BigFraction.ofLong(2).reciprocal()
-        val output = MpsOutput(objectiveScale = 3L, sourceArithmeticValue = { checked?.let(SourceValue::Rational) })
-        val publication = ArithmeticPublication(output)
-
-        val text = capture {
-            publication.publish("v X=1/2", SourceValue.Rational(BigFraction.ofLong(3)))
-            publication.publish("v X=1/2", SourceValue.Rational(BigFraction.ofLong(99)))
-            checked = null
-            publication.publish("v X=1/2", SourceValue.Rational(BigFraction.ofLong(3)))
-        }
-
-        assertEquals("o 0.5\nv X=1/2\n", text)
-        assertEquals(1L, publication.solutions)
-    }
-
-    @Test
     fun `accepted MPS objectives should retain original units and decimal formatting`() {
-        val output = MpsOutput(objectiveScale = 3L, sourceObjective = { BigFraction.ofLong(99) })
+        val output = MpsOutput()
 
         val text = capture {
             output.onArithmeticIncumbent(
@@ -946,44 +870,6 @@ class MpsModeTest {
         }
 
         assertEquals("o 0.5\nv X=1/2\n", text)
-    }
-
-    @Test
-    fun `exact open objectives should undo the MPS scale without rounding`() {
-        for (sign in listOf(-1L, 1L)) {
-            val output = MpsOutput(objectiveScale = 3L)
-
-            val text = capture { output.onExactSolution("v X=$sign", BigFraction.ofLong(sign)) }
-
-            assertTrue("o ${if (sign < 0) "-" else ""}1/3" in text, text)
-        }
-    }
-
-    @Test
-    fun `retained integer objectives should undo arbitrary positive multipliers`() {
-        for ((scale, expected) in listOf(2L to "0.5", 3L to "1/3", 5L to "0.2", 100L to "0.01")) {
-            val output = MpsOutput(objectiveScale = scale)
-
-            val text = capture { output.onSolution("v I=1", objective = 1L) }
-
-            assertTrue("o $expected" in text.lines(), text)
-        }
-    }
-
-    @Test
-    fun `MPS root statistics should retain their source objective scale`() {
-        for (scale in listOf(1L, 3L, 100L)) {
-            val output = MpsOutput(objectiveScale = scale)
-            val stats = SolveStats(
-                run = RunStats(backend = "backtrack"),
-                lp = LpStats(solves = SumResult(1.0), rootBound = -1.23456789),
-            )
-
-            val text = capture { output.onStatistics(stats, 1L, 0L) }
-
-            assertTrue("c lpRootBound=-1.23456789\n" in text, text)
-            assertTrue("c lpRootBoundScale=$scale\n" in text, text)
-        }
     }
 
     private fun capture(block: () -> Unit): String {
@@ -1036,7 +922,7 @@ class MpsModeTest {
 
             val invocation = assertIs<SourceRendering.LinearSource>(solvable.rendering).invocation
             val original = assertIs<LinearSourceProblem>(invocation.source.originalSource)
-            assertEquals(SourceExecutionKind.NUMERICAL, SourceSetup.executionKind(invocation))
+            assertEquals(SourceExecutionKind.LINEAR, SourceSetup.executionKind(invocation))
             assertEquals(sense == "MAX", assertNotNull(original.objective).sense == ObjectiveSense.MAXIMIZE)
         }
     }
@@ -1109,7 +995,7 @@ class MpsModeTest {
         val solvable = MpsMode.newSession().load(mps.absolutePath, CommonOptions().apply { exact = true })
 
         val invocation = assertIs<SourceRendering.LinearSource>(solvable.rendering).invocation
-        assertEquals(SourceExecutionKind.NUMERICAL, SourceSetup.executionKind(invocation))
+        assertEquals(SourceExecutionKind.LINEAR, SourceSetup.executionKind(invocation))
         assertEquals(SourceTolerance(), invocation.source.semantics.effective.feasibilityTolerance)
     }
 
@@ -1174,68 +1060,33 @@ class MpsModeTest {
     }
 
     @Test
-    fun `a source objective with no finite decimal should print as a fraction`() {
+    fun `an exact objective with no finite decimal should print as a fraction`() {
         val third = BigFraction.ofLong(3L).reciprocal()
-        val output = MpsOutput(sourceObjective = { third })
+        val output = MpsOutput()
 
-        val text = capture { output.onSolution("v X=1/3", objective = 0L, continuousObjective = 1.0 / 3.0) }
+        val text = capture { output.onExactSolution("v X=1/3", third) }
 
         assertTrue("o 1/3" in text, text)
     }
 
     @Test
-    fun `a source objective with a finite decimal should stay decimal`() {
+    fun `an exact objective with a finite decimal should stay decimal`() {
         val half = BigFraction.ofLong(2L).reciprocal()
-        val output = MpsOutput(sourceObjective = { half })
+        val output = MpsOutput()
 
-        val text = capture { output.onSolution("v X=0.5", objective = 0L, continuousObjective = 0.5) }
+        val text = capture { output.onExactSolution("v X=0.5", half) }
 
         assertTrue("o 0.5" in text, text)
     }
 
     @Test
-    fun `a source difference should qualify the lowered optimum`() {
-        val output = MpsOutput(sourceExact = false, sourceDifference = "objective coefficient 'X'")
-
-        val text = capture {
-            output.onSolution("v X=1", objective = 1L)
-            output.onComplete(Verdict.OPTIMAL)
-        }
-
-        assertTrue("s SATISFIABLE" in text, text)
-        assertTrue("lowered model differs from MPS source at objective coefficient 'X'" in text, text)
-    }
-
-    @Test
     fun `a feasible verdict without a verified source witness should be unknown`() {
-        val output = MpsOutput(sourceExact = false, sourceDifference = "row 'R' coefficient")
+        val output = MpsOutput()
 
         val text = capture { output.onComplete(Verdict.OPTIMAL) }
 
         assertTrue("s UNKNOWN" in text, text)
         assertTrue("s SATISFIABLE" !in text, text)
-    }
-
-    @Test
-    fun `a source difference should decline negative terminal claims`() {
-        listOf(Verdict.UNSATISFIABLE, Verdict.UNBOUNDED).forEach { verdict ->
-            val output = MpsOutput(sourceExact = false, sourceDifference = "row 'R' coefficient")
-
-            val text = capture { output.onComplete(verdict) }
-
-            assertTrue("s UNKNOWN" in text, text)
-        }
-    }
-
-    @Test
-    fun `a source within tolerance should still decline negative terminal claims`() {
-        listOf(Verdict.UNSATISFIABLE, Verdict.UNBOUNDED).forEach { verdict ->
-            val output = MpsOutput(sourceExact = true, proofExact = false)
-
-            val text = capture { output.onComplete(verdict) }
-
-            assertTrue("s UNKNOWN" in text, text)
-        }
     }
 
     @Test
@@ -1351,25 +1202,6 @@ class MpsModeTest {
     }
 
     @Test
-    fun `rejected terminal witnesses should not promote an earlier incumbent`() {
-        for (verdict in listOf(Verdict.OPTIMAL, Verdict.UNBOUNDED)) {
-            var accepted = true
-            val output = MpsOutput(sourceWitnessAccepted = { accepted })
-
-            val text = capture {
-                output.onSolution("v X=1", objective = 1)
-                accepted = false
-                output.onSolution("v X=0", objective = 0)
-                output.onComplete(verdict)
-            }
-
-            assertTrue("s SATISFIABLE" in text.lines(), text)
-            assertFalse("s OPTIMUM FOUND" in text.lines(), text)
-            assertFalse("s UNBOUNDED" in text.lines(), text)
-        }
-    }
-
-    @Test
     fun `constant source objectives should retain attained optimum semantics`() {
         val mps = File.createTempFile("mpsconstantsource", ".mps").apply {
             writeText("ROWS\n N COST\n E R\nRHS\n RHS R 0 COST 0.3\nENDATA\n")
@@ -1417,60 +1249,6 @@ class MpsModeTest {
 
         assertTrue("o 1.0000000000000000001" in text.lines(), text)
         assertFalse("o 2" in text.lines(), text)
-    }
-
-    @Test
-    fun `source witness guarantees should distinguish exact and tolerance acceptance`() {
-        val mps = File.createTempFile("mpswitnessguarantee", ".mps").apply {
-            writeText("OBJSENSE\n MAX\nROWS\n N COST\nCOLUMNS\n X COST 1\nBOUNDS\n UP B X 1\nENDATA\n")
-            deleteOnExit()
-        }
-        for (exact in listOf(false, true)) {
-            val common = CommonOptions().apply { this.exact = exact }
-            val session = MpsMode.newSession()
-            val solvable = session.load(mps.absolutePath, common)
-            val pipeline = assertIs<SourceRendering.LinearSource>(solvable.rendering)
-            val source = assertIs<LinearSourceProblem>(pipeline.invocation.source.originalSource)
-            val value = if (exact) BigFraction.ONE else assertNotNull(BigFraction.ofDouble(1.00000001))
-            val point = assertNotNull(source.checkMpsWitness(listOf(value)))
-            val output = MpsOutput(
-                sourceObjective = { point.objective },
-                exactSourceWitness = { point.exact },
-                claimsCoverTolerance = exact,
-            )
-
-            val text = capture {
-                ArithmeticPublication(output).publish(pipeline.render(point),
-                    SourceValue.Rational(checkNotNull(point.objective)))
-                output.onComplete(Verdict.OPTIMAL)
-            }
-
-            val qualification = if (exact) "exact original MPS source witness" else "MPS source tolerance witness"
-            assertTrue(qualification in text, text)
-            val status = if (exact) "attained-optimum" else "tolerance-optimum"
-            val scope = if (exact) "optimizationStatus" else "nominalSourceOptimizationStatus"
-            assertTrue("c $scope=$status" in text.lines(), text)
-            assertTrue((if (exact) "s OPTIMUM FOUND" else "s SATISFIABLE") in text.lines(), text)
-        }
-    }
-
-    @Test
-    fun `exact feasibility alone should not establish attained optimality`() {
-        for ((proofExact, exactOptimum) in listOf(false to true, true to false)) {
-            val output = MpsOutput(
-                proofExact = proofExact,
-                exactSourceWitness = { true },
-                exactSourceOptimum = { exactOptimum },
-            )
-
-            val text = capture {
-                output.onSolution("v X=1", objective = 1)
-                output.onComplete(Verdict.OPTIMAL)
-            }
-
-            assertTrue("c optimizationStatus=tolerance-optimum" in text.lines(), text)
-            assertTrue("exact original MPS source witness" in text, text)
-        }
     }
 
     @Test

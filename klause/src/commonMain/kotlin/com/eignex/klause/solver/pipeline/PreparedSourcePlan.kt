@@ -37,9 +37,6 @@ enum class PreparedExecutionKind {
 
     /** Original exact real functions retain their sound incomplete source service. */
     TRANSCENDENTAL,
-
-    /** Numerical linear traversal with a retained original-unit source. */
-    NUMERICAL,
 }
 
 /** Semantic responsibility of a component, independent of an engine name. */
@@ -346,13 +343,10 @@ class PreparedSourcePlan private constructor(
             is PreparedExecution.Declined -> when (val retained = selected.retained) {
                 is PreparedExecution.Polynomial -> id
                 is PreparedExecution.FiniteLinear -> retained.ownership.cpIntVars.indexOf(id).takeIf { it >= 0 }
-                is PreparedExecution.Numerical, is PreparedExecution.NumericalWorking -> null
                 null -> null
             }
 
             is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
-
-            is PreparedExecution.Numerical, is PreparedExecution.NumericalWorking -> null
         }
     }
 
@@ -762,23 +756,3 @@ internal fun nonlinearIntegerExecutionContract(): ComponentExecutionContract = C
         ),
     ),
 )
-
-internal fun PreparedSourcePlan.numericalWorkingPlan(
-    model: Problem,
-    objective: LinearObjective,
-    maximize: Boolean,
-): PreparedSourcePlan {
-    val numerical = requireNotNull(execution as? PreparedExecution.Numerical)
-    require(numerical.model === model && originalSource === numerical.source) {
-        "numerical working model differs from its original source plan"
-    }
-    require(workingLinearObjective == null || workingLinearObjective === objective) {
-        "numerical working objective differs from its captured source objective"
-    }
-    require(this.maximize == maximize) { "numerical working direction differs from its captured source objective" }
-    return PreparedSourcePlan(
-        model, PreparedExecution.NumericalWorking(model), components,
-        model.numBoolVars, model.numIntVars, model.numRealVars,
-        objective, maximize, operations = operationKinds, factorProjections = factorProjections,
-    )
-}

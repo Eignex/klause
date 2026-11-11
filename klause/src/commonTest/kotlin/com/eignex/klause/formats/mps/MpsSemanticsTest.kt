@@ -23,6 +23,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -32,16 +33,18 @@ class MpsSemanticsTest {
         val source = Mps.parse(
             "ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1\n M1 'MARKER' 'INTEND'\nENDATA",
         )
-        val compiled = source.toProblem(semanticOverrides = SemanticOverrides(
-            undeclaredIntegers = BoundsOverride(upper = BoundOverride.Value(3L)),
-        ))
+        val overrides = SemanticOverrides(undeclaredIntegers = BoundsOverride(upper = BoundOverride.Value(3L)))
+
+        val compiled = source.toProblem(semanticOverrides = overrides)
 
         assertEquals(UndeclaredIntegerBounds(0, 1), compiled.semantics.declared.undeclaredIntegers)
         assertEquals(UndeclaredIntegerBounds(0, 3), compiled.semantics.effective.undeclaredIntegers)
         assertEquals(0L, compiled.model.intBounds.lower(0))
         assertEquals(3L, compiled.model.intBounds.upper(0))
-        assertEquals(BigFraction.ofLong(3), compiled.sourceWitness(listOf(BigFraction.ofLong(3))).objective)
-        assertFailsWith<MpsLoweringException> { source.toProblem().sourceWitness(listOf(BigFraction.ofLong(3))) }
+        val linear = assertNotNull(source.toLinearSourceProblem(overrides))
+        assertEquals(BigFraction.ofLong(3),
+            assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ofLong(3)))).objective)
+        assertNull(assertNotNull(source.toLinearSourceProblem()).checkMpsWitness(listOf(BigFraction.ofLong(3))))
     }
 
     @Test
@@ -68,12 +71,10 @@ class MpsSemanticsTest {
         for (integer in listOf(false, true)) {
             val columns = if (integer) " M0 'MARKER' 'INTORG'\n X COST 1\n M1 'MARKER' 'INTEND'" else " X COST 1"
             for ((range, points) in ranges) {
-                val compiled = Mps.parse("ROWS\n N COST\nCOLUMNS\n$columns\nBOUNDS\n $range\nENDATA")
-                    .toProblem(semanticOverrides = overrides)
+                val source = assertNotNull(Mps.parse("ROWS\n N COST\nCOLUMNS\n$columns\nBOUNDS\n $range\nENDATA")
+                    .toLinearSourceProblem(overrides))
                 for ((point, accepted) in points) {
-                    val values = listOf(BigFraction.ofLong(point))
-                    if (accepted) compiled.sourceWitness(values)
-                    else assertFailsWith<MpsLoweringException>(range) { compiled.sourceWitness(values) }
+                    assertEquals(accepted, source.checkMpsWitness(listOf(BigFraction.ofLong(point))) != null, range)
                 }
             }
         }
@@ -90,8 +91,9 @@ class MpsSemanticsTest {
 
         assertTrue(compiled.model.intBounds.isOpenLower(0))
         assertTrue(compiled.model.intBounds.isOpenUpper(0))
+        val linear = assertNotNull(source.toLinearSourceProblem(overrides))
         for (value in listOf(Long.MIN_VALUE, Long.MAX_VALUE)) {
-            compiled.sourceWitness(listOf(BigFraction.ofLong(value)))
+            assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ofLong(value))))
         }
     }
 
@@ -113,15 +115,14 @@ class MpsSemanticsTest {
         assertFalse(compiled.model.intBounds.isOpenUpper(0))
         assertEquals(Long.MIN_VALUE, compiled.model.intBounds.lower(0))
         assertEquals(Long.MAX_VALUE, compiled.model.intBounds.upper(0))
-        compiled.sourceWitness(listOf(BigFraction.ofLong(Long.MIN_VALUE)))
-        compiled.sourceWitness(listOf(BigFraction.ofLong(Long.MAX_VALUE)))
-        assertFailsWith<MpsLoweringException> {
-            compiled.sourceWitness(listOf(BigFraction.ofLong(Long.MAX_VALUE) + BigFraction.ONE))
-        }
+        val linear = assertNotNull(source.toLinearSourceProblem(overrides))
+        assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ofLong(Long.MIN_VALUE))))
+        assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ofLong(Long.MAX_VALUE))))
+        assertNull(linear.checkMpsWitness(listOf(BigFraction.ofLong(Long.MAX_VALUE) + BigFraction.ONE)))
     }
 
     @Test
-    fun `rational caller real bounds should govern exact source rows through both loading entries`() {
+    fun `rational caller real bounds should govern exact source rows`() {
         val source = Mps.parse("ROWS\n L R\nCOLUMNS\n X R 0\nENDATA")
         val third = SemanticRational.of(BIG_ONE, bigIntOf(3))
         val overrides = SemanticOverrides(
@@ -129,24 +130,20 @@ class MpsSemanticsTest {
             feasibilityTolerance = SourceTolerance(),
         )
 
-        val compiled = listOf(source.toProblem(semanticOverrides = overrides),
-            source.toExactSourceProblem(semanticOverrides = overrides))
+        val compiled = source.toProblem(semanticOverrides = overrides)
 
-        for (model in compiled) {
-            val value = BigFraction.ofLong(3).reciprocal()
-            model.sourceWitness(listOf(value))
-            assertTrue(model.sourceExact)
-            assertTrue(model.model.factors.flatMap { it.linearRows }.all { row ->
-                val constants = row.constants as IntegralConstants
-                val activity = (0 until row.size).fold(BigFraction.ZERO) { sum, index ->
-                    sum + BigFraction.of(constants.exactCoeff(index), BIG_ONE) * value
-                }
-                activity == BigFraction.of(constants.exactBound, BIG_ONE)
-            })
-            assertFailsWith<MpsLoweringException> {
-                model.sourceWitness(listOf(checkNotNull(BigFraction.ofDouble(1.0 / 3))))
+        val linear = assertNotNull(source.toLinearSourceProblem(overrides))
+        val value = BigFraction.ofLong(3).reciprocal()
+        assertNotNull(linear.checkMpsWitness(listOf(value)))
+        assertTrue(compiled.sourceExact)
+        assertTrue(compiled.model.factors.flatMap { it.linearRows }.all { row ->
+            val constants = row.constants as IntegralConstants
+            val activity = (0 until row.size).fold(BigFraction.ZERO) { sum, index ->
+                sum + BigFraction.of(constants.exactCoeff(index), BIG_ONE) * value
             }
-        }
+            activity == BigFraction.of(constants.exactBound, BIG_ONE)
+        })
+        assertNull(linear.checkMpsWitness(listOf(checkNotNull(BigFraction.ofDouble(1.0 / 3)))))
     }
 
     @Test
@@ -160,10 +157,11 @@ class MpsSemanticsTest {
 
         val compiled = source.toProblem(semanticOverrides = overrides)
 
+        val linear = assertNotNull(source.toLinearSourceProblem(overrides))
         val value = BigFraction.of(lower.numerator, lower.denominator)
-        compiled.sourceWitness(listOf(value))
+        assertNotNull(linear.checkMpsWitness(listOf(value)))
         assertTrue(compiled.sourceExact)
-        assertFailsWith<MpsLoweringException> { compiled.sourceWitness(listOf(value - BigFraction.ONE)) }
+        assertNull(linear.checkMpsWitness(listOf(value - BigFraction.ONE)))
     }
 
     @Test
@@ -177,10 +175,11 @@ class MpsSemanticsTest {
 
         val compiled = source.toProblem(semanticOverrides = overrides)
 
+        val linear = assertNotNull(source.toLinearSourceProblem(overrides))
         val value = BigFraction.of(endpoint.numerator, endpoint.denominator)
-        compiled.sourceWitness(listOf(value))
+        assertNotNull(linear.checkMpsWitness(listOf(value)))
         assertTrue(compiled.sourceExact)
-        assertFailsWith<MpsLoweringException> { compiled.sourceWitness(listOf(value + BigFraction.ONE)) }
+        assertNull(linear.checkMpsWitness(listOf(value + BigFraction.ONE)))
     }
 
     @Test
@@ -191,10 +190,10 @@ class MpsSemanticsTest {
             undeclaredReals = BoundsOverride(upper = BoundOverride.Value(SemanticRational.ONE)),
         )
 
-        val compiled = supplied.toProblem(semanticOverrides = overrides)
+        val linear = assertNotNull(supplied.toLinearSourceProblem(overrides))
 
-        compiled.sourceWitness(listOf(BigFraction.ofLong(-100)))
-        compiled.sourceWitness(listOf(BigFraction.ofLong(100)))
+        assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ofLong(-100))))
+        assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ofLong(100))))
     }
 
     @Test
@@ -202,11 +201,13 @@ class MpsSemanticsTest {
         val source = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1\nENDATA")
             .copy(variables = listOf(MpsVar("X", false, 1e21, null)))
 
-        val compiled = source.toProblem(semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()))
+        val linear = assertNotNull(source.toLinearSourceProblem(
+            SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+        ))
 
         val endpoint = checkNotNull(BigFraction.ofDouble(1e21))
-        compiled.sourceWitness(listOf(endpoint))
-        assertFailsWith<MpsLoweringException> { compiled.sourceWitness(listOf(BigFraction.ZERO)) }
+        assertNotNull(linear.checkMpsWitness(listOf(endpoint)))
+        assertNull(linear.checkMpsWitness(listOf(BigFraction.ZERO)))
     }
 
     @Test
@@ -217,8 +218,9 @@ class MpsSemanticsTest {
 
         val compiled = source.toProblem()
 
-        compiled.sourceWitness(listOf(BigFraction.ONE))
-        assertFailsWith<MpsLoweringException> { compiled.sourceWitness(listOf(BigFraction.ZERO)) }
+        val linear = assertNotNull(source.toLinearSourceProblem())
+        assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ONE)))
+        assertNull(linear.checkMpsWitness(listOf(BigFraction.ZERO)))
         assertSame(source.semantics, compiled.semantics.declared)
     }
 
@@ -227,11 +229,13 @@ class MpsSemanticsTest {
         val source = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1\nENDATA")
         val overrides = SemanticOverrides(undeclaredReals = BoundsOverride(lower = BoundOverride.Open))
 
-        val compiled = source.copy().toProblem(semanticOverrides = overrides)
+        val copied = source.copy()
+        val compiled = copied.toProblem(semanticOverrides = overrides)
 
-        compiled.sourceWitness(listOf(BigFraction.MINUS_ONE))
+        val linear = assertNotNull(copied.toLinearSourceProblem(overrides))
+        assertNotNull(linear.checkMpsWitness(listOf(BigFraction.MINUS_ONE)))
         assertEquals(UndeclaredRealBounds(lower = SemanticRational.ZERO), compiled.semantics.declared.undeclaredReals)
-        assertFailsWith<MpsLoweringException> { source.toProblem().sourceWitness(listOf(BigFraction.MINUS_ONE)) }
+        assertNull(assertNotNull(source.toLinearSourceProblem()).checkMpsWitness(listOf(BigFraction.MINUS_ONE)))
     }
 
     @Test
@@ -245,13 +249,11 @@ class MpsSemanticsTest {
             undeclaredReals = BoundsOverride(lower = BoundOverride.Open),
         )
 
-        val compiled = source.toProblem(semanticOverrides = overrides)
+        val linear = assertNotNull(source.toLinearSourceProblem(overrides))
 
         assertEquals(BigFraction.MINUS_ONE,
-            compiled.sourceWitness(listOf(BigFraction.ofLong(2), BigFraction.MINUS_ONE)).objective)
-        assertFailsWith<MpsLoweringException> {
-            compiled.sourceWitness(listOf(BigFraction.ONE, BigFraction.MINUS_ONE))
-        }
+            assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ofLong(2), BigFraction.MINUS_ONE))).objective)
+        assertNull(linear.checkMpsWitness(listOf(BigFraction.ONE, BigFraction.MINUS_ONE)))
     }
 
     @Test
@@ -298,10 +300,10 @@ class MpsSemanticsTest {
     fun `relative bound slack should use the source bound magnitude without an absolute floor`() {
         val source = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 0\nBOUNDS\n LO B X 0.1\nENDATA")
         val relative = SourceTolerance(relative = SemanticRational.of(BIG_ONE, bigIntOf(10)))
-        val compiled = source.toProblem(semanticOverrides = SemanticOverrides(feasibilityTolerance = relative))
+        val linear = assertNotNull(source.toLinearSourceProblem(SemanticOverrides(feasibilityTolerance = relative)))
 
-        assertTrue(compiled.withinTolerance(LongArray(0), doubleArrayOf(0.095)))
-        assertFalse(compiled.withinTolerance(LongArray(0), doubleArrayOf(0.085)))
+        assertNotNull(linear.checkMpsWitness(listOf(checkNotNull(BigFraction.ofDouble(0.095)))))
+        assertNull(linear.checkMpsWitness(listOf(checkNotNull(BigFraction.ofDouble(0.085)))))
     }
 
     @Test
@@ -316,15 +318,15 @@ class MpsSemanticsTest {
         )
 
         for ((policy, accepted) in cases) {
-            val compiled = source.toProblem(semanticOverrides = SemanticOverrides(feasibilityTolerance = policy))
+            val linear = assertNotNull(source.toLinearSourceProblem(SemanticOverrides(feasibilityTolerance = policy)))
             val values = listOf(assertNotNull(BigFraction.ofDouble(99.5)))
-            assertEquals(policy, compiled.semantics.effective.feasibilityTolerance)
+            assertEquals(policy, linear.semantics.effective.feasibilityTolerance)
+            val witness = linear.checkMpsWitness(values)
             if (accepted) {
-                val witness = compiled.sourceWitness(values)
-                assertFalse(witness.exact, "$policy")
+                assertFalse(assertNotNull(witness, "$policy").exact, "$policy")
                 assertEquals("199/20", witness.objective.toString())
             } else {
-                assertFailsWith<MpsLoweringException>("$policy") { compiled.sourceWitness(values) }
+                assertNull(witness, "$policy")
             }
         }
     }
@@ -332,35 +334,40 @@ class MpsSemanticsTest {
     @Test
     fun `zero tolerance should retain decimals and reject a rounded equality point`() {
         val source = Mps.parse("ROWS\n N COST\n E R\nCOLUMNS\n X R 3.0000000000000001\nRHS\n RHS R 1\nENDATA")
-        val compiled = source.toProblem(semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()))
+        val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+        val compiled = source.toProblem(semanticOverrides = exact)
 
         assertTrue(compiled.sourceExact)
         assertFalse(compiled.semantics.isApproximate)
-        assertFailsWith<MpsLoweringException> {
-            compiled.sourceWitness(listOf(BigFraction.ofLong(3).reciprocal()))
-        }
+        assertNull(assertNotNull(source.toLinearSourceProblem(exact))
+            .checkMpsWitness(listOf(BigFraction.ofLong(3).reciprocal())))
     }
 
     @Test
     fun `positive tolerance should apply even when lowering retains exact source numbers`() {
-        val compiled = Mps.parse("ROWS\n N COST\n E R\nCOLUMNS\n X R 1\nRHS\n RHS R 1\nENDATA").toProblem()
+        val source = Mps.parse("ROWS\n N COST\n E R\nCOLUMNS\n X R 1\nRHS\n RHS R 1\nENDATA")
+        val compiled = source.toProblem()
+        val linear = assertNotNull(source.toLinearSourceProblem())
         val value = BigFraction.ONE - BigFraction.of(BIG_ONE, bigIntOf(100_000_000))
 
-        val witness = compiled.sourceWitness(listOf(value))
+        val witness = assertNotNull(linear.checkMpsWitness(listOf(value)))
 
         assertTrue(compiled.sourceExact)
         assertFalse(witness.exact)
-        assertFalse(compiled.sourceWitness(listOf(assertNotNull(BigFraction.ofDouble(value.toDouble())))).exact)
-        assertTrue(compiled.withinTolerance(longArrayOf(1), DoubleArray(0)))
+        val rounded = assertNotNull(BigFraction.ofDouble(value.toDouble()))
+        assertFalse(assertNotNull(linear.checkMpsWitness(listOf(rounded))).exact)
+        assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ONE)))
     }
 
     @Test
     fun `exact point qualification should not depend on source projection equality`() {
-        val compiled = Mps.parse(
+        val source = Mps.parse(
             "ROWS\n N COST\n E R\nCOLUMNS\n X COST 0.10000000000000000001 R 3\nRHS\n RHS R 1\nENDATA",
-        ).toProblem()
+        )
 
-        val witness = compiled.sourceWitness(listOf(BigFraction.ofLong(3).reciprocal()))
+        val compiled = source.toProblem()
+        val witness = assertNotNull(assertNotNull(source.toLinearSourceProblem())
+            .checkMpsWitness(listOf(BigFraction.ofLong(3).reciprocal())))
 
         assertFalse(compiled.sourceExact)
         assertTrue(witness.exact)
@@ -373,9 +380,11 @@ class MpsSemanticsTest {
                 "BOUNDS\n BV B I\nINDICATORS\n IF R I 1\nENDATA",
         )
         val policy = SourceTolerance(absolute = SemanticRational.ONE)
-        val compiled = source.toProblem(semanticOverrides = SemanticOverrides(feasibilityTolerance = policy))
+        val overrides = SemanticOverrides(feasibilityTolerance = policy)
+        val compiled = source.toProblem(semanticOverrides = overrides)
 
-        val witness = compiled.sourceWitness(listOf(BigFraction.ZERO, BigFraction.ONE))
+        val witness = assertNotNull(assertNotNull(source.toLinearSourceProblem(overrides))
+            .checkMpsWitness(listOf(BigFraction.ZERO, BigFraction.ONE)))
 
         assertEquals(policy, compiled.semantics.effective.feasibilityTolerance)
         assertFalse(witness.exact)
@@ -383,40 +392,40 @@ class MpsSemanticsTest {
 
     @Test
     fun `large tolerance should never relax integer integrality`() {
-        val compiled = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 0\nBOUNDS\n BV B X\nENDATA").toProblem(
-            semanticOverrides = SemanticOverrides(
+        val source = assertNotNull(Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 0\nBOUNDS\n BV B X\nENDATA")
+            .toLinearSourceProblem(SemanticOverrides(
                 feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ONE),
-            ),
-        )
+            )))
 
-        assertFailsWith<MpsLoweringException> {
-            compiled.sourceWitness(listOf(BigFraction.ofLong(2).reciprocal()))
-        }
+        assertNull(source.checkMpsWitness(listOf(BigFraction.ofLong(2).reciprocal())))
     }
 
     @Test
     fun `float checking should preserve wide integer coordinates`() {
-        val compiled = Mps.parse(
+        val source = assertNotNull(Mps.parse(
             "ROWS\n E R\nCOLUMNS\n X R 1\nRHS\n RHS R 9007199254740993\n" +
                 "BOUNDS\n LI B X 0\n UI B X 9007199254740994\nENDATA",
-        ).toProblem(semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()))
+        ).toLinearSourceProblem(SemanticOverrides(feasibilityTolerance = SourceTolerance())))
 
-        assertTrue(compiled.withinTolerance(longArrayOf(9_007_199_254_740_993L), DoubleArray(0)))
-        assertFalse(compiled.withinTolerance(longArrayOf(9_007_199_254_740_992L), DoubleArray(0)))
+        assertNotNull(source.checkMpsWitness(listOf(BigFraction.ofLong(9_007_199_254_740_993L))))
+        assertNull(source.checkMpsWitness(listOf(BigFraction.ofLong(9_007_199_254_740_992L))))
     }
 
     @Test
     fun `cancelled source checks should withhold an otherwise valid point`() {
-        val compiled = Mps.parse("ROWS\n E R\nCOLUMNS\n X R 1\nRHS\n RHS R 1\nENDATA").toProblem()
+        val source = assertNotNull(
+            Mps.parse("ROWS\n E R\nCOLUMNS\n X R 1\nRHS\n RHS R 1\nENDATA").toLinearSourceProblem(),
+        )
         val stop = Cancellation { true }
 
-        assertFalse(compiled.withinTolerance(LongArray(0), doubleArrayOf(1.0), stop))
-        assertFailsWith<MpsLoweringException> { compiled.sourceWitness(listOf(BigFraction.ONE), stop) }
+        assertNull(source.checkMpsWitness(listOf(BigFraction.ONE), stop))
     }
 
     @Test
     fun `cancellation during source checking should withhold a partial witness`() {
-        val compiled = Mps.parse("ROWS\n E R\nCOLUMNS\n X R 1\nRHS\n RHS R 1\nENDATA").toProblem()
+        val source = assertNotNull(
+            Mps.parse("ROWS\n E R\nCOLUMNS\n X R 1\nRHS\n RHS R 1\nENDATA").toLinearSourceProblem(),
+        )
         var charged = 0L
         val meter = WorkMeter { charged += it }
         val stop = object : Cancellation {
@@ -424,17 +433,17 @@ class MpsSemanticsTest {
             override fun isCancelled(): Boolean = charged >= 3L
         }
 
-        assertFailsWith<MpsLoweringException> { compiled.sourceWitness(listOf(BigFraction.ONE), stop) }
+        assertNull(source.checkMpsWitness(listOf(BigFraction.ONE), stop))
         assertEquals(3L, charged)
     }
 
     @Test
     fun `cancellation in row activity should use original decimal coefficients`() {
-        val compiled = Mps.parse(
+        val source = assertNotNull(Mps.parse(
             "ROWS\n E R\nCOLUMNS\n X R 10000000000000001\n Y R -10000000000000000\nRHS\n RHS R 0\nENDATA",
-        ).toProblem(semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()))
+        ).toLinearSourceProblem(SemanticOverrides(feasibilityTolerance = SourceTolerance())))
 
-        assertFalse(compiled.withinTolerance(LongArray(0), doubleArrayOf(1.0, 1.0)))
-        assertTrue(compiled.withinTolerance(LongArray(0), doubleArrayOf(0.0, 0.0)))
+        assertNull(source.checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ONE)))
+        assertNotNull(source.checkMpsWitness(listOf(BigFraction.ZERO, BigFraction.ZERO)))
     }
 }
