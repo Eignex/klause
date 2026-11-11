@@ -1205,7 +1205,7 @@ internal fun reducedCostFixingReasons(
     improvingMax: Long,
     observer: LpCertificationObserver? = null,
 ): ReducedCostFixingReasons? {
-    if (!cert.belongsTo(relaxation.model, observer)) return null
+    if (!cert.citesAllPremises() || !cert.belongsTo(relaxation.model, observer)) return null
     val objectiveVarMax = relaxation.objectiveVariableValue(objectiveVar, BigFraction.ofLong(improvingMax))
         ?.floorLong() ?: return null
     if (session.intDomain(objectiveVar).max > objectiveVarMax) return null
@@ -1218,10 +1218,8 @@ internal fun reducedCostFixingReasons(
         supportCols.add(-1) // row premise: part of every fixing's reason, never excluded
         supportLits.add(premLits[k])
     }
-    for (col in relaxation.colVarId.indices) {
-        val sign = cert.reducedCostSign(col)
-        if (sign == 0) continue
-        val premises = LpExplanation.boundPremiseLits(relaxation, session, col, lowerSide = sign > 0) ?: return null
+    for (col in relaxation.colVarId.indices) for (lowerSide in LpExplanation.citedSides(cert, col)) {
+        val premises = LpExplanation.boundPremiseLits(relaxation, session, col, lowerSide) ?: return null
         for (literal in premises) {
             val direct = relaxation.colVarId[col] >= 0
             supportCols.add(if (direct) col else -1)
