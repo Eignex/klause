@@ -766,8 +766,17 @@ retain their slack and source ordering. Scope incidence supplies
 only an ordering preference. Endpoint authority still comes from checked derivations.
 With `source-cut-fractional-order=true`, point aggregation ranks complete finite
 rows by maximum integer fractionality per support entry, then normalized slack and
-source order. Seed rows and incidence partners share that ordering. With no
-fractional support it retains the ordinary scoped preference. Its projections,
+source order. A funded traversal keeps at most eight generation-local seed cursors
+and visits one pair per cursor before revisiting it for continuation. Opposite-sign
+partner buckets can use a funded stable support-size order; equal supports retain
+their point and source order. A nonseparating pair retains its immutable aggregate
+and proof snapshots until that seed's next turn. The initial cursor envelope and
+each optional bucket copy/sort must fit within one quarter of their remaining
+work and allocation before setup. Declined cursor setup retains ordinary streaming;
+a declined bucket order retains that bucket's point and source order. Every visit,
+lookup, sort and snapshot debits the same generation allowance. The cursors and
+bucket copies expire with the call. With no fractional support it retains the
+ordinary scoped preference. Its projections,
 score storage and sorting debit the existing generation allowance; declined ranking
 keeps source order.
 Fractional discovery permits at most two attempts for the current immutable generation
@@ -1867,8 +1876,10 @@ output without revoking already retained immutable evidence.
 The journal can attribute disjoint generation phases to accepted containing-meter
 charges. Parent spans close before child derivations; interrupted spans retain
 their paid prefix. Rejected rows keep funded immutable cumulative phase costs
-within their seed-row or source-pair attempt. Continuations share that attempt, so
-its successive prefixes overlap. Bound substitution, rounding and their remaining
+within their seed-row or source-pair execution segment. Immediate continuations
+share that attempt ordinal, so its successive prefixes overlap. A deferred
+continuation starts a new ordinal after intervening seeds; its prefix contains
+only resumed work. Both segments remain in the complete generation totals. Bound substitution, rounding and their remaining
 proof construction form one phase. Indexing and ordering remain in the containing
 totals. Fixed phase snapshots and record copies share the existing observer and
 source allowances; absent or limited observation supplies no complete cost.

@@ -1247,7 +1247,12 @@ to the bounded candidate pool. All derivation and projection costs, including th
 without retained rows, remain in the existing generation work/allocation totals.
 Aggregate-only generation retains its source-order proposal policy.
 An observed fractional rejection can include `cost.kind=cumulative-source-pair-prefix`
-and an `attempt` ordinal. `phases` reports modeled `work`, `allocation` and completed
+and an `attempt` execution-segment ordinal. Immediate continuations share the
+original ordinal; deferred continuations start a new one after intervening seeds.
+The `AggregateDeferredContinuation` event counts resumed segments, while
+`AggregatePairFairTraversal`, `AggregatePairFairTraversalDeclined` and
+`AggregatePairFairBucketOrderDeclined` report traversal admission and fallbacks.
+`phases` reports modeled `work`, `allocation` and completed
 or interrupted `spans` for `Aggregation`, `ProofCombination`, `BoundRounding`,
 `PointScreen`, `Continuation` and `IntegerHalf`. `ProofCombination` includes prepaid
 premise identity/proof storage; `BoundRounding` combines bound substitution,

@@ -126,7 +126,8 @@ internal object LinearAuthorityAggregateCuts {
             val bounds = prepared.bounds
             val incidence = prepared.incidence
             eligibilityKnown = prepared.complete
-            if (point != null) orderPointRows(rows, incidence, point, meter, observe, source, fractionalTargeting)
+            val fairTargeting = point != null &&
+                orderPointRows(rows, incidence, point, meter, observe, source, fractionalTargeting)
             val charge: (String, Long) -> Unit = { name, count ->
                 when (name) {
                     "AggregateWork" -> meter.reserve(count)
@@ -170,61 +171,114 @@ internal object LinearAuthorityAggregateCuts {
                     integerMeter.closePhase()
                 }
             }
-            for (row in rows) {
-                meter.reserve(1L)
-                if (!row.hasInteger) continue
-                meter.reserve(1L, 128L)
-                val paired = HashSet<Int>()
-                for ((id, coefficient) in row.coefficients) {
-                    meter.reserve(1L)
-                    if (id.kind != SourceCoordinate.Kind.Real) continue
-                    for (other in incidence[id to (coefficient < BigFraction.ZERO)].orEmpty()) {
-                        meter.reserve(1L)
-                        if (other.hasInteger && other.term.owner <= row.term.owner) continue
-                        meter.reserve(1L, 64L)
-                        if (!paired.add(other.term.owner)) continue
-                        if (candidates.size >= maximumCandidates) stopAggregate("RetentionLimit")
-                        costObserver?.invoke("AggregateCostAttempt", 1L)
-                        meter.phase(LinearAuthorityAggregatePhase.Aggregation)
-                        observe("AggregatePairAttempts", 1L)
-                        val pivot = other.coefficients.getValue(id)
-                        val rightWeight = meter.number(if (coefficient > BigFraction.ZERO) coefficient
-                            else coefficient.negated())
-                        val leftWeight = meter.number(if (pivot > BigFraction.ZERO) pivot else pivot.negated())
-                        meter.reserve(1L, 320L)
-                        val terms = listOf(row.term.copy(weight = leftWeight), other.term.copy(weight = rightWeight))
-                        val snapshots = listOf(row.coefficients, other.coefficients)
-                        meter.closePhase()
-                        var cut = deriveWithCoefficients(terms, derivedStop, charge, attemptLimits,
-                            allowMixed = true, continuousBounds = selectedBounds,
-                            coefficientSnapshots = snapshots, capture = extension?.capture,
-                            costObserver = costObserver, costMeter = meter)
-                        var continuedAfterRetention = false
-                        if (point != null) {
-                            val initial = cut
-                            val separating = if (initial == null) false else separates(initial, point, meter, observe)
-                            if (separating == null) {
+            fun offerPair(
+                row: ProbeRow, id: SourceCoordinate, coefficient: BigFraction, other: ProbeRow,
+                cursor: FairPairCursor? = null,
+            ) {
+                if (candidates.size >= maximumCandidates) stopAggregate("RetentionLimit")
+                costObserver?.invoke("AggregateCostAttempt", 1L)
+                meter.phase(LinearAuthorityAggregatePhase.Aggregation)
+                observe("AggregatePairAttempts", 1L)
+                val pivot = other.coefficients.getValue(id)
+                val rightWeight = meter.number(if (coefficient > BigFraction.ZERO) coefficient
+                    else coefficient.negated())
+                val leftWeight = meter.number(if (pivot > BigFraction.ZERO) pivot else pivot.negated())
+                meter.reserve(1L, 320L)
+                val terms = listOf(row.term.copy(weight = leftWeight), other.term.copy(weight = rightWeight))
+                val snapshots = listOf(row.coefficients, other.coefficients)
+                meter.closePhase()
+                var cut = deriveWithCoefficients(terms, derivedStop, charge, attemptLimits,
+                    allowMixed = true, continuousBounds = selectedBounds,
+                    coefficientSnapshots = snapshots, capture = extension?.capture,
+                    costObserver = costObserver, costMeter = meter)
+                var continuedAfterRetention = false
+                if (point != null) {
+                    val initial = cut
+                    val separating = if (initial == null) false else separates(initial, point, meter, observe)
+                    if (separating == null) {
+                        eligibilityKnown = false
+                        return
+                    }
+                    if (!separating) {
+                        if (cursor != null) {
+                            val capture = checkNotNull(extension).capture
+                            if (capture.coefficients != null || capture.integer != null) {
+                                meter.reserve(1L, 128L)
+                                cursor.pending = PendingPair(terms, snapshots, capture.coefficients, capture.integer)
                                 eligibilityKnown = false
-                                continue
                             }
-                            if (!separating) {
-                                if (candidates.isNotEmpty()) {
-                                    if (retainedContinuationUsed) continue
-                                    retainedContinuationUsed = true
-                                    continuedAfterRetention = true
-                                    observe("AggregateRetainedContinuation", 1L)
-                                }
-                                cut = extension?.extend(terms, snapshots)
-                                if (extension?.attempted == true) eligibilityKnown = false
-                            }
+                            return
                         }
-                        val retained = cut ?: continue
-                        if (continuedAfterRetention && redundantContinuation(retained, candidates, meter, limits)) {
-                            observe("AggregateRetainedContinuationDuplicate", 1L)
-                            continue
+                        if (candidates.isNotEmpty()) {
+                            if (retainedContinuationUsed) return
+                            retainedContinuationUsed = true
+                            continuedAfterRetention = true
+                            observe("AggregateRetainedContinuation", 1L)
                         }
-                        meter.reserve(1L, 128L + retained.inequality.supportSize * 64L)
-                        candidates += retained
+                        cut = extension?.extend(terms, snapshots)
+                        if (extension?.attempted == true) eligibilityKnown = false
+                    }
+                }
+                val retained = cut ?: return
+                if (continuedAfterRetention && redundantContinuation(retained, candidates, meter, limits)) {
+                    observe("AggregateRetainedContinuationDuplicate", 1L)
+                    return
+                }
+                meter.reserve(1L, 128L + retained.inequality.supportSize * 64L)
+                candidates += retained
+            }
+            fun resumePair(pending: PendingPair) {
+                val producer = checkNotNull(extension)
+                var continuedAfterRetention = false
+                if (candidates.isNotEmpty()) {
+                    if (retainedContinuationUsed) return
+                    retainedContinuationUsed = true
+                    continuedAfterRetention = true
+                    observe("AggregateRetainedContinuation", 1L)
+                }
+                costObserver?.invoke("AggregateCostAttempt", 1L)
+                observe("AggregateDeferredContinuation", 1L)
+                producer.capture.coefficients = pending.coefficients
+                producer.capture.integer = pending.integer
+                val cut = producer.extend(pending.terms, pending.snapshots)
+                if (producer.attempted) eligibilityKnown = false
+                val retained = cut ?: return
+                if (continuedAfterRetention && redundantContinuation(retained, candidates, meter, limits)) {
+                    observe("AggregateRetainedContinuationDuplicate", 1L)
+                    return
+                }
+                meter.reserve(1L, 128L + retained.inequality.supportSize * 64L)
+                candidates += retained
+            }
+            val fair = if (fairTargeting && candidates.size < maximumCandidates) {
+                prepareFairPairs(rows, incidence, meter, observe)
+            } else null
+            if (fair != null) {
+                while (true) {
+                    if (candidates.size >= maximumCandidates) stopAggregate("RetentionLimit")
+                    val cursor = fair.next() ?: break
+                    val pending = cursor.pending
+                    if (pending != null) {
+                        cursor.pending = null
+                        resumePair(pending)
+                    } else offerPair(cursor.row, cursor.coordinate, cursor.coefficient, cursor.partner, cursor)
+                }
+            } else {
+                for (row in rows) {
+                    meter.reserve(1L)
+                    if (!row.hasInteger) continue
+                    meter.reserve(1L, 128L)
+                    val paired = HashSet<Int>()
+                    for ((id, coefficient) in row.coefficients) {
+                        meter.reserve(1L)
+                        if (id.kind != SourceCoordinate.Kind.Real) continue
+                        for (other in incidence[id to (coefficient < BigFraction.ZERO)].orEmpty()) {
+                            meter.reserve(1L)
+                            if (other.hasInteger && other.term.owner <= row.term.owner) continue
+                            meter.reserve(1L, 64L)
+                            if (!paired.add(other.term.owner)) continue
+                            offerPair(row, id, coefficient, other)
+                        }
                     }
                 }
             }
@@ -235,6 +289,124 @@ internal object LinearAuthorityAggregateCuts {
             meter.closePhase()
         }
         return candidates.toList()
+    }
+
+    private class PendingPair(
+        val terms: List<LinearAuthorityAggregateTerm>,
+        val snapshots: List<Map<SourceCoordinate, BigFraction>>,
+        val coefficients: Map<SourceCoordinate, BigFraction>?, val integer: IntegerAggregate?,
+    )
+
+    private fun prepareFairPairs(
+        rows: List<ProbeRow>, incidence: Map<Pair<SourceCoordinate, Boolean>, List<ProbeRow>>,
+        meter: AggregateMeter, observe: (String, Long) -> Unit,
+    ): FairPairs? {
+        val cursors = minOf(8, rows.size)
+        val work = 2L + rows.size + cursors * 2L
+        val allocation = 512L + cursors * 384L
+        if (work > meter.remainingWork / 4L || allocation > meter.remainingAllocation / 4L) {
+            observe("AggregatePairFairTraversalDeclined", 1L)
+            return null
+        }
+        meter.reserve(1L, 512L)
+        observe("AggregatePairFairTraversal", 1L)
+        return FairPairs(rows, incidence, meter, observe)
+    }
+
+    private class FairPairs(
+        private val rows: List<ProbeRow>,
+        private val incidence: Map<Pair<SourceCoordinate, Boolean>, List<ProbeRow>>,
+        private val meter: AggregateMeter, private val observe: (String, Long) -> Unit,
+    ) {
+        private val active = ArrayList<FairPairCursor>(8)
+        private val ordered = HashMap<Pair<SourceCoordinate, Boolean>, List<ProbeRow>>()
+        private var seed = 0
+        private var position = 0
+
+        private fun fill() {
+            while (active.size < 8 && seed < rows.size) {
+                meter.reserve(1L)
+                val row = rows[seed++]
+                if (!row.hasInteger) continue
+                meter.reserve(1L, 384L)
+                active += FairPairCursor(row)
+            }
+        }
+
+        fun partners(id: SourceCoordinate, coefficient: BigFraction): List<ProbeRow> {
+            meter.reserve(1L, 64L)
+            val key = id to (coefficient < BigFraction.ZERO)
+            ordered[key]?.let { return it }
+            val original = incidence[key].orEmpty()
+            if (original.size < 2) return original
+            val levels = Int.SIZE_BITS - (original.size - 1).countLeadingZeroBits()
+            val work = 1L + original.size * (2L + levels)
+            val allocation = 192L + original.size * 16L
+            if (work > meter.remainingWork / 4L || allocation > meter.remainingAllocation / 4L) {
+                observe("AggregatePairFairBucketOrderDeclined", 1L)
+                return original
+            }
+            meter.reserve(original.size + 1L, allocation)
+            val copy = original.toMutableList()
+            copy.sortWith { left, right ->
+                meter.reserve(1L)
+                left.coefficients.size.compareTo(right.coefficients.size)
+            }
+            ordered[key] = copy
+            return copy
+        }
+
+        fun next(): FairPairCursor? {
+            fill()
+            while (active.isNotEmpty()) {
+                if (position >= active.size) position = 0
+                meter.reserve(1L)
+                val cursor = active[position]
+                if (cursor.pending != null || cursor.advance(this, meter)) {
+                    position++
+                    return cursor
+                }
+                meter.reserve(active.size.toLong())
+                active.removeAt(position)
+                fill()
+            }
+            return null
+        }
+    }
+
+    private class FairPairCursor(val row: ProbeRow) {
+        private val entries = row.coefficients.entries.iterator()
+        private val paired = HashSet<Int>()
+        private var partners: Iterator<ProbeRow>? = null
+        lateinit var coordinate: SourceCoordinate
+            private set
+        lateinit var coefficient: BigFraction
+            private set
+        lateinit var partner: ProbeRow
+            private set
+        var pending: PendingPair? = null
+
+        fun advance(traversal: FairPairs, meter: AggregateMeter): Boolean {
+            while (true) {
+                val current = partners
+                if (current != null && current.hasNext()) {
+                    meter.reserve(1L)
+                    val other = current.next()
+                    if (other.hasInteger && other.term.owner <= row.term.owner) continue
+                    meter.reserve(1L, 64L)
+                    if (!paired.add(other.term.owner)) continue
+                    partner = other
+                    return true
+                }
+                if (!entries.hasNext()) return false
+                meter.reserve(1L)
+                val entry = entries.next()
+                if (entry.key.kind != SourceCoordinate.Kind.Real) continue
+                coordinate = entry.key
+                coefficient = entry.value
+                partners = traversal.partners(coordinate, coefficient).iterator()
+            }
+        }
     }
 
     private fun sourcePairs(
@@ -410,8 +582,8 @@ internal object LinearAuthorityAggregateCuts {
         rows: MutableList<ProbeRow>, incidence: Map<Pair<SourceCoordinate, Boolean>, MutableList<ProbeRow>>,
         point: Map<SourceCoordinate, Double>, meter: AggregateMeter, observe: (String, Long) -> Unit,
         source: SourceProofContext, fractionalTargeting: Boolean,
-    ) {
-        if (!admitPointRowOrder(rows, incidence, meter, observe, fractionalTargeting)) return
+    ): Boolean {
+        if (!admitPointRowOrder(rows, incidence, meter, observe, fractionalTargeting)) return false
         meter.reserve(rows.size.toLong(), (128L + rows.size * 64L) * (if (fractionalTargeting) 2L else 1L))
         val priorities = HashMap<Int, Double>()
         val fractions = if (fractionalTargeting) HashMap<Int, Double>() else null
@@ -476,6 +648,7 @@ internal object LinearAuthorityAggregateCuts {
             if (fractionalTargeting) observe("AggregatePointFractionalOrderNoOpportunity", 1L)
             prioritizeScopedRows(rows, priorities, source, meter, observe)
         }
+        return fractionalTargeting && hasFractional
     }
 
     private fun prioritizeScopedRows(
