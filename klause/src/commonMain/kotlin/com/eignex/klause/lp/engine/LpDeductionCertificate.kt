@@ -18,11 +18,8 @@ internal interface LpDeductionCertificate {
     /** Sign of column [col]'s reduced cost: -1, 0 or +1. */
     fun reducedCostSign(col: Int): Int
 
-    /** Whether both of column [col]'s bounds back the bound, as when its reduced cost is within rounding of zero. */
-    fun citesBothSides(col: Int): Boolean = false
-
-    /** Whether reasons can cite every premise of the bound; otherwise its deductions stay local. */
-    fun citesAllPremises(): Boolean = true
+    /** Bounds of column [col] the bound reads beyond its reduced cost's minimizing side: bit 0 lower, bit 1 upper. */
+    fun extraCitedSides(col: Int): Int = 0
 
     /** `⌈objective + extraConstant⌉`, or null when it does not fit a `Long` (the caller keeps the node). */
     fun objectiveBoundCeil(extraConstant: Long): Long?

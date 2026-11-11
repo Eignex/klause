@@ -128,4 +128,20 @@ class FloatEvidenceTest {
 
         assertTrue(bound == null || bound <= 0.0, "bound $bound")
     }
+
+    @Test
+    fun `a reduced cost beyond tolerance on an open side should be priced at the bound its row implies`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 10L, cost = 1L)
+            val z = addOpenAboveVar(0L)
+            val u = addVar(0L, 100_000_000L)
+            addRow(intArrayOf(z, u), longArrayOf(1L, -1L), Relation.EQ, 100_000_000L)
+        }.build(Sense.MINIMIZE)
+
+        val certificate = assertNotNull(FloatDeductionCertificate.of(model, doubleArrayOf(0.5)))
+
+        assertTrue(certificate.lowerBound <= 0.0)
+        assertTrue(certificate.dualNonzeroRow(0))
+        assertEquals(3, certificate.extraCitedSides(2))
+    }
 }

@@ -1602,11 +1602,11 @@ Numerical deductions compute no certificate. `FloatDeductionCertificate` sums th
 Lagrangian `L(y)` from the float duals in binary64 and lowers it by that summation's
 rounding plus an absolute and relative slack, so float noise never rounds an integral
 bound up. A reduced cost beyond its rounding prices and cites its minimizing side; one
-within it prices and cites both sides of a finite box. One within `FLOAT_EVIDENCE_TOLERANCE`
-on an open side is priced at its row-implied bound and withholds reasons. It supplies node
-pruning, objective propagation, reduced-cost fixing with their reasons, root bounds shared
-with peers, and shaving; fixing also tries the objective box (zero multipliers) and half
-the duals. `floatFarkasRay` normalises a dual-unbounded ray and accepts it when its binary64
+within it prices both sides and cites the finite ones. An open side is priced at the tightest
+bound a single row implies, and the reasons cite that row and both finite sides of its
+columns. It supplies node pruning, objective propagation, reduced-cost fixing with their
+reasons, root bounds shared with peers, and shaving; fixing also tries the objective box
+(zero multipliers) and half the duals. `floatFarkasRay` normalises a dual-unbounded ray and accepts it when its binary64
 Farkas margin exceeds the tolerance times the terms' size, pricing open sides at their
 row-implied bounds; the rounded integer ray must pass again against the box sides its
 clause cites, or the node is refuted without a learned clause. It backs infeasibility
