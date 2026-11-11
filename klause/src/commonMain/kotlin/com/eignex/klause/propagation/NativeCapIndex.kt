@@ -342,12 +342,17 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                         stage = if (aborting) Stage.Clear else Stage.PruneDirty
                         changed()
                     } else {
+                        budget.visit(4L)
+                        val alive = policy.alive(retries.first())
+                        budget.visit(0L)
                         budget.visit(12L)
                         budget.visit(0L)
-                        candidates[heapSize] = retries.pop(pool)
-                        sift = heapSize++
-                        afterSift = Stage.Restore
-                        stage = if (aborting) Stage.Restore else Stage.Up
+                        if (alive) {
+                            candidates[heapSize] = retries.pop(pool)
+                            sift = heapSize++
+                            afterSift = Stage.Restore
+                            stage = if (aborting) Stage.Restore else Stage.Up
+                        } else retries.pop(pool)
                         changed()
                     }
                 }

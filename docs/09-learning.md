@@ -611,7 +611,8 @@ An empty window releases its pages and leaves subsequent admissions to fresh
 reservation. Subsequent admission funds its additional capacity
 before publishing a row. Heap removals leave a processed gap in the candidate
 array, while new admissions remain in its unread suffix. Protected roots return
-through that gap before suffix compaction. Sparse marker cleanup completes the
+through that gap before suffix compaction. Restoration rechecks liveness and drops
+an externally retired retry without publishing its handle. Sparse marker cleanup completes the
 epoch, and funded unlink steps release spare pages. Below-cap retirement cleanup
 prunes stale handles without aging tiers. External tier changes request a rescan.
 Released metadata can erase retired comparison keys while a sift is suspended.
