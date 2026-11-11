@@ -18,6 +18,7 @@ import com.eignex.klause.lp.engine.verifyExactBasis
 import com.eignex.klause.simplex.basis.RationalBasisLimits
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
+import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.util.Cancellation
 
 // One residual owns its continuation and terminal result; changed exact rows retire both.
@@ -141,6 +142,12 @@ internal class LinearResidualCompletion(
                     return@resumeSparse null
                 }
                 if (budget.funding?.paused == true) return@resumeSparse null
+                if (budget.context.certificationPolicy.numericalDeductions) {
+                    point = numericalPoint(result, residual, token, observe)
+                    finished = point != null || (!token() && budget.funding?.paused != true)
+                    if (point != null) observe("PrimalRecoveryNumericalCompleted", 1L)
+                    return@resumeSparse point
+                }
                 val model = checkNotNull(current.state.ownerWorkingModel())
                 val limits = ReconstructionLimits(maxWork = 2_000_000L,
                     maxAllocation = 64L * 1024L * 1024L)
@@ -195,6 +202,27 @@ internal class LinearResidualCompletion(
             owner = null
         }
         return point
+    }
+
+    private fun numericalPoint(
+        result: FloatLpResult, residual: List<ExactRationalInequality>, cancellation: Cancellation,
+        observe: (String, Long) -> Unit,
+    ): List<BigFraction>? {
+        val funding = budget.funding
+        val allocation = 128L + 512L * columns
+        if (cancellation() || columns > 4096 || result.primal.size < columns ||
+            funding?.paused == true || funding?.remainingAllocation?.let { allocation > it } == true) return null
+        funding?.charge(0L, allocation)
+        budget.observe(preparation = 1L)
+        val coordinates = ArrayList<SourceCoordinate>(columns)
+        val proposed = ArrayList<BigFraction>(columns)
+        for (column in 0 until columns) {
+            if (cancellation() || funding?.availableWork?.let { it < 20L } == true) return null
+            budget.observe(preparation = 20L)
+            coordinates += SourceCoordinate(SourceCoordinate.Kind.Real, column)
+            proposed += BigFraction.ofDouble(result.primal[column]) ?: return null
+        }
+        return proposeLinearPrimal(coordinates, proposed, residual, emptySet(), budget, cancellation, observe)
     }
 
     override fun close() {

@@ -5,6 +5,7 @@ import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -303,6 +304,31 @@ class LinearIncumbentCompletionTest {
             }
 
             assertEquals(1, originalChecks)
+        }
+    }
+
+    @Test
+    fun `numerical advisory completion should retain original source predicate admission`() {
+        for (accept in listOf(false, true)) {
+            val funding = SourceLpFunding(2_000_000L, 64L * 1024L * 1024L).apply { grant(2_000_000L) }
+            val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical }, funding = funding)
+            var checks = 0
+
+            val point = LinearIncumbentCompletion(budget, originalCheck = { sample, value, _ ->
+                checks++
+                assertEquals(seed.intValue(0), sample.intValue(0))
+                assertEquals(BigFraction.ONE + third, value)
+                accept
+            }) { _, _ -> }.use {
+                val completed = it.complete(source, seed, Cancellation.Never)
+                assertSame(completed, it.complete(source, seed.copy(), Cancellation.Never))
+                completed
+            }
+
+            if (accept) assertEquals(listOf(third), assertNotNull(point).exactReals) else assertNull(point)
+            assertEquals(1, checks)
+            assertTrue(funding.spent > 0L)
+            assertTrue(funding.allocated > 0L)
         }
     }
 
