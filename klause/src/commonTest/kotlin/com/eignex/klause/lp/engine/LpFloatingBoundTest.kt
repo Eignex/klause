@@ -10,6 +10,49 @@ import kotlin.test.assertTrue
 
 class LpFloatingBoundTest {
     @Test
+    fun `column pricing should retain scaled source objective units`() {
+        val source = ExactLpModel(listOf(emptyList()), emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)),
+                ExactLpSide(ExactLpNumber.of(4L))))), emptyList(),
+            ExactLpObjective(listOf(ExactLpNumber.of(3L)), ExactLpNumber.of(0L), ExactLpNumber.of(2L)))
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+
+        val result = floatingReducedCost(model, doubleArrayOf(), 0, 100L)
+
+        assertTrue(assertNotNull(result.lower) <= 1.5)
+        assertTrue(assertNotNull(result.upper) >= 1.5)
+        assertTrue(assertNotNull(result.lower) > 1.49)
+        assertNull(result.stop)
+    }
+
+    @Test
+    fun `column pricing should enclose a numerical reduced cost`() {
+        val builder = LpBuilder()
+        val x = builder.addVar(0L, 10L, cost = 2L)
+        builder.addRow(intArrayOf(x), longArrayOf(3L), Relation.LE, 5L)
+
+        val result = floatingReducedCost(builder.build(Sense.MINIMIZE), doubleArrayOf(0.5), x, 100L)
+
+        assertEquals(0.5, result.lower)
+        assertEquals(0.5, result.upper)
+        assertNull(result.stop)
+    }
+
+    @Test
+    fun `column pricing should retain work without publishing an incomplete reduced cost`() {
+        val builder = LpBuilder()
+        val x = builder.addVar(0L, 10L, cost = 2L)
+        builder.addRow(intArrayOf(x), longArrayOf(3L), Relation.LE, 5L)
+
+        val result = floatingReducedCost(builder.build(Sense.MINIMIZE), doubleArrayOf(0.5), x, 2L)
+
+        assertNull(result.lower)
+        assertNull(result.upper)
+        assertEquals(LpFloatingBoundStop.WORK, result.stop)
+        assertEquals(2L, result.work)
+    }
+
+    @Test
     fun `dual bounds should include shifted objective constants`() {
         val model = LpBuilder().apply { addVar(-3L, 4L, cost = 2L) }.build(Sense.MINIMIZE)
 
