@@ -12,6 +12,7 @@ import com.eignex.klause.lp.statesLowerBound
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.constructionIntArray
 import com.eignex.klause.util.constructionLongArray
+import com.eignex.util.arrays.argsortBy
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 import com.eignex.util.collections.MutableIntObjectMap
@@ -316,8 +317,8 @@ internal fun energeticRhs(cap: Long, est: LongArray, dur: LongArray, res: LongAr
     var bSumR = 0L // Σ_B rᵢ
     for (k in 0 until n) fullEnergy = addExact(fullEnergy, mulExact(res[k], dur[k]))
 
-    val estOrder = (0 until n).sortedBy { est[it] }
-    val ectOrder = (0 until n).sortedBy { ect[it] }
+    val estOrder = argsortBy(n) { left, right -> est[left].compareTo(est[right]) }
+    val ectOrder = argsortBy(n) { left, right -> ect[left].compareTo(ect[right]) }
     var ei = 0 // next est event (task entering B)
     var ci = 0 // next ect event (task leaving B for C)
     var maxEct = Long.MIN_VALUE

@@ -7,6 +7,7 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.model.PbOp
+import com.eignex.util.arrays.argsortBy
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.LongArrayList
@@ -61,7 +62,7 @@ internal class KnapsackCoverSeparator : CutSeparator {
             }
             if (!ok) continue
             // Greedy cover: highest fractional value first, until the weight sum exceeds the bound.
-            val order = (0 until k).sortedByDescending { xstar[it] }
+            val order = argsortBy(k) { left, right -> xstar[right].compareTo(xstar[left]) }
             val inCover = BooleanArray(k)
             var coverCount = 0
             var wsum = 0L
@@ -76,7 +77,13 @@ internal class KnapsackCoverSeparator : CutSeparator {
             // the base inequality `Σ_C x ≤ |C| − 1` is as strong as possible before lifting.
             run {
                 var cw = wsum
-                for (i in (0 until k).filter { inCover[it] }.sortedBy { factor.weights[it] }) {
+                val cover = IntArrayList(coverCount)
+                for (i in 0 until k) if (inCover[i]) cover.add(i)
+                val coverOrder = argsortBy(cover.size) { left, right ->
+                    factor.weights[cover[left]].compareTo(factor.weights[cover[right]])
+                }
+                for (position in coverOrder) {
+                    val i = cover[position]
                     if (cw - factor.weights[i] > b) {
                         inCover[i] = false
                         coverCount--
@@ -100,8 +107,13 @@ internal class KnapsackCoverSeparator : CutSeparator {
             }
             if (b <= MAX_LIFT_CAP) {
                 val groupOf = cliquePartition(k, factor.literals, conflict)
-                val nonCover = (0 until k).filter { !inCover[it] }.sortedByDescending { factor.weights[it] }
-                for (kk in nonCover) {
+                val nonCover = IntArrayList(k - coverCount)
+                for (i in 0 until k) if (!inCover[i]) nonCover.add(i)
+                val nonCoverOrder = argsortBy(nonCover.size) { left, right ->
+                    factor.weights[nonCover[right]].compareTo(factor.weights[nonCover[left]])
+                }
+                for (position in nonCoverOrder) {
+                    val kk = nonCover[position]
                     val cap = b - factor.weights[kk]
                     val maxv = if (cap < 0) {
                         0L

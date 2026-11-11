@@ -89,7 +89,7 @@ class RegressionVariableSelector private constructor(
         var bestScore = Double.NEGATIVE_INFINITY
         for (c in candidates) {
             val f = features(session, c)
-            val score = bandit.evaluate(0, DenseVector.of(f))
+            val score = bandit.evaluate(0, DenseVector.wrap(f))
             if (score > bestScore) {
                 bestScore = score
                 best = c.ref
@@ -111,7 +111,7 @@ class RegressionVariableSelector private constructor(
             // Squash propagation yield into [0,1): 0 → 0, large → ~1.
             (delta / (delta + PROP_SQUASH)).coerceIn(0.0, 1.0)
         }
-        bandit.update(0, DenseVector.of(f), reward, 1.0)
+        bandit.update(0, DenseVector.wrap(f), reward, 1.0)
         pendingFeatures = null
     }
 
