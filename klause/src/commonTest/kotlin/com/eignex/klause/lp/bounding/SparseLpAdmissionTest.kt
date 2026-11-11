@@ -13,6 +13,7 @@ import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.EngineConstruction
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpFloatAllowance
@@ -281,21 +282,24 @@ class SparseLpAdmissionTest {
         val problem = Problem(0, 96, Array(96) { IntDomain(0, 1) },
             List(95) { Linear(intArrayOf(1, 1), intArrayOf(it, it + 1), LinearOp.GE, 1) },
             settings = ProblemSettings(lpCeilingTableauCells = 1L))
-        val sink = SolveStatsSink("checked-paused-sparse-root")
-        val stop = Cancellation { (sink.lp.sparseTrial["PausedCertifiedBounds"] ?: 0L) > 0L }
+        for (mode in LpCertificationMode.entries) {
+            val key = if (mode == LpCertificationMode.NUMERICAL) "PausedNumericalBounds" else "PausedCertifiedBounds"
+            val sink = SolveStatsSink("checked-paused-sparse-root")
+            val stop = Cancellation { (sink.lp.sparseTrial[key] ?: 0L) > 0L }
 
-        val (lower, work) = LpEngine(problem, LinearObjective(intCoefficients = LongArray(96) { 1L }),
-            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink).use { engine ->
-            repeat(3) { engine.observeNodeWork(false, 96, 96, 1) }
-            val bound = engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList(), stop)
-            assertTrue(engine.propagator.floatPaused)
-            bound to engine.totalSolveWork()
+            val (lower, work) = LpEngine(problem, LinearObjective(intCoefficients = LongArray(96) { 1L }),
+                LpParams(lpConfig = LpConfig.parse("default,+sparse-trial"), lpMode = mode), sink).use { engine ->
+                repeat(3) { engine.observeNodeWork(false, 96, 96, 1) }
+                val bound = engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList(), stop)
+                assertTrue(engine.propagator.floatPaused)
+                bound to engine.totalSolveWork()
+            }
+
+            assertTrue(lower > 0.0 && lower <= 48.0)
+            assertEquals(1L, sink.snapshot().lp.sparseTrial[key])
+            assertEquals(0.0, sink.snapshot().lp.rootPasses.sum)
+            assertTrue(work <= SPARSE_LP_MAX_WORK)
         }
-
-        assertTrue(lower > 0.0 && lower <= 48.0)
-        assertEquals(1L, sink.snapshot().lp.sparseTrial["PausedCertifiedBounds"])
-        assertEquals(0.0, sink.snapshot().lp.rootPasses.sum)
-        assertTrue(work <= SPARSE_LP_MAX_WORK)
     }
 
     @Test

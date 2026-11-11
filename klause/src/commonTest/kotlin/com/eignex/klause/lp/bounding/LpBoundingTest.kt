@@ -482,20 +482,24 @@ class LpBoundingTest {
     @Test
     fun `source bounds should retain exact cancellation of wide opposite terms`() {
         val lower = 9007199254740993L
-        val constant = 9007199254740995L
         val problem = Problem(0, 1, arrayOf(IntDomain(lower, lower + 1L)), emptyArray())
-        val objective = LinearObjective(intCoefficients = longArrayOf(-1L), constant = constant)
-        val sink = SolveStatsSink(backend = "source-cancellation")
-        val session = PropagationSession(problem)
-        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
-            val relaxer = assertNotNull(engine.lpRelaxer)
+        for (coefficient in listOf(-1L, 1L)) {
+            val endpoint = if (coefficient < 0L) lower + 1L else lower
+            val constant = 1L - coefficient * endpoint
+            val objective = LinearObjective(intCoefficients = longArrayOf(coefficient), constant = constant)
+            val sink = SolveStatsSink(backend = "source-cancellation")
+            val session = PropagationSession(problem)
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val relaxer = assertNotNull(engine.lpRelaxer)
 
-            val root = engine.rootLpRelaxationBound(relaxer, emptyList())
+                val root = engine.rootLpRelaxationBound(relaxer, emptyList())
 
-            assertEquals(BigFraction.ONE, BigFraction.ofLong(constant) - BigFraction.ofLong(lower + 1L))
-            assertEquals(1.0, root)
-            assertFalse(engine.sparseSafePrune(relaxer, session, 2.0, sink, Cancellation.Never, -1, true).prune)
-            assertFalse(engine.sparseCertifiedPrune(relaxer, session, 2.0, sink, Cancellation.Never).prune)
+                assertEquals(BigFraction.ONE, BigFraction.ofLong(constant) +
+                    BigFraction.ofLong(coefficient) * BigFraction.ofLong(endpoint))
+                assertEquals(1.0, root)
+                assertFalse(engine.sparseSafePrune(relaxer, session, 2.0, sink, Cancellation.Never, -1, true).prune)
+                assertFalse(engine.sparseCertifiedPrune(relaxer, session, 2.0, sink, Cancellation.Never).prune)
+            }
         }
     }
 
