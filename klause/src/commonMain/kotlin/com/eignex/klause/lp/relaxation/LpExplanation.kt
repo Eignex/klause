@@ -152,9 +152,10 @@ internal object LpExplanation {
      * row without recorded premises carries dual weight. By LP duality `c·x = y·b + Σ_j d_j·x_j` holds
      * row-wise, so for any point satisfying the rows, `objective ≥ L` follows from `x_j ≥ lo_j` on the
      * columns with `d_j > 0` and `x_j ≤ ub_j` on those with `d_j < 0` — exactly the premises cited here.
-     * Basic and zero-reduced-cost columns do not move the bound and stay uncited (a basic column's exact
-     * reduced cost is `0`); rows stay implicit, which is why every row with `y_i ≠ 0` must be globally
-     * valid or carry recorded validity premises ([LpModel.rowPremises]) cited alongside.
+     * A certificate may name further sides it reads ([LpDeductionCertificate.extraCitedSides]), and those are cited
+     * too; other columns with a zero reduced cost stay uncited. Rows stay implicit, which is why every row with
+     * `y_i ≠ 0`, or that a certificate cites, must be globally valid or carry recorded validity premises
+     * ([LpModel.rowPremises]) cited alongside.
      */
     fun objectiveBoundReason(
         relaxation: LpRelaxation,

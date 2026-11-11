@@ -1603,18 +1603,22 @@ Lagrangian `L(y)` from the float duals in binary64 and lowers it by that summati
 rounding plus an absolute and relative slack, so float noise never rounds an integral
 bound up. A reduced cost beyond its rounding prices and cites its minimizing side; one
 within it prices both sides and cites the finite ones. An open side is priced at the tightest
-bound a single row implies, and the reasons cite that row and both finite sides of its
-columns; a reduced cost within rounding on a side no row bounds counts as zero. It supplies
-node pruning, objective propagation, reduced-cost fixing with their reasons, root bounds
-shared with peers, and shaving; fixing also tries the objective box (zero multipliers) and
-half the duals. `floatFarkasRay` normalises a dual-unbounded ray and accepts it when its
-binary64 Farkas margin exceeds the tolerance times the terms' size, pricing open sides at their
-row-implied bounds; the rounded integer ray must pass again against the box sides its
-clause cites, or the node is refuted without a learned clause. It backs infeasibility
-pruning, learned conflicts and presolve root infeasibility. Mixed row projections, strict-row
-solves and component bounds have no numerical form and are skipped. Optimality, infeasibility
-and bound claims resting on these deductions are numerical. Under exact certification
-every deduction uses the packages below.
+bound a single row implies, preferring rows whose validity a reason can cite, and the
+reasons cite that row and each side the implied bound reads; a reduced cost within rounding
+on a side no row bounds counts as zero. It supplies node pruning, objective propagation,
+reduced-cost fixing with their reasons, root bounds shared with peers, and shaving; fixing
+also tries the objective box (zero multipliers) and half the duals.
+
+`floatFarkasRay` normalises a dual-unbounded ray and accepts it when its binary64 Farkas
+margin exceeds the tolerance times the terms' size, pricing open sides at their row-implied
+bounds. Each implying row is folded into the ray so its open column cancels, and the rounded
+integer ray must pass again against the box sides its clause cites, taking an open column
+within the ray's rounding as cancelled; otherwise the node is refuted without a learned
+clause. It backs infeasibility pruning, learned conflicts and presolve root infeasibility.
+Learned-reason and clause-less outcomes are counted as node deduction phases. Mixed row
+projections, strict-row solves and component bounds have no numerical form and are skipped.
+Optimality, infeasibility and bound claims resting on these deductions are numerical. Under
+exact certification every deduction uses the packages below.
 
 ### Proof packages
 
