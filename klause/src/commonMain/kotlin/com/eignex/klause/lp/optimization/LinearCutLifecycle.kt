@@ -9,6 +9,8 @@ internal class LinearCutLifecycle(private val budget: SourceLpBudget) {
     private var ownedFamilies: Set<CutFamily> = emptySet()
     private var recipe: String = "NO_CUT"
     fun snapshot(): Map<String, Long> = counts.toMap()
+    fun recipeMetric(recipe: String, stage: String): Long =
+        counts["numericalCutLifecycleRECIPE_${recipe}_$stage"] ?: 0L
 
     fun observe(family: CutFamily, stage: String, count: Long = 1L) {
         val key = "numericalCutLifecycle${family.name}_$stage"

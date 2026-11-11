@@ -83,6 +83,31 @@ The summary reports selected and examined queries separately. A missing query or
 stopped inspection establishes no absence of useful candidates. Atomic work can
 overspend an allowance; its cost remains recorded. Inspection grants
 are separate from solver grants, and inspection does not change the running policy.
+With `pointCuts=true aggregateCuts=true fractionalOrder=true`, a completed current
+point query with its entire retained pool checked and installed can continue with
+fractional integer support ordering. The continuation
+retains its checked pool and installed mask, and charges the extra generation and
+query to the remaining source allowance. Omit `fractionalOrder` for the current-order
+control.
+With `fractional-attempt=true`, the profile records the first actual attempt in
+`selection.json`, including its paid point, current and generation scopes, installed
+definitions, pre/post funding and LP counters, and bounded unchecked rejections.
+Its `queryCost` frame separates augmented-query snapshots from preparation, retaining
+the installed mask, pause/resume counts and observation charges; incomplete frames cannot qualify a complete query cost.
+The frame includes bound reconstruction input calls, work and time, with inclusive
+bound certificate time. This input prefix
+overlaps inclusive bound certification and must not be added to it.
+Enable `frontier=true pointCuts=true aggregateCuts=true fractionalOrder=true`
+explicitly. `sourceWork` and `sourceAllocation` set the containing allowances;
+`heapMiB=2560 gc=default` matches those JVM settings in ordinary comparisons.
+`effective-controls.json` and `launcher.json` record the declared controls and actual
+JVM arguments. The driver is a direct numerical authority with no external
+incumbent provider; these captures diagnose mechanisms and do not qualify ordinary
+CLI performance. Post-solve export has a separate bounded inspection window.
+`aggregateReuse=true` opts into bounded source-incidence preparation reuse between
+point calls. Omit it for the existing preparation control; effective controls and
+frontier records report the setting. Point ordering, bound selection and proof
+checks remain per-call work under the existing generation and source allowances.
 Imported proof records retain their original scope, consequence or bound payload,
 and nested derivation. Depth and cancellation limits mark withheld proofs
 unavailable.
@@ -1182,6 +1207,18 @@ endpoint independently from the point. Its generation shares the original
 65,536-work allowance; point projection, failed preparation, fresh verification
 and any resulting owner replacement retain their containing source/recipe costs.
 `PointPreparationUnavailable` does not establish complete ineligibility.
+The explicit fractional policy allows at most two discovery attempts per current
+immutable generation context. `numericalCutSelectionFractionalPassAttempts` includes
+declines; the later attempt needs a newer completed paid query and a fully installed,
+checked pool. Each attempt keeps its 65,536-work/1 MiB generation ceiling and the
+containing source allowance. Retain failed and deferred readiness costs alongside
+successful generation and subsequent query costs.
+Fractional augmentation selects up to eight checked, nonparallel additions within
+the existing 64-row pool cap. Ordinary selection admits one addition.
+`numericalCutSelectionFractionalBatchAttempts` counts these bounded selection
+calls, including a declined call. Batch storage and comparisons share existing
+selection/source limits; cancellation or exhausted funding preserves the prior
+mask. The counter supplies no installation, useful-bound or independent-proof claim.
 
 `MpsProofFrontier selection=true replay=true` compares disabled, originally
 installed and all-captured masks over the first four captured scope/pool pairs
@@ -1199,6 +1236,35 @@ The inspection shares a 20-second, 20,000,000-work and 64 MiB containing cap.
 `point-producer.jsonl` retains candidates, scopes, limits and native checks.
 It installs no rows and performs no LP query; accepted consequences alone do not
 establish strict separation, bound strengthening, later pruning or independent proof.
+
+`MpsProofFrontier aggregate-production=true aggregate-probe=true selection=true
+aggregate-query=N` inspects a later retained query whose checked pool is fully
+installed. It retains the actual immutable generation contexts for query zero and
+query N within the existing archive allowance, then invokes the production cached
+source-pair kernel in a private diagnostic cache: current ordering at zero,
+fractional ordering at N. Each call has 65,536 generation work and 1 MiB modeled
+allocation; point projection has the same separate per-point ceilings.
+The projection follows production's finite rounded `Double` conversion and records
+the original rational point separately from the projected values. Both native
+consequence checks share 100,000 proof polls and 16 MiB modeled proof reservation.
+`production-aggregates.jsonl` records scopes, generation-context identity,
+preparation/discovery counters, candidates, checks and release. Missing retained
+points decline; context retention can shorten the archive prefix. The observation
+has a 20-second deadline, releases its private index and context references, issues
+no LP query and changes no production policy. Pay cold preparation and failed
+checks; this reconstruction supplies no ordinary performance comparison or
+independently validated proof. It cannot be combined with other replay modes.
+
+Adding `aggregate-production-replay=true` replays the later point's freshly native-checked
+proposals after releasing generation resources. Three fresh owners receive the same
+captured and appended definitions, with masks for no cuts, the full current pool,
+and the full pool plus proposals. No individual-cut family is regenerated. Each arm
+has one LP operation, 20,000,000 work and 64 MiB modeled allocation; all arms share
+a 30-second deadline and a separate 100,000-poll, 16 MiB native postcheck allowance.
+`production-replays.jsonl` records definitions, masks, fresh checks, bound/refutation
+derivations and costs. Common import costs and fresh bases make this a diagnostic
+bound comparison; stronger bounds still need later search use and ordinary-source
+benefit qualification before any production policy change.
 
 The generated-aggregate replay includes the ordinary opt-in producer's bounded
 source-pair indexing and discovery. Keep this cost separate from replaying supplied
@@ -1225,6 +1291,24 @@ retain rejected projections; `AggregatePairPointEligible` counts proposals admit
 to the bounded candidate pool. All derivation and projection costs, including those
 without retained rows, remain in the existing generation work/allocation totals.
 Aggregate-only generation retains its source-order proposal policy.
+An observed fractional rejection can include `cost.kind=cumulative-source-pair-prefix`
+and an `attempt` execution-segment ordinal. Immediate continuations share the
+original ordinal; deferred continuations start a new one after intervening seeds.
+The `AggregateDeferredContinuation` event counts resumed segments, while
+`AggregatePairFairTraversal`, `AggregatePairFairTraversalDeclined` and
+`AggregatePairFairBucketOrderDeclined` report traversal admission and fallbacks.
+`phases` reports modeled `work`, `allocation` and completed
+or interrupted `spans` for `Aggregation`, `ProofCombination`, `BoundRounding`,
+`PointScreen`, `Continuation` and `IntegerHalf`. `ProofCombination` includes prepaid
+premise identity/proof storage; `BoundRounding` combines bound substitution,
+rounding and remaining proof construction. Integer half-rounding and its proof
+construction are also combined. Zero spans mean the phase has not run in that
+prefix. Rejections sharing an attempt have overlapping cumulative costs: compare
+successive prefixes, never sum them. `AggregateCost*` events retain global phase
+totals, including paid work without a rejection. These phases partition part of
+the containing generation charges; indexing, ordering and observation retain their
+separate charges. Missing or limited capture is incomplete, and all rejected rows
+remain unchecked.
 Point-directed aggregation selects each coordinate's nearer established source
 endpoint when both distances are finite. `AggregatePointLowerBounds` and
 `AggregatePointUpperBounds` count these indexed choices; endpoint projection and

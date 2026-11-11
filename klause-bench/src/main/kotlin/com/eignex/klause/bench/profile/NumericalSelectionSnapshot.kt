@@ -19,6 +19,7 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.util.Cancellation
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -50,8 +51,126 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
         put("constructedModeledBytes", field(journal, "constructedBytes") as Long)
         put("limited", journal.javaClass.getDeclaredMethod("getLimited").invoke(journal) as Boolean)
         put("independentProofCheck", false)
+        put("fractionalAttempt", fractionalAttempt(journal))
         put("records", buildJsonArray { records(journal).forEach { if (!stop()) add(query(it)) } })
         put("inspectionStopped", stop())
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun fractionalAttempt(journal: Any): JsonObject = buildJsonObject {
+        put("enabled", field(journal, "fractionalEnabled") as Boolean)
+        put("attempted", field(journal, "fractionalAttempts") as Long)
+        put("limited", field(journal, "fractionalAttemptLimited") as Boolean)
+        put("independentProofCheck", false)
+        val captured = field(journal, "fractionalAttempt")
+        if (captured == null || stop()) {
+            put("available", false)
+            put("reason", if (stop()) "inspection-stopped" else "not-retained")
+            return@buildJsonObject
+        }
+        val record = field(captured, "query")
+        put("available", record != null && field(record, "point") != null)
+        put("outcome", field(captured, "outcome") as String)
+        put("observationWork", field(captured, "observationWork") as Long)
+        put("observationAllocation", field(captured, "observationAllocation") as Long)
+        for (name in listOf("before", "after")) put(name, buildJsonObject {
+            (field(captured, name) as Map<String, Long?>).forEach { (key, value) -> put(key, value) }
+        })
+        put("queryCost", fractionalQueryCost(journal))
+        if (record != null) {
+            put("query", query(record))
+            val numeric = field(record, "numeric") as SourceProofContext
+            val generation = field(record, "generationScope") as SourceScope?
+            if (generation != null) put("generationOwnerMap", generationOwnerMap(numeric))
+        }
+        put("rejectedAttempts", field(captured, "rejectedAttempts") as Long)
+        put("events", buildJsonObject {
+            (field(captured, "events") as Map<String, Long>).forEach { (name, count) -> put(name, count) }
+        })
+        put("rejectionsLimited", field(captured, "rejectionsLimited") as Boolean)
+        put("rejections", buildJsonArray {
+            for (rejected in field(captured, "rejections") as List<Any>) {
+                if (stop()) break
+                val row = field(rejected, "inequality") as SourceInequality
+                add(buildJsonObject {
+                    put("checked", false)
+                    put("coefficients", coefficients(row.coefficients))
+                    put("rhs", row.rhs.toString())
+                    put("strict", row.strict)
+                    put("family", (field(rejected, "family") as Enum<*>).name)
+                    put("owners", buildJsonArray {
+                        (field(rejected, "owners") as Set<Int>).sorted().forEach { add(JsonPrimitive(it)) }
+                    })
+                    for (name in listOf("activity", "normSquared", "efficacy", "minimumEfficacy")) {
+                        put(name, (field(rejected, name) as Double).toString())
+                    }
+                    put("cost", rejectionCost(field(rejected, "cost")) ?: JsonNull)
+                })
+            }
+        })
+        put("inspectionStopped", stop())
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun rejectionCost(cost: Any?): JsonObject? = cost?.let {
+        buildJsonObject {
+            put("kind", "cumulative-source-pair-prefix")
+            put("attempt", field(cost, "attempt") as Long)
+            put("phases", buildJsonObject {
+                for ((phase, value) in field(cost, "phases") as Map<Enum<*>, Any>) put(phase.name, buildJsonObject {
+                    for (name in listOf("work", "allocation", "spans")) put(name, field(value, name) as Long)
+                })
+            })
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun fractionalQueryCost(journal: Any): JsonObject = buildJsonObject {
+        put("pending", field(journal, "fractionalQueryCostPending") as Boolean)
+        put("limited", field(journal, "fractionalQueryCostLimited") as Boolean)
+        put("independentProofCheck", false)
+        val captured = field(journal, "fractionalQueryCost")
+        if (captured == null || stop()) {
+            put("available", false)
+            put("complete", false)
+            put("reason", if (stop()) "inspection-stopped" else "not-retained")
+            return@buildJsonObject
+        }
+        val outcome = field(captured, "outcome") as String
+        val after = field(captured, "after") as Map<String, Long?>?
+        put("available", after != null)
+        put("complete", after != null && outcome == "completed")
+        put("outcome", outcome)
+        put("scope", scope(field(captured, "scope") as SourceScope))
+        put("installed", buildJsonArray {
+            (field(captured, "installed") as Set<Int>).sorted().forEach { add(JsonPrimitive(it)) }
+        })
+        for (name in listOf("calls", "pauses", "observationWork", "observationAllocation")) {
+            put(name, field(captured, name) as Long)
+        }
+        fun counts(values: Map<String, Long?>) = buildJsonObject {
+            values.forEach { (key, value) -> put(key, value) }
+        }
+        put("before", counts(field(captured, "before") as Map<String, Long?>))
+        put("after", after?.let(::counts) ?: JsonNull)
+        put("inspectionStopped", stop())
+    }
+
+    fun generationOwnerMap(context: SourceProofContext): JsonObject = buildJsonObject {
+        val premises = context.premises
+        var visited = 0
+        put("ordering", "source-iteration")
+        put("owners", buildJsonArray {
+            for ((owner, premise) in premises.keys.withIndex()) {
+                if (stop()) break
+                add(buildJsonObject {
+                    put("owner", owner)
+                    put("premise", premise)
+                })
+                visited++
+            }
+        })
+        put("complete", visited == premises.size && !stop())
     }
 
     fun replay(journal: Any, emit: (JsonObject) -> Unit) {

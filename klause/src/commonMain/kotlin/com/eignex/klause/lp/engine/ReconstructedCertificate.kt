@@ -579,7 +579,11 @@ private fun classifyPointRejection(column: Int, structuralColumns: Int, strictEn
         if (column < structuralColumns) LpPointRejection.COLUMN_BOUND else LpPointRejection.LOGICAL_BOUND
     }
 
-private class ReconstructionRun(private val a: ReconstructionAuthority, private val meter: ReconstructionMeter) {
+private class ReconstructionRun(
+    private val a: ReconstructionAuthority,
+    private val meter: ReconstructionMeter,
+    private val observer: LpCertificationObserver? = null,
+) {
     var pointRejection: LpPointRejection? = null
         private set
     var point: ReconstructedPoint? = null
@@ -591,6 +595,21 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
     var complementary = false
     var boundUsesBasis = false
         private set
+
+    private inline fun <T : Any> observeCandidate(phase: LpSolvePhase, block: () -> T?): T? {
+        val sink = observer ?: return block()
+        val before = meter.spentWork
+        val timer = LpPhaseTimer(sink, phase)
+        var outcome = "DECLINED"
+        try {
+            return block().also { if (it != null) outcome = "CANDIDATE" }
+        } catch (overflow: ReconstructionOverflow) {
+            outcome = "OVERFLOW"
+            throw overflow
+        } finally {
+            timer.finish(outcome, meter.spentWork - before)
+        }
+    }
 
     fun point(candidate: List<BigFraction>, basis: Basis?) {
         meter.phase = ReconstructionPhase.POINT
@@ -616,10 +635,14 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
         meter.phase = if (ray) ReconstructionPhase.RAY else ReconstructionPhase.DUAL
         if (ray) meter.rayChecks++ else meter.dualChecks++
         val checked = try {
-            FixedReconstructionVerifier(a, meter).dual(candidate, ray)
+            observeCandidate(LpSolvePhase.BOUND_RECONSTRUCTION_FIXED_DUAL) {
+                FixedReconstructionVerifier(a, meter).dual(candidate, ray)
+            }
         } catch (_: ReconstructionOverflow) {
             meter.verificationRestarts++
-            BigReconstructionVerifier(a, meter).dual(candidate, ray)
+            observeCandidate(LpSolvePhase.BOUND_RECONSTRUCTION_BIG_DUAL) {
+                BigReconstructionVerifier(a, meter).dual(candidate, ray)
+            }
         } ?: run {
             if (usesBasis) meter.basisDualRejection = meter.dualRejection?.let {
                 it.copy(basic = basis?.status?.get(it.column) == VarStatus.BASIC)
@@ -688,6 +711,8 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
 
     fun basisDual(candidate: List<BigFraction>, basis: Basis): List<BigFraction>? {
         val before = meter.spentWork
+        val timer = observer?.let { LpPhaseTimer(it, LpSolvePhase.BOUND_RECONSTRUCTION_BASIS) }
+        var candidateReady = false
         try {
             if (!validHeadings(basis)) return null
             meter.phase = ReconstructionPhase.BASIS
@@ -699,9 +724,11 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
                 meter.basisRepair = ReconstructionBasisMetrics(decline = stop.reason.name)
                 return null
             }
-            return reconstructBasisDual(a, basis, layout, candidate, meter)
+            return reconstructBasisDual(a, basis, layout, candidate, meter).also { candidateReady = it != null }
         } finally {
-            meter.basisWork += meter.spentWork - before
+            val spent = meter.spentWork - before
+            meter.basisWork += spent
+            timer?.finish(if (candidateReady) "CANDIDATE" else "DECLINED", spent)
         }
     }
 
@@ -821,14 +848,14 @@ private fun reconstructCandidates(
     cancellation: Cancellation,
     limits: ReconstructionLimits,
     goal: ReconstructionGoal = ReconstructionGoal.ATTAINMENT,
-    inputObserver: LpCertificationObserver? = null,
+    observer: LpCertificationObserver? = null,
     validate: (ReconstructionMeter) -> Unit = {},
 ): ReconstructedCertificate {
     val meter = ReconstructionMeter(limits, cancellation)
     var run: ReconstructionRun? = null
     var decline: ReconstructionDecline? = null
     try {
-        val inputTimer = inputObserver?.let { LpPhaseTimer(it, LpSolvePhase.BOUND_RECONSTRUCTION_INPUT) }
+        val inputTimer = observer?.let { LpPhaseTimer(it, LpSolvePhase.BOUND_RECONSTRUCTION_INPUT) }
         var inputComplete = false
         val authority = try {
             meter.step()
@@ -842,7 +869,7 @@ private fun reconstructCandidates(
         } finally {
             inputTimer?.finish(if (inputComplete) "CAPTURED" else "DECLINED", meter.spentWork)
         }
-        val current = ReconstructionRun(authority, meter)
+        val current = ReconstructionRun(authority, meter, observer)
         run = current
         meter.storage((primalSize.toLong() + dualSize + raySize) * 24L)
         val x = primal?.let { values ->
@@ -1252,7 +1279,7 @@ private fun certifyLpBoundOnlyWithin(
         model, 0, duals.size, 0, null,
         { meter -> reconstructIeee(duals, meter) }, null, basis, cancellation, limits,
         goal = ReconstructionGoal.BOUND,
-        inputObserver = observer,
+        observer = observer,
         validate = { meter ->
             meter.poll()
             meter.step(duals.size.toLong())

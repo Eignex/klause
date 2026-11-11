@@ -85,10 +85,16 @@ internal object MpsProofFrontier {
         val supported = setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier", "cuts",
             "selection", "replay", "operations", "activeRows", "supportBranching", "pointCuts", "aggregate-probe",
             "aggregate-mixed", "aggregate-replay", "aggregateCuts", "refutationReuse", "feedbackDelivery",
-            "feedbackRequest", "solveSeconds", "certificateState", "point-producer",
-            "aggregate-query", "aggregate-work", "aggregate-allocation")
+            "feedbackRequest", "solveSeconds", "certificateState", "point-producer", "fractionalOrder",
+            "fractional-attempt", "sourceWork", "sourceAllocation", "heapMiB", "gc", "aggregateReuse",
+            "aggregate-query", "aggregate-work", "aggregate-allocation", "aggregate-production",
+            "aggregate-production-replay")
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
             (options.keys - supported).isEmpty())
+        require(options["fractional-attempt"]?.toBooleanStrict() != true ||
+            (listOf("frontier", "pointCuts", "aggregateCuts", "fractionalOrder").all {
+                options[it]?.toBooleanStrict() == true
+            } && options["cuts"]?.toBooleanStrict() != false))
         if (options.keys.any { it in setOf("aggregate-query", "aggregate-work", "aggregate-allocation") }) {
             require(options["aggregate-probe"]?.toBooleanStrict() == true &&
                 options["selection"]?.toBooleanStrict() == true)
@@ -96,8 +102,43 @@ internal object MpsProofFrontier {
         options["aggregate-query"]?.toInt()?.let { require(it >= 0) }
         options["aggregate-work"]?.toLong()?.let { require(it in 0L..20_000_000L) }
         options["aggregate-allocation"]?.toLong()?.let { require(it in 0L..67_108_864L) }
+        require(options["aggregate-production-replay"]?.toBooleanStrict() != true ||
+            options["aggregate-production"]?.toBooleanStrict() == true)
+        if (options["aggregate-production"]?.toBooleanStrict() == true) {
+            require(options["aggregate-probe"]?.toBooleanStrict() == true &&
+                options["selection"]?.toBooleanStrict() == true &&
+                (options["aggregate-query"]?.toInt() ?: 0) > 0 &&
+                listOf("aggregate-replay", "replay", "point-producer").none {
+                    options[it]?.toBooleanStrict() == true
+                })
+            require(options["aggregate-work"]?.toLong()?.let { it == 65_536L } != false &&
+                options["aggregate-allocation"]?.toLong()?.let { it == 1_048_576L } != false)
+        }
         return options
     }
+
+    fun controlParams(options: Map<String, String>, solveStop: Cancellation): TheoryParams =
+        TheoryParams(timeout = solveStop, cancellation = solveStop, randomSeed = 3L,
+            sourceCuts = options["cuts"]?.toBooleanStrict() ?: true,
+            sourcePointCuts = options["pointCuts"]?.toBooleanStrict() ?: false,
+            sourceAggregateCuts = options["aggregateCuts"]?.toBooleanStrict() ?: false,
+            sourceCutFractionalOrder = options["fractionalOrder"]?.toBooleanStrict() ?: false,
+            sourceCutPreparationReuse = options["aggregateReuse"]?.toBooleanStrict() ?: false,
+            sourceRefutationReuse = options["refutationReuse"]?.toBooleanStrict() ?: false,
+            sourceLpWorkLimit = options["sourceWork"]?.toLong() ?: 1_000_000_000L,
+            sourceLpAllocationLimit = options["sourceAllocation"]?.toLong() ?: 536_870_912L,
+            sourceLpOperations = options["operations"]?.toInt()?.also { require(it in 1..256) } ?: Int.MAX_VALUE)
+
+    fun launchJvmOptions(options: Map<String, String>): List<String> {
+        val heap = options["heapMiB"]?.toInt() ?: 3072
+        val gc = options["gc"] ?: "serial"
+        require(heap > 0 && gc in setOf("default", "serial"))
+        return listOf("-Xmx${heap}m", "-XX:ActiveProcessorCount=1") +
+            if (gc == "serial") listOf("-XX:+UseSerialGC") else emptyList()
+    }
+
+    fun selectionSnapshot(journal: Any): JsonObject =
+        NumericalSelectionSnapshot(Cancellation.after(10.seconds)).capture(journal)
 
     private fun capture(args: Array<String>, out: File) {
         val options = parseOptions(args)
@@ -144,12 +185,34 @@ internal object MpsProofFrontier {
         require(feedbackDelivery in setOf("latest", "prefix"))
         val feedbackRequest = options["feedbackRequest"] ?: "requested"
         require(feedbackRequest in setOf("requested", "full"))
-        val params = TheoryParams(timeout = solveStop, cancellation = solveStop, randomSeed = 3L,
-            sourceCuts = options["cuts"]?.toBooleanStrict() ?: true,
-            sourcePointCuts = options["pointCuts"]?.toBooleanStrict() ?: false,
-            sourceAggregateCuts = options["aggregateCuts"]?.toBooleanStrict() ?: false,
-            sourceRefutationReuse = options["refutationReuse"]?.toBooleanStrict() ?: false,
-            sourceLpOperations = options["operations"]?.toInt()?.also { require(it in 1..256) } ?: Int.MAX_VALUE)
+        val params = controlParams(options, solveStop)
+        Reports.writeJson(out.resolve("effective-controls.json").path, buildJsonObject {
+            put("driver", "direct-numerical-authority")
+            put("ordinaryCliPerformance", false)
+            put("externalIncumbentSource", "none")
+            put("fractionalAttemptObservation", options["fractional-attempt"]?.toBooleanStrict() ?: false)
+            put("declaredJvmOptions", buildJsonArray { launchJvmOptions(options).forEach { add(JsonPrimitive(it)) } })
+            put("actualJvmOptions", buildJsonArray {
+                ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
+            })
+            put("sourceCuts", params.sourceCuts)
+            put("sourcePointCuts", params.sourcePointCuts)
+            put("sourceAggregateCuts", params.sourceAggregateCuts)
+            put("fractionalOrder", params.sourceCutFractionalOrder)
+            put("aggregateReuse", params.sourceCutPreparationReuse)
+            put("sourceWork", params.sourceLpWorkLimit)
+            put("sourceAllocation", params.sourceLpAllocationLimit)
+            put("sourceOperations", params.sourceLpOperations)
+            put("refutationReuse", params.sourceRefutationReuse)
+            put("refutationPropagation", params.sourceRefutationPropagation)
+            put("refutationResolution", params.sourceRefutationResolution)
+            put("incumbentCompletion", params.sourceIncumbentCompletion)
+            put("sourceCutBranchingParam", params.sourceCutBranching)
+            put("supportBranching", supportBranching)
+            put("activeRows", activeRows)
+            put("history", historyEnabled)
+            put("seed", params.randomSeed)
+        })
         val authority = request.javaClass.declaredMethods.single {
             it.name == "authorityContext" && it.parameterCount == 2
         }.apply { isAccessible = true }
@@ -178,9 +241,19 @@ internal object MpsProofFrontier {
         val invocation = NumericalFrontierSnapshot.open(context, params, historyEnabled, frontierEnabled, activeRows,
             supportBranching, feedbackDelivery == "latest", feedbackRequest == "full")
         val selection = NumericalSelectionSnapshot(Cancellation.after(30.seconds))
-        val journal = if (options["selection"]?.toBooleanStrict() == true || aggregateProbe || pointProducer) {
+        val journal = if (options["selection"]?.toBooleanStrict() == true || aggregateProbe || pointProducer ||
+            options["fractional-attempt"]?.toBooleanStrict() == true) {
             selection.attach(invocation)
         } else null
+        if (options["fractional-attempt"]?.toBooleanStrict() == true) {
+            checkNotNull(journal).javaClass.getDeclaredMethod("observeFractionalAttempt").invoke(journal)
+        }
+        if (options["aggregate-production"]?.toBooleanStrict() == true) {
+            val retained = checkNotNull(journal)
+            val retain = retained.javaClass.getDeclaredMethod("retainGenerationContext", Int::class.javaPrimitiveType)
+            require(retain.invoke(retained, 0) == true)
+            require(retain.invoke(retained, options.getValue("aggregate-query").toInt()) == true)
+        }
         val history = ArrayList<JsonObject>()
         out.resolve("incumbents.jsonl").writeText("")
         out.resolve("bounds.jsonl").writeText("")
@@ -244,7 +317,8 @@ internal object MpsProofFrontier {
             }
             runCatching { Reports.writeJson(out.resolve("cuts.json").path, snapshot.cuts(invocation)) }
             if (journal != null) {
-                Reports.writeJson(out.resolve("selection.json").path, selection.capture(journal))
+                Reports.writeJson(out.resolve("selection.json").path,
+                    selectionSnapshot(journal))
                 if (pointProducer) {
                     out.resolve("point-producer.jsonl").writeText("")
                     NumericalPointProducerSnapshot(Cancellation.after(20.seconds)).inspect(journal) {
@@ -257,7 +331,20 @@ internal object MpsProofFrontier {
                         out.resolve("selection-replays.jsonl").appendText(it.toString() + "\n")
                     }
                 }
-                if (aggregateProbe) {
+                if (options["aggregate-production"]?.toBooleanStrict() == true) {
+                    out.resolve("production-aggregates.jsonl").writeText("")
+                    val productionReplay = options["aggregate-production-replay"]?.toBooleanStrict() == true
+                    if (productionReplay) out.resolve("production-replays.jsonl").writeText("")
+                    NumericalProductionAggregateSnapshot(Cancellation.after(20.seconds)).inspect(journal,
+                        options.getValue("aggregate-query").toInt(), onAccepted = { record, candidates ->
+                            if (productionReplay) NumericalCapturedPoolReplay(Cancellation.after(30.seconds))
+                                .replay(record, candidates) {
+                                    out.resolve("production-replays.jsonl").appendText(it.toString() + "\n")
+                                }
+                        }) {
+                        out.resolve("production-aggregates.jsonl").appendText(it.toString() + "\n")
+                    }
+                } else if (aggregateProbe) {
                     Reports.writeJson(out.resolve("aggregate-parents.json").path,
                         NumericalSelectionSnapshot(Cancellation.after(20.seconds)).capture(journal))
                     out.resolve("aggregate-pairs.jsonl").writeText("")
@@ -311,10 +398,13 @@ internal object MpsProofFrontier {
                 put("feedbackRequest", feedbackRequest)
                 put("pointCuts", params.sourcePointCuts)
                 put("aggregateCuts", params.sourceAggregateCuts)
+                put("fractionalOrder", params.sourceCutFractionalOrder)
+                put("aggregateReuse", params.sourceCutPreparationReuse)
                 put("refutationReuse", params.sourceRefutationReuse)
                 put("aggregateProbe", aggregateProbe)
                 put("aggregateMixed", aggregateMixed)
                 put("aggregateReplay", aggregateReplay)
+                put("productionReplay", options["aggregate-production-replay"]?.toBooleanStrict() ?: false)
                 put("pointProducer", pointProducer)
                 put("sourceLpOperationAllowance", params.sourceLpOperations)
                 put("activeRows", activeRows)
@@ -352,7 +442,13 @@ internal object MpsProofFrontier {
                     .probeRoot(invocation) { out.resolve("root-probes.jsonl").appendText(it.toString() + "\n") }
             }
         } finally {
-            (invocation as AutoCloseable).close()
+            try {
+                if (options["aggregate-production"]?.toBooleanStrict() == true) {
+                    journal?.javaClass?.getDeclaredMethod("releaseGenerationContexts")?.invoke(journal)
+                }
+            } finally {
+                (invocation as AutoCloseable).close()
+            }
         }
     }
 
@@ -384,7 +480,9 @@ internal object MpsProofFrontier {
     private fun launch(args: Array<String>, out: File) {
         val command = arrayListOf(
             File(System.getProperty("java.home"), "bin/java").path,
-            "-Xmx3g", "-XX:+UseSerialGC", "-XX:ActiveProcessorCount=1",
+        )
+        command += launchJvmOptions(args.associate { it.substringBefore('=') to it.substringAfter('=') })
+        command += listOf(
             "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector",
             "-XX:StartFlightRecording=filename=${out.resolve("measured-profile.jfr")},settings=profile,dumponexit=true",
         )

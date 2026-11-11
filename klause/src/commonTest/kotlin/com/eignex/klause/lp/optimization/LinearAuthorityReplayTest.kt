@@ -57,6 +57,62 @@ class LinearAuthorityReplayTest {
     )
 
     @Test
+    fun `captured proposal replay should preserve existing rows and append fresh cuts`() {
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        LinearAuthority(SourceLpBudget(), retainLp = true, additionalCuts = cuts.take(1)).use {
+            it.capture = capture
+            it.advance(source, Cancellation.Never, cuts = true, cutMask = setOf(0))
+        }
+
+        val replay = LinearAuthorityReplay.runWithCapturedCandidates(capture.records.single(), setOf(0, 1),
+            cuts.drop(1), 1_000_000L, 4_000_000L, Cancellation.Never)
+
+        val replayed = assertNotNull(replay.query)
+        val bound = assertNotNull(replay.strongestBound)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(3)), (bound.claim as SourceClaim.Bound).value)
+        assertEquals(cuts.map { it.inequality.coefficients }, replayed.cuts.map { it.inequality.coefficients })
+        assertEquals(cuts.map { it.owners }, replayed.cuts.map { it.owners })
+        assertEquals(setOf(0, 1), replayed.cuts.filter { it.installed && it.checked }.mapTo(HashSet()) { it.id })
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(bound))
+    }
+
+    @Test
+    fun `captured proposal replay should recheck newly supplied derivations`() {
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        LinearAuthority(SourceLpBudget(), retainLp = true, additionalCuts = cuts.take(1)).use {
+            it.capture = capture
+            it.advance(source, Cancellation.Never, cuts = true, cutMask = setOf(0))
+        }
+        val invalid = LinearAuthorityCut(cuts[1].owner, cuts[1].inequality, SourceDerivation.Premise("missing"),
+            owners = cuts[1].owners, family = cuts[1].family)
+
+        val replay = LinearAuthorityReplay.runWithCapturedCandidates(capture.records.single(), setOf(0, 1),
+            listOf(invalid), 1_000_000L, 4_000_000L, Cancellation.Never)
+
+        assertTrue(replay.query?.cuts?.none { it.id == 1 && it.installed } != false)
+        replay.strongestBound?.let {
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(2)), (it.claim as SourceClaim.Bound).value)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(it))
+        }
+    }
+
+    @Test
+    fun `captured proposal replay should decline a combined pool beyond its row limit`() {
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        LinearAuthority(SourceLpBudget(), retainLp = true, additionalCuts = cuts).use {
+            it.capture = capture
+            it.advance(source, Cancellation.Never, cuts = true, cutMask = setOf(0))
+        }
+
+        val replay = LinearAuthorityReplay.runWithCapturedCandidates(capture.records.single(), setOf(0),
+            List(63) { cuts[0] }, 1_000_000L, 4_000_000L, Cancellation.Never)
+
+        assertNotNull(replay.decline)
+        assertNull(replay.query)
+        assertEquals(0, replay.operations)
+    }
+
+    @Test
     fun `replay masks should target supplied captured cuts after their owner closes`() {
         val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
         LinearAuthority(SourceLpBudget(), retainLp = true, additionalCuts = cuts).use {

@@ -841,13 +841,13 @@ class ResumableMinimizeTest {
 
     @Test
     fun `rebind should preserve a restricted optimum after LP bounding`() {
-        val weights = intArrayOf(6, 7, 2, 3, 5, 9, 4, 3, 4)
-        val profits = longArrayOf(7, 5, 4, 3, 8, 6, 5, 8, 6)
+        val weights = intArrayOf(6, 7, 2, 3)
+        val profits = longArrayOf(7, 5, 4, 3)
         val problem = Problem(
             0,
             weights.size,
             Array(weights.size) { IntDomain(0, 1) },
-            arrayOf(Linear(weights.copyOf(), IntArray(weights.size) { it }, LinearOp.LE, 25)),
+            arrayOf(Linear(weights.copyOf(), IntArray(weights.size) { it }, LinearOp.LE, 10)),
         ).bake()
         val objective = LinearObjective(intCoefficients = LongArray(profits.size) { -profits[it] })
         val params = BacktrackParams(
@@ -866,7 +866,8 @@ class ResumableMinimizeTest {
                         "bound=${search.stats.lp.rootBound}, spent=${search.stats.lp.workAllowanceSpent}"
                 } else null,
             )
-            assertEquals(-38.0, initial.objective)
+            assertEquals(-11.0, initial.objective)
+            assertTrue(search.stats.lp.rootWorkOps.sum > 0.0)
 
             search.rebind(Assumptions.None.withInt(0, 0), 100000L)
             val restrictedResult = search.runSlice(Cancellation.Never, 1000L, 100000L) {}
@@ -878,10 +879,10 @@ class ResumableMinimizeTest {
                         "bound=${search.stats.lp.rootBound}, spent=${search.stats.lp.workAllowanceSpent}"
                 } else null,
             )
-            assertEquals(-36.0, restricted.objective)
+            assertEquals(-9.0, restricted.objective)
             assertEquals(0L, restricted.sample.ints[0])
-            assertTrue(weights.indices.sumOf { weights[it] * restricted.sample.ints[it] } <= 25L)
-            assertEquals(-36L, objective.evaluateLong(restricted.sample))
+            assertTrue(weights.indices.sumOf { weights[it] * restricted.sample.ints[it] } <= 10L)
+            assertEquals(-9L, objective.evaluateLong(restricted.sample))
         }
     }
 
