@@ -654,7 +654,13 @@ definitions with independently chosen nearer continuous endpoints. Exact premise
 still authorize every row. The replacement shares the original generation's work
 limit and retains the source-row template; unavailable preparation leaves its prior
 candidates intact. Each immutable template attempts this preparation once.
-Point scoring admits at most one additional checked cut at each usable point.
+Point scoring admits at most one additional checked cut at each ordinary usable
+point. Explicit fractional augmentation can admit a batch of at most eight newly
+selected checked cuts within the existing 64-row installed-pool cap. The same
+score ordering and nonparallel filter apply to the batch and installed rows.
+Batch storage is prepaid, and every additional comparison shares the existing
+selection work and allocation limits. An interrupted or unfunded batch returns
+the prior installed mask without advancing its aging state.
 An addition waits for its completed selected query before enabling another scan
 at the next point. Only a strictly stronger checked bound, a checked incumbent or
 terminal evidence enables that immediate continuation. An unchanged or unavailable

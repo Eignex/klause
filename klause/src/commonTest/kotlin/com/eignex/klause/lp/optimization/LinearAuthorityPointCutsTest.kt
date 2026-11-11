@@ -821,6 +821,169 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `fractional batching should retain the useful alternative to the highest violation`() {
+        val context = SourceProofContext(scope, setOf(x, y), linkedMapOf(
+            "x lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(-10)),
+                BigFraction.MINUS_ONE)),
+            "y lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(-5)),
+                BigFraction.ofLong(-2))),
+        ), mapOf(x to BigFraction.ONE, y to BigFraction.ofLong(100)))
+        val rows = assertNotNull(LinearAuthorityCuts.prepare(context, Cancellation.Never)).rows
+        val checked = rows.indices.toSet()
+        val coordinates = listOf(x, y)
+        val costs = listOf(BigFraction.ONE, BigFraction.ofLong(100))
+        val point = listOf(BigFraction.ofLong(10).reciprocal(),
+            BigFraction.ofLong(2) * BigFraction.ofLong(5).reciprocal())
+        val bounds = ArrayList<SourceValue>()
+        for (fractional in listOf(false, true)) {
+            val selection = LinearAuthorityPointCuts(SourceLpBudget())
+
+            val selected = selection.select(rows, coordinates, costs, checked, point, emptySet(),
+                Cancellation.Never, fractional = fractional)
+            val result = LinearAuthority(SourceLpBudget()).use {
+                it.useReplayCuts(rows)
+                it.advance(context, Cancellation.Never, cuts = true, cutMask = selected)
+            }
+
+            assertEquals(if (fractional) setOf(0, 1) else setOf(0), selected)
+            val bound = assertNotNull(result.bound)
+            bounds += (bound.claim as SourceClaim.Bound).value
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(context.withLinearAuthority()).verify(bound))
+        }
+
+        assertEquals(listOf(SourceValue.Rational(BigFraction.ofLong(41)),
+            SourceValue.Rational(BigFraction.ofLong(101))), bounds)
+    }
+
+    @Test
+    fun `fractional batches should respect the addition and installed pool caps`() {
+        val coordinates = (0..9).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val rows = coordinates.mapIndexed { id, coordinate ->
+            LinearAuthorityCut(id, SourceInequality(mapOf(coordinate to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("upper $id"))
+        }
+        for (maximum in listOf(64, 5)) {
+            val selection = LinearAuthorityPointCuts(SourceLpBudget(), maximumCuts = maximum)
+
+            val selected = selection.select(rows, coordinates, List(10) { BigFraction.ZERO },
+                (0..8).toSet(), List(10) { if (it == 0) BigFraction.ZERO else BigFraction.ONE }, setOf(0),
+                Cancellation.Never, fractional = true)
+
+            assertEquals((0..minOf(8, maximum - 1)).toSet(), selected)
+            assertEquals(1L, selection.observations["numericalCutSelectionFractionalBatchAttempts"])
+        }
+    }
+
+    @Test
+    fun `fractional batches should exclude candidates parallel to an installed row`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("x upper")),
+            LinearAuthorityCut(1, SourceInequality(mapOf(x to BigFraction.ofLong(2)), BigFraction.MINUS_ONE),
+                SourceDerivation.Premise("parallel upper")),
+            LinearAuthorityCut(2, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("y upper")),
+        )
+
+        val selected = LinearAuthorityPointCuts(SourceLpBudget()).select(rows, listOf(x, y),
+            List(2) { BigFraction.ZERO }, setOf(0, 1, 2), listOf(BigFraction.ZERO, BigFraction.ONE), setOf(0),
+            Cancellation.Never, fractional = true)
+
+        assertEquals(setOf(0, 2), selected)
+    }
+
+    @Test
+    fun `cancelling batch comparisons should withhold the partially selected mask`() {
+        val coordinates = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val rows = coordinates.mapIndexed { id, coordinate ->
+            LinearAuthorityCut(id, SourceInequality(mapOf(coordinate to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("upper $id"))
+        }
+        val budget = SourceLpBudget()
+        val selection = LinearAuthorityPointCuts(budget)
+        var batching = false
+        var polls = 0
+        selection.observeTo { key, _ ->
+            if (key == "numericalCutSelectionFractionalBatchAttempts") batching = true
+        }
+
+        val selected = selection.select(rows, coordinates, List(3) { BigFraction.ZERO }, setOf(0, 1, 2),
+            List(3) { BigFraction.ONE }, emptySet(), Cancellation { batching && ++polls >= 2 }, fractional = true)
+
+        assertTrue(polls >= 2)
+        assertTrue(selected.isEmpty())
+        assertNull(selection.observations["numericalCutSelectionSelected"])
+        assertEquals(1L, selection.observations["numericalCutSelectionWorkLimited"])
+        assertTrue(budget.measuredPreparationWork > 0L)
+    }
+
+    @Test
+    fun `unfunded batches should preserve the prior installed mask`() {
+        val coordinates = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val rows = coordinates.mapIndexed { id, coordinate ->
+            LinearAuthorityCut(id, SourceInequality(mapOf(coordinate to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("upper $id"))
+        }
+        for (resource in listOf("work", "allocation")) {
+            val funding = SourceLpFunding(100_000L, 1_048_576L).apply { grant(100_000L) }
+            val budget = SourceLpBudget(funding = funding)
+            val selection = LinearAuthorityPointCuts(budget)
+            selection.observeTo { key, _ ->
+                if (key == "numericalCutSelectionFractionalBatchAttempts") {
+                    if (resource == "work") funding.charge(funding.remainingWork)
+                    else funding.charge(0L, funding.remainingAllocation)
+                }
+            }
+
+            val selected = selection.select(rows, coordinates, List(3) { BigFraction.ZERO }, setOf(0, 1, 2),
+                listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.ONE), setOf(0), Cancellation.Never,
+                fractional = true)
+
+            assertEquals(setOf(0), selected)
+            assertEquals(1L, selection.observations["numericalCutSelectionWorkLimited"])
+            assertTrue(budget.measuredPreparationWork > 0L)
+        }
+    }
+
+    @Test
+    fun `cancelling fractional batch publication should retain the paid base bound`() {
+        val context = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y, mixedReal), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    mixedReal to BigFraction.ONE), BigFraction.ofLong(3))),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                    mixedReal to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            ), mapOf(x to BigFraction.ONE, y to BigFraction.ONE))
+        val rows = context.premises.entries.mapIndexed { owner, (name, premise) ->
+            LinearAuthorityCut(owner, premise.inequality, SourceDerivation.Premise(name),
+                mixed = true, family = CutFamily.SOURCE_AGGREGATION)
+        }
+        var observed: LinearAuthority? = null
+        var stopped = false
+        val funding = SourceLpFunding(4_000_000L, 8_000_000L).apply { grant(4_000_000L) }
+        val budget = SourceLpBudget(funding = funding, onWork = {
+            if ((observed?.cutObservations()?.get("numericalCutSelectionFractionalBatchAttempts") ?: 0L) > 0L) {
+                stopped = true
+            }
+        })
+
+        val result = LinearAuthority(budget, retainLp = true, additionalCuts = rows, aggregateCuts = true,
+            fractionalAggregateOrder = true).use {
+            observed = it
+            it.advanceWithPointCuts(context, Cancellation { stopped })
+        }
+
+        assertTrue(stopped)
+        assertEquals(1, budget.operations)
+        val bound = assertNotNull(result.bound)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
+            (bound.claim as SourceClaim.Bound).value)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(context.withLinearAuthority()).verify(bound))
+    }
+
+    @Test
     fun `explicit objective aliases should rank cuts like their structural objective`() {
         val rows = listOf(
             LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),

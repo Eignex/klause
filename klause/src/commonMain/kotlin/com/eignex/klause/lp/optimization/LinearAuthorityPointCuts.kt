@@ -197,6 +197,7 @@ internal class LinearAuthorityPointCuts(
         cancellation: Cancellation,
         adoptCurrent: Boolean = false,
         objectiveSource: SourceProofContext? = null,
+        fractional: Boolean = false,
     ): Set<Int> {
         adoptedCurrent = false
         if (rows.isEmpty()) return installed
@@ -341,8 +342,13 @@ internal class LinearAuthorityPointCuts(
                     candidates += Scored(id, checkNotNull(projected), norm, score)
                 }
             }
+            val maximumAdded = minOf(if (fractional) 8 else 1, maxOf(0, maximumCuts - installed.size))
+            if (fractional) {
+                observe("FractionalBatchAttempts")
+                if (!meter.charge(1L + maximumAdded, 128L + maximumAdded * 96L)) return installed
+            }
             val selected = selectNonparallelCuts(candidates.sortedWith(compareByDescending<Scored> { it.score }
-                .thenBy { it.id }), minOf(1, maximumCuts - installed.size),
+                .thenBy { it.id }), maximumAdded,
                 1.0 - CutPool.MIN_ORTHOGONALITY, forced) { a, b ->
                 if (!meter.charge(a.values.size.toLong() + b.values.size)) Double.POSITIVE_INFINITY else {
                     var dot = 0.0
@@ -350,6 +356,9 @@ internal class LinearAuthorityPointCuts(
                     val cosine = abs(dot) / (a.norm * b.norm)
                     if (cosine.isFinite()) cosine else Double.POSITIVE_INFINITY
                 }
+            }
+            if (fractional && (meter.limited || cancellation() || budget.funding?.exhausted == true)) {
+                return installed
             }
             observe("Selected", selected.size.toLong())
             for (cut in selected) onCut(rows[cut.id].family, "POINT_SELECTED", 1L)
@@ -359,6 +368,9 @@ internal class LinearAuthorityPointCuts(
                 checked.size == rows.size && !meter.limited && meter.charge(rows.size * 2L) &&
                 rows.indices.all { it in checked && (!installedPending || it in installed) }
             var retained = installed
+            if (fractional && (meter.limited || cancellation() || budget.funding?.exhausted == true)) {
+                return installed
+            }
             if (!meter.limited && !cancellation()) {
                 if (layoutCovered) {
                     if (layoutPending) {

@@ -1174,6 +1174,12 @@ declines; the later attempt needs a newer completed paid query and a fully insta
 checked pool. Each attempt keeps its 65,536-work/1 MiB generation ceiling and the
 containing source allowance. Retain failed and deferred readiness costs alongside
 successful generation and subsequent query costs.
+Fractional augmentation selects up to eight checked, nonparallel additions within
+the existing 64-row pool cap. Ordinary selection admits one addition.
+`numericalCutSelectionFractionalBatchAttempts` counts these bounded selection
+calls, including a declined call. Batch storage and comparisons share existing
+selection/source limits; cancellation or exhausted funding preserves the prior
+mask. The counter supplies no installation, useful-bound or independent-proof claim.
 
 `MpsProofFrontier selection=true replay=true` compares disabled, originally
 installed and all-captured masks over the first four captured scope/pool pairs
