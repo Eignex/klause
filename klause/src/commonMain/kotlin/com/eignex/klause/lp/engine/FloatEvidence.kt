@@ -468,17 +468,22 @@ private class FloatEvidenceModel(val model: LpModel) {
  * Lagrangian deduction data read from float duals, for finite-lane deductions accepted numerically
  * ([LpSolveContext.numericalDeductions]). `L(y) = y·rhs + Σⱼ min_{[lⱼ,uⱼ]} dⱼ·zⱼ` bounds the objective for any
  * multipliers; here it is summed in binary64, lowered by that summation's rounding and by an absolute and
- * relative slack, so float noise above an integer never rounds an integral bound up. Every nonzero reduced cost
- * prices and cites its minimizing side; one within [FLOAT_EVIDENCE_TOLERANCE] on an open side is accepted as
- * zero, which with the binary64 evaluation makes the deductions numerical. Reduced costs are in source units.
+ * relative slack, so float noise above an integer never rounds an integral bound up. A reduced cost beyond its
+ * rounding prices and cites its minimizing side; one within it prices and cites both sides of a finite box. One
+ * within [FLOAT_EVIDENCE_TOLERANCE] on an open side is priced at the bound the rows imply, and then reasons are
+ * withheld. Binary64 evaluation and that tolerance make the deductions numerical. Reduced costs are in source units.
  */
 internal class FloatDeductionCertificate private constructor(
     private val model: LpModel,
     private val duals: DoubleArray,
     private val reduced: DoubleArray,
+    private val bothSides: BooleanArray,
+    private val complete: Boolean,
     /** The source objective bound [exactObjectiveBound] states. */
     val lowerBound: Double,
 ) : LpDeductionCertificate {
+    override fun citesBothSides(col: Int): Boolean = bothSides[col]
+    override fun citesAllPremises(): Boolean = complete
     private val bound by lazy { checkNotNull(BigFraction.ofDouble(lowerBound)) }
 
     override fun belongsTo(model: LpModel, observer: LpCertificationObserver?): Boolean = model === this.model
@@ -532,24 +537,44 @@ internal class FloatDeductionCertificate private constructor(
             }
             var margin = 0.0
             val reduced = DoubleArray(view.numVars)
+            val bothSides = BooleanArray(view.numVars)
+            var local = false
+            val rows = lazy { RowView(view) }
             for (j in 0 until view.numVars) {
                 val (d, error) = reducedCost(view, duals, j)
-                if (d == 0.0) continue
-                val side = if (d > 0.0) view.lower(j) else view.upper(j)
-                if (!side.isFinite()) {
-                    if (abs(d) <= FLOAT_EVIDENCE_TOLERANCE) continue
-                    return null
+                if (d == 0.0 && error == 0.0) continue
+                val lower = view.lower(j)
+                val upper = view.upper(j)
+                val signed = abs(d) > error
+                val side = if (d > 0.0) lower else upper
+                if (signed && side.isFinite()) {
+                    value += d * side
+                    magnitude += abs(d * side)
+                    margin += error * abs(side)
+                    reduced[j] = d / scale
+                    continue
                 }
-                value += d * side
-                magnitude += abs(d * side)
-                margin += error * abs(side)
-                reduced[j] = d / scale
+                // A sign within rounding prices both sides of a finite box, and both are cited.
+                if (!signed && lower.isFinite() && upper.isFinite()) {
+                    margin += (abs(d) + error) * max(abs(lower), abs(upper))
+                    bothSides[j] = true
+                    continue
+                }
+                // A reduced cost within tolerance on an open side is priced at the bound the rows imply, which no
+                // reason cites.
+                if (abs(d) > FLOAT_EVIDENCE_TOLERANCE) return null
+                val (low, high) = rows.value.impliedBounds(j)
+                val reach = if (signed) abs(if (d > 0.0) low else high) else max(abs(low), abs(high))
+                if (!reach.isFinite()) return null
+                margin += (abs(d) + error) * reach
+                local = true
             }
             margin += (view.numVars + view.m + 4) * UNIT_ROUNDOFF * magnitude
             val source = model.objectiveD(value - margin)
             val lowerBound = source - 2 * UNIT_ROUNDOFF * abs(source) -
                 INTEGRAL_SLACK - INTEGRAL_SLACK_RELATIVE * abs(source)
-            return if (lowerBound.isFinite()) FloatDeductionCertificate(model, duals, reduced, lowerBound) else null
+            if (!lowerBound.isFinite()) return null
+            return FloatDeductionCertificate(model, duals, reduced, bothSides, !local, lowerBound)
         }
     }
 }

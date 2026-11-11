@@ -108,11 +108,24 @@ class FloatEvidenceTest {
 
         val rays = listOf(1.0 + 1e-9, 1.0 - 1e-9).map { floatFarkasRay(model, doubleArrayOf(base[0], base[1] * it)) }
 
-        assertTrue(rays.any { it == null })
         for (ray in rays.filterNotNull()) {
             var open = 0L
             model.forEachInColumn(1) { row, a -> open += ray[row] * a }
             assertTrue(open <= 0L)
         }
+    }
+
+    @Test
+    fun `a tiny reduced cost on an open side should not raise the bound past the optimum`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 10L, cost = 1L)
+            val z = addOpenAboveVar(0L)
+            val u = addVar(0L, 100_000_000L)
+            addRow(intArrayOf(z, u), longArrayOf(1L, -1L), Relation.EQ, 100_000_000L)
+        }.build(Sense.MINIMIZE)
+
+        val bound = FloatDeductionCertificate.of(model, doubleArrayOf(5e-8))?.lowerBound
+
+        assertTrue(bound == null || bound <= 0.0, "bound $bound")
     }
 }

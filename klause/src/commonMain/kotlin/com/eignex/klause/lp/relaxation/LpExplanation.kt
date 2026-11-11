@@ -146,20 +146,31 @@ internal object LpExplanation {
      * reduced cost is `0`); rows stay implicit, which is why every row with `y_i ≠ 0` must be globally
      * valid or carry recorded validity premises ([LpModel.rowPremises]) cited alongside.
      */
+    /** The sides of column [col] whose bounds [cert]'s bound rests on, `true` for the lower side. */
+    fun citedSides(cert: LpDeductionCertificate, col: Int): List<Boolean> = when {
+        cert.citesBothSides(col) -> BOTH_SIDES
+        else -> when (cert.reducedCostSign(col)) {
+            0 -> emptyList()
+            1 -> LOWER_SIDE
+            else -> UPPER_SIDE
+        }
+    }
+
     fun objectiveBoundReason(
         relaxation: LpRelaxation,
         cert: LpDeductionCertificate,
         session: PropagationSession,
         observer: LpCertificationObserver? = null,
     ): IntArray? {
+        if (!cert.citesAllPremises()) return null
         val lits = IntArrayList()
         val seen = IntHashSet()
         if (!addDualRowPremiseLits(lits, seen, relaxation, cert, session, observer)) return null
         for (col in relaxation.colVarId.indices) {
-            val sign = cert.reducedCostSign(col)
-            if (sign == 0) continue
-            val premises = boundPremiseLits(relaxation, session, col, lowerSide = sign > 0) ?: return null
-            for (lit in premises) if (seen.add(lit)) lits.add(lit)
+            for (lowerSide in citedSides(cert, col)) {
+                val premises = boundPremiseLits(relaxation, session, col, lowerSide) ?: return null
+                for (lit in premises) if (seen.add(lit)) lits.add(lit)
+            }
         }
         return lits.toIntArray()
     }
@@ -338,9 +349,8 @@ internal object LpExplanation {
         val rows = (0 until relaxation.model.m).filter {
             if (state != null) {
                 val column = relaxation.model.slackCol(it)
-                val sign = cert.reducedCostSign(column)
-                if (sign != 0) {
-                    val support = state.activeSide(column, sign < 0) ?: return false
+                for (lowerSide in citedSides(cert, column)) {
+                    val support = state.activeSide(column, !lowerSide) ?: return false
                     if (support.witness >= 0L || support.side.premises != null) return false
                 }
             }
@@ -459,3 +469,7 @@ internal object LpExplanation {
         return Lit.make(variable, !trueHolds)
     }
 }
+
+private val BOTH_SIDES = listOf(true, false)
+private val LOWER_SIDE = listOf(true)
+private val UPPER_SIDE = listOf(false)
