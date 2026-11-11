@@ -231,7 +231,8 @@ internal class LinearAuthority(
         } finally {
             continuationListener = null
         }
-        if (base.paused || base.evidence != null || base.incumbent != null || cancellation() ||
+        if (base.paused || base.evidence != null || base.numerical?.infeasible == true ||
+            base.incumbent != null || cancellation() ||
             budget.funding?.paused == true) {
             return base.copy(advisoryPoint = base.advisoryPoint.takeUnless { cancellation() })
         }
@@ -450,7 +451,8 @@ internal class LinearAuthority(
         fractionalRound = null
         fractionalOperation = budget.operations
         val completed = !stopped && !result.paused &&
-            (result.evidence != null || result.bound != null || result.incumbent != null || result.split != null)
+            (result.evidence != null || result.bound != null || result.numerical != null ||
+                result.incumbent != null || result.split != null)
         finishFractionalQueryCost(pending, when {
             stopped -> "stopped"
             completed -> "completed"
@@ -465,17 +467,21 @@ internal class LinearAuthority(
                 advisoryPoint = pending.base.advisoryPoint.takeUnless { stopped })
         }
         val strongest = strongerLinearBound(pending.base.bound, result.bound)
+        val numerical = strongerNumericalClaim(pending.base.numerical, result.numerical)
         pointPolicy?.observeRound(pending.rows, result.evidence != null || result.incumbent != null ||
-            (strongest != null && strongest !== pending.base.bound))
+            (strongest != null && strongest !== pending.base.bound) ||
+            result.numerical?.improvesOver(pending.base.numerical) == true)
         pending.previous.policy?.releaseCandidates()
         val branchGuidance = pending.branchGuidance.takeIf {
-            result.incumbent == null && result.evidence == null && !cancellation()
+            result.incumbent == null && result.evidence == null && result.numerical?.infeasible != true &&
+                !cancellation()
         }
         if (branchGuidance != null) pointPolicy?.observe("FractionalBaselineGuidancePublished")
-        return result.copy(bound = strongest, primalStages = stages,
+        return result.copy(bound = strongest, numerical = numerical, primalStages = stages,
             branchGuidance = branchGuidance,
             advisoryPoint = (pending.base.advisoryPoint ?: pending.base.relaxedPoint).takeIf {
-                retainBasePoint && result.incumbent == null && result.evidence == null
+                retainBasePoint && result.incumbent == null && result.evidence == null &&
+                    numerical?.infeasible != true
             }, cutBoundFamilies = if (strongest != null && strongest === pending.base.bound) {
                 pending.base.cutBoundFamilies
             } else result.cutBoundFamilies)
@@ -519,7 +525,8 @@ internal class LinearAuthority(
                 deferAggregatePreparation = false
                 pointListener = null
             }
-            if (base.paused || base.evidence != null || base.incumbent != null || cancellation()) return base
+            if (base.paused || base.evidence != null || base.numerical?.infeasible == true ||
+                base.incumbent != null || cancellation()) return base
             val observed = point ?: run {
                 policy.observe("PointUnavailable")
                 return base
@@ -610,19 +617,23 @@ internal class LinearAuthority(
             return pending.base.copy(primalStages = stages)
         }
         val completed = !result.paused && budget.funding?.paused != true && !cancellation()
-        if (!result.paused && result.evidence == null && result.incumbent == null && result.split == null) {
+        if (!result.paused && result.evidence == null && result.numerical == null &&
+            result.incumbent == null && result.split == null) {
             if (completed) policy.observeRound(pending.rows, improved = false)
             policy.observe("UnavailableRounds")
             return pending.base.copy(primalStages = stages)
         }
         val strongest = strongerLinearBound(pending.base.bound, result.bound)
+        val numerical = strongerNumericalClaim(pending.base.numerical, result.numerical)
         if (completed) {
             policy.observeRound(pending.rows, result.evidence != null || result.incumbent != null ||
-                (strongest != null && strongest !== pending.base.bound))
+                (strongest != null && strongest !== pending.base.bound) ||
+                result.numerical?.improvesOver(pending.base.numerical) == true)
         }
-        return result.copy(bound = strongest, primalStages = stages,
+        return result.copy(bound = strongest, numerical = numerical, primalStages = stages,
             advisoryPoint = pending.base.relaxedPoint.takeIf {
-                retainBasePoint && completed && result.incumbent == null && result.evidence == null
+                retainBasePoint && completed && result.incumbent == null && result.evidence == null &&
+                    numerical?.infeasible != true
             },
             cutBoundFamilies = if (strongest != null && strongest === pending.base.bound) {
                 pending.base.cutBoundFamilies

@@ -78,6 +78,11 @@ contradictions, can close a traversal node. These closures retain numerical coun
 and never create an exact source derivation. Candidate assignments still pass their
 original-source arithmetic check, independently of numerical deduction authority.
 
+Cut rounds retain the strongest available numerical bound independently of exact
+source evidence. A tighter numerical bound beyond the objective tolerance, or a
+new numerical contradiction, counts as round progress for selection cooldown and
+aging. A weaker follow-up query preserves the earlier scoped numerical authority.
+
 Exact-linear preparation keeps templates for every source row and original column.
 Unconditional rows are installed up front; guarded, Boolean-dependent and
 disjunctive rows materialize when asserted, and a row enabled by an integer

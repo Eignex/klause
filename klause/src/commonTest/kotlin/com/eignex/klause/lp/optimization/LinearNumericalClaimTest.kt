@@ -19,6 +19,45 @@ import kotlin.test.assertTrue
 
 class LinearNumericalClaimTest {
     @Test
+    fun `numerical round progress should exceed the objective tolerance`() {
+        val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical })
+        for (sense in listOf(ObjectiveSense.MINIMIZE, ObjectiveSense.MAXIMIZE)) {
+            val scope = SourceScope(SourceRevision("numeric-round-progress", "linear"),
+                objective = SourceObjective("x", sense))
+            val source = SourceProofContext(scope, setOf(x), emptyMap(), mapOf(x to BigFraction.ONE))
+            val before = assertNotNull(LinearNumericalClaim.create(source, 2.0, false, budget, Cancellation.Never))
+            val sign = if (sense == ObjectiveSense.MINIMIZE) 1.0 else -1.0
+            val near = assertNotNull(LinearNumericalClaim.create(source, 2.0 + sign * 0.0000001,
+                false, budget, Cancellation.Never))
+            val far = assertNotNull(LinearNumericalClaim.create(source, 2.0 + sign * 0.0001,
+                false, budget, Cancellation.Never))
+
+            assertFalse(near.improvesOver(before))
+            assertTrue(far.improvesOver(before))
+        }
+    }
+
+    @Test
+    fun `a weaker numerical result should retain an incumbent closing bound`() {
+        val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical })
+        for (sense in listOf(ObjectiveSense.MINIMIZE, ObjectiveSense.MAXIMIZE)) {
+            val scope = SourceScope(SourceRevision("numeric-round-retention", "linear"),
+                objective = SourceObjective("x", sense))
+            val source = SourceProofContext(scope, setOf(x), emptyMap(), mapOf(x to BigFraction.ONE))
+            val before = assertNotNull(LinearNumericalClaim.create(source, 2.0, false, budget, Cancellation.Never))
+            val value = if (sense == ObjectiveSense.MINIMIZE) 1.0 else 3.0
+            val queried = assertNotNull(LinearNumericalClaim.create(source, value, false, budget, Cancellation.Never))
+
+            val retained = assertNotNull(strongerNumericalClaim(before, queried))
+
+            assertFalse(queried.reaches(BigFraction.ofLong(2)))
+            assertTrue(retained.reaches(BigFraction.ofLong(2)))
+        }
+    }
+
+    @Test
     fun `numerical bounds should close only within the declared objective tolerance`() {
         val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical })

@@ -4,6 +4,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.engine.CutFamily
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
@@ -69,6 +70,37 @@ class LinearAuthorityPointCutsTest {
             ), listOf(x, y, z, w).associateWith { BigFraction.ONE })
     }
 
+
+    @Test
+    fun `a numerical cut improvement should count as progress while the LP point stays fractional`() {
+        val triangle = (1..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val premises = linkedMapOf<String, SourcePremise>()
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["nonnegative $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE),
+                BigFraction.ONE))
+        }
+        val source = SourceProofContext(mixedMaximum.scope.copy(
+            objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
+            mixedMaximum.coordinates + triangle, mixedMaximum.premises + premises,
+            (triangle + x).associateWith { BigFraction.ONE })
+        val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical })
+
+        LinearAuthority(budget, retainLp = true).use { authority ->
+            val before = authority.advance(source, Cancellation.Never, cuts = true)
+
+            val selected = authority.advanceWithPointCuts(source, Cancellation.Never)
+
+            assertEquals(4.0, assertNotNull(before.numerical?.bound), 0.00000001)
+            assertEquals(3.5, assertNotNull(selected.numerical?.bound), 0.00000001)
+            assertNull(selected.incumbent)
+            assertNotNull(selected.split)
+            assertNull(selected.bound)
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionImprovedRounds"])
+        }
+    }
 
     @Test
     fun `later paid points should stop fractional discovery after two attempts`() {
