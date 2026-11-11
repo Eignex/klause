@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.collections.IntArrayList
 import com.eignex.util.numbers.negate
 import com.eignex.util.numbers.signum
 import com.eignex.util.numbers.times
@@ -330,13 +331,30 @@ private class RowView(private val exact: FloatEvidenceModel) {
     private val leastInfinite = IntArray(exact.m)
     private val mostInfinite = IntArray(exact.m)
     private val terms = IntArray(exact.m)
+    private val members = Array(exact.m) { IntArrayList() }
 
     init {
         for (i in 0 until exact.m) add(i, exact.n + i, 1.0)
         for (j in 0 until exact.n) exact.forEachInColumn(j) { row, a -> add(row, j, a) }
     }
 
+    /** The columns of row [i], its slack included. */
+    fun columnsOf(i: Int): IntArrayList = members[i]
+
+    /** The tightest finite bound on [lowSide] of [j] that a single row implies, with that row, or null. */
+    fun impliedBy(j: Int, lowSide: Boolean): Pair<Double, Int>? {
+        var best: Pair<Double, Int>? = null
+        fun offer(i: Int, a: Double) {
+            val value = implied(i, j, a, lowSide)
+            val current = best
+            if (value.isFinite() && (current == null || (lowSide == value > current.first))) best = value to i
+        }
+        if (j >= exact.n) offer(j - exact.n, 1.0) else exact.forEachInColumn(j) { row, a -> offer(row, a) }
+        return best
+    }
+
     private fun add(i: Int, j: Int, a: Double) {
+        members[i].add(j)
         val low = if (a > 0) a * lower[j] else a * upper[j]
         val high = if (a > 0) a * upper[j] else a * lower[j]
         // A subnormal coefficient carries no relative accuracy, so its term is as good as unbounded.
@@ -469,21 +487,20 @@ private class FloatEvidenceModel(val model: LpModel) {
  * ([LpSolveContext.numericalDeductions]). `L(y) = y·rhs + Σⱼ min_{[lⱼ,uⱼ]} dⱼ·zⱼ` bounds the objective for any
  * multipliers; here it is summed in binary64, lowered by that summation's rounding and by an absolute and
  * relative slack, so float noise above an integer never rounds an integral bound up. A reduced cost beyond its
- * rounding prices and cites its minimizing side; one within it prices and cites both sides of a finite box. One
- * within [FLOAT_EVIDENCE_TOLERANCE] on an open side is priced at the bound the rows imply, and then reasons are
- * withheld. Binary64 evaluation and that tolerance make the deductions numerical. Reduced costs are in source units.
+ * rounding prices and cites its minimizing side; one within it prices both sides and cites the finite ones. An open
+ * side is priced at the tightest bound a single row implies, citing that row and the finite sides of its columns.
+ * Binary64 evaluation makes the deductions numerical. Reduced costs are in source units.
  */
 internal class FloatDeductionCertificate private constructor(
     private val model: LpModel,
     private val duals: DoubleArray,
     private val reduced: DoubleArray,
-    private val bothSides: BooleanArray,
-    private val complete: Boolean,
+    private val sides: ByteArray,
+    private val rows: BooleanArray,
     /** The source objective bound [exactObjectiveBound] states. */
     val lowerBound: Double,
 ) : LpDeductionCertificate {
-    override fun citesBothSides(col: Int): Boolean = bothSides[col]
-    override fun citesAllPremises(): Boolean = complete
+    override fun extraCitedSides(col: Int): Int = sides[col].toInt()
     private val bound by lazy { checkNotNull(BigFraction.ofDouble(lowerBound)) }
 
     override fun belongsTo(model: LpModel, observer: LpCertificationObserver?): Boolean = model === this.model
@@ -491,7 +508,7 @@ internal class FloatDeductionCertificate private constructor(
     override fun exactMultiplier(row: Int): BigFraction = checkNotNull(BigFraction.ofDouble(duals[row]))
     override fun exactReducedCost(col: Int): BigFraction = checkNotNull(BigFraction.ofDouble(reduced[col]))
     override fun exactObjectiveBound(): BigFraction = bound
-    override fun dualNonzeroRow(row: Int): Boolean = duals[row] != 0.0
+    override fun dualNonzeroRow(row: Int): Boolean = duals[row] != 0.0 || rows[row]
     override fun reducedCostSign(col: Int): Int = sign(reduced[col]).toInt()
     override fun objectiveBoundCeil(extraConstant: Long): Long? = (bound + BigFraction.ofLong(extraConstant)).ceilLong()
     override fun improvingGapNonNegative(improvingMax: Long, sourceConstant: Long): Boolean =
@@ -521,7 +538,7 @@ internal class FloatDeductionCertificate private constructor(
     }
 
     companion object {
-        /** The certificate [y] supports on [model], or null when a non-negligible reduced cost meets an open side. */
+        /** The certificate [y] supports on [model], or null when a reduced cost meets a side no row bounds. */
         @Suppress("ReturnCount", "CyclomaticComplexMethod")
         fun of(model: LpModel, y: DoubleArray): FloatDeductionCertificate? {
             if (y.size != model.m || !model.finiteExactInput()) return null
@@ -537,47 +554,54 @@ internal class FloatDeductionCertificate private constructor(
             }
             var margin = 0.0
             val reduced = DoubleArray(view.numVars)
-            val bothSides = BooleanArray(view.numVars)
-            var local = false
+            val sides = ByteArray(view.numVars)
+            val citedRows = BooleanArray(view.m)
             val rows = lazy { RowView(view) }
+            // An open side is priced at the tightest bound one row implies; that row and both finite sides of every
+            // column in it are cited, which covers every premise the implied bound reads.
+            fun implied(j: Int, lowSide: Boolean): Double? {
+                val (bound, row) = rows.value.impliedBy(j, lowSide) ?: return null
+                citedRows[row] = true
+                val columns = rows.value.columnsOf(row)
+                for (k in 0 until columns.size) {
+                    val other = columns[k]
+                    if (other != j) sides[other] = (sides[other].toInt() or finiteSides(view, other)).toByte()
+                }
+                return bound
+            }
             for (j in 0 until view.numVars) {
                 val (d, error) = reducedCost(view, duals, j)
                 if (d == 0.0 && error == 0.0) continue
                 val lower = view.lower(j)
                 val upper = view.upper(j)
-                val signed = abs(d) > error
-                val side = if (d > 0.0) lower else upper
-                if (signed && side.isFinite()) {
+                if (abs(d) > error) {
+                    val boxed = if (d > 0.0) lower else upper
+                    val side = if (boxed.isFinite()) boxed else implied(j, d > 0.0) ?: return null
                     value += d * side
                     magnitude += abs(d * side)
                     margin += error * abs(side)
-                    reduced[j] = d / scale
+                    if (boxed.isFinite()) reduced[j] = d / scale
                     continue
                 }
-                // A sign within rounding prices both sides of a finite box, and both are cited.
-                if (!signed && lower.isFinite() && upper.isFinite()) {
-                    margin += (abs(d) + error) * max(abs(lower), abs(upper))
-                    bothSides[j] = true
-                    continue
-                }
-                // A reduced cost within tolerance on an open side is priced at the bound the rows imply, which no
-                // reason cites.
-                if (abs(d) > FLOAT_EVIDENCE_TOLERANCE) return null
-                val (low, high) = rows.value.impliedBounds(j)
-                val reach = if (signed) abs(if (d > 0.0) low else high) else max(abs(low), abs(high))
-                if (!reach.isFinite()) return null
-                margin += (abs(d) + error) * reach
-                local = true
+                // A sign within rounding prices both sides, and the finite box sides are cited.
+                val low = if (lower.isFinite()) lower else implied(j, true) ?: return null
+                val high = if (upper.isFinite()) upper else implied(j, false) ?: return null
+                margin += (abs(d) + error) * max(abs(low), abs(high))
+                sides[j] = (sides[j].toInt() or finiteSides(view, j)).toByte()
             }
             margin += (view.numVars + view.m + 4) * UNIT_ROUNDOFF * magnitude
             val source = model.objectiveD(value - margin)
             val lowerBound = source - 2 * UNIT_ROUNDOFF * abs(source) -
                 INTEGRAL_SLACK - INTEGRAL_SLACK_RELATIVE * abs(source)
             if (!lowerBound.isFinite()) return null
-            return FloatDeductionCertificate(model, duals, reduced, bothSides, !local, lowerBound)
+            return FloatDeductionCertificate(model, duals, reduced, sides, citedRows, lowerBound)
         }
     }
 }
+
+// The finite box sides of column [j]: bit 0 the lower, bit 1 the upper.
+private fun finiteSides(view: FloatEvidenceModel, j: Int): Int =
+    (if (view.lower(j).isFinite()) 1 else 0) or (if (view.upper(j).isFinite()) 2 else 0)
 
 // Duals at noise level are dropped, and a one-sided slack's dual moves to its cost so the slack prices nothing:
 // any multipliers bound the objective, and these keep the bound finite and the cited rows few.

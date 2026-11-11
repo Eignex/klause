@@ -19,6 +19,7 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.FloatDeductionCertificate
 import com.eignex.klause.lp.engine.LpBoundTrail
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpDeductionCertificate
@@ -793,5 +794,42 @@ class LpExplanationTest {
             session.boundGeLit(0, lo, positive = false) in reason.toList(),
             "reason ${reason.toList()} must cite the negated lower-bound premise of x (lo=$lo)",
         )
+    }
+
+    @Test
+    fun `a float bound priced at a row-implied side should cite the row and the bounds it reads`() {
+        val (relaxation, session) = impliedSideRelaxation(global = true)
+        val certificate = assertNotNull(FloatDeductionCertificate.of(relaxation.model, doubleArrayOf(0.0)))
+
+        val reason = assertNotNull(LpExplanation.objectiveBoundReason(relaxation, certificate, session))
+
+        assertTrue(session.boundLeLit(0, 3L, positive = false) in reason.toList())
+    }
+
+    @Test
+    fun `a float bound priced through a non-global row without premises should withhold its reason`() {
+        val (relaxation, session) = impliedSideRelaxation(global = false)
+        val certificate = assertNotNull(FloatDeductionCertificate.of(relaxation.model, doubleArrayOf(0.0)))
+
+        val reason = LpExplanation.objectiveBoundReason(relaxation, certificate, session)
+
+        assertNull(reason)
+    }
+
+    // min x - z over z <= x + 2 with z open above: zero duals price z at the upper bound the row implies from x <= 3.
+    private fun impliedSideRelaxation(global: Boolean): Pair<LpRelaxation, PropagationSession> {
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 4), IntDomain(0, 100)), arrayOf<Factor>())
+        val session = PropagationSession(problem)
+        session.implyIntAtMost(0, 3L)
+        val model = LpBuilder().apply {
+            val x = addVar(0L, 3L, cost = 1L)
+            val z = addOpenAboveVar(0L, cost = -1L)
+            addRow(intArrayOf(z, x), longArrayOf(1L, -1L), Relation.LE, 2L)
+        }.build(Sense.MINIMIZE)
+        model.rowGlobal[0] = global
+        val relaxation = LpRelaxation(
+            model, intArrayOf(0, 1), booleanArrayOf(false, false), 0L, intArrayOf(0, 1), intArrayOf(),
+        )
+        return relaxation to session
     }
 }

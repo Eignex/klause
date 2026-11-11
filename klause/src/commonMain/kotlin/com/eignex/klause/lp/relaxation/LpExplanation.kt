@@ -137,13 +137,13 @@ internal object LpExplanation {
     }
 
     /** The sides of column [col] whose bounds [cert]'s bound rests on, `true` for the lower side. */
-    fun citedSides(cert: LpDeductionCertificate, col: Int): List<Boolean> = when {
-        cert.citesBothSides(col) -> BOTH_SIDES
-        else -> when (cert.reducedCostSign(col)) {
-            0 -> emptyList()
-            1 -> LOWER_SIDE
-            else -> UPPER_SIDE
+    fun citedSides(cert: LpDeductionCertificate, col: Int): List<Boolean> {
+        val minimizing = when (cert.reducedCostSign(col)) {
+            0 -> 0
+            1 -> 1
+            else -> 2
         }
+        return CITED_SIDES[minimizing or cert.extraCitedSides(col)]
     }
 
     /**
@@ -162,7 +162,6 @@ internal object LpExplanation {
         session: PropagationSession,
         observer: LpCertificationObserver? = null,
     ): IntArray? {
-        if (!cert.citesAllPremises()) return null
         val lits = IntArrayList()
         val seen = IntHashSet()
         if (!addDualRowPremiseLits(lits, seen, relaxation, cert, session, observer)) return null
@@ -470,6 +469,4 @@ internal object LpExplanation {
     }
 }
 
-private val BOTH_SIDES = listOf(true, false)
-private val LOWER_SIDE = listOf(true)
-private val UPPER_SIDE = listOf(false)
+private val CITED_SIDES = listOf(emptyList(), listOf(true), listOf(false), listOf(true, false))
