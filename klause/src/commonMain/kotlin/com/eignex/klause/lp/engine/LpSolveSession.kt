@@ -33,8 +33,10 @@ internal class LpSolveSession(
             val previous = solver
             val current = prepare(model, cancellation, workLimit)
                 ?: return CertifiedLpResult(null, null, null, null, null, false, { null })
-            current.configureRecessionCapture(context.certificationPolicy.numericalDeductions && floatAccept != null &&
-                (claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.ATTAINED_OPTIMUM))
+            current.configureRecessionCapture(
+                context.certificationPolicy.numericalDeductions && floatAccept != null &&
+                    (claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.ATTAINED_OPTIMUM),
+            )
             observeQuery(model, current, current === previous, workLimit, claim,
                 floatOffset, floatAccept != null, refinementLimits)
             val result = try {
@@ -71,8 +73,10 @@ internal class LpSolveSession(
                 val previous = solver
                 val current = prepare(model, cancellation, workLimit)
                     ?: return@LpSolveCursor cancelledResult()
-                current.configureRecessionCapture(context.certificationPolicy.numericalDeductions && floatAccept != null &&
-                    (claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.ATTAINED_OPTIMUM))
+                current.configureRecessionCapture(
+                    context.certificationPolicy.numericalDeductions && floatAccept != null &&
+                        (claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.ATTAINED_OPTIMUM),
+                )
                 observeQuery(model, current, current === previous, workLimit, claim,
                     floatOffset, floatAccept != null, null)
                 val stage = solveFloating(current, current === previous, cancellation, observer, workLimit)
