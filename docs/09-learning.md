@@ -1051,8 +1051,8 @@ to turn off the remaining cost variables in descending weight order through a cl
 walk with penalty escalation, restoring the previous feasible assignment on failure.
 Trials run on a projected model reduced by unit propagation and bounded Boolean
 elimination, and lift their result back. Private infeasible verdicts contribute no
-outer proof. The search replays a proposal's values and saves its phases; the proposal does
-not become an incumbent.
+outer proof. The search puts a proposal's values first until a decision it led conflicts; the
+proposal does not become an incumbent.
 
 The probe's work is charged to its arm and the solve-wide move allowance, within at
 most half the remaining time and 5 seconds.

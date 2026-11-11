@@ -1001,7 +1001,7 @@ internal class ResumableMinimize(
         if (guideBy(proposal)) sink.search.clausalPrimalAccepted++
     }
 
-    // A clause-walk point never passed this arm's propagation, so it only steers the next branches.
+    // A point this arm did not reach through its own propagation only steers the next branches.
     private fun guideBy(proposal: Sample): Boolean {
         if (!::brancher.isInitialized || proposal.numBoolVars != problem.numBoolVars ||
             proposal.numIntVars != problem.numIntVars
@@ -1028,7 +1028,8 @@ internal class ResumableMinimize(
         initialCandidate = null
         val token = if (params.cancellation.workScheduled()) params.cancellation else
             params.cancellation or Cancellation.after(LP_VERIFY_BUDGET)
-        val accepted = engineLeaf(sample, token) ?: return null
+        // A pooled point this run cannot adopt still guides its first dive.
+        val accepted = engineLeaf(sample, token) ?: return null.also { if (!token()) guideBy(sample) }
         return recordIfImproving(accepted, objective.evaluate(accepted), startingWitness = !rebindable)
     }
 
@@ -1511,7 +1512,10 @@ internal class ResumableMinimize(
             forgetIfOverCap(session, params, inprocessing?.retainsPublication == true)
             val simplified = simplify(context, true)
             if (simplified != SearchRunDisposition.Continue) return simplified
-            pooledIncumbents?.poll()?.let { brancher.importPooledSolution(it.assignment) }
+            // A restart is a root, so a pooled point replays from a consistent prefix when no local incumbent exists.
+            pooledIncumbents?.poll()?.let {
+                brancher.importPooledSolution(it.assignment, replay = incumbents.current() == null)
+            }
             return SearchRunDisposition.Continue
         }
 

@@ -688,7 +688,7 @@ private class CpSatisfactionTraversalPolicy(
         forgetIfOverCap(session, params, inprocessing?.retainsPublication == true)
         val simplified = simplify(context, true)
         if (simplified != SearchRunDisposition.Continue) return simplified
-        pooledIncumbents?.poll()?.let { brancher.importPooledSolution(it.assignment) }
+        pooledIncumbents?.poll()?.let { brancher.importPooledSolution(it.assignment, replay = true) }
         return capContinuation(cursor, heap, operation)
     }
 
@@ -735,8 +735,9 @@ internal class BacktrackBrancher(
     private val onEvent = params.onEvent
     private val branchObserver = params.branchObserver
     private var restartCount = 0L
-    // A replayed point leads every value order, restarts included, until a conflict shows propagation disagrees.
+    // A replayed point leads every value order, restarts included, until a decision it led conflicts.
     private var hint: Sample? = null
+    private val hinted = HashSet<SearchDecision>()
 
     init {
         session.completeAtLeaves(leafColumns)
@@ -763,7 +764,8 @@ internal class BacktrackBrancher(
             variable,
             phase.applyPhase(variable, values.values(session, variable, rng), rng),
         )
-        val ordered = hint?.let { replayFirst(variable, preferred, it) } ?: preferred
+        val replayed = hint?.let { hintedValue(variable, it) }
+        val ordered = if (replayed == null) preferred else sequenceOf(replayed) + preferred.filter { it != replayed }
         val alternatives = when (variable) {
             is VarRef.Bool -> ordered.map { value ->
                 require(value == 0L || value == 1L) { "Boolean selector produced $value" }
@@ -775,6 +777,7 @@ internal class BacktrackBrancher(
             is VarRef.IntVar -> ordered.firstOrNull()?.let { splitIntAlternatives(session, variable, it) }
                 ?: emptyList()
         }
+        if (replayed != null) alternatives.firstOrNull()?.let(hinted::add)
         if (session.probeCancelled) {
             session.probeCancelled = false
             context.requestCancellationPoll()
@@ -787,13 +790,14 @@ internal class BacktrackBrancher(
         is VarRef.IntVar -> session.needsIntDecision(variable.varId)
     }
 
-    private fun replayFirst(variable: VarRef, order: Sequence<Long>, point: Sample): Sequence<Long> {
-        val value = when (variable) {
-            is VarRef.Bool -> if (point.boolValue(variable.varId)) 1L else 0L
-            is VarRef.IntVar -> point.intValue(variable.varId).takeIf { it in session.intDomain(variable.varId) }
-                ?: return order
-        }
-        return sequenceOf(value) + order.filter { it != value }
+    private fun hintedValue(variable: VarRef, point: Sample): Long? = when (variable) {
+        is VarRef.Bool -> if (point.boolValue(variable.varId)) 1L else 0L
+        is VarRef.IntVar -> point.intValue(variable.varId).takeIf { it in session.intDomain(variable.varId) }
+    }
+
+    private fun clearHint() {
+        hint = null
+        hinted.clear()
     }
 
     override fun onAttempt(decision: SearchDecision, context: SearchContext) {
@@ -821,7 +825,8 @@ internal class BacktrackBrancher(
 
     override fun onConflict(decision: SearchDecision?) {
         sink?.search?.observeFail()
-        hint = null
+        // A prune without a decision, or a refuted hinted decision, shows the replayed point cannot lead further.
+        if (decision == null || decision in hinted) clearHint()
         val (variable, value) = decision?.asSelectorDecision() ?: return
         val conflict = nativeConflict()
         if (conflict == null) variables.onConflict(variable) else variables.onConflict(variable, conflict)
@@ -831,7 +836,7 @@ internal class BacktrackBrancher(
 
     fun onCascadeConflict(conflict: PropagationResult.Unsat) {
         sink?.search?.observeFail()
-        hint = null
+        clearHint()
         variables.onConflict(null, BranchingConflict(conflict.conflictBools, conflict.conflictInts))
         phase.onConflictTick()
     }
@@ -865,7 +870,7 @@ internal class BacktrackBrancher(
         branchObserver.observeGuidance(PooledGuidanceKind.LOCAL) {
             PooledGuidanceObservation(PooledGuidanceKind.LOCAL, hint != null)
         }
-        hint = null
+        clearHint()
         variables.onSolution(sample)
         values.onSolution(sample)
         phase.onSolution(sample)
@@ -875,7 +880,10 @@ internal class BacktrackBrancher(
         if (guideValues && values is SolutionGuided) values.onSolution(sample)
         if (replay && sample.numBoolVars == session.problem.numBoolVars &&
             sample.numIntVars == session.problem.numIntVars
-        ) hint = sample
+        ) {
+            hint = sample
+            hinted.clear()
+        }
         phase.onSolution(sample)
     }
 
