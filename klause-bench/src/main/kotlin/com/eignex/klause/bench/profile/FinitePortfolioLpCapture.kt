@@ -152,8 +152,8 @@ internal object FinitePortfolioLpCapture {
                             finiteRequest = { shape -> policy.finiteRequest(shape, FiniteEngine.MIXED,
                                 cancellation = stop, randomSeed = seed,
                                 onPortfolioEvent = { worker, event ->
-                                    if (event.javaClass.simpleName in setOf("PortfolioDiagnostic", "CompanionComparison",
-                                            "WorkerAdmission")) {
+                                    if (event.javaClass.simpleName in setOf(
+                                            "PortfolioDiagnostic", "CompanionComparison", "WorkerAdmission")) {
                                         if (eventCount++ < 1024) events.appendLine(buildJsonObject {
                                             put("worker", worker)
                                             put("event", event.toString().take(4096))
@@ -267,7 +267,8 @@ internal object FinitePortfolioLpCapture {
                             val jointObserver: (String, Long, Any) -> Unit = { worker, workerSeed, observation ->
                                 val started = System.nanoTime()
                                 try {
-                                    joint.appendLine(jointMetadata(worker, workerSeed, sourceHash, observation).toString())
+                                    val metadata = jointMetadata(worker, workerSeed, sourceHash, observation)
+                                    joint.appendLine(metadata.toString())
                                     joint.flush()
                                     jointRecords++
                                 } finally {
@@ -314,7 +315,8 @@ internal object FinitePortfolioLpCapture {
                             put("jointCapture", captureJoint)
                             put("jointRecords", jointRecords)
                             put("jointObserverNs", jointObserverNs)
-                            put("jointCaptureLimits", "64 records, 16384 entries, 1048576 modeled bytes, 4096 scalar bits")
+                            put("jointCaptureLimits",
+                                "64 records, 16384 entries, 1048576 modeled bytes, 4096 scalar bits")
                             val finite = (result as? SourceExecutionResult.Finite)?.result?.outcome
                                 as? FiniteSolveOutcome.Completed
                             put("jointCaptureCounters", buildJsonObject {
@@ -331,7 +333,8 @@ internal object FinitePortfolioLpCapture {
                             put("guidanceImportAndLocalLimitPerWorker", 16)
                             put("guidanceAttemptAndCommitLimitPerWorker", 128)
                             put("guidanceBranchWindow", 8)
-                            put("guidancePreferenceScope", "configured preference; no counterfactual ordering evaluated")
+                            put("guidancePreferenceScope",
+                                "configured preference; no counterfactual ordering evaluated")
                             put("guidanceCutoffScope", "last scalar read; exact cutoff not captured")
                             put("executionNs", System.nanoTime() - executionStarted)
                             put("executionScope", "parse, source setup, execution and retirement; " +

@@ -703,7 +703,8 @@ internal class JointLinearRepair(
                 val selector = selection
                 val disposition = when {
                     selector == null -> "jointRepairRefutationSelectorMissing"
-                    selector.guideRefutation(support.assumptions, condition, budget, stop) -> "jointRepairRefutationGuidance"
+                    selector.guideRefutation(support.assumptions, condition, budget, stop) ->
+                        "jointRepairRefutationGuidance"
                     else -> "jointRepairRefutationSeedDeclined"
                 }
                 observe(disposition)
