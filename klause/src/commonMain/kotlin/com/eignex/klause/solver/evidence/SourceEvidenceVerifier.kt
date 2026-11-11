@@ -84,6 +84,8 @@ class SourceProofContext(
     /** Exact affine source objective coefficients; an omitted constructor objective has no affine authority. */
     val objective: Map<SourceCoordinate, BigFraction> get() = capturedObjective.orEmpty().toMap()
 
+    internal fun premise(id: String): SourcePremise? = capturedPremises[id]
+
     internal fun forEachPremise(action: (String, SourcePremise) -> Unit) {
         for ((name, premise) in capturedPremises) action(name, premise)
     }

@@ -63,14 +63,6 @@ internal fun sourceNumericalRefutationSupport(
         }
         return false
     }
-    val original = query.context.premises
-    val numeric = query.numeric.premises
-    val lower = feedback.scope.condition.lower
-    val upper = feedback.scope.condition.upper
-    if (!spend(original.size + numeric.size + lower.size + upper.size,
-            SourceNumericalSupportResult.LimitStage.Context)) {
-        return SourceNumericalSupportResult.Unavailable(feedback, failure, limitStage)
-    }
     fun add(values: Collection<SourceCoordinate>): Boolean {
         if (!spend(values.size)) return false
         coordinates.addAll(values)
@@ -87,15 +79,20 @@ internal fun sourceNumericalRefutationSupport(
             is LinearPinnedRefutation -> visit(proof.conflict, depth + 1)
             is LinearActiveRefutation -> visit(proof.conflict, depth + 1)
             is SourceDerivation.Premise -> {
-                val row = original[proof.id] ?: numeric[proof.id] ?: return false
+                if (!spend(1, SourceNumericalSupportResult.LimitStage.Context)) return false
+                val row = query.context.premise(proof.id) ?: run {
+                    if (!spend(1, SourceNumericalSupportResult.LimitStage.Context)) return false
+                    query.numeric.premise(proof.id)
+                } ?: return false
                 if (!add(row.inequality.coefficients.keys) || !add(row.integerPins.keys) ||
                     !add(row.guards.keys.map { SourceCoordinate(SourceCoordinate.Kind.Boolean, it) })) return false
                 premises += proof.id
                 true
             }
             is SourceDerivation.Assumption -> {
-                val bounds = if (proof.upper) upper else lower
-                if (proof.coordinate !in bounds || !add(listOf(proof.coordinate))) return false
+                if (!spend(1, SourceNumericalSupportResult.LimitStage.Context) ||
+                    feedback.scope.condition.boundValue(proof.coordinate, proof.upper) == null ||
+                    !add(listOf(proof.coordinate))) return false
                 assumptions += proof
                 true
             }
