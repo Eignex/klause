@@ -7,13 +7,8 @@ and a semantics checker. A producer's revision label or row snapshot cannot repl
 it; an omitted objective supplies no bound authority.
 
 Evidence capture is optional and retained in memory. Engine attestations remain
-separate from checked derivations: a certificate says that an adapter's engine
-completed a proof, while a derivation is rechecked here against original premises.
-Configured tolerance acceptance is source-defined semantics, not a derivation; see
-[tolerance claim transfer](#tolerance-claim-transfer). A
-[reused witness check](07-presolve.md#reused-validation) carries no derivation
-either. The [proof-file boundary](01-introduction.md#independently-checkable-proof-files)
-applies to all of them.
+separate from checked derivations, and the
+[proof-file boundary](01-introduction.md#independently-checkable-proof-files) applies.
 
 ## Source contexts and scopes
 
@@ -207,9 +202,7 @@ from an actual completed result or publication.
 `PortfolioWorker.bindSharingInvocation` binds the pool query separately from the
 worker's runtime. Consumers compare plan, execution identity, objective,
 restrictions and capture scope, require exact equality of values and endpoints, and
-run their installed source checker. Invocation restrictions go through the single
-[admission owner](12-portfolio.md#verification-outcomes), which checks each distinct
-invocation once per point. A more restricted worker can supply a feasible
+run their installed source checker. A more restricted worker can supply a feasible
 point but no global bound, and unbound workers withhold shared root deductions.
 
 Linear runtime terminal admission checks the captured typed terminal directly under

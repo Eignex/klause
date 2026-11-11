@@ -15,14 +15,10 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
-import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.ModelIdentity
-import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.BooleanProofContext
-import com.eignex.klause.solver.validation.FinitePointCheck
-import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.SchedulingCancellation
 import com.eignex.klause.util.workScheduled
@@ -53,7 +49,6 @@ internal class BooleanProofPortfolio private constructor(
     }
 
     private var taskContext: BooleanProofContext? = null
-    private val points = FinitePointCheck(problem)
     private val openingTokens = Array(parameters.size) { Cancellation.Never }
     private val parameters = parameters.mapIndexed { worker, params ->
         params.withCancellation(object : SchedulingCancellation {
@@ -181,18 +176,7 @@ internal class BooleanProofPortfolio private constructor(
                 throw failure
             }
             val step = search.runSlice(global, millis, work)
-            step.sample?.let { sample ->
-                val verification = finiteWitnessVerifier(problem, null,
-                    Assumptions(bools = condition.bools), global, points = points).verify(Candidate(sample, null))
-                if (verification is Verification.Accepted) return finish(
-                    SolveResult.Sat(sample, semantics = problem.semantics),
-                )
-                check(verification !is Verification.Rejected) { "source probe produced an invalid witness" }
-                return finish(SolveResult.Unknown(
-                    if (global()) TerminationReason.Cancelled else TerminationReason.BudgetExhausted,
-                    semantics = problem.semantics,
-                ))
-            }
+            step.sample?.let { sample -> return finish(SolveResult.Sat(sample, semantics = problem.semantics)) }
             if (step.reason != null) return finish(
                 if (step.reason == TerminationReason.SearchExhausted) SolveResult.Unsat(
                     assumptionCore = Assumptions(bools = condition.bools), semantics = problem.semantics,

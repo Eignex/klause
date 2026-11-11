@@ -1,6 +1,5 @@
 package com.eignex.klause.backtrack.lp
 
-import com.eignex.klause.backtrack.ComposedSampleVerifier
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.Factor
@@ -31,6 +30,7 @@ import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
@@ -267,8 +267,8 @@ class LpPrimalHeuristicsTest {
             val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
 
             assertEquals(listOf(1L, 1L, 1L, 1L, 1L, 0L, 0L, 0L), sample.ints.toList())
-            val verifier = ComposedSampleVerifier(problem, objective, Cancellation.Never)
-            assertIs<Verification.Accepted<Sample, Double>>(
+            val verifier = finiteWitnessVerifier(problem.bake(), objective)
+            assertIs<Verification.Accepted<*, *>>(
                 verifier.verify(Candidate(sample, objective.evaluate(sample))),
             )
             assertTrue(factory.calls.isEmpty())
@@ -338,8 +338,8 @@ class LpPrimalHeuristicsTest {
 
                 assertEquals(2L, sample.ints[0])
                 assertEquals(2L, sample.ints[width])
-                assertIs<Verification.Accepted<Sample, Double>>(
-                    ComposedSampleVerifier(problem, objective, Cancellation.Never)
+                assertIs<Verification.Accepted<*, *>>(
+                    finiteWitnessVerifier(problem.bake(), objective)
                         .verify(Candidate(sample, objective.evaluate(sample))),
                 )
                 assertTrue(engine.primalPropagationWork - before < 200_000L)
@@ -441,8 +441,8 @@ class LpPrimalHeuristicsTest {
 
             assertEquals(2L, sample.ints[0])
             assertEquals(2L, sample.ints[4])
-            assertIs<Verification.Accepted<Sample, Double>>(
-                ComposedSampleVerifier(problem, objective, Cancellation.Never)
+            assertIs<Verification.Accepted<*, *>>(
+                finiteWitnessVerifier(problem.bake(), objective)
                     .verify(Candidate(sample, objective.evaluate(sample))),
             )
             assertEquals(prefix.work, engine.primalPropagationWork)
@@ -504,8 +504,8 @@ class LpPrimalHeuristicsTest {
 
             assertEquals(2L, sample.ints[0])
             assertEquals(2L, sample.ints[4])
-            assertIs<Verification.Accepted<Sample, Double>>(
-                ComposedSampleVerifier(problem, objective, Cancellation.Never)
+            assertIs<Verification.Accepted<*, *>>(
+                finiteWitnessVerifier(problem.bake(), objective)
                     .verify(Candidate(sample, objective.evaluate(sample))),
             )
             assertEquals(prefix.work, engine.primalPropagationWork)
@@ -1701,11 +1701,11 @@ class LpPrimalHeuristicsTest {
                 LpParams(lpPlan = LpPlan(bounding = true, probe = true, lbTreeSearch = true)),
                 SolveStatsSink(backend = "lp-proposal-test"),
             )
-            val verifier = ComposedSampleVerifier(problem, objective, Cancellation.Never)
+            val verifier = finiteWitnessVerifier(problem.bake(), objective)
             for ((name, produce) in producers) {
                 val proposal = engine.produce(objective, Cancellation.Never) ?: continue
                 produced[name] = produced.getValue(name) + 1
-                assertIs<Verification.Accepted<Sample, Double>>(
+                assertIs<Verification.Accepted<*, *>>(
                     verifier.verify(Candidate(proposal, objective.evaluate(proposal))),
                     "$name proposed an assignment the composed model refuses",
                 )
