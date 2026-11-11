@@ -18,6 +18,7 @@ import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.solver.pipeline.execute
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import java.io.ByteArrayOutputStream
