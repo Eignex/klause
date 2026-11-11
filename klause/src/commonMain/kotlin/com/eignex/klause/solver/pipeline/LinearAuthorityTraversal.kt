@@ -199,15 +199,47 @@ internal class LinearAuthorityTraversal(
 
     fun frontierRank(): BigFraction? {
         val minimizes = source.scope.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE
-        return path.mapNotNull { (_, node) ->
+        val exact = path.mapNotNull { (_, node) ->
             val claim = (node.coveredBound ?: node.result?.bound ?: node.partialBound)?.claim as? SourceClaim.Bound
             val value = (claim?.value as? SourceValue.Rational)?.value
             if (minimizes) value else value?.negated()
         }.reduceOrNull { left, right -> if (left >= right) left else right }
+        if (!budget.context.certificationPolicy.numericalDeductions) return exact
+        var rank: Double? = null
+        for ((_, node) in path) {
+            if (!budget.reserveTraversal(4L, 64L, cancellation)) break
+            for (claim in arrayOf(node.coveredNumerical, node.result?.numerical, node.partialNumerical)) {
+                val value = claim?.bound ?: continue
+                if (!claim.appliesUnder(source, node.condition, budget, cancellation)) continue
+                val oriented = if (minimizes) value else -value
+                rank = rank?.let { maxOf(it, oriented) } ?: oriented
+            }
+        }
+        val value = rank ?: return exact
+        if (!budget.reserveTraversal(19L, 512L, cancellation)) return exact
+        val numerical = BigFraction.ofDouble(value) ?: return exact
+        if (cancellation()) return exact
+        return if (exact == null || numerical > exact) numerical else exact
     }
 
     fun updateGlobalBound() {
         val minimizes = source.scope.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE
+        if (budget.context.certificationPolicy.numericalDeductions) {
+            if (!budget.reserveTraversal(1L, 128L, cancellation)) return
+            val coverage = NumericalCoverageScan(source, budget, cancellation, minimizes).collect(root) ?: return
+            val previous = rootNumerical
+            if (previous?.infeasible == true) return
+            val value = coverage.bound
+            val retained = previous?.bound
+            if (!coverage.infeasible && value != null && retained != null &&
+                if (minimizes) value <= retained else value >= retained) return
+            val claim = LinearNumericalClaim.create(source, coverage.bound, coverage.infeasible,
+                budget, cancellation) ?: return
+            rootNumerical = claim
+            root.partialNumerical = claim
+            observe("numericalGlobalProjectionBounds")
+            return
+        }
         val coverage = root.boundCoverage(null, minimizes, cancellation) ?: return
         val value = coverage.value ?: return
         val checkedValue = ((rootBound?.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value
@@ -817,6 +849,51 @@ private class CoverageNode(val condition: SourceCondition) {
             else -> null
         }
     }
+}
+
+private class NumericalCoverage(val bound: Double?, val infeasible: Boolean = false)
+
+private class NumericalCoverageScan(
+    private val source: SourceProofContext,
+    private val budget: SourceLpBudget,
+    private val cancellation: Cancellation,
+    private val minimizes: Boolean,
+) {
+    private var visited = 0
+
+    fun collect(node: CoverageNode, inherited: NumericalCoverage? = null, depth: Int = 0): NumericalCoverage? {
+        if (depth >= 128 || visited >= 4096 || !budget.reserveTraversal(8L, 256L, cancellation)) return null
+        visited++
+        var local = inherited
+        for (claim in arrayOf(node.coveredNumerical, node.result?.numerical, node.partialNumerical)) {
+            if (claim == null || !claim.appliesUnder(source, node.condition, budget, cancellation)) continue
+            if (claim.infeasible) return NumericalCoverage(null, true)
+            val value = claim.bound ?: continue
+            val previous = local?.bound
+            if (previous == null || if (minimizes) value > previous else value < previous) {
+                local = NumericalCoverage(value)
+            }
+        }
+        if (cancellation()) return null
+        if (node.result?.evidence?.claim == SourceClaim.Refutation) return NumericalCoverage(null, true)
+        val split = node.split ?: return local
+        val below = collect(split.below, local, depth + 1) ?: return null
+        val above = collect(split.above, local, depth + 1) ?: return null
+        if (cancellation()) return null
+        if (below.infeasible) return above
+        if (above.infeasible) return below
+        val left = below.bound ?: return null
+        val right = above.bound ?: return null
+        return NumericalCoverage(if (minimizes) minOf(left, right) else maxOf(left, right))
+    }
+}
+
+private fun SourceLpBudget.reserveTraversal(work: Long, allocation: Long, cancellation: Cancellation): Boolean {
+    if (cancellation()) return false
+    if (funding?.let { it.availableWork < work || it.remainingAllocation < allocation } == true) return false
+    funding?.charge(0L, allocation)
+    observe(preparation = work)
+    return !cancellation()
 }
 
 private class BoundCoverage(val value: BigFraction?, val proof: SourceDerivation)

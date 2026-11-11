@@ -4,6 +4,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.engine.FLOAT_EVIDENCE_TOLERANCE
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.util.Cancellation
 import kotlin.math.abs
@@ -18,16 +19,21 @@ internal class LinearNumericalClaim private constructor(
     private val semantics = source.semantics
     private val checker = source.semanticsChecker
 
-    fun appliesTo(other: SourceProofContext, budget: SourceLpBudget, cancellation: Cancellation): Boolean {
+    fun appliesTo(other: SourceProofContext, budget: SourceLpBudget, cancellation: Cancellation): Boolean =
+        appliesUnder(other, other.scope.condition, budget, cancellation)
+
+    fun appliesUnder(
+        other: SourceProofContext, condition: SourceCondition, budget: SourceLpBudget, cancellation: Cancellation,
+    ): Boolean {
         if (cancellation() || !budget.context.certificationPolicy.numericalDeductions ||
             definitions !== other.linearDefinitionIdentity || semantics !== other.semantics ||
             checker !== other.semanticsChecker || scope.revision != other.scope.revision ||
             scope.objective != other.scope.objective) return false
-        if (scope.condition === other.scope.condition) return !cancellation()
-        val work = 1L + 128L * (scope.condition.comparisonSize + other.scope.condition.comparisonSize)
+        if (scope.condition === condition) return !cancellation()
+        val work = 1L + 128L * (scope.condition.comparisonSize + condition.comparisonSize)
         if (budget.funding?.let { it.availableWork < work } == true) return false
         budget.observe(preparation = work)
-        return !cancellation() && other.scope.condition.implies(scope.condition) && !cancellation()
+        return !cancellation() && condition.implies(scope.condition) && !cancellation()
     }
 
     fun reaches(incumbent: BigFraction): Boolean {
