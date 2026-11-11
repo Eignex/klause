@@ -13,7 +13,6 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.search.ComponentCheck
-import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.fitsLong
 import kotlin.concurrent.atomics.AtomicReference
@@ -33,7 +32,8 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 internal class FinitePointCheck(private val problem: Problem, private val enforcingPeers: Set<Int> = emptySet()) {
     private val finite = problem as? BakedProblem
     private val shared: PropagationProblem? by lazy {
-        if (problem.selectedFactorProjections().nativePropagation) PropagationProblem(problem) else null
+        // Without a prepared selection the projection uses built-in propagators only.
+        if (finite?.factorProjections?.nativePropagation != false) PropagationProblem(problem) else null
     }
     private val checks: SelectedProjectionChecks? by lazy {
         finite?.factorProjections?.let {

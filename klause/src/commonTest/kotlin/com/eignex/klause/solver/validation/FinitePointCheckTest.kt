@@ -189,7 +189,8 @@ class FinitePointCheckTest {
 
     @Test
     fun `an unchanged point should reuse its completed verdict without propagation`() {
-        val check = FinitePointCheck(sumModel())
+        val check = FinitePointCheck(Problem(0, 2, Array(2) { IntDomain(0, 10) },
+            arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 10))).bake())
         val point = Sample(booleanArrayOf(), longArrayOf(3, 7))
         check.check(Candidate(point, Unit), Cancellation.Never)
         var work = -1L
@@ -202,7 +203,8 @@ class FinitePointCheckTest {
 
     @Test
     fun `a changed coordinate should invalidate the retained verdict`() {
-        val check = FinitePointCheck(sumModel())
+        val check = FinitePointCheck(Problem(0, 2, Array(2) { IntDomain(0, 10) },
+            arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 10))).bake())
         check.check(Candidate(Sample(booleanArrayOf(), longArrayOf(3, 7)), Unit), Cancellation.Never)
 
         val result = check.check(Candidate(Sample(booleanArrayOf(), longArrayOf(4, 7)), Unit), Cancellation.Never)
@@ -212,7 +214,8 @@ class FinitePointCheckTest {
 
     @Test
     fun `a retained point should still be checked against new caller pins`() {
-        val check = FinitePointCheck(sumModel())
+        val check = FinitePointCheck(Problem(0, 2, Array(2) { IntDomain(0, 10) },
+            arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 10))).bake())
         val point = Sample(booleanArrayOf(), longArrayOf(3, 7))
         check.check(Candidate(point, Unit), Cancellation.Never)
 
@@ -248,9 +251,4 @@ class FinitePointCheckTest {
         assertIs<Verification.Accepted<*, *>>(result)
         assertTrue(work > 0L, "the retried check reported $work work")
     }
-
-    private fun sumModel() = Problem(
-        0, 2, Array(2) { IntDomain(0, 10) },
-        arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 10)),
-    ).bake()
 }
