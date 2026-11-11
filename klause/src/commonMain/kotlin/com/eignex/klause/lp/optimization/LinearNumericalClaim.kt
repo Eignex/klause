@@ -51,6 +51,16 @@ internal class LinearNumericalClaim private constructor(
         return if (scope.objective?.sense == ObjectiveSense.MINIMIZE) bound > before else bound < before
     }
 
+    fun improvesOver(other: LinearNumericalClaim?): Boolean {
+        if (other == null) return true
+        if (!strongerThan(other)) return false
+        if (infeasible) return !other.infeasible
+        val before = other.bound ?: return true
+        val after = bound ?: return false
+        val tolerance = FLOAT_EVIDENCE_TOLERANCE * maxOf(1.0, abs(before), abs(after))
+        return abs(after - before) > tolerance
+    }
+
     companion object {
         fun create(
             source: SourceProofContext, bound: Double?, infeasible: Boolean,
