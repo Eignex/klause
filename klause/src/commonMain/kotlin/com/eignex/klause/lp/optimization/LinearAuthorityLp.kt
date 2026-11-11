@@ -22,6 +22,7 @@ import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpPhaseMetrics
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.LpSolveMetrics
+import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -129,6 +130,14 @@ internal class LinearAuthorityLp(
             onCutMetric("Continuation_${metrics.decline?.name ?: "COMPLETED"}", 1L)
         }
     }
+    private val solveObserver = object : LpCertificationObserver by observer {
+        override fun observePhase(metrics: LpPhaseMetrics) {
+            if (metrics.phase == LpSolvePhase.NUMERICAL_BOUND || metrics.phase == LpSolvePhase.NUMERICAL_CONFLICT) {
+                budget.observe(floatWork = metrics.work)
+            }
+            observer.observePhase(metrics)
+        }
+    }
     fun solve(
         rows: List<ExactRationalInequality>,
         costs: List<BigFraction>,
@@ -172,7 +181,7 @@ internal class LinearAuthorityLp(
             val preparation = owner.metrics.preparationWork
             val refinement = owner.refinementCache.work
             try {
-                val solved = owner.solve(token = token, observer = observer, claim = claim)
+                val solved = owner.solve(token = token, observer = solveObserver, claim = claim)
                 val result = solved?.takeIf { result -> result.exactPrimal?.admittedSourcePoint() != false &&
                     result.lowerBound?.let { listOf(it).admittedSourcePoint() } != false } ?: return@runPrepared null
                 val boundWeights = result.bound?.dualMultipliers?.map { it.negated() }
