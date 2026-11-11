@@ -596,15 +596,21 @@ internal fun LpEngine.sparseSafePrune(
     sink.lp.observeLuFill(result.luMaxFill, result.luMaxDensity, result.luMaxDim)
     // The scoped owner carries appended-row bases itself; the hint is only for external fresh solves.
     var optimalBasis: Basis? = result.basis
-    val rowMeter = if (problem.numRealVars > 0 &&
-        (problem.numIntVars > 0 || problem.numBoolVars > 0)
-    ) MixedCertificateMeter(cancellation) else null
+    val mixedRows = problem.numRealVars > 0 && (problem.numIntVars > 0 || problem.numBoolVars > 0)
+    val numerical = solveContext.certificationPolicy.numericalDeductions
+    val rowMeter = if (mixedRows && !numerical) MixedCertificateMeter(cancellation) else null
     val canPrune = bound.isFinite()
     val canPropagate = objectiveVar >= 0 && objectiveAscending
     val objectiveCeiling = if (canPrune) null else singleObjectiveCeiling(relaxation, cancellation)
     val canFix = canPrune || objectiveCeiling != null
     if (!canFix && !canPropagate) {
-        if (rowMeter != null && applyMixedRowBounds(relaxation, session, sink, learn, cancellation, rowMeter)) {
+        if (mixedRows && numerical) {
+            if (applyNumericalRows(relaxer, relaxation, session, learn, cancellation) { optimalBasis = null }) {
+                return LpNodeOutcome(true, null)
+            }
+        } else if (rowMeter != null &&
+            applyMixedRowBounds(relaxation, session, sink, learn, cancellation, rowMeter)
+        ) {
             return LpNodeOutcome(true, null)
         }
         if (cancellation()) return LpNodeOutcome(false, optimalBasis)
@@ -689,6 +695,11 @@ internal fun LpEngine.sparseSafePrune(
     }
     if (solveContext.certificationPolicy.numericalDeductions) {
         hints?.recordPoint(boundRel, boundRes)
+        var rowChanged = false
+        if (applyNumericalRows(relaxer, boundRel, session, learn, cancellation) { rowChanged = true }) {
+            return LpNodeOutcome(true, null)
+        }
+        if (rowChanged || cancellation()) return LpNodeOutcome(false, null)
         val lower = numericalObjectiveBound(boundRel.model, boundRes.duals, cancellation)
         var prune = lower != null && applyNumericalBound(boundRel, lower, bound, session,
             objectiveVar, objectiveAscending, cancellation, learn)

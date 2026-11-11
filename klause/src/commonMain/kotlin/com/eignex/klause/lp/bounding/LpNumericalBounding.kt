@@ -135,6 +135,8 @@ internal fun LpEngine.numericalPremiseClause(
     for (column in relaxation.colVarId.indices) {
         if (cancellation()) return null
         for (lower in listOf(true, false)) {
+            if (lower && (!model.hasFiniteLower(column) || model.probeClampedLo.getOrElse(column) { false })) continue
+            if (!lower && (!model.hasFiniteUpper(column) || model.probeClampedHi.getOrElse(column) { false })) continue
             val premises = LpExplanation.boundPremiseLits(relaxation, session, column, lower) ?: return null
             for (literal in premises) if (seen.add(literal)) literals.add(literal)
         }

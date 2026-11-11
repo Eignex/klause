@@ -64,6 +64,16 @@ or source cannot reuse them. Expressible learned reasons retain every row-validi
 premise and live column bound, including isolated objective columns. A named source
 objective cutoff also belongs to a fixing's reason. Missing premises keep the
 deduction local. Root observations distinguish numerical bounds from exact certificates.
+Numerical mixed-row deductions project current row and endpoint intervals onto
+integer columns. Bounded pairs and singleton equality definitions can eliminate
+continuous columns. Interval arithmetic retains cancellation residuals; an
+uncertain coefficient with an unavailable endpoint prevents that projection.
+Row construction, combinations, source threshold mapping and application share the
+node's existing work and memory allowances. A second pass refreshes the relaxation
+after an earlier deduction tightens a domain. Learned numerical consequences cite
+all active row premises and finite bound sides; absent bounds supply no premise.
+Cancellation withholds projections, while an exhausted producer retains only its
+completed enclosures. These deductions compute no exact LP certificate.
 
 ## Boundaries
 

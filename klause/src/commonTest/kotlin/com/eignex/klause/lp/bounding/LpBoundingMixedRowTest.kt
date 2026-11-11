@@ -33,6 +33,25 @@ import kotlin.test.assertTrue
 
 class LpBoundingMixedRowTest {
     @Test
+    fun `numerical row deductions should retain shifted integer source bounds`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(5L, 6L)), arrayOf(
+            Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 6.0),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.25))
+        val session = PropagationSession(problem)
+        val sink = SolveStatsSink("shifted-numerical-row")
+        LpEngine(problem, LinearObjective(realCoefficients = doubleArrayOf(1.0)),
+            LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            val outcome = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session,
+                100.0, sink, Cancellation.Never, -1, true)
+
+            assertFalse(outcome.prune)
+            assertEquals(IntDomain(6L, 6L), session.intDomain(0))
+            assertTrue(assertNotNull(sink.snapshot().lp.phases["NUMERICAL_ROWS_NODE"]).work > 0L)
+            assertEquals(0.0, sink.snapshot().lp.integerCertify.attempts.sum)
+        }
+    }
+
+    @Test
     fun `dense mixed row deductions should retract with a defining integer branch`() {
         for (learn in listOf(false, true)) {
             val problem = Problem(
