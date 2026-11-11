@@ -400,6 +400,8 @@ class LinearAuthorityAggregateCutsTest {
         assertTrue(observed.getValue("AggregateCostAttempt") > observed.getValue("AggregatePairAttempts"))
         assertTrue(observed.getValue("AggregateWork") <= limits.work)
         assertTrue(observed.getValue("AggregateAllocation") <= limits.allocation)
+        assertFalse(capture.limited)
+        assertTrue(capture.records.isNotEmpty())
         val prefixes = capture.records.map { assertNotNull(it.cost) }.groupBy { it.attempt }
         for (phase in LinearAuthorityAggregatePhase.entries) {
             assertTrue(prefixes.values.sumOf { it.last().phases.getValue(phase).work } <=
@@ -463,22 +465,27 @@ class LinearAuthorityAggregateCutsTest {
 
     @Test
     fun `unaffordable fair traversal should leave the streaming pair available`() {
-        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
-        val source = SourceProofContext(scope, setOf(x, real, residual), linkedMapOf(
+        val residuals = (1..6).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val premises = linkedMapOf(
             "left" to SourcePremise(left),
             "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-            "other lower" to SourcePremise(SourceInequality(
-                mapOf(residual to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-        ))
+        ).apply {
+            for ((index, id) in residuals.withIndex()) put("other lower $index",
+                SourcePremise(SourceInequality(mapOf(id to BigFraction.MINUS_ONE), BigFraction.ZERO)))
+        }
+        val source = SourceProofContext(scope, setOf(x, real) + residuals, premises)
+        val point = mapOf(x to 1.5, real to 0.0) + residuals.associateWith { 0.0 }
         val observed = HashMap<String, Long>()
-        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(allocation = 8192L)
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(allocation = 16_384L)
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairsTargeted(source, Cancellation.Never,
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairsTargeted(source, Cancellation.Never,
             { name, count -> observed[name] = (observed[name] ?: 0L) + count }, 1, limits,
-            mapOf(x to 1.5, real to 0.0, residual to 0.0), fractionalTargeting = true).single()
+            point, fractionalTargeting = true)
 
-        assertEquals(1L, observed["AggregatePairFairTraversalDeclined"])
+        assertEquals(1L, observed["AggregatePairFairTraversalDeclined"], observed.toString())
         assertEquals(0L, observed["AggregatePairFairTraversal"] ?: 0L)
+        assertEquals(1, cuts.size, observed.toString())
+        val cut = cuts.single()
         assertEquals(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), cut.inequality)
         assertTrue(observed.getValue("AggregateWork") <= limits.work)
         assertTrue(observed.getValue("AggregateAllocation") <= limits.allocation)
