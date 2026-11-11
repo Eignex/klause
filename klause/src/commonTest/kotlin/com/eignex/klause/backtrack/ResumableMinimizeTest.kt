@@ -890,12 +890,13 @@ class ResumableMinimizeTest {
     @Test
     fun `pooled witness validation should spend its slice before search or publication`() {
         val size = 64
-        // Checking a complete point costs a slice node; open domains cost nothing.
+        // Checking a complete point costs a slice node and refutes a final value of one; open domains cost nothing.
         val costlyPoint = object : Factor by AllDifferent(IntArray(size) { it }, domainMin = 0, domainSize = size),
             Propagator {
             override fun propagate(state: PropagationState, factorId: Int): Boolean {
-                if (state.intDomains.all { it.isFixed }) state.work += PROPAGATION_WORK_PER_NODE
-                return true
+                if (state.intDomains.any { !it.isFixed }) return true
+                state.work += PROPAGATION_WORK_PER_NODE
+                return state.intDomains[size - 1].min != 1L
             }
         }
         val problem = Problem(0, size, Array(size) { IntDomain(0, (size - 1).toLong()) },
@@ -931,7 +932,10 @@ class ResumableMinimizeTest {
             val values = LongArray(size) { it.toLong() }.apply {
                 this[0] = 5L
                 this[5] = 0L
-                if (!valid) this[lastIndex] = 0L
+                if (!valid) {
+                    this[1] = lastIndex.toLong()
+                    this[lastIndex] = 1L
+                }
             }
             val hints = IncumbentExchange.minimizing<Sample>().apply {
                 offer(Sample(BooleanArray(0), values), 5.0)
@@ -943,10 +947,8 @@ class ResumableMinimizeTest {
 
                 assertNull(result)
                 assertTrue(offered.isEmpty())
-                if (valid) {
-                    assertEquals(0, attempts)
-                    assertTrue(search.work >= grant)
-                }
+                assertEquals(0, attempts)
+                assertTrue(search.work >= grant)
                 val paid = search.work
                 search.runSlice(cancellation, Long.MAX_VALUE, 0L) {}
                 assertEquals(paid, search.work)

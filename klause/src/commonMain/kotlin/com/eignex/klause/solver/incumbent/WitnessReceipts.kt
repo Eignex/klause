@@ -29,9 +29,7 @@ internal class WitnessReceipts {
         }
     }
 
-    fun copyInto(target: WitnessReceipts) {
-        for (key in keys.load()) target.record(key)
-    }
+    fun copy(): WitnessReceipts = WitnessReceipts().also { it.keys.store(keys.load()) }
 
     private companion object {
         // A point meets a handful of consumers; the oldest receipt only costs a repeated check.
