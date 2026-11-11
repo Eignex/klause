@@ -9,6 +9,7 @@ import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -17,6 +18,22 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RevisedSimplexPrimalTest {
+    @Test
+    fun `a cancelled capture query should withhold its completed primal snapshot`() {
+        val builder = LpBuilder()
+        builder.addOpenAboveVar(0L, cost = -1L)
+        var cancelled = false
+        RevisedSimplex(builder.build(Sense.MINIMIZE)).use { owner ->
+            owner.configureRecessionCapture(true, Cancellation { cancelled })
+            assertNull(owner.solvePrimal())
+            assertNotNull(owner.recessionCandidate)
+
+            cancelled = true
+
+            assertNull(owner.recessionCandidate)
+        }
+    }
+
     @Test
     fun `a captured recession should move the coupled basic columns`() {
         val builder = LpBuilder()

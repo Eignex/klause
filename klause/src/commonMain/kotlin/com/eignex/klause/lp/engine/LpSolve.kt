@@ -225,7 +225,7 @@ private fun solveNumerically(
     return newLpSolver(working, cancellation, componentSplit, context.engineFactory, pricing, floatingWork)
         .use { solver ->
             solver.deferUnscaledSourceDiagnostics()
-            solver.configureRecessionCapture(completion)
+            solver.configureRecessionCapture(completion, cancellation)
             val result = try {
                 solver.solve(warm)
             } finally {

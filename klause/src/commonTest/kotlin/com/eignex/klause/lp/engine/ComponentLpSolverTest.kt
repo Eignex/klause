@@ -15,6 +15,26 @@ import kotlin.test.assertTrue
 
 class ComponentLpSolverTest {
     @Test
+    fun `a cancelled capture query should withhold its completed component snapshot`() {
+        val builder = LpBuilder()
+        builder.addOpenAboveVar(0L, cost = -1L)
+        repeat(2) {
+            val column = builder.addVar(0L, 2L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
+        }
+        var cancelled = false
+        assertIs<ComponentLpSolver>(newLpSolver(builder.build(Sense.MINIMIZE))).use { owner ->
+            owner.configureRecessionCapture(true, Cancellation { cancelled })
+            assertNull(owner.solve())
+            assertNotNull(owner.recessionCandidate)
+
+            cancelled = true
+
+            assertNull(owner.recessionCandidate)
+        }
+    }
+
+    @Test
     fun `a recession snapshot should complete the other components`() {
         val builder = LpBuilder()
         val x = builder.addOpenAboveVar(0L, cost = -1L)
