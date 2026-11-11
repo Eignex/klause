@@ -378,7 +378,11 @@ internal class LinearAuthorityCapture(
                 point == null && !pointWithheld -> "point-unavailable"
                 result.bound == null -> "bound-unavailable"
                 else -> "completed"
-            }, projection = projection, generationScope = generationScope, numericalCuts = query?.numericalCuts == true)
+            },
+            projection = projection,
+            generationScope = generationScope,
+            numericalCuts = query?.numericalCuts == true,
+        )
         if (archive) {
             retained += captured
             recordedAttempt = attempted
