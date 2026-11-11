@@ -723,7 +723,8 @@ internal class JointLinearRepair(
                 observe(disposition)
                 if (queryCenterStep == null && centerProgress != null && !proposalHasCheckedCenter) {
                     queryOriginalCondition?.let { original ->
-                        queryCenterStep = centerProgress.suggest(support.assumptions, condition, original)
+                        queryCenterStep = centerProgress.suggest(support.assumptions, condition, original,
+                            rootPoint.orEmpty())
                         if (queryCenterStep != null) observe("jointRepairAdvisoryCenterProposals")
                     }
                 }

@@ -8,6 +8,8 @@ import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.magnitudeBitLength
+import kotlin.math.abs
+import kotlin.math.round
 
 internal class JointRepairCenter(
     private val model: Problem,
@@ -28,9 +30,11 @@ internal class JointRepairCenter(
     }
 
     fun suggest(assumptions: Set<SourceDerivation.Assumption>, captured: ExactNeighborhoodCondition,
-        original: ExactNeighborhoodCondition): Step? {
+        original: ExactNeighborhoodCondition, point: Map<SourceCoordinate, Double> = emptyMap()): Step? {
         if (captured.cutoff != null) return null
         var visited = 0
+        var selected: Step? = null
+        var priority = -1.0
         for (assumption in assumptions) {
             if (++visited > MAX_ENTRIES || !pay(1L, 64L)) return null
             val coordinate = assumption.coordinate
@@ -46,9 +50,15 @@ internal class JointRepairCenter(
             if (after.num.magnitudeBitLength().toLong() + after.den.magnitudeBitLength() > MAX_SCALAR_BITS) continue
             if (!legal(id, after)) continue
             if (stop() || budget.funding?.exhausted != false) return null
-            return Step(original, id, before, after)
+            if (point.isEmpty()) return Step(original, id, before, after)
+            val value = point[coordinate]
+            val fractionality = if (value == null || !value.isFinite()) 0.0 else abs(value - round(value))
+            if (fractionality > priority) {
+                selected = Step(original, id, before, after)
+                priority = fractionality
+            }
         }
-        return null
+        return if (stop() || budget.funding?.exhausted != false) null else selected
     }
 
     private fun legal(id: Int, value: BigFraction): Boolean {

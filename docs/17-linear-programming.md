@@ -1928,6 +1928,10 @@ These finite counters carry no proof authority and change no admission allowance
 `source-refutation-center-step=true` opts completion-enabled joint repair into a
 bounded advisory center move before its first checked incumbent. A compatible
 root refutation can suggest one legal integer step away from a cited bound side.
+Eligible legal coordinates are ranked by fractionality in the retained advisory
+root point. Missing or nonfinite guidance has zero priority; ties keep citation
+order. Without a root point the first legal citation supplies the move. Ranking
+does not choose a new center from the root point or change the cited step direction.
 Only completion of that exact queried region makes the suggestion available to
 the neighborhood owner; paused, imported, branch-local and cutoff-only outcomes
 withhold it. The owner checks unchanged pins and Boolean context before updating

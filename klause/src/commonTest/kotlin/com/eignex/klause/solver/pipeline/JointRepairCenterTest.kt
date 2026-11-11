@@ -20,6 +20,128 @@ import kotlin.test.assertTrue
 
 class JointRepairCenterTest {
     @Test
+    fun `fractional root coordinates should outrank earlier legal citations`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(2, 2), null, null),
+            factors = emptyArray())
+        val first = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val second = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val pins = mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE)
+        val condition = ExactNeighborhoodCondition(emptyMap(), pins, pins)
+        for (reverse in listOf(false, true)) {
+            val policy = JointRepairCenter(model, SourceLpBudget(funding = SourceLpFunding(1_000_000, 1_000_000)),
+                Cancellation.Never) { true }
+            val citations = listOf(SourceDerivation.Assumption(first, false),
+                SourceDerivation.Assumption(second, true)).let { if (reverse) it.reversed() else it }
+
+            val step = assertNotNull(policy.suggest(citations.toSet(), condition, condition,
+                mapOf(first to 1.1, second to 0.6)))
+
+            assertEquals(1, step.coordinate)
+            assertEquals(BigFraction.ofLong(2), step.after)
+        }
+    }
+
+    @Test
+    fun `equal or unavailable priorities should retain the first legal citation`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(2, 2), null, null),
+            factors = emptyArray())
+        val first = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val second = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val pins = mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE)
+        val condition = ExactNeighborhoodCondition(emptyMap(), pins, pins)
+        val citations = setOf(SourceDerivation.Assumption(first, false), SourceDerivation.Assumption(second, true))
+        for (point in listOf(emptyMap(), mapOf(first to 0.25, second to 1.25),
+                mapOf(first to Double.NaN, second to Double.POSITIVE_INFINITY), mapOf(second to 1.0))) {
+            val policy = JointRepairCenter(model, SourceLpBudget(funding = SourceLpFunding(1_000_000, 1_000_000)),
+                Cancellation.Never) { true }
+
+            val step = assertNotNull(policy.suggest(citations, condition, condition, point))
+
+            assertEquals(0, step.coordinate)
+            assertEquals(BigFraction.ZERO, step.after)
+        }
+    }
+
+    @Test
+    fun `illegal fractional candidates should not displace a legal step`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 1), null, null),
+            factors = emptyArray())
+        val first = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val second = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val pins = mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE)
+        val condition = ExactNeighborhoodCondition(emptyMap(), pins, pins)
+        val policy = JointRepairCenter(model, SourceLpBudget(funding = SourceLpFunding(1_000_000, 1_000_000)),
+            Cancellation.Never) { true }
+
+        val step = assertNotNull(policy.suggest(setOf(SourceDerivation.Assumption(first, false),
+            SourceDerivation.Assumption(second, true)), condition, condition, mapOf(first to 1.0, second to 0.5)))
+
+        assertEquals(0, step.coordinate)
+        assertEquals(BigFraction.ZERO, step.after)
+    }
+
+    @Test
+    fun `ineligible fractional candidates should not displace a legal step`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(2, 2), null, null),
+            factors = emptyArray())
+        val first = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val second = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val pins = mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE)
+        val condition = ExactNeighborhoodCondition(emptyMap(), pins, pins)
+        val policy = JointRepairCenter(model, SourceLpBudget(funding = SourceLpFunding(1_000_000, 1_000_000)),
+            Cancellation.Never) { it == 0 }
+
+        val step = assertNotNull(policy.suggest(setOf(SourceDerivation.Assumption(first, false),
+            SourceDerivation.Assumption(second, true)), condition, condition, mapOf(first to 1.0, second to 0.5)))
+
+        assertEquals(0, step.coordinate)
+    }
+
+    @Test
+    fun `unfunded ranking should withhold a partially selected step`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(2, 2), null, null),
+            factors = emptyArray())
+        val first = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val second = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val pins = mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE)
+        val condition = ExactNeighborhoodCondition(emptyMap(), pins, pins)
+        val funding = SourceLpFunding(1_000_000, 300)
+        val policy = JointRepairCenter(model, SourceLpBudget(funding = funding), Cancellation.Never) { true }
+
+        val step = policy.suggest(setOf(SourceDerivation.Assumption(first, false),
+            SourceDerivation.Assumption(second, true)), condition, condition, mapOf(first to 0.25, second to 0.5))
+
+        assertNull(step)
+        assertTrue(funding.spent > 0 && funding.allocated > 0)
+        assertEquals(0L, funding.availableWork)
+    }
+
+    @Test
+    fun `cancelled ranking should withhold a partially selected step`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(2, 2), null, null),
+            factors = emptyArray())
+        val first = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val second = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val pins = mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE)
+        val condition = ExactNeighborhoodCondition(emptyMap(), pins, pins)
+        val funding = SourceLpFunding(1_000_000, 1_000_000)
+        val policy = JointRepairCenter(model, SourceLpBudget(funding = funding),
+            Cancellation { funding.allocated > 300 }) { true }
+
+        val step = policy.suggest(setOf(SourceDerivation.Assumption(first, false),
+            SourceDerivation.Assumption(second, true)), condition, condition, mapOf(first to 0.25, second to 0.5))
+
+        assertNull(step)
+        assertEquals(0L, funding.availableWork)
+    }
+
+    @Test
     fun `cited bound sides should suggest legal integer center steps`() {
         val model = Problem(0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null), factors = emptyArray())
