@@ -5,6 +5,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
 
 internal object OriginalClauseSubsumption {
     private const val MAX_WIDTH = 8
@@ -75,7 +76,7 @@ internal object OriginalClauseSubsumption {
         val work = Work(cancellation, limits)
         val db = SatClauseDb.buildShortClauses(problem, MAX_WIDTH, work::visit) ?: return SourceDelta()
         val queue = IntArrayList()
-        val signatures = ArrayList<Long>()
+        val signatures = LongArrayList()
         for (slot in 0 until db.slotCount) {
             if (!work.visit()) return SourceDelta()
             queue.add(slot)
@@ -144,7 +145,7 @@ internal object OriginalClauseSubsumption {
         flipped: Int,
         db: SatClauseDb,
         queue: IntArrayList,
-        signatures: ArrayList<Long>,
+        signatures: LongArrayList,
     ) {
         // Every edit is equivalent against the live database. Publishing its replacement before
         // retiring the target keeps earlier premises implied, even when they are rewritten later.

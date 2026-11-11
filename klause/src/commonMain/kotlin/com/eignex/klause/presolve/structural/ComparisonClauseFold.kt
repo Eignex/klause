@@ -21,6 +21,7 @@ import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
 import com.eignex.util.collections.MutableIntObjectMap
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.mulExact
@@ -137,7 +138,7 @@ internal object ComparisonClauseFold {
     ): Triple<ComparisonClause, IntArray, List<RebuildStep>>? {
         val vars = IntArrayList()
         val ops = ArrayList<LinearOp>()
-        val consts = ArrayList<Long>()
+        val consts = LongArrayList()
         val consumed = IntArrayList()
         val rebuilds = ArrayList<RebuildStep>()
         val seen = IntHashSet()

@@ -9,6 +9,7 @@ import com.eignex.klause.propagation.PbAccumulator
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.installLitWatch
 import com.eignex.klause.propagation.removeBoolWatch
+import com.eignex.util.arrays.argsortBy
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayList
 
@@ -37,7 +38,7 @@ internal class PseudoBooleanPropagator(
     /** Literal indices ordered by descending weight — the greedy pick order for the smallest covering
      *  watch set. Built only in [watched] mode. */
     internal val byWeightDesc: IntArray = if (watched) {
-        (0 until literals.size).sortedByDescending { weights[it] }.toIntArray()
+        argsortBy(literals.size) { a, b -> weights[b].compareTo(weights[a]) }
     } else {
         emptyIntArray()
     }
