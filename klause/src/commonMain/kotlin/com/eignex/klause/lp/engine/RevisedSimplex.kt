@@ -58,13 +58,9 @@ internal class FloatLpResult(
     /** Basis factorizations this solve built; 0 when it continued on factors kept from a previous solve. */
     val refactorizations: Int = 0,
     /**
-     * Whether the solve reached a primal-feasible basis, i.e. the optimum.
-     *
-     * False for an iterate the solve stopped short of optimality — the dual simplex holds dual
-     * feasibility from its first basis, so such an iterate still carries a valid *bound*. Its finite
-     * coordinates can guide a separately checked candidate without supplying a complete feasible
-     * point. It is not an optimum: no reduced-cost fixing, no tableau cuts, and
-     * no claim of infeasibility rests on it.
+     * Whether the solve reached an optimal candidate basis. Nonoptimal coordinates require separate
+     * source acceptance and their duals require a bound check; they enable neither reduced-cost fixing
+     * nor tableau cuts.
      */
     val optimal: Boolean = true,
     val exactState: LpExactState? = null,
@@ -503,6 +499,25 @@ internal class RevisedSimplex(
     override var infeasibleRay: DoubleArray? = null
         private set
 
+    private var captureRecession = false
+    private var capturedRecession: LpRecessionCandidate? = null
+    private var recessionModel: LpModel? = null
+
+    override val recessionCandidate: LpRecessionCandidate?
+        get() = capturedRecession.takeIf {
+            activeSolve == null && lastTermination == LpFloatTermination.UNBOUNDED_CANDIDATE &&
+                recessionModel === model && solvedExactState === model.exactState
+        }
+
+    override val recessionDirection: DoubleArray? get() = recessionCandidate?.direction
+
+    override fun configureRecessionCapture(enabled: Boolean) {
+        check(activeSolve == null) { "LP solve is suspended" }
+        captureRecession = enabled
+        capturedRecession = null
+        recessionModel = null
+    }
+
     /**
      * Count nonbasic columns with zero reduced cost against duals [y].
      *
@@ -636,6 +651,8 @@ internal class RevisedSimplex(
     @Suppress("TooGenericExceptionCaught")
     override fun close() {
         initialFactorCopy = null
+        capturedRecession = null
+        recessionModel = null
         pendingProbeValues = false
         val pending = activeSolve
         activeSolve = null
@@ -1581,6 +1598,8 @@ internal class RevisedSimplex(
     }
 
     private fun resetSolveState(warmAttempted: Boolean) {
+        capturedRecession = null
+        recessionModel = null
         factorCopyFailed = false
         hasImportedParentValues = false
         progressTrace?.let { progressTrace = SimplexProgressTrace(it.profile) }
@@ -2855,51 +2874,70 @@ internal class RevisedSimplex(
         }
     }
 
-    /**
-     * The iterate a solve stopped short on, as a bound-only result.
-     *
-     * Deliberately does *not* record [optimalBasis] / [optimalPrimal]: those gate tableau cut generation,
-     * which needs an optimal tableau, so leaving them alone makes the cut path decline on its own rather
-     * than relying on every caller to remember. Same objective arithmetic as [optimal], since the bound
-     * is read the same way.
-     */
-    private fun truncated(beta: DoubleArray): FloatLpResult = profiled(SimplexProfilePhase.OUTPUT) {
-        solvedExactState = model.exactState
-        var obj = model.objConstantD
-        for (j in 0 until numVars) {
-            val c = cost(j)
-            if (c != 0.0 && status[j] != VarStatus.BASIC) obj += c * seat(numerical, status[j], j)
+    // Nonoptimal points keep tableau cuts disabled. Explicit source duals describe a primal-only
+    // candidate and carry no optimality or bound authority.
+    private fun truncated(beta: DoubleArray, sourceDuals: DoubleArray? = null): FloatLpResult =
+        profiled(SimplexProfilePhase.OUTPUT) {
+            solvedExactState = model.exactState
+            var obj = model.objConstantD
+            for (j in 0 until numVars) {
+                val c = cost(j)
+                if (c != 0.0 && status[j] != VarStatus.BASIC) obj += c * seat(numerical, status[j], j)
+            }
+            for (i in 0 until m) {
+                val c = cost(basicVar[i])
+                if (c != 0.0) obj += c * beta[i]
+            }
+            val primal = DoubleArray(n)
+            for (j in 0 until n) {
+                primal[j] = model.loShiftD(j) + numerical.sourceCoordinate(j, seat(numerical, status[j], j))
+            }
+            for (i in 0 until m) {
+                val v = basicVar[i]
+                if (v < n) primal[v] = model.loShiftD(v) + numerical.sourceCoordinate(v, beta[i])
+            }
+            val y = sourceDuals ?: run {
+                val scaledDuals = duals()
+                recordDegeneracy(scaledDuals)
+                DoubleArray(m) { numerical.sourceDual(it, scaledDuals[it]) }
+            }
+            if (sourceDuals == null) recordSourceResiduals(beta, y)
+            return@profiled FloatLpResult(
+                Basis(basicVar.copyOf(), status.copyOf(), captureEligible = basisCaptureEligible),
+                model.objectiveD(obj),
+                y.copyOf(),
+                primal,
+                observations.pivots,
+                observations.maxLuFill,
+                observations.maxLuDensity,
+                luMaxDim = observations.maxLuDim,
+                warmStarted = observations.warmStarted,
+                refactorizations = observations.refactorizations,
+                optimal = false,
+                exactState = model.exactState,
+            )
         }
-        for (i in 0 until m) {
-            val c = cost(basicVar[i])
-            if (c != 0.0) obj += c * beta[i]
+
+    @Suppress("ReturnCount")
+    private fun captureRecessionCandidate(beta: DoubleArray, alpha: DoubleArray, entering: Int, sign: Double) {
+        if (!captureRecession || cancellation()) return
+        val units = 8L * (numVars.toLong() + n + 3L * m) + 32L
+        if (units > 262_144L || (effectiveWorkLimit > 0L && units > effectiveWorkLimit - work.ops)) return
+        work.add(units)
+        if (cancellation()) return
+        val direction = DoubleArray(n)
+        if (entering < n) direction[entering] = numerical.sourceCoordinate(entering, sign)
+        for (row in 0 until m) {
+            if (cancellation()) return
+            val column = basicVar[row]
+            if (column < n) direction[column] = numerical.sourceCoordinate(column, -alpha[row] * sign)
         }
-        val primal = DoubleArray(n)
-        for (j in 0 until n) {
-            primal[j] = model.loShiftD(j) + numerical.sourceCoordinate(j, seat(numerical, status[j], j))
-        }
-        for (i in 0 until m) {
-            val v = basicVar[i]
-            if (v < n) primal[v] = model.loShiftD(v) + numerical.sourceCoordinate(v, beta[i])
-        }
-        val scaledDuals = duals()
-        recordDegeneracy(scaledDuals)
-        val y = DoubleArray(m) { numerical.sourceDual(it, scaledDuals[it]) }
-        recordSourceResiduals(beta, y)
-        return@profiled FloatLpResult(
-            Basis(basicVar.copyOf(), status.copyOf(), captureEligible = basisCaptureEligible),
-            model.objectiveD(obj),
-            y.copyOf(),
-            primal,
-            observations.pivots,
-            observations.maxLuFill,
-            observations.maxLuDensity,
-            luMaxDim = observations.maxLuDim,
-            warmStarted = observations.warmStarted,
-            refactorizations = observations.refactorizations,
-            optimal = false,
-            exactState = model.exactState,
-        )
+        val point = truncated(beta, DoubleArray(m))
+        if (cancellation() || !point.objective.isFinite() || point.primal.any { !it.isFinite() } ||
+            direction.any { !it.isFinite() }
+        ) return
+        capturedRecession = LpRecessionCandidate(point, direction)
+        recessionModel = model
     }
 
     // A boxed iterate bounds only the boxed LP, a restriction of the real one, so it is withheld.
@@ -3705,6 +3743,7 @@ internal class RevisedSimplex(
                 basisLifecycle.kept = true
                 retainBasicValues(beta, primalOnly = true)
                 solvedExactState = model.exactState
+                captureRecessionCandidate(beta, alpha, q, dir)
                 return stopped(LpFloatTermination.UNBOUNDED_CANDIDATE)
             }
             if (leaving == -1) {
