@@ -13,6 +13,7 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
@@ -74,6 +75,31 @@ internal class LinearAuthorityLp(
     private var guidancePacked: LinearAuthorityModel? = null
     private var residualCompletion: LinearResidualCompletion? = null
     private var objectiveCompletion: LinearResidualCompletion? = null
+    fun separationPoint(result: FloatLpResult?, columns: Int, cancellation: Cancellation): List<BigFraction>? {
+        if (result == null || !result.optimal || columns <= 0 || columns > result.primal.size || cancellation()) {
+            return null
+        }
+        val funding = budget.funding ?: return null
+        // A finite binary64 value needs at most 18 words across its numerator and denominator.
+        val scalarWords = 18L
+        val work = 1L + columns * (1L + scalarWords)
+        val allocation = 64L + columns * (8L + 128L + 16L * scalarWords)
+        if (funding.availableWork < work || funding.remainingAllocation < allocation) return null
+        funding.charge(0L, allocation)
+        budget.observe(preparation = 1L)
+        if (cancellation()) return null
+        val point = ArrayList<BigFraction>(columns)
+        for (column in 0 until columns) {
+            if (cancellation() || funding.availableWork < 1L + scalarWords) return null
+            budget.observe(preparation = 1L)
+            val value = result.primal[column]
+            if (!value.isFinite()) return null
+            budget.observe(preparation = scalarWords)
+            if (cancellation()) return null
+            point += checkNotNull(BigFraction.ofDouble(value))
+        }
+        return point.takeUnless { cancellation() }
+    }
     val preparations: Long get() = session?.preparations ?: 0L
     val reuses: Long get() = session?.reuses ?: 0L
     fun invalidateGuidance() = session?.invalidateGuidance() ?: Unit
