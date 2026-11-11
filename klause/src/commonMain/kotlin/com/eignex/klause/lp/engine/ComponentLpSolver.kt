@@ -55,15 +55,18 @@ internal class ComponentLpSolver(
     override var recessionDirection: DoubleArray? = null
         private set
     private var captureRecession = false
+    private var recessionCancellation: Cancellation = Cancellation.Never
     override var recessionCandidate: LpRecessionCandidate? = null
-        get() = field.takeIf {
-            activeSolve == null && lastTermination == LpFloatTermination.UNBOUNDED_CANDIDATE && currentAuthority()
+        get() = field?.takeIf {
+            activeSolve == null && lastTermination == LpFloatTermination.UNBOUNDED_CANDIDATE &&
+                !recessionCancellation() && currentAuthority()
         }
         private set
 
-    override fun configureRecessionCapture(enabled: Boolean) {
+    override fun configureRecessionCapture(enabled: Boolean, cancellation: Cancellation) {
         check(activeSolve == null) { "LP solve is suspended" }
         captureRecession = enabled
+        recessionCancellation = if (enabled) cancellation else Cancellation.Never
         recessionCandidate = null
     }
     override var solvedExactState: LpExactState? = null
@@ -232,6 +235,7 @@ internal class ComponentLpSolver(
 
     private fun clearEvidence() {
         recessionCandidate = null
+        recessionCancellation = Cancellation.Never
         blockResults = null
         solvedExactState = null
         continuationTarget = null
@@ -430,7 +434,7 @@ internal class ComponentLpSolver(
                 return null
             }
             metrics += LpSolveMetrics(workOps = units)
-            if (cancellation()) {
+            if (recessionCancellation()) {
                 lastTermination = LpFloatTermination.CANCELLED
                 return null
             }
@@ -513,7 +517,7 @@ internal class ComponentLpSolver(
                 if (lastTermination != null) return null
             }
             metrics += if (reused == null) LpSolveMetrics(componentSolves = 1) else LpSolveMetrics(componentReuses = 1)
-            if (reused == null) solvers[k].configureRecessionCapture(captureRecession)
+            if (reused == null) solvers[k].configureRecessionCapture(captureRecession, recessionCancellation)
             val returned = reused ?: op(solvers[k])
             val recession = if (returned == null && captureRecession) solvers[k].recessionCandidate else null
             val r = returned ?: recession?.point ?: run {
@@ -549,7 +553,7 @@ internal class ComponentLpSolver(
                     return null
                 }
                 metrics += LpSolveMetrics(workOps = units)
-                if (cancellation()) {
+                if (recessionCancellation()) {
                     metrics += solvers[k].lastMetrics
                     lastTermination = LpFloatTermination.CANCELLED
                     return null
@@ -619,7 +623,7 @@ internal class ComponentLpSolver(
         )
         recessionDirection?.let { direction ->
             lastTermination = LpFloatTermination.UNBOUNDED_CANDIDATE
-            if (!cancellation()) recessionCandidate = LpRecessionCandidate(result, direction)
+            if (!recessionCancellation()) recessionCandidate = LpRecessionCandidate(result, direction)
             return null
         }
         return result

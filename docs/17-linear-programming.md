@@ -21,6 +21,10 @@ their own dependencies. Pre-bake checks, harvest and portfolio workers carry the
 captured mode without substituting recipe pools or heuristic edits. Root shaving, redundancy and implication probes use the
 selected authority and the remaining root grant; their integer source objectives
 are rounded before their bounds are consumed.
+Numerical root publication also retains the integral source objective's finite-domain
+box floor within the same mapping allowance. It combines that floor with the LP lower
+bound in source units, preserving cancellation between wide integer coefficients and
+source constants without treating rounded LP arithmetic as an exact certificate.
 Standalone and retained solves carry numerical packages separately from their exact
 verdict and proof fields. A numerical point requires the caller's source-acceptance
 predicate; a numerical optimum also requires its objective to meet the lower bound

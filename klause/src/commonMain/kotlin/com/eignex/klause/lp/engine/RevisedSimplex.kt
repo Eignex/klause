@@ -500,20 +500,23 @@ internal class RevisedSimplex(
         private set
 
     private var captureRecession = false
+    private var recessionCancellation: Cancellation = Cancellation.Never
     private var capturedRecession: LpRecessionCandidate? = null
     private var recessionModel: LpModel? = null
 
     override val recessionCandidate: LpRecessionCandidate?
-        get() = capturedRecession.takeIf {
+        get() = capturedRecession?.takeIf {
             activeSolve == null && lastTermination == LpFloatTermination.UNBOUNDED_CANDIDATE &&
-                recessionModel === model && solvedExactState === model.exactState
+                recessionModel === model && solvedExactState === model.exactState &&
+                !recessionCancellation() && !cancellation()
         }
 
     override val recessionDirection: DoubleArray? get() = recessionCandidate?.direction
 
-    override fun configureRecessionCapture(enabled: Boolean) {
+    override fun configureRecessionCapture(enabled: Boolean, cancellation: Cancellation) {
         check(activeSolve == null) { "LP solve is suspended" }
         captureRecession = enabled
+        recessionCancellation = if (enabled) cancellation else Cancellation.Never
         capturedRecession = null
         recessionModel = null
     }
@@ -654,6 +657,7 @@ internal class RevisedSimplex(
         capturedRecession = null
         recessionModel = null
         pendingProbeValues = false
+        recessionCancellation = Cancellation.Never
         val pending = activeSolve
         activeSolve = null
         var cleanup: Throwable? = null
@@ -2920,20 +2924,21 @@ internal class RevisedSimplex(
 
     @Suppress("ReturnCount")
     private fun captureRecessionCandidate(beta: DoubleArray, alpha: DoubleArray, entering: Int, sign: Double) {
-        if (!captureRecession || cancellation()) return
+        if (!captureRecession || cancellation() || recessionCancellation()) return
         val units = 8L * (numVars.toLong() + n + 3L * m) + 32L
         if (units > 262_144L || (effectiveWorkLimit > 0L && units > effectiveWorkLimit - work.ops)) return
         work.add(units)
-        if (cancellation()) return
+        if (cancellation() || recessionCancellation()) return
         val direction = DoubleArray(n)
         if (entering < n) direction[entering] = numerical.sourceCoordinate(entering, sign)
         for (row in 0 until m) {
-            if (cancellation()) return
+            if (cancellation() || recessionCancellation()) return
             val column = basicVar[row]
             if (column < n) direction[column] = numerical.sourceCoordinate(column, -alpha[row] * sign)
         }
         val point = truncated(beta, DoubleArray(m))
-        if (cancellation() || !point.objective.isFinite() || point.primal.any { !it.isFinite() } ||
+        if (cancellation() || recessionCancellation() || !point.objective.isFinite() ||
+            point.primal.any { !it.isFinite() } ||
             direction.any { !it.isFinite() }
         ) return
         capturedRecession = LpRecessionCandidate(point, direction)

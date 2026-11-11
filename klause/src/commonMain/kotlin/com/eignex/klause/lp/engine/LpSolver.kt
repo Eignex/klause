@@ -222,7 +222,7 @@ internal interface LpSolver : AutoCloseable {
     val recessionDirection: DoubleArray? get() = null
 
     // A requested snapshot supplies candidates, never feasibility, bound or cut authority.
-    fun configureRecessionCapture(enabled: Boolean) = Unit
+    fun configureRecessionCapture(enabled: Boolean, cancellation: Cancellation = Cancellation.Never) = Unit
 
     val recessionCandidate: LpRecessionCandidate? get() = null
 

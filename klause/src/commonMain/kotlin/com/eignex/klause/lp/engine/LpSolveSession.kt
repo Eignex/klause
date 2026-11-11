@@ -36,6 +36,7 @@ internal class LpSolveSession(
             current.configureRecessionCapture(
                 context.certificationPolicy.numericalDeductions && floatAccept != null &&
                     (claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.ATTAINED_OPTIMUM),
+                cancellation,
             )
             observeQuery(model, current, current === previous, workLimit, claim,
                 floatOffset, floatAccept != null, refinementLimits)
@@ -76,6 +77,7 @@ internal class LpSolveSession(
                 current.configureRecessionCapture(
                     context.certificationPolicy.numericalDeductions && floatAccept != null &&
                         (claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.ATTAINED_OPTIMUM),
+                    cancellation,
                 )
                 observeQuery(model, current, current === previous, workLimit, claim,
                     floatOffset, floatAccept != null, null)

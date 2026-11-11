@@ -1812,10 +1812,14 @@ internal fun LpEngine.projectCertifiedLowerBound(
         else relaxation.model.hasIntegralObjective()
     val sourceRange = if (integral) sourceObjectiveRange(relaxation) else null
     if (cancellation()) return Double.NaN
+    val combined = if (numerical && sourceRange != null) {
+        val floor = BigFraction.ofLong(sourceRange.first).lowerBoundDouble() ?: return Double.NaN
+        maxOf(projected, floor)
+    } else projected
     return when {
         integral && sourceRange == null -> Double.NaN
-        integral && abs(projected) >= EXACT_INTEGER_DOUBLE_LIMIT -> projected.nextDown()
-        else -> projected
+        integral && abs(combined) >= EXACT_INTEGER_DOUBLE_LIMIT -> combined.nextDown()
+        else -> combined
     }
 }
 
