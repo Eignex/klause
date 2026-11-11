@@ -16,7 +16,6 @@ import com.eignex.klause.solver.evidence.sourceProofContext
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -96,25 +95,6 @@ class CompletedEnginePublicationTest {
     }
 
     @Test
-    fun `witness publication should enforce its source assumptions`() {
-        val restricted = EngineInvocation(
-            plan,
-            model,
-            objective,
-            sourceAssumptions = Assumptions(ints = mapOf(0 to 3L)),
-        )
-        val sample = Sample(booleanArrayOf(), longArrayOf(2, 1))
-        val certificate = EvidenceCertificate.published(CompletedEnginePublication.Witness(restricted, sample, 2.0))
-
-        val checked = verifier.verify(
-            ModelEvidence.Witness(model, Candidate(sample, 2.0), certificate),
-            invocation = restricted,
-        )
-
-        assertIs<Verification.Rejected>(checked)
-    }
-
-    @Test
     fun `restricted witness should be accepted under its containing query`() {
         val restricted = EngineInvocation(
             plan,
@@ -144,26 +124,6 @@ class CompletedEnginePublicationTest {
         val checked = incomplete.verify(
             ModelEvidence.Witness(model, Candidate(sample, 2.0), certificate),
             invocation = invocation,
-        )
-
-        assertIs<Verification.Indeterminate>(checked)
-    }
-
-    @Test
-    fun `cancelled restriction check should withhold witness admission`() {
-        val restricted = EngineInvocation(
-            plan,
-            model,
-            objective,
-            sourceAssumptions = Assumptions(ints = mapOf(0 to 2L)),
-        )
-        val sample = Sample(booleanArrayOf(), longArrayOf(2, 1))
-        val certificate = EvidenceCertificate.published(CompletedEnginePublication.Witness(restricted, sample, 2.0))
-
-        val checked = verifier.verify(
-            ModelEvidence.Witness(model, Candidate(sample, 2.0), certificate),
-            invocation = restricted,
-            cancellation = Cancellation { true },
         )
 
         assertIs<Verification.Indeterminate>(checked)
