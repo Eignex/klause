@@ -5,8 +5,15 @@ import com.eignex.klause.util.Cancellation
 
 internal enum class LpRootGuidancePhase { PREPARATION, FLOAT, CERTIFICATE, NUMERICAL, COMPLETE }
 
-internal class LpNumericalBound(private val model: LpModel, val value: Double) {
+internal class LpNumericalBound(
+    private val model: LpModel,
+    val value: Double,
+    private val duals: DoubleArray? = null,
+) {
     fun belongsTo(candidate: LpModel): Boolean = candidate === model
+
+    fun usesDuals(candidate: DoubleArray): Boolean = candidate === duals ||
+        (model.m == 0 && candidate.isEmpty() && duals?.isEmpty() == true)
 }
 
 internal class LpNumericalConflict(private val model: LpModel, val margin: Double) {

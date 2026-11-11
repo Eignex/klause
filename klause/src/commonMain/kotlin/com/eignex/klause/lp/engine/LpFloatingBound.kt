@@ -8,6 +8,13 @@ internal enum class LpFloatingBoundStop { WORK, CANCELLED, INPUT, NON_FINITE, UN
 
 internal data class LpFloatingBound(val bound: Double?, val work: Long, val stop: LpFloatingBoundStop?)
 
+internal data class LpFloatingCost(
+    val lower: Double?,
+    val upper: Double?,
+    val work: Long,
+    val stop: LpFloatingBoundStop?,
+)
+
 internal data class LpFloatingConflict(
     val infeasible: Boolean,
     val margin: Double?,
@@ -22,6 +29,43 @@ internal fun floatingObjectiveLowerBound(
     workLimit: Long = Long.MAX_VALUE,
     cancellation: Cancellation = Cancellation.Never,
 ): LpFloatingBound = floatingLagrangianLowerBound(model, duals, workLimit, cancellation, objective = true)
+
+@Suppress("ReturnCount", "CyclomaticComplexMethod")
+internal fun floatingReducedCost(
+    model: LpModel,
+    duals: DoubleArray,
+    column: Int,
+    workLimit: Long,
+    cancellation: Cancellation = Cancellation.Never,
+): LpFloatingCost {
+    require(workLimit >= 0L)
+    val meter = FloatingBoundMeter(workLimit, cancellation)
+    val arithmetic = FloatingBoundArithmetic(meter)
+    if (!meter.visit()) return meter.cost(null, null, LpFloatingBoundStop.WORK)
+    if (column !in 0 until model.n || duals.size != model.m) {
+        return meter.cost(null, null, LpFloatingBoundStop.INPUT)
+    }
+    var lower = model.costD(column)
+    var upper = lower
+    model.forEachInColumnD(column) { row, coefficient ->
+        if (!meter.visit()) return meter.cost(null, null, LpFloatingBoundStop.WORK)
+        val dual = duals[row]
+        if (!coefficient.isFinite() || !dual.isFinite()) {
+            return meter.cost(null, null, LpFloatingBoundStop.NON_FINITE)
+        }
+        lower = arithmetic.sumLower(lower, -arithmetic.productUpper(coefficient, dual))
+        upper = arithmetic.sumUpper(upper, -arithmetic.productLower(coefficient, dual))
+    }
+    val scale = model.exactState?.model?.objective?.scale?.approximation ?: 1.0
+    if (!scale.isFinite() || scale <= 0.0) return meter.cost(null, null, LpFloatingBoundStop.NON_FINITE)
+    if (scale != 1.0) {
+        if (!meter.visit()) return meter.cost(null, null, LpFloatingBoundStop.WORK)
+        lower = (lower / scale).nextDown()
+        upper = (upper / scale).nextUp()
+    }
+    if (!lower.isFinite() || !upper.isFinite()) return meter.cost(null, null, LpFloatingBoundStop.NON_FINITE)
+    return meter.cost(lower, upper)
+}
 
 internal fun floatingInfeasibilityMargin(
     model: LpModel,
@@ -149,6 +193,11 @@ private class FloatingBoundMeter(private val limit: Long, private val cancellati
     fun finish(bound: Double): LpFloatingBound {
         if (cancellation()) return refuse(LpFloatingBoundStop.CANCELLED)
         return LpFloatingBound(bound, work, null)
+    }
+
+    fun cost(lower: Double?, upper: Double?, reason: LpFloatingBoundStop? = null): LpFloatingCost {
+        val stopped = stop ?: if (cancellation()) LpFloatingBoundStop.CANCELLED else reason
+        return LpFloatingCost(lower.takeIf { stopped == null }, upper.takeIf { stopped == null }, work, stopped)
     }
 }
 

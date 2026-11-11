@@ -64,6 +64,19 @@ class LpBoundingTest {
     private val sumObjective = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
 
     @Test
+    fun `numerical node bounds should preserve the coupled optimum without exact certifiers`() {
+        val result = BacktrackSolver(triangle().bake(), LpSolveContext.Numerical).minimize(sumObjective,
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)))
+
+        assertIs<MinimizeResult.Optimal>(result)
+        assertEquals(3.0, result.objectiveValue)
+        assertTrue(result.stats.lp.phases.keys.any { it.startsWith("NUMERICAL_BOUND_") })
+        assertEquals(0.0, result.stats.lp.integerCertify.attempts.sum)
+        assertEquals(0.0, result.stats.lp.safeObjectiveLowerBound.attempts.sum)
+        assertEquals(0.0, result.stats.lp.exactBasisFeasible.attempts.sum)
+    }
+
+    @Test
     fun `lp bounding should preserve the optimum`() {
         val problem = triangle()
         val off = BacktrackSolver(problem.bake()).minimize(sumObjective, BacktrackParams(randomSeed = 1L))

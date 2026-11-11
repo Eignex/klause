@@ -23,6 +23,16 @@ numerical bound. The numerical path does not enter exact point recovery, basis
 verification, reconstruction or continuation. A finite source work limit leaves
 only its unspent work for deductions. Numerical claim observations include that
 work without classifying it as an exact certificate.
+Finite numerical consumers use the same work ledger for column pricing, source
+objective mapping, premise construction and deductions. One node shares a bounded
+deduction allowance inside its containing grant. Bounds, objective propagation
+and reduced-cost fixing use conservative objective tolerances and enclosing source
+cutoffs. A fixing prices each structural column once without retaining a coefficient
+array. Numerical bounds belong to their current working model; a changed objective
+or source cannot reuse them. Expressible learned reasons retain every row-validity
+premise and live column bound, including isolated objective columns. A named source
+objective cutoff also belongs to a fixing's reason. Missing premises keep the
+deduction local. Root observations distinguish numerical bounds from exact certificates.
 
 ## Boundaries
 
