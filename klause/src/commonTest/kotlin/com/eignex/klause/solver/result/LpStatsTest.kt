@@ -27,7 +27,7 @@ class LpStatsTest {
         observer.observePhase(LpPhaseMetrics(LpSolvePhase.NUMERICAL_CONFLICT, "WORK", 0L, work = 7L))
 
         assertEquals(12L, sink.standaloneWork)
-        assertEquals(12L, sink.snapshot().standaloneWorkOps.sum)
+        assertEquals(12.0, sink.snapshot().standaloneWorkOps.sum)
     }
 
     @Test
