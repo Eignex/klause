@@ -14,8 +14,13 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-private class RecordingCertificationPolicy(private val accept: Boolean) : LpCertificationPolicy {
+private class RecordingCertificationPolicy(
+    private val accept: Boolean,
+    private val compute: Boolean = true,
+) : LpCertificationPolicy {
     val attempts = ArrayList<Pair<LpCertifier, Boolean>>()
+
+    override fun canCompute(certifier: LpCertifier): Boolean = compute
 
     override fun accepts(certifier: LpCertifier, successful: Boolean): Boolean {
         attempts += certifier to successful
@@ -24,6 +29,48 @@ private class RecordingCertificationPolicy(private val accept: Boolean) : LpCert
 }
 
 class LpCertificationPolicyTest {
+
+    @Test
+    fun `computation refusal should not evaluate a certificate producer`() {
+        val policy = RecordingCertificationPolicy(accept = true, compute = false)
+
+        val result = policy.computeNullable(LpCertifier.INTEGER) { error("certificate producer was evaluated") }
+
+        assertNull(result)
+        assertTrue(policy.attempts.isEmpty())
+    }
+
+    @Test
+    fun `bound computation refusal should not invoke certifiers`() {
+        val model = LpBuilder().apply { addVar(0L, 3L, cost = 1L) }.build(Sense.MINIMIZE)
+        val policy = RecordingCertificationPolicy(accept = true, compute = false)
+        val observer = object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+                error("certifier was invoked")
+            }
+
+            override fun observeExactInput(accepted: Boolean) {}
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) {}
+        }
+
+        val result = certifiedTightObjectiveLowerBound(model, doubleArrayOf(), observer, policy)
+
+        assertNull(result)
+        assertTrue(policy.attempts.isEmpty())
+    }
+
+    @Test
+    fun `an admitted integer bound should survive refusal of the safe bound computation`() {
+        val model = LpBuilder().apply { addVar(0L, 3L, cost = 1L) }.build(Sense.MINIMIZE)
+        val policy = object : LpCertificationPolicy {
+            override fun canCompute(certifier: LpCertifier): Boolean = certifier == LpCertifier.INTEGER
+            override fun accepts(certifier: LpCertifier, successful: Boolean): Boolean = successful
+        }
+
+        val result = certifiedTightObjectiveLowerBound(model, doubleArrayOf(), null, policy)
+
+        assertEquals(0.0, result)
+    }
 
     @Test
     fun `forced decline should reject supplied certificates on legacy and retained models`() {

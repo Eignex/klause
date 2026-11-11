@@ -196,6 +196,12 @@ connected dominant component remains subject to the ordinary size and work guard
 
 ## Numerical authority
 
+Certification computation admission is separate from acceptance of a completed
+certificate. The objective and variable bound helpers check admission before
+invoking their safe-bound or integer certifiers; a skipped computation emits no
+certifier work observation.
+Rejecting a completed certificate does not erase the work that produced it.
+
 Optional simplex diagnostics retain bounded progress observations per numerical
 invocation. A retained invocation replaces its completed observations while
 compatible factors remain owned by the scoped solver. A paused invocation keeps
