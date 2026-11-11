@@ -28,6 +28,7 @@ import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -35,6 +36,59 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class RationalTheoryDescentTest {
+    @Test
+    fun `fallback descent should consume a reached numerical bound in original objective units`() {
+        for (sense in ObjectiveSense.entries) {
+            val minimizes = sense == ObjectiveSense.MINIMIZE
+            val source = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
+                intArrayOf(0), doubleArrayOf(1.0), if (minimizes) LinearOp.GE else LinearOp.LE,
+                0.0, strict = true)), numRealVars = 1,
+                realLower = doubleArrayOf(if (minimizes) 0.0 else -1.0),
+                realUpper = doubleArrayOf(if (minimizes) 1.0 else 0.0))
+            val original = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(if (minimizes) 1.0 else -1.0))
+            val context = assertNotNull(source.linearAuthorityContext(original, sense, Cancellation.Never))
+            val descent = RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 96,
+                maxLeaves = 96, sourceLpOperations = 4, sourceLpWorkLimit = 1_000_000), context)
+
+            val result = descent.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _ -> } }
+
+            assertIs<MinimizeResult.BestFound>(result)
+            val completed = assertNotNull(descent.linearResult)
+            val numerical = assertNotNull(completed.numerical)
+            val value = assertNotNull(completed.value)
+            val distance = if (minimizes) value.toDouble() else -value.toDouble()
+            assertTrue(distance > 0.0 && distance <= numerical.objectiveTolerance)
+            assertTrue(numerical.optimal)
+            assertNull(completed.terminal)
+            assertNull(completed.bound)
+            assertEquals(TerminationReason.SearchExhausted, completed.reason)
+            assertTrue(completed.stats.openTheory.openWork <= 96)
+            assertSame(completed, descent.linearSnapshot(TerminationReason.Cancelled))
+        }
+    }
+
+    @Test
+    fun `cancellation during fallback improvements should withhold numerical completion`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
+            intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 0.0, strict = true)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        var offers = 0
+        val descent = RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 96,
+            maxLeaves = 96, sourceLpOperations = 4, sourceLpWorkLimit = 1_000_000,
+            cancellation = Cancellation { offers >= 3 }))
+
+        val result = descent.use {
+            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { offers++ }
+        }
+
+        assertIs<MinimizeResult.BestFound>(result)
+        assertEquals(3, offers)
+        assertEquals(TerminationReason.Cancelled, result.reason)
+        assertFalse(assertNotNull(descent.linearResult?.numerical).optimal)
+    }
+
     @Test
     fun `fallback witness publication should keep the actual bound invocation`() {
         val source = Problem(

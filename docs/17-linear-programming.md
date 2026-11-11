@@ -107,6 +107,11 @@ Numerical source bounds and contradictions retain a separate scoped claim. Scope
 copies share their immutable linear-definition namespace; a new source binding,
 revision, objective or semantics cannot adopt an earlier numerical claim. Stronger
 branch restrictions can consume a funded implication check and inherit the bound.
+A fallback source descent can finish when its checked original-source incumbent
+reaches a retained compatible numerical bound within the declared objective tolerance.
+Each comparison spends an open-theory check from the containing allowance. Cancellation
+withholds completion. Completed snapshots retain numerical authority without an exact
+terminal, including after owner closure.
 Numerical bounds reaching an incumbent within the LP tolerance, and numerical
 contradictions, can close a traversal node. These closures retain numerical counters
 and never create an exact source derivation. Candidate assignments still pass their

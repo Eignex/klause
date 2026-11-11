@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.lp.optimization.linearCoordinatesSupported
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.presolve.PresolveConfig
@@ -24,6 +25,7 @@ import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LinearNumericalResult
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
@@ -260,6 +262,7 @@ internal class RationalTheoryDescent(
                             onIncumbent
                         )
                     }
+                    completeNumericalBound(global or params.timeout or params.cancellation)?.let { return it }
                 }
 
                 is OpenTheoryResult.Unsat -> {
@@ -276,7 +279,7 @@ internal class RationalTheoryDescent(
     }
 
     fun linearSnapshot(reason: TerminationReason): LinearOptimizationResult? {
-        if (proofDeclined) return partial(reason)
+        if (proofDeclined && result == null) return partial(reason)
         linearResult?.let { return it }
         val captured = context ?: return null
         val snapshot = linear?.snapshot(reason) ?: return null
@@ -339,6 +342,25 @@ internal class RationalTheoryDescent(
             checkedValue = exact
         }
         return true
+    }
+
+    private fun completeNumericalBound(cancellation: Cancellation): MinimizeResult? {
+        if (!proofDeclined || params.lpMode != LpCertificationMode.NUMERICAL || cancellation()) return null
+        val original = requireNotNull(context)
+        val partial = linearResult ?: return null
+        val numerical = partial.numerical ?: return null
+        val point = checkedIncumbent ?: return null
+        val exact = checkedValue ?: return null
+        if (!numerical.claim.isFor(original) || numerical.infeasible ||
+            state.work.acceptedChecks >= params.maxLeaves || !state.work.theoryCheck()) return null
+        val completed = LinearNumericalResult(numerical.claim, exact, complete = true)
+        if (!completed.optimal || cancellation()) return null
+        val scalarValue = objective.evaluateExact(point).toDouble()
+        if (cancellation()) return null
+        linearResult = LinearOptimizationResult(original.scope, null, partial.bound, point, exact,
+            TerminationReason.SearchExhausted, stats, original.semantics, completed)
+        result = MinimizeResult.BestFound(point, scalarValue, TerminationReason.SearchExhausted, stats)
+        return result
     }
 
     private fun conditionedSource(): Problem {
