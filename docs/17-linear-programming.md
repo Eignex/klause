@@ -65,7 +65,7 @@ contiguous input domains and retain a bounded endpoint snapshot; changed bounds
 or holes retire the assembly before another objective consumes it. Stable source
 declarations need no repeated domain scan. Each objective gets private costs and
 a fresh numerical solver; preparation, declined mapping and interrupted work spend
-the same LP allowance. Each proposal only steers the search's value order.
+the same LP allowance. Pinning still realizes each proposal through propagation.
 Exact bound columns materialize only when an import needs them. Each endpoint
 definition retains one completed normalized column; changing an open upper side
 replaces the cached column without linking prior versions. Preparation reserves
@@ -540,7 +540,7 @@ reduced-cost or directional history and supply no query or proof authority. A ne
 root guide, restart, assumption reseeding and engine close discard them.
 The private coordinate and availability buffers spend the existing guidance byte
 limit and root work before allocation. This guide carries no complete LP point or
-proof authority; a proposed assignment only steers the search.
+proof authority; a proposed assignment is still pinned through propagation.
 
 The same explicit setting dispatches root tableau separation to the owning block.
 Lifted cuts retain all row multipliers, bound substitutions, integrality premises
@@ -897,15 +897,15 @@ phase contributes only completed deductions. Interrupted root rounding retains i
 relaxation layout and basis for later slices. A completed rounding LP can retain its
 coordinates under the same bounded guidance allowance after charging the solve, avoiding another LP solve
 when pinning resumes. Every retry consumes the remaining root and LP allowances.
-Root rounding and pumping propose discrete assignments that set the search's root
-value order; a relaxation point supplies a target, never witness authority.
+Root rounding and pumping propose discrete assignments pinned through the arm's own
+propagation; a relaxation point supplies a target, never witness authority.
 An original-objective rounding probe can reuse a prepared retained root owner while
 its exact model and root scope remain current. Its query adopts the current token
 and spends the smaller of the remaining primal, root and worker grants. Incomplete
 numerical work retains the private owner for an eligible later rounding slice;
 queries with changed authority or objective use ordinary construction. Complete points and
-masked child-coordinate guides can steer rounding, and only a leaf the search reaches
-becomes an incumbent.
+masked child-coordinate guides can steer rounding; only the pinned leaf it reaches can
+become an incumbent.
 An integer guide with known fractional coordinates can prepare a private component
 probe before its handoff to ordinary traversal. The admission scan charges visited
 columns and reads only coordinates marked known; unknown payloads supply no target.
