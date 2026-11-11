@@ -1900,7 +1900,10 @@ requests no additional LP query and changes no generation allowance.
 Before its first checked incumbent, completion-enabled joint repair can seed its
 next neighborhood with integer pins cited by refuted root queries.
 Refutation-only feedback and bounded support projection debit the containing source
-funding. At most four recent eligible pins and their exact values survive across
+funding. Support reads cited premises and condition bounds from immutable contexts
+without snapshotting whole maps. Lookups, visited proof entries and retained results
+share a 4,096-entry allowance and debit containing funding; depth is at most 64.
+At most four recent eligible pins and their exact values survive across
 proposals. Distinct cited roots reserve places within the existing free-variable
 width; connectivity fills any remaining places. Retention and every lookup debit
 the containing funding without granting numerical work. Changed Boolean pins,
@@ -1912,7 +1915,7 @@ keeps its complete scope, and every discovered point still needs full source che
 Refutation feedback counters separate unavailable data, incompatible scope, absent
 claims, support projection outcomes and seed selection outcomes. Funding declines
 distinguish an exhausted containing owner from a paused numerical query grant.
-Support limits identify context-map charging, proof traversal, result collection
+Support limits identify context lookups, proof traversal, result collection
 or derivation depth.
 These finite counters carry no proof authority and change no admission allowance.
 Each joint owner retains at most four completed pre-incumbent regional refutations.
