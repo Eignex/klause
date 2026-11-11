@@ -614,17 +614,26 @@ class LpBoundingTest {
     }
 
     @Test
-    fun `node bounding should compute exact certificates only under exact certification`() {
+    fun `numerical node bounding should refute infeasible nodes without exact farkas certification`() {
         val (problem, objective) = infeasibleNodeProblem()
-        val params = BacktrackParams(randomSeed = 7L, lpPlan = LpPlan(bounding = true))
-        for (exact in listOf(false, true)) {
-            val result = BacktrackSolver(problem.bake(), LpSolveContext.finite(exact)).minimize(objective, params)
 
-            val lp = result.stats.lp
-            assertTrue(lp.infeasible.sum > 0.0)
-            assertEquals(exact, lp.exactFarkasRay.attempts.sum > 0.0)
-            assertIs<MinimizeResult.Infeasible>(result)
-        }
+        val result = BacktrackSolver(problem.bake(), LpSolveContext.finite(numerical = true))
+            .minimize(objective, BacktrackParams(randomSeed = 7L, lpPlan = LpPlan(bounding = true)))
+
+        assertIs<MinimizeResult.Infeasible>(result)
+        assertTrue(result.stats.lp.infeasible.sum > 0.0)
+        assertEquals(0.0, result.stats.lp.exactFarkasRay.attempts.sum)
+    }
+
+    @Test
+    fun `exact node bounding should certify the farkas rays it prunes with`() {
+        val (problem, objective) = infeasibleNodeProblem()
+
+        val result = BacktrackSolver(problem.bake())
+            .minimize(objective, BacktrackParams(randomSeed = 7L, lpPlan = LpPlan(bounding = true)))
+
+        assertIs<MinimizeResult.Infeasible>(result)
+        assertTrue(result.stats.lp.exactFarkasRay.attempts.sum > 0.0)
     }
 
     private fun reuseProblem(): Pair<Problem, LinearObjective> {

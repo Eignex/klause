@@ -74,8 +74,8 @@ class FinitePipelineRequest(
     val transformObjective: Boolean = true,
     /** Source-template policy shared by finite presolve and the consuming LP engines. */
     val sourcePreparation: LpSourcePreparation = LpSourcePreparation.ADMITTED,
-    /** Whether presolve LP deductions require exact certificates rather than float results within tolerances. */
-    val exactLp: Boolean = false,
+    /** Whether presolve LP deductions accept float results within tolerances instead of exact certificates. */
+    val numericalLp: Boolean = false,
 ) {
     /** Finite projection data selected by [preparedPlan]. */
     val componentPlan: ComponentPlan = requireNotNull(preparedPlan.execution.finiteLinear) {
@@ -193,7 +193,7 @@ object FinitePipeline {
             request.randomSeed,
             plan.factorProjections,
             request.sourcePreparation,
-            request.exactLp,
+            request.numericalLp,
         )
         val bakedModel = if (outcome.stats.infeasible) {
             outcome.problem

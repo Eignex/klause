@@ -43,29 +43,29 @@ internal class BacktrackWorkerConfig(
     private val coreRefinement: CoreRefinementMode = CoreRefinementMode.NONE,
     private val onLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
     private val onGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
-    private val exactLp: Boolean = false,
+    private val numericalLp: Boolean = false,
 ) : WorkerConfig {
 
     fun withToleranceCheck(check: (Sample) -> Boolean): BacktrackWorkerConfig =
-        BacktrackWorkerConfig(recipe, zeroObjectivePricing, check, coreRefinement, onLpQuery, onGuidance, exactLp)
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, check, coreRefinement, onLpQuery, onGuidance, numericalLp)
 
-    fun withExactLp(): BacktrackWorkerConfig =
+    fun withNumericalLp(): BacktrackWorkerConfig =
         BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery, onGuidance, true)
 
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
         BacktrackWorkerConfig(recipe.spending(budget), zeroObjectivePricing, toleranceCheck, coreRefinement,
-            onLpQuery, onGuidance, exactLp)
+            onLpQuery, onGuidance, numericalLp)
 
     override fun withCoreRefinement(mode: CoreRefinementMode): BacktrackWorkerConfig =
-        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, mode, onLpQuery, onGuidance, exactLp)
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, mode, onLpQuery, onGuidance, numericalLp)
 
     fun withLpQueryObserver(observer: (String, Double?, LpQueryObservation) -> Unit): BacktrackWorkerConfig =
         BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, observer, onGuidance,
-            exactLp)
+            numericalLp)
 
     fun withGuidanceObserver(observer: (String, PooledGuidanceObservation) -> Unit): BacktrackWorkerConfig =
         BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery, observer,
-            exactLp)
+            numericalLp)
 
     override val label: String get() = recipe.label
 
@@ -213,7 +213,7 @@ internal class BacktrackWorkerConfig(
                     { supplier().also { observedCutoff = it } }
                 })
             } else null
-        val finite = LpSolveContext.finite(exactLp)
+        val finite = LpSolveContext.finite(numericalLp)
         val context = onLpQuery?.let { observer ->
             finite.copy(onQuery = { observer(workerLabel, observedCutoff, it) })
         } ?: finite
