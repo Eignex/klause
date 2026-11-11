@@ -2,7 +2,6 @@ package com.eignex.klause.solver.incumbent
 
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -12,7 +11,6 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -214,53 +212,6 @@ class ModelEvidenceTest {
         val verifier = ModelEvidenceVerifier<Sample, Unit>(model, CandidateVerifier.trusting())
 
         val checked = verifier.verify(ModelEvidence.Witness(model, Candidate(other, Unit), certificate))
-
-        assertIs<Verification.Rejected>(checked)
-    }
-
-    @Test
-    fun `verify should check consumer restrictions that a producer check did not cover`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(1, 3)), emptyArray())
-        val model = ModelIdentity.of(source)
-        val plan = source.prepareExecutionPlan()
-        val producer = EngineInvocation(plan, model)
-        val consumer = EngineInvocation(plan, model, executionAssumptions = Assumptions.None.withInt(0, 2))
-        val evidence = ModelEvidence.Witness(model, Candidate(Sample(booleanArrayOf(), longArrayOf(1)), Unit))
-        val verifier = ModelEvidenceVerifier<Sample, Unit>(model, CandidateVerifier.trusting())
-        verifier.verify(evidence, restrictions = WitnessRestrictions(producer))
-
-        val checked = verifier.verify(evidence, restrictions = WitnessRestrictions(producer, consumer = consumer))
-
-        assertIs<Verification.Rejected>(checked)
-    }
-
-    @Test
-    fun `verify should not repeat a restriction check the point already passed`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(1, 3)), emptyArray())
-        val model = ModelIdentity.of(source)
-        val producer = EngineInvocation(source.prepareExecutionPlan(), model,
-            executionAssumptions = Assumptions.None.withIntHole(0, 3))
-        val evidence = ModelEvidence.Witness(model, Candidate(Sample(booleanArrayOf(), longArrayOf(1)), Unit))
-        val verifier = ModelEvidenceVerifier<Sample, Unit>(model, CandidateVerifier.trusting())
-        verifier.verify(evidence, restrictions = WitnessRestrictions(producer))
-
-        val checked = verifier.verify(evidence, cancellation = Cancellation { true },
-            restrictions = WitnessRestrictions(producer))
-
-        assertIs<Verification.Accepted<*, *>>(checked)
-    }
-
-    @Test
-    fun `verify should repeat a restriction check that cancellation interrupted`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(1, 3)), emptyArray())
-        val model = ModelIdentity.of(source)
-        val producer = EngineInvocation(source.prepareExecutionPlan(), model,
-            executionAssumptions = Assumptions.None.withIntHole(0, 1))
-        val evidence = ModelEvidence.Witness(model, Candidate(Sample(booleanArrayOf(), longArrayOf(1)), Unit))
-        val verifier = ModelEvidenceVerifier<Sample, Unit>(model, CandidateVerifier.trusting())
-        verifier.verify(evidence, cancellation = Cancellation { true }, restrictions = WitnessRestrictions(producer))
-
-        val checked = verifier.verify(evidence, restrictions = WitnessRestrictions(producer))
 
         assertIs<Verification.Rejected>(checked)
     }

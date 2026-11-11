@@ -33,7 +33,7 @@ internal object WeightedSearchProfile {
     private val constructor = type.declaredConstructors.single { it.parameterCount == 8 }.apply {
         isAccessible = true
     }
-    private val fields = listOf("preparationVisits", "thresholdVisits", "queryCount", "verificationVisits")
+    private val fields = listOf("preparationVisits", "thresholdVisits", "queryCount")
         .associateWith { type.getDeclaredField(it).apply { isAccessible = true } }
     private val weight = type.getDeclaredField("coreWeight").apply { isAccessible = true }
     private val threshold = type.getDeclaredField("threshold").apply { isAccessible = true }

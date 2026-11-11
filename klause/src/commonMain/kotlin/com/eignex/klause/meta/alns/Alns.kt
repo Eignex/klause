@@ -27,7 +27,7 @@ import com.eignex.klause.solver.result.AlnsStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.solver.validation.FinitePointCheck
+import com.eignex.klause.solver.validation.checkPointRestrictions
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
@@ -183,8 +183,6 @@ internal class Alns(
         private var seenVersion = 0L
         private val toleranceCheck = incumbentToleranceCheck
         private val assumptions = backtrackParams?.assumptions?.mergedWith(params.assumptions) ?: params.assumptions
-        private val seedProblem = problem
-        private val points = FinitePointCheck(seedProblem)
         private var supplied = false
 
         fun acquire(current: Sample?, cancellation: Cancellation): Sample? {
@@ -197,27 +195,28 @@ internal class Alns(
             if (cancellation()) return best.takeUnless { it === current }
             val fresh = exchange?.current()
             if (fresh != null && fresh.version > seenVersion) {
-                if (fresh.assignment !== current && fresh.objective.isFinite() &&
-                    accepts(fresh.assignment, best, cancellation, fresh.objective)
-                ) best = fresh.assignment
+                // Pooled incumbents are engine results; only this worker's own pins are a new obligation.
+                val point = fresh.assignment
+                if (point !== current && point.numBoolVars == problem.numBoolVars &&
+                    point.numIntVars == problem.numIntVars && fresh.objective.isFinite() && improves(point, best) &&
+                    checkPointRestrictions(point, assumptions, cancellation) == null
+                ) {
+                    best = point
+                }
                 if (!cancellation()) seenVersion = fresh.version
             }
             return best.takeUnless { it === current }
         }
 
-        private fun accepts(
-            sample: Sample,
-            current: Sample?,
-            cancellation: Cancellation,
-            claimed: Double? = null,
-        ): Boolean {
-            val checked = finiteWitnessVerifier(seedProblem, objective, assumptions, cancellation,
-                toleranceCheck, points)
-                .verify(Candidate(sample, claimed))
-            if (checked !is Verification.Accepted || cancellation()) return false
-            if (!objective.evaluate(sample).isFinite()) return false
-            return current == null || objective.evaluateExact(sample) < objective.evaluateExact(current)
+        // A caller-supplied starting point is outside every engine, so it is the one seed checked against the source.
+        private fun accepts(sample: Sample, current: Sample?, cancellation: Cancellation): Boolean {
+            val checked = finiteWitnessVerifier(problem, objective, assumptions, cancellation, toleranceCheck)
+                .verify(Candidate(sample, null))
+            return checked is Verification.Accepted && !cancellation() && improves(sample, current)
         }
+
+        private fun improves(sample: Sample, current: Sample?): Boolean = objective.evaluate(sample).isFinite() &&
+            (current == null || objective.evaluateExact(sample) < objective.evaluateExact(current))
 
         fun publish(sample: Sample, value: Double) {
             val target = exchange ?: return

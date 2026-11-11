@@ -121,37 +121,4 @@ class SharedPoolsTest {
 
         assertEquals(7.0, exchange.current()?.objective)
     }
-
-    @Test
-    fun `direct engine publications should pass the built-in pool source checker`() {
-        val problem = Problem(
-            numBoolVars = 1,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf(Cardinality(intArrayOf(Lit.make(0, true)), min = 1, max = 1)),
-        ).bake()
-        val objective = LinearObjective(boolWeights = longArrayOf(7))
-        val worker = PortfolioBuilder.build(
-            problem,
-            PortfolioScenario(cores = 1, arms = 1, kind = Kind.COP, engine = EngineMix.BACKTRACK),
-            objective = objective,
-        ).single()
-
-        worker.use {
-            val pools = requireNotNull(it.sharedPools)
-            val exchange = requireNotNull(pools.solutions)
-            val model = ModelIdentity.of(problem, objective)
-            val invocation = EngineInvocation(problem.prepareExecutionPlan(objective), model, objective)
-            val falsePoint = Sample(booleanArrayOf(false), LongArray(0))
-            val certificate = EvidenceCertificate.published(
-                CompletedEnginePublication.Witness(invocation, falsePoint, 0.0),
-            )
-            val rejected = pools.offerSolution(model, falsePoint, 0.0, certificate, invocation)
-            assertIs<Publication.Rejected>(rejected)
-            assertNull(exchange.current())
-            exchange.offer(Sample(booleanArrayOf(true), LongArray(0)), 7.0)
-
-            assertEquals(7.0, exchange.current()?.objective)
-        }
-    }
 }

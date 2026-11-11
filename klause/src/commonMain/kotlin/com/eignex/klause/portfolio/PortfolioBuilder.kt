@@ -12,12 +12,10 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.incumbent.ModelIdentity
-import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionStrategy
@@ -25,7 +23,6 @@ import com.eignex.klause.solver.pipeline.ObjectiveCoordinateView
 import com.eignex.klause.solver.pipeline.PreparedSourceHints
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.SearchEvent
-import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
 
@@ -336,7 +333,6 @@ object PortfolioBuilder {
         val identity = ModelIdentity.of(problem, objective)
         val concurrent = scenario.cores != 1
         val cuts = if (scenario.shareCuts) SharedCutPool(Mutex(concurrent)) else null
-        val witnessVerifier = finiteWitnessVerifier(problem, objective, toleranceCheck = scenario.toleranceCheck)
         // The bound managers are the dual of the shared incumbent: harmless for a CSP pool (no arm
         // publishes), so they are always present and only an optimising arm feeds them.
         return SharedPools(
@@ -357,24 +353,7 @@ object PortfolioBuilder {
             cuts,
             SharedObjectiveBound(Mutex(concurrent), identity),
             SharedVarBounds(problem.numIntVars, Mutex(concurrent), identity.forObjective(null)),
-            IncumbentExchange<Sample, Double>(
-                improves = { candidate, standing -> candidate < standing },
-                verifier = { candidate ->
-                    if (!candidate.objective.isFinite()) {
-                        Verification.Rejected("non-finite objective ${candidate.objective}")
-                    } else {
-                        when (val checked = witnessVerifier.verify(candidate)) {
-                            is Verification.Accepted -> Verification.Accepted(
-                                Candidate(candidate.assignment, candidate.objective),
-                            )
-
-                            is Verification.Rejected -> checked
-
-                            is Verification.Indeterminate -> checked
-                        }
-                    }
-                },
-            ),
+            IncumbentExchange.minimizing(),
             ContributionTally(Mutex(concurrent)),
             nativeProjection = PropagationProblem(problem).takeIf { it.isNativeSatEligible },
             localSearchProjection = LocalSearchPreparation(

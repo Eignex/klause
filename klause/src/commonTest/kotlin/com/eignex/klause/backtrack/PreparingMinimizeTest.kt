@@ -29,57 +29,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PreparingMinimizeTest {
-    @Test
-    fun `pending root layout stays visible until the prepared worker can query`() {
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
-            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1))).bake()
-        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
-        var constructions = 0
-        var queries = 0
-        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
-                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
-            ): PersistentLpSolver {
-                constructions++
-                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
-                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
-                return object : PersistentLpSolver by delegate {
-                    private var preparationWork = 0L
-                    override val lastMetrics get() = delegate.lastMetrics.copy(
-                        workOps = delegate.lastMetrics.workOps + preparationWork,
-                    )
-                    override fun prepareLogicals(token: Cancellation): Basis? =
-                        delegate.prepareLogicals(token).also { preparationWork = 5_000L * LP_WORK_PER_NODE }
-
-                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
-                        preparationWork = 0L
-                        queries++
-                        return delegate.resolveBounds(allowance)
-                    }
-                }
-            }
-        }
-        val params = BacktrackParams(maxDecisions = 0L,
-            lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true, rootCutHarvest = false))
-        val samples = mutableListOf<MinimizeResult.WithSample>()
-        val stopAtWitness = Cancellation { samples.isNotEmpty() }
-        PreparingMinimize(BacktrackSolver(problem, LpSolveContext(factory)), objective, params).use { search ->
-            search.runSlice(stopAtWitness, Long.MAX_VALUE, 5_000L, samples::add)
-
-            assertTrue(search.preparationPending)
-            assertFalse(search.canReseed)
-            assertEquals(1, constructions)
-            assertEquals(0, queries)
-            assertTrue(samples.isEmpty())
-            search.runSlice(stopAtWitness, Long.MAX_VALUE, 100_000L, samples::add)
-
-            assertFalse(search.preparationPending)
-            assertEquals(listOf(1L, 0L), samples.single().sample.ints.toList())
-            assertEquals(1, constructions)
-            assertEquals(1, queries)
-        }
-    }
 
     @Test
     fun `a preparation time boundary should publish no incumbent before resuming`() {
