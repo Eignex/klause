@@ -257,15 +257,13 @@ internal class ModelEvidenceVerifier<A, V>(
             if (completedPoint != null && !completedPoint.equals(candidate.assignment)) {
                 return Verification.Rejected("published point differs from the actual engine completion")
             }
-            // A native publication may come from a private invocation without the consumer's pins.
-            if (witnessPublication != null) {
-                val producer = witnessPublication.invocation
-                for (binding in listOfNotNull(producer, invocation?.takeUnless { it.matches(producer) })) {
-                    when (val checked = binding.checkWitness(witnessPublication.sample, cancellation)) {
-                        SourceEvidenceCheck.Checked -> Unit
-                        is SourceEvidenceCheck.Rejected -> return Verification.Rejected(checked.reason)
-                        is SourceEvidenceCheck.Unavailable -> return Verification.Indeterminate(checked.reason)
-                    }
+            // The producer enforced its own pins; a private invocation may lack some of the consumer's.
+            val consumer = invocation
+            if (witnessPublication != null && consumer != null && !witnessPublication.invocation.enforces(consumer)) {
+                when (val checked = consumer.checkWitness(witnessPublication.sample, cancellation)) {
+                    SourceEvidenceCheck.Checked -> Unit
+                    is SourceEvidenceCheck.Rejected -> return Verification.Rejected(checked.reason)
+                    is SourceEvidenceCheck.Unavailable -> return Verification.Indeterminate(checked.reason)
                 }
             }
             when (val verdict = witnessVerifier.verify(candidate)) {
