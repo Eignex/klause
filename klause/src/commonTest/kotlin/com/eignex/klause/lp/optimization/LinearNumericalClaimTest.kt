@@ -33,6 +33,25 @@ class LinearNumericalClaimTest {
 
         assertTrue(claim.appliesTo(narrower, budget, Cancellation.Never))
         assertFalse(claim.appliesTo(wider, budget, Cancellation.Never))
+        assertFalse(claim.appliesTo(source, budget, Cancellation.Never))
+    }
+
+    @Test
+    fun `numerical claims should reject changed revision objective or direction`() {
+        val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val scope = SourceScope(SourceRevision("numeric-invocation", "linear"),
+            objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
+        val source = SourceProofContext(scope, setOf(x), emptyMap(), mapOf(x to BigFraction.ONE))
+        val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical })
+        val claim = assertNotNull(LinearNumericalClaim.create(source, 2.0, false, budget, Cancellation.Never))
+
+        for (changed in listOf(
+            scope.copy(revision = SourceRevision("other", "linear")),
+            scope.copy(objective = SourceObjective("other", ObjectiveSense.MINIMIZE)),
+            scope.copy(objective = SourceObjective("x", ObjectiveSense.MAXIMIZE)),
+        )) {
+            assertFalse(claim.appliesTo(source.atScope(changed), budget, Cancellation.Never))
+        }
     }
 
     @Test
@@ -80,5 +99,25 @@ class LinearNumericalClaimTest {
         val applicable = claim.appliesTo(child, budget, Cancellation.Never)
 
         assertFalse(applicable)
+    }
+
+    @Test
+    fun `cancelled scope verification should withhold authority and retain charged work`() {
+        val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val scope = SourceScope(SourceRevision("numeric-cancellation", "linear"),
+            objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
+        val source = SourceProofContext(scope, setOf(x), emptyMap(), mapOf(x to BigFraction.ONE))
+        val initial = SourceLpBudget(solveContext = { LpSolveContext.Numerical })
+        val claim = assertNotNull(LinearNumericalClaim.create(source, 2.0, false, initial, Cancellation.Never))
+        val funding = SourceLpFunding(1000L, 4096L).apply { grant(1000L) }
+        var cancelled = false
+        val budget = SourceLpBudget(funding = funding, solveContext = { LpSolveContext.Numerical },
+            onWork = { if (it.preparationWork > 0L) cancelled = true })
+        val child = source.atScope(scope.copy(condition = scope.condition.bound(x, BigFraction.ofLong(3), false)))
+
+        val applicable = claim.appliesTo(child, budget, Cancellation { cancelled })
+
+        assertFalse(applicable)
+        assertTrue(funding.spent > 0L)
     }
 }
