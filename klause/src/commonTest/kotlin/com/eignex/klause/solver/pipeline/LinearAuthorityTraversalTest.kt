@@ -23,6 +23,7 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponentSet
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
