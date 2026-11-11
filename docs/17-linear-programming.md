@@ -1912,6 +1912,8 @@ keeps its complete scope, and every discovered point still needs full source che
 Refutation feedback counters separate unavailable data, incompatible scope, absent
 claims, support projection outcomes and seed selection outcomes. Funding declines
 distinguish an exhausted containing owner from a paused numerical query grant.
+Support limits identify context-map charging, proof traversal, result collection
+or derivation depth.
 These finite counters carry no proof authority and change no admission allowance.
 Each joint owner retains at most four completed pre-incumbent regional refutations.
 Its source, semantics and objective stay fixed; exact keys snapshot every Boolean
