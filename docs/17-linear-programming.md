@@ -29,10 +29,19 @@ Standalone and retained solves carry numerical packages separately from their ex
 verdict and proof fields. A numerical point requires the caller's source-acceptance
 predicate; a numerical optimum also requires its objective to meet the lower bound
 within the declared relative tolerance. Refusing a point preserves an available
-numerical bound. The numerical path does not enter exact point recovery, basis
-verification, reconstruction or continuation. A finite source work limit leaves
+numerical bound. The numerical path does not enter exact LP point recovery, basis
+verification, certificate reconstruction or continuation. A finite source work limit leaves
 only its unspent work for deductions. Numerical claim observations include that
 work without classifying it as an exact certificate.
+Finite point acceptance receives only the numerical deduction work left after bound
+or ray inspection. It first proposes the IEEE coordinates. If strict source arithmetic
+refuses them, it may propose one vector of small rational convergents, with a bounded
+coordinate count and visited construction work. Both proposals use the original
+source arithmetic predicate; neither supplies exact LP authority. Tolerance-only
+predicates retain their declared semantics. Source-acceptance phases record proposal
+construction work once and include the original arithmetic check in their elapsed
+time. Work exhaustion withholds the point while preserving an independently obtained
+bound; cancellation withholds both.
 Completion queries can request a bounded snapshot of the feasible basis and improving
 direction at a primal unbounded stop. Capture spends the solve's remaining work and
 does not enable tableau cuts. Component composition completes the other blocks

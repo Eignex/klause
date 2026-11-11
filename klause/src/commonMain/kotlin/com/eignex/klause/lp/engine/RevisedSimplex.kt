@@ -1702,7 +1702,13 @@ internal class RevisedSimplex(
         }
         val sameObjective = before?.model?.objective == after?.model?.objective
         val sameSeats = cachedStatus?.contentEquals(status) == true
-        if ((observations.warmStarted || after != null) &&
+        val inspectCold = captureRecession && after == null && !observations.warmStarted
+        if (inspectCold) {
+            work.add(numVars)
+            if (cancellation() || recessionCancellation()) return stopped(LpFloatTermination.CANCELLED)
+            if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return stopped(LpFloatTermination.WORK)
+        }
+        if ((observations.warmStarted || after != null || inspectCold) &&
             (!kept || !sameObjective || !sameSeats) && !dualFeasible()
         ) {
             val pivotsBeforeOpening = observations.pivots
