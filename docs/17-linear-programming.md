@@ -1343,8 +1343,11 @@ Residuals rejected by small exact input admission can prepare a sparse feasibili
 query with the shared source budget. Its floating cursor survives funding pauses;
 the lifetime uses the caller's remaining cumulative funding and consultation work
 requests follow its current grant, without renewing paid preparation or numerical work.
-Completed coordinates undergo bounded rational reconstruction and primal-only exact
-basis verification. These checks publish no dual bound or conflict.
+Each rational reconstruction or primal-only exact basis verification first requires
+the solve context's computation admission. A denied certifier computes no witness
+and reports no performed certification work. Admitted checks retain their bounded
+work and allocation charges, including unsuccessful attempts, and publish no dual
+bound or conflict.
 Primal-only verification removes basic logical unit columns before factoring the
 remaining structural core, then recovers their values and checks all original
 column and row sides under the same allowance. The most recent

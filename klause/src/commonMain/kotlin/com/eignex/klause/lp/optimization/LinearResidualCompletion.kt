@@ -12,7 +12,7 @@ import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.ReconstructionLimits
-import com.eignex.klause.lp.engine.acceptNullable
+import com.eignex.klause.lp.engine.computeNullable
 import com.eignex.klause.lp.engine.reconstructCertificate
 import com.eignex.klause.lp.engine.verifyExactBasis
 import com.eignex.klause.simplex.basis.RationalBasisLimits
@@ -144,32 +144,38 @@ internal class LinearResidualCompletion(
                 val model = checkNotNull(current.state.ownerWorkingModel())
                 val limits = ReconstructionLimits(maxWork = 2_000_000L,
                     maxAllocation = 64L * 1024L * 1024L)
-                val reconstructed = reconstructCertificate(model, primal = result.primal, basis = result.basis,
-                    cancellation = token, limits = limits, claim = LpClaim.FEASIBLE_COMPLETION)
-                budget.observe(refinement = reconstructed.metrics.work)
-                budget.funding?.charge(0L, reconstructed.metrics.allocation)
-                observe("PrimalRecoverySparsePointWork", reconstructed.metrics.work)
-                observe("PrimalRecoverySparsePointAllocation", reconstructed.metrics.allocation)
-                reconstructed.metrics.decline?.let { observe("PrimalRecoverySparsePoint${it.name}", 1L) }
-                point = budget.context.certificationPolicy.acceptNullable(LpCertifier.RATIONAL,
-                    reconstructed.witness)?.primal
+                var reconstructionWork = 0L
+                var reconstructionAllocation = 0L
+                point = budget.context.certificationPolicy.computeNullable(LpCertifier.RATIONAL) {
+                    val reconstructed = reconstructCertificate(model, primal = result.primal, basis = result.basis,
+                        cancellation = token, limits = limits, claim = LpClaim.FEASIBLE_COMPLETION)
+                    reconstructionWork = reconstructed.metrics.work
+                    reconstructionAllocation = reconstructed.metrics.allocation
+                    budget.observe(refinement = reconstructionWork)
+                    budget.funding?.charge(0L, reconstructionAllocation)
+                    observe("PrimalRecoverySparsePointWork", reconstructionWork)
+                    observe("PrimalRecoverySparsePointAllocation", reconstructionAllocation)
+                    reconstructed.metrics.decline?.let { observe("PrimalRecoverySparsePoint${it.name}", 1L) }
+                    reconstructed.witness
+                }?.primal
                 if (point == null && !token()) {
-                    val checked = verifyExactBasis(model, result.basis, cancellation = token,
-                        limits = ExactBasisLimits(
-                            RationalBasisLimits(dimension = 512,
-                                work = limits.maxWork - reconstructed.metrics.work,
-                                allocationBytes = limits.maxAllocation - reconstructed.metrics.allocation),
-                            limits), primalOnly = true)
-                    budget.observe(refinement = checked.metrics.work)
-                    budget.funding?.charge(0L, checked.metrics.allocation)
-                    observe("PrimalRecoverySparseBasisWork", checked.metrics.work)
-                    observe("PrimalRecoverySparseBasisAllocation", checked.metrics.allocation)
-                    observe("PrimalRecoverySparseBasisMaxFill", checked.metrics.peakFill.toLong())
-                    observe("PrimalRecoverySparseBasisMaxBits", checked.metrics.maxBits.toLong())
-                    observe("PrimalRecoverySparseBasisPhase_${checked.metrics.phase.name}", 1L)
-                    checked.metrics.decline?.let { observe("PrimalRecoverySparseBasis${it.name}", 1L) }
-                    point = budget.context.certificationPolicy.acceptNullable(LpCertifier.EXACT_BASIS,
-                        checked.witness)?.primal
+                    point = budget.context.certificationPolicy.computeNullable(LpCertifier.EXACT_BASIS) {
+                        val checked = verifyExactBasis(model, result.basis, cancellation = token,
+                            limits = ExactBasisLimits(
+                                RationalBasisLimits(dimension = 512,
+                                    work = limits.maxWork - reconstructionWork,
+                                    allocationBytes = limits.maxAllocation - reconstructionAllocation),
+                                limits), primalOnly = true)
+                        budget.observe(refinement = checked.metrics.work)
+                        budget.funding?.charge(0L, checked.metrics.allocation)
+                        observe("PrimalRecoverySparseBasisWork", checked.metrics.work)
+                        observe("PrimalRecoverySparseBasisAllocation", checked.metrics.allocation)
+                        observe("PrimalRecoverySparseBasisMaxFill", checked.metrics.peakFill.toLong())
+                        observe("PrimalRecoverySparseBasisMaxBits", checked.metrics.maxBits.toLong())
+                        observe("PrimalRecoverySparseBasisPhase_${checked.metrics.phase.name}", 1L)
+                        checked.metrics.decline?.let { observe("PrimalRecoverySparseBasis${it.name}", 1L) }
+                        checked.witness
+                    }?.primal
                 }
                 finished = !token()
                 if (point != null) observe("PrimalRecoverySparseCompleted", 1L)

@@ -4,7 +4,10 @@ import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLpLimits
 import com.eignex.klause.lp.SparseSourceLpPolicy
+import com.eignex.klause.lp.engine.LpCertificationPolicy
+import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpFloatAllowance
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.satisfiesSourceRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -17,6 +20,58 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LinearResidualCompletionTest {
+    @Test
+    fun `denied residual certification should skip reconstruction and basis computation`() {
+        val consulted = mutableSetOf<LpCertifier>()
+        val certification = object : LpCertificationPolicy {
+            override fun canCompute(certifier: LpCertifier): Boolean {
+                consulted += certifier
+                return false
+            }
+            override fun accepts(certifier: LpCertifier, successful: Boolean): Boolean =
+                error("denied certifier computed")
+        }
+        val budget = SourceLpBudget(solveContext = { LpSolveContext(certificationPolicy = certification) })
+        val observations = mutableSetOf<String>()
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.ofLong(3) }, BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.ofLong(-3) }, BigFraction.MINUS_ONE),
+        )
+
+        val point = LinearResidualCompletion(budget, SparseSourceLpPolicy()).use {
+            it.complete(rows, 2, Cancellation.Never, { stage, _ -> observations += stage }, small = { null })
+        }
+
+        assertNull(point)
+        assertEquals(setOf(LpCertifier.RATIONAL, LpCertifier.EXACT_BASIS), consulted)
+        assertEquals(0L, budget.measuredRefinementWork)
+        assertFalse(observations.any {
+            it.startsWith("PrimalRecoverySparsePoint") || it.startsWith("PrimalRecoverySparseBasis")
+        })
+    }
+
+    @Test
+    fun `admitted basis recovery should remain available when rational reconstruction is denied`() {
+        val certification = object : LpCertificationPolicy {
+            override fun canCompute(certifier: LpCertifier): Boolean = certifier == LpCertifier.EXACT_BASIS
+            override fun accepts(certifier: LpCertifier, successful: Boolean): Boolean = successful
+        }
+        val budget = SourceLpBudget(solveContext = { LpSolveContext(certificationPolicy = certification) })
+        val observations = mutableSetOf<String>()
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.ofLong(3) }, BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.ofLong(-3) }, BigFraction.MINUS_ONE),
+        )
+
+        val point = LinearResidualCompletion(budget, SparseSourceLpPolicy()).use {
+            it.complete(rows, 2, Cancellation.Never, { stage, _ -> observations += stage }, small = { null })
+        }
+
+        assertTrue(assertNotNull(point).satisfiesSourceRows(rows))
+        assertTrue("PrimalRecoverySparseBasisWork" in observations)
+        assertFalse(observations.any { it.startsWith("PrimalRecoverySparsePoint") })
+    }
+
     @Test
     fun `an objective lifetime cap should survive fresh caller funding`() {
         val funding = SourceLpFunding(1_000_000L, 64L * 1024L * 1024L)
