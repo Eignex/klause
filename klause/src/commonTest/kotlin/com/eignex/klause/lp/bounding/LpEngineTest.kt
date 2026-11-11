@@ -55,6 +55,193 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `unfunded admission preserves a later funded current comparison`() {
+        val problem = boundedProblem()
+        val objective = LinearObjective(intCoefficients = LongArray(3) { 1L })
+        val sink = SolveStatsSink("current-comparison-funding")
+        var offered = 10_000L
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, rootCutHarvest = false,
+            boundAdaptiveWork = false, boundMaxOpsPerNode = 0L)), sink,
+            nodeWorkAllowance = { offered }).use { engine ->
+            val relaxation = assertNotNull(engine.nodeRelaxation(assertNotNull(engine.lpRelaxer),
+                PropagationSession(problem)))
+            assertNotNull(engine.solveNode(relaxation.model, null, Cancellation.Never)?.second)
+            val model = assertNotNull(engine.propagator.state?.ownerWorkingModel())
+            val before = engine.pendingNodeSolveWork()
+            offered = 1L
+
+            assertNull(engine.branchDirectionalGains(model, intArrayOf(0, 1), longArrayOf(0L, 0L), 0L))
+            offered = 10_000L
+            val gains = assertNotNull(engine.branchDirectionalGains(model, intArrayOf(0, 1), longArrayOf(0L, 0L), 0L))
+
+            assertEquals(2, gains.size)
+            assertEquals(2L, sink.lp.directionalBranchCount("CURRENT_QUERY_ADMISSION"))
+            assertEquals(1L, sink.lp.directionalBranchCount("CURRENT_QUERY_SETUP_UNFUNDED"))
+            assertEquals(1L, sink.lp.directionalBranchCount("CURRENT_QUERY_ATTEMPT"))
+            assertEquals(1L, sink.lp.directionalBranchCount("CURRENT_QUERY_AVAILABLE"))
+            assertEquals(4L, sink.lp.directionalBranchCount("CURRENT_QUERY_CHILDREN"))
+            val paid = listOf("CURRENT_QUERY_ADMISSION_WORK", "CURRENT_QUERY_OBSERVATION_WORK",
+                "CURRENT_QUERY_PREPARATION_WORK", "CURRENT_QUERY_SOLVE_WORK").sumOf(sink.lp::directionalBranchCount)
+            assertEquals(paid, engine.pendingNodeSolveWork() - before)
+            assertTrue(sink.lp.directionalBranchCount("CURRENT_QUERY_GRANTED_WORK") in 1L..10_000L)
+        }
+    }
+
+    @Test
+    fun `owner replacement cannot renew a spent current point`() {
+        for (ready in listOf(false, true)) {
+            val problem = boundedProblem()
+            val objective = LinearObjective(intCoefficients = LongArray(3) { 1L })
+            val sink = SolveStatsSink("current-comparison-lifetime")
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, rootCutHarvest = false,
+                boundAdaptiveWork = false, boundMaxOpsPerNode = 0L)), sink,
+                nodeWorkAllowance = { 10_000L }).use { engine ->
+                val relaxation = assertNotNull(engine.nodeRelaxation(assertNotNull(engine.lpRelaxer),
+                    PropagationSession(problem)))
+                assertNotNull(engine.solveNode(relaxation.model, null, Cancellation.Never)?.second)
+                val model = assertNotNull(engine.propagator.state?.ownerWorkingModel())
+                if (!ready) engine.releasePersistentSolvers()
+                val first = engine.branchDirectionalGains(model, intArrayOf(0, 1), longArrayOf(0L, 0L), 0L)
+                if (ready) assertNotNull(first) else assertNull(first)
+                engine.releasePersistentSolvers()
+                assertNotNull(engine.solveNode(model, null, Cancellation.Never)?.second)
+
+                val repeated = engine.branchDirectionalGains(model, intArrayOf(0, 1), longArrayOf(0L, 0L), 0L)
+
+                assertNull(repeated)
+                assertEquals(1L, sink.lp.directionalBranchCount("CURRENT_QUERY_ATTEMPT"))
+                assertEquals(1L, sink.lp.directionalBranchCount("CURRENT_QUERY_REPEATED_POINT"))
+                assertEquals(if (ready) 4L else 0L, sink.lp.directionalBranchCount("CURRENT_QUERY_CHILDREN"))
+            }
+        }
+    }
+
+    @Test
+    fun `exhausted current query admission checks remain exhausted after funding returns`() {
+        val problem = boundedProblem()
+        val objective = LinearObjective(intCoefficients = LongArray(3) { 1L })
+        val sink = SolveStatsSink("current-comparison-admission-cap")
+        var offered = 10_000L
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, rootCutHarvest = false,
+            boundAdaptiveWork = false, boundMaxOpsPerNode = 0L)), sink,
+            nodeWorkAllowance = { offered }).use { engine ->
+            val relaxation = assertNotNull(engine.nodeRelaxation(assertNotNull(engine.lpRelaxer),
+                PropagationSession(problem)))
+            assertNotNull(engine.solveNode(relaxation.model, null, Cancellation.Never)?.second)
+            val model = assertNotNull(engine.propagator.state?.ownerWorkingModel())
+            offered = 1L
+            repeat(33) { assertNull(engine.branchDirectionalGains(model, intArrayOf(0, 1), longArrayOf(0L, 0L), 0L)) }
+            offered = 10_000L
+
+            val after = engine.branchDirectionalGains(model, intArrayOf(0, 1), longArrayOf(0L, 0L), 0L)
+
+            assertNull(after)
+            assertEquals(32L, sink.lp.directionalBranchCount("CURRENT_QUERY_ADMISSION"))
+            assertEquals(640L, sink.lp.directionalBranchCount("CURRENT_QUERY_ADMISSION_WORK"))
+            assertEquals(2L, sink.lp.directionalBranchCount("CURRENT_QUERY_ADMISSION_LIMIT"))
+            assertEquals(0L, sink.lp.directionalBranchCount("CURRENT_QUERY_ATTEMPT"))
+        }
+    }
+
+    @Test
+    fun `cancelled current comparisons retain their paid partial children`() {
+        val problem = boundedProblem()
+        val objective = LinearObjective(intCoefficients = LongArray(3) { 1L })
+        val sink = SolveStatsSink("current-comparison-cancellation")
+        val token = Cancellation { sink.lp.directionalBranchCount("CURRENT_QUERY_CHILDREN") > 0L }
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, rootCutHarvest = false,
+            boundAdaptiveWork = false, boundMaxOpsPerNode = 0L), cancellation = token), sink,
+            nodeWorkAllowance = { 10_000L }).use { engine ->
+            val relaxation = assertNotNull(engine.nodeRelaxation(assertNotNull(engine.lpRelaxer),
+                PropagationSession(problem)))
+            assertNotNull(engine.solveNode(relaxation.model, null, Cancellation.Never)?.second)
+            val state = assertNotNull(engine.propagator.state)
+            val model = assertNotNull(state.ownerWorkingModel())
+
+            val gains = engine.branchDirectionalGains(model, intArrayOf(0, 1), longArrayOf(0L, 0L), 0L)
+
+            assertNull(gains)
+            assertTrue(state === engine.propagator.state)
+            assertEquals(1L, sink.lp.directionalBranchCount("CURRENT_QUERY_ATTEMPT"))
+            assertEquals(1L, sink.lp.directionalBranchCount("CURRENT_QUERY_CHILDREN"))
+            assertEquals(1L, sink.lp.directionalBranchCount("CURRENT_QUERY_DECLINE_CANCELLED"))
+            assertTrue(sink.lp.directionalBranchCount("CURRENT_QUERY_PREPARATION_WORK") > 0L)
+            assertEquals(0L, sink.lp.directionalBranchCount("CURRENT_QUERY_AVAILABLE"))
+        }
+    }
+
+    @Test
+    fun `distinct lp points share one nonrenewable query allowance`() {
+        val problem = boundedProblem()
+        val objective = LinearObjective(intCoefficients = LongArray(3) { 1L })
+        val sink = SolveStatsSink("shared-query-cap")
+        var offered = 100_000L
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, rootCutHarvest = false,
+            boundAdaptiveWork = false, boundMaxOpsPerNode = 0L)), sink,
+            nodeWorkAllowance = { offered }).use { engine ->
+            val relaxation = assertNotNull(engine.nodeRelaxation(assertNotNull(engine.lpRelaxer),
+                PropagationSession(problem)))
+            var queryCharges = 0L
+            var lifetimeWork = 0L
+            repeat(4) { point ->
+                assertNotNull(engine.solveNode(relaxation.model, null, Cancellation.Never)?.second)
+                val model = assertNotNull(engine.propagator.state?.ownerWorkingModel())
+                val before = engine.pendingNodeSolveWork()
+                assertNotNull(engine.branchDirectionalGains(model, intArrayOf(0, 1),
+                    longArrayOf(0L, 0L), point.toLong()))
+                queryCharges += engine.pendingNodeSolveWork() - before
+                if (point == 0) lifetimeWork = sink.lp.directionalBranchCount("CURRENT_QUERY_LIFETIME_WORK")
+                assertEquals(lifetimeWork, sink.lp.directionalBranchCount("CURRENT_QUERY_LIFETIME_WORK"))
+                offered = 1_000_000L
+            }
+            val model = assertNotNull(engine.propagator.state?.ownerWorkingModel())
+
+            val fifth = engine.branchDirectionalGains(model, intArrayOf(0, 1), longArrayOf(0L, 0L), 4L)
+
+            assertNull(fifth)
+            assertEquals(4L, sink.lp.directionalBranchCount("CURRENT_QUERY_ATTEMPT"))
+            assertEquals(4L, sink.lp.directionalBranchCount("CURRENT_QUERY_AVAILABLE"))
+            assertEquals(16L, sink.lp.directionalBranchCount("CURRENT_QUERY_CHILDREN"))
+            assertEquals(1L, sink.lp.directionalBranchCount("CURRENT_QUERY_SPENT"))
+            val queryWork = listOf("CURRENT_QUERY_PREPARATION_WORK", "CURRENT_QUERY_SOLVE_WORK",
+                "CURRENT_QUERY_OBSERVATION_WORK").sumOf(sink.lp::directionalBranchCount)
+            assertTrue(queryWork in 1L..lifetimeWork)
+            assertEquals(queryWork + sink.lp.directionalBranchCount("CURRENT_QUERY_ADMISSION_WORK"),
+                queryCharges)
+        }
+    }
+
+    @Test
+    fun `a larger later offer cannot replenish spent query work`() {
+        val problem = boundedProblem()
+        val objective = LinearObjective(intCoefficients = LongArray(3) { 1L })
+        val sink = SolveStatsSink("shared-query-work")
+        var offered = 10_000L
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, rootCutHarvest = false,
+            boundAdaptiveWork = false, boundMaxOpsPerNode = 0L)), sink,
+            nodeWorkAllowance = { offered }).use { engine ->
+            val relaxation = assertNotNull(engine.nodeRelaxation(assertNotNull(engine.lpRelaxer),
+                PropagationSession(problem)))
+            assertNotNull(engine.solveNode(relaxation.model, null, Cancellation.Never)?.second)
+            val model = assertNotNull(engine.propagator.state?.ownerWorkingModel())
+            offered = 1_800L
+            assertNull(engine.branchDirectionalGains(model, intArrayOf(0, 1), longArrayOf(0L, 0L), 0L))
+            val lifetimeWork = sink.lp.directionalBranchCount("CURRENT_QUERY_LIFETIME_WORK")
+            assertTrue(lifetimeWork > 0L)
+            offered = 1_000_000L
+
+            val later = engine.branchDirectionalGains(model, intArrayOf(0, 1), longArrayOf(0L, 0L), 1L)
+
+            assertNull(later)
+            assertEquals(1L, sink.lp.directionalBranchCount("CURRENT_QUERY_ATTEMPT"))
+            assertEquals(lifetimeWork, sink.lp.directionalBranchCount("CURRENT_QUERY_LIFETIME_WORK"))
+            val queryWork = listOf("CURRENT_QUERY_PREPARATION_WORK", "CURRENT_QUERY_SOLVE_WORK",
+                "CURRENT_QUERY_OBSERVATION_WORK").sumOf(sink.lp::directionalBranchCount)
+            assertTrue(queryWork in 1L..lifetimeWork)
+        }
+    }
+
+    @Test
     fun `linear bound should release branch costs when first read after a backtrack`() {
         val problem = Problem(2, 1, arrayOf(IntDomain(0, 1)), emptyArray())
         val session = PropagationSession(problem)

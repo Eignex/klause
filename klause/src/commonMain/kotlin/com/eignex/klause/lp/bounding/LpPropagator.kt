@@ -12,13 +12,17 @@ import com.eignex.klause.lp.engine.LpBoundAssertion
 import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpClaim
+import com.eignex.klause.lp.engine.LpDirectionalGain
 import com.eignex.klause.lp.engine.LpExactCitedSide
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpExactSupport
 import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpLayoutRemap
+import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpPrimalGuidance
+import com.eignex.klause.lp.engine.LpProbeDecline
+import com.eignex.klause.lp.engine.LpProbeMetrics
 import com.eignex.klause.lp.engine.LpScopedMetrics
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.LpScopedSolver
@@ -123,6 +127,21 @@ internal class LpPropagator(
     val pausedTrialProgress: Map<String, Long> get() = owner?.pausedTrialProgress.orEmpty()
 
     fun pausedDualProposal(token: Cancellation): DoubleArray? = owner?.pausedDualProposal(token)
+
+    fun directionalGains(
+        model: LpModel,
+        columns: IntArray,
+        splits: LongArray,
+        allowance: Long,
+        token: Cancellation,
+        observe: (LpProbeMetrics) -> Unit,
+    ): List<LpDirectionalGain>? {
+        if (owner == null) {
+            observe(LpProbeMetrics(0L, 0L, 0, LpProbeDecline.OWNER))
+            return null
+        }
+        return withOwner { it.directionalGains(model, columns, splits, allowance, token, observe) }
+    }
 
     val primalGuidanceState: String get() = withOwner { it.primalGuidanceState } ?: "ABSENT_OWNER"
 

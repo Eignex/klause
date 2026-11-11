@@ -8,7 +8,29 @@ internal class LpPassiveVariableChoice(
     private val applyAdvice: Boolean,
     private val observe: (String) -> Unit,
     private val charge: (Long) -> Unit,
+    private val kind: Kind = Kind.RELIABLE,
 ) {
+    enum class Kind(prefix: String) {
+        RELIABLE("PASSIVE_VARIABLE_"),
+        MEASURED("CURRENT_VARIABLE_"),
+        COLLECTION("PASSIVE_COLLECTION_VARIABLE_");
+
+        val selection = prefix + "SELECTION"
+        val stale = prefix + "STALE"
+        val unreliable = prefix + "UNRELIABLE"
+        val compared = prefix + "COMPARED"
+        val proposalChanged = prefix + "PROPOSAL_CHANGED"
+        val proposalAgreed = prefix + "PROPOSAL_AGREED"
+        val consumed = prefix + "CONSUMED"
+        val withheld = prefix + "WITHHELD"
+        val branchCheck = prefix + "BRANCH_CHECK"
+        val commitCheck = prefix + "COMMIT_CHECK"
+        val committed = prefix + "COMMITTED"
+        val commitWithheld = prefix + "COMMIT_WITHHELD"
+        val commitChanged = prefix + "COMMIT_CHANGED"
+        val commitWithheldChanged = prefix + "COMMIT_WITHHELD_CHANGED"
+    }
+
     data class Candidate(val variable: VarRef, val point: Double)
 
     private var nomination: Candidate? = null
@@ -33,18 +55,18 @@ internal class LpPassiveVariableChoice(
         reliable: () -> Boolean,
     ): VarRef {
         clear()
-        observe("PASSIVE_VARIABLE_SELECTION")
+        observe(kind.selection)
         charge(16L)
-        if (!fresh()) return baseline.variable.also { observe("PASSIVE_VARIABLE_STALE") }
-        if (!proposal.fractional() || !baseline.fractional() || !reliable()) {
-            observe("PASSIVE_VARIABLE_UNRELIABLE")
+        if (!fresh()) return baseline.variable.also { observe(kind.stale) }
+        if (!proposal.fractional() || (kind != Kind.COLLECTION && !baseline.fractional()) || !reliable()) {
+            observe(kind.unreliable)
             return baseline.variable
         }
-        if (!fresh()) return baseline.variable.also { observe("PASSIVE_VARIABLE_STALE") }
+        if (!fresh()) return baseline.variable.also { observe(kind.stale) }
         changed = proposal.variable != baseline.variable
-        observe("PASSIVE_VARIABLE_COMPARED")
-        observe(if (changed) "PASSIVE_VARIABLE_PROPOSAL_CHANGED" else "PASSIVE_VARIABLE_PROPOSAL_AGREED")
-        observe(if (applyAdvice) "PASSIVE_VARIABLE_CONSUMED" else "PASSIVE_VARIABLE_WITHHELD")
+        observe(kind.compared)
+        observe(if (changed) kind.proposalChanged else kind.proposalAgreed)
+        observe(if (applyAdvice) kind.consumed else kind.withheld)
         nomination = if (applyAdvice) proposal else baseline
         nominationStamp = stamp
         return checkNotNull(nomination).variable
@@ -52,7 +74,7 @@ internal class LpPassiveVariableChoice(
 
     fun branch(variable: VarRef, stamp: Int) {
         if (nomination == null) return
-        observe("PASSIVE_VARIABLE_BRANCH_CHECK")
+        observe(kind.branchCheck)
         charge(4L)
         branched = nomination?.variable == variable && nominationStamp == stamp
         if (!branched) clear()
@@ -60,15 +82,15 @@ internal class LpPassiveVariableChoice(
 
     fun commit(decision: SearchDecision) {
         val current = nomination ?: return
-        observe("PASSIVE_VARIABLE_COMMIT_CHECK")
+        observe(kind.commitCheck)
         charge(4L)
         val accepted = branched && current.matches(decision)
         val wasChanged = changed
         clear()
         if (!accepted) return
-        observe(if (applyAdvice) "PASSIVE_VARIABLE_COMMITTED" else "PASSIVE_VARIABLE_COMMIT_WITHHELD")
-        if (wasChanged) observe(if (applyAdvice) "PASSIVE_VARIABLE_COMMIT_CHANGED"
-            else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED")
+        observe(if (applyAdvice) kind.committed else kind.commitWithheld)
+        if (wasChanged) observe(if (applyAdvice) kind.commitChanged
+            else kind.commitWithheldChanged)
     }
 
     private fun Candidate.fractional(): Boolean {

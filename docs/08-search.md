@@ -325,35 +325,85 @@ The common objective constant stays in the scope key and is excluded from gain
 subtraction, preserving small gains when the constant exceeds floating precision.
 
 The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
-`lp-directional-gains=true`, with LP bounding and branching enabled. Two recent samples
-in each direction permit a balanced gain score; otherwise reduced-cost/fractionality
-scoring and the configured selector keep their precedence. Directional scores compete
-with each other before fallback, so objective units are not mixed with reduced costs.
-Saturated scope-wide sample counts skip history lookups while two-sided reliability
-is impossible. Passing that prerequisite still requires the variable's own recent
-samples; it grants no score or authority. History reset clears the prerequisite.
-Selection rechecks that the fractional point and optimum belong to the same current
-relaxation and exact state, and declines on cancellation or stale information. A
-nomination retains only its variable, point and solve stamp. Proposal and
-baseline roles share one immutable candidate when they name the same variable.
-Clearing an already-empty nomination leaves its state untouched; transient selection
-flags still clear. Comparison and changed-proposal observations remain separate from
-the actual variable and matching
-adjacent split committed by search; replacement, retraction and retirement discard
-an unconsumed nomination.
-Disabled directional gains collect no history or retained model scope and charge no
-history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
+`lp-directional-gains=true`, with LP bounding and branching enabled. Before a
+checked incumbent, the existing running-mean passive policy remains available, while
+private measurements, calibration and extra acquisition stay dormant. Both advice
+application modes share that cold passive policy. Entering the measured phase clears
+cold history and pending observations before validating the current source scope.
+Missing, stale or unusable history keeps reduced-cost/fractionality scoring and the
+configured selector's precedence.
 
-Samples share one retained exact base model, active-row identity, objective mapping
-and incumbent cutoff. Changed rows or cuts, layout or objective rescaling invalidate
-history and pending comparisons. Restart and assumption reseeding clear history.
-Ordinary sibling retraction preserves compatible observations and the immediate
-parent split; a skipped child cannot borrow a deeper descendant's objective.
-Directions expire after 256 node visits without a sample. At most 8,192 variable
-histories and 128 ancestor splits are retained. Ancestor records use depth-indexed
-slots allocated on the first usable split; trimming clears removed references and
-counts only live records. Bookkeeping charges the existing LP work allowance and
-creates no extra LP query. Invocation close releases the scope.
+A measured nominee needs two positive recent samples in each direction. Each direction uses
+the smaller of its latest two normalized gains, scaled to the current fractional
+movement; their geometric mean keeps the minimized objective units. Both samples
+in each pair must be within 256 node visits. A fresh sample does not renew its
+predecessor's age, and older numeric observations do not enter that estimate.
+Directional scores compete with each other before fallback, so objective units are
+not mixed with reduced costs.
+
+A different reliable nominee requests both children of itself and the ordinary LP
+baseline at the same current relaxation. All four floating comparisons must complete.
+Actual finite nonnegative gains use low + (high - low) / 7 in minimized source units;
+a positive proposal must strictly exceed the finite baseline score. A zero baseline
+is available data. Agreement needs no query. Invalid, interrupted, unavailable or
+nonimproving measurements keep the baseline. Private advice withholding performs the
+same observation and acquisition policy. Measured variable commitments have their own
+counters, separate from legacy passive and acquisition choices. Ordinary child ordering
+is unchanged.
+
+One invocation admits at most four queries at distinct monotonically stamped points
+and 32 paid admission checks. The first funded ordinary offer fixes a nonrenewable
+private preparation, solve and metric-work pool. Every query also obeys the current
+node, slice, cumulative and cancellation allowances. Admission charges 20 work;
+eight reserved observations at 32 work and the 48-work follow-up hold reduce the
+private offer. Failed and cancelled work remains spent. Later offers, history resets
+and numerical-owner replacement renew neither the pool nor either count limit.
+Complete comparison classification charges 8 work. Variable branch and commitment
+checks charge 4 each; no child-preference work is created.
+
+A fresh rejected measurement can calibrate an overpredicted geometric nominee.
+Its measured geometric gain divided by the already-read learned geometric score is
+a dimensionless discount on the current factor. Only a smaller finite nonnegative
+measurement reduces that factor. Passive sample counts, running means and recent
+values are unchanged; these probe-derived quality discounts supply no bound or
+certificate authority. One factor and its node timestamp belong to each existing
+variable history. A zero or underflowed discounted score withholds nomination.
+The factor expires after the same node-age horizon and is not renewed by passive
+updates. Repeated calibration applies to the same unscaled prediction.
+
+Calibration checks charge 8 LP work and recheck point, source, state and cancellation
+before changing a factor. Rejected comparisons install no reliable-variable advice;
+comparison plus calibration uses 16 work within the unchanged follow-up hold.
+An eligible comparison's classification and variable checks also use at most 16.
+Existing ancestor bookkeeping remains separately charged to the containing LP ledger.
+Every lookup of a stored discount charges 2 work, including expiry; fixed counters
+separate active use, zero-score withholding and expiry. These are modeled work,
+not additional queries or unique committed choices.
+
+Selection rechecks the current relaxation and exact state. A nomination retains only
+its variable, point and solve stamp. Proposal and baseline share one immutable
+candidate when they agree. Clearing an empty nomination leaves its state untouched;
+comparison and changed-proposal observations remain separate from matching actual
+variable commitments. Replacement, retraction and retirement discard unconsumed
+nominations. Every split remains exhaustive, and all advice is search-only.
+
+Samples and calibration share the exact source identity, columns, objective mapping,
+variable coordinates and incumbent cutoff. Compatible source-preserving row edits
+retain completed history but discard pending parent/child observations until a fresh
+optimum revalidates the context. Foreign source, assumptions, objective rescaling,
+coordinate changes, restart or reseeding clear history and calibration. Common
+objective constants stay in the scope key and cancel before gain subtraction.
+At most 8,192 variable histories and 128 ancestor splits are retained. Ancestor slots
+are allocated on the first usable split; trimming clears references and counts live
+records. Invocation close releases the scope. Disabled gains collect no history,
+calibration or retained source scope and charge no history bookkeeping.
+
+When no reliable nominee exists, matched information acquisition can select an open
+fractional variable with a positive incomplete history retained by a compatible source
+edit. A productive ordinary baseline keeps priority. Each invocation permits 32 scans
+of 128 histories, with 4 work per baseline or visited history, 16 per nomination and
+4 for each matching branch and commitment check. Acquisition charges and counters
+stay separate from reliable measured advice, and history reset does not renew scans.
 
 ### Leaf-completed columns
 

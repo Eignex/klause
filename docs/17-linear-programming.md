@@ -1385,8 +1385,10 @@ metrics remain untouched. Common objective constants are excluded before gain
 subtraction; objective scaling maps every result to minimized source units.
 Both directions of every candidate require a complete optimal floating result
 and a finite nonnegative gain. Infeasibility, an unfinished query, cancellation
-or failed preparation withholds the entire comparison. These estimates train no
-history and supply no pruning or certificate authority.
+or failed preparation withholds the entire comparison. Passive sample estimates
+and counts are not trained by these queries. The finite caller may retain bounded,
+source-scoped nomination calibration as described in [finite guidance](08-search.md#finite-lp-directional-guidance);
+measurements and calibration supply no pruning or certificate authority.
 Completed-child observations report preparation, solve and completion deltas;
 the final observation retains any unfinished work and decline. Every exit releases
 the private owner. Refreshes prepay scalar-vector visits and copies. Cold backends
@@ -1457,6 +1459,11 @@ Preparation preflights retain workspace and scalar requirements, remaining work,
 factor-copy work and entries, saved source-copy work, identity or scaled reuse,
 and the refusing preparation stage. These fixed observations
 grant no work and construct no numerical owner. The caller owns probe admission and cadence.
+The finite caller routes current comparisons through the live trail or fallback owner.
+Its four-query lifetime pool includes private preparation, solve and actual metric
+work. A later larger ordinary offer cannot replenish that pool, and replacement
+retains completed costs and spent point identities. Numerical-owner isolation and
+retirement remain the same for every complete or declined query.
 Numerical observations retain each positive solve grant, entry limit, termination,
 pivots, imported factor entries and factor-build costs. Basis-build work is a diagnostic within the solve,
 not an additional charge to add to the query ledger.
