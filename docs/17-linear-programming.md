@@ -1166,10 +1166,22 @@ ordinary numerical traversal under its remaining cumulative funding.
 
 ### Leaf completion
 
+Finite leaf completion consumes numerical results separately from exact proof
+packages. A numerical conflict belongs to its current working model and cites
+the active source factors; learned finite reasons also retain live bounds and row
+premises. A numerical point must pass the caller's source acceptance. Without
+tolerance acceptance, its binary-rational source coordinates must pass the retained
+arithmetic witness check. This check certifies neither a bound nor an optimum and
+does not invoke exact LP recovery or continuation. A refused point stays unknown.
+Exact point coordinates do not turn numerical LP authority into an exact certificate.
+A numerical optimum meets the numerical bound within the declared LP tolerance;
+its consumption has a separate observation from exact claims. Cancellation after
+acceptance or observation withholds the result.
+
 Finite optimization keeps a pinned real-leaf request across portfolio slices.
 The discrete assignment, assembled row authority, source encoding and required
-certification remain owned by that request. Numerical pauses preserve the live
-solve; a completed floating solve can wait for certification in a later slice.
+mode remain owned by that request. Numerical pauses preserve the live
+solve; exact mode can retain a completed floating solve for later certification.
 Source encoding and relaxation assembly are atomic preparation of the request.
 Neither pause consumes the discrete model or records an indeterminate region.
 Reseeding and shared objective-floor imports are deferred while completion is

@@ -12,7 +12,6 @@ import com.eignex.klause.localsearch.ObjectiveGuidance
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.engine.LpCertificationMode
-import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.Sample
@@ -152,7 +151,7 @@ internal class LocalSearchWorkerConfig private constructor(
             seedImplicitOnRestart = recipe.seedImplicitOnRestart,
             // Floating scores guide candidates; the residual LP retains the configured source guarantee.
             completion = if (problem.numRealVars > 0) LeafRealCompletion(problem, objective, toleranceCheck,
-                context = LpSolveContext.forMode(lpMode)) else null,
+                mode = lpMode) else null,
         ).apply {
             objectiveBound = boundHandle
             if (effectiveProblem === problem) {

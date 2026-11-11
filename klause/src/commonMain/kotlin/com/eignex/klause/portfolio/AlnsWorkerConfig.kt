@@ -10,7 +10,6 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.schedule.Geometric
 import com.eignex.klause.lp.engine.LpCertificationMode
-import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.meta.alns.Alns
 import com.eignex.klause.meta.alns.BacktrackRepair
 import com.eignex.klause.propagation.BakedProblem
@@ -138,7 +137,7 @@ internal class AlnsWorkerConfig private constructor(
                 definitionalSweep = definitionalSweep,
                 perMoveInvariants = definitionalSweep != null,
                 completion = if (numericalCompletion && problem.numRealVars > 0)
-                    LeafRealCompletion(problem, objective, toleranceCheck, context = LpSolveContext.forMode(lpMode))
+                    LeafRealCompletion(problem, objective, toleranceCheck, mode = lpMode)
                 else null,
             ).apply {
                 matchedPools?.localSearchProjection?.let { engine.projection = it }

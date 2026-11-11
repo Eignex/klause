@@ -58,6 +58,7 @@ import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.lpHullFamily
 import com.eignex.klause.lp.lpHullGroupKey
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.LeafRealAcceptance
 import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpAuxiliarySources
@@ -65,10 +66,9 @@ import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.lp.relaxation.RootDomains
-import com.eignex.klause.lp.relaxation.exactLeafResult
-import com.eignex.klause.lp.relaxation.floatReals
+import com.eignex.klause.lp.relaxation.leafResult
+import com.eignex.klause.lp.relaxation.observedConsumption
 import com.eignex.klause.lp.relaxation.gatedEnforcement
-import com.eignex.klause.lp.relaxation.observeConsumption
 import com.eignex.klause.lp.relaxation.prepareSchedulingViews
 import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.lp.relaxation.withModel
@@ -81,7 +81,6 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.SolveStatsSink
-import com.eignex.klause.solver.validation.floatingOptimumAcceptance
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.constructionLongArray
@@ -1490,45 +1489,30 @@ internal class LpEngine(
         val model = relaxation.model
         val solver = leafSolver ?: LpSolveSession(solveContext, pricingOptions, params.lpPlan.componentSplit)
             .also { leafSolver = it }
+        val sample = leafSample(session, emptyDoubleArray())
+        val acceptance = LeafRealAcceptance(relaxation, problem, sample, toleranceCheck, params.cancellation,
+            solveContext.certificationPolicy.numericalDeductions)
         val certified = solver.solve(
             model,
             cancellation = params.cancellation,
             workLimit = leafWorkBudget(model),
             observer = sink.lp.certificationObserver(LpRoute.STANDALONE),
             counterResults = lpCounterResults,
-            floatAccept = toleranceCheck.floatingOptimumAcceptance()?.let { check ->
-                { result -> check(leafSample(session, relaxation.floatReals(result.primal, problem))) }
-            },
+            floatAccept = acceptance.predicate,
             floatOffset = relaxation.objectiveConstant.toDouble(),
             claim = if (objective == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM,
         )
-        certified.float?.let { sink.lp.observeComponentSplit(it.blocks) }
-        return when (certified.verdict) {
-            LpVerdict.TOLERANCE_OPTIMUM -> LeafRealResult(
-                LpVerdict.TOLERANCE_OPTIMUM,
-                relaxation.floatReals(checkNotNull(certified.floatOptimum).primal, problem),
-            )
-
-            LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED ->
-                relaxation.exactLeafResult(certified, problem, objective, leafSample(session, emptyDoubleArray()))
-
-            LpVerdict.INFEASIBLE -> {
-                // Pool the theory lemma for restart-time registration: the leaf itself just rejects
-                // (the engine backtracks chronologically), and the next restart makes the lemma a
-                // permanent clause pruning the dead region everywhere.
-                val clause = certified.farkasRay
-                    ?.let { LpExplanation.infeasibilityClause(relaxation, it, session) }
+        val result = relaxation.leafResult(certified, problem, objective, sample, sink.lp, acceptance,
+            params.cancellation)
+        if (result.verdict == LpVerdict.INFEASIBLE) {
+            val clause = if (result.numerical) numericalPremiseClause(relaxation, session, params.cancellation) else {
+                certified.farkasRay?.let { LpExplanation.infeasibilityClause(relaxation, it, session) }
                     ?: certified.infeasibleRows?.let { LpExplanation.premiseClauseForRows(relaxation, it, session) }
                     ?: activePremiseClause(relaxation, session)
-                if (clause != null) lpNogoods?.add(clause)
-                LeafRealResult(LpVerdict.INFEASIBLE, emptyDoubleArray())
             }
-
-            LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> LeafRealResult(
-                LpVerdict.INDETERMINATE,
-                emptyDoubleArray(),
-            )
-        }.also { it.observeConsumption(sink.lp) }
+            if (clause != null && !params.cancellation()) lpNogoods?.add(clause)
+        }
+        return result.observedConsumption(sink.lp, params.cancellation)
     }
 
     private fun leafSample(session: PropagationSession, reals: DoubleArray): Sample = Sample(

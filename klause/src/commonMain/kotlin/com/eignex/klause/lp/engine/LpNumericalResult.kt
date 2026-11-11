@@ -32,7 +32,9 @@ internal fun numericalLpResult(
     val checked = floatingObjectiveLowerBound(model, result.duals, workLimit, cancellation)
     timer.finish(checked.stop?.name ?: if (checked.bound != null) "ACCEPTED" else "REFUSED", checked.work)
     if (cancellation()) return numericalResult(result, work = checked.work, stop = LpFloatingBoundStop.CANCELLED)
+    val acceptance = LpPhaseTimer(observer, LpSolvePhase.SOURCE_FLOAT_ACCEPTANCE)
     val point = result.acceptedNumericalPoint(model, checked.stop, floatAccept)
+    acceptance.finish(if (point == null) "REFUSED" else "ACCEPTED")
     if (cancellation()) return numericalResult(result, work = checked.work, stop = LpFloatingBoundStop.CANCELLED)
     val bound = checked.bound?.let { LpNumericalBound(model, it) }
     val sourceObjective = point?.objective?.plus(floatOffset)
