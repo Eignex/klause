@@ -649,12 +649,37 @@ internal class JointLinearRepair(
 
     private fun guideRefutation(condition: ExactNeighborhoodCondition, querySource: SourceProofContext,
         feedback: SourceNumericalFeedbackResult) {
-        if (feedback !is SourceNumericalFeedbackResult.Available ||
-            !feedback.compatible(querySource, null) || feedback.query.refutation == null) return
-        val support = sourceNumericalRefutationSupport(feedback, funding, stop)
-        if (support is SourceNumericalSupportResult.Available &&
-            selection?.guideRefutation(support.assumptions, condition, budget, stop) == true) {
-            observe("jointRepairRefutationGuidance")
+        observe("jointRepairRefutationFeedbackObserved")
+        if (feedback !is SourceNumericalFeedbackResult.Available) {
+            observe("jointRepairRefutationFeedbackUnavailable")
+            return
+        }
+        if (!feedback.compatible(querySource, null)) {
+            observe("jointRepairRefutationScopeIncompatible")
+            return
+        }
+        if (feedback.query.refutation == null) {
+            observe("jointRepairRefutationClaimMissing")
+            return
+        }
+        when (val support = sourceNumericalRefutationSupport(feedback, funding, stop)) {
+            is SourceNumericalSupportResult.Available -> {
+                observe("jointRepairRefutationSupportAvailable")
+                val selector = selection
+                when {
+                    selector == null -> observe("jointRepairRefutationSelectorMissing")
+                    selector.guideRefutation(support.assumptions, condition, budget, stop) ->
+                        observe("jointRepairRefutationGuidance")
+                    else -> observe("jointRepairRefutationSeedDeclined")
+                }
+            }
+            is SourceNumericalSupportResult.Unavailable -> {
+                observe("jointRepairRefutationSupport${support.reason}")
+                if (support.reason == SourceNumericalSupportResult.Reason.Funding) {
+                    observe(if (funding.exhausted) "jointRepairRefutationOwnerExhausted"
+                        else "jointRepairRefutationGrantPaused")
+                }
+            }
         }
     }
 

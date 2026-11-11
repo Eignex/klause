@@ -1909,6 +1909,10 @@ an exact repeated-refutation hit also discards it. Boolean snapshots and scalar
 widths are bounded. Branch-local, unavailable and unsupported feedback supplies
 no new seed. This is advisory ordering: the refutation
 keeps its complete scope, and every discovered point still needs full source checking.
+Refutation feedback counters separate unavailable data, incompatible scope, absent
+claims, support projection outcomes and seed selection outcomes. Funding declines
+distinguish an exhausted containing owner from a paused numerical query grant.
+These finite counters carry no proof authority and change no admission allowance.
 Each joint owner retains at most four completed pre-incumbent regional refutations.
 Its source, semantics and objective stay fixed; exact keys snapshot every Boolean
 pin, numeric bound and cutoff. Only a terminal refutation in the queried root scope
