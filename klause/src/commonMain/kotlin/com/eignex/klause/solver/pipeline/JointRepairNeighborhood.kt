@@ -24,6 +24,7 @@ internal class JointRepairNeighborhood private constructor(
         BooleanArray(integers).also { mask -> indices.forEach { mask[it] = true } }
     }
     private var seeds = inputs?.toList() ?: (0 until integers).toList()
+    var onRefutationRoots: ((List<Int>) -> Unit)? = null
     private var rankedSeeds: List<Int>? = null
     private val refutedPins = ArrayDeque<Pair<Int, BigFraction>>()
     private var refutationBools: Map<Int, Boolean>? = null
@@ -166,9 +167,11 @@ internal class JointRepairNeighborhood private constructor(
         radius: BigFraction, cutoff: BigFraction?,
     ): ExactNeighborhoodCondition {
         val order = rankedSeeds ?: seeds
+        onRefutationRoots?.invoke(emptyList())
         val freed = if (round == 0L || order.isEmpty()) emptySet() else {
             val width = minOf(inputs?.size ?: integers, maxOf(2, count), MAX_FREE_INTEGERS)
             val preferred = refutationRoots(centers, bools, cutoff).take(width)
+            onRefutationRoots?.invoke(preferred)
             val roots = preferred.ifEmpty { listOf(order[((round - 1) % order.size).toInt()]) }
             if (preferred.isNotEmpty()) {
                 refutationSeeds++

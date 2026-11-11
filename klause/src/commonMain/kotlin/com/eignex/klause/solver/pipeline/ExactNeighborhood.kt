@@ -59,6 +59,7 @@ internal class ExactNeighborhood(
     private val proposal: ExactNeighborhoodProposal? = null,
     private val completionExhausted: () -> Boolean = { false },
     private val centerPreparationPending: () -> Boolean = { false },
+    private val onProposalOperator: ((Int, Long) -> Unit)? = null,
 ) : AutoCloseable {
     private val random = Random(seed)
     private var centers = centers.toMutableList()
@@ -141,6 +142,7 @@ internal class ExactNeighborhood(
             val operator = pending?.first ?: operator()
             val count = when (operator) { 0 -> 1; 1 -> maxOf(1, total / 2); else -> total }
             val before = nativeWork()
+            if (pending == null) onProposalOperator?.invoke(operator, round)
             val condition = pending?.second ?: proposal?.propose(centers, bools, count,
                 moves, radius, value) ?: run {
                 val selected = if (moves == 0L) emptySet() else (0 until total).shuffled(random).take(count).toSet()

@@ -59,6 +59,14 @@ grant and at most four snapshots. A retained rejected ray does not stop capture 
 another ray passes the complete kernel check. `missingBoundSideObserved` records the
 rejection history; `stoppedOnUnresolvedMissingSide` identifies an unresolved matching
 rejection that stopped the producer. Snapshot and source-journal limits remain separate.
+`capture-mode=joint-ordinary handoff=true` observes the actual finite portfolio's
+ordinary pre-incumbent companion with complete proof-worker coverage and progress
+logging disabled. It records bounded exact proposals, selected refutation roots,
+cited support and query/publication dispositions in `joint-repair.jsonl`; it retains
+no LP snapshots. Observation spends the existing four-second companion lifetime
+and source funding. `result.json` retains capture counters and callback time, which
+is included in containing execution and core capture time. This diagnostic grants
+no production performance or source-verdict authority.
 `capture-guidance=true captures=0` records bounded native guide adoption and branch
 observations without retaining LP queries. The preference flag describes configured
 precedence; it does not compare a counterfactual value order. Last-read scalar cutoffs

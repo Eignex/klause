@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class FinitePortfolioLpCaptureTest {
     @ParameterizedTest
@@ -139,6 +140,27 @@ class FinitePortfolioLpCaptureTest {
         val parameters = FinitePortfolioLpCapture.parameters(options)
 
         assertEquals(listOf("portfolio-progress=$progress"), parameters.filter { it.startsWith("portfolio-progress=") })
+    }
+
+    @Test
+    fun `ordinary joint capture should preserve quiet production companion controls`() {
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "true", "capture-mode" to "joint-ordinary")
+
+        val parameters = FinitePortfolioLpCapture.parameters(options)
+
+        assertEquals(FinitePortfolioLpCapture.parameters(options + ("capture-mode" to "joint-before")), parameters)
+        assertTrue("portfolio-progress=false" in parameters)
+        assertTrue("companion-admission=ordinary" in parameters)
+    }
+
+    @ParameterizedTest
+    @CsvSource("captures,1", "handoff,false", "portfolio-progress,true", "inspect-rays,true", "capture-guidance,true")
+    fun `ordinary joint capture should reject unrelated observer controls`(key: String, value: String) {
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "true", "capture-mode" to "joint-ordinary") + (key to value)
+
+        assertFailsWith<IllegalArgumentException> { FinitePortfolioLpCapture.parameters(options) }
     }
 
     @Test

@@ -35,6 +35,34 @@ import kotlin.time.TestTimeSource
 
 class FiniteNumericalCompanionsTest {
     @Test
+    fun `quiet companion workers should report proposals without comparison logging`() {
+        val model = Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 1, 2, 3), LinearOp.GE, 0),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1))
+        val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+        val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1)
+        val cost = finiteNumericalCompanionEligibility(model, PortfolioScenario.sequential(Kind.COP),
+            objective, params).requirements.construction
+        val events = mutableListOf<Pair<Long, JointRepairObservation>>()
+        val companions = assertNotNull(FiniteNumericalCompanions.prepare(model, objective, params,
+            Cancellation.Never, cost, onObservation = { seed, event -> events += seed to event }).companions)
+
+        PortfolioInvocationResources(2, 1, 0, Cancellation.Never, null).use { resources ->
+            val slot = resources.slots[1]
+            companions.factories(plan, 0).last().materialize(plan, slot).use { worker ->
+                assertNotNull(worker.newResumableSearch { Double.POSITIVE_INFINITY }).use { search ->
+                    repeat(32) { if (!search.isDone) search.runSlice(Cancellation.Never, 1_000, 5_000) { } }
+                }
+            }
+            assertTrue(events.isNotEmpty())
+            assertTrue(events.all { it.first == slot.seed })
+        }
+        assertTrue(events.any { it.second.phase == "proposal" })
+        assertTrue(events.any { it.second.phase == "query" })
+    }
+
+    @Test
     fun `a paused numerical companion should retain its global bound after retirement`() {
         val model = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),

@@ -66,6 +66,7 @@ internal class JointLinearRepair(
     private val incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
     private val onComparison: ((JointRepairComparison) -> Unit)? = null,
     private val repairGuidance: LinearRepairGuidance? = null,
+    onObservation: ((JointRepairObservation) -> Unit)? = null,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private class CheckedCenter(val sample: Sample, val value: BigFraction?)
 
@@ -76,6 +77,12 @@ internal class JointLinearRepair(
     private val budget = SourceLpBudget(maxOperations = params.sourceLpOperations,
         onWork = state.smt::observeSourceLp, funding = funding)
     private val stages = linkedMapOf<String, Long>()
+    private val observation = onObservation?.let { JointRepairObservationCapture(budget, stop, it) }
+    private var proposalSequence = 0L
+    private var observationQuery = 0L
+    private var observedOperator = 0
+    private var observedSchedulingRound = 0L
+    private var observedRoots: List<Int> = emptyList()
     private val completion = if (params.sourceIncumbentCompletion)
         LinearIncumbentCompletion(budget, incumbentCompletionCheck, sharedCompletions) { stage, count ->
             val key = "jointRepairExternalCompletion$stage"
@@ -121,7 +128,7 @@ internal class JointLinearRepair(
     val work: Long get() = state.work.spent + funding.spent / LP_WORK_PER_NODE + preparationWork +
         (selection?.visitedEntries ?: 0)
     val stats: SolveStats get() = SolveStats(openTheory = state.work.snapshot(), smt = state.smt.snapshot().copy(
-        completeSearchStages = observations() + mapOf(
+        completeSearchStages = (observations() + mapOf(
             "jointRepairSelectedIntegers" to (selection?.selectedIntegers ?: 0),
             "jointRepairConnectivityVisits" to (selection?.visitedEntries ?: 0),
             "jointRepairRefutationSeeds" to (selection?.refutationSeeds ?: 0),
@@ -131,7 +138,7 @@ internal class JointLinearRepair(
             "jointRepairLpReuses" to authority.reuses,
             "jointRepairFundedWork" to funding.spent,
             "jointRepairFundedAllocation" to funding.allocated,
-        )))
+        )).let { counters -> if (observation == null) counters else counters + observation.observations() }))
 
     private fun observe(stage: String) { stages[stage] = (stages[stage] ?: 0) + 1 }
 
@@ -260,6 +267,10 @@ internal class JointLinearRepair(
             prepareBooleanCenter = ::prepare, rootCoordinateValue = ::center,
             completionExhausted = { exhausted },
             centerPreparationPending = { rootPreparationPending },
+            onProposalOperator = observation?.let { { operator, round ->
+                observedOperator = operator
+                observedSchedulingRound = round
+            } },
             proposal = ExactNeighborhoodProposal { centers, bools, count, round, radius, cutoff ->
                 val checked = preparedCenter?.takeIf { round == 0L &&
                     (cutoff == null || it.value?.let { value -> value < cutoff } == true)
@@ -311,6 +322,13 @@ internal class JointLinearRepair(
                 val guided = requireNotNull(selection).guide(hint, from, budget, stop)
                 requireNotNull(selection).propose(from, pooled?.bools ?: bools, size, proposalRound, radius, limit)
                     .also { condition ->
+                        if (observation != null) {
+                            proposalSequence++
+                            observationQuery = 0L
+                            observation.proposal(proposalSequence, observedOperator, observedSchedulingRound,
+                                proposalRound, count, size, if (pooled == null) "stored" else "checked-pooled",
+                                from, model.numIntVars, sourceIntegers, observedRoots, condition)
+                        }
                         guidedProposal = condition.takeIf { guided }
                         if (checkedStart) {
                             checkedTrialCenter = pooled
@@ -351,6 +369,7 @@ internal class JointLinearRepair(
             }
             selection = JointRepairNeighborhood.prepare(source, model.numIntVars, model.numRealVars, construction,
                 sourceIntegers)
+            selection?.onRefutationRoots = observation?.let { { roots -> observedRoots = roots } }
             if (selection == null) {
                 declined = !stop() && !cancellation()
                 return false
@@ -422,6 +441,11 @@ internal class JointLinearRepair(
     fun attempt(condition: ExactNeighborhoodCondition, cancellation: Cancellation): JointRepairAttempt {
         val result = advanceAttempt(condition, cancellation)
         if (result.result != ExactNeighborhoodResult.Paused) {
+            observation?.event(proposalSequence, observationQuery, "result", when (result.result) {
+                is ExactNeighborhoodResult.Witness -> "checked-source-witness"
+                ExactNeighborhoodResult.Refuted -> "regional-refutation"
+                else -> "undecided-${result.reason}"
+            })
             if (queryFreedIntegers > 2 && (result.result == ExactNeighborhoodResult.Refuted ||
                     result.result is ExactNeighborhoodResult.Witness)) {
                 observe("jointRepairLargerNeighborhoodCompletions")
@@ -473,6 +497,7 @@ internal class JointLinearRepair(
                 queryFreedIntegers = 0
                 selection?.clearRefutation()
                 observe("jointRepairRepeatedQueriesSkipped")
+                observation?.event(proposalSequence, 0L, "reuse", "checked-regional-refutation")
                 compare("reuse", "checked-refutation")
                 return JointRepairAttempt(ExactNeighborhoodResult.Refuted, TerminationReason.SearchExhausted)
             }
@@ -489,7 +514,9 @@ internal class JointLinearRepair(
                 }
             }
             pending = captured
-            if (onComparison != null) conditionSequence++
+            if (onComparison != null || observation != null) conditionSequence++
+            observationQuery = conditionSequence
+            observation?.event(proposalSequence, observationQuery, "query", "opened")
             compare("query", "opened", cutoff = condition.cutoff)
             val querySource = source.atScope(source.scope.copy(condition = bounds))
             queryRefutationKey = key
@@ -548,6 +575,11 @@ internal class JointLinearRepair(
                 } else observe(if (originalChecked) "jointRepairOriginalPublicationChecked"
                     else "jointRepairOriginalPublicationRejected")
             }
+            observation?.event(proposalSequence, observationQuery, "publication", when {
+                checked != SourceEvidenceCheck.Checked -> "source-unchecked"
+                !originalChecked -> "original-unchecked"
+                else -> "checked"
+            })
             stages["jointRepairPublicationNs"] = (stages["jointRepairPublicationNs"] ?: 0L) +
                 mark.elapsedNow().inWholeNanoseconds
             if (publicationLifetime == null && cancellation() && !stop()) {
@@ -652,29 +684,36 @@ internal class JointLinearRepair(
         observe("jointRepairRefutationFeedbackObserved")
         if (feedback !is SourceNumericalFeedbackResult.Available) {
             observe("jointRepairRefutationFeedbackUnavailable")
+            observation?.event(proposalSequence, observationQuery, "feedback", "unavailable")
             return
         }
         if (!feedback.compatible(querySource, null)) {
             observe("jointRepairRefutationScopeIncompatible")
+            observation?.event(proposalSequence, observationQuery, "feedback", "incompatible-scope")
             return
         }
         if (feedback.query.refutation == null) {
             observe("jointRepairRefutationClaimMissing")
+            observation?.event(proposalSequence, observationQuery, "feedback", "missing-refutation")
             return
         }
         when (val support = sourceNumericalRefutationSupport(feedback, funding, stop)) {
             is SourceNumericalSupportResult.Available -> {
                 observe("jointRepairRefutationSupportAvailable")
                 val selector = selection
-                when {
-                    selector == null -> observe("jointRepairRefutationSelectorMissing")
-                    selector.guideRefutation(support.assumptions, condition, budget, stop) ->
-                        observe("jointRepairRefutationGuidance")
-                    else -> observe("jointRepairRefutationSeedDeclined")
+                val disposition = when {
+                    selector == null -> "jointRepairRefutationSelectorMissing"
+                    selector.guideRefutation(support.assumptions, condition, budget, stop) -> "jointRepairRefutationGuidance"
+                    else -> "jointRepairRefutationSeedDeclined"
                 }
+                observe(disposition)
+                observation?.feedback(proposalSequence, observationQuery, disposition, support.assumptions,
+                    condition, model.numIntVars)
             }
             is SourceNumericalSupportResult.Unavailable -> {
                 observe("jointRepairRefutationSupport${support.reason}")
+                observation?.event(proposalSequence, observationQuery, "feedback",
+                    "support-${support.reason}-${support.limitStage}")
                 support.limitStage?.let { observe("jointRepairRefutationSupportLimit$it") }
                 if (support.reason == SourceNumericalSupportResult.Reason.Funding) {
                     observe(if (funding.exhausted) "jointRepairRefutationOwnerExhausted"

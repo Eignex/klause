@@ -54,6 +54,23 @@ import kotlin.time.Duration
 
 class SourceExecutionTest {
     @Test
+    fun `mixed observer attachment should preserve the quiet joint observer`() {
+        val source = LinearSourceProblem(listOf(
+            LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),
+            LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
+        ), emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE))))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
+        val observer: (String, Long, JointRepairObservation) -> Unit = { _, _, _ -> }
+        val request = SourceExecutionRequest(invocation).withPortfolioJointRepairObserver(observer)
+            .withPortfolioLpQueryObserver { _, _, _ -> }.withPortfolioGuidanceObserver { _, _ -> }
+
+        assertSame(observer, request.onPortfolioJointRepair)
+        assertNotNull(request.onPortfolioLpQuery)
+        assertNotNull(request.onPortfolioGuidance)
+    }
+
+    @Test
     fun `mixed source observations should retain the selected native worker binding`() {
         val source = LinearSourceProblem(listOf(
             LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),

@@ -93,6 +93,7 @@ class SourceExecutionRequest private constructor(
     val prepareOnly: Boolean = false,
     internal val onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
     internal val onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
+    internal val onPortfolioJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
 ) {
     internal fun withPortfolioLpQueryObserver(
         observer: (String, Double?, LpQueryObservation) -> Unit,
@@ -103,7 +104,7 @@ class SourceExecutionRequest private constructor(
         }
         return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, observer, onPortfolioGuidance)
+            prepareOnly, observer, onPortfolioGuidance, onPortfolioJointRepair)
     }
 
     internal fun withPortfolioGuidanceObserver(
@@ -115,7 +116,19 @@ class SourceExecutionRequest private constructor(
         }
         return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, onPortfolioLpQuery, observer)
+            prepareOnly, onPortfolioLpQuery, observer, onPortfolioJointRepair)
+    }
+
+    internal fun withPortfolioJointRepairObserver(
+        observer: (String, Long, JointRepairObservation) -> Unit,
+    ): SourceExecutionRequest {
+        require(invocation.request.engine == FiniteEngine.MIXED &&
+            SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly) {
+            "joint repair observation requires mixed finite source execution"
+        }
+        return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
+            presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
+            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, observer)
     }
 
     /**
@@ -466,7 +479,7 @@ private fun executeCapturedSource(
             )
             val result = FinitePipeline.solve(finite, callbacks.finite, LpSolveContext.Production,
                 if (invocation.requestsFiniteNumericalCompanions) request.theory.boundTo(invocation) else null,
-                request.onPortfolioLpQuery, request.onPortfolioGuidance)
+                request.onPortfolioLpQuery, request.onPortfolioGuidance, request.onPortfolioJointRepair)
             SourceExecutionResult.Finite(invocation, result)
         }
 

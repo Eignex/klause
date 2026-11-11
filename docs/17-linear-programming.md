@@ -1918,6 +1918,19 @@ distinguish an exhausted containing owner from a paused numerical query grant.
 Support limits identify context lookups, proof traversal, result collection
 or derivation depth.
 These finite counters carry no proof authority and change no admission allowance.
+A private finite-request observer can capture actual joint proposals without enabling
+portfolio progress. It records the scheduling operator and round, requested and
+effective counts, exact eligible integer centers and condition pins, actual free
+coordinates, selected refutation roots, bounded cited support and correlated query
+and publication dispositions. Proposal identifiers are owner-local; query zero
+means no numerical query has been associated with that event. The default observer
+is absent. Each owner captures at most 64 records, 16,384 entries and 1 MiB modeled
+bytes, with 4,096-bit scalars. Copies debit containing source funding without
+renewing numerical grants; copying and observer callbacks spend the active lifetime.
+Counters retain capture time, visited entries, modeled bytes, dropped records and
+the stopping reason. A declined capture withholds the entire record and stops
+further capture. These snapshots retain no live numerical owner, perform no solve
+or proof check, and confer no source or performance authority.
 Each joint owner retains at most four completed pre-incumbent regional refutations.
 Its source, semantics and objective stay fixed; exact keys snapshot every Boolean
 pin, numeric bound and cutoff. Only a terminal refutation in the queried root scope
