@@ -74,6 +74,8 @@ class SourceProofContext(
     private val capturedCoordinates = coordinates.toSet()
     private val capturedPremises = premises.toMap()
     private val capturedObjective = objective?.filterValues { !it.isZero }?.toMap()
+    private var definitionIdentity: Any = Any()
+    internal val linearDefinitionIdentity: Any get() = definitionIdentity
     internal val coordinateCount: Int get() = capturedCoordinates.size
     internal val premiseCount: Int get() = capturedPremises.size
     internal val affineObjectiveAvailable: Boolean get() = capturedObjective != null
@@ -101,6 +103,10 @@ class SourceProofContext(
         capturedCoordinates == other.capturedCoordinates && capturedPremises == other.capturedPremises &&
             capturedObjective.orEmpty() == other.capturedObjective.orEmpty() &&
             objectiveConstant == other.objectiveConstant
+
+    internal fun scoped(scope: SourceScope): SourceProofContext = SourceProofContext(
+        scope, capturedCoordinates, capturedPremises, capturedObjective, objectiveConstant, semanticsChecker, semantics,
+    ).also { it.definitionIdentity = definitionIdentity }
 
     init {
         require(capturedPremises.keys.none { it.isBlank() })
