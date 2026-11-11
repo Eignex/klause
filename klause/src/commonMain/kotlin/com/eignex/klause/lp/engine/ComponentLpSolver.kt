@@ -54,6 +54,18 @@ internal class ComponentLpSolver(
     private var continuationTarget: Basis? = null
     override var recessionDirection: DoubleArray? = null
         private set
+    private var captureRecession = false
+    override var recessionCandidate: LpRecessionCandidate? = null
+        get() = field.takeIf {
+            activeSolve == null && lastTermination == LpFloatTermination.UNBOUNDED_CANDIDATE && currentAuthority()
+        }
+        private set
+
+    override fun configureRecessionCapture(enabled: Boolean) {
+        check(activeSolve == null) { "LP solve is suspended" }
+        captureRecession = enabled
+        recessionCandidate = null
+    }
     override var solvedExactState: LpExactState? = null
         get() = field.takeIf { activeSolve == null }
         private set
@@ -219,6 +231,7 @@ internal class ComponentLpSolver(
     }
 
     private fun clearEvidence() {
+        recessionCandidate = null
         blockResults = null
         solvedExactState = null
         continuationTarget = null
@@ -389,6 +402,7 @@ internal class ComponentLpSolver(
     ): FloatLpResult? = try {
         stitch(allowance, op)
     } catch (primary: Throwable) {
+        recessionCandidate = null
         lastTermination = null
         blockResults = null
         solvedExactState = null
@@ -405,12 +419,32 @@ internal class ComponentLpSolver(
         iterations = if (allowance.iterations > 0) (allowance.iterations - metrics.pivots).coerceAtLeast(1) else 0,
     )
 
+    private fun recessionBuffer(allowance: LpFloatAllowance?): DoubleArray? {
+        recessionDirection?.let { return it }
+        if (captureRecession) {
+            val units = model.n.toLong()
+            if (units > 262_144L || (allowance != null && allowance.work > 0L &&
+                    units > allowance.work - metrics.workOps)
+            ) {
+                lastTermination = LpFloatTermination.WORK
+                return null
+            }
+            metrics += LpSolveMetrics(workOps = units)
+            if (cancellation()) {
+                lastTermination = LpFloatTermination.CANCELLED
+                return null
+            }
+        }
+        return DoubleArray(model.n).also { recessionDirection = it }
+    }
+
     private suspend fun stitch(
         allowance: LpFloatAllowance?,
         op: suspend (LpSolver) -> FloatLpResult?,
     ): FloatLpResult? {
         check(!closed)
         lastTermination = null
+        recessionCandidate = null
         infeasibleRay = null
         blockResults = null
         continuationTarget = null
@@ -436,16 +470,22 @@ internal class ComponentLpSolver(
             val shifted = if (model.exactState == null) {
                 if (c < 0.0) {
                     if (!model.hasFiniteUpper(j)) {
-                        lastTermination = LpFloatTermination.UNBOUNDED_CANDIDATE
-                        return null
+                        if (!captureRecession) {
+                            lastTermination = LpFloatTermination.UNBOUNDED_CANDIDATE
+                            return null
+                        }
+                        val direction = recessionBuffer(allowance) ?: return null
+                        direction[j] = 1.0
+                        0.0
+                    } else {
+                        model.upperD(j)
                     }
-                    model.upperD(j)
                 } else {
                     0.0
                 }
             } else {
                 (isolatedValue(j) ?: run {
-                    val direction = recessionDirection ?: DoubleArray(model.n).also { recessionDirection = it }
+                    val direction = recessionBuffer(allowance) ?: return null
                     direction[j] = if (c < 0.0) 1.0 else -1.0
                     feasibleIsolatedValue(j)
                 }).toDouble()
@@ -473,7 +513,10 @@ internal class ComponentLpSolver(
                 if (lastTermination != null) return null
             }
             metrics += if (reused == null) LpSolveMetrics(componentSolves = 1) else LpSolveMetrics(componentReuses = 1)
-            val r = (reused ?: op(solvers[k])) ?: run {
+            if (reused == null) solvers[k].configureRecessionCapture(captureRecession)
+            val returned = reused ?: op(solvers[k])
+            val recession = if (returned == null && captureRecession) solvers[k].recessionCandidate else null
+            val r = returned ?: recession?.point ?: run {
                 metrics += solvers[k].lastMetrics
                 lastTermination = solvers[k].lastTermination
                 // A dual-unbounded block is a candidate infeasibility of the whole model: its float
@@ -491,9 +534,34 @@ internal class ComponentLpSolver(
                 if (recessionDirection != null) continuationTarget = componentBasis()
                 return null
             }
+            if (recession != null) {
+                if (recession.direction.size != part.cols.size || r.primal.size != part.model.n) {
+                    metrics += solvers[k].lastMetrics
+                    lastTermination = solvers[k].lastTermination
+                    return null
+                }
+                val units = model.n.toLong() + recession.direction.size
+                if (units > 262_144L || (allowance != null && allowance.work > 0L &&
+                        units > allowance.work - metrics.workOps - solvers[k].lastMetrics.workOps)
+                ) {
+                    metrics += solvers[k].lastMetrics
+                    lastTermination = LpFloatTermination.WORK
+                    return null
+                }
+                metrics += LpSolveMetrics(workOps = units)
+                if (cancellation()) {
+                    metrics += solvers[k].lastMetrics
+                    lastTermination = LpFloatTermination.CANCELLED
+                    return null
+                }
+                val full = DoubleArray(model.n)
+                for (column in recession.direction.indices) full[part.cols[column]] = recession.direction[column]
+                recessionDirection = full
+            }
             if (part.model.exactState != null &&
                 (r.exactState !== part.model.exactState || solvers[k].solvedExactState !== part.model.exactState)
             ) {
+                if (reused == null) metrics += solvers[k].lastMetrics
                 solvedExactState = null
                 return null
             }
@@ -528,13 +596,13 @@ internal class ComponentLpSolver(
         val basis = Basis(basicVars, status)
         // A float optimum can violate an exact source row; continuation must retain its full-model target.
         continuationTarget = basis
-        if (recessionDirection != null) {
+        if (recessionDirection != null && !captureRecession) {
             lastTermination = LpFloatTermination.UNBOUNDED_CANDIDATE
             return null
         }
         blockResults = results
         if (results.all { it?.optimal == true }) lastTermination = LpFloatTermination.OPTIMAL_CANDIDATE
-        return FloatLpResult(
+        val result = FloatLpResult(
             basis = basis,
             objective = model.objectiveD(objective),
             duals = duals,
@@ -544,11 +612,17 @@ internal class ComponentLpSolver(
             luMaxDensity = maxDensity,
             luMaxDim = maxDim,
             blocks = parts.size,
-            optimal = results.all { it?.optimal == true },
+            optimal = recessionDirection == null && results.all { it?.optimal == true },
             warmStarted = metrics.warmHits > 0,
             refactorizations = lastRefactorizations,
             exactState = model.exactState,
         )
+        recessionDirection?.let { direction ->
+            lastTermination = LpFloatTermination.UNBOUNDED_CANDIDATE
+            if (!cancellation()) recessionCandidate = LpRecessionCandidate(result, direction)
+            return null
+        }
+        return result
     }
 
     override fun partialBoundDuals(cancellation: Cancellation): DoubleArray? {

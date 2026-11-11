@@ -36,6 +36,45 @@ import kotlin.test.assertTrue
 
 class LeafRealSolverTest {
     @Test
+    fun `cancellation during recession point acceptance should withhold the pair`() {
+        val problem = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val sample = Sample(booleanArrayOf(), longArrayOf())
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
+        var cancelled = false
+
+        val result = leafRealFeasibility(problem, objective, sample, context = LpSolveContext.Numerical,
+            cancellation = Cancellation { cancelled }, toleranceCheck = { cancelled = true; true })
+
+        assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+        assertTrue(result.reals.isEmpty())
+    }
+
+    @Test
+    fun `numerical completion should publish an unbounded pair only after source arithmetic accepts it`() {
+        val problem = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val sample = Sample(booleanArrayOf(), longArrayOf())
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
+        val sink = LpStatsSink(LpRoute.STANDALONE)
+
+        val fresh = leafRealFeasibility(problem, objective, sample, sink = sink, context = LpSolveContext.Numerical)
+        val retained = LeafRealSolver(problem, objective, sink = sink, context = LpSolveContext.Numerical)
+            .use { it.solve(sample) }
+
+        for (result in listOf(fresh, retained)) {
+            assertEquals(LpVerdict.UNBOUNDED, result.verdict)
+            assertTrue(result.numerical)
+            assertTrue(assertNotNull(result.exactReals).single() >= BigFraction.ZERO)
+            assertTrue(assertNotNull(result.direction).single() > BigFraction.ZERO)
+        }
+        val stats = sink.snapshot()
+        assertEquals(2L, stats.phases["SOURCE_RECESSION_ACCEPTANCE_STANDALONE"]?.outcomes?.get("UNBOUNDED"))
+        assertEquals(0.0, stats.exactPointFeasible.attempts.sum)
+        assertFalse(stats.phases.keys.any { it.startsWith("CLAIM_CONSUMPTION") })
+    }
+
+    @Test
     fun `numerical leaf completion should separate exact point coordinates from LP authority`() {
         val problem = Problem(0, 0, emptyArray(), arrayOf<Factor>(
             Linear(longArrayOf(), intArrayOf(), doubleArrayOf(2.0), intArrayOf(0), LinearOp.EQ, 1L),

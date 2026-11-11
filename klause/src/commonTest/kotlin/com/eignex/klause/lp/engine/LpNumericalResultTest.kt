@@ -3,11 +3,57 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpNumericalResultTest {
+    @Test
+    fun `numerical recession should require the source point without exact certification`() {
+        val model = LpBuilder().apply { addOpenAboveVar(0L, cost = -1L) }.build(Sense.MINIMIZE)
+        for (accepted in listOf(false, true)) {
+            var claim: LpPhaseMetrics? = null
+            val observer = object : LpCertificationObserver {
+                override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+                    error("exact certification was invoked")
+                }
+                override fun observeExactInput(accepted: Boolean) = Unit
+                override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+                override fun observePhase(metrics: LpPhaseMetrics) {
+                    if (metrics.phase == LpSolvePhase.CLAIM_ATTAINED_OPTIMUM) claim = metrics
+                }
+            }
+            val result = solveAndCertify(model, context = LpSolveContext.Numerical,
+                observer = observer, floatAccept = { accepted })
+
+            val numerical = assertNotNull(result.numerical)
+            assertEquals(accepted, numerical.point != null)
+            assertEquals(accepted, numerical.recession?.belongsTo(model) == true)
+            assertFalse(numerical.optimumWithinTolerance)
+            assertNull(result.witness)
+            assertNull(result.unboundedness)
+            assertNull(result.bound)
+            assertNull(result.continuation)
+            assertTrue(numerical.work > 0L)
+            assertEquals(numerical.work, assertNotNull(claim).work)
+        }
+    }
+
+    @Test
+    fun `an exhausted recession allowance should skip source acceptance`() {
+        val model = LpBuilder().apply { addOpenAboveVar(0L, cost = -1L) }.build(Sense.MINIMIZE)
+
+        val result = solveAndCertify(model, context = LpSolveContext.Numerical,
+            refinementLimits = LpRefinementLimits(maxWork = 0L),
+            floatAccept = { error("source acceptance ran without work") })
+
+        val numerical = assertNotNull(result.numerical)
+        assertEquals(LpFloatingBoundStop.WORK, numerical.stop)
+        assertNull(numerical.point)
+        assertNull(numerical.recession)
+    }
+
     @Test
     fun `a numerical solve should establish a bound without an exact certificate`() {
         val builder = LpBuilder()

@@ -21,6 +21,7 @@ import com.eignex.klause.ir.complemented
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.bigIntOf
@@ -35,25 +36,36 @@ import com.eignex.util.numbers.bigIntOf
  * along it. A factor over a moved real that this check cannot read declines the proof. Discrete-only factors
  * are not re-checked: [point] is a leaf assignment the search already found consistent.
  */
-internal fun Problem.provesUnbounded(objective: LinearObjective, point: Sample, direction: List<BigFraction>): Boolean {
+internal fun Problem.provesUnbounded(
+    objective: LinearObjective,
+    point: Sample,
+    direction: List<BigFraction>,
+    cancellation: Cancellation = Cancellation.Never,
+): Boolean {
+    if (cancellation()) return false
     val reals = point.exactReals ?: return false
     if (reals.size != numRealVars || direction.size != numRealVars) return false
     if (point.numIntVars != numIntVars || point.numBoolVars != numBoolVars) return false
     if (direction.all { it.isZero }) return false
     for (r in 0 until numRealVars) {
+        cancellation.charge(1L)
+        if (cancellation()) return false
         if (!within(reals[r], realLower[r], realUpper[r])) return false
         if (direction[r].signum() < 0 && realLower[r] != Double.NEGATIVE_INFINITY) return false
         if (direction[r].signum() > 0 && realUpper[r] != Double.POSITIVE_INFINITY) return false
     }
     var descent = BigFraction.ZERO
     for (r in 0 until minOf(objective.realCoefficientValues.size, numRealVars)) {
+        cancellation.charge(1L)
+        if (cancellation()) return false
         val coefficient = BigFraction.ofDouble(objective.realCoefficientValues[r]) ?: return false
         descent += coefficient * direction[r]
     }
     if (descent.signum() >= 0) return false
     return factors.all { factor ->
-        factor.variables.reals.all { direction[it].isZero } || keeps(factor, point, direction)
-    }
+        cancellation.charge(1L)
+        !cancellation() && (factor.variables.reals.all { direction[it].isZero } || keeps(factor, point, direction))
+    } && !cancellation()
 }
 
 private fun within(value: BigFraction, lower: Double, upper: Double): Boolean {

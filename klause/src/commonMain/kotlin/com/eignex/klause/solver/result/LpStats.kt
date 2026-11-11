@@ -797,7 +797,9 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                 override fun observePhase(metrics: LpPhaseMetrics) {
                     if (route == LpRoute.STANDALONE &&
                         (metrics.phase == LpSolvePhase.NUMERICAL_BOUND ||
-                            metrics.phase == LpSolvePhase.NUMERICAL_CONFLICT)
+                            metrics.phase == LpSolvePhase.NUMERICAL_CONFLICT ||
+                            metrics.phase == LpSolvePhase.NUMERICAL_RECESSION ||
+                            metrics.phase == LpSolvePhase.SOURCE_OPEN_PROJECTION)
                     ) {
                         standaloneWorkOps += minOf(metrics.work, Long.MAX_VALUE - standaloneWorkOps)
                     }

@@ -29,6 +29,18 @@ numerical bound. The numerical path does not enter exact point recovery, basis
 verification, reconstruction or continuation. A finite source work limit leaves
 only its unspent work for deductions. Numerical claim observations include that
 work without classifying it as an exact certificate.
+Completion queries can request a bounded snapshot of the feasible basis and improving
+direction at a primal unbounded stop. Capture spends the solve's remaining work and
+does not enable tableau cuts. Component composition completes the other blocks
+before exposing a global point; an infeasible or unfinished block withholds it.
+Fresh completion projects legacy probe boxes to their actual open source bounds
+within its preparation and work allowance. This imports source definitions without
+invoking an LP certificate producer. Numerical recession validation checks descent
+and structural and logical bound signs on the current model. The source adapter
+then checks the accepted point and mapped direction against the original arithmetic.
+A refused source ray leaves only a feasible completion. Capture, numerical checking,
+source projection and source acceptance have separate cost observations; none supplies
+an exact LP unboundedness certificate.
 Finite numerical consumers use the same work ledger for column pricing, source
 objective mapping, premise construction and deductions. One node shares a bounded
 deduction allowance inside its containing grant. Bounds, objective propagation
