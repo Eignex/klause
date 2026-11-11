@@ -571,7 +571,6 @@ internal class FloatDeductionCertificate private constructor(
             // An open side is priced at the tightest bound one row implies; that row and both finite sides of every
             // column in it are cited, which covers every premise the implied bound reads.
             fun implied(j: Int, lowSide: Boolean): Double? {
-                declined[0] = if (j >= view.n) "OPEN_SLACK" else "OPEN_COLUMN"
                 val (bound, row) = rows.value.impliedBy(j, lowSide) ?: return null
                 citedRows[row] = true
                 val columns = rows.value.columnsOf(row)
@@ -588,6 +587,7 @@ internal class FloatDeductionCertificate private constructor(
                 val upper = view.upper(j)
                 if (abs(d) > error) {
                     val boxed = if (d > 0.0) lower else upper
+                    declined[0] = if (j >= view.n) "OPEN_SLACK" else "OPEN_COLUMN"
                     val side = if (boxed.isFinite()) boxed else implied(j, d > 0.0) ?: return null
                     value += d * side
                     magnitude += abs(d * side)
@@ -595,9 +595,10 @@ internal class FloatDeductionCertificate private constructor(
                     if (boxed.isFinite()) reduced[j] = d / scale
                     continue
                 }
-                // A sign within rounding prices both sides, and the finite box sides are cited.
-                val low = if (lower.isFinite()) lower else implied(j, true) ?: return null
-                val high = if (upper.isFinite()) upper else implied(j, false) ?: return null
+                // A sign within rounding prices both sides, and the finite box sides are cited. A side no row bounds
+                // takes the reduced cost as the zero it equals within that rounding: the numerical acceptance.
+                val low = if (lower.isFinite()) lower else implied(j, true) ?: 0.0
+                val high = if (upper.isFinite()) upper else implied(j, false) ?: 0.0
                 margin += (abs(d) + error) * max(abs(low), abs(high))
                 sides[j] = (sides[j].toInt() or finiteSides(view, j)).toByte()
             }
