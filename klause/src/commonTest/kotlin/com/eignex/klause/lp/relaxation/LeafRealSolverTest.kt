@@ -136,7 +136,7 @@ class LeafRealSolverTest {
                 val result = owner.solve(sample, toleranceCheck = check)
 
                 assertEquals(expected, result.verdict)
-                if (check == null) assertEquals(BigFraction.ONE / BigFraction.ofLong(3L), result.exactReals?.single())
+                if (check == null) assertEquals(BigFraction.ofLong(3L).reciprocal(), result.exactReals?.single())
             }
         }
 
@@ -151,7 +151,7 @@ class LeafRealSolverTest {
         val problem = Problem(0, 0, emptyArray(), arrayOf<Factor>(
             Linear(longArrayOf(), intArrayOf(), doubleArrayOf(3.0), intArrayOf(0), LinearOp.EQ, 1L),
         ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
-        val third = BigFraction.ONE / BigFraction.ofLong(3L)
+        val third = BigFraction.ofLong(3L).reciprocal()
         var cancelled = false
         var checks = 0
         val acceptance = FiniteSourceAcceptance({ point ->
