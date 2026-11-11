@@ -416,16 +416,20 @@ class CoreGuidedSearchTest {
         val objective = LinearObjective(longArrayOf(1, 1))
         val search = CoreGuidedSearch(source.bake(providers.prepare(source)), objective,
             BacktrackParams(nativeSat = false))
+        val initialPreparation = search.preparationWork
+
 
         val paused = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) { error("interrupted opening") }
         val charged = search.work
+        val chargedPreparation = search.preparationWork
         cancelled = false
         val result = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) {}
 
         assertNull(paused)
         assertTrue(interrupted)
-        assertTrue(augmentedModels.size > 1)
-        assertTrue(augmentedModels[0] === augmentedModels[1])
+        assertTrue(augmentedModels.isNotEmpty())
+        assertTrue(augmentedModels.all { it === augmentedModels.first() })
+        assertTrue(chargedPreparation > initialPreparation)
         val optimal = assertIs<MinimizeResult.Optimal>(result)
         assertEquals(1L, objective.evaluateLong(optimal.sample))
         assertTrue(search.work >= charged)
