@@ -12,6 +12,54 @@ import kotlin.test.assertTrue
 
 class NativeCapIndexTest {
     @Test
+    fun `an externally retired protected retry should not return after cleanup`() {
+        val rows = Rows()
+        repeat(6) { rows.add(9 + it) }
+        rows.finish(6)
+        rows.protected[5] = true
+        rows.retireHook = { rows.cancelled = true }
+        rows.attempt(5)
+        assertFalse(rows.alive[4])
+        assertTrue(rows.alive[5])
+        rows.alive[5] = false
+        rows.keys[5] = 0
+        rows.index.invalidateRetiredHandles()
+        rows.retireHook = {}
+        rows.cancelled = false
+
+        rows.finish(5)
+
+        assertEquals(rows.survivors(), rows.candidates.toIntArray().sorted())
+        rows.finish(0)
+        assertEquals(NativeCapIndex.CREATION_BYTES, rows.index.modeledBytes)
+        assertFalse(rows.index.hasPending)
+    }
+
+    @Test
+    fun `aborting should discard an externally retired protected retry`() {
+        val rows = Rows()
+        repeat(6) { rows.add(9 + it) }
+        rows.finish(6)
+        rows.protected[5] = true
+        rows.retireHook = { rows.cancelled = true }
+        rows.attempt(5)
+        assertFalse(rows.alive[4])
+        assertTrue(rows.alive[5])
+        rows.alive[5] = false
+        rows.keys[5] = 0
+        rows.index.invalidateRetiredHandles()
+        rows.retireHook = {}
+        rows.cancelled = false
+        rows.budget = ReclamationPreparation(100_000L, 1_048_576L, { false }, {})
+
+        val completion = rows.index.abort(rows.budget, rows.policy)
+
+        assertEquals(NativeCapIndex.Completion.Aborted, completion)
+        assertEquals(rows.survivors(), rows.candidates.toIntArray().sorted())
+        assertTrue(rows.classified.none { it })
+    }
+
+    @Test
     fun `abort after logical retirement should preserve live candidate handles`() {
         val rows = Rows()
         repeat(8) { rows.add(9 + it) }
