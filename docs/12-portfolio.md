@@ -138,6 +138,10 @@ query's time. `finiteCompanionAdmissionDeclined` records an unfunded initial pai
 no query reports zero capture attempts. Final invocation accounting reads these
 shared counters once; worker summaries do not duplicate the capture.
 
+Finite numerical factories can withhold shared assignments independently of
+completion. The shared incumbent exchange, scalar bounds, admission and lifetimes
+retain their configured policies.
+
 `source-incumbent-completion=true` lets the numerical and joint-repair companions
 use an approximate incumbent's Boolean and finite integer coordinates as advisory
 pins. Approximate real coordinates guide rational reconstruction without carrying

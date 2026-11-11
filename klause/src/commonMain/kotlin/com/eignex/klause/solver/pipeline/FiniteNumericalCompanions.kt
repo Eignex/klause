@@ -106,7 +106,7 @@ internal class FiniteNumericalCompanions private constructor(
         LinearIncumbentSharing() else null
     private val repairGuidance = if (completionSharing != null) LinearRepairGuidance() else null
 
-    fun factories(plan: PreparedSourcePlan, firstArm: Int): List<PortfolioArmFactory> {
+    fun factories(plan: PreparedSourcePlan, firstArm: Int, sharePoints: Boolean = true): List<PortfolioArmFactory> {
         val identity = ModelIdentity.of(model, objective)
         val binding = EngineInvocation(plan, identity, objective)
         fun factory(arm: Int, family: ArmFamily, create: (PortfolioWorkerSlot) -> PortfolioWorker) =
@@ -124,9 +124,12 @@ internal class FiniteNumericalCompanions private constructor(
                 lateinit var worker: PortfolioWorker
                 worker = PortfolioWorker.ofMinimize("numerical/finite-companion", firstArm, resumable = {
                     val limits = local(slot)
-                    val search = if (admission == null) numericalSearch(limits, worker, requireNotNull(context))
+                    val search = if (admission == null)
+                        numericalSearch(limits, worker, requireNotNull(context), sharePoints)
                     else DeferredCompanionSearch({ admission.declineReason }) { global, millis ->
-                        admission.contextForStart(global, millis)?.let { numericalSearch(limits, worker, it) }
+                        admission.contextForStart(global, millis)?.let {
+                            numericalSearch(limits, worker, it, sharePoints)
+                        }
                     }
                     BoundedCompanionSearch(search, "finiteNumericalCompanion",
                         activeLimit = requireNotNull(cost.activeMillis).milliseconds,
@@ -141,14 +144,14 @@ internal class FiniteNumericalCompanions private constructor(
                 repairGuidance?.let(slot::own)
                 lateinit var companion: PortfolioWorker
                 val limits = local(slot)
-                val worker = context?.let { repairWorker(slot, firstArm + 1, limits, it) { companion } }
+                val worker = context?.let { repairWorker(slot, firstArm + 1, limits, it, sharePoints) { companion } }
                 companion = PortfolioWorker.ofMinimize("ls/finite-joint-companion", firstArm + 1,
                     countsInstructions = true,
                     resumable = {
                         val search = if (worker != null) requireNotNull(worker.newResumableSearch(incumbents::bound))
                         else DeferredCompanionSearch({ requireNotNull(admission).declineReason }) { global, millis ->
                             requireNotNull(admission).contextForStart(global, millis)?.let {
-                                requireNotNull(repairWorker(slot, firstArm + 1, limits, it) { companion }
+                                requireNotNull(repairWorker(slot, firstArm + 1, limits, it, sharePoints) { companion }
                                     .newResumableSearch(incumbents::bound))
                             }
                         }
@@ -165,12 +168,12 @@ internal class FiniteNumericalCompanions private constructor(
     }
 
     private fun repairWorker(slot: PortfolioWorkerSlot, arm: Int, limits: TheoryParams,
-        context: SourceProofContext, companion: () -> PortfolioWorker): PortfolioWorker {
+        context: SourceProofContext, sharePoints: Boolean, companion: () -> PortfolioWorker): PortfolioWorker {
         var readVersion = 0L
         var importedVersion = 0L
         val repair = slot.own(JointLinearRepair(model, context, objective, limits,
             boundOrdered = true, external = {
-                sharedIncumbent(companion()) { readVersion = it }
+                sharedIncumbent(companion(), sharePoints) { readVersion = it }
             }, onIncumbentImport = {
                 importedVersion = readVersion
                 companion().observeLifecycle(PortfolioLifecycleKind.INCUMBENT_IMPORTED, importedVersion)
@@ -203,19 +206,21 @@ internal class FiniteNumericalCompanions private constructor(
             open = { repair.search(adaptive = adaptiveRepair, seed = slot.seed) })
     }
 
-    private fun sharedIncumbent(worker: PortfolioWorker, onVersion: (Long) -> Unit) =
-        incumbents.exchange.current()?.also {
+    private fun sharedIncumbent(worker: PortfolioWorker, sharePoints: Boolean, onVersion: (Long) -> Unit): Sample? {
+        if (!sharePoints) return null
+        return incumbents.exchange.current()?.also {
             onVersion(it.version)
             worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_READ, it.version)
         }?.assignment
+    }
 
     private fun numericalSearch(limits: TheoryParams, worker: PortfolioWorker,
-        context: SourceProofContext): ResumableSearch =
+        context: SourceProofContext, sharePoints: Boolean): ResumableSearch =
         object : ResumableSearch {
             private var readVersion = 0L
             private var importedVersion = 0L
             private val search = LinearAuthorityInvocation(context, limits, boundOrdered = true,
-                external = { sharedIncumbent(worker) { readVersion = it } }, onIncumbentImport = {
+                external = { sharedIncumbent(worker, sharePoints) { readVersion = it } }, onIncumbentImport = {
                     importedVersion = readVersion
                     worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_IMPORTED, importedVersion)
                 }, onIncumbentUse = {
