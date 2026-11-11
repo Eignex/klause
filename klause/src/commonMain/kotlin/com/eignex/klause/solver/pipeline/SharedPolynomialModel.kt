@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalAtomicApi::class)
+
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.LinearForm
@@ -11,11 +13,13 @@ import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lowering.PolynomialRealLowering
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.encodingPreparationScope
+import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingAttribution
 import com.eignex.klause.theory.EncodingTarget
@@ -25,6 +29,8 @@ import com.eignex.klause.theory.qfnra.PolynomialTheoryService
 import com.eignex.klause.theory.qfnra.QfNraAssignment
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.BigInt
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 internal class SharedPolynomialModel private constructor(
     val source: Problem,
@@ -37,6 +43,18 @@ internal class SharedPolynomialModel private constructor(
     val finiteEnforcingFactors: Set<Int> = finiteFactorIndices.indices.filter { local ->
         encodingAttributions.any { it.sourceFactorIndex == finiteFactorIndices[local] }
     }.toSet()
+
+    // The finite view and its selected projections are immutable, so one bake serves every witness check. A bake
+    // cut short by cancellation keeps sound but weaker root deductions and is rebuilt by the next check.
+    private val finitePoints = AtomicReference<Pair<PreparedFactorProjections?, FinitePointCheck>?>(null)
+
+    fun finitePointCheck(projections: PreparedFactorProjections?, cancellation: Cancellation): FinitePointCheck {
+        finitePoints.load()?.let { (selected, check) -> if (selected === projections) return check }
+        val baked = projections?.let { finite.bake(it, cancellation) } ?: finite.bake(cancellation)
+        val check = FinitePointCheck(baked, finiteEnforcingFactors)
+        if (!cancellation()) finitePoints.store(projections to check)
+        return check
+    }
 
     fun capture(assignment: QfNraAssignment, bools: BooleanArray, ints: LongArray): Sample {
         val reals = List(source.numRealVars) { assignment.realValue(it) }
