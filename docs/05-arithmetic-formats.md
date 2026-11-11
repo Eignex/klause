@@ -35,8 +35,8 @@ defaults.
 
 MPS defaults to `SourceTolerance(absolute=1/10000000, relative=1/10000000)`. Each
 component can be replaced independently, including by zero, which requires exact
-checks and certificates, including exact finite LP certification. `--exact` sets the
-tolerance to zero. The CLI captures one
+checks and certificates, including exact finite LP certification; a positive tolerance
+makes finite LP deductions numerical. `--exact` sets the tolerance to zero. The CLI captures one
 [linear source snapshot](#source-correspondence) and registers it with the common
 invocation, which owns preparation, validation and result qualification. Slack and
 rendered objectives stay in source units when working rows are scaled.

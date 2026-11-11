@@ -362,7 +362,10 @@ private class RowView(private val exact: FloatEvidenceModel) {
     }
 
     /** Width of [j]'s box intersected with the interval every row through it implies, never below zero. */
-    fun impliedRange(j: Int): Double {
+    fun impliedRange(j: Int): Double = impliedBounds(j).let { max(it.second - it.first, 0.0) }
+
+    /** [j]'s box intersected with the interval every row through it implies, as `(low, high)`. */
+    fun impliedBounds(j: Int): Pair<Double, Double> {
         var low = lower[j]
         var high = upper[j]
         if (j >= exact.n) {
@@ -374,7 +377,7 @@ private class RowView(private val exact: FloatEvidenceModel) {
                 high = minOf(high, implied(row, j, a, lowSide = false))
             }
         }
-        return max(high - low, 0.0)
+        return low to high
     }
 
     // One side of the interval row i implies for column j, (b(i) − the others' activity) / a(i, j), widened by
@@ -464,9 +467,10 @@ private class FloatEvidenceModel(val model: LpModel) {
 /**
  * Lagrangian deduction data read from float duals, for finite-lane deductions accepted numerically
  * ([LpSolveContext.numericalDeductions]). `L(y) = y·rhs + Σⱼ min_{[lⱼ,uⱼ]} dⱼ·zⱼ` bounds the objective for any
- * multipliers; here it is summed in binary64 and lowered by that summation's rounding. A reduced cost within
- * [FLOAT_EVIDENCE_TOLERANCE] counts as zero: on a finite box its largest effect lowers the bound too, on an open
- * side it is accepted, and its column is cited by no reason. Reduced costs are in source objective units.
+ * multipliers; here it is summed in binary64, lowered by that summation's rounding and by an absolute and
+ * relative slack, so float noise above an integer never rounds an integral bound up. Every nonzero reduced cost
+ * prices and cites its minimizing side; one within [FLOAT_EVIDENCE_TOLERANCE] on an open side is accepted as
+ * zero, which with the binary64 evaluation makes the deductions numerical. Reduced costs are in source units.
  */
 internal class FloatDeductionCertificate private constructor(
     private val model: LpModel,
@@ -530,15 +534,12 @@ internal class FloatDeductionCertificate private constructor(
             val reduced = DoubleArray(view.numVars)
             for (j in 0 until view.numVars) {
                 val (d, error) = reducedCost(view, duals, j)
-                val lower = view.lower(j)
-                val upper = view.upper(j)
-                if (abs(d) <= FLOAT_EVIDENCE_TOLERANCE) {
-                    val reach = max(abs(lower), abs(upper))
-                    if (reach.isFinite()) margin += (abs(d) + error) * reach
-                    continue
+                if (d == 0.0) continue
+                val side = if (d > 0.0) view.lower(j) else view.upper(j)
+                if (!side.isFinite()) {
+                    if (abs(d) <= FLOAT_EVIDENCE_TOLERANCE) continue
+                    return null
                 }
-                val side = if (d > 0.0) lower else upper
-                if (!side.isFinite()) return null
                 value += d * side
                 magnitude += abs(d * side)
                 margin += error * abs(side)
@@ -546,7 +547,8 @@ internal class FloatDeductionCertificate private constructor(
             }
             margin += (view.numVars + view.m + 4) * UNIT_ROUNDOFF * magnitude
             val source = model.objectiveD(value - margin)
-            val lowerBound = source - 2 * UNIT_ROUNDOFF * abs(source)
+            val lowerBound = source - 2 * UNIT_ROUNDOFF * abs(source) -
+                INTEGRAL_SLACK - INTEGRAL_SLACK_RELATIVE * abs(source)
             return if (lowerBound.isFinite()) FloatDeductionCertificate(model, duals, reduced, lowerBound) else null
         }
     }
@@ -591,55 +593,67 @@ private fun reducedCost(view: FloatEvidenceModel, y: DoubleArray, j: Int): Pair<
 
 /**
  * [ray] oriented and rounded to integer multipliers when, summed in binary64, it shows the rows of [model] cannot
- * hold inside its box with a margin of [FLOAT_EVIDENCE_TOLERANCE] times the terms' size: `ρ·rhs > Σⱼ max(ρ·Aⱼ·zⱼ)`.
- * The numerical counterpart of [certifyLpFarkas]; ray entries within the tolerance of the largest count as zero.
+ * hold inside its box: `ρ·rhs > Σⱼ max(ρ·Aⱼ·zⱼ)` by [FLOAT_EVIDENCE_TOLERANCE] times the terms' size. An open side
+ * that the float ray meets is priced at the bound the other rows imply. The rounded ray is checked again against the
+ * box alone, the sides an infeasibility clause cites. The numerical counterpart of [certifyLpFarkas].
  */
-@Suppress("ReturnCount", "CyclomaticComplexMethod")
+@Suppress("ReturnCount")
 internal fun floatFarkasRay(model: LpModel, ray: DoubleArray): LongArray? {
     if (ray.size != model.m || !model.finiteExactInput()) return null
-    val view = FloatEvidenceModel(model)
     var largest = 0.0
     for (value in ray) {
         if (!value.isFinite()) return null
         largest = max(largest, abs(value))
     }
     if (largest == 0.0) return null
+    val view = FloatEvidenceModel(model)
+    val rows = lazy { RowView(view) }
+    val normalized = DoubleArray(ray.size) { ray[it] / largest }
+    val sign = farkasSign(view, normalized, rows) ?: return null
+    val rounded = roundDuals(model, DoubleArray(ray.size) { sign * normalized[it] })?.mult ?: return null
+    return rounded.takeIf { farkasSign(view, DoubleArray(it.size) { row -> it[row].toDouble() }, null) == 1 }
+}
+
+// +1 when ρ·rhs exceeds every ρ·A·z in the box by the margin, -1 when it falls below every one, else null. Open
+// sides take their implied bounds from [rows] when given and refute nothing otherwise.
+@Suppress("ReturnCount", "CyclomaticComplexMethod")
+private fun farkasSign(view: FloatEvidenceModel, ray: DoubleArray, rows: Lazy<RowView>?): Int? {
     var activity = 0.0
     var magnitude = 0.0
     for (i in 0 until view.m) {
         activity += ray[i] * view.rhs(i)
         magnitude += abs(ray[i] * view.rhs(i))
     }
-    // The greatest and least of ρ·A·z over the box, with how many open sides each meets.
     var most = 0.0
     var least = 0.0
-    var mostOpen = false
-    var leastOpen = false
-    var ignored = 0.0
     for (j in 0 until view.numVars) {
         var r = 0.0
         if (j >= view.n) r = ray[j - view.n] else view.forEachInColumn(j) { row, a -> r += ray[row] * a }
-        val lower = view.lower(j)
-        val upper = view.upper(j)
-        if (abs(r) <= FLOAT_EVIDENCE_TOLERANCE * largest) {
-            val reach = max(abs(lower), abs(upper))
-            if (reach.isFinite()) ignored += abs(r) * reach
-            continue
+        if (r == 0.0) continue
+        var lower = view.lower(j)
+        var upper = view.upper(j)
+        if (rows != null && (!lower.isFinite() || !upper.isFinite())) {
+            val (low, high) = rows.value.impliedBounds(j)
+            lower = low
+            upper = high
         }
         val high = r * (if (r > 0.0) upper else lower)
         val low = r * (if (r > 0.0) lower else upper)
-        if (high.isFinite()) most += high else mostOpen = true
-        if (low.isFinite()) least += low else leastOpen = true
+        most += high
+        least += low
         magnitude += max(if (high.isFinite()) abs(high) else 0.0, if (low.isFinite()) abs(low) else 0.0)
     }
-    val margin = FLOAT_EVIDENCE_TOLERANCE * magnitude + ignored
-    val oriented = when {
-        !mostOpen && activity - most > margin -> ray
-        !leastOpen && least - activity > margin -> DoubleArray(ray.size) { -ray[it] }
-        else -> return null
+    val margin = FLOAT_EVIDENCE_TOLERANCE * magnitude
+    return when {
+        most.isFinite() && activity - most > margin -> 1
+        least.isFinite() && least - activity > margin -> -1
+        else -> null
     }
-    return roundDuals(model, oriented)?.mult
 }
+
+// Slack below a numerical bound before any integral rounding: float noise of this size is not an objective step.
+private const val INTEGRAL_SLACK: Double = 1e-6
+private const val INTEGRAL_SLACK_RELATIVE: Double = 1e-9
 
 // Duals this far below the largest carry no information a binary64 basis solve can resolve.
 private const val NEGLIGIBLE_DUAL: Double = 1e-15

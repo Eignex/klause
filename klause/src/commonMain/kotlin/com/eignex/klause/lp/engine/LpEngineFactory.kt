@@ -136,7 +136,8 @@ internal data class LpSolveContext(
     companion object {
         val Production = LpSolveContext()
 
-        /** The finite-lane context: exact certification only when [exact] is requested. */
-        fun finite(exact: Boolean): LpSolveContext = if (exact) Production else LpSolveContext(numericalDeductions = true)
+        /** The finite-lane context, with [numerical] deductions or exact certification. */
+        fun finite(numerical: Boolean): LpSolveContext =
+            if (numerical) LpSolveContext(numericalDeductions = true) else Production
     }
 }

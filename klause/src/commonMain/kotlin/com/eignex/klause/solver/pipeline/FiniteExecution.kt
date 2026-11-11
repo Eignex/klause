@@ -111,8 +111,6 @@ class FiniteSolveRequest(
      * check accepts it; `null` keeps exact semantics.
      */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
-    /** Whether finite-lane LP deductions require exact certificates; float results within tolerances otherwise. */
-    val exactLp: Boolean = false,
 ) {
     private var capturedSourceControls: SourceFiniteControls? = null
     internal val sourceControls: SourceFiniteControls? get() = capturedSourceControls
@@ -161,9 +159,13 @@ class FiniteSolveRequest(
         ) { "enumeration needs its captured source operation" }
     }
 
-    /** Finite LP dependencies: exact certification when requested or when the source admits zero tolerance. */
+    /**
+     * Finite LP dependencies. A source that accepts points within a positive feasibility tolerance accepts
+     * LP deductions within tolerances too; every other source, and `--exact`, which zeroes the tolerance,
+     * certifies them exactly.
+     */
     internal val lpSolveContext: LpSolveContext get() = LpSolveContext.finite(
-        exactLp || shape.sourceInvocation?.source?.semantics?.effective?.feasibilityTolerance?.isExact == true,
+        numerical = shape.sourceInvocation?.source?.semantics?.effective?.feasibilityTolerance?.isExact == false,
     )
 
     /** Captured frontend `key=value` parameters; empty for directly typed options. */
@@ -195,7 +197,6 @@ class FiniteSolveRequest(
         onPortfolioFault: ((ArmFault) -> Unit)? = null,
         prepareOnly: Boolean = false,
         toleranceCheck: ((Sample) -> Boolean)? = null,
-        exactLp: Boolean = false,
     ) : this(
         shape = shape,
         engine = engine,
@@ -221,7 +222,6 @@ class FiniteSolveRequest(
         onPortfolioFault = onPortfolioFault,
         prepareOnly = prepareOnly,
         toleranceCheck = toleranceCheck,
-        exactLp = exactLp,
     )
 }
 
@@ -741,7 +741,7 @@ private fun FiniteSolveRequest.preparationRequest(
         } else stop,
         presolveBudget = presolveBudget, zeroObjectivePricing = zeroObjectivePricing, randomSeed = randomSeed,
         sourcePreparation = sourcePreparation,
-        exactLp = !lpSolveContext.numericalDeductions,
+        numericalLp = lpSolveContext.numericalDeductions,
     )
 }
 
@@ -1238,7 +1238,7 @@ private fun executePortfolio(
     }
     val profile = ProblemProfile.of(request.problem, request.optimize)
     val baseScenario = clausalDefaultScenario(
-        plan.scenario.copy(exactLp = !request.lpSolveContext.numericalDeductions),
+        plan.scenario.copy(numericalLp = request.lpSolveContext.numericalDeductions),
         profile,
         request.defaultArms,
         explicitArms = request.executionOptions.explicitArms,

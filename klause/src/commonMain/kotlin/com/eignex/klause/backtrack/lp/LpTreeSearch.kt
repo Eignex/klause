@@ -164,7 +164,8 @@ internal fun LpEngine.lbTreeSearch(
                         val result = node.float
                         val lower = result?.let { candidate ->
                             objectiveLowerBound(model, candidate.duals, rootCertificationObserver())
-                                ?.let { BigFraction.ofDouble(it) }?.plus(BigFraction.ofLong(relaxation.objectiveConstant))
+                                ?.let { BigFraction.ofDouble(it) }
+                                ?.plus(BigFraction.ofLong(relaxation.objectiveConstant))
                         }
                         if (lower != null && bestExact?.let { lower >= it } == true) return SearchNodeDisposition.Prune
                         val witness = result?.let { candidate ->

@@ -172,8 +172,8 @@ data class PortfolioScenario(
     val sharingMemoryBytes: Long? = null,
     /** Apply bounded root defaults to eligible curated satisfaction recipes. */
     val rootMaintenance: Boolean = true,
-    /** Whether the backtrack arms' LP deductions require exact certificates rather than float results. */
-    val exactLp: Boolean = false,
+    /** Whether the backtrack arms' LP deductions accept float results within tolerances. */
+    val numericalLp: Boolean = false,
 ) {
     init {
         require(sharingMemoryWork >= 0L && sharingMemoryScratch >= 0) { "sharing memory limits must be nonnegative" }
@@ -279,7 +279,7 @@ internal object PortfolioComposition {
         facts: ProblemFacts = ProblemFacts.assumed(scenario.kind),
     ): List<WorkerConfig> {
         val arms = composeArms(scenario, facts).map {
-            if (scenario.exactLp && it is BacktrackWorkerConfig) it.withExactLp() else it
+            if (scenario.numericalLp && it is BacktrackWorkerConfig) it.withNumericalLp() else it
         }
         val check = scenario.toleranceCheck ?: return arms
         return arms.map {

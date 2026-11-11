@@ -136,9 +136,10 @@ this is separate from heap measurements and diagnostic payload-category sums.
   Earned selective reuse is the default; `preparation=index` selects complete-index reuse.
   Arms choose intensity below it. `--lp-pricing` selects zero-objective
   entering policy. Native arithmetic routes reject explicit LP flags.
-- `--exact`: exact certification of finite LP deductions, which are otherwise
-  [numerical](17-linear-programming.md#numerical-and-exact-deductions), plus continuous
-  float interpretation and zero source tolerance for the format's declared policies.
+- `--exact`: continuous float interpretation and zero source tolerance for the
+  format's declared policies; zero tolerance also certifies finite LP deductions exactly,
+  which are otherwise [numerical](17-linear-programming.md#numerical-and-exact-deductions)
+  for MPS.
   Unsupported exact lowering declines explicitly.
 - `--param <key>=<value>`: repeatable engine parameters. Unknown keys exit with
   status 2. The families are CP and LS strategy settings, portfolio slice policy

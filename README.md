@@ -37,8 +37,8 @@ It reads FlatZinc, XCSP3, SMT-LIB, MPS, DIMACS, OPB/WBO and WCNF, and MiniZinc m
 
 - Klause has its own revised simplex written in Kotlin: a floating-point dual simplex with Devex pricing, sparse LU factorization and Forrest-Tomlin updates.
 - The LP lives inside search. Bound changes and backtracking update the same warm basis instead of starting a new solve at every node.
-- The heavy work runs in floating point. By default, LP deductions in finite search and presolve (objective bounds, reduced-cost fixing, Farkas conflicts and root infeasibility) accept floating results within tolerances, as Gurobi and HiGHS do, so the optimality and infeasibility claims they support are numerical.
-- `--exact` checks every LP result in exact rational arithmetic before it counts, whether it is a feasible point, an objective bound, an infeasibility proof or an unbounded ray, and a result that fails the check is never used as a proof. A zero source tolerance selects the same certification. Linear theories always decide exactly, and real-valued witnesses are checked against the source within its declared tolerance.
+- The heavy work runs in floating point. The certification mode follows the format. MPS declares a positive feasibility tolerance, so by default its LP deductions in search and presolve (objective bounds, reduced-cost fixing, Farkas conflicts and root infeasibility) accept floating results within tolerances, as Gurobi and HiGHS do, and the optimality and infeasibility claims they support are numerical. A floating optimum that passes the source checks within that tolerance is accepted without an exact certificate.
+- Every other format, and MPS under `--exact`, checks every LP result in exact rational arithmetic before it counts, whether it is a feasible point, an objective bound, an infeasibility proof or an unbounded ray, and a result that fails the check is never used as a proof.
 - The same engine carries integer and continuous columns, so it serves MIP, CP relaxations and SMT real arithmetic, and works alongside propagation and local search.
 - LP bounds and conflicts are explained by the source constraints, so they feed conflict learning the same way propagation does.
 - Strict inequalities are handled exactly, as SMT linear arithmetic requires.
@@ -50,7 +50,7 @@ Specialised solvers are mature and usually faster on problems squarely in their 
 
 - CP-SAT works over Booleans and integers; Klause also handles reals, unbounded integers and nonlinear arithmetic in the same model.
 - Z3 decides logical theories; Klause adds optimization, global constraints and local search while still deciding linear integer and real arithmetic exactly.
-- Gurobi and HiGHS accept floating-point results within tolerances, as Klause does by default; `--exact` certifies every LP result in exact arithmetic before it prunes or proves anything.
+- Gurobi and HiGHS accept floating-point results within tolerances, as Klause does by default on MPS; other formats and `--exact` certify every LP result in exact arithmetic before it prunes or proves anything.
 
 ## Limitations
 

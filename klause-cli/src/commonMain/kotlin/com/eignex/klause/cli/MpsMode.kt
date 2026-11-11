@@ -77,7 +77,6 @@ internal object MpsMode : CliMode {
             return MpsOutput(
                 exactSourceWitness = { state.exactSourceWitness },
                 effectiveDeclarations = state.effectiveDeclarations,
-                exactLp = common.exact,
             )
         }
     }
@@ -143,8 +142,6 @@ private fun checkedIntegralMpsSource(
 internal class MpsOutput(
     private val exactSourceWitness: () -> Boolean? = { null },
     private val effectiveDeclarations: Boolean = false,
-    // Without exact LP certification a native optimum rests on numerical LP deductions.
-    private val exactLp: Boolean = true,
 ) : BufferedBestOutput() {
     private var bestObjective: Long? = null
     private var linearSource: LinearSourceOutcome? = null
@@ -153,7 +150,8 @@ internal class MpsOutput(
     override fun onLinearSourceResult(result: SourceExecutionResult) {
         val qualified = result.linearSource ?: return
         linearSource = qualified
-        val certified = exactLp || qualified.source.semantics.effective.feasibilityTolerance?.isExact == true
+        // Under a positive tolerance a native optimum rests on numerical LP deductions.
+        val certified = qualified.source.semantics.effective.feasibilityTolerance?.isExact != false
         nativeOptimumExact = if (result is SourceExecutionResult.Finite) {
             certified && (result.result.outcome as? FiniteSolveOutcome.Completed)?.bestSample?.let {
                 it.numRealVars == 0 || it.exactReals != null

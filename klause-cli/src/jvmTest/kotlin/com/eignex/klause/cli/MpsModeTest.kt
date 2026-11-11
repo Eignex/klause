@@ -444,7 +444,20 @@ class MpsModeTest {
     }
 
     @Test
-    fun `a complete finite portfolio optimum should be attained only under exact LP certification`() {
+    fun `a default tolerance finite optimum should be reported as a tolerance optimum`() {
+        val text = finiteOptimum()
+
+        assertTrue("c optimizationStatus=tolerance-optimum" in text.lines(), text)
+    }
+
+    @Test
+    fun `an exact finite optimum should retain an attained optimum certificate`() {
+        val text = finiteOptimum("--exact")
+
+        assertTrue("c optimizationStatus=attained-optimum" in text.lines(), text)
+    }
+
+    private fun finiteOptimum(vararg flags: String): String {
         val source = File.createTempFile("mps-finite-optimum-certificate", ".mps").apply {
             writeText(
                 "OBJSENSE\n MAX\nROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
@@ -452,17 +465,11 @@ class MpsModeTest {
             )
             deleteOnExit()
         }
-
-        for (exact in listOf(false, true)) {
-            val flags = listOf("-e", "cp", "-p", "1", "--param", "node-limit=100") +
-                if (exact) listOf("--exact") else emptyList()
-            val text = capture { assertEquals(0, runCli((flags + source.absolutePath).toTypedArray())) }
-
-            assertTrue("s OPTIMUM FOUND" in text.lines(), text)
-            assertTrue("o 2" in text.lines(), text)
-            val status = if (exact) "attained-optimum" else "tolerance-optimum"
-            assertTrue("c optimizationStatus=$status" in text.lines(), text)
-        }
+        val arguments = arrayOf("-e", "cp", "-p", "1", "--param", "node-limit=100", *flags, source.absolutePath)
+        val text = capture { assertEquals(0, runCli(arguments)) }
+        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+        assertTrue("o 2" in text.lines(), text)
+        return text
     }
 
     @Test

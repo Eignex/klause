@@ -6,6 +6,7 @@ import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
@@ -185,28 +186,29 @@ class SourceExecutionPolicyTest {
     }
 
     @Test
-    fun `finite requests should certify LP deductions exactly only when exact is requested`() {
-        for (exact in listOf(false, true)) {
-            val shape = FiniteSolveShape(Problem(0, 0, emptyArray(), emptyArray()), false, false, null, null, null, null)
+    fun `a positive source tolerance should select numerical LP deductions`() {
+        val request = finiteRequest(SourceTolerance(absolute = SemanticRational.ONE))
 
-            val request = SourceExecutionPolicy(exactLp = exact).finiteRequest(shape, FiniteEngine.BACKTRACK)
-
-            assertEquals(!exact, request.lpSolveContext.numericalDeductions)
-        }
+        assertTrue(request.lpSolveContext.numericalDeductions)
     }
 
     @Test
-    fun `a zero source tolerance should certify LP deductions exactly`() {
+    fun `a zero or undeclared source tolerance should certify LP deductions exactly`() {
+        for (tolerance in listOf(SourceTolerance(), null)) {
+            val request = finiteRequest(tolerance)
+
+            assertFalse(request.lpSolveContext.numericalDeductions)
+        }
+    }
+
+    private fun finiteRequest(tolerance: SourceTolerance?): FiniteSolveRequest {
         val source = Problem(
             0, 1, arrayOf(IntDomain(0, 3)), arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)),
-            semantics = SourceSemantics(SourceFormat.IR, feasibilityTolerance = SourceTolerance()).resolve(),
+            semantics = SourceSemantics(SourceFormat.IR, feasibilityTolerance = tolerance).resolve(),
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(SourceAttachment(source), ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK),
         )
-
-        val request = SourceExecutionPolicy().finiteRequest(invocation.finiteShape(), FiniteEngine.BACKTRACK)
-
-        assertFalse(request.lpSolveContext.numericalDeductions)
+        return SourceExecutionPolicy().finiteRequest(invocation.finiteShape(), FiniteEngine.BACKTRACK)
     }
 }

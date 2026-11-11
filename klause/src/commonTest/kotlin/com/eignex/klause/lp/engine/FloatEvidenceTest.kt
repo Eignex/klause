@@ -18,7 +18,7 @@ class FloatEvidenceTest {
 
         val bound = assertNotNull(FloatDeductionCertificate.of(model, result.duals)).lowerBound
 
-        assertTrue(bound <= 1.5 && bound > 1.5 - 1e-9, "bound $bound")
+        assertTrue(bound <= 1.5 && bound > 1.5 - 1e-5, "bound $bound")
     }
 
     @Test
@@ -68,5 +68,51 @@ class FloatEvidenceTest {
 
         assertNull(floatFarkasRay(model, doubleArrayOf(1.0, 1.0)))
         assertNull(floatFarkasRay(model, doubleArrayOf(1.0, -1.0)))
+    }
+
+    @Test
+    fun `a float deduction bound at an integral optimum should not round up past it`() {
+        val model = LpBuilder().apply {
+            val x = addVar(0L, 9L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L)
+        }.build(Sense.MINIMIZE)
+        val result = assertNotNull(RevisedSimplex(model).solve())
+
+        val certificate = assertNotNull(FloatDeductionCertificate.of(model, result.duals))
+
+        assertTrue(certificate.lowerBound < 3.0 && certificate.lowerBound > 3.0 - 1e-5)
+        assertEquals(3L, certificate.objectiveBoundCeil(0L))
+    }
+
+    @Test
+    fun `a float farkas ray should not drop an open column it meets`() {
+        val model = LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            val z = addOpenAboveVar(0L)
+            addRow(intArrayOf(x, z), longArrayOf(1L, 1L), Relation.GE, 1_000_000_000L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+
+        assertNull(floatFarkasRay(model, doubleArrayOf(1e-7, 1.0)))
+    }
+
+    @Test
+    fun `a rounded float farkas ray should never rest on an open side`() {
+        val model = LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            val z = addOpenAboveVar(0L)
+            addRow(intArrayOf(z, x), longArrayOf(1L, -1L), Relation.GE, 1L)
+            addRow(intArrayOf(z), longArrayOf(1L), Relation.LE, 0L)
+        }.build(Sense.MINIMIZE)
+        val base = listOf(doubleArrayOf(1.0, 1.0), doubleArrayOf(1.0, -1.0)).first { floatFarkasRay(model, it) != null }
+
+        val rays = listOf(1.0 + 1e-9, 1.0 - 1e-9).map { floatFarkasRay(model, doubleArrayOf(base[0], base[1] * it)) }
+
+        assertTrue(rays.any { it == null })
+        for (ray in rays.filterNotNull()) {
+            var open = 0L
+            model.forEachInColumn(1) { row, a -> open += ray[row] * a }
+            assertTrue(open <= 0L)
+        }
     }
 }

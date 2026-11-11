@@ -2,8 +2,8 @@
 
 Finite relaxations, mixed-integer models and [linear theories](15-linear-arithmetic.md)
 share one floating revised simplex. Open theories always certify its results exactly;
-finite search and presolve accept them within tolerances unless exact certification is
-requested ([numerical and exact deductions](#numerical-and-exact-deductions)). Model-facing
+finite search and presolve accept them within tolerances for sources that declare a
+positive feasibility tolerance ([numerical and exact deductions](#numerical-and-exact-deductions)). Model-facing
 adapters assemble source-aware rows; the engine solves and certifies them; consumers
 interpret the result in source coordinates. Shared search owns integer and Boolean alternatives.
 LP feasibility alone establishes no integrality.
@@ -268,9 +268,9 @@ the effort governor's point-assessment warmup. Completed queries assess that
 preceding work too; numerical stops, zero-pivot stops and infeasibility candidates
 provide no growth feedback.
 
-For mixed models, node bounding uses the
-[mixed deduction operations](#mixed-deduction-operations),
-keeps the strongest checked objective bound and applies only integral consequences
+For mixed models, exact node bounding uses the
+[mixed deduction operations](#mixed-deduction-operations); numerical bounding skips them.
+It keeps the strongest objective bound and applies only integral consequences
 with complete explanations. For a bound `L`, reduced cost `d(j)` and cutoff `U`, a
 fixing allows movement at most `(U - L) / abs(d(j))` from the minimizing endpoint.
 Objective changes retract dependent bounds, cuts and clauses, or restore an
@@ -1592,22 +1592,26 @@ owns these checks.
 ### Numerical and exact deductions
 
 `LpSolveContext.numericalDeductions` selects how finite search and presolve consume
-LP results. The finite pipeline sets it unless `--exact` is given or the source declares
-zero feasibility tolerance. Open theories, source LP optimization and real leaf
+LP results. The mode follows the format: the finite pipeline sets it only when the source
+declares a positive feasibility tolerance, which today is MPS by default. SMT-LIB, the
+other formats, sources without a declared tolerance and `--exact`, which zeroes the
+tolerance, keep exact certification. Open theories, source LP optimization and real leaf
 completion never read it; leaf witnesses follow the source tolerance.
 
 Numerical deductions compute no certificate. `FloatDeductionCertificate` sums the
-Lagrangian `L(y)` from the float duals in binary64, lowers it by that summation's
-rounding and by the largest effect of reduced costs within `FLOAT_EVIDENCE_TOLERANCE`
-that it takes as zero, and accepts such a reduced cost on an open side. It supplies
-node pruning, objective propagation, reduced-cost fixing with their reasons, root
-bounds shared with peers, and shaving; fixing also tries the objective box (zero
-multipliers) and half the duals. `floatFarkasRay` accepts a dual-unbounded ray
-whose binary64 Farkas margin exceeds the tolerance times the terms' size; it backs
-infeasibility pruning, learned conflicts and presolve root infeasibility. Mixed row
-projections, strict-row solves and component bounds have no numerical form and are
-skipped. Optimality, infeasibility and bound claims resting on these deductions are
-numerical. Under exact certification every deduction uses the packages below.
+Lagrangian `L(y)` from the float duals in binary64 and lowers it by that summation's
+rounding plus an absolute and relative slack, so float noise never rounds an integral
+bound up. Every nonzero reduced cost prices and cites its minimizing side; one within
+`FLOAT_EVIDENCE_TOLERANCE` on an open side is accepted as zero. It supplies node
+pruning, objective propagation, reduced-cost fixing with their reasons, root bounds shared
+with peers, and shaving; fixing also tries the objective box (zero multipliers) and half
+the duals. `floatFarkasRay` normalises a dual-unbounded ray and accepts it when its binary64
+Farkas margin exceeds the tolerance times the terms' size, pricing open sides at their
+row-implied bounds; the rounded integer ray must pass again against the box sides its
+clause cites. It backs infeasibility pruning, learned conflicts and presolve root
+infeasibility. Mixed row projections, strict-row solves and component bounds have no
+numerical form and are skipped. Optimality, infeasibility and bound claims resting on these
+deductions are numerical. Under exact certification every deduction uses the packages below.
 
 ### Proof packages
 
