@@ -55,10 +55,15 @@ internal object FinitePortfolioLpCapture {
         val required = setOf("suite", "problem", "sha256", "seed", "handoff")
         require(options.keys.containsAll(required) && (options.keys - required).all {
             it in setOf("timeout-ms", "captures", "cutoff-bits", "capture-worker", "capture-route", "capture-guidance",
-                "portfolio-policy", "portfolio-progress", "capture-mode", "inspect-rays")
+                "portfolio-policy", "portfolio-progress", "capture-mode", "inspect-rays",
+                "source-refutation-center-step")
         })
         val mode = options["capture-mode"] ?: "portfolio"
         require(mode in setOf("portfolio", "joint-before", "joint-ordinary"))
+        val centerStep = options["source-refutation-center-step"]?.let {
+            require(mode == "joint-ordinary") { "source-refutation-center-step requires joint-ordinary capture" }
+            it.toBooleanStrict()
+        }
         if ("inspect-rays" in options) {
             require(mode == "joint-before" && options["inspect-rays"] in setOf("true", "false"))
         }
@@ -74,7 +79,8 @@ internal object FinitePortfolioLpCapture {
             return listOf("companion-integers=true", "companion-active-ms=4000",
                 "companion-after-incumbent=false", "companion-admission=ordinary", "companion-repair=fixed",
                 "source-incumbent-completion=true", "portfolio-progress=false",
-                "portfolio-proof-workers=complete", "portfolio-proof-share=0.5")
+                "portfolio-proof-workers=complete", "portfolio-proof-share=0.5") +
+                listOfNotNull(centerStep?.let { "source-refutation-center-step=$it" })
         }
         if (preset == "ordinary") {
             require(!handoff) { "ordinary portfolio policy requires handoff=false" }

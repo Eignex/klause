@@ -67,6 +67,9 @@ no LP snapshots. Observation spends the existing four-second companion lifetime
 and source funding. `result.json` retains capture counters and callback time, which
 is included in containing execution and core capture time. This diagnostic grants
 no production performance or source-verdict authority.
+`source-refutation-center-step=true|false` is accepted only in `joint-ordinary` mode
+and forwards the source option to that producer. Omission leaves its default false.
+The existing observation and companion limits apply.
 `capture-guidance=true captures=0` records bounded native guide adoption and branch
 observations without retaining LP queries. The preference flag describes configured
 precedence; it does not compare a counterfactual value order. Last-read scalar cutoffs
