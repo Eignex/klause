@@ -45,7 +45,8 @@ internal class LinearPortfolioTerminal(
     override fun check(worker: PortfolioWorker, search: ResumableSearch?): PortfolioTerminalPublication? {
         val completed = search as? LinearPortfolioSearch ?: return null
         val result = completed.result ?: return null
-        if (result.terminal == null) return null
+        if (result.terminal == null && result.numerical?.optimal != true &&
+            result.numerical?.infeasible != true) return null
         if (!worker.permitsSourceProofs) {
             return PortfolioTerminalPublication(Verification.Indeterminate("linear arm is witness-only")) {}
         }

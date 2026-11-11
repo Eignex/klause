@@ -97,7 +97,7 @@ internal class LinearAuthorityInvocation(
     private var result: LinearInvocationResult? = null
     private val budget = SourceLpBudget(maxOperations = params.sourceLpOperations,
         onWork = state.smt::observeSourceLp, funding = funding,
-        solveContext = { borrowedAuthority?.solveContext ?: LpSolveContext.Production })
+        solveContext = { borrowedAuthority?.solveContext ?: LpSolveContext.forMode(params.lpMode) })
     private val completion = if (params.sourceIncumbentCompletion)
         LinearIncumbentCompletion(budget, incumbentCompletionCheck, sharedCompletions) { stage, count ->
             val key = "numericalExternalCompletion$stage"

@@ -19,6 +19,7 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.solver.result.LinearNumericalResult
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -72,7 +73,9 @@ internal class OpenLinearPortfolioResults(
             else -> return null
         }
         val completed = native.result ?: return null
-        val claim = completed.terminal?.claim ?: return null
+        val claim = completed.terminal?.claim
+        if (claim == null && completed.numerical?.optimal != true &&
+            completed.numerical?.infeasible != true) return null
         val rayValue = (claim as? SourceClaim.Ray)?.let { original.linearValue(it.sample, cancellation) }
         val mathematical = LinearPortfolioTerminal(binding, original, cancellation) {
             accepted.store(Accepted(it, rayValue))
@@ -87,6 +90,7 @@ internal class OpenLinearPortfolioResults(
             else -> null
         }
         val contradicts = standing != null && (claim == SourceClaim.Refutation ||
+            completed.numerical?.infeasible == true || completed.numerical?.contradicts(standing) == true ||
             (boundary != null && (values.improves(standing, boundary) ||
                 (claim is SourceClaim.Limit && standing == boundary))))
         return if (contradicts) PortfolioTerminalPublication(
@@ -104,8 +108,12 @@ internal class OpenLinearPortfolioResults(
             result is MinimizeResult.Unknown -> result.reason
             else -> TerminationReason.BudgetExhausted
         }
+        val numerical = strongestNumerical()?.let {
+            if (it.infeasible && pooled != null) null else LinearNumericalResult(it.claim,
+                pooled?.objective?.source, !cancellation() && !timeout())
+        }
         val authority = LinearOptimizationResult(original.scope, terminal?.result?.terminal, bound,
-            pooled?.assignment, pooled?.objective?.source, reason, result.stats, original.semantics)
+            pooled?.assignment, pooled?.objective?.source, reason, result.stats, original.semantics, numerical)
         val point = pooled?.assignment?.let { OpenTheoryAssignment.Sampled(it) }
         val score = pooled?.objective?.source?.let(::minimized)
         return when (val claim = authority.terminal?.claim) {
@@ -116,6 +124,25 @@ internal class OpenLinearPortfolioResults(
                 minimized(checkNotNull(terminal?.rayValue)), result.stats, authority)
             else -> OpenTheoryOptimum.Bounded(point, score, reason, result.stats, authority)
         }
+    }
+
+    private fun strongestNumerical(): LinearNumericalResult? {
+        var standing = accepted.load()?.result?.numerical?.takeIf { it.claim.isFor(original) }
+        val minimizes = original.scope.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE
+        for ((worker, reference) in handles) {
+            if (!worker.permitsSourceProofs) continue
+            val handle = reference.load() ?: continue
+            if (!binding.matches(handle.invocation)) continue
+            val snapshot = handle.result ?: continue
+            if (snapshot.scope != original.scope) continue
+            val candidate = snapshot.numerical?.takeIf { it.claim.isFor(original) } ?: continue
+            if (candidate.infeasible) return candidate
+            val bound = candidate.bound ?: continue
+            if (standing?.infeasible == true) return standing
+            val before = standing?.bound
+            if (before == null || if (minimizes) bound > before else bound < before) standing = candidate
+        }
+        return standing
     }
 
     private fun strongestBound(): SourceEvidence? {

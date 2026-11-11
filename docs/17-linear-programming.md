@@ -7,6 +7,9 @@ the result in source coordinates. Shared search owns integer and Boolean alterna
 LP feasibility alone establishes no integrality.
 
 An LP solve context selects numerical deductions separately from exact certification.
+Source traversal and joint repair read the selected LP mode from their theory
+parameters. Application policy carries that mode through source workers and finite
+companions; source feasibility tolerance does not select certification mode.
 Numerical root guidance uses outward-rounded Lagrangian bounds over the floating
 projection. A positive zero-objective Lagrangian margin beyond the declared
 feasibility tolerance establishes numerical infeasibility. Both ray orientations
@@ -119,6 +122,16 @@ exact terminals and bounds. Numerical completion reports infeasibility or incumb
 optimality within the objective tolerance; finite numerical gaps use the context's
 original objective direction and units. Partial snapshots retain the bound without
 a completion status. Witness-only callers omit both exact and numerical deductions.
+Numerical portfolio completion retains the runtime model, objective, source namespace
+and original condition identity. Consumer pins and retained arithmetic witness checks
+remain in force. A numerical refutation cannot coexist with an accepted incumbent,
+and a bound contradicting that incumbent beyond tolerance cannot finish the pool.
+The source proof-bound exchange continues to require exact source evidence; numerical
+packages retain their separate result channel and worker-local pruning authority.
+Original linear-source outcomes identify numerical LP authority independently of
+source tolerance. An unrestricted exact source view can project a numerical bound
+back through its positive objective scale with outward scalar rounding. That value
+and its original-unit gap remain numerical; neither populates exact bound evidence.
 
 Cut rounds retain the strongest available numerical bound independently of exact
 source evidence. A tighter numerical bound beyond the objective tolerance, or a

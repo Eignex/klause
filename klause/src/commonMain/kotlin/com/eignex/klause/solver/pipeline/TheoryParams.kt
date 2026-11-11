@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.util.Cancellation
 
 /** Which Boolean branching a complete open-model traversal uses. */
@@ -121,6 +122,8 @@ data class TheoryParams(
     val sourceCutBranching: Boolean = false,
     /** Move a pre-incumbent joint repair center using paid conditional refutation advice. */
     val sourceRefutationCenterStep: Boolean = false,
+    /** LP deduction authority, independent of source arithmetic and feasibility tolerances. */
+    val lpMode: LpCertificationMode = LpCertificationMode.NUMERICAL,
 ) {
     init {
         require(!sourceRefutationCenterStep || sourceIncumbentCompletion) {

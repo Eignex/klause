@@ -32,7 +32,12 @@ internal fun reportLinearOptimization(
         is SourceClaim.Limit -> Verdict.BEST_FOUND
         is SourceClaim.Ray, is SourceClaim.Unbounded -> Verdict.UNBOUNDED
         SourceClaim.Refutation -> Verdict.UNSATISFIABLE
-        else -> if (point != null) Verdict.BEST_FOUND else Verdict.UNKNOWN
+        else -> when {
+            result.numerical?.optimal == true -> Verdict.OPTIMAL
+            result.numerical?.infeasible == true -> Verdict.UNSATISFIABLE
+            point != null -> Verdict.BEST_FOUND
+            else -> Verdict.UNKNOWN
+        }
     }
     output.onVerdictContext(VerdictContext(budgetExhausted = budgetExhausted(stats.run.timedOut),
         terminationReason = result.reason, completePool = completePool))

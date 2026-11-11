@@ -7,6 +7,9 @@ import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.result.LinearNumericalResult
+import kotlin.math.nextDown
+import kotlin.math.nextUp
 
 /** Native global bound over the nominal source, in its original objective units. */
 class LinearSourceBound internal constructor(
@@ -44,4 +47,22 @@ internal fun PreparedLinearSource.qualifyBound(
     var value = finite?.value ?: (claim.value as? SourceValue.Rational)?.value ?: return null
     if (finite != null && objective.sense == ObjectiveSense.MAXIMIZE) value = value.negated()
     return LinearSourceBound(value * view.objectiveScale.reciprocal(), objective.sense, claim.strict)
+}
+
+internal fun PreparedLinearSource.qualifyNumericalBound(
+    numerical: LinearNumericalResult?, unrestricted: Boolean,
+): Double? {
+    val objective = view.source.objective ?: return null
+    val native = numerical?.bound ?: return null
+    if (!view.exact || !unrestricted || numerical.scope.condition != SourceCondition() ||
+        numerical.scope.objective?.sense != objective.sense) return null
+    val value = (BigFraction.ofDouble(native) ?: return null) * view.objectiveScale.reciprocal()
+    val rounded = value.toDouble().takeIf { it.isFinite() } ?: return null
+    val projected = BigFraction.ofDouble(rounded) ?: return null
+    val conservative = if (objective.sense == ObjectiveSense.MINIMIZE) {
+        if (projected <= value) rounded else rounded.nextDown()
+    } else {
+        if (projected >= value) rounded else rounded.nextUp()
+    }
+    return conservative.takeIf { it.isFinite() }
 }

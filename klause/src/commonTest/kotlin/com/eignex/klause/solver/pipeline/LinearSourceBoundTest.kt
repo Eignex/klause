@@ -9,6 +9,9 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.optimization.LinearNumericalClaim
 import com.eignex.klause.presolve.ObjectiveAdjustment
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.SourceMapping
@@ -20,8 +23,11 @@ import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceObjective
+import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.result.LinearNumericalResult
+import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -31,8 +37,38 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class LinearSourceBoundTest {
+    @Test
+    fun `numerical source bounds should round outward in original objective units`() {
+        for (sense in ObjectiveSense.entries) {
+            val source = LinearSourceProblem(
+                listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE)),
+                emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0,
+                    SemanticRational.of(BIG_ONE, bigIntOf(3)))),
+                    SemanticRational.of(BIG_ONE, bigIntOf(10)), sense))
+            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED, maximize = sense == ObjectiveSense.MAXIMIZE))
+            val prepared = assertNotNull(invocation.linearSource)
+            val scope = SourceScope(SourceRevision("numeric-original-units", "linear"),
+                objective = SourceObjective("x", sense))
+            val context = SourceProofContext(scope, emptySet(), emptyMap(), emptyMap())
+            val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical })
+            val native = if (sense == ObjectiveSense.MINIMIZE) 3.0 else 13.0
+            val claim = assertNotNull(LinearNumericalClaim.create(context, native, false, budget, Cancellation.Never))
+
+            val bound = assertNotNull(prepared.qualifyNumericalBound(LinearNumericalResult(claim, null, false), true))
+
+            val expected = BigFraction.of(bigIntOf(if (sense == ObjectiveSense.MINIMIZE) 1 else 13),
+                bigIntOf(if (sense == ObjectiveSense.MINIMIZE) 10 else 30))
+            val actual = assertNotNull(BigFraction.ofDouble(bound))
+            assertTrue(if (sense == ObjectiveSense.MINIMIZE) actual <= expected else actual >= expected)
+            assertEquals(expected.toDouble(), bound, 0.000000000000001)
+            assertNull(prepared.qualifyNumericalBound(LinearNumericalResult(claim, null, false), false))
+        }
+    }
+
     @Test
     fun `finite source bounds should preserve original units and objective direction`() {
         for (sense in ObjectiveSense.entries) {

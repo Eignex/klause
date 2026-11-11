@@ -136,7 +136,11 @@ internal class LinearAuthorityLp(
     }
     private val solveObserver = object : LpCertificationObserver by observer {
         override fun observePhase(metrics: LpPhaseMetrics) {
-            if (metrics.phase == LpSolvePhase.NUMERICAL_BOUND || metrics.phase == LpSolvePhase.NUMERICAL_CONFLICT) {
+            if (metrics.phase == LpSolvePhase.NUMERICAL_BOUND || metrics.phase == LpSolvePhase.NUMERICAL_CONFLICT ||
+                metrics.phase == LpSolvePhase.NUMERICAL_RECESSION ||
+                metrics.phase == LpSolvePhase.SOURCE_OPEN_PROJECTION ||
+                metrics.phase == LpSolvePhase.SOURCE_FLOAT_ACCEPTANCE
+            ) {
                 budget.observe(floatWork = metrics.work)
             }
             observer.observePhase(metrics)

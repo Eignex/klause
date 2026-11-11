@@ -36,6 +36,11 @@ internal class LinearNumericalClaim private constructor(
         return !cancellation() && condition.implies(scope.condition) && !cancellation()
     }
 
+    fun isFor(other: SourceProofContext): Boolean =
+        definitions === other.linearDefinitionIdentity && semantics === other.semantics &&
+            checker === other.semanticsChecker && scope.revision == other.scope.revision &&
+            scope.objective == other.scope.objective && scope.condition === other.scope.condition
+
     fun reaches(incumbent: BigFraction): Boolean {
         val value = bound ?: return false
         val standing = incumbent.toDouble()

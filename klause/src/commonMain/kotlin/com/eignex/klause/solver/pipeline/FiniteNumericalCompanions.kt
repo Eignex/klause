@@ -6,16 +6,16 @@ import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioIncumbents
+import com.eignex.klause.portfolio.PortfolioLifecycleKind
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.PortfolioWorker
-import com.eignex.klause.portfolio.PortfolioLifecycleKind
+import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.portfolio.WorkerConstructionCost
 import com.eignex.klause.portfolio.WorkerEligibility
 import com.eignex.klause.portfolio.WorkerFragment
 import com.eignex.klause.portfolio.WorkerObjectiveView
 import com.eignex.klause.portfolio.WorkerProofAuthority
 import com.eignex.klause.portfolio.WorkerRequirements
-import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.portfolio.binaryIntegers
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.difference.DifferenceSystem
@@ -301,6 +301,15 @@ internal class FiniteNumericalCompanions private constructor(
 
 internal fun finiteNumericalCompletion(result: LinearOptimizationResult, context: SourceProofContext,
     cancellation: Cancellation): MinimizeResult {
+    val numerical = result.numerical
+    if (result.terminal == null && !cancellation() && numerical?.claim?.isFor(context) == true) {
+        if (numerical.infeasible && result.incumbent == null) return MinimizeResult.Infeasible(stats = result.stats)
+        val point = result.incumbent
+        val value = result.value
+        if (numerical.optimal && point != null && value != null && !numerical.contradicts(value)) {
+            return MinimizeResult.Optimal(point, value.toDouble(), result.stats)
+        }
+    }
     // A verified relaxation proof uses the finite working coordinates and objective.
     if (result.verifyTerminal(context, cancellation) is Verification.Accepted) {
         when (val claim = result.terminal?.claim) {
