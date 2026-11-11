@@ -10,6 +10,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SearchGroup
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
@@ -898,12 +899,15 @@ class FiniteExecutionTest {
 
     @Test
     fun `typed and parsed proof shares should execute a curated finite optimization`() {
-        for (options in listOf(ExecutionOptions(ExecutionOption.portfolioProofShare(0.75)),
-            ExecutionOptions.parse(listOf("portfolio-proof-share=0.75")))) {
+        val configurations = LpCertificationMode.entries.flatMap { mode ->
+            listOf(ExecutionOptions(ExecutionOption.portfolioProofShare(0.75)),
+                ExecutionOptions.parse(listOf("portfolio-proof-share=0.75"))).map { mode to it }
+        }
+        for ((mode, options) in configurations) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val objective = LinearObjective(intCoefficients = longArrayOf(1))
             val shape = FiniteSolveShape(problem, true, false, null, objective, 0, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF, lpMode = mode).finiteRequest(
                 shape, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.NONE,
                 executionOptions = options, nodeBudget = NodeBudget(8),
             )

@@ -30,7 +30,7 @@ class PortfolioPlanTest {
                 engine = FiniteEngine.MIXED,
                 optimize = true,
                 cores = 1,
-                executionOptions = ExecutionOptions.parse(listOf("portfolio-proof-share=0.75")),
+                executionOptions = ExecutionOptions.parse(emptyList()),
                 randomSeed = 17L,
                 defaultArms = 6,
                 lpCeiling = LpConfig.AGGRESSIVE,
