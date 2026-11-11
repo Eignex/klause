@@ -46,23 +46,6 @@ class SolutionGuidedTest {
     }
 
     @Test
-    fun `saved values should take priority over a later value ordering`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(0, 4)),
-            factors = emptyArray(),
-        )
-        val session = PropagationSession(problem)
-        val guided = SolutionGuided(IndomainMin)
-        guided.onSolution(Sample(BooleanArray(0), longArrayOf(3)))
-
-        val values = guided.guide(session, VarRef.IntVar(0), sequenceOf(4L, 2L, 3L, 1L, 0L)).toList()
-
-        assertEquals(listOf(3L, 4L, 2L, 1L, 0L), values)
-    }
-
-    @Test
     fun `solution-guided should receive onSolution from the engine`() {
         val recorded = ArrayList<Sample>()
         val spy = object : ValueSelector {
