@@ -215,13 +215,21 @@ internal class LinearAuthoritySession(
                 costs.map(ExactLpNumber::of) + List(prepared.emittedRowCount) { zero }, ExactLpNumber.of(constant))
             val current = bind(packed, emittedObjective, active, { prepared.model }, scope, profile, appendRows)
                 ?: return@resumeSparse null
+            fun consumeChecked(guide: LpRootGuidance): T? {
+                if (guide.numericalBound != null || guide.numericalConflict != null) {
+                    val model = current.state.ownerWorkingModel() ?: return null
+                    if (guide.numericalBound?.belongsTo(model) == false ||
+                        guide.numericalConflict?.belongsTo(model) == false) return null
+                }
+                return consume(guide, prepared, token)
+            }
             completed?.let {
                 val usable = it.primal != null || it.bound != null || it.conflict != null ||
                     it.numericalBound != null || it.numericalConflict != null
                 if (completedPolicy?.certificate == policy.certificate &&
                     (usable || completedPolicy?.floating == profile)) {
                     onLifecycle("QueryReused", 1L)
-                    return@resumeSparse consume(it, prepared, token)
+                    return@resumeSparse consumeChecked(it)
                 }
                 completed = null
             }
@@ -244,7 +252,7 @@ internal class LinearAuthoritySession(
                             completedPolicy = policy.copy(floating = profile)
                         }
                     }
-                consume(guidance, prepared, token)
+                consumeChecked(guidance)
             } finally {
                 observer?.observeSolve(current.lastMetrics, component = false)
                 budget.observe(preparation = current.metrics.preparationWork - preparation,

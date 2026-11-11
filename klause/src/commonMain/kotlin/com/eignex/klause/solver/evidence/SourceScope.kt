@@ -52,6 +52,8 @@ class SourceCondition(
     val upper: Map<SourceCoordinate, BigFraction> get() = capturedUpper.toMap()
 
     internal val hasNumericBounds: Boolean get() = capturedLower.isNotEmpty() || capturedUpper.isNotEmpty()
+    internal val comparisonSize: Long get() = capturedBools.size.toLong() + capturedLower.size + capturedUpper.size +
+        capturedIntegerRows.sumOf { 1L + it.supportSize }
     internal fun boundValue(coordinate: SourceCoordinate, upper: Boolean): BigFraction? =
         if (upper) capturedUpper[coordinate] else capturedLower[coordinate]
 

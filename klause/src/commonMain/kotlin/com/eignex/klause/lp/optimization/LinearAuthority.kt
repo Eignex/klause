@@ -49,6 +49,7 @@ internal data class LinearAuthorityResult(
     val cutConflictFamilies: Set<CutFamily> = emptySet(),
     val cutTerminalBoundFamilies: Set<CutFamily> = emptySet(),
     val branchGuidance: LinearAuthorityBranchGuidance? = null,
+    val numerical: LinearNumericalClaim? = null,
 )
 
 internal class LinearAuthority(
@@ -1031,6 +1032,9 @@ internal class LinearAuthority(
             }
         }
         val closure = solved.result
+        if (budget.context.certificationPolicy.numericalDeductions) {
+            return numericalSource(source, prepared, guide, solved, cancellation)
+        }
         closure.float?.let { result ->
             for (family in prepared.cutFamilies.values.toSet()) {
                 cutLifecycle.observe(family, "SolveMaxFillRatioMicrosSum", (result.luMaxFill * 1_000_000.0).toLong())
@@ -1222,6 +1226,37 @@ internal class LinearAuthority(
             }
         }
         return LinearAuthorityResult(bound = bound, cutBoundFamilies = boundFamilies, incumbent = feasible)
+    }
+    private fun numericalSource(
+        source: SourceProofContext, prepared: LinearAuthorityQuery, guide: LinearAuthorityLpGuidance?,
+        solved: LinearAuthorityLpResult, cancellation: Cancellation,
+    ): LinearAuthorityResult {
+        val value = solved.numericalBound?.value?.let { if (prepared.sign.signum() > 0) it else -it }
+        val claim = LinearNumericalClaim.create(source, value, solved.numericalConflict != null, budget, cancellation)
+        if (claim?.infeasible == true || cancellation()) return LinearAuthorityResult(numerical = claim)
+        val coordinates = prepared.coordinates
+        val point = guide?.point ?: lp.separationPoint(solved.result.float, coordinates.size, cancellation)
+        if (point == null) return LinearAuthorityResult(numerical = claim)
+        val projected = point.map { it.toDouble() }
+        if (projected.all(Double::isFinite)) {
+            relaxedPoint = coordinates.indices.associate { coordinates[it] to projected[it] }
+        }
+        val allFractions = fractional(coordinates, point)
+        val fractions = allFractions.filter { (coordinate, value) ->
+            val threshold = (coordinate to value).floorSplit().second
+            val lower = source.scope.condition.lower[coordinate]
+            val upper = source.scope.condition.upper[coordinate]
+            (lower == null || threshold + BigFraction.ONE > lower) && (upper == null || threshold < upper)
+        }
+        val candidate = if (allFractions.isEmpty()) {
+            val proposed = sample(source, coordinates, point)
+            val witness = SourceEvidence(source.scope, SourceClaim.Witness(proposed), SourceDerivation.SourceWitness)
+            proposed.takeIf {
+                SourceEvidenceVerifier(prepared.context).verify(witness, cancellation) == SourceEvidenceCheck.Checked
+            }
+        } else null
+        return LinearAuthorityResult(incumbent = candidate, split = fractions.firstOrNull()?.floorSplit(),
+            fractional = fractions, numerical = claim)
     }
 }
 

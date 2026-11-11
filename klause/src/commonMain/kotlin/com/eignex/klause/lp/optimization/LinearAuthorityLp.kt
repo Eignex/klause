@@ -19,6 +19,8 @@ import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpNumericalBound
+import com.eignex.klause.lp.engine.LpNumericalConflict
 import com.eignex.klause.lp.engine.LpPhaseMetrics
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.LpSolveMetrics
@@ -40,6 +42,8 @@ internal data class LinearAuthorityLpResult(
     val result: CertifiedLpResult,
     val boundWeights: List<BigFraction>?,
     val conflictWeights: List<BigFraction>?,
+    val numericalBound: LpNumericalBound? = result.numerical?.bound,
+    val numericalConflict: LpNumericalConflict? = result.numerical?.conflict,
 )
 
 internal class LinearAuthorityLpGuidance(
@@ -184,6 +188,11 @@ internal class LinearAuthorityLp(
                 val solved = owner.solve(token = token, observer = solveObserver, claim = claim)
                 val result = solved?.takeIf { result -> result.exactPrimal?.admittedSourcePoint() != false &&
                     result.lowerBound?.let { listOf(it).admittedSourcePoint() } != false } ?: return@runPrepared null
+                if (result.numerical != null) {
+                    val model = owner.state.ownerWorkingModel() ?: return@runPrepared null
+                    if (result.numerical.bound?.belongsTo(model) == false ||
+                        result.numerical.conflict?.belongsTo(model) == false) return@runPrepared null
+                }
                 val boundWeights = result.bound?.dualMultipliers?.map { it.negated() }
                     ?.let { packed.lift(it, costs.map { cost -> cost.negated() }, token) }
                 val conflict = result.rationalConflict
@@ -266,7 +275,8 @@ internal class LinearAuthorityLp(
                 if (token()) return@guideResult null
                 packed.columns[column].bounds.projectGuidance(raw[column]) ?: return@guideResult null
             }
-            LinearAuthorityLpGuidance(LinearAuthorityLpResult(result, weights, conflictWeights), point,
+            LinearAuthorityLpGuidance(LinearAuthorityLpResult(result, weights, conflictWeights,
+                guide.numericalBound, guide.numericalConflict), point,
                 workingRows, guide.paused)
         }.also {
             onShape(LinearAuthorityLpShape(rows.size, workingRows, costs.size, it != null,

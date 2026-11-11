@@ -4,6 +4,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.engine.CutFamily
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.LinearAuthorityCapture
 import com.eignex.klause.lp.optimization.LinearAuthorityCut
@@ -36,6 +37,108 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LinearAuthorityTraversalTest {
+    @Test
+    fun `an inherited numerical bound should prune a child without another LP query`() {
+        val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val z = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val scope = SourceScope(SourceRevision("numeric-inherited-bound", "linear"),
+            objective = SourceObjective("z", ObjectiveSense.MINIMIZE))
+        val source = SourceProofContext(scope, setOf(x, z), linkedMapOf(
+            "x lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(-2)), BigFraction.MINUS_ONE)),
+            "x upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE)),
+            "z lower" to SourcePremise(SourceInequality(mapOf(z to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+            "z upper" to SourcePremise(SourceInequality(mapOf(z to BigFraction.ONE), BigFraction.ofLong(2))),
+        ), mapOf(z to BigFraction.ONE))
+        val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical })
+        var standing: Pair<Sample, BigFraction>? = null
+
+        LinearAuthorityTraversal(source, budget, Cancellation.Never, { false }, {}, { standing },
+            useGuidance = true, inheritBounds = true, useCuts = false).use { component ->
+            val session = SearchComponentSet(listOf(component)).session()
+            assertEquals(ComponentResult.Consistent, session.initialize())
+            assertEquals(SearchNodeDisposition.Expand, component.beforeBranch(session))
+            val operations = budget.operations
+            val alternative = assertNotNull(component.nextBranch(session)).first()
+            standing = Sample(booleanArrayOf(), longArrayOf(1L), doubleArrayOf(1.0),
+                exactReals = listOf(BigFraction.ONE)) to BigFraction.ONE
+            assertEquals(ComponentResult.Consistent, session.push(alternative))
+
+            val disposition = component.beforeBranch(session)
+
+            assertEquals(SearchNodeDisposition.Prune, disposition)
+            assertEquals(operations, budget.operations)
+            assertEquals(1L, component.observations()["numericalInheritedProjectionBoundClosures"])
+            assertNull(component.rootBound)
+            assertNull(component.completed())
+        }
+    }
+
+    @Test
+    fun `numerical source bounds should prune a reached incumbent without creating an exact proof`() {
+        for (sense in listOf(ObjectiveSense.MINIMIZE, ObjectiveSense.MAXIMIZE)) {
+            val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+            val scope = SourceScope(SourceRevision("numeric-bound-prune", "linear"),
+                objective = SourceObjective("x", sense))
+            val source = SourceProofContext(scope, setOf(x), linkedMapOf(
+                "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ofLong(-2))),
+                "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(3))),
+            ), mapOf(x to BigFraction.ONE))
+            val value = if (sense == ObjectiveSense.MINIMIZE) 2L else 3L
+            val standing = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(value.toDouble()),
+                exactReals = listOf(BigFraction.ofLong(value)))
+            val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical })
+
+            LinearAuthorityTraversal(source, budget, Cancellation.Never, { false }, {},
+                { standing to BigFraction.ofLong(value) }, useGuidance = true, useCuts = false).use { component ->
+                val session = SearchComponentSet(listOf(component)).session()
+                assertEquals(ComponentResult.Consistent, session.initialize())
+
+                val disposition = component.beforeBranch(session)
+
+                assertEquals(SearchNodeDisposition.Prune, disposition)
+                assertEquals(value.toDouble(), assertNotNull(component.rootNumerical).bound)
+                assertNull(component.rootBound)
+                assertNull(component.completed())
+                assertEquals(1L, component.observations()["numericalProjectionBoundPrunes"])
+                assertEquals(0L, budget.measuredBoundCertificationWork)
+            }
+        }
+    }
+
+    @Test
+    fun `numerical source contradictions should prune without creating an exact refutation`() {
+        val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val y = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val scope = SourceScope(SourceRevision("numeric-conflict-prune", "linear"),
+            objective = SourceObjective("sum", ObjectiveSense.MINIMIZE))
+        val source = SourceProofContext(scope, setOf(x, y), linkedMapOf(
+            "low sum" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE,
+                y to BigFraction.MINUS_ONE), BigFraction.ofLong(-2))),
+            "high sum" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE),
+                BigFraction.ONE)),
+            "x lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "x upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE)),
+            "y upper" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ONE)),
+        ), mapOf(x to BigFraction.ONE, y to BigFraction.ONE))
+        val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical })
+
+        LinearAuthorityTraversal(source, budget, Cancellation.Never, { false }, {}, { null },
+            useGuidance = true, useCuts = false).use { component ->
+            val session = SearchComponentSet(listOf(component)).session()
+            assertEquals(ComponentResult.Consistent, session.initialize())
+
+            val disposition = component.beforeBranch(session)
+
+            assertEquals(SearchNodeDisposition.Prune, disposition)
+            assertTrue(assertNotNull(component.rootNumerical).infeasible)
+            assertNull(component.rootBound)
+            assertNull(component.completed())
+            assertEquals(1L, component.observations()["numericalProjectionConflictPrunes"])
+            assertEquals(0L, budget.measuredConflictCertificationWork)
+        }
+    }
+
     @Test
     fun `fractional bounds should retain current branch decisions`() {
         val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)

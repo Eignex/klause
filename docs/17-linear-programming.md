@@ -59,6 +59,15 @@ builder; wider coefficients use an exact positive row normalization whose ration
 entries remain certificate authority beside the floating projection. A
 normalization that cannot project to finite nonzero floating values declines.
 
+Numerical source bounds and contradictions retain a separate scoped claim. Scope-only
+copies share their immutable linear-definition namespace; a new source binding,
+revision, objective or semantics cannot adopt an earlier numerical claim. Stronger
+branch restrictions can consume a funded implication check and inherit the bound.
+Numerical bounds reaching an incumbent within the LP tolerance, and numerical
+contradictions, can close a traversal node. These closures retain numerical counters
+and never create an exact source derivation. Candidate assignments still pass their
+original-source arithmetic check, independently of numerical deduction authority.
+
 Exact-linear preparation keeps templates for every source row and original column.
 Unconditional rows are installed up front; guarded, Boolean-dependent and
 disjunctive rows materialize when asserted, and a row enabled by an integer

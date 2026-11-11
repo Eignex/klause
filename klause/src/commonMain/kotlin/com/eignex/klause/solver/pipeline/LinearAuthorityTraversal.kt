@@ -9,9 +9,11 @@ import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.LinearAuthorityCapture
 import com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest
 import com.eignex.klause.lp.optimization.LinearAuthorityResult
+import com.eignex.klause.lp.optimization.LinearNumericalClaim
 import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.lp.optimization.floorSplit
 import com.eignex.klause.lp.optimization.strongerLinearBound
+import com.eignex.klause.lp.optimization.strongerNumericalClaim
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -194,6 +196,8 @@ internal class LinearAuthorityTraversal(
     var ray: SourceEvidence? = null
         private set
     var rootBound: SourceEvidence? = null
+        private set
+    var rootNumerical: LinearNumericalClaim? = null
         private set
 
     fun frontierRank(): BigFraction? {
@@ -422,7 +426,8 @@ internal class LinearAuthorityTraversal(
         }
         current.result?.let {
             return when {
-                it.evidence != null || current.coveredBound != null -> SearchNodeDisposition.Prune
+                it.evidence != null || current.coveredBound != null || current.coveredNumerical != null ->
+                    SearchNodeDisposition.Prune
                 current.split != null -> SearchNodeDisposition.Expand
                 else -> SearchNodeDisposition.Indeterminate
             }
@@ -451,7 +456,8 @@ internal class LinearAuthorityTraversal(
         val result = queried.copy(bound = strongestBound,
             cutBoundFamilies = if (strongestBound != null && strongestBound === current.partialBound) {
                 current.partialCutFamilies
-            } else queried.cutBoundFamilies)
+            } else queried.cutBoundFamilies,
+            numerical = strongerNumericalClaim(current.partialNumerical, queried.numerical))
         for ((stage, count) in result.primalStages) {
             val key = "numerical$stage"
             val previous = observations[key] ?: 0L
@@ -460,6 +466,7 @@ internal class LinearAuthorityTraversal(
         if (result.paused) {
             current.partialBound = result.bound
             current.partialCutFamilies = result.cutBoundFamilies
+            current.partialNumerical = result.numerical
             feedback?.consume(branch, paused = true)?.let { onNumericalFeedback?.invoke(it) }
             current.pending = true
             observe("numericalLpPauses")
@@ -475,6 +482,14 @@ internal class LinearAuthorityTraversal(
         val lateFeedback = feedback != null && feedback.lateCollections != lateBefore
         current.result = if (result.primalStages.isEmpty()) result else result.copy(primalStages = emptyMap())
         observe("numericalChecks")
+        if (result.numerical != null) {
+            result.incumbent?.let(onIncumbent)
+            if (result.numerical.appliesTo(branch, budget, cancellation)) {
+                if (current === root) rootNumerical = result.numerical
+                if (result.numerical.bound != null) observe("numericalProjectionBounds")
+                if (closeNumerical(result.numerical, branch)) return SearchNodeDisposition.Prune
+            }
+        }
         result.evidence?.takeIf { it.claim == SourceClaim.Refutation }?.let { refutations?.retain(it) }
         if (result.evidence?.claim == SourceClaim.Refutation) {
             authority.observeCutConsumption(result.cutConflictFamilies, "CONFLICT_PRUNE")
@@ -530,7 +545,7 @@ internal class LinearAuthorityTraversal(
         } else if (result.split == null && branchGuidance == null) {
             observe("numericalUnavailableGuidance")
         }
-        result.incumbent?.let(onIncumbent)
+        if (result.numerical == null) result.incumbent?.let(onIncumbent)
         if (current === root) rootBound = result.bound
         if (result.evidence?.claim is SourceClaim.Ray) {
             ray = checked(result.evidence.claim, SourceDerivation.SourceRay)
@@ -597,7 +612,12 @@ internal class LinearAuthorityTraversal(
     }
 
     private fun closeCurrentBound(): Boolean {
-        if (current.split != null || current.coveredBound != null || current.result?.evidence != null) return false
+        if (current.split != null || current.coveredBound != null || current.coveredNumerical != null ||
+            current.result?.evidence != null) return false
+        strongerNumericalClaim(current.result?.numerical, current.partialNumerical)?.let { claim ->
+            val branch = source.atScope(source.scope.copy(condition = current.condition))
+            if (closeNumerical(claim, branch)) return true
+        }
         val retained = current.result
         val bound = retained?.bound ?: current.partialBound ?: return false
         val value = ((bound.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value ?: return false
@@ -625,6 +645,15 @@ internal class LinearAuthorityTraversal(
         val minimizes = source.scope.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE
         for ((_, ancestor) in path.dropLast(1).asReversed()) {
             if (cancellation()) return false
+            val numerical = strongerNumericalClaim(ancestor.coveredNumerical,
+                strongerNumericalClaim(ancestor.result?.numerical, ancestor.partialNumerical))
+            if (numerical != null) {
+                val branch = source.atScope(source.scope.copy(condition = current.condition))
+                if (closeNumerical(numerical, branch)) {
+                    observe("numericalInheritedProjectionBoundClosures")
+                    return true
+                }
+            }
             val inherited = ancestor.coveredBound ?: ancestor.result?.bound ?: ancestor.partialBound ?: continue
             val claim = inherited.claim as? SourceClaim.Bound ?: continue
             val value = (claim.value as? SourceValue.Rational)?.value ?: continue
@@ -644,6 +673,20 @@ internal class LinearAuthorityTraversal(
             return true
         }
         return false
+    }
+
+    private fun closeNumerical(claim: LinearNumericalClaim, branch: SourceProofContext): Boolean {
+        if (!claim.appliesTo(branch, budget, cancellation)) return false
+        if (!claim.infeasible && incumbent()?.second?.let(claim::reaches) != true) return false
+        if (cancellation()) return false
+        current.pending = false
+        current.coveredNumerical = claim
+        if (current === root) rootNumerical = claim
+        current.result = (current.result ?: LinearAuthorityResult()).copy(numerical = claim)
+        pending--
+        observe(if (claim.infeasible) "numericalProjectionConflictPrunes" else "numericalProjectionBoundPrunes")
+        observe("numericalClosedLeaves")
+        return true
     }
 
     fun completed(): SourceEvidence? {
@@ -711,6 +754,8 @@ private class CoverageNode(val condition: SourceCondition) {
     var coveredBound: SourceEvidence? = null
     var pending: Boolean = false
     var partialBound: SourceEvidence? = null
+    var partialNumerical: LinearNumericalClaim? = null
+    var coveredNumerical: LinearNumericalClaim? = null
     var partialCutFamilies: Set<CutFamily> = emptySet()
     var coveredCutFamilies: Set<CutFamily> = emptySet()
 
