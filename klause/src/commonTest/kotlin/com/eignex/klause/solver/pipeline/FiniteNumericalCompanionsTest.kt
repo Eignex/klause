@@ -457,6 +457,33 @@ class FiniteNumericalCompanionsTest {
     }
 
     @Test
+    fun `a retired numerical companion should retain completion authority in its live stats`() {
+        val model = Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 1, 2, 3), LinearOp.GE, 0),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1))
+        val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+        val params = TheoryParams(sourceCuts = false)
+        val cost = finiteNumericalCompanionEligibility(model, PortfolioScenario.sequential(Kind.COP),
+            objective, params).requirements.construction
+        val companions = assertNotNull(FiniteNumericalCompanions.prepare(model, objective, params,
+            Cancellation.Never, cost).companions)
+
+        PortfolioInvocationResources(2, 1, 0, Cancellation.Never, null).use { resources ->
+            companions.factories(plan, 0).first().materialize(plan, resources.slots[0]).use { worker ->
+                val search = assertNotNull(worker.newResumableSearch { Double.POSITIVE_INFINITY })
+                search.use {
+                    repeat(8) { if (!search.isDone) search.runSlice(Cancellation.Never, 1_000, 5_000) { } }
+                    assertTrue(search.isDone)
+                }
+
+                assertEquals(1L, search.stats.lp.phases["NUMERICAL_CONSUMPTION_STANDALONE"]
+                    ?.outcomes?.get("SOURCE_OPTIMUM"))
+            }
+        }
+    }
+
+    @Test
     fun `a checked numerical optimum should complete the same finite working model`() {
         val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
