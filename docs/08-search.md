@@ -283,8 +283,9 @@ linear completion owner reuses the point of its last numerical check, and the op
 `openHintFlips` provider indexes source clauses and prefers the polarity that breaks
 fewer of them. Index construction is bounded and charged to the opening token; see
 [native arithmetic allowances](06-sessions.md#native-arithmetic-allowances).
-Solution-guided LP bounding may also replay a peer incumbent's values until its
-first local witness or conflict. Hints supply no incumbent, pruning or publication authority.
+Solution-guided LP bounding may also replay a peer incumbent at resume, and an arm
+without a local incumbent replays a pooled incumbent after each restart, until a
+decision it led conflicts or the arm finds its own witness. Hints supply no incumbent, pruning or publication authority.
 
 A non-restarting retained complete optimization worker with an external cutoff reads
 the current pooled assignment at its first root and adopts it as a local incumbent

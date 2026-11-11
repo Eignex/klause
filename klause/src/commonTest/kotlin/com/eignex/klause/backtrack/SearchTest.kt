@@ -185,29 +185,79 @@ class SearchTest {
     }
 
     @Test
-    fun `a replayed point should lead integer and Boolean value order under any selector`() {
-        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, randomSeed = 0L)
-        val integer = BacktrackBrancher(PropagationSession(problemOf(IntDomain(0, 10))), params, sink = null,
-            restart = RestartSchedule.from(params))
-        val bool = BacktrackBrancher(PropagationSession(Problem(1, 0, emptyArray(), emptyArray())), params,
-            sink = null, restart = RestartSchedule.from(params))
+    fun `a replayed point should lead an integer value order the selector would not choose`() {
+        val brancher = minFirstBrancher(problemOf(IntDomain(0, 10)))
+        brancher.importPooledSolution(Sample(booleanArrayOf(), longArrayOf(7L)), replay = true)
 
-        integer.importPooledSolution(Sample(booleanArrayOf(), longArrayOf(7L)), replay = true)
-        bool.importPooledSolution(Sample(booleanArrayOf(true), longArrayOf()), replay = true)
+        val first = brancher.nextBranch(SearchSession(emptyList()))?.first()
 
-        assertEquals(SearchDecision.IntAtMost(0, 7L), integer.nextBranch(SearchSession(emptyList()))?.first())
-        assertEquals(SearchDecision.Bool(Lit.make(0, true)), bool.nextBranch(SearchSession(emptyList()))?.first())
+        assertEquals(SearchDecision.IntAtMost(0, 7L), first)
     }
 
     @Test
-    fun `a conflict should end point replay`() {
-        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, randomSeed = 0L)
-        val brancher = BacktrackBrancher(PropagationSession(problemOf(IntDomain(0, 10))), params, sink = null,
-            restart = RestartSchedule.from(params))
+    fun `a replayed point should lead a Boolean value order the selector would not choose`() {
+        val brancher = minFirstBrancher(Problem(1, 0, emptyArray(), emptyArray()))
+        brancher.importPooledSolution(Sample(booleanArrayOf(true), longArrayOf()), replay = true)
+
+        val first = brancher.nextBranch(SearchSession(emptyList()))?.first()
+
+        assertEquals(SearchDecision.Bool(Lit.make(0, true)), first)
+    }
+
+    @Test
+    fun `a conflict on a hinted decision should end point replay`() {
+        val brancher = minFirstBrancher(problemOf(IntDomain(0, 10)))
+        brancher.importPooledSolution(Sample(booleanArrayOf(), longArrayOf(7L)), replay = true)
+        val hinted = brancher.nextBranch(SearchSession(emptyList()))?.first()
+
+        brancher.onConflict(hinted)
+
+        assertEquals(SearchDecision.IntAtMost(0, 0L), brancher.nextBranch(SearchSession(emptyList()))?.first())
+    }
+
+    @Test
+    fun `a prune without a decision should end point replay`() {
+        val brancher = minFirstBrancher(problemOf(IntDomain(0, 10)))
         brancher.importPooledSolution(Sample(booleanArrayOf(), longArrayOf(7L)), replay = true)
 
         brancher.onConflict(null)
 
         assertEquals(SearchDecision.IntAtMost(0, 0L), brancher.nextBranch(SearchSession(emptyList()))?.first())
+    }
+
+    @Test
+    fun `a conflict on an unhinted decision should keep point replay`() {
+        val brancher = minFirstBrancher(problemOf(IntDomain(0, 10)))
+        brancher.importPooledSolution(Sample(booleanArrayOf(), longArrayOf(7L)), replay = true)
+
+        brancher.onConflict(SearchDecision.IntAtMost(0, 2L))
+
+        assertEquals(SearchDecision.IntAtMost(0, 7L), brancher.nextBranch(SearchSession(emptyList()))?.first())
+    }
+
+    @Test
+    fun `point replay should survive a restart`() {
+        val brancher = minFirstBrancher(problemOf(IntDomain(0, 10)))
+        brancher.importPooledSolution(Sample(booleanArrayOf(), longArrayOf(7L)), replay = true)
+
+        brancher.onRestart(0L)
+
+        assertEquals(SearchDecision.IntAtMost(0, 7L), brancher.nextBranch(SearchSession(emptyList()))?.first())
+    }
+
+    @Test
+    fun `a found solution should end point replay`() {
+        val brancher = minFirstBrancher(problemOf(IntDomain(0, 10)))
+        brancher.importPooledSolution(Sample(booleanArrayOf(), longArrayOf(7L)), replay = true)
+
+        brancher.onSolution(Sample(booleanArrayOf(), longArrayOf(3L)))
+
+        assertEquals(SearchDecision.IntAtMost(0, 0L), brancher.nextBranch(SearchSession(emptyList()))?.first())
+    }
+
+    private fun minFirstBrancher(problem: Problem): BacktrackBrancher {
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, randomSeed = 0L)
+        return BacktrackBrancher(PropagationSession(problem), params, sink = null,
+            restart = RestartSchedule.from(params))
     }
 }
