@@ -147,6 +147,8 @@ internal class LinearAuthority(
     private var fractionalOperation = -1
     private var cutPreparationWork = 0L
     private var cutVerificationWork = 0L
+    private var cutScreeningWork = 0L
+    private val numericalCuts: Boolean get() = budget.context.certificationPolicy.numericalDeductions
     private var retainedCutPeak = 0L
     private var activeCutPeak = 0L
     private val cutEligibility = linkedMapOf<String, Long>()
@@ -155,6 +157,7 @@ internal class LinearAuthority(
     fun cutObservations(): Map<String, Long> = mapOf(
         "numericalCutPreparationWork" to cutPreparationWork,
         "numericalCutVerificationWork" to cutVerificationWork,
+        "numericalCutScreeningWork" to cutScreeningWork,
         "numericalMaxRetainedCuts" to retainedCutPeak,
         "numericalMaxActiveCuts" to activeCutPeak,
         "numericalMaxRetainedMixedCuts" to retainedMixedCutPeak,
@@ -218,7 +221,9 @@ internal class LinearAuthority(
         fractionalRound?.let { pending ->
             val previous = pending.previous.query
             if (previous.matches(source, true, previous.cutMask, previous.checkUnselectedCuts,
-                    previous.retainMaskedCuts)) return advanceFractionalRound(source, cancellation, retainBasePoint)
+                    previous.retainMaskedCuts, numericalCuts = numericalCuts)) {
+                return advanceFractionalRound(source, cancellation, retainBasePoint)
+            }
             finishFractionalQueryCost(pending, "scope-changed")
             restorePointRecipe(pending.previous)
             fractionalRound = null
@@ -338,13 +343,15 @@ internal class LinearAuthority(
         cutCost(work, 64L)
         if (cancellation() || budget.funding?.paused == true) return false
         policy.observe("FractionalPoolObservations")
-        val ready = prepared.checkedCuts.size == rows &&
+        val ready = prepared.admittedCuts.size == rows &&
             prepared.installedCuts.size == rows &&
-            (0 until rows).all { it in prepared.checkedCuts && it in prepared.installedCuts }
+            (0 until rows).all { it in prepared.admittedCuts && it in prepared.installedCuts }
         policy.observe(if (ready) "FractionalPoolReady" else "FractionalPoolDeferred")
         if (ready) {
             policy.observe("FractionalAttemptPoolRows", rows.toLong())
             policy.observe("FractionalAttemptCheckedRows", prepared.checkedCuts.size.toLong())
+            policy.observe("FractionalAttemptNumericalRows",
+                if (prepared.numericalCuts) prepared.admittedCuts.size.toLong() else 0L)
             policy.observe("FractionalAttemptInstalledRows", prepared.installedCuts.size.toLong())
         }
         return ready
@@ -399,14 +406,14 @@ internal class LinearAuthority(
         }
         val installed = prepared.installedCuts
         val selected = policy.select(checkNotNull(refined.first.cuts).rows,
-            refined.second.coordinates, refined.second.costs, refined.second.checkedCuts,
+            refined.second.coordinates, refined.second.costs, refined.second.admittedCuts,
             point, installed, cancellation, objectiveSource = source, fractional = true)
         val maskWork = 2L * installed.size + selected.size
         val covered = budget.funding?.availableWork?.let { maskWork <= it } != false
         if (covered) cutCost(maskWork, 0L)
         if (cancellation() || budget.funding?.paused == true ||
             !covered ||
-            !refined.second.checkedCuts.containsAll(installed) || !selected.containsAll(installed) ||
+            !refined.second.admittedCuts.containsAll(installed) || !selected.containsAll(installed) ||
             selected.none { it !in installed }) {
             policy.observe("FractionalDeclined")
             restorePointRecipe(previous)
@@ -510,7 +517,7 @@ internal class LinearAuthority(
         var pending = pointRound?.takeIf {
             it.query.matches(source, cuts = true, cutMask = it.query.cutMask,
                 checkUnselectedCuts = it.query.checkUnselectedCuts,
-                retainMaskedCuts = it.query.retainMaskedCuts)
+                retainMaskedCuts = it.query.retainMaskedCuts, numericalCuts = numericalCuts)
         }
         if (pending == null) {
             pointRound = null
@@ -540,7 +547,7 @@ internal class LinearAuthority(
             if (family.cuts == null ||
                 !prepared.matches(source, cuts = true, cutMask = baselineMask,
                     checkUnselectedCuts = checkUnselectedCuts(baselineMask),
-                    retainMaskedCuts = retainMaskedCuts(baselineMask))) {
+                    retainMaskedCuts = retainMaskedCuts(baselineMask), numericalCuts = numericalCuts)) {
                 policy.observe("PointUnavailable")
                 return base
             }
@@ -577,7 +584,7 @@ internal class LinearAuthority(
             }
             val selected = cutLifecycle.containing("POINT_SELECTION") {
                 policy.select(checkNotNull(family.cuts).rows, prepared.coordinates, prepared.costs,
-                    prepared.checkedCuts, observed.second, pointMask.orEmpty().intersect(prepared.checkedCuts),
+                    prepared.admittedCuts, observed.second, pointMask.orEmpty().intersect(prepared.admittedCuts),
                     cancellation, adoptCurrent = baselineMask == null && family === baselineFamily &&
                         prepared.activeCuts == checkNotNull(family.cuts).rows.size, objectiveSource = source)
             }
@@ -694,7 +701,7 @@ internal class LinearAuthority(
         val before = original.cuts?.rows ?: return false
         val after = refined.cuts?.rows ?: return false
         if (before.size > 64 || before.size != after.size || query.activeCuts != before.size ||
-            query.checkedCuts.size != before.size || cancellation()) return false
+            query.admittedCuts.size != before.size || cancellation()) return false
         pointPolicy?.observe("PreparationReuseChecks")
         var work = 0L
         fun charge(amount: Long, allocation: Long = 0L): Boolean {
@@ -715,7 +722,7 @@ internal class LinearAuthority(
             val left = before[index]
             val right = after[index]
             if (!charge(1L + left.owners.size + right.owners.size + left.inequality.supportSize, 64L)) return false
-            if (index !in query.checkedCuts || left.owner != right.owner || left.owners != right.owners ||
+            if (index !in query.admittedCuts || left.owner != right.owner || left.owners != right.owners ||
                 left.family != right.family || left.mixed != right.mixed ||
                 left.inequality.strict != right.inequality.strict) return false
             val first = left.inequality.coefficients
@@ -894,7 +901,12 @@ internal class LinearAuthority(
             }
         }, cutMask = cutMask, onCut = cutLifecycle::observe,
             checkUnselectedCuts = checkUnselectedCuts(cutMask),
-            retainMaskedCuts = retainMaskedCuts(cutMask))?.also {
+            retainMaskedCuts = retainMaskedCuts(cutMask), budget = budget, onNumericalCutWork = { work ->
+                cutScreeningWork += work
+                for (family in prepared?.cuts?.rows.orEmpty().mapTo(HashSet()) { it.family }) {
+                    cutLifecycle.observe(family, "NumericalScreeningWork", work)
+                }
+            })?.also {
             cutLifecycle.families = it.cutFamilies.values.toSet()
             activeCutPeak = maxOf(activeCutPeak, it.activeCuts.toLong())
             activeMixedCutPeak = maxOf(activeMixedCutPeak, it.activeMixedCuts.toLong())
@@ -956,7 +968,8 @@ internal class LinearAuthority(
         cutMask: Set<Int>? = null,
     ): LinearAuthorityResult {
         val cached = if (retainLp || guidance) query?.takeIf {
-            it.matches(source, cuts, cutMask, checkUnselectedCuts(cutMask), retainMaskedCuts(cutMask))
+            it.matches(source, cuts, cutMask, checkUnselectedCuts(cutMask), retainMaskedCuts(cutMask),
+                numericalCuts = numericalCuts)
         } else null
         val prepared = cached ?: prepareQuery(source, cancellation, cuts, cutMask)?.also {
             if (retainLp || guidance) query = it

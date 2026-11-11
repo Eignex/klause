@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.optimization
 
+import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
@@ -7,6 +8,7 @@ import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRoundingLimit
+import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.mixedIntegerRounding
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.BIG_ONE
@@ -28,8 +30,32 @@ internal class LinearAuthorityCut(
     val family: CutFamily = if (mixed) CutFamily.SOURCE_MIXED_ROUNDING else CutFamily.SOURCE_ROUNDING,
 ) {
     val owners: Set<Int> = owners.toSet()
+    private var generatedDefinitions: Any? = null
+    private var generatedScope: SourceScope? = null
 
     init { require(owner in this.owners && this.owners.all { it >= 0 }) }
+
+    internal fun bindGeneratedSource(source: SourceProofContext) {
+        if (generatedDefinitions != null) {
+            check(generatedDefinitions === source.linearDefinitionIdentity && generatedScope === source.scope)
+            return
+        }
+        generatedDefinitions = source.linearDefinitionIdentity
+        generatedScope = source.scope
+    }
+
+    fun admitsNumerically(source: SourceProofContext, budget: SourceLpBudget, cancellation: Cancellation): Boolean {
+        val scope = generatedScope ?: return false
+        if (cancellation() || !budget.context.certificationPolicy.numericalDeductions ||
+            generatedDefinitions !== source.linearDefinitionIdentity || scope.revision != source.scope.revision ||
+            scope.objective != source.scope.objective) return false
+        val same = scope.condition === source.scope.condition
+        val work = if (same) 1L else 1L + 128L *
+            (scope.condition.comparisonSize + source.scope.condition.comparisonSize)
+        if (budget.funding?.availableWork?.let { work > it } == true) return false
+        budget.observe(preparation = work)
+        return !cancellation() && (same || source.scope.condition.implies(scope.condition)) && !cancellation()
+    }
 }
 
 internal class LinearAuthorityCuts private constructor(
@@ -207,7 +233,14 @@ internal class LinearAuthorityCuts private constructor(
                                 continue
                             }
                             val proof = SourceDerivation.MixedIntegerRounding(combination, selected.map { it.second })
-                            cuts += LinearAuthorityCut(owner, conclusion, proof, mixed = true)
+                            if (work >= maximumWork) {
+                                observe("RowScanLimited")
+                                break
+                            }
+                            work++
+                            cuts += LinearAuthorityCut(owner, conclusion, proof, mixed = true).also {
+                                it.bindGeneratedSource(source)
+                            }
                             mixedCount++
                             if (choice > 0) observe("MixedComplementaryRetained")
                         }
@@ -219,7 +252,12 @@ internal class LinearAuthorityCuts private constructor(
                     if (rhs == scaled && !row.strict) continue
                     val conclusion = SourceInequality(coefficients.mapValues { (_, value) -> value * multiplier }, rhs)
                     val proof = SourceDerivation.IntegerRounding(combination)
-                    cuts += LinearAuthorityCut(owner, conclusion, proof)
+                    if (work >= maximumWork) {
+                        observe("RowScanLimited")
+                        break
+                    }
+                    work++
+                    cuts += LinearAuthorityCut(owner, conclusion, proof).also { it.bindGeneratedSource(source) }
                 }
                 return LinearAuthorityCuts(cuts, work, observations, complementary, point != null)
             } finally {
