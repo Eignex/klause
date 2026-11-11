@@ -1,6 +1,5 @@
 package com.eignex.klause.backtrack.lp
 
-import com.eignex.klause.backtrack.snapshotAssignment
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpRounding
 import com.eignex.klause.lp.bounding.RootComponentRounding
@@ -187,7 +186,7 @@ internal fun LpEngine.pinRootComponents(
             sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ROUNDING", "GROUP_COMPLETED", 0L)
         }
     }
-    return snapshotAssignment(session)
+    return pinnedLeaf(session)
 }
 
 private fun LpEngine.retainCompletedRoundingComponents(
