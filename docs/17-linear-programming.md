@@ -661,7 +661,13 @@ definitions with independently chosen nearer continuous endpoints. Exact premise
 still authorize every row. The replacement shares the original generation's work
 limit and retains the source-row template; unavailable preparation leaves its prior
 candidates intact. Each immutable template attempts this preparation once.
-Point scoring admits at most one additional checked cut at each usable point.
+Point scoring admits at most one additional checked cut at each ordinary usable
+point. Explicit fractional augmentation can admit a batch of at most eight newly
+selected checked cuts within the existing 64-row installed-pool cap. The same
+score ordering and nonparallel filter apply to the batch and installed rows.
+Batch storage is prepaid, and every additional comparison shares the existing
+selection work and allocation limits. An interrupted or unfunded batch returns
+the prior installed mask without advancing its aging state.
 An addition waits for its completed selected query before enabling another scan
 at the next point. Only a strictly stronger checked bound, a checked incumbent or
 terminal evidence enables that immediate continuation. An unchanged or unavailable
@@ -771,6 +777,41 @@ invocation bounds, a funded linear partition places finite seed rows containing 
 scoped integer coordinate before other seed rows. Each group and the partner buckets
 retain their slack and source ordering. Scope incidence supplies
 only an ordering preference. Endpoint authority still comes from checked derivations.
+With `source-cut-fractional-order=true`, point aggregation ranks complete finite
+rows by maximum integer fractionality per support entry, then normalized slack and
+source order. A funded traversal keeps at most eight generation-local seed cursors
+and visits one pair per cursor before revisiting it for continuation. Opposite-sign
+partner buckets can use a funded stable support-size order; equal supports retain
+their point and source order. A nonseparating pair retains its immutable aggregate
+and proof snapshots until that seed's next turn. The initial cursor envelope and
+each optional bucket copy/sort must fit within one quarter of their remaining
+work and allocation before setup. Declined cursor setup retains ordinary streaming;
+a declined bucket order retains that bucket's point and source order. Every visit,
+lookup, sort and snapshot debits the same generation allowance. The cursors and
+bucket copies expire with the call. With no fractional support it retains the
+ordinary scoped preference. Its projections,
+score storage and sorting debit the existing generation allowance; declined ranking
+keeps source order.
+Fractional discovery permits at most two attempts for the current immutable generation
+context. A later attempt requires a newer completed paid query and a fully checked,
+active, installed pool; a cached point cannot unlock it. Failed preparation consumes
+an attempt. Both passes preserve existing definitions and their installed mask and
+retain the same per-pass generation and containing source allowances. Paused augmented
+queries resume their pending pass without reserving another attempt.
+Completed nonterminal fractional augmentation retains a separate immutable baseline
+branch guide for the same verification scope. Ordinary traversal uses that guide
+while consuming the strongest checked bound; the augmented relaxation point and
+fractional coordinates retain their own meaning. Snapshot copies debit the existing
+source allowance. Pauses, cancellation and terminal results withhold the guide.
+With `source-cut-preparation-reuse=true`, point calls can retain one immutable
+source-incidence index within the numerical owner. Reuse requires the same
+generation context object and support allowance; a new context or owner release
+drops it. Partial preparation is never retained. The index stays within 65,536
+modeled work and 1 MiB of modeled allocation, including charged reference copies
+and a prepaid constant release. Each point gets fresh seed and incidence lists,
+ordering and bound-side selection under the existing generation allowance.
+Retaining an index supplies no proof authority; query certification still checks
+the complete source premises and scope. Reuse is disabled by default.
 Incidence lookup, partition storage and copy-back share the containing generation
 allowance. The partition's estimate admits at most half the remaining work and
 allocation after slack ordering; a declined partition retains that order. Incomplete
@@ -1236,8 +1277,17 @@ requested projection and records it, so a withheld field is explicit rather than
 unavailable, and the query state still reports the actual point outcome. Full records
 retain the template's immutable generation scope separately from the current
 verification scope, charging its retained conditions to the capture allowance.
-A missing template leaves generation provenance unavailable. Installed
-cut activity keeps the installed, checked cuts with active owners; their violations
+A missing template leaves generation provenance unavailable. An attached
+inspection may explicitly retain at most two immutable generation contexts,
+charging references and their retained extent to the same archive allowance.
+Their identity belongs to the generating template; a rescoped verification copy
+does not establish preparation-cache compatibility. Releasing this optional
+retention drops its context references without retaining a numerical solver owner.
+Captured-pool replay preserves row definitions and their identifiers, appends supplied
+consequences within the same row ceiling, and selects the combined pool by an explicit
+mask. Import and copying debit its query allowance; selected derivations are checked
+afresh. It owns a fresh authority and retains no numerical owner from the capture.
+Installed cut activity keeps the installed, checked cuts with active owners; their violations
 are evaluated on demand while that query is still delivered, and a replaced,
 released, cancelled or oversized evaluation declines. A callback without a request
 receives the full record, and an external observer keeps its full archive. Such coordinates can contain numerical residuals and require
@@ -1647,11 +1697,17 @@ charged with the input authority.
 Claim phases report inclusive certification time, existing charged work and terminal
 refusal, including unsupported authority, missing bound sides, scalar limits, singularity,
 resource stops and policy refusal. These work totals overlap the certifier ledger and
-must not be added to it. Bound reconstruction reports its validation and exact-input
-capture prefix, including stopped prefixes, through the optional phase observer. Its
-work and time are subsets of the inclusive bound certificate phase; vector
-reconstruction, dual arithmetic and support follow it. Source optimization retains
-these input and inclusive bound times beside the existing per-recipe work counters.
+must not be added to it. Bound reconstruction additionally reports its
+validation and exact-input capture prefix, including stopped prefixes, through the
+optional phase observer. Its work and time are subsets of the inclusive bound
+certificate phase. Exact-basis candidate reconstruction and fixed-width and arbitrary-precision
+dual verification report separate child phases, retaining overflow and declined prefixes.
+Their work and time are disjoint from input capture and remain subsets of inclusive
+certification. Vector reconstruction and support remain in the containing phase.
+A reconstructed candidate supplies no authority until the complete certificate check
+and policy accept it.
+Source optimization retains these child and inclusive bound times beside the existing
+per-recipe work counters.
 Separate consumption observations count accepted leaf packages
 and actual bound or conflict pruning; a successful check alone is not consumption.
 Source optimization records deterministic claim work and outcomes in its existing stage
@@ -1881,6 +1937,34 @@ every query; candidate scoring supplies no proof authority.
 The optional observer has separate record, entry, modeled byte and cancellation
 allowances. It retains immutable source values and derivations, never a numerical
 owner or live workspace. Incomplete capture and unavailable points remain unknown.
+Opt-in fractional-attempt observation reserves one of its record slots for the
+first attempted query, its paid point, current and actual generation scopes, and
+preparation outcome. Funding and operation snapshots bracket preparation. Its
+128-work, 8-KiB metadata frame and captured entries/bytes debit the containing
+source allowance as well as the observer limits. A temporary journal shares the
+remaining observer limits and containing funding; it keeps at most 16 unchecked
+rejected inequalities with 128 coefficients/owners and 256-bit scalars, and at most
+64 event names. Completed records retain scalar snapshots and immutable values
+without retaining the journal's live budget. Inspection cancellation withholds new
+output without revoking already retained immutable evidence.
+The journal can attribute disjoint generation phases to accepted containing-meter
+charges. Parent spans close before child derivations; interrupted spans retain
+their paid prefix. Rejected rows keep funded immutable cumulative phase costs
+within their seed-row or source-pair execution segment. Immediate continuations
+share that attempt ordinal, so its successive prefixes overlap. A deferred
+continuation starts a new ordinal after intervening seeds; its prefix contains
+only resumed work. Both segments remain in the complete generation totals. Bound substitution, rounding and their remaining
+proof construction form one phase. Indexing and ordering remain in the containing
+totals. Fixed phase snapshots and record copies share the existing observer and
+source allowances; absent or limited observation supplies no complete cost.
+The first retained fractional attempt can reserve a separate 128-work, 8-KiB frame
+for its augmented query's scope, installed mask and scalar funding, owner, basis,
+fill and certification snapshots. Each observed call charges one additional work
+unit to both ledgers. Pauses retain one frame and count resumed calls;
+completion, failure, scope change or invalidation ends the interval. An unfinished
+or stopped observation supplies no complete cost. Snapshots include observation
+charges and any intervening work sharing the containing budget; they overlap the
+existing totals and supply no independent proof or whole-source timing claim.
 Imported cut proof records preserve their original scope, claimed inequality and
 nested derivation. Bound and refutation imports keep their claim semantics;
 depth or cancellation limits leave an explicit unavailable derivation.
@@ -1898,6 +1982,9 @@ branching controls to its admitted numerical companions. The containing source r
 them from finite worker recipe options; they change neither companion admission
 nor lifetime. Joint repair binds separation, point selection and aggregation to its
 shared numerical owner for both root preparation and retained neighborhood queries.
+With fractional point aggregation, the advisory root uses an uncut query to seed
+its coordinates. Retained neighborhood queries purchase separation through the same
+owner and source funding.
 Its advisory root center and neighborhood order use the paid point preceding
 selection when the selected query remains nonterminal without a checked incumbent.
 A selected witness or terminal keeps its selected guidance. The baseline point
@@ -1960,6 +2047,25 @@ Snapshots and retention debit the containing funding, with bounded entry, byte a
 scalar widths. Changed conditions, incomplete results and checked centers do not
 reuse these entries; owner retirement releases them. This reuse neither reduces proof
 scope nor publishes a global refutation.
+
+Fractional-order aggregation follows a completed nonterminal current point query
+whose entire retained cut pool is checked and installed. Partial pools defer
+without spending the template's generation attempt. The coverage scan charges
+`1 + 2 * poolRows` work and 64 modeled bytes to the containing allowance; counters
+record readiness, deferral and the attempted retained, checked and installed sizes.
+The continuation keeps the query's checked definitions, installed mask, strongest bound and paid exact
+point, then appends funded proposals under the 64-row ceiling in the same numerical
+generation scope. It permits at most two augmentations per immutable generation context using only
+the containing allowance's remaining work, memory and operations. Generation and
+the additional query have separate charged costs. A candidate selector must retain
+every still-checked installed ID before adding a row. An immutable template
+identity keeps that prepared pool compatible with explicit masks while preserving
+its original complementary provenance; each query rechecks the selected derivations.
+A paused candidate query retains the completed current result and resumes its
+existing operation. Decline, cancellation or exhausted funding restores the current
+recipe and selector, retaining all failed-attempt costs. Cancellation withholds
+advisory data. Restoring the recipe does not promise a free numerical basis rebuild.
+Other point preparation uses point-directed row alternatives.
 A new template first runs the ordinary checked cut recipe; a completed point can
 add one selection round at that node. A trial that admits no candidate retains
 the ordinary template, checked query and numerical owner for later queries of that
@@ -1977,7 +2083,15 @@ copying public snapshots. Funding preparation traverses the captured premises an
 charges each visited row, coefficient, guard and integer pin; cancellation retains
 the visited prefix's charge. The score combines normalized violation,
 inverse square-root support and objective parallelism. The model-facing cut pool
-and source selector share the greedy parallelism filter. Floating scores guide
+and source selector share the greedy parallelism filter. When a singleton objective
+coordinate occurs in no candidate row, a unique pair of opposite, non-strict,
+unconditional source rows can express its scoring costs in the other coordinates.
+This one-step projection admits at most 128 row entries and 4,096 combined numerator
+and denominator bits per scalar. Row visits, exact pair checks and floating
+projection spend the scoring allowance. Ambiguous, scoped or nonfinite definitions
+keep the raw scoring costs; exhaustion or cancellation retains the installed mask.
+The numerical objective and proof premises retain their original representation.
+Retired installed-row scans omit this objective projection. Floating scores guide
 selection; source inequalities and their derivations remain exact rationals.
 Nonfinite projections supply no score. Each call visits at most 8,192 support
 entries with 65,536 modeled scoring work and 1 MiB modeled allocation, within the

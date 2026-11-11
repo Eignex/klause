@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.optimization
 
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -13,6 +14,9 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.magnitudeBitLength
+
+private const val FRACTIONAL_FRAME_WORK = 128L
+private const val FRACTIONAL_FRAME_BYTES = 8192L
 
 // The fields a feedback consumer reads from a completed query; Full is the inspection archive's shape.
 internal data class LinearAuthorityFeedbackRequest(
@@ -93,6 +97,136 @@ internal class LinearAuthorityCapture(
         require(maximumRecords >= 0 && maximumEntries >= 0 && maximumBytes >= 0)
     }
     private val retained = ArrayList<LinearAuthorityCapturedQuery>()
+    var fractionalEnabled: Boolean = false
+        private set
+    var fractionalAttempts: Long = 0L
+        private set
+    var fractionalAttemptLimited: Boolean = false
+        private set
+    var fractionalAttempt: LinearAuthorityFractionalAttempt? = null
+        private set
+    var fractionalQueryCost: LinearAuthorityFractionalQueryCost? = null
+        private set
+    var fractionalQueryCostStarted: Boolean = false
+        private set
+    var fractionalQueryCostPending: Boolean = false
+        private set
+    var fractionalQueryCostLimited: Boolean = false
+        private set
+    private var fractionalQueryObservation: LinearAuthorityFractionalQueryObservation? = null
+    private val maximumQueryRecords: Int get() = (maximumRecords - if (fractionalEnabled) 1 else 0).coerceAtLeast(0)
+
+    fun observeFractionalAttempt() { fractionalEnabled = true }
+
+    fun beginFractionalAttempt(
+        source: SourceProofContext, query: LinearAuthorityQuery, template: LinearAuthorityTemplate,
+        values: List<BigFraction>, result: LinearAuthorityResult, budget: SourceLpBudget,
+        cancellation: Cancellation, snapshot: () -> Map<String, Long?>,
+    ): LinearAuthorityFractionalObservation? {
+        if (!fractionalEnabled || fractionalAttempts != 0L) return null
+        fractionalAttempts++
+        val funding = budget.funding
+        if (funding == null || stop() || cancellation() || maximumRecords < 1 ||
+            maximumEntries - constructedEntries < FRACTIONAL_FRAME_WORK ||
+            maximumBytes - constructedBytes < FRACTIONAL_FRAME_BYTES ||
+            funding.availableWork < FRACTIONAL_FRAME_WORK || funding.remainingAllocation < FRACTIONAL_FRAME_BYTES) {
+            fractionalAttemptLimited = true
+            return null
+        }
+        val before = snapshot()
+        budget.observe(preparation = FRACTIONAL_FRAME_WORK)
+        funding.charge(0L, FRACTIONAL_FRAME_BYTES)
+        val active = Cancellation { stop() || cancellation() || funding.paused }
+        val child = LinearAuthorityCapture(1,
+            minOf(maximumEntries - constructedEntries - FRACTIONAL_FRAME_WORK, funding.availableWork),
+            minOf(maximumBytes - constructedBytes - FRACTIONAL_FRAME_BYTES, funding.remainingAllocation), active)
+        val point = child.point(query.coordinates, values)
+        child.record(source, query, template, point, result)
+        val work = FRACTIONAL_FRAME_WORK + child.constructedEntries
+        val allocation = FRACTIONAL_FRAME_BYTES + child.constructedBytes
+        budget.observe(preparation = child.constructedEntries)
+        funding.charge(0L, child.constructedBytes)
+        entries += work
+        bytes += allocation
+        constructedEntries += work
+        constructedBytes += allocation
+        val captured = child.lastRecord
+        fractionalAttemptLimited = captured?.point == null || child.limited
+        return LinearAuthorityFractionalObservation(captured, before,
+            LinearAuthorityAggregateRejections(budget, active,
+                maximumWork = (maximumEntries - constructedEntries).coerceAtLeast(0L),
+                maximumAllocation = (maximumBytes - constructedBytes).coerceAtLeast(0L)), work, allocation)
+    }
+
+    fun finishFractionalAttempt(observed: LinearAuthorityFractionalObservation?, outcome: String,
+        snapshot: () -> Map<String, Long?>) {
+        if (observed == null) return
+        val rejected = observed.rejected
+        entries += rejected.work
+        bytes += rejected.allocation
+        constructedEntries += rejected.work
+        constructedBytes += rejected.allocation
+        fractionalAttempt = LinearAuthorityFractionalAttempt(observed.query, observed.before, snapshot(), outcome,
+            rejected.records.toList(), rejected.events, rejected.attempted, rejected.limited,
+            observed.work + rejected.work, observed.allocation + rejected.allocation)
+    }
+
+    fun beginFractionalQueryCost(
+        scope: SourceScope, installed: Set<Int>, budget: SourceLpBudget, cancellation: Cancellation,
+        snapshot: () -> Map<String, Long?>,
+    ): LinearAuthorityFractionalQueryObservation? {
+        if (!fractionalEnabled || fractionalQueryCostStarted ||
+            fractionalAttempt?.outcome != "query-selected") return null
+        fractionalQueryCostStarted = true
+        val funding = budget.funding
+        if (funding == null || stop() || cancellation() || maximumRecords < 1 || installed.size > 64 ||
+            fractionalAttempt?.query?.point == null ||
+            maximumEntries - constructedEntries < FRACTIONAL_FRAME_WORK ||
+            maximumBytes - constructedBytes < FRACTIONAL_FRAME_BYTES ||
+            funding.availableWork < FRACTIONAL_FRAME_WORK || funding.remainingAllocation < FRACTIONAL_FRAME_BYTES) {
+            fractionalQueryCostLimited = true
+            return null
+        }
+        val before = snapshot()
+        budget.observe(preparation = FRACTIONAL_FRAME_WORK)
+        funding.charge(0L, FRACTIONAL_FRAME_BYTES)
+        entries += FRACTIONAL_FRAME_WORK
+        bytes += FRACTIONAL_FRAME_BYTES
+        constructedEntries += FRACTIONAL_FRAME_WORK
+        constructedBytes += FRACTIONAL_FRAME_BYTES
+        fractionalQueryCostPending = true
+        return LinearAuthorityFractionalQueryObservation(scope, installed.toSet(), before,
+            FRACTIONAL_FRAME_WORK, FRACTIONAL_FRAME_BYTES).also { fractionalQueryObservation = it }
+    }
+
+    fun observeFractionalQueryCall(observed: LinearAuthorityFractionalQueryObservation, budget: SourceLpBudget,
+        cancellation: Cancellation): Boolean {
+        val funding = budget.funding
+        if (fractionalQueryObservation !== observed) return false
+        if (funding == null || stop() || cancellation() || constructedEntries >= maximumEntries ||
+            funding.availableWork < 1L) {
+            fractionalQueryCostLimited = true
+            return false
+        }
+        budget.observe(preparation = 1L)
+        entries++
+        constructedEntries++
+        observed.work++
+        observed.calls++
+        return true
+    }
+
+    fun finishFractionalQueryCost(observed: LinearAuthorityFractionalQueryObservation?, outcome: String,
+        snapshot: () -> Map<String, Long?>) {
+        if (observed == null || fractionalQueryObservation !== observed) return
+        fractionalQueryCostPending = false
+        fractionalQueryObservation = null
+        val stopped = stop()
+        fractionalQueryCost = LinearAuthorityFractionalQueryCost(observed.scope, observed.installed,
+            observed.before, if (stopped) null else snapshot(), if (stopped) "inspection-stopped" else outcome,
+            observed.calls, observed.pauses, observed.work, observed.allocation)
+    }
+
     val records: List<LinearAuthorityCapturedQuery> get() = retained.toList()
     val lastRecord: LinearAuthorityCapturedQuery? get() = retained.lastOrNull()
     var entries: Long = 0L
@@ -106,7 +240,7 @@ internal class LinearAuthorityCapture(
     private var limitReached = false
     private var archiveClosed = false
     val limited: Boolean get() = limitReached || attempted > retained.size
-    private val archiving: Boolean get() = retained.size < maximumRecords && entries < maximumEntries &&
+    private val archiving: Boolean get() = retained.size < maximumQueryRecords && entries < maximumEntries &&
         bytes < maximumBytes
     val accepting: Boolean get() = (archiving || delivering) && !stop()
     var attempted: Long = 0L
@@ -131,6 +265,25 @@ internal class LinearAuthorityCapture(
     private var liveEntries = 0L
     private var liveBytes = 0L
     private var pointWithheld = false
+    private var generationContexts: MutableMap<Int, SourceProofContext?>? = null
+
+    fun retainGenerationContext(query: Int): Boolean {
+        require(query >= 0 && attempted == 0L && maximumRecords > 0)
+        val requested = generationContexts
+        if (requested?.containsKey(query) == true) return true
+        require((requested?.size ?: 0) < 2)
+        if (!spend(1L, 192L)) return false
+        (requested ?: linkedMapOf<Int, SourceProofContext?>().also { generationContexts = it })[query] = null
+        return true
+    }
+
+    fun generationContext(query: Int): SourceProofContext? = generationContexts?.get(query)
+
+    fun releaseGenerationContexts(): Int {
+        val released = generationContexts?.values?.count { it != null } ?: 0
+        generationContexts = null
+        return released
+    }
 
     fun restrict(records: Int, entries: Long, bytes: Long) {
         require(records >= 0 && entries >= 0 && bytes >= 0)
@@ -170,7 +323,7 @@ internal class LinearAuthorityCapture(
         inProgress = true
         // The archive is a prefix: once a record or allowance fills it, later queries are constructed for delivery
         // alone and never start as archive copies.
-        archive = retained.size < maximumRecords && !archiveClosed
+        archive = retained.size < maximumQueryRecords && !archiveClosed
         live = delivering
         liveEntries = 0L
         liveBytes = 0L
@@ -278,7 +431,7 @@ internal class LinearAuthorityCapture(
         attempted++
         delivered = null
         deliveredBase = null
-        if (archive && retained.size >= maximumRecords) {
+        if (archive && retained.size >= maximumQueryRecords) {
             limitReached = true
             archive = false
         }
@@ -359,7 +512,18 @@ internal class LinearAuthorityCapture(
         for (evidence in listOfNotNull(result.bound, retainedRefutation)) {
             if (if (full) !proof(evidence.derivation) else !spend(1L, 16L)) return
         }
-        val captured = LinearAuthorityCapturedQuery((attempted - 1L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+        val id = (attempted - 1L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        val generation = template?.numeric?.takeIf {
+            full && archive && generationContexts?.containsKey(id) == true
+        }
+        if (generation != null) {
+            val shared = generationContexts?.values?.any { it === generation } == true
+            val work = if (shared) 3L else 2L + generation.premiseCount + generation.coordinateCount * 2L
+            val allocation = if (shared) 16L else
+                128L + generation.premiseCount * 64L + generation.coordinateCount * 128L
+            if (!spend(work, allocation)) return
+        }
+        val captured = LinearAuthorityCapturedQuery(id,
             source, numeric.atScope(source.scope),
             query?.coordinates.orEmpty().let { if (full) it.toList() else it },
             cited.toList(), query?.inactive.orEmpty().let { if (full) it.toSet() else it },
@@ -376,6 +540,7 @@ internal class LinearAuthorityCapture(
             }, projection = projection, generationScope = generationScope)
         if (archive) {
             retained += captured
+            if (generation != null) generationContexts?.set(id, generation)
             recordedAttempt = attempted
         }
         if (live) {

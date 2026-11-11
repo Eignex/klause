@@ -69,11 +69,13 @@ internal class LinearAuthorityTraversal(
     private val pointCuts: Boolean = false,
     private val onNumericalFeedback: ((SourceNumericalFeedbackResult) -> Unit)? = null,
     aggregateCuts: Boolean = false,
+    fractionalAggregateOrder: Boolean = false,
     latestFeedback: Boolean = true,
     feedbackRequest: LinearAuthorityFeedbackRequest? = null,
     composeBooleanBranches: Boolean = false,
     aggregateBranching: Boolean = false,
     private val repairGuidance: LinearRepairGuidance? = null,
+    reuseAggregatePreparation: Boolean = false,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
@@ -94,7 +96,8 @@ internal class LinearAuthorityTraversal(
             shape.phase?.let { observe("numericalSparseLpPhase$it") }
             if (!shape.admitted) observe("numericalSparseLpDeclines")
         } else if (!shape.admitted) observe("numericalLpShapesOutsideDimensionGuard")
-    }, retainLp = true, aggregateCuts = aggregateCuts)
+    }, retainLp = true, aggregateCuts = aggregateCuts, fractionalAggregateOrder = fractionalAggregateOrder,
+        reuseAggregatePreparation = reuseAggregatePreparation)
     private val initialCutObservations = authority.cutObservations()
     private val activeRows = if (useActiveRows || composeBooleanBranches)
         LinearActiveRows(source, budget, composeBranches = composeBooleanBranches) else null
@@ -520,10 +523,11 @@ internal class LinearAuthorityTraversal(
                 }
             }
         }
+        val branchGuidance = result.branchGuidance?.takeIf { it.scope === branch.scope }
         if (result.evidence != null || current.coveredBound != null) {
             observe("numericalClosedLeaves")
             pending--
-        } else if (result.split == null) {
+        } else if (result.split == null && branchGuidance == null) {
             observe("numericalUnavailableGuidance")
         }
         result.incumbent?.let(onIncumbent)
@@ -533,7 +537,9 @@ internal class LinearAuthorityTraversal(
             return SearchNodeDisposition.Indeterminate
         }
         if (current.coveredBound != null) return SearchNodeDisposition.Prune
-        result.split?.let { (coordinate, threshold) ->
+        val branchFractions = branchGuidance?.fractional ?: result.fractional
+        if (branchGuidance != null) observe("numericalBaselineBranchGuidance")
+        (branchGuidance?.split ?: result.split)?.let { (coordinate, threshold) ->
             aggregateBranches?.propose(branch, cancellation)?.let { row ->
                 budget.funding?.charge(0L, 256L + 128L * row.supportSize)
                 current.split = CoverageSplit.Aggregate(row, current.condition)
@@ -542,12 +548,14 @@ internal class LinearAuthorityTraversal(
                 return SearchNodeDisposition.Expand
             }
             val candidate = if (supportBranching != null && numericalFeedback != null)
-                supportBranching.select(numericalFeedback, result.fractional, cancellation)
-                else if (useBranchHistory) branchHistory.select(result.fractional, cancellation)
-                else result.fractional.firstOrNull()
+                supportBranching.select(numericalFeedback, branchFractions, cancellation)
+                else if (useBranchHistory) branchHistory.select(branchFractions, cancellation)
+                else branchFractions.firstOrNull()
             val selected = candidate?.floorSplit() ?: (coordinate to threshold)
-            if (supportBranching == null && selected != result.split) observe("numericalHistorySelections")
-            if (supportBranching != null && lateFeedback && candidate != result.fractional.firstOrNull()) {
+            if (supportBranching == null && selected != (branchGuidance?.split ?: result.split)) {
+                observe("numericalHistorySelections")
+            }
+            if (supportBranching != null && lateFeedback && candidate != branchFractions.firstOrNull()) {
                 observe("numericalSupportLateSelections")
             }
             current.split = CoverageSplit.Integer(selected.first, selected.second, current.condition, candidate)

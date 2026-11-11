@@ -3,12 +3,16 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.optimization.LinearAuthority
+import com.eignex.klause.lp.optimization.LinearAuthorityCapture
+import com.eignex.klause.lp.optimization.LinearAuthorityCut
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceInequality
@@ -21,6 +25,7 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponentSet
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -31,6 +36,73 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LinearAuthorityTraversalTest {
+    @Test
+    fun `fractional bounds should retain current branch decisions`() {
+        val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val clique = (2..6).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val scope = SourceScope(SourceRevision("baseline-cut-guidance", "exact-affine"),
+            objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE))
+        val premises = linkedMapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                real to BigFraction.ONE), BigFraction.ofLong(3))),
+            "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        )
+        for ((index, coordinate) in clique.withIndex()) {
+            premises["lower $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["upper $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE), BigFraction.ONE))
+            for (other in clique.drop(index + 1)) {
+                premises["edge $index ${other.id}"] = SourcePremise(SourceInequality(
+                    mapOf(coordinate to BigFraction.ONE, other to BigFraction.ONE), BigFraction.ONE))
+            }
+        }
+        val integers = listOf(x, y) + clique
+        val source = SourceProofContext(scope, (integers + real).toSet(), premises,
+            integers.associateWith { BigFraction.ONE })
+        val cuts = premises.entries.mapIndexed { owner, (name, premise) ->
+            LinearAuthorityCut(owner, premise.inequality, SourceDerivation.Premise(name),
+                mixed = true, family = CutFamily.SOURCE_AGGREGATION)
+        }
+        var baselineBranches: List<SearchDecision>? = null
+        var baselineBound: BigFraction? = null
+        for (fractional in listOf(false, true)) {
+            val budget = SourceLpBudget()
+            val capture = LinearAuthorityCapture(2, 100_000L, 4_000_000L, Cancellation.Never)
+            LinearAuthority(budget, retainLp = true, additionalCuts = cuts, aggregateCuts = true,
+                fractionalAggregateOrder = fractional).use { authority ->
+                authority.capture = capture
+                LinearAuthorityTraversal(source, budget, Cancellation.Never, { false }, {}, { null },
+                    borrowedAuthority = authority, useGuidance = true, pointCuts = true,
+                    aggregateCuts = true).use { component ->
+                    val session = SearchComponentSet(listOf(component)).session()
+                    assertEquals(ComponentResult.Consistent, session.initialize())
+
+                    val disposition = component.beforeBranch(session)
+
+                    assertEquals(SearchNodeDisposition.Expand, disposition)
+                    val bound = assertNotNull(component.rootBound)
+                    val value = (bound.claim as SourceClaim.Bound).value as SourceValue.Rational
+                    if (fractional) {
+                        assertEquals(baselineBranches, component.nextBranch(session))
+                        assertTrue(value.value < assertNotNull(baselineBound))
+                        assertEquals(1L, component.observations()["numericalBaselineBranchGuidance"])
+                        val point = assertNotNull(capture.records.last().point)
+                        assertEquals(BigFraction.ONE, point.getValue(x) + point.getValue(y))
+                    } else {
+                        baselineBranches = assertNotNull(component.nextBranch(session))
+                        baselineBound = value.value
+                    }
+                    assertEquals(SourceEvidenceCheck.Checked,
+                        SourceEvidenceVerifier(source.withLinearAuthority()).verify(bound))
+                }
+            }
+        }
+    }
+
     @Test
     fun `a later incumbent should close a checked partial bound without another LP query`() {
         for (sense in listOf(ObjectiveSense.MINIMIZE, ObjectiveSense.MAXIMIZE)) {

@@ -571,6 +571,63 @@ class LpBoundCertificationTest {
     }
 
     @Test
+    fun `bound reconstruction observation should preserve basis repaired certificates`() {
+        val phases = ArrayList<LpPhaseMetrics>()
+        val observer = object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+            override fun observePhase(metrics: LpPhaseMetrics) { phases += metrics }
+        }
+        val source = model(upper = null, coefficient = 3L, rhs = 1L)
+        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
+        val limits = ReconstructionLimits(maxAttempts = 1)
+        val unobserved = certifyLpBoundOnly(source, doubleArrayOf(-1.0 / 3.0), limits, basis = basis)
+
+        val observed = certifyLpBoundOnly(source, doubleArrayOf(-1.0 / 3.0), limits,
+            observer = observer, basis = basis)
+
+        assertEquals(assertNotNull(unobserved.bound).value, assertNotNull(observed.bound).value)
+        assertEquals(unobserved.metrics, observed.metrics)
+        val repair = phases.single { it.phase == LpSolvePhase.BOUND_RECONSTRUCTION_BASIS }
+        assertEquals("CANDIDATE", repair.outcome)
+        assertEquals(observed.metrics.basisWork, repair.work)
+        assertTrue(repair.work > 0L)
+        val containing = phases.single { it.phase == LpSolvePhase.BOUND_CERTIFICATE }
+        val children = phases.filter { it.phase.name.startsWith("BOUND_RECONSTRUCTION_") }
+        assertTrue(children.sumOf { it.work } <= containing.work)
+        assertTrue(children.sumOf { it.nanos } <= containing.nanos)
+    }
+
+    @Test
+    fun `bound reconstruction observation should retain failed fixed verification cost`() {
+        val phases = ArrayList<LpPhaseMetrics>()
+        val observer = object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+            override fun observePhase(metrics: LpPhaseMetrics) { phases += metrics }
+        }
+        val source = model()
+        val dual = doubleArrayOf(-Double.MIN_VALUE)
+        val unobserved = certifyLpBoundOnly(source, dual, ReconstructionLimits())
+
+        val observed = certifyLpBoundOnly(source, dual, ReconstructionLimits(), observer = observer)
+
+        assertEquals(assertNotNull(unobserved.bound).value, assertNotNull(observed.bound).value)
+        assertEquals(unobserved.metrics, observed.metrics)
+        val fixed = phases.single { it.phase == LpSolvePhase.BOUND_RECONSTRUCTION_FIXED_DUAL }
+        val big = phases.single { it.phase == LpSolvePhase.BOUND_RECONSTRUCTION_BIG_DUAL }
+        assertEquals("OVERFLOW", fixed.outcome)
+        assertEquals("CANDIDATE", big.outcome)
+        assertTrue(fixed.work > 0L && big.work > 0L)
+        val containing = phases.single { it.phase == LpSolvePhase.BOUND_CERTIFICATE }
+        val children = phases.filter { it.phase.name.startsWith("BOUND_RECONSTRUCTION_") }
+        assertTrue(children.sumOf { it.work } <= containing.work)
+        assertTrue(children.sumOf { it.nanos } <= containing.nanos)
+    }
+
+    @Test
     fun `stopped bound input observation should retain the paid prefix`() {
         val cases = listOf(
             Triple(ReconstructionLimits(maxWork = 8L), -1.0, ReconstructionDecline.WORK),

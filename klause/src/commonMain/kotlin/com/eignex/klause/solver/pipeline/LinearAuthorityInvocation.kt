@@ -130,7 +130,10 @@ internal class LinearAuthorityInvocation(
         useRefutationPropagation = params.sourceRefutationPropagation,
         useRefutationResolution = params.sourceRefutationResolution, useSupportBranching = supportBranching,
         pointCuts = boundOrdered && params.sourcePointCuts, onNumericalFeedback = onNumericalFeedback,
-        aggregateCuts = boundOrdered && params.sourceAggregateCuts, latestFeedback = latestFeedback,
+        aggregateCuts = boundOrdered && params.sourceAggregateCuts,
+        fractionalAggregateOrder = boundOrdered && params.sourceAggregateCuts && params.sourceCutFractionalOrder,
+        reuseAggregatePreparation = boundOrdered && params.sourceAggregateCuts && params.sourceCutPreparationReuse,
+        latestFeedback = latestFeedback,
         feedbackRequest = feedbackRequest, aggregateBranching = aggregateBranching, repairGuidance = repairGuidance)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,
         atoms = if (params.sourceRefutationPropagation || params.sourceRefutationResolution) SearchAtomRegistry(

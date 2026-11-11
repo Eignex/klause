@@ -88,7 +88,8 @@ original-unit qualification.
 
 Solver-control flags are common to every mode; `--help` lists every parameter.
 
-The `source-cuts`, `source-point-cuts` and `source-aggregate-cuts` Boolean parameters
+The `source-cuts`, `source-point-cuts`, `source-aggregate-cuts` and
+`source-cut-fractional-order` Boolean parameters
 configure [source cut selection](17-linear-programming.md#cuts) in direct numerical
 frontiers and admitted numerical companions of ordinary linear sources. Finite
 worker recipes do not interpret these controls; admission and lifetime are separate.
