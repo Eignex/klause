@@ -5,6 +5,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -322,7 +323,8 @@ class LinearOptimizationExecutionTest {
         )
         val accepted = ArrayList<BigFraction>()
 
-        val result = OpenTheoryPipeline.optimizeLinear(context) { _, value -> accepted += value }
+        val result = OpenTheoryPipeline.optimizeLinear(context,
+            TheoryParams(lpMode = LpCertificationMode.EXACT)) { _, value -> accepted += value }
 
         val claim = assertIs<SourceClaim.Limit>(assertNotNull(result.terminal).claim)
         assertEquals(SourceEvidenceCheck.Checked, result.evidence.verify(claim, context.withLinearAuthority()))
