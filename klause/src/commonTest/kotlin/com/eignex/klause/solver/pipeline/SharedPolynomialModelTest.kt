@@ -32,6 +32,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNotSame
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -212,5 +213,35 @@ class SharedPolynomialModelTest {
         val witness = assertIs<OpenTheoryResult.Sat>(execution.result).assignment
         val real = assertNotNull(witness.algebraicRealValue(compiled.realVarIdByName.getValue("x")))
         assertEquals(0, AlgebraicArithmetic().signAt(RationalPolynomial.of(-2, 0, 1), real))
+    }
+
+    @Test
+    fun `finite witness checks should share one completed bake`() {
+        val model = assertNotNull(Problem(0, 0, emptyArray(), emptyArray())
+            .preparePolynomialExecutionPlan(PolynomialRealFormula.Constant(true)).polynomialModel)
+
+        val first = model.finitePointCheck(null, Cancellation.Never)
+
+        assertSame(first, model.finitePointCheck(null, Cancellation.Never))
+    }
+
+    @Test
+    fun `another finite projection should bake its own witness checker`() {
+        val model = assertNotNull(Problem(0, 0, emptyArray(), emptyArray())
+            .preparePolynomialExecutionPlan(PolynomialRealFormula.Constant(true)).polynomialModel)
+        val first = model.finitePointCheck(null, Cancellation.Never)
+
+        val other = model.finitePointCheck(FactorProjectionProviders().prepare(model.finite), Cancellation.Never)
+
+        assertNotSame(first, other)
+    }
+
+    @Test
+    fun `a bake cut short by cancellation should not be retained`() {
+        val model = assertNotNull(Problem(0, 0, emptyArray(), emptyArray())
+            .preparePolynomialExecutionPlan(PolynomialRealFormula.Constant(true)).polynomialModel)
+        val interrupted = model.finitePointCheck(null, Cancellation { true })
+
+        assertNotSame(interrupted, model.finitePointCheck(null, Cancellation.Never))
     }
 }

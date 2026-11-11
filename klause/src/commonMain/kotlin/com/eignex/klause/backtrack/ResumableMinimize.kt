@@ -77,7 +77,7 @@ import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.search.completedSearchSample
-import com.eignex.klause.solver.validation.composedFixpoint
+import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
@@ -141,6 +141,7 @@ internal class ResumableMinimize(
     private val sink: SolveStatsSink = SolveStatsSink(backend = "backtrack"),
     private val deferredInstallation: Boolean = false,
 ) : ResumableSearch, ReseedGuard, SliceWorkAccounting {
+    private val pointCheck = if (problem === solver.problem) solver.pointCheck else FinitePointCheck(problem)
     override var repaidWork: Long = 0L
         private set
     private val hasPreparation = preparationBudget != null
@@ -1047,8 +1048,7 @@ internal class ResumableMinimize(
         }
         val onWork: (Long) -> Unit = { proposalPropagationWork += it }
         val sample = if (problem.numRealVars > 0 && proposal.numRealVars == 0) {
-            val discrete = composedFixpoint(problem, Candidate(proposal, Unit), cancellation,
-                params.assumptions, onWork)
+            val discrete = pointCheck.check(Candidate(proposal, Unit), cancellation, params.assumptions, onWork)
             if (discrete !is Verification.Accepted) {
                 return decline(if (discrete is Verification.Rejected) "DISCRETE_REJECTED" else "DISCRETE_INDETERMINATE")
             }
@@ -1063,7 +1063,7 @@ internal class ResumableMinimize(
             cancellation or Cancellation.after(LP_VERIFY_BUDGET)
         if (budget()) return decline("CANCELLED")
         val verifier = ComposedSampleVerifier(problem, objective, budget,
-            params.assumptions, onWork, params.toleranceCheck)
+            params.assumptions, onWork, params.toleranceCheck, pointCheck)
         val verdict = verifier.verify(Candidate(sample, objective.evaluate(sample)))
         if (budget()) return decline("CANCELLED")
         return when (verdict) {
@@ -1093,22 +1093,15 @@ internal class ResumableMinimize(
         val token = if (params.cancellation.workScheduled()) params.cancellation else
             params.cancellation or Cancellation.after(LP_VERIFY_BUDGET)
         if (token() || sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) return null
-        var validation: PropagationSession? = null
         try {
-            val checking = PropagationSession(PropagationProblem(problem), token,
-                onPropagationWork = { initialValidationPropagationWork = it })
-            validation = checking
-            if (checking.fixpointCancelled || token()) return null
-            if (checking.seed(params.assumptions) is PropagationResult.Unsat || checking.isUnsatAtRoot) return null
-            for (variable in (0 until sample.numBoolVars)) {
-                if (checking.fixpointCancelled || token()) return null
-                if (checking.pinBool(variable, sample.boolValue(variable)) is PropagationResult.Unsat) return null
-            }
-            for (variable in (0 until sample.numIntVars)) {
-                if (checking.fixpointCancelled || token()) return null
-                if (checking.pinInt(variable, sample.intValue(variable)) is PropagationResult.Unsat) return null
-            }
-            if (checking.fixpointCancelled || token()) return null
+            // The live supplier meters the slice while the check runs; the final work moves to the proposal total.
+            val checked = pointCheck.check(Candidate(sample, Unit), token, params.assumptions,
+                onWork = { work ->
+                    initialValidationPropagationWork = null
+                    proposalPropagationWork += work
+                },
+                liveWork = { initialValidationPropagationWork = it })
+            if (checked !is Verification.Accepted || token()) return null
             val accepted = if (problem.numRealVars == 0) {
                 sample
             } else {
@@ -1132,13 +1125,9 @@ internal class ResumableMinimize(
             if (token()) return null
             return recordIfImproving(accepted, objective.evaluate(accepted), startingWitness = !rebindable)
         } finally {
-            try {
-                validation?.releaseRetainedState()
-            } finally {
-                val spent = initialValidationPropagationWork?.invoke() ?: 0L
-                initialValidationPropagationWork = null
-                proposalPropagationWork += spent
-            }
+            // A check that threw before reporting its work still charges what the live supplier observed.
+            initialValidationPropagationWork?.let { proposalPropagationWork += it() }
+            initialValidationPropagationWork = null
         }
     }
 
@@ -1478,9 +1467,7 @@ internal class ResumableMinimize(
             // incumbent: an assignment the composed fixpoint refutes is an engine defect, never a solution. A check
             // the deadline cut short refutes nothing, so the leaf stands.
             if (pendingRealLeaf == null && pendingRealResult == null) {
-                val verdict = composedFixpoint(
-                    problem, Candidate(sample, Unit), params.cancellation, params.assumptions,
-                )
+                val verdict = pointCheck.check(Candidate(sample, Unit), params.cancellation, params.assumptions)
                 if (verdict is Verification.Rejected) {
                     throw UnsoundnessException(
                         "backtrack reached an optimization leaf its constraints refute: ${verdict.reason}",

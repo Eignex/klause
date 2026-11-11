@@ -43,7 +43,8 @@ class ProjectedSourceWitnessTest {
         val checker = source.withFactors(emptyArray()).bake()
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0), exactReals = listOf(BigFraction.ZERO))
         for (filter in listOf<((Sample) -> Boolean)?>(null, { true })) {
-            val result = verifyProjectedSourceWitness(source, checker, point, Cancellation.Never, filter)
+            val result = verifyProjectedSourceWitness(source, checker, point, Cancellation.Never,
+                toleranceCheck = filter)
 
             assertIs<Verification.Accepted<*, *>>(result)
         }

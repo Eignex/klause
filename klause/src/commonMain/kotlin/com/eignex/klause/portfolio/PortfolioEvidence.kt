@@ -2,9 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceScope
-import com.eignex.klause.solver.evidence.checkWitness
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.CompletedEngineResult
@@ -15,6 +13,7 @@ import com.eignex.klause.solver.incumbent.ModelEvidence
 import com.eignex.klause.solver.incumbent.ModelEvidenceVerifier
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.solver.incumbent.WitnessRestrictions
 import com.eignex.klause.util.Cancellation
 
 internal class PortfolioEvidence(
@@ -50,23 +49,10 @@ internal class PortfolioEvidence(
     fun witness(worker: PortfolioWorker, sample: Sample, value: Double?): Verification<Sample, Double?> {
         val identity = worker.evidenceModel ?: return Verification.Indeterminate("worker has no model identity")
         val candidate = Candidate(sample, value)
-        val produced = worker.evidenceInvocation?.checkWitness(sample, scopeCancellation)
-            ?: worker.evidenceScope?.condition?.checkWitness(sample, scopeCancellation)
-        when (produced) {
-            is SourceEvidenceCheck.Rejected -> return Verification.Rejected(produced.reason)
-            is SourceEvidenceCheck.Unavailable -> return Verification.Indeterminate(produced.reason)
-            SourceEvidenceCheck.Checked, null -> Unit
-        }
-        val conditions = invocation?.checkWitness(sample, scopeCancellation)
-            ?: sourceScope?.condition?.checkWitness(sample, scopeCancellation)
-        when (val checked = conditions) {
-            is SourceEvidenceCheck.Rejected -> return Verification.Rejected(checked.reason)
-            is SourceEvidenceCheck.Unavailable -> return Verification.Indeterminate(checked.reason)
-            SourceEvidenceCheck.Checked, null -> Unit
-        }
         val certificate = sample.witnessCertificate?.takeIf { it.publication != null }
         val evidence = ModelEvidence.Witness(identity, candidate, certificate)
-        return when (val verdict = verifier.verify(evidence, sourceScope, invocation, scopeCancellation)) {
+        return when (val verdict = verifier.verify(evidence, sourceScope, invocation, scopeCancellation,
+            restrictions(worker))) {
             is Verification.Accepted -> Verification.Accepted(candidate)
             is Verification.Rejected -> verdict
             is Verification.Indeterminate -> verdict
@@ -100,6 +86,7 @@ internal class PortfolioEvidence(
         val minimized = completion as? CompletedEngineResult.Minimize
         val pointValue = minimized?.result?.objectiveValue
         val value = if (kind == EvidenceKind.Bound) minimized?.executionBound else pointValue
+        // The point passes witness admission first; an unbounded claim then reuses the receipts it recorded.
         if (sample != null) {
             when (val checked = witness(worker, sample, pointValue)) {
                 is Verification.Rejected -> return checked
@@ -107,8 +94,12 @@ internal class PortfolioEvidence(
                 is Verification.Accepted -> Unit
             }
         }
-        return proof(identity, worker.certificateFor(kind, completion), kind, sample, value)
+        return proof(identity, worker.certificateFor(kind, completion), kind, sample, value, restrictions(worker))
     }
+
+    private fun restrictions(worker: PortfolioWorker) = WitnessRestrictions(
+        worker.evidenceInvocation, worker.evidenceScope?.condition, invocation, sourceScope?.condition,
+    )
 
     private fun proof(
         identity: ModelIdentity,
@@ -116,6 +107,7 @@ internal class PortfolioEvidence(
         kind: EvidenceKind,
         sample: Sample?,
         value: Double?,
+        restrictions: WitnessRestrictions,
     ): Verification<Unit, Unit> {
         val evidence: ModelEvidence<Sample, Double?> = when (kind) {
             EvidenceKind.Bound -> ModelEvidence.Bound(identity, value, certificate)
@@ -125,7 +117,8 @@ internal class PortfolioEvidence(
             )
             EvidenceKind.Witness -> error("a witness is checked separately")
         }
-        return when (val verdict = verifier.verify(evidence, sourceScope, invocation)) {
+        val verdict = verifier.verify(evidence, sourceScope, invocation, scopeCancellation, restrictions)
+        return when (verdict) {
             is Verification.Accepted -> Verification.Accepted(Candidate(Unit, Unit))
             is Verification.Rejected -> verdict
             is Verification.Indeterminate -> verdict

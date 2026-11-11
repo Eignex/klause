@@ -21,6 +21,7 @@ import com.eignex.klause.solver.search.BooleanProofContext
 import com.eignex.klause.solver.search.BooleanProofTasks
 import com.eignex.klause.solver.search.BooleanTaskCheck
 import com.eignex.klause.solver.search.BooleanTaskLease
+import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.util.Cancellation
 
@@ -53,6 +54,8 @@ internal class BooleanProofScheduler(
         splitVariables: List<Int>,
         parameters: List<BacktrackParams>,
     ) : this(problem, context, splitVariables, parameters, false, null)
+
+    private val points = FinitePointCheck(problem)
 
     private class Worker {
         var search: RepairSearch? = null
@@ -128,7 +131,7 @@ internal class BooleanProofScheduler(
             val result = search.runSlice(cancellation, millis, offeredWork)
             val sample = result.sample
             if (sample != null) {
-                val verdict = finiteWitnessVerifier(problem, null, assumptions(lease), cancellation)
+                val verdict = finiteWitnessVerifier(problem, null, assumptions(lease), cancellation, points = points)
                     .verify(Candidate(sample, null))
                 if (verdict is Verification.Accepted) {
                     witness = sample

@@ -95,6 +95,8 @@ internal fun bindSourceExecutionControls(
                 ?: defaults.sourceCutPreparationReuse,
             sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
                 ?: defaults.sourceIncumbentCompletion,
+            sourceRefutationCenterStep = reader[ExecutionOption.sourceRefutationCenterStep]
+                ?: defaults.sourceRefutationCenterStep,
             sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
             sourceRefutationPropagation = reader[ExecutionOption.sourceRefutationPropagation]
                 ?: defaults.sourceRefutationPropagation,
@@ -154,6 +156,8 @@ internal fun bindSourceExecutionControls(
                 ?: defaults.sourceCutPreparationReuse,
             sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
                 ?: defaults.sourceIncumbentCompletion,
+            sourceRefutationCenterStep = reader[ExecutionOption.sourceRefutationCenterStep]
+                ?: defaults.sourceRefutationCenterStep,
             sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
             sourceRefutationPropagation = reader[ExecutionOption.sourceRefutationPropagation]
                 ?: defaults.sourceRefutationPropagation,
@@ -285,5 +289,5 @@ private fun ExecutionOptions.withoutSourceCompanionControls(): ExecutionOptions 
     "source-cuts", "source-point-cuts", "source-cut-branching", "source-aggregate-cuts",
     "source-cut-fractional-order", "source-cut-preparation-reuse",
     "source-refutation-reuse", "source-refutation-propagation", "source-refutation-resolution",
-    "source-incumbent-completion",
+    "source-incumbent-completion", "source-refutation-center-step",
 )

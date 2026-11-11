@@ -13,8 +13,10 @@ internal fun verifyProjectedSourceWitness(
     integerChecker: BakedProblem,
     sample: Sample,
     cancellation: Cancellation,
+    points: FinitePointCheck = FinitePointCheck(integerChecker),
     toleranceCheck: ((Sample) -> Boolean)?,
 ): Verification<Sample, Unit> {
+    require(points.checksAllOf(integerChecker)) { "point checker does not cover this problem" }
     if (cancellation()) return Verification.Indeterminate("source verification cancelled")
     if (sample.numBoolVars != source.numBoolVars || sample.numIntVars != source.numIntVars ||
         sample.numRealVars != source.numRealVars
@@ -43,7 +45,7 @@ internal fun verifyProjectedSourceWitness(
         if (!admitted) return Verification.Rejected("additional source acceptance filter refutes the assignment")
     }
     if (cancellation()) return Verification.Indeterminate("source verification cancelled")
-    return composedFixpoint(integerChecker, Candidate(sample, Unit), cancellation,
+    return points.check(Candidate(sample, Unit), cancellation,
         onWork = { cancellation.charge(it) })
 }
 

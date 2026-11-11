@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.solver.validation.verifyProjectedSourceWitness
 import com.eignex.klause.util.Cancellation
 
@@ -18,6 +19,7 @@ internal class FloatGridPublication(
     private var best: Sample? = null
     private var bestObjective: BigFraction? = null
     private var lastChecked: Sample? = null
+    private val sourcePoints = FinitePointCheck(binding.sourceChecker)
 
     fun onSample(native: Sample) {
         accept(native)?.let(callbacks.onSample)
@@ -40,7 +42,7 @@ internal class FloatGridPublication(
             if (toleranceCheck?.invoke(sample) == false || cancellation()) return null
         } else {
             val verdict = verifyProjectedSourceWitness(binding.projection.mapping.source, binding.sourceChecker, sample,
-                cancellation, toleranceCheck)
+                cancellation, sourcePoints, toleranceCheck)
             if (verdict !is Verification.Accepted || cancellation()) return null
         }
         val objective = binding.objective?.let {
@@ -68,7 +70,9 @@ internal class FloatGridPublication(
         nativeSourceResult: SolveResult? = null,
         nativeSourceMinimum: MinimizeResult? = null,
     ): FiniteSolveResult {
-        if (native is FiniteSolveOutcome.Completed) native.bestSample?.let(::onSample)
+        // A checked native best already stands or failed to improve, so checking it again publishes nothing.
+        if (native is FiniteSolveOutcome.Completed) native.bestSample
+            ?.takeUnless { it === lastChecked && binding.objective != null }?.let(::onSample)
         val qualified = if (native is FiniteSolveOutcome.Completed) {
             FiniteSolveOutcome.Completed(
                 when {

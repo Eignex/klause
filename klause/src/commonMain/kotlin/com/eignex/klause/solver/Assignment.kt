@@ -8,6 +8,8 @@ import com.eignex.klause.ir.indices
 import com.eignex.klause.ir.randomValue
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
+import com.eignex.klause.solver.incumbent.WitnessCheckKey
+import com.eignex.klause.solver.incumbent.WitnessReceipts
 import com.eignex.util.arrays.emptyDoubleArray
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BigInt
@@ -178,6 +180,15 @@ class Sample private constructor(
     val numIntVars: Int get() = exactInts?.size ?: integerValues.size
 
     internal var witnessCertificate: EvidenceCertificate? = null
+    // Allocated by the first recorded check, so samples that are never checked pay nothing. Racing writers can
+    // drop a receipt, which only costs a repeated check.
+    private var receiptStore: WitnessReceipts? = null
+
+    internal fun hasReceipt(key: WitnessCheckKey): Boolean = receiptStore?.covers(key) == true
+
+    internal fun recordReceipt(key: WitnessCheckKey) {
+        (receiptStore ?: WitnessReceipts().also { receiptStore = it }).record(key)
+    }
     private var capturedSemantics: EffectiveSourceSemantics? = null
     private var capturedFrame: Any? = null
 
@@ -269,6 +280,7 @@ class Sample private constructor(
             algebraicReals == this.algebraicReals && symbolicReals == this.symbolicReals
         ) {
             it.witnessCertificate = witnessCertificate
+            receiptStore?.let { store -> it.receiptStore = store.copy() }
             it.capturedSemantics = capturedSemantics
             it.capturedFrame = capturedFrame
         }
@@ -297,6 +309,10 @@ class Sample private constructor(
         31 * (31 * (31 * (31 * (31 * booleanValues.contentHashCode() + integerValues.contentHashCode()) +
             (exactInts?.hashCode() ?: 0)) + approximateReals.contentHashCode()) +
             (exactReals?.hashCode() ?: 0)) + (algebraicReals?.hashCode() ?: 0) + 31 * (symbolicReals?.hashCode() ?: 0)
+
+    internal fun sameDiscreteCoordinates(other: Sample): Boolean = this === other ||
+        (booleanValues.contentEquals(other.booleanValues) && integerValues.contentEquals(other.integerValues) &&
+            exactInts == other.exactInts)
 
     /** Authoritative integer coordinate, widened on demand for finite samples. */
     fun exactIntValue(id: Int): BigInt = exactInts?.get(id) ?: bigIntOf(integerValues[id])

@@ -41,6 +41,8 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
@@ -889,8 +891,17 @@ class ResumableMinimizeTest {
     @Test
     fun `pooled witness validation should spend its slice before search or publication`() {
         val size = 64
+        // Checking a complete point costs a slice node and refutes a final value of one; open domains cost nothing.
+        val costlyPoint = object : Factor by AllDifferent(IntArray(size) { it }, domainMin = 0, domainSize = size),
+            Propagator {
+            override fun propagate(state: PropagationState, factorId: Int): Boolean {
+                if (state.intDomains.any { !it.isFixed }) return true
+                state.work += PROPAGATION_WORK_PER_NODE
+                return state.intDomains[size - 1].min != 1L
+            }
+        }
         val problem = Problem(0, size, Array(size) { IntDomain(0, (size - 1).toLong()) },
-            arrayOf<Factor>(AllDifferent(IntArray(size) { it }, domainMin = 0, domainSize = size))).bake()
+            arrayOf(AllDifferent(IntArray(size) { it }, domainMin = 0, domainSize = size), costlyPoint)).bake()
         val objective = LinearObjective(intCoefficients = LongArray(size) { if (it == 0) 1L else 0L })
         var cancelled = false
         var attempts = 0
@@ -922,7 +933,10 @@ class ResumableMinimizeTest {
             val values = LongArray(size) { it.toLong() }.apply {
                 this[0] = 5L
                 this[5] = 0L
-                if (!valid) this[lastIndex] = 0L
+                if (!valid) {
+                    this[1] = lastIndex.toLong()
+                    this[lastIndex] = 1L
+                }
             }
             val hints = IncumbentExchange.minimizing<Sample>().apply {
                 offer(Sample(BooleanArray(0), values), 5.0)

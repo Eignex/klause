@@ -292,8 +292,23 @@ Verification preserves three outcomes. Accepted witnesses may become incumbents;
 rejected proposals quarantine their producer without proving the model infeasible;
 indeterminate checks publish nothing and do not count as a fault. Finite fixpoint
 cancellation stays indeterminate. Uncertified real coordinates require a complete
-source-row check or the configured source tolerance check, and scoped admission
-checks the containing invocation's pins and windows first.
+source-row check or the configured source tolerance check.
+
+`ModelEvidenceVerifier` owns the restriction checks of a witness or unbounded point:
+its native publication's invocation, the producing worker's invocation or condition,
+and the consumer's. Each distinct restriction set is checked once per point. A
+matching invocation or an equal condition adds no obligation, and an invocation's
+check covers its own source condition. The point records each satisfied set as a
+[receipt](07-presolve.md#reused-validation), so a later consumer checks only the
+restrictions it adds. `PortfolioEvidence` supplies its worker's and its own
+restrictions to that one check and runs no separate pass. A completion's point passes
+witness admission first, and its proof check reuses the receipts that admission recorded.
+
+Native enforcement, source checks and receipts have different scopes. A worker's
+own propagation or theory search enforces the relations it owns. The portfolio
+accepts a point only after the source witness check for its model, objective and
+tolerance policy, possibly reused from an earlier consumer. Neither supplies a bound
+or refutation.
 
 Open theory execution publishes `SourceIncumbentPublication` after verified
 installation, carrying the source sample, exact original-direction `SourceValue` and

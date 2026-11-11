@@ -177,6 +177,10 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val sourceIncumbentCompletion: ExecutionOption<Boolean> =
             ExecutionOption("source-incumbent-completion", ValueKind.BOOLEAN)
 
+        /** Opt-in advisory integer center steps within the existing joint repair allowance. */
+        val sourceRefutationCenterStep: ExecutionOption<Boolean> =
+            ExecutionOption("source-refutation-center-step", ValueKind.BOOLEAN)
+
         /** Invocation-local checked numerical refutation reuse control. */
         val sourceRefutationReuse: ExecutionOption<Boolean> =
             ExecutionOption("source-refutation-reuse", ValueKind.BOOLEAN)
@@ -613,6 +617,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 sourcePointCuts, sourceCutBranching, sourceAggregateCuts, sourceCutFractionalOrder,
                 sourceCutPreparationReuse,
                 sourceIncumbentCompletion,
+                sourceRefutationCenterStep,
                 sourceRefutationReuse,
                 sourceRefutationPropagation,
                 sourceRefutationResolution,

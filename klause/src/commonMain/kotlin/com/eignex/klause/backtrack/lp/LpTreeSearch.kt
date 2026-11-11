@@ -2,7 +2,6 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.backtrack.ComposedSampleVerifier
 import com.eignex.klause.backtrack.NodeBudget
-import com.eignex.klause.backtrack.composedFixpoint
 import com.eignex.klause.backtrack.exactSourceObjective
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpFractionalBranch
@@ -43,6 +42,7 @@ import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSolveParams
+import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.BIG_ONE
 
@@ -83,8 +83,9 @@ internal fun LpEngine.lbTreeSearch(
         override fun workMeter() = stop.workMeter()
     }
     val dive = forObjective(objective, token, rootProbe = true)
+    val pointCheck = FinitePointCheck(problem)
     val verifier = ComposedSampleVerifier(problem, objective, token, assumptions,
-        { primalPropagationWork += it }, toleranceCheck)
+        { primalPropagationWork += it }, toleranceCheck, pointCheck)
     try {
         return dive.use {
             val leafSolver = if (problem.numRealVars > 0 && complete == null) {
@@ -110,7 +111,7 @@ internal fun LpEngine.lbTreeSearch(
                         primalPropagationWork += problem.numIntVars.toLong() + problem.numBoolVars
                         val key = discrete.ints.joinToString(",") + ";" + discrete.bools.joinToString(",")
                         if (!tried.add(key) || token()) return false
-                        if (!discreteChecked && composedFixpoint(problem, Candidate(sample, Unit), token,
+                        if (!discreteChecked && pointCheck.check(Candidate(sample, Unit), token,
                                 assumptions, { primalPropagationWork += it }) !is Verification.Accepted
                         ) return false
                         val rootWork = rootPrimalWorkBudget(sink.lp.standaloneWork)

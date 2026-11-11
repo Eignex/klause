@@ -77,6 +77,12 @@ internal class JointLinearRepair(
     private val budget = SourceLpBudget(maxOperations = params.sourceLpOperations,
         onWork = state.smt::observeSourceLp, funding = funding)
     private val stages = linkedMapOf<String, Long>()
+    private val centerProgress = if (params.sourceRefutationCenterStep)
+        JointRepairCenter(model, budget, stop) { selection?.eligibleInteger(it) == true } else null
+    private var queryOriginalCondition: ExactNeighborhoodCondition? = null
+    private var queryCenterStep: JointRepairCenter.Step? = null
+    private var readyCenterStep: JointRepairCenter.Step? = null
+    private var proposalHasCheckedCenter = false
     private val observation = onObservation?.let { JointRepairObservationCapture(budget, stop, it) }
     private var proposalSequence = 0L
     private var observationQuery = 0L
@@ -269,6 +275,7 @@ internal class JointLinearRepair(
             prepareBooleanCenter = ::prepare, rootCoordinateValue = ::center,
             completionExhausted = { exhausted },
             centerPreparationPending = { rootPreparationPending },
+            reviseRefutedCenter = centerProgress?.let { ::reviseRefutedCenter },
             onProposalOperator = observation?.let { { operator, round ->
                 observedOperator = operator
                 observedSchedulingRound = round
@@ -287,6 +294,7 @@ internal class JointLinearRepair(
                 val current = if (round == 0L && checked != null && checked === preparedCenter)
                     refreshedCenter(checked) else checked
                 val pooled = current?.sample
+                if (centerProgress != null) proposalHasCheckedCenter = pooled != null
                 val from = pooled?.let { sample ->
                     if (sample !== importedCenter) {
                         importedCenter = sample
@@ -441,6 +449,7 @@ internal class JointLinearRepair(
         attempt(condition, cancellation).result
 
     fun attempt(condition: ExactNeighborhoodCondition, cancellation: Cancellation): JointRepairAttempt {
+        readyCenterStep = null
         val result = advanceAttempt(condition, cancellation)
         if (result.result != ExactNeighborhoodResult.Paused) {
             observation?.event(proposalSequence, observationQuery, "result", when (result.result) {
@@ -524,10 +533,11 @@ internal class JointLinearRepair(
             queryRefutationKey = key
             queryRefutationScope = querySource.scope
             querySawExternal = false
+            queryOriginalCondition = condition
             val refutationGuidance = completion != null && anchor == null && preparedCenter == null &&
                 condition.cutoff == null
             query = LinearAuthorityInvocation(querySource,
-                params.copy(sourceIncumbentCompletion = false),
+                params.copy(sourceIncumbentCompletion = false, sourceRefutationCenterStep = false),
                 external = {
                     (externalIncumbent() ?: anchor).also { sample ->
                         if (sample != null) {
@@ -626,8 +636,11 @@ internal class JointLinearRepair(
         val refuted = result.terminal?.claim == SourceClaim.Refutation
         val completedKey = queryRefutationKey.takeIf { refuted && !querySawExternal &&
             result.terminal?.scope == queryRefutationScope }
+        val completedStep = queryCenterStep.takeIf { refuted && !querySawExternal &&
+            result.terminal?.scope == queryRefutationScope && anchor == null && preparedCenter == null }
         retire()
         if (completedKey != null) rememberRefutation(completedKey, cancellation)
+        readyCenterStep = completedStep
         return JointRepairAttempt(
             if (refuted) ExactNeighborhoodResult.Refuted
             else ExactNeighborhoodResult.Undecided,
@@ -710,6 +723,12 @@ internal class JointLinearRepair(
                     else -> "jointRepairRefutationSeedDeclined"
                 }
                 observe(disposition)
+                if (queryCenterStep == null && centerProgress != null && !proposalHasCheckedCenter) {
+                    queryOriginalCondition?.let { original ->
+                        queryCenterStep = centerProgress.suggest(support.assumptions, condition, original)
+                        if (queryCenterStep != null) observe("jointRepairAdvisoryCenterProposals")
+                    }
+                }
                 observation?.feedback(proposalSequence, observationQuery, disposition, support.assumptions,
                     condition, model.numIntVars)
             }
@@ -726,6 +745,21 @@ internal class JointLinearRepair(
         }
     }
 
+    private fun reviseRefutedCenter(centers: MutableList<BigFraction>, bools: BooleanArray,
+        condition: ExactNeighborhoodCondition, cancellation: Cancellation) {
+        val step = readyCenterStep
+        readyCenterStep = null
+        if (step == null || anchor != null || preparedCenter != null || completion == null ||
+            proposalHasCheckedCenter) return
+        if (centerProgress?.apply(step, centers, bools, condition, cancellation) != true) {
+            observe("jointRepairAdvisoryCenterDeclined")
+            return
+        }
+        selection?.clearRefutation()
+        observe("jointRepairAdvisoryCenterMoves")
+        observation?.event(proposalSequence, observationQuery, "center", "advisory-step")
+    }
+
     private fun retire() {
         val observations = queryObservations(authority.cutObservations().keys)
         for ((key, value) in observations) stages[key] = combine(key, stages[key] ?: 0, value)
@@ -734,6 +768,8 @@ internal class JointLinearRepair(
         pending = null
         queryRefutationKey = null
         queryRefutationScope = null
+        queryOriginalCondition = null
+        queryCenterStep = null
         querySawExternal = false
         active?.close()
     }
@@ -758,6 +794,7 @@ internal class JointLinearRepair(
         enlargedTrialProposal = null
         checkedTrialCenter = null
         guidedProposal = null
+        readyCenterStep = null
         selection?.clearRefutation()
         refutedConditions.clear()
         queryFreedIntegers = 0

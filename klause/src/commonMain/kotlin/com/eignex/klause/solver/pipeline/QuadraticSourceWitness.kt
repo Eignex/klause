@@ -9,13 +9,11 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.solver.validation.composedFixpoint
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.fitsLong
@@ -80,10 +78,8 @@ private fun checkQuadraticIrWitness(
         return SourceEvidenceCheck.Rejected("quadratic finite source integer is outside its declared range")
     }
     val discrete = Sample(point.bools, point.ints)
-    val finite = plan.finiteFactorProjections?.let { model.finite.bake(it, cancellation) }
-        ?: model.finite.bake(cancellation)
-    when (val checked = composedFixpoint(finite, Candidate(discrete, Unit), cancellation,
-        enforcingPeers = model.finiteEnforcingFactors)) {
+    when (val checked = model.finitePointCheck(plan.finiteFactorProjections, cancellation)
+        .check(Candidate(discrete, Unit), cancellation)) {
         is Verification.Rejected -> return SourceEvidenceCheck.Rejected(checked.reason)
         is Verification.Indeterminate -> return SourceEvidenceCheck.Unavailable(checked.reason)
         is Verification.Accepted -> Unit

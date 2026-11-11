@@ -462,12 +462,14 @@ class PropagationSession private constructor(
     }
 
     internal companion object {
-        // Point pins belong to a disposable verification root, never a reusable search root.
-        fun forPointCheck(problem: BakedProblem, point: Assumptions, cancellation: Cancellation): PropagationSession =
-            PropagationSession(
-                problem, cancellation, PROPAGATION_CANCEL_FLOOR, true, false, PropagationProblem(problem),
-                initialAssumptions = point,
-            )
+        // Point pins belong to a disposable verification root over a shareable projection, never a search root.
+        fun forPointCheck(
+            projection: PropagationProblem, point: Assumptions, cancellation: Cancellation,
+            onPropagationWork: ((() -> Long) -> Unit)? = null,
+        ): PropagationSession = PropagationSession(
+            projection.problem, cancellation, PROPAGATION_CANCEL_FLOOR, true, false, projection,
+            initialAssumptions = point, onPropagationWork = onPropagationWork,
+        )
 
         fun preparation(
             state: PropagationState,
