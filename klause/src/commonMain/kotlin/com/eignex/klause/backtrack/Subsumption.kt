@@ -5,6 +5,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.util.SharingMemoryObservation
+import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
@@ -208,26 +209,12 @@ private const val NO_FLIP = -1
 private fun subsetWithOneFlip(d: IntArray, c: IntArray): Int? {
     var flipped = NO_FLIP
     for (lit in d) {
-        if (binaryContains(c, lit)) continue
+        if (c.binarySearchInt(lit) >= 0) continue
         val neg = Lit.negate(lit)
-        if (flipped == NO_FLIP && binaryContains(c, neg)) { flipped = neg; continue }
+        if (flipped == NO_FLIP && c.binarySearchInt(neg) >= 0) { flipped = neg; continue }
         return null
     }
     return flipped
-}
-
-private fun binaryContains(sorted: IntArray, value: Int): Boolean {
-    var lo = 0
-    var hi = sorted.size - 1
-    while (lo <= hi) {
-        val mid = (lo + hi) ushr 1
-        when {
-            sorted[mid] < value -> lo = mid + 1
-            sorted[mid] > value -> hi = mid - 1
-            else -> return true
-        }
-    }
-    return false
 }
 
 private fun signatureOf(literals: IntArray): Long {

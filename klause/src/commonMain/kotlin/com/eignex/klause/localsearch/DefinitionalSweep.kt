@@ -48,15 +48,17 @@ class DefinitionalSweep internal constructor(
         for (node in nodes) if (node.outIsBool) defined.add(node.out)
     }
 
-    private val unitBooleanLinks: Map<Int, IntArray> = run {
-        val links = HashMap<Int, MutableList<Int>>()
+    private val unitBooleanLinks: MutableIntObjectMap<IntArray> = run {
+        val links = MutableIntObjectMap<IntArrayList>()
         for (node in nodes) {
             if (node !is SweepNode.BoolFold || node.ins.size != 1) continue
             val source = Lit.variable(node.ins[0])
-            links.getOrPut(node.out) { ArrayList() }.add(source)
-            links.getOrPut(source) { ArrayList() }.add(node.out)
+            links.getOrPut(node.out) { IntArrayList() }.add(source)
+            links.getOrPut(source) { IntArrayList() }.add(node.out)
         }
-        links.mapValues { (_, neighbors) -> neighbors.toIntArray() }
+        MutableIntObjectMap<IntArray>(links.size).also { result ->
+            links.forEach { variable, neighbors -> result.put(variable, neighbors.toIntArray()) }
+        }
     }
 
     internal fun expandUnitBooleanScope(variables: IntArray, cancellation: Cancellation): IntArray? {

@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.lattice
 
+import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
@@ -30,18 +31,8 @@ internal class SparseIntRow(val index: IntArray, val value: Array<BigInt>) {
     val isZero: Boolean get() = index.isEmpty()
 
     operator fun get(column: Int): BigInt {
-        var lo = 0
-        var hi = index.size - 1
-        while (lo <= hi) {
-            val mid = (lo + hi) ushr 1
-            val c = index[mid]
-            when {
-                c < column -> lo = mid + 1
-                c > column -> hi = mid - 1
-                else -> return value[mid]
-            }
-        }
-        return BIG_ZERO
+        val position = index.binarySearchInt(column)
+        return if (position >= 0) value[position] else BIG_ZERO
     }
 
     companion object {

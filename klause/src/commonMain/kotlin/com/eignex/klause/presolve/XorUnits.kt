@@ -14,6 +14,7 @@ import com.eignex.klause.util.ScanMeter
 import com.eignex.util.collections.Bits
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongHashSet
+import com.eignex.util.collections.MutableLongIntMap
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.isZero
@@ -49,15 +50,15 @@ internal object XorUnits {
         if (system.infeasible) return SourceDelta(infeasible = true)
         if (system.rows.isEmpty() || system.columns.isEmpty()) return SourceDelta()
         val vars = system.columns.toLongArray()
-        val indexOf = HashMap<Long, Int>(vars.size * 2)
-        for (i in vars.indices) indexOf[vars[i]] = i
+        val indexOf = MutableLongIntMap(vars.size)
+        for (i in vars.indices) indexOf.put(vars[i], i)
         val words = (vars.size + 63) ushr 6
         val rowCount = system.rows.size
         if (rowCount.toLong() * minOf(rowCount, vars.size) > XOR_ELIMINATION_WORK_CAP / words) return SourceDelta()
         val rows = Array(rowCount) { LongArray(words) }
         val rhs = IntArray(rowCount)
         for (r in 0 until rowCount) {
-            system.rows[r].forEach { column -> Bits.set(rows[r], indexOf.getValue(column)) }
+            system.rows[r].forEach { column -> Bits.set(rows[r], indexOf.getOrDefault(column, -1)) }
             rhs[r] = system.rhs[r]
         }
 
