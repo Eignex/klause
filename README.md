@@ -29,7 +29,7 @@ Klause is built for applications that ask many questions of the same model, not 
 
 Typical uses are constraint-aware test and fuzz input generation, configuration synthesis, scheduling and assignment, and long-running services that re-solve and re-sample one model.
 
-Complete search, local search, LP relaxations and arithmetic theories all work on that same model, alone or together in a portfolio. Each engine enforces the original model itself.
+Complete search, local search, LP relaxations and arithmetic theories all work on that same model, alone or together in a portfolio. Search engines and theories enforce the original model themselves; LP relaxations bound and guide them.
 
 It reads FlatZinc, XCSP3, SMT-LIB, MPS, DIMACS, OPB/WBO and WCNF, and MiniZinc models through the included solver integration. Any model, whether built in Kotlin or read from a file, saves to and loads from JSON without loss.
 

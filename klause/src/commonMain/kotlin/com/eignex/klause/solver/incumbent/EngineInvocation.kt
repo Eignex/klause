@@ -67,6 +67,18 @@ internal class EngineInvocation(
         sourcePins == other.sourcePins && executionPins == other.executionPins && scope == other.scope &&
         sourceCondition == other.sourceCondition
 
+    // A point this invocation's engine produced already satisfies [other] when its conditions imply [other]'s and
+    // [other] adds no hole or value-set restriction of its own.
+    fun enforces(other: EngineInvocation): Boolean = preparedPlan === other.preparedPlan &&
+        sourceCondition.implies(other.sourceCondition) &&
+        sourceWitnessCondition.implies(other.sourceWitnessCondition) &&
+        executionCondition.implies(other.executionCondition) &&
+        addsNoSets(other.sourcePins, sourcePins) && addsNoSets(other.executionPins, executionPins)
+
+    private fun addsNoSets(other: Assumptions, own: Assumptions): Boolean =
+        (other.deductions.intHoleVarIds.isEmpty() && other.deductions.intSetKeys.isEmpty()) ||
+            other.deductions == own.deductions
+
     fun checkWitness(sample: Sample, cancellation: Cancellation): SourceEvidenceCheck {
         if (sourceCondition != sourceWitnessCondition) {
             val declared = sourceCondition.checkWitness(sample, cancellation)

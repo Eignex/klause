@@ -18,7 +18,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class IncumbentCandidatesTest {
+class SourceObjectiveScoreTest {
     private val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
 
     private fun problem(numRealVars: Int = 0) = Problem(

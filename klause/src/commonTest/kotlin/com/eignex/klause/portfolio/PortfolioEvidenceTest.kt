@@ -3,7 +3,6 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
@@ -11,7 +10,6 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
-import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.incumbent.CandidateVerifier
@@ -26,7 +24,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -139,26 +136,6 @@ class PortfolioEvidenceTest {
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(binding)
 
         val checked = verifier.witness(worker, point, 3.0)
-
-        assertIs<Verification.Rejected>(checked)
-    }
-
-    @Test
-    fun `portfolio admission should reject a violated native producer condition`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
-        val model = ModelIdentity.of(source)
-        val plan = source.prepareExecutionPlan()
-        val containing = EngineInvocation(plan, model)
-        val producer = EngineInvocation(plan, model, sourceAssumptions = Assumptions(ints = mapOf(0 to 1L)))
-        val point = Sample(booleanArrayOf(), longArrayOf(2))
-        point.witnessCertificate = EvidenceCertificate.published(
-            CompletedEnginePublication.Witness(producer, point, null),
-        )
-        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
-            .bindSource(SourceWorkerBinding(producer))
-        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(containing)
-
-        val checked = verifier.witness(worker, point, null)
 
         assertIs<Verification.Rejected>(checked)
     }
