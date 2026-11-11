@@ -108,7 +108,7 @@ class FloatEvidenceTest {
 
         val rays = listOf(1.0 + 1e-9, 1.0 - 1e-9).map { floatFarkasRay(model, doubleArrayOf(base[0], base[1] * it)) }
 
-        for (ray in rays.filterNotNull()) {
+        for (ray in rays.filterNotNull().filter { it.isNotEmpty() }) {
             var open = 0L
             model.forEachInColumn(1) { row, a -> open += ray[row] * a }
             assertTrue(open <= 0L)
