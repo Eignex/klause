@@ -29,14 +29,14 @@ class LinearSupportBranchingTest {
         point, listOf(cut), emptyMap(), null, null, "bound-unavailable")
 
     @Test
-    fun `admitted tight cut support should rank the more fractional integer coordinate`() {
-        for (checked in listOf(false, true)) {
+    fun `tight admitted cut support should rank the more fractional integer coordinate`() {
+        for (numerical in listOf(false, true)) {
             val funding = SourceLpFunding(1_000L, 10_000L).apply { grant(1_000L) }
             val branching = LinearSupportBranching(funding, SourceNumericalFeedback(funding, Cancellation.Never))
-            val admitted = query.copy(cuts = listOf(cut.copy(checked = checked, admitted = true,
-                numerical = !checked)), numericalCuts = !checked)
+            val admitted = cut.copy(checked = !numerical, admitted = true, numerical = numerical)
+            val current = query.copy(cuts = listOf(admitted), numericalCuts = numerical)
 
-            val selected = branching.select(SourceNumericalFeedbackResult.Available(admitted, null),
+            val selected = branching.select(SourceNumericalFeedbackResult.Available(current, null),
                 point.toList(), Cancellation.Never)
 
             assertEquals(y to point.getValue(y), selected)
@@ -77,12 +77,14 @@ class LinearSupportBranchingTest {
     }
 
     @Test
-    fun `uninstalled inactive unadmitted and slack cuts should preserve source order`() {
+    fun `uninstalled inactive unchecked and slack cuts should preserve source order`() {
         val funding = SourceLpFunding(1_000L, 10_000L).apply { grant(1_000L) }
         val branching = LinearSupportBranching(funding, SourceNumericalFeedback(funding, Cancellation.Never))
 
         for (ignored in listOf(cut.copy(installed = false), cut.copy(ownerActive = false),
-            cut.copy(checked = false, admitted = false), cut.copy(violation = BigFraction.MINUS_ONE))) {
+            cut.copy(checked = false), cut.copy(admitted = false),
+            cut.copy(checked = false, numerical = true, admitted = false),
+            cut.copy(violation = BigFraction.MINUS_ONE))) {
             val selected = branching.select(SourceNumericalFeedbackResult.Available(query.copy(cuts = listOf(ignored)),
                 null), point.toList(), Cancellation.Never)
 
