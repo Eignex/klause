@@ -1093,22 +1093,15 @@ internal class ResumableMinimize(
         val token = if (params.cancellation.workScheduled()) params.cancellation else
             params.cancellation or Cancellation.after(LP_VERIFY_BUDGET)
         if (token() || sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) return null
-        var validation: PropagationSession? = null
         try {
-            val checking = PropagationSession(PropagationProblem(problem), token,
-                onPropagationWork = { initialValidationPropagationWork = it })
-            validation = checking
-            if (checking.fixpointCancelled || token()) return null
-            if (checking.seed(params.assumptions) is PropagationResult.Unsat || checking.isUnsatAtRoot) return null
-            for (variable in (0 until sample.numBoolVars)) {
-                if (checking.fixpointCancelled || token()) return null
-                if (checking.pinBool(variable, sample.boolValue(variable)) is PropagationResult.Unsat) return null
-            }
-            for (variable in (0 until sample.numIntVars)) {
-                if (checking.fixpointCancelled || token()) return null
-                if (checking.pinInt(variable, sample.intValue(variable)) is PropagationResult.Unsat) return null
-            }
-            if (checking.fixpointCancelled || token()) return null
+            // The live supplier meters the slice while the check runs; the final work moves to the proposal total.
+            val checked = pointCheck.check(Candidate(sample, Unit), token, params.assumptions,
+                onWork = { work ->
+                    initialValidationPropagationWork = null
+                    proposalPropagationWork += work
+                },
+                liveWork = { initialValidationPropagationWork = it })
+            if (checked !is Verification.Accepted || token()) return null
             val accepted = if (problem.numRealVars == 0) {
                 sample
             } else {
@@ -1132,13 +1125,7 @@ internal class ResumableMinimize(
             if (token()) return null
             return recordIfImproving(accepted, objective.evaluate(accepted), startingWitness = !rebindable)
         } finally {
-            try {
-                validation?.releaseRetainedState()
-            } finally {
-                val spent = initialValidationPropagationWork?.invoke() ?: 0L
-                initialValidationPropagationWork = null
-                proposalPropagationWork += spent
-            }
+            initialValidationPropagationWork = null
         }
     }
 

@@ -51,4 +51,20 @@ class UnscoredCandidateCheckTest {
         assertIs<Completion.Refuted>(refuted)
         assertIs<Completion.Witness>(accepted)
     }
+
+    @Test
+    fun `a baked source should leave a value outside its declared domains to the factors`() {
+        val factor = object : Factor by Product(0, 1, 2), Propagator {
+            override fun propagate(state: PropagationState, factorId: Int): Boolean {
+                val domains = state.intDomains
+                if (domains.any { !it.isFixed }) return true
+                return domains[0].min * domains[1].min == domains[2].min
+            }
+        }
+        val check = UnscoredCandidateCheck(Problem(0, 3, Array(3) { IntDomain(0, 9) }, arrayOf<Factor>(factor)).bake())
+
+        val decided = check.check(Sample(BooleanArray(0), longArrayOf(10, 1, 10)), Assumptions.None, Cancellation.Never)
+
+        assertIs<Completion.Witness>(decided)
+    }
 }
