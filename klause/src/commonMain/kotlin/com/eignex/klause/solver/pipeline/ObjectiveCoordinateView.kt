@@ -3,10 +3,13 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.presolve.retainedCoordinates
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.fitsLong
 
@@ -39,6 +42,7 @@ internal class ObjectiveCoordinateView private constructor(
             if (listOf(mapping.source, target, privateProblem).any {
                 it.numBoolVars != target.numBoolVars || it.numIntVars != target.numIntVars || it.numRealVars != 0
             }) return null
+            val verifier = finiteWitnessVerifier(target, targetObjective, cancellation)
             return ObjectiveCoordinateView(
                 privateProblem, privateObjective, hints, ModelIdentity.of(target, targetObjective),
             ) { point ->
@@ -51,9 +55,12 @@ internal class ObjectiveCoordinateView private constructor(
                     return@ObjectiveCoordinateView null
                 }
                 if (lifted.exactInts?.any { !it.fitsLong() } == true) return@ObjectiveCoordinateView null
-                // Presolve reconstruction preserves feasibility; private certificates and frames stay behind.
+                // Drop private certificates and frames; the canonical verifier establishes fresh witness authority.
                 val sample = Sample(lifted.bools, lifted.ints)
-                MinimizeResult.BestFound(sample, targetObjective.evaluate(sample), TerminationReason.SearchExhausted)
+                val value = targetObjective.evaluate(sample)
+                if (verifier.verify(Candidate(sample, value)) is Verification.Accepted) {
+                    MinimizeResult.BestFound(sample, value, TerminationReason.SearchExhausted)
+                } else null
             }
         }
     }

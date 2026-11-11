@@ -261,9 +261,11 @@ Reseeding a handle does not remove its worker.
 
 ## Witnesses and proof scope
 
-Finite workers' points are engine results and enter the pool as published. Arithmetic
-points pass [source validation](07-presolve.md#source-witness-validation) where their
-engine does not enforce the source exactly. Claims need the authority below.
+Finite workers' points are engine results and enter the pool as published. A private
+protected-coordinate view solves a differently presolved model, so its lifted point is
+checked against the canonical model. Arithmetic points pass
+[source validation](07-presolve.md#source-witness-validation) where their engine does
+not enforce the source exactly. Claims need the authority below.
 
 ### Publication identity
 

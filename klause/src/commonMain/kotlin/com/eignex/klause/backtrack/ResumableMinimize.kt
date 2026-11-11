@@ -94,10 +94,9 @@ internal sealed interface StepEvent {
 }
 
 /**
- * Cap on one LP proposal's composed verification, composed with the run's own token rather than
- * standing in for it — verification must stop at a cancellation or a slice boundary like everything
- * else the engine does. This bounds the case that token cannot: a solve with budget left to spare
- * whose fixpoint over a fully-fixed assignment runs away inside one propagator.
+ * Cap on admitting a pooled or previous candidate (its pin check and real completion), composed with the
+ * run's own token rather than standing in for it, so admission still stops at a cancellation or a slice
+ * boundary. It bounds the case that token cannot: a run with budget to spare whose completion runs away.
  */
 private val LP_VERIFY_BUDGET = 100.milliseconds
 

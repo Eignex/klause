@@ -300,7 +300,7 @@ internal class FiniteNumericalCompanions private constructor(
 
 internal fun finiteNumericalCompletion(result: LinearOptimizationResult, context: SourceProofContext,
     cancellation: Cancellation): MinimizeResult {
-    // A verified relaxation proof uses the finite working coordinates and objective; finite admission checks the point.
+    // A verified relaxation proof uses the finite working coordinates and objective.
     if (result.verifyTerminal(context, cancellation) is Verification.Accepted) {
         when (val claim = result.terminal?.claim) {
             is SourceClaim.Optimal -> return MinimizeResult.Optimal(claim.sample,

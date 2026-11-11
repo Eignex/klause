@@ -1016,22 +1016,23 @@ whose payloads must be immutable. See
 
 ## Primal heuristics and statistics
 
-Primal heuristics propose incumbents inside complete search. Each proposal needs
-full source verification and supplies no proof authority.
+Primal heuristics propose incumbents inside complete search and supply no proof
+authority.
 
 ### Root primal proposals
 
 On mixed models, the root LP relaxation also proposes incumbents. Nearest rounding,
 directed upward and downward rounding of the retained LP point, a peer worker's
 discrete assignment and a feasibility pump each produce discrete targets. Every
-distinct proposal passes the discrete fixpoint under the caller's assumptions, then
-real completion through the real-leaf owner or the caller's source tolerance check,
-then full source verification. Only a complete checked witness that strictly
-improves the current cutoff becomes an incumbent.
+distinct target is pinned through the arm's own propagation, and the leaf checks of
+relations whose selected propagation is inert must accept the pinned point, so it is
+a search leaf. It must then satisfy the caller's assumptions and complete its reals
+through the real-leaf owner. Only a completed leaf that strictly improves the current
+cutoff becomes an incumbent; a declined one lets the probe try its next target.
 
 The opt-in `lbTreeSearch` probe extends this to a private finite trail with exhaustive
 fractional and value alternatives, trying the nearer side of the LP value first. It
-returns accepted witnesses only and exports no optimum, refutation, bound or recession
+returns its own propagated leaves only and exports no optimum, refutation, bound or recession
 claim. The `lp-lbtree` portfolio recipe can enable it.
 
 Root primal work charges the containing root ledger and solve-wide `NodeBudget`, and
@@ -1039,8 +1040,8 @@ a fallback solve receives only the remaining allowance.
 
 ### Monotone clausal primal probe
 
-Pure Boolean clausal optimization with at most 64 positive-cost variables can seed
-incumbents through greedy feasibility repairs when those variables occur only
+Pure Boolean clausal optimization with at most 64 positive-cost variables can guide
+search through greedy feasibility repairs when those variables occur only
 positively in hard clauses. The probe runs once before ordinary optimization and is
 skipped behind an existing shared incumbent or within repair fragments.
 
@@ -1050,7 +1051,8 @@ to turn off the remaining cost variables in descending weight order through a cl
 walk with penalty escalation, restoring the previous feasible assignment on failure.
 Trials run on a projected model reduced by unit propagation and bounded Boolean
 elimination, and lift their result back. Private infeasible verdicts contribute no
-outer proof, and the full original proposal is verified before publication.
+outer proof. A proposal sets the root value order and saved phases and does not
+become an incumbent.
 
 The probe's work is charged to its arm and the solve-wide move allowance, within at
 most half the remaining time and 5 seconds.

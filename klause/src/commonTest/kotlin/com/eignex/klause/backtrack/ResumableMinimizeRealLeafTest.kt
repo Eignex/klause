@@ -479,7 +479,7 @@ class ResumableMinimizeRealLeafTest {
     }
 
     @Test
-    fun `declined float coordinates should retain the discrete real completion fallback`() {
+    fun `mixed tolerance rounding should complete its reals before any decision`() {
         val problem = Problem(
             0,
             1,
