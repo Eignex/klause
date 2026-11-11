@@ -1982,6 +1982,9 @@ branching controls to its admitted numerical companions. The containing source r
 them from finite worker recipe options; they change neither companion admission
 nor lifetime. Joint repair binds separation, point selection and aggregation to its
 shared numerical owner for both root preparation and retained neighborhood queries.
+With fractional point aggregation, the advisory root uses an uncut query to seed
+its coordinates. Retained neighborhood queries purchase separation through the same
+owner and source funding.
 Its advisory root center and neighborhood order use the paid point preceding
 selection when the selected query remains nonterminal without a checked incumbent.
 A selected witness or terminal keeps its selected guidance. The baseline point

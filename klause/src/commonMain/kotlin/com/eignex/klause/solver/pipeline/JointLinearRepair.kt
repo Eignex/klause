@@ -397,14 +397,17 @@ internal class JointLinearRepair(
                     return true
                 }
             }
+            val rootCuts = boundOrdered && params.sourceCuts &&
+                !(params.sourcePointCuts && params.sourceAggregateCuts && params.sourceCutFractionalOrder)
             if (!rootStarted) {
                 if (!state.work.theoryCheck()) return false
                 rootStarted = true
                 observe("jointRepairRootQueries")
+                if (boundOrdered && params.sourceCuts && !rootCuts) observe("jointRepairRootBaseGuidanceQueries")
             }
-            val result = if (boundOrdered && params.sourceCuts && params.sourcePointCuts)
+            val result = if (rootCuts && params.sourcePointCuts)
                 authority.advanceWithPointCuts(source, stop, retainBasePoint = true)
-            else authority.advance(source, stop, cuts = boundOrdered && params.sourceCuts)
+            else authority.advance(source, stop, cuts = rootCuts)
             for ((stage, count) in result.primalStages) {
                 val key = "jointRepairRoot$stage"
                 stages[key] = combine(key, stages[key] ?: 0L, count)
