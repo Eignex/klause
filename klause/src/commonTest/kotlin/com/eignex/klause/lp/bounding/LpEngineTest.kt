@@ -55,6 +55,50 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `proposal value targets should spend containing work`() {
+        val problem = boundedProblem()
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, rootCutHarvest = false)),
+            SolveStatsSink("paid-proposal-values")).use { engine ->
+            val before = engine.totalSolveWork()
+
+            engine.guideRootValues(booleanArrayOf(), longArrayOf(1, 1, 1))
+
+            assertNotNull(engine.rootPrimalTargets)
+            assertTrue(engine.totalSolveWork() > before)
+        }
+    }
+
+    @Test
+    fun `proposal value targets should respect the guidance storage cap`() {
+        val problem = Problem(90_000, 0, emptyArray(), emptyList())
+        LpEngine(problem, LinearObjective(boolWeights = LongArray(problem.numBoolVars)),
+            LpParams(lpPlan = LpPlan(bounding = false, probe = false)),
+            SolveStatsSink("oversized-proposal-values")).use { engine ->
+
+            engine.guideRootValues(BooleanArray(problem.numBoolVars), longArrayOf())
+
+            assertNull(engine.rootPrimalTargets)
+        }
+    }
+
+    @Test
+    fun `proposal value targets should decline insufficient root work`() {
+        val problem = boundedProblem()
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, rootCutHarvest = false,
+                rootMaxWork = 4L, rootBudgetFraction = 1.0)),
+            SolveStatsSink("unfunded-proposal-values")).use { engine ->
+            val before = engine.totalSolveWork()
+
+            engine.guideRootValues(booleanArrayOf(), longArrayOf(1, 1, 1))
+
+            assertNull(engine.rootPrimalTargets)
+            assertEquals(before, engine.totalSolveWork())
+        }
+    }
+
+    @Test
     fun `linear bound should release branch costs when first read after a backtrack`() {
         val problem = Problem(2, 1, arrayOf(IntDomain(0, 1)), emptyArray())
         val session = PropagationSession(problem)
