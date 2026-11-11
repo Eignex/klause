@@ -31,6 +31,28 @@ private class RecordingCertificationPolicy(
 class LpCertificationPolicyTest {
 
     @Test
+    fun `numerical policy should refuse exact bound and conflict computation`() {
+        val source = LpBuilder().apply { addVar(0L, 3L, cost = 1L) }.build(Sense.MINIMIZE)
+        val retained = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        val policy = NumericalLpCertificationPolicy
+        val limits = ReconstructionLimits()
+
+        val results = listOf(
+            certifyLpBoundOnly(retained, doubleArrayOf(), limits, policy = policy),
+            certifyLpIntegerBoundOnly(retained, doubleArrayOf(), limits, policy = policy),
+            certifyLpConflictOnly(retained, doubleArrayOf(), limits, policy = policy),
+        )
+
+        for (result in results) {
+            assertNull(result.bound)
+            assertNull(result.conflict)
+            assertEquals(0L, result.metrics.work)
+            assertEquals(0L, result.metrics.allocation)
+            assertEquals(ReconstructionDecline.POLICY, result.metrics.decline)
+        }
+    }
+
+    @Test
     fun `computation refusal should not evaluate a certificate producer`() {
         val policy = RecordingCertificationPolicy(accept = true, compute = false)
 

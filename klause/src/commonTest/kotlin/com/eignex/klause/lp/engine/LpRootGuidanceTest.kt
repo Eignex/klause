@@ -18,6 +18,98 @@ class LpRootGuidanceTest {
     )
 
     @Test
+    fun `numerical conflict guidance should skip exact certification`() {
+        val observer = object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+                error("exact certifier was invoked")
+            }
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+        }
+        LpScopedSolver(LpExactState(model), context = LpSolveContext.Numerical).use { owner ->
+            val guide = owner.advanceRootGuidance(100_000L, LpFloatAllowance(100_000L, 100), ReconstructionLimits(),
+                observer = observer)
+
+            val conflict = assertNotNull(guide.numericalConflict)
+            assertTrue(conflict.margin > FLOAT_EVIDENCE_TOLERANCE)
+            assertTrue(conflict.belongsTo(assertNotNull(owner.state.ownerWorkingModel())))
+            assertEquals(LpRootGuidancePhase.COMPLETE, guide.phase)
+            assertNull(guide.conflict)
+            assertNull(guide.conflictSupport)
+            assertNull(guide.certificateMetrics)
+            assertTrue(guide.numericalWork > 0L)
+        }
+    }
+
+    @Test
+    fun `numerical bound guidance should remain separate from exact authority`() {
+        val source = LpBuilder().apply { addVar(2L, 3L, cost = 1L) }.build(Sense.MINIMIZE)
+        LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel())),
+            context = LpSolveContext.Numerical).use { owner ->
+            val guide = owner.advanceRootGuidance(100_000L, LpFloatAllowance(100_000L, 100), ReconstructionLimits())
+
+            val bound = assertNotNull(guide.numericalBound)
+            assertEquals(2.0, bound.value)
+            assertTrue(bound.belongsTo(assertNotNull(owner.state.ownerWorkingModel())))
+            assertEquals(LpRootGuidancePhase.COMPLETE, guide.phase)
+            assertNull(guide.bound)
+            assertNull(guide.certificateMetrics)
+            assertTrue(guide.numericalWork > 0L)
+        }
+    }
+
+    @Test
+    fun `numerical guidance should retain work when its bound allowance is exhausted`() {
+        val source = LpBuilder().apply { addVar(2L, 3L, cost = 1L) }.build(Sense.MINIMIZE)
+        LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel())),
+            context = LpSolveContext.Numerical).use { owner ->
+            val guide = owner.advanceRootGuidance(100_000L, LpFloatAllowance(100_000L, 100),
+                ReconstructionLimits(maxWork = 1L))
+
+            assertEquals(LpRootGuidancePhase.NUMERICAL, guide.phase)
+            assertNull(guide.numericalBound)
+            assertNull(guide.bound)
+            assertNull(guide.certificateMetrics)
+            assertEquals(1L, guide.numericalWork)
+        }
+    }
+
+    @Test
+    fun `cancellation after numerical observation should withhold guidance authority`() {
+        var cancelled = false
+        val observer = object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+            override fun observePhase(metrics: LpPhaseMetrics) {
+                if (metrics.phase == LpSolvePhase.NUMERICAL_CONFLICT) cancelled = true
+            }
+        }
+        LpScopedSolver(LpExactState(model), Cancellation { cancelled },
+            context = LpSolveContext.Numerical).use { owner ->
+            val guide = owner.advanceRootGuidance(100_000L, LpFloatAllowance(100_000L, 100), ReconstructionLimits(),
+                observer = observer)
+
+            assertNull(guide.numericalConflict)
+            assertNull(guide.conflict)
+            assertEquals(LpRootGuidancePhase.NUMERICAL, guide.phase)
+            assertTrue(guide.numericalWork > 0L)
+        }
+    }
+
+    @Test
+    fun `numerical bounds should not transfer to a foreign working model`() {
+        val source = LpBuilder().apply { addVar(2L, 3L, cost = 1L) }.build(Sense.MINIMIZE)
+        val authority = assertNotNull(source.authoritativeModel())
+        val foreign = assertNotNull(LpExactState(authority).toWorkingModel())
+        LpScopedSolver(LpExactState(authority), context = LpSolveContext.Numerical).use { owner ->
+            val guide = owner.advanceRootGuidance(100_000L, LpFloatAllowance(100_000L, 100), ReconstructionLimits())
+
+            assertEquals(false, assertNotNull(guide.numericalBound).belongsTo(foreign))
+        }
+    }
+
+    @Test
     fun `infeasible guidance should certify a ray without a point or a bound`() {
         LpScopedSolver(LpExactState(model)).use { owner ->
             val guide = owner.advanceRootGuidance(100_000L, LpFloatAllowance(100_000L, 100), ReconstructionLimits())

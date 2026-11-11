@@ -6,6 +6,16 @@ assemble source-aware rows; the engine solves and certifies them; consumers inte
 the result in source coordinates. Shared search owns integer and Boolean alternatives.
 LP feasibility alone establishes no integrality.
 
+An LP solve context selects numerical deductions separately from exact certification.
+Numerical root guidance uses outward-rounded Lagrangian bounds over the floating
+projection. A positive zero-objective Lagrangian margin beyond the declared
+feasibility tolerance establishes numerical infeasibility. Both ray orientations
+share one work allowance; cancellation or exhausted work withholds the deduction.
+Numerical bounds and conflicts retain their current working-model identity and
+carry no exact certificate or exact support. Their work debits the consuming LP
+allowance, including refused attempts. Exact computation admission precedes the
+certificate producer; a numerical policy invokes no exact root certifier.
+
 ## Boundaries
 
 ```text

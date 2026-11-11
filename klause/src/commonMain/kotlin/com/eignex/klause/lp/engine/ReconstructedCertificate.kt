@@ -34,6 +34,7 @@ internal data class ReconstructionLimits(
 }
 
 internal enum class ReconstructionDecline {
+    POLICY,
     INVALID_INPUT,
     NONFINITE,
     DIMENSION,
@@ -1136,6 +1137,7 @@ internal fun certifyLpConflictOnly(
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
 ): ReconstructedCertificate {
+    if (!policy.canCompute(LpCertifier.RATIONAL)) return refusedComputation()
     val observation = observer?.takeUnless { it is LpClaimObservation }?.let {
         LpClaimObservation(LpClaim.CONTRADICTION, it)
     }
@@ -1173,6 +1175,7 @@ internal fun certifyLpIntegerBoundOnly(
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
 ): ReconstructedCertificate {
+    if (!policy.canCompute(LpCertifier.INTEGER)) return refusedComputation()
     val observation = observer?.takeUnless { it is LpClaimObservation }?.let {
         LpClaimObservation(LpClaim.BOUND, it)
     }
@@ -1256,6 +1259,7 @@ internal fun certifyLpBoundOnly(
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
     basis: Basis? = null,
 ): ReconstructedCertificate {
+    if (!policy.canCompute(LpCertifier.RATIONAL)) return refusedComputation()
     val observation = observer?.takeUnless { it is LpClaimObservation }?.let {
         LpClaimObservation(LpClaim.BOUND, it)
     }
@@ -1264,6 +1268,12 @@ internal fun certifyLpBoundOnly(
         false, { null }, reconstruction = checked.metrics))
     return checked
 }
+
+private fun refusedComputation(): ReconstructedCertificate = ReconstructedCertificate(
+    null, null, null, null, false, false,
+    ReconstructionMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0L, 0L, 0,
+        ReconstructionDecline.POLICY, ReconstructionPhase.INPUT),
+)
 
 private fun certifyLpBoundOnlyWithin(
     model: LpModel,

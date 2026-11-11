@@ -3,6 +3,8 @@ package com.eignex.klause.lp.engine
 import kotlin.math.nextDown
 
 internal fun interface LpCertificationPolicy {
+    val numericalDeductions: Boolean get() = false
+
     fun canCompute(certifier: LpCertifier): Boolean = true
 
     fun accepts(certifier: LpCertifier, successful: Boolean): Boolean
@@ -10,6 +12,12 @@ internal fun interface LpCertificationPolicy {
 
 internal object ProductionLpCertificationPolicy : LpCertificationPolicy {
     override fun accepts(certifier: LpCertifier, successful: Boolean): Boolean = successful
+}
+
+internal object NumericalLpCertificationPolicy : LpCertificationPolicy {
+    override val numericalDeductions: Boolean = true
+    override fun canCompute(certifier: LpCertifier): Boolean = false
+    override fun accepts(certifier: LpCertifier, successful: Boolean): Boolean = false
 }
 
 internal inline fun <T : Any> LpCertificationPolicy.computeNullable(certifier: LpCertifier, compute: () -> T?): T? {
