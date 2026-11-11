@@ -128,6 +128,8 @@ remain in force. A numerical refutation cannot coexist with an accepted incumben
 and a bound contradicting that incumbent beyond tolerance cannot finish the pool.
 The source proof-bound exchange continues to require exact source evidence; numerical
 packages retain their separate result channel and worker-local pruning authority.
+A finite companion consuming a numerical completion records that authority in its
+merged consumption phases so source qualification cannot report it as exact.
 Original linear-source outcomes identify numerical LP authority independently of
 source tolerance. An unrestricted exact source view can project a numerical bound
 back through its positive objective scale with outward scalar rounding. That value

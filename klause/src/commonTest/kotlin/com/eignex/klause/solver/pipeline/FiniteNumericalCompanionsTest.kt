@@ -6,6 +6,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioLifecycleKind
@@ -461,25 +462,39 @@ class FiniteNumericalCompanionsTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val context = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
             Cancellation.Never))
-        val result = OpenTheoryPipeline.optimizeLinear(context)
+        for (mode in LpCertificationMode.entries) {
+            val result = OpenTheoryPipeline.optimizeLinear(context, TheoryParams(lpMode = mode))
 
-        val completed = finiteNumericalCompletion(result, context, Cancellation.Never)
+            if (mode == LpCertificationMode.NUMERICAL) assertNotNull(result.numerical)
 
-        assertEquals(0.0, assertIs<MinimizeResult.Optimal>(completed).objective)
+            val completed = finiteNumericalCompletion(result, context, Cancellation.Never)
+
+            assertEquals(0.0, assertIs<MinimizeResult.Optimal>(completed).objective)
+            val numerical = completed.stats.lp.phases["NUMERICAL_CONSUMPTION_STANDALONE"]
+                ?.outcomes?.get("SOURCE_OPTIMUM") == 1L
+            assertEquals(mode == LpCertificationMode.NUMERICAL, numerical)
+        }
     }
 
     @Test
     fun `a checked numerical refutation should complete the same finite working model`() {
-        val model = Problem(0, 1, arrayOf(IntDomain(0, 1)),
-            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)))
-        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val model = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
         val context = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
             Cancellation.Never))
-        val result = OpenTheoryPipeline.optimizeLinear(context)
+        for (mode in LpCertificationMode.entries) {
+            val result = OpenTheoryPipeline.optimizeLinear(context, TheoryParams(lpMode = mode))
 
-        val completed = finiteNumericalCompletion(result, context, Cancellation.Never)
+            if (mode == LpCertificationMode.NUMERICAL) assertNotNull(result.numerical)
 
-        assertIs<MinimizeResult.Infeasible>(completed)
+            val completed = finiteNumericalCompletion(result, context, Cancellation.Never)
+
+            assertIs<MinimizeResult.Infeasible>(completed)
+            val numerical = completed.stats.lp.phases["NUMERICAL_CONSUMPTION_STANDALONE"]
+                ?.outcomes?.get("SOURCE_REFUTATION") == 1L
+            assertEquals(mode == LpCertificationMode.NUMERICAL, numerical)
+        }
     }
 
     @Test

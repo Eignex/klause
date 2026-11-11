@@ -31,8 +31,10 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LinearOptimizationResult
+import com.eignex.klause.solver.result.LpPhaseStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration.Companion.milliseconds
@@ -303,11 +305,14 @@ internal fun finiteNumericalCompletion(result: LinearOptimizationResult, context
     cancellation: Cancellation): MinimizeResult {
     val numerical = result.numerical
     if (result.terminal == null && !cancellation() && numerical?.claim?.isFor(context) == true) {
-        if (numerical.infeasible && result.incumbent == null) return MinimizeResult.Infeasible(stats = result.stats)
+        if (numerical.infeasible && result.incumbent == null) {
+            return MinimizeResult.Infeasible(stats = numericalCompletionStats(result.stats, "SOURCE_REFUTATION"))
+        }
         val point = result.incumbent
         val value = result.value
         if (numerical.optimal && point != null && value != null && !numerical.contradicts(value)) {
-            return MinimizeResult.Optimal(point, value.toDouble(), result.stats)
+            return MinimizeResult.Optimal(point, value.toDouble(),
+                numericalCompletionStats(result.stats, "SOURCE_OPTIMUM"))
         }
     }
     // A verified relaxation proof uses the finite working coordinates and objective.
@@ -327,4 +332,11 @@ internal fun finiteNumericalCompletion(result: LinearOptimizationResult, context
     } else result.reason
     return if (point == null || value == null) MinimizeResult.Unknown(reason, result.stats)
     else MinimizeResult.BestFound(point, value.toDouble(), reason, result.stats)
+}
+
+private fun numericalCompletionStats(stats: SolveStats, outcome: String): SolveStats {
+    val key = "NUMERICAL_CONSUMPTION_STANDALONE"
+    val completion = LpPhaseStats(calls = 1L, outcomes = mapOf(outcome to 1L))
+    val phases = stats.lp.phases + (key to (stats.lp.phases[key] ?: LpPhaseStats()).mergedWith(completion))
+    return stats.copy(lp = stats.lp.copy(phases = phases))
 }
