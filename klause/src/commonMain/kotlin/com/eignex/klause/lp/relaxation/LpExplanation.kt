@@ -136,16 +136,6 @@ internal object LpExplanation {
         return PREMISE_AUX
     }
 
-    /**
-     * Reason atoms certifying the LP's objective lower bound for an OPTIMAL [cert] (the exact
-     * basis-certificate), or null when the certificate touches an auxiliary column or a non-global
-     * row without recorded premises carries dual weight. By LP duality `c·x = y·b + Σ_j d_j·x_j` holds
-     * row-wise, so for any point satisfying the rows, `objective ≥ L` follows from `x_j ≥ lo_j` on the
-     * columns with `d_j > 0` and `x_j ≤ ub_j` on those with `d_j < 0` — exactly the premises cited here.
-     * Basic and zero-reduced-cost columns do not move the bound and stay uncited (a basic column's exact
-     * reduced cost is `0`); rows stay implicit, which is why every row with `y_i ≠ 0` must be globally
-     * valid or carry recorded validity premises ([LpModel.rowPremises]) cited alongside.
-     */
     /** The sides of column [col] whose bounds [cert]'s bound rests on, `true` for the lower side. */
     fun citedSides(cert: LpDeductionCertificate, col: Int): List<Boolean> = when {
         cert.citesBothSides(col) -> BOTH_SIDES
@@ -156,6 +146,16 @@ internal object LpExplanation {
         }
     }
 
+    /**
+     * Reason atoms certifying the LP's objective lower bound for an OPTIMAL [cert] (the exact
+     * basis-certificate), or null when the certificate touches an auxiliary column or a non-global
+     * row without recorded premises carries dual weight. By LP duality `c·x = y·b + Σ_j d_j·x_j` holds
+     * row-wise, so for any point satisfying the rows, `objective ≥ L` follows from `x_j ≥ lo_j` on the
+     * columns with `d_j > 0` and `x_j ≤ ub_j` on those with `d_j < 0` — exactly the premises cited here.
+     * Basic and zero-reduced-cost columns do not move the bound and stay uncited (a basic column's exact
+     * reduced cost is `0`); rows stay implicit, which is why every row with `y_i ≠ 0` must be globally
+     * valid or carry recorded validity premises ([LpModel.rowPremises]) cited alongside.
+     */
     fun objectiveBoundReason(
         relaxation: LpRelaxation,
         cert: LpDeductionCertificate,
