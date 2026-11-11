@@ -74,6 +74,7 @@ internal class CertifiedLpResult(
     // A float optimum accepted under tolerance semantics in place of exact evidence; its primal is not exact.
     val floatOptimum: FloatLpResult? = null,
     val certificationReused: Boolean = false,
+    val numerical: LpNumericalResult? = null,
 ) {
     val verdict: LpVerdict = when {
         floatOptimum != null -> LpVerdict.TOLERANCE_OPTIMUM
@@ -148,6 +149,10 @@ internal fun solveAndCertify(
     floatOffset: Double = 0.0,
     claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
 ): CertifiedLpResult {
+    if (context.certificationPolicy.numericalDeductions) {
+        return solveNumerically(model, warm, cancellation, workLimit, componentSplit, observer, context,
+            pricing, refinementLimits.maxWork, floatAccept, floatOffset, claim)
+    }
     if (claim == LpClaim.ATTAINED_OPTIMUM && floatAccept != null && workLimit == 0L &&
         model.exactState == null && model.floatProjectionAuthoritative()
     ) {
@@ -189,6 +194,38 @@ internal fun solveAndCertify(
         context.certificationPolicy,
     )
 }
+
+private fun solveNumerically(
+    model: LpModel,
+    warm: Basis?,
+    cancellation: Cancellation,
+    workLimit: Long,
+    componentSplit: Boolean,
+    observer: LpCertificationObserver?,
+    context: LpSolveContext,
+    pricing: LpPricingOptions,
+    deductionWork: Long,
+    floatAccept: ((FloatLpResult) -> Boolean)?,
+    floatOffset: Double,
+    claim: LpClaim,
+): CertifiedLpResult = newLpSolver(model, cancellation, componentSplit, context.engineFactory, pricing, workLimit)
+    .use { solver ->
+        solver.deferUnscaledSourceDiagnostics()
+        val result = try {
+            solver.solve(warm)
+        } finally {
+            observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolverCapability)
+        }
+        var remaining = deductionWork
+        if (workLimit > 0L) {
+            var sourceRemaining = workLimit - minOf(workLimit, solver.lastMetrics.workOps)
+            sourceRemaining -= minOf(sourceRemaining, solver.lastMetrics.preparationOps)
+            remaining = minOf(remaining, sourceRemaining)
+        }
+        val observation = observer?.let { LpClaimObservation(claim, it) }
+        numericalLpResult(model, solver, result, remaining, cancellation, observation,
+            floatAccept, floatOffset).also { observation?.finish(it) }
+    }
 
 private fun sourceCertifiedResult(
     model: LpModel,
@@ -345,6 +382,10 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
         floatOffset: Double,
         claim: LpClaim,
     ): CertifiedLpResult {
+        if (context.certificationPolicy.numericalDeductions) {
+            return numericalLpResult(model, solver, result, refinementLimits.maxWork, cancellation, observer,
+                floatAccept, floatOffset)
+        }
         // Tolerance semantics accept a float optimum before any exact work; a rejected one falls through to it.
         if ((claim == LpClaim.ATTAINED_OPTIMUM || claim == LpClaim.FEASIBLE_COMPLETION) &&
             floatAccept != null && result != null && result.optimal &&
@@ -414,6 +455,13 @@ internal fun certifyLpResult(
     sparsePointRecovery: Boolean = false,
     claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
 ): CertifiedLpResult {
+    if (policy.numericalDeductions) {
+        val work = refinement?.effectiveLimits()?.maxWork ?: ReconstructionLimits().maxWork
+        val observation = observer as? LpClaimObservation ?: observer?.let { LpClaimObservation(claim, it) }
+        return numericalLpResult(model, solver, result, work, cancellation, observation).also {
+            if (observer !is LpClaimObservation) observation?.finish(it)
+        }
+    }
     if (LpCertifier.entries.none(policy::canCompute)) {
         return CertifiedLpResult(result, null, null, null, null, false, { null })
     }

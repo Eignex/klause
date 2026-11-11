@@ -15,6 +15,14 @@ Numerical bounds and conflicts retain their current working-model identity and
 carry no exact certificate or exact support. Their work debits the consuming LP
 allowance, including refused attempts. Exact computation admission precedes the
 certificate producer; a numerical policy invokes no exact root certifier.
+Standalone and retained solves carry numerical packages separately from their exact
+verdict and proof fields. A numerical point requires the caller's source-acceptance
+predicate; a numerical optimum also requires its objective to meet the lower bound
+within the declared relative tolerance. Refusing a point preserves an available
+numerical bound. The numerical path does not enter exact point recovery, basis
+verification, reconstruction or continuation. A finite source work limit leaves
+only its unspent work for deductions. Numerical claim observations include that
+work without classifying it as an exact certificate.
 
 ## Boundaries
 

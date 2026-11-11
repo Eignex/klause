@@ -17,10 +17,12 @@ import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpPhaseMetrics
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
+import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
@@ -353,6 +355,11 @@ internal class SourceLp(
         override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
         override fun observeExactInput(accepted: Boolean) = Unit
         override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+        override fun observePhase(metrics: LpPhaseMetrics) {
+            if (metrics.phase == LpSolvePhase.NUMERICAL_BOUND || metrics.phase == LpSolvePhase.NUMERICAL_CONFLICT) {
+                budget.observe(floatWork = metrics.work)
+            }
+        }
         override fun observeBasisVerification(metrics: ExactBasisMetrics) {
             budget.onBasisVerification?.invoke(metrics)
         }
