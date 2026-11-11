@@ -334,7 +334,9 @@ no dense basis continuation.
 
 Completed root points can supply private rounding guidance under the same
 objective identity. A live root owner copies at most one MiB within the remaining
-root and LP allowance. A closed auxiliary rounding solver transfers its completed
+root and LP allowance. Discrete proposal targets reserve their coordinate buffers
+within the same storage cap and charge construction to the remaining root and LP
+allowance. A closed auxiliary rounding solver transfers its completed
 output array into the same private storage cap after its work is charged. The
 constant-size handoff can preserve a completed point across a slice interruption;
 later pinning still polls its fresh token. A completed auxiliary point keeps its

@@ -349,6 +349,13 @@ internal class LpEngine(
     // A heuristic point orders root values instead of becoming an incumbent; integer columns precede Boolean ones.
     internal fun guideRootValues(bools: BooleanArray, ints: LongArray) {
         if (bools.size != problem.numBoolVars || ints.size != problem.numIntVars) return
+        val columns = ints.size.toLong() + bools.size
+        val bytes = ROOT_PRIMAL_TARGET_HEADER_BYTES + columns * (Double.SIZE_BYTES + Int.SIZE_BYTES)
+        val work = 1L + 4L * columns + if (rootComponentValues == null) 0L else 2L * ints.size
+        if (!rootGuidanceFits(bytes) || lpWorkAllowanceSpent(work)) return
+        val remaining = if (retainedRootEnabled) retainedRootRemainingWork() else rootPrimalWorkBudget()
+        if ((retainedRootEnabled || remaining > 0L) && remaining <= work) return
+        noteNodeOverhead(work)
         val coordinates = DoubleArray(ints.size + bools.size) { column ->
             if (column < ints.size) ints[column].toDouble() else if (bools[column - ints.size]) 1.0 else 0.0
         }
