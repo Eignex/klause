@@ -19,11 +19,13 @@ import com.eignex.util.numbers.shr
 import com.eignex.util.numbers.toLong
 import com.eignex.util.numbers.toLongExact
 
+internal const val LP_DEFAULT_DEDUCTION_WORK = 250_000L
+
 internal data class ReconstructionLimits(
     val maxCoordinates: Int = 4096,
     val maxEntries: Int = 65536,
     val maxBits: Int = 4096,
-    val maxWork: Long = 250000L,
+    val maxWork: Long = LP_DEFAULT_DEDUCTION_WORK,
     val maxAllocation: Long = 16L * 1024L * 1024L,
     val maxAttempts: Int = 4,
 ) {

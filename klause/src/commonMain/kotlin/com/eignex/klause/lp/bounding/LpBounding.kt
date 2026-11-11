@@ -356,6 +356,15 @@ private fun LpEngine.solveSelectedCuts(
         observeCutFill(it.luMaxFill, tightened.model.m)
         return LpCutOutcome.Solved(tightened, it)
     }
+    if (solveContext.certificationPolicy.numericalDeductions) {
+        val ray = attempt.first.infeasibleRay ?: return previous
+        if (!numericalConflict(tightened.model, ray, cancellation)) return previous
+        val clause = if (learn) numericalPremiseClause(tightened, session, cancellation) else null
+        if (cancellation()) return previous
+        sink.lp.observeInfeasiblePrune()
+        observeNumericalConsumption("CUT_CONFLICT")
+        return LpCutOutcome.Pruned(clause)
+    }
     if (lpCounterResults.read(tightened.model, solveContext.certificationPolicy)?.witness != null) return previous
     val floatRay = attempt.first.infeasibleRay ?: return previous
     val ray = solveContext.certificationPolicy.acceptNullable(
@@ -453,6 +462,18 @@ internal fun LpEngine.sparseSafePrune(
             val gatedRay = filter.simplex.infeasibleRay?.copyOf()
             if (gatedRay != null && !cancellation()) {
                 for (i in 0 until gatedModel.m) if (!filter.enforced[i]) gatedRay[i] = 0.0
+                if (solveContext.certificationPolicy.numericalDeductions) {
+                    if (numericalConflict(gatedModel, gatedRay, cancellation)) {
+                        val clause = if (learn) numericalPremiseClause(filter.relaxation, session, cancellation)
+                            else null
+                        if (cancellation()) return LpNodeOutcome(false, null)
+                        sink.lp.observeInfeasiblePrune()
+                        observeNumericalConsumption("GATED_CONFLICT")
+                        hints?.recordInfeasible()
+                        return LpNodeOutcome(true, null, clause)
+                    }
+                    return@let
+                }
                 val ray = solveContext.certificationPolicy.acceptNullable(
                     LpCertifier.EXACT_FARKAS,
                     certifyLpFarkas(gatedModel.alsoCharged(this), gatedRay, onRoute = {
@@ -495,7 +516,7 @@ internal fun LpEngine.sparseSafePrune(
             spread.rowRatio,
         )
     }
-    if (model.rowStrict.any { it }) {
+    if (!solveContext.certificationPolicy.numericalDeductions && model.rowStrict.any { it }) {
         strictSourcePrune(relaxation, session, bound, sink, cancellation, learn)?.let { return it }
     }
     val attempted = solveNode(model, warm, cancellation)
@@ -523,8 +544,18 @@ internal fun LpEngine.sparseSafePrune(
     }
     if (floatResult == null) observeNodeWorkStop(simplex)
     val result = floatResult ?: run {
-        if (pruneWithComponentBound(relaxation, simplex, bound, sink, cancellation)) {
+        if (pruneWithComponentBound(relaxation, session, simplex, bound, sink, cancellation)) {
             return LpNodeOutcome(true, null)
+        }
+        if (solveContext.certificationPolicy.numericalDeductions) {
+            val ray = simplex.infeasibleRay
+            if (ray == null || !numericalConflict(model, ray, cancellation)) return LpNodeOutcome(false, null)
+            val clause = if (learn) numericalPremiseClause(relaxation, session, cancellation) else null
+            if (cancellation()) return LpNodeOutcome(false, null)
+            sink.lp.observeInfeasiblePrune()
+            observeNumericalConsumption("CONFLICT")
+            hints?.recordInfeasible()
+            return LpNodeOutcome(true, null, clause)
         }
         if (lpCounterResults.read(model, solveContext.certificationPolicy)?.witness != null) {
             return LpNodeOutcome(false, null)
@@ -654,6 +685,23 @@ internal fun LpEngine.sparseSafePrune(
                 }
             }
         }
+    }
+    if (solveContext.certificationPolicy.numericalDeductions) {
+        hints?.recordPoint(boundRel, boundRes)
+        val lower = numericalObjectiveBound(boundRel.model, boundRes.duals, cancellation)
+        var prune = lower != null && applyNumericalBound(boundRel, lower, bound, session,
+            objectiveVar, objectiveAscending, cancellation, learn)
+        if (!prune && canFix && lower != null) {
+            val timer = LpPhaseTimer(sink.lp.certificationObserver(LpRoute.NODE), LpSolvePhase.NUMERICAL_FIXING)
+            val before = totalSolveWork()
+            try {
+                prune = applyNumericalFixing(boundRel, boundRes.duals, lower, bound, session, objectiveVar,
+                    objectiveAscending, objectiveCeiling, cancellation, learn)
+            } finally {
+                timer.finish(if (prune) "CONFLICT" else "COMPLETE", totalSolveWork() - before)
+            }
+        }
+        return LpNodeOutcome(prune, if (prune) null else optimalBasis)
     }
     // The exact basis-certificate backs the prune bound, the learnable objective-bound reason and the
     // reduced-cost fixing. Compute it once when any of them needs it; a singular/unbounded certify
@@ -823,6 +871,7 @@ internal fun LpEngine.sparseSafePrune(
 
 private fun LpEngine.pruneWithComponentBound(
     relaxation: LpRelaxation,
+    session: PropagationSession,
     solver: LpSolver,
     cutoff: Double,
     sink: SolveStatsSink,
@@ -830,6 +879,18 @@ private fun LpEngine.pruneWithComponentBound(
 ): Boolean {
     val component = solver as? ComponentLpSolverCapability ?: return false
     if (!cutoff.isFinite() || cancellation()) return false
+    if (solveContext.certificationPolicy.numericalDeductions) {
+        val model = relaxation.model
+        val copyWork = 8L * (model.m.toLong() + model.n)
+        if (model.m.toLong() * Double.SIZE_BYTES > numericalCheckingAllocation() ||
+            copyWork >= numericalNodeWorkRemaining()
+        ) return false
+        noteNumericalWork(copyWork)
+        val duals = component.partialBoundDuals(cancellation) ?: return false
+        val lower = numericalObjectiveBound(model, duals, cancellation) ?: return false
+        return applyNumericalBound(relaxation, lower, cutoff, session,
+            -1, false, cancellation, false)
+    }
     noteNodeOverhead(relaxation.model.extent() * LpNodeOverhead.EXACT)
     if (lpWorkAllowanceSpent() || cancellation()) return false
     val observer = sink.lp.certificationObserver(LpRoute.NODE)
@@ -862,6 +923,7 @@ private fun LpEngine.applyMixedRowBounds(
     relaxer: CpToLpRelaxation? = null,
     onRefresh: () -> Unit = {},
 ): Boolean {
+    if (!solveContext.certificationPolicy.canCompute(LpCertifier.INTEGER)) return false
     var current = relaxation
     val initialWork = meter.work
     try {
@@ -1263,21 +1325,24 @@ private fun LpEngine.permitsIntegralObjectiveCutoff(cert: LpDeductionCertificate
     return rows.isNotEmpty() || problem.numRealVars > 0
 }
 
-private fun LpEngine.sourceObjectiveRange(relaxation: LpRelaxation): LongRange? {
+internal fun LpEngine.sourceObjectiveRange(relaxation: LpRelaxation): LongRange? {
     val model = relaxation.model
-    if (!model.finiteExactInput() || !model.hasIntegralObjective()) return null
+    if (!model.objConstantD.isFinite()) return null
     val source = model.exactState?.model
     source?.objective?.let {
         if (it.scale.value != BigFraction.ONE || !it.externalConstant.value.isZero) return null
     }
     if (source == null && model.exactConstant() != BigFraction.ofLong(model.objConstant)) return null
     val objectiveConstant = ExactLpNumber.of(model.exactConstant()).exactLong() ?: return null
-    fun costAt(column: Int): Long? = if (source != null) {
-        source.objective.cost(column).exactLong()
-    } else if (model.doubleView == null) {
-        model.cost[column]
-    } else {
-        model.cost[column].takeIf { model.exactCost(column) == BigFraction.ofLong(it) }
+    fun costAt(column: Int): Long? {
+        if (!model.costD(column).isFinite()) return null
+        return if (source != null) {
+            source.objective.cost(column).exactLong()
+        } else if (model.doubleView == null) {
+            model.cost[column]
+        } else {
+            model.cost[column].takeIf { model.exactCost(column) == BigFraction.ofLong(it) }
+        }
     }
     val constant = Int128().also {
         it.addLong(objectiveConstant)
@@ -1286,7 +1351,8 @@ private fun LpEngine.sourceObjectiveRange(relaxation: LpRelaxation): LongRange? 
     for (j in 0 until model.numVars) {
         val cost = costAt(j) ?: return null
         if (cost == 0L) continue
-        if (j >= model.n || model.colContinuous[j]) return null
+        if (j >= model.n || model.colContinuous[j] || source?.column(j)?.integral == false) return null
+        if (!model.loShiftD(j).isFinite()) return null
         if (source == null && model.exactShift(j) != BigFraction.ofLong(model.loShift[j])) return null
         val origin = ExactLpNumber.of(model.exactShift(j)).exactLong() ?: return null
         val shift = Int128().also { it.addProduct(cost, origin) }
@@ -1324,7 +1390,7 @@ private fun enclosingCutoff(bound: Double): BigFraction? {
     return BigFraction.ofDouble(if (abs(bound) >= EXACT_INTEGER_DOUBLE_LIMIT) bound.nextUp() else bound)
 }
 
-private fun LpEngine.sourceObjectiveCutoff(
+internal fun LpEngine.sourceObjectiveCutoff(
     relaxation: LpRelaxation,
     bound: Double,
     sourceRange: LongRange? = sourceObjectiveRange(relaxation),
@@ -1339,10 +1405,10 @@ private fun LpEngine.sourceObjectiveCutoff(
     }
 }
 
-private fun LpRelaxation.objectiveVariableLowerBound(variable: Int, lower: BigFraction): Long? =
+internal fun LpRelaxation.objectiveVariableLowerBound(variable: Int, lower: BigFraction): Long? =
     objectiveVariableValue(variable, lower)?.ceilLong()
 
-private fun LpRelaxation.objectiveVariableValue(variable: Int, value: BigFraction): BigFraction? {
+internal fun LpRelaxation.objectiveVariableValue(variable: Int, value: BigFraction): BigFraction? {
     val column = intColOf.getOrNull(variable) ?: return null
     if (column !in 0 until model.n || colVarId[column] != variable || colIsBool[column]) return null
     val coefficient = model.exactCost(column)
@@ -1391,6 +1457,12 @@ internal fun LpEngine.sparseCertifiedPrune(
     }
     if (result == null) return LpNodeOutcome(false, null)
     if (cancellation()) return LpNodeOutcome(false, null) // honor the deadline before the exact certify
+    if (solveContext.certificationPolicy.numericalDeductions) {
+        val lower = numericalObjectiveBound(relaxation.model, result.duals, cancellation)
+            ?: return LpNodeOutcome(false, null)
+        return LpNodeOutcome(applyNumericalBound(relaxation, lower, bound, session, -1, false,
+            cancellation, false), null)
+    }
     // Both bounds are sound for any duals and neither dominates, so the larger wins: the
     // integer-multiplier bound carries no rounding margin, the float one never declines. A null (neither
     // available) keeps the node.
@@ -1525,13 +1597,16 @@ private fun LpEngine.retainedRootLpRelaxationBound(
                     ("RootPauses" to ((sink.lp.sparseTrial["RootPauses"] ?: 0L) + 1L))
                 observeNodePause()
                 if (sparseTrialActive && ownsRootPrimalModel(relaxation.model)) {
-                    observeStage("AT_PAUSED_CERTIFICATION")
+                    observeStage(if (solveContext.certificationPolicy.numericalDeductions)
+                        "AT_PAUSED_NUMERICAL_BOUND" else "AT_PAUSED_CERTIFICATION")
                     val lower = retainedRootLowerBound(relaxation.model, null, cancellation, pausedProposal = true)
-                    val bound = if (cancellation()) Double.NaN else projectCertifiedLowerBound(relaxation, lower)
+                    val bound = if (cancellation()) Double.NaN else projectCertifiedLowerBound(relaxation, lower,
+                        cancellation = cancellation)
                     if (!bound.isNaN() && !cancellation()) {
                         pausedBound = if (pausedBound.isNaN()) bound else maxOf(pausedBound, bound)
-                        sink.lp.sparseTrial = sink.lp.sparseTrial + ("PausedCertifiedBounds" to
-                            ((sink.lp.sparseTrial["PausedCertifiedBounds"] ?: 0L) + 1L))
+                        val key = if (solveContext.certificationPolicy.numericalDeductions) "PausedNumericalBounds"
+                            else "PausedCertifiedBounds"
+                        sink.lp.sparseTrial = sink.lp.sparseTrial + (key to ((sink.lp.sparseTrial[key] ?: 0L) + 1L))
                     }
                 }
                 continue
@@ -1544,21 +1619,24 @@ private fun LpEngine.retainedRootLpRelaxationBound(
             if (attempt.second?.optimal != true) {
                 retainRootPartialPrimalGuidance(relaxation, component, cancellation)
             }
-            observeStage("AT_CERTIFICATION")
+            observeStage(if (solveContext.certificationPolicy.numericalDeductions) "AT_NUMERICAL_BOUND"
+                else "AT_CERTIFICATION")
             val lower = retainedRootLowerBound(
                 relaxation.model, attempt.second, cancellation,
                 component,
             )
             retainRootPrimalGuidance(relaxation, attempt.second, cancellation)
             val stopped = cancellation()
-            val bound = if (stopped) Double.NaN else projectCertifiedLowerBound(relaxation, lower)
+            val bound = if (stopped) Double.NaN else projectCertifiedLowerBound(relaxation, lower,
+                cancellation = cancellation)
             observeStage(
                 when {
                     bound.isNaN() && !pausedBound.isNaN() -> "PAUSED_BOUND"
                     stopped -> "CANCELLED_AFTER_QUERY"
                     attempt.second == null && !bound.isNaN() -> "PARTIAL_BOUND"
                     attempt.second == null -> "NO_FLOAT_${attempt.first.lastTermination?.name ?: "NO_TERMINATION"}"
-                    lower == null -> "CERTIFICATE_DECLINED"
+                    lower == null -> if (solveContext.certificationPolicy.numericalDeductions) "NUMERICAL_DECLINED"
+                        else "CERTIFICATE_DECLINED"
                     bound.isNaN() -> "SOURCE_PROJECTION_DECLINED"
                     else -> "BOUND"
                 },
@@ -1597,7 +1675,9 @@ private fun LpEngine.standaloneRootLpRelaxationBound(
             }
         }
         val lower = result?.let {
-            if (retainedRootEnabled) {
+            if (solveContext.certificationPolicy.numericalDeductions) {
+                numericalObjectiveBound(relaxation.model, it.duals, cancellation, root = true)?.value
+            } else if (retainedRootEnabled) {
                 retainedRootLowerBound(relaxation.model, it, cancellation)
             } else {
                 certifiedTightObjectiveLowerBound(
@@ -1609,7 +1689,7 @@ private fun LpEngine.standaloneRootLpRelaxationBound(
             }
         }
         retainRootPrimalGuidance(relaxation, result, cancellation)
-        projectCertifiedLowerBound(relaxation, lower)
+        projectCertifiedLowerBound(relaxation, lower, cancellation = cancellation)
     }
 }
 
@@ -1621,6 +1701,18 @@ private fun LpEngine.retainedRootLowerBound(
     pausedProposal: Boolean = false,
 ): Double? {
     if (result == null && component == null && !pausedProposal) return null
+    if (solveContext.certificationPolicy.numericalDeductions) {
+        val duals = result?.duals ?: run {
+            val copyWork = 8L * (model.m.toLong() + model.n)
+            if (model.m.toLong() * Double.SIZE_BYTES > numericalCheckingAllocation() ||
+                copyWork >= retainedRootRemainingWork() || cancellation()
+            ) return null
+            noteNumericalWork(copyWork, root = true)
+            if (pausedProposal) propagator.pausedDualProposal(cancellation)
+                else component?.partialBoundDuals(cancellation)
+        } ?: return null
+        return numericalObjectiveBound(model, duals, cancellation, root = true)?.value
+    }
     val projectionWork = model.extent() * LpNodeOverhead.EXACT
     val snapshotWork = if (pausedProposal) 8L * model.m else 0L
     if (retainedRootRemainingWork() <= projectionWork + snapshotWork || cancellation()) return null
@@ -1683,6 +1775,13 @@ private fun LpEngine.checkRetainedRootBound(
 
 private fun LpEngine.recordRootQueryBound(relaxation: LpRelaxation, result: FloatLpResult) {
     if (!measuresRootQueries) return
+    if (solveContext.certificationPolicy.numericalDeductions) {
+        val lower = numericalObjectiveBound(relaxation.model, result.duals, params.cancellation)
+        if (!params.cancellation()) {
+            recordRootLowerBound(projectCertifiedLowerBound(relaxation, lower?.value, root = false))
+        }
+        return
+    }
     val lower = certifiedTightObjectiveLowerBound(
         relaxation.model.alsoCharged(this),
         result.duals,
@@ -1692,9 +1791,24 @@ private fun LpEngine.recordRootQueryBound(relaxation: LpRelaxation, result: Floa
     if (!params.cancellation()) recordRootLowerBound(projectCertifiedLowerBound(relaxation, lower))
 }
 
-private fun LpEngine.projectCertifiedLowerBound(relaxation: LpRelaxation, lower: Double?): Double {
+private fun LpEngine.projectCertifiedLowerBound(
+    relaxation: LpRelaxation,
+    lower: Double?,
+    root: Boolean = true,
+    cancellation: Cancellation = params.cancellation,
+): Double {
+    if (solveContext.certificationPolicy.numericalDeductions) {
+        val remaining = if (root) retainedRootRemainingWork() else numericalNodeWorkRemaining()
+        if (remaining < 8L) return Double.NaN
+        noteNumericalWork(8L, root)
+        if (cancellation()) return Double.NaN
+    }
     val full = lower?.let { BigFraction.ofDouble(it) }?.plus(BigFraction.ofLong(relaxation.objectiveConstant))
     val projected = full?.lowerBoundDouble() ?: return Double.NaN
+    if (solveContext.certificationPolicy.numericalDeductions) {
+        return (projected - com.eignex.klause.lp.engine.FLOAT_EVIDENCE_TOLERANCE * maxOf(1.0, abs(projected)))
+            .nextDown()
+    }
     val integral = relaxation.model.hasIntegralObjective()
     return when {
         integral && sourceObjectiveRange(relaxation) == null -> Double.NaN

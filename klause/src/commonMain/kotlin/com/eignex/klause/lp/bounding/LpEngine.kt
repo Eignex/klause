@@ -1035,6 +1035,23 @@ internal class LpEngine(
         return if (containing == 0L) offered else minOf(containing, offered)
     }
 
+    internal fun numericalNodeWorkRemaining(): Long {
+        val cap = com.eignex.klause.lp.engine.LP_DEFAULT_DEDUCTION_WORK
+        var remaining = cap - minOf(cap, pendingNumericalWork)
+        lpEffortGovernor.remainingWork()?.let { remaining = minOf(remaining, it) }
+        nodeWorkAllowance()?.let { remaining = minOf(remaining, it.coerceAtLeast(0L)) }
+        return remaining
+    }
+
+    internal fun noteNumericalWork(work: Long, root: Boolean = false) {
+        if (!root) pendingNumericalWork = saturatingAdd(pendingNumericalWork, work)
+        noteNodeOverhead(work)
+    }
+
+    internal fun numericalCheckingAllocation(): Long = if (sparseTrialActive) {
+        minOf(SPARSE_LP_CHECKING_ALLOCATION, sink.lp.sparseTrial["CheckingReservedBytes"] ?: 0L)
+    } else SPARSE_LP_CHECKING_ALLOCATION
+
     internal fun nodePreparationWorkBudget(): Long = if (sparseTrialActive) {
         nodeWorkBudget()
     } else if (separateNodePreparation) {
@@ -1065,6 +1082,7 @@ internal class LpEngine(
 
     // Work the current node's LP has charged, across its base, cut-augmented and recovery solves.
     private var pendingSolveOps = 0L
+    private var pendingNumericalWork = 0L
     private var nodeWorkStoppedAfterProgress = false
 
     /** Add one solve's work to the current node's total. */
@@ -1688,6 +1706,7 @@ internal class LpEngine(
             lpEffortGovernor.observeSolve(pendingSolveOps, outcome.prune,
                 nodeWorkStoppedAfterProgress && outcome.basis == null)
             pendingSolveOps = 0L
+            pendingNumericalWork = 0L
             if (lpEffortGovernor.isDemoted) sink.lp.observeDemoted()
             lpPivotBudget.observe(pruned = outcome.prune, couldPrune = effectiveBound.isFinite())
             if (outcome.basis != null) {
