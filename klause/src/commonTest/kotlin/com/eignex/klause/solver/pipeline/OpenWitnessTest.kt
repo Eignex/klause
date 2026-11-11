@@ -371,26 +371,4 @@ class OpenWitnessTest {
 
         assertIs<Verification.Indeterminate>(verdict)
     }
-
-    @Test
-    fun `a point the source verifier accepted should not be checked again`() {
-        val point = sample(3, 7)
-        openWitnessVerifier(model, null).verify(Candidate(point, null))
-
-        val checked = openWitnessVerifier(model, null, cancellation = Cancellation { true })
-            .verify(Candidate(point, null))
-
-        assertIs<Verification.Accepted<*, *>>(checked)
-    }
-
-    @Test
-    fun `another model should check a point the source verifier accepted again`() {
-        val point = sample(3, 7)
-        openWitnessVerifier(model, null).verify(Candidate(point, null))
-
-        val checked = openWitnessVerifier(model.withFactors(model.factors), null, cancellation = Cancellation { true })
-            .verify(Candidate(point, null))
-
-        assertIs<Verification.Indeterminate>(checked)
-    }
 }

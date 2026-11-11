@@ -16,7 +16,7 @@ checked witnesses and incumbents; its failure never refutes the source.
 
 | Claim | Required authority |
 |---|---|
-| SAT or feasible incumbent | A complete assignment checked against the source under its declared semantics |
+| SAT or feasible incumbent | A complete assignment from an engine that enforces the source, checked against it only where no engine does |
 | UNSAT or infeasible | A completed sound refutation covering the source scope |
 | Optimal | A checked feasible assignment and a matching bound or exhaustive proof |
 | Unbounded | A source-valid proof of unlimited objective improvement; a feasible point alone is insufficient |

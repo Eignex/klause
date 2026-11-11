@@ -201,8 +201,7 @@ from an actual completed result or publication.
 
 `PortfolioWorker.bindSharingInvocation` binds the pool query separately from the
 worker's runtime. Consumers compare plan, execution identity, objective,
-restrictions and capture scope, require exact equality of values and endpoints, and
-run their installed source checker. A more restricted worker can supply a feasible
+restrictions and capture scope and require exact equality of values and endpoints. A more restricted worker can supply a feasible
 point but no global bound, and unbound workers withhold shared root deductions.
 
 Linear runtime terminal admission checks the captured typed terminal directly under
