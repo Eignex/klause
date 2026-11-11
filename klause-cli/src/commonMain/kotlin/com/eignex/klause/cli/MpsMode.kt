@@ -157,15 +157,33 @@ internal class MpsOutput(
     private var bestObjective: Long? = null
     private var linearSource: LinearSourceOutcome? = null
     private var nativeOptimumExact = false
+    private var numericalLinearOptimum = false
 
     override fun onLinearSourceResult(result: SourceExecutionResult) {
         val qualified = result.linearSource ?: return
         linearSource = qualified
-        nativeOptimumExact = if (result is SourceExecutionResult.Finite) {
+        nativeOptimumExact = !qualified.numericalClaims && if (result is SourceExecutionResult.Finite) {
             (result.result.outcome as? FiniteSolveOutcome.Completed)?.bestSample?.let {
                 it.numRealVars == 0 || it.exactReals != null
             } == true
         } else qualified.nativeConclusion == LinearSourceConclusion.OPTIMAL
+    }
+
+    override fun onLinearResult(result: com.eignex.klause.solver.result.LinearOptimizationResult) {
+        val native = result.numerical ?: return
+        numericalLinearOptimum = native.optimal
+        val source = linearSource
+        val bound = if (source == null) native.bound else source.numericalObjectiveBound
+        val gap = if (source == null) native.relativeGap else source.numericalRelativeGap
+        val sense = source?.source?.objective?.sense ?: result.scope.objective?.sense
+        val direction = if (sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE) "lower" else "upper"
+        println("c lpDeductionAuthority=numerical")
+        println("c numericalObjectiveTolerance=" + native.objectiveTolerance)
+        bound?.let {
+            println("c numericalObjectiveBoundDirection=$direction")
+            println("c numericalObjectiveBound=$it")
+        }
+        gap?.let { println("c numericalRelativeGap=$it") }
     }
 
     override fun acceptsSourceWitness(): Boolean = sourceWitnessAccepted()
@@ -258,6 +276,9 @@ internal class MpsOutput(
     override fun keepStat(key: String): Boolean = true
 
     override fun completionMetadata(verdict: Verdict): String? {
+        if (linearSource == null && numericalLinearOptimum && verdict == Verdict.OPTIMAL) {
+            return "optimizationStatus=tolerance-optimum"
+        }
         linearSource?.let { source ->
             if (best == null) return null
             if (verdict == Verdict.OPTIMAL && source.conclusion == LinearSourceConclusion.OPTIMAL) {

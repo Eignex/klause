@@ -238,6 +238,17 @@ internal class MiniZincOutput(
     }
 
     override fun onLinearResult(result: LinearOptimizationResult) {
+        result.numerical?.let { numerical ->
+            val direction = if (result.scope.objective?.sense == ObjectiveSense.MINIMIZE) "lower" else "upper"
+            println("% lpDeductionAuthority=numerical")
+            println("% numericalObjectiveTolerance=" + numerical.objectiveTolerance)
+            if (numerical.optimal) println("% optimizationStatus=tolerance-optimum")
+            numerical.bound?.let {
+                println("% numericalObjectiveBoundDirection=$direction")
+                println("% numericalObjectiveBound=$it")
+            }
+            numerical.relativeGap?.let { println("% numericalRelativeGap=$it") }
+        }
         val claim = result.terminal?.claim as? SourceClaim.Limit ?: return
         val sense = result.scope.objective?.sense ?: return
         unattainedLimit(claim.value, sense, strict = true)

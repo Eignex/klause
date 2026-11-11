@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.Term
+import com.eignex.klause.lp.engine.FLOAT_EVIDENCE_TOLERANCE
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -15,6 +16,7 @@ import com.eignex.klause.solver.validation.checkLinearSourceWitness
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
+import kotlin.math.abs
 
 /** Conclusion under the captured linear source certification and acceptance policy. */
 enum class LinearSourceConclusion {
@@ -61,9 +63,26 @@ class LinearSourceOutcome internal constructor(
     val objectiveScale: BigFraction,
     /** Native nominal-source global bound; independent proof validation is separate. */
     val nativeObjectiveBound: LinearSourceBound? = null,
+    private val numericalLp: Boolean = false,
+    /** Numerical global objective bound in original declaration units, separate from exact bounds. */
+    val numericalObjectiveBound: Double? = null,
 ) {
     /** Whether terminal statuses use numerical tolerance policy rather than exact source certification. */
-    val numericalClaims: Boolean get() = source.semantics.effective.feasibilityTolerance?.isExact == false
+    val numericalClaims: Boolean get() = numericalLp ||
+        source.semantics.effective.feasibilityTolerance?.isExact == false
+
+    /** Relative LP objective tolerance, absent when no numerical LP deduction was retained. */
+    val numericalObjectiveTolerance: Double? get() = if (numericalLp) FLOAT_EVIDENCE_TOLERANCE else null
+
+    /** Relative numerical gap in original declaration units, absent without a finite point and bound. */
+    val numericalRelativeGap: Double? get() {
+        val bound = numericalObjectiveBound ?: return null
+        val value = incumbent?.objective?.toDouble()?.takeIf { it.isFinite() } ?: return null
+        val scale = maxOf(1.0, abs(value), abs(bound))
+        val difference = if (source.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE)
+            value / scale - bound / scale else bound / scale - value / scale
+        return (difference / (maxOf(1.0, abs(value)) / scale)).coerceAtLeast(0.0).takeIf { it.isFinite() }
+    }
 }
 
 internal fun PreparedLinearSource.check(sample: Sample, stop: Cancellation): LinearSourceCheck {
@@ -199,6 +218,8 @@ internal fun executeLinearSource(
         stop = stop or scope
         finiteUnrestricted = unrestricted
     }
+    var numericalLp = false
+    var numericalBound: Double? = null
     var native = LinearSourceConclusion.UNKNOWN
     var nativeOptimalValue: BigFraction? = null
     var nativeOptimum: LinearSourceWitness? = null
@@ -212,6 +233,18 @@ internal fun executeLinearSource(
         assignment?.let { checked(prepared.check(it, stop)) }
     fun linear(result: com.eignex.klause.solver.result.LinearOptimizationResult) {
         val point = sample(result.incumbent)
+        numericalLp = result.numerical != null && result.terminal == null
+        numericalBound = prepared.qualifyNumericalBound(result.numerical, finiteUnrestricted)
+        if (result.terminal == null && result.numerical?.infeasible == true && point == null) {
+            native = LinearSourceConclusion.UNSATISFIABLE
+            return
+        }
+        if (result.terminal == null && result.numerical?.optimal == true && point != null) {
+            nativeOptimum = point
+            nativeOptimalValue = result.value
+            native = LinearSourceConclusion.OPTIMAL
+            return
+        }
         native = when (val claim = result.terminal?.claim) {
             is SourceClaim.Optimal -> {
                 nativeOptimum = point
@@ -240,6 +273,9 @@ internal fun executeLinearSource(
         is SourceExecutionResult.Prepared -> return result
         is SourceExecutionResult.Finite -> (result.result.outcome as? FiniteSolveOutcome.Completed)?.let { completed ->
             val point = sample(completed.bestSample)
+            numericalLp = completed.stats.lp.phases.keys.any {
+                it.startsWith("NUMERICAL_CONSUMPTION_") || it.startsWith("NUMERICAL_FIXING_")
+            }
             native = when (completed.verdict) {
                 FiniteSolveVerdict.OPTIMAL -> {
                     nativeOptimum = point
@@ -355,7 +391,8 @@ internal fun executeLinearSource(
     } else {
         true
     }
-    val numerical = prepared.view.source.semantics.effective.feasibilityTolerance?.isExact == false
+    val numerical = numericalLp ||
+        prepared.view.source.semantics.effective.feasibilityTolerance?.isExact == false
     val equivalent = prepared.view.exact && prepared.claimsCoverTolerance && nativeClaimsUnrestricted
     val acceptedOptimal = incumbent?.objective?.let { value -> value == prepared.acceptedObjectiveBound } == true
     val nativeOptimalAttained = nativeOptimum?.let { point ->
@@ -393,7 +430,8 @@ internal fun executeLinearSource(
         prepared.view.source, incumbent, native, conclusion,
         prepared.view.exact, prepared.view.constraintsExact, prepared.claimsCoverTolerance,
         prepared.acceptedObjectiveBound,
-        nativeClaimsUnrestricted, prepared.view.objectiveScale, bound,
+        nativeClaimsUnrestricted, prepared.view.objectiveScale, bound, numericalLp,
+        numericalBound.takeIf { nativeClaimsUnrestricted },
     )
     return when (result) {
         is SourceExecutionResult.Prepared -> result

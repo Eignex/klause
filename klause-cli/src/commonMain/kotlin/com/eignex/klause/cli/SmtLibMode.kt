@@ -183,6 +183,16 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
 
     override fun onLinearResult(result: LinearOptimizationResult) {
         linearResult = result
+        result.numerical?.let { numerical ->
+            val direction = if (result.scope.objective?.sense == ObjectiveSense.MINIMIZE) "lower" else "upper"
+            println("; lpDeductionAuthority=numerical")
+            println("; numericalObjectiveTolerance=" + numerical.objectiveTolerance)
+            numerical.bound?.let {
+                println("; numericalObjectiveBoundDirection=$direction")
+                println("; numericalObjectiveBound=$it")
+            }
+            numerical.relativeGap?.let { println("; numericalRelativeGap=$it") }
+        }
         val bound = when (val claim = result.terminal?.claim) {
             is SourceClaim.Optimal -> SourceClaim.Bound(claim.value)
             is SourceClaim.Limit -> SourceClaim.Bound(claim.value, strict = true)
@@ -203,7 +213,9 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
 
     override fun completionMetadata(verdict: Verdict): String? {
         if (!optimize) return null
-        val status = if (linearResult?.terminal?.claim is SourceClaim.Limit) {
+        val status = if (linearResult?.numerical?.optimal == true) {
+            "tolerance-optimum"
+        } else if (linearResult?.terminal?.claim is SourceClaim.Limit) {
             if (linearResult?.scope?.objective?.sense == ObjectiveSense.MINIMIZE) {
                 "unattained-infimum"
             } else {

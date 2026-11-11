@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLpPolicy
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest
 import com.eignex.klause.lp.optimization.atScope
@@ -75,7 +76,8 @@ internal class JointLinearRepair(
     private val state = OpenTheorySolveState(params)
     private val funding = SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
     private val budget = SourceLpBudget(maxOperations = params.sourceLpOperations,
-        onWork = state.smt::observeSourceLp, funding = funding)
+        onWork = state.smt::observeSourceLp, funding = funding,
+        solveContext = { LpSolveContext.forMode(params.lpMode) })
     private val stages = linkedMapOf<String, Long>()
     private val centerProgress = if (params.sourceRefutationCenterStep)
         JointRepairCenter(model, budget, stop) { selection?.eligibleInteger(it) == true } else null

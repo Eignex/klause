@@ -19,6 +19,41 @@ import kotlin.test.assertTrue
 
 class LinearNumericalResultTest {
     @Test
+    fun `numerical completion should apply its declared tolerance on both sides of the bound`() {
+        for (sense in listOf(ObjectiveSense.MINIMIZE, ObjectiveSense.MAXIMIZE)) {
+            val scope = SourceScope(SourceRevision("numeric-result-tolerance", "linear"),
+                objective = SourceObjective("x", sense))
+            val source = SourceProofContext(scope, emptySet(), emptyMap(), emptyMap())
+            val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical })
+            val claim = assertNotNull(LinearNumericalClaim.create(source, 2.0, false, budget, Cancellation.Never))
+            for (sign in listOf(-1.0, 1.0)) {
+                val near = assertNotNull(BigFraction.ofDouble(2.0 + sign * 0.0000001))
+                val far = assertNotNull(BigFraction.ofDouble(2.0 + sign * 0.00001))
+
+                assertTrue(LinearNumericalResult(claim, near, true).optimal)
+                assertFalse(LinearNumericalResult(claim, far, true).optimal)
+            }
+        }
+    }
+
+    @Test
+    fun `a numerical bound contradicted by an incumbent should withhold optimum status`() {
+        for (sense in listOf(ObjectiveSense.MINIMIZE, ObjectiveSense.MAXIMIZE)) {
+            val scope = SourceScope(SourceRevision("numeric-result-contradiction", "linear"),
+                objective = SourceObjective("x", sense))
+            val source = SourceProofContext(scope, emptySet(), emptyMap(), emptyMap())
+            val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical })
+            val claim = assertNotNull(LinearNumericalClaim.create(source, 2.0, false, budget, Cancellation.Never))
+            val value = BigFraction.ofLong(if (sense == ObjectiveSense.MINIMIZE) 1L else 3L)
+
+            val result = LinearNumericalResult(claim, value, true)
+
+            assertFalse(result.optimal)
+            assertTrue(result.contradicts(value))
+        }
+    }
+
+    @Test
     fun `numerical result bounds should retain source direction and relative gap`() {
         for (sense in listOf(ObjectiveSense.MINIMIZE, ObjectiveSense.MAXIMIZE)) {
             val scope = SourceScope(SourceRevision("numeric-result-gap", "linear"),

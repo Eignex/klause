@@ -4,6 +4,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLpPolicy
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.withLinearAuthority
@@ -37,6 +38,29 @@ class LinearAuthorityInvocationTest {
         SourceRevision("conditioned-linear", "exact-affine"),
         objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
     )
+
+    @Test
+    fun `source invocation should use the selected LP mode independently of arithmetic semantics`() {
+        val source = SourceProofContext(scope, setOf(real), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
+                BigFraction.ofLong(-2))),
+            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(3))),
+        ), mapOf(real to BigFraction.ONE))
+        for (mode in LpCertificationMode.entries) {
+            val result = LinearAuthorityInvocation(source, TheoryParams(lpMode = mode, sourceCuts = false),
+                boundOrdered = true).use { it.run { _, _ -> } }
+
+            assertEquals(TerminationReason.SearchExhausted, result.reason)
+            if (mode == LpCertificationMode.NUMERICAL) {
+                assertTrue(assertNotNull(result.numerical).optimal)
+                assertNull(result.terminal)
+                assertNull(result.bound)
+            } else {
+                assertIs<SourceClaim.Optimal>(assertNotNull(result.terminal).claim)
+                assertNull(result.numerical)
+            }
+        }
+    }
 
     @Test
     fun `a borrowed numerical authority should publish numerical completion without exact evidence`() {

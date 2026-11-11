@@ -18,10 +18,11 @@ class LinearNumericalResult internal constructor(
     val bound: Double? = claim.bound
     /** Whether the complete source is numerically infeasible under the selected LP policy. */
     val infeasible: Boolean = complete && claim.infeasible
-    /** Whether the accepted incumbent reaches the global bound within [objectiveTolerance]. */
-    val optimal: Boolean = complete && !claim.infeasible && value?.let(claim::reaches) == true
     /** Relative objective comparison tolerance, with an absolute floor at unit objective magnitude. */
     val objectiveTolerance: Double = FLOAT_EVIDENCE_TOLERANCE
+    /** Whether the accepted incumbent reaches the global bound within [objectiveTolerance]. */
+    val optimal: Boolean = complete && !claim.infeasible &&
+        value?.let { claim.reaches(it) && !contradicts(it) } == true
     /** Nonnegative relative numerical gap, scaled by max(1, abs(incumbent)); null without finite values. */
     val relativeGap: Double? = value?.toDouble()?.takeIf { it.isFinite() }?.let { standing ->
         bound?.let { bound ->
@@ -30,6 +31,15 @@ class LinearNumericalResult internal constructor(
                 standing / scale - bound / scale else bound / scale - standing / scale
             (difference / (maxOf(1.0, abs(standing)) / scale)).coerceAtLeast(0.0).takeIf { it.isFinite() }
         }
+    }
+
+    internal fun contradicts(value: BigFraction): Boolean {
+        val bound = bound ?: return infeasible
+        val standing = value.toDouble()
+        if (!standing.isFinite()) return true
+        val tolerance = objectiveTolerance * maxOf(1.0, abs(standing))
+        return if (scope.objective?.sense == ObjectiveSense.MINIMIZE) bound > standing + tolerance
+            else bound < standing - tolerance
     }
 
     internal fun partial(value: BigFraction?): LinearNumericalResult? =

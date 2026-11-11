@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.LinearOptimizationResult
@@ -39,5 +40,17 @@ internal fun LinearOptimizationResult.verifyRuntimeTerminal(
             is SourceEvidenceCheck.Unavailable -> return Verification.Indeterminate(checked.reason)
         }
     }
-    return verifyTerminal(original, cancellation)
+    val native = numerical
+    return if (terminal == null && native != null && (native.optimal || native.infeasible)) {
+        when {
+            cancellation() -> Verification.Indeterminate("numerical linear completion was cancelled")
+            native.scope != scope || !native.claim.isFor(original) ->
+                Verification.Rejected("numerical linear completion has another source binding")
+            native.infeasible && incumbent != null ->
+                Verification.Rejected("numerical linear refutation has a source incumbent")
+            native.optimal && (incumbent == null || value == null || native.contradicts(value)) ->
+                Verification.Rejected("numerical linear optimum lacks a compatible source incumbent")
+            else -> Verification.Accepted(Candidate(Unit, Unit))
+        }
+    } else verifyTerminal(original, cancellation)
 }

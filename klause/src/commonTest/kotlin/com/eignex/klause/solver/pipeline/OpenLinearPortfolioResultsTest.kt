@@ -6,6 +6,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.simplex.exact.BigFraction
@@ -28,10 +29,31 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class OpenLinearPortfolioResultsTest {
+    @Test
+    fun `the default numerical portfolio should retain global authority without exact terminal evidence`() {
+        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(2.0), realUpper = doubleArrayOf(3.0))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        for (maximize in listOf(false, true)) {
+            val execution = assertIs<OpenTheoryExecution.Optimize>(OpenTheoryPipeline.execute(
+                OpenTheoryRequest(model, objective, maximize), TheoryParams(sourceCuts = false),
+                FiniteEngine.MIXED, 1, null))
+
+            val authority = assertNotNull(execution.result.linearResult)
+
+            val numerical = assertNotNull(authority.numerical)
+            assertTrue(numerical.optimal)
+            assertEquals(if (maximize) 3.0 else 2.0, numerical.bound)
+            assertNull(authority.terminal)
+            assertNull(authority.bound)
+        }
+    }
+
     @Test
     fun `a captured real pin should keep its ordinary portfolio invocation`() {
         val model = Problem(
@@ -59,7 +81,7 @@ class OpenLinearPortfolioResultsTest {
             val result = assertIs<OpenTheoryExecution.Optimize>(
                 OpenTheoryPipeline.execute(
                     request,
-                    TheoryParams(openWorkLimit = 100_000, maxFlips = 0),
+                    TheoryParams(lpMode = LpCertificationMode.EXACT, openWorkLimit = 100_000, maxFlips = 0),
                     engine,
                     cores,
                 ),
@@ -114,7 +136,7 @@ class OpenLinearPortfolioResultsTest {
                 val result = assertIs<OpenTheoryExecution.Optimize>(
                     OpenTheoryPipeline.execute(
                         request,
-                        TheoryParams(openWorkLimit = 1000, maxFlips = 0),
+                        TheoryParams(lpMode = LpCertificationMode.EXACT, openWorkLimit = 1000, maxFlips = 0),
                         FiniteEngine.MIXED,
                         cores,
                         null,
@@ -156,7 +178,7 @@ class OpenLinearPortfolioResultsTest {
         val standing = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(2.0), listOf(BigFraction.ofLong(2)))
         incumbents.exchange.offer(standing, assertNotNull(values.value(standing)))
         val search = LinearPortfolioSearch(
-            RationalTheoryDescent(model, objective, TheoryParams(), context) {
+            RationalTheoryDescent(model, objective, TheoryParams(lpMode = LpCertificationMode.EXACT), context) {
                 incumbents.exchange.current()?.let { it.assignment to it.objective.execution }
             },
             binding,

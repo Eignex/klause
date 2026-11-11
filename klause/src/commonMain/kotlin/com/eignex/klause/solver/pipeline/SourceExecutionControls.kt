@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.util.Cancellation
@@ -75,7 +76,7 @@ internal fun bindSourceExecutionControls(
     if (kind == SourceExecutionKind.FINITE || kind == SourceExecutionKind.REFUTED) {
         options.validateKnown()
         val defaults = TheoryParams(nodeBudget = budget, randomSeed = seed, timeout = timeout,
-            cancellation = cancellation)
+            cancellation = cancellation, lpMode = policy.lpMode ?: LpCertificationMode.NUMERICAL)
         val theory = if (companions) defaults.copy(
             maxDecisions = reader[ExecutionOption.maxDecisions] ?: defaults.maxDecisions,
             maxFlips = reader[ExecutionOption.maxFlips] ?: defaults.maxFlips,
@@ -140,6 +141,7 @@ internal fun bindSourceExecutionControls(
     val theory = if (linear) {
         val defaults = TheoryParams()
         TheoryParams(
+            lpMode = policy.lpMode ?: defaults.lpMode,
             openWorkLimit = reader.defaulted(ExecutionOption.openWorkLimit, defaults.openWorkLimit) ?: Long.MAX_VALUE,
             sourceLpWorkLimit = reader.defaulted(ExecutionOption.sourceLpWorkLimit, defaults.sourceLpWorkLimit)
                 ?: Long.MAX_VALUE,
@@ -175,7 +177,8 @@ internal fun bindSourceExecutionControls(
             alnsIterations = iterations, randomSeed = seed, maxFlips = flips, maxInstructions = instructions,
         )
     } else {
-        TheoryParams(nodeBudget = budget, randomSeed = seed, timeout = timeout, cancellation = cancellation)
+        TheoryParams(nodeBudget = budget, randomSeed = seed, timeout = timeout, cancellation = cancellation,
+            lpMode = policy.lpMode ?: LpCertificationMode.NUMERICAL)
     }
     val functionDefaults = TranscendentalTheoryParams()
     val polynomial = if (linear) {
