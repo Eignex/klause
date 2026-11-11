@@ -277,4 +277,3 @@ internal class ModelEvidenceVerifier<A, V>(
         return Verification.Accepted(Candidate(evidence, Unit))
     }
 }
-
