@@ -414,7 +414,8 @@ class CoreGuidedSearchTest {
             }
         }
         val objective = LinearObjective(longArrayOf(1, 1))
-        val search = CoreGuidedSearch(source.bake(providers.prepare(source)), objective, BacktrackParams())
+        val search = CoreGuidedSearch(source.bake(providers.prepare(source)), objective,
+            BacktrackParams(nativeSat = false))
 
         val paused = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) { error("interrupted opening") }
         val charged = search.work
