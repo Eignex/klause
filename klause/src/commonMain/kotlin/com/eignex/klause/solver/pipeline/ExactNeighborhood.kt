@@ -60,6 +60,8 @@ internal class ExactNeighborhood(
     private val completionExhausted: () -> Boolean = { false },
     private val centerPreparationPending: () -> Boolean = { false },
     private val onProposalOperator: ((Int, Long) -> Unit)? = null,
+    private val reviseRefutedCenter: ((MutableList<BigFraction>, BooleanArray,
+        ExactNeighborhoodCondition, Cancellation) -> Unit)? = null,
 ) : AutoCloseable {
     private val random = Random(seed)
     private var centers = centers.toMutableList()
@@ -153,6 +155,9 @@ internal class ExactNeighborhood(
             }
             pending = operator to condition
             val result = completion.check(condition, cancellation)
+            if (result == ExactNeighborhoodResult.Refuted) {
+                reviseRefutedCenter?.invoke(centers, bools, condition, cancellation)
+            }
             val cost = 1 + ceil((nativeWork() - before).coerceAtLeast(0) * 0.8).toLong()
             charge(cost)
             if (result == ExactNeighborhoodResult.Paused) return searchAllowanceSpent()

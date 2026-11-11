@@ -48,6 +48,9 @@ internal class JointRepairNeighborhood private constructor(
         }
     }
 
+    fun eligibleInteger(id: Int): Boolean =
+        id in 0 until integers && eligible?.get(id) != false
+
     fun clearRefutation() {
         refutedPins.clear()
         refutationBools = null

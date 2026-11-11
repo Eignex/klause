@@ -119,8 +119,13 @@ data class TheoryParams(
     val openLinearIncremental: Boolean = true,
     /** Rank numerical frontier integer splits by installed checked cut supports without proof authority. */
     val sourceCutBranching: Boolean = false,
+    /** Move a pre-incumbent joint repair center using paid conditional refutation advice. */
+    val sourceRefutationCenterStep: Boolean = false,
 ) {
     init {
+        require(!sourceRefutationCenterStep || sourceIncumbentCompletion) {
+            "source-refutation-center-step requires source-incumbent-completion"
+        }
         require(sourceLpWorkLimit >= 0 && sourceLpAllocationLimit >= 0 && sourceLpOperations >= 0)
         require(maxFlips >= 0) { "heuristic proposal cap must not be negative" }
         require(maxInstructions == null || maxInstructions >= 0) { "heuristic instruction cap must not be negative" }

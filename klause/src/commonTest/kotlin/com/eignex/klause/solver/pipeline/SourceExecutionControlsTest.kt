@@ -110,6 +110,29 @@ class SourceExecutionControlsTest {
     }
 
     @Test
+    fun `advisory center progress should require explicit source opt in`() {
+        val source = LinearSourceProblem(listOf(
+            LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),
+            LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
+        ), emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE))))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
+
+        for (enabled in listOf(false, true)) {
+            val options = ExecutionOptions.parse(listOf("source-incumbent-completion=true",
+                "source-refutation-center-step=$enabled"))
+            val request = SourceExecutionRequest(invocation, options)
+            assertEquals(enabled, request.theory.sourceRefutationCenterStep)
+        }
+        assertFalse(SourceExecutionRequest(invocation).theory.sourceRefutationCenterStep)
+    }
+
+    @Test
+    fun `advisory center progress should require incumbent completion`() {
+        assertFailsWith<IllegalArgumentException> { TheoryParams(sourceRefutationCenterStep = true) }
+    }
+
+    @Test
     fun `ordinary finite source execution should bind advisory completion to its companions`() {
         val source = LinearSourceProblem(listOf(
             LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),

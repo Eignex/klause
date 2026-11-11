@@ -91,6 +91,8 @@ internal fun bindSourceExecutionControls(
             sourceAggregateCuts = reader[ExecutionOption.sourceAggregateCuts] ?: defaults.sourceAggregateCuts,
             sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
                 ?: defaults.sourceIncumbentCompletion,
+            sourceRefutationCenterStep = reader[ExecutionOption.sourceRefutationCenterStep]
+                ?: defaults.sourceRefutationCenterStep,
             sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
             sourceRefutationPropagation = reader[ExecutionOption.sourceRefutationPropagation]
                 ?: defaults.sourceRefutationPropagation,
@@ -146,6 +148,8 @@ internal fun bindSourceExecutionControls(
             sourceAggregateCuts = reader[ExecutionOption.sourceAggregateCuts] ?: defaults.sourceAggregateCuts,
             sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
                 ?: defaults.sourceIncumbentCompletion,
+            sourceRefutationCenterStep = reader[ExecutionOption.sourceRefutationCenterStep]
+                ?: defaults.sourceRefutationCenterStep,
             sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
             sourceRefutationPropagation = reader[ExecutionOption.sourceRefutationPropagation]
                 ?: defaults.sourceRefutationPropagation,
@@ -276,5 +280,5 @@ private fun ExecutionOptions.withoutSourceCompanionControls(): ExecutionOptions 
     "source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations",
     "source-cuts", "source-point-cuts", "source-cut-branching", "source-aggregate-cuts",
     "source-refutation-reuse", "source-refutation-propagation", "source-refutation-resolution",
-    "source-incumbent-completion",
+    "source-incumbent-completion", "source-refutation-center-step",
 )
