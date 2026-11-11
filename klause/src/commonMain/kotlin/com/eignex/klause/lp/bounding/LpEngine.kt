@@ -347,18 +347,17 @@ internal class LpEngine(
     }
 
     // A heuristic point orders root values instead of becoming an incumbent; integer columns precede Boolean ones.
+    // A live root rounding owns the targets, and only component values it already knows take the point's values.
     internal fun guideRootValues(bools: BooleanArray, ints: LongArray) {
         if (bools.size != problem.numBoolVars || ints.size != problem.numIntVars) return
+        if (rootRoundingWarmStart != null) return
         val coordinates = DoubleArray(ints.size + bools.size) { column ->
             if (column < ints.size) ints[column].toDouble() else if (bools[column - ints.size]) 1.0 else 0.0
         }
         rootPrimalTargets = RootPrimalTargets(IntArray(ints.size) { it }, IntArray(bools.size) { ints.size + it },
             coordinates, null)
         rootComponentValues?.let { saved ->
-            for (variable in ints.indices) {
-                saved.values[variable] = ints[variable]
-                saved.known[variable] = true
-            }
+            for (variable in ints.indices) if (saved.known[variable]) saved.values[variable] = ints[variable]
         }
         sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "PROPOSAL", 0L)
     }

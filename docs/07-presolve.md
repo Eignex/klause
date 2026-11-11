@@ -985,6 +985,10 @@ factories permit it, without constructing the general watcher index.
 Cancellation or an unavailable required check returns indeterminate, and every exit
 reports its propagation work to the caller.
 
+Local search checks the relations it cannot score this way before publishing a
+zero-violation candidate. A baked source with closed domains reuses one baked view of
+those relations; open declarations and values outside the declared domains get
+singleton domains for each candidate, so the relations alone decide it.
 Exact point checking also validates integer absolute-value and distinctness
 relations on authoritative arbitrary-width values. `AllDifferent` compares every
 present position, preserving presence-literal polarity and exempt values, and

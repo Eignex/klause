@@ -133,7 +133,7 @@ internal class BooleanProofScheduler(
             }
             if (result.reason != null) {
                 tasks.complete(lease) {
-                    if (sample == null && result.reason == TerminationReason.SearchExhausted) {
+                    if (result.reason == TerminationReason.SearchExhausted) {
                         BooleanTaskCheck.NativeRefutation
                     } else BooleanTaskCheck.Unresolved
                 }
