@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
@@ -37,6 +38,177 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LinearAuthorityTraversalTest {
+    @Test
+    fun `global numerical bounds should require every Boolean alternative`() {
+        for (sense in listOf(ObjectiveSense.MINIMIZE, ObjectiveSense.MAXIMIZE)) {
+            val b = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+            val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+            val sign = if (sense == ObjectiveSense.MINIMIZE) BigFraction.MINUS_ONE else BigFraction.ONE
+            val scope = SourceScope(SourceRevision("numeric-global-coverage", "linear"),
+                objective = SourceObjective("x", sense))
+            val source = SourceProofContext(scope, setOf(b, x), linkedMapOf(
+                "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(4))),
+                "false" to SourcePremise(SourceInequality(mapOf(x to sign), sign * BigFraction.ofLong(2)),
+                    guards = mapOf(0 to false)),
+                "true" to SourcePremise(SourceInequality(mapOf(x to sign), sign * BigFraction.ofLong(3)),
+                    guards = mapOf(0 to true)),
+            ), mapOf(x to BigFraction.ONE))
+            val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical })
+            var standing: Pair<Sample, BigFraction>? = null
+
+            LinearAuthorityTraversal(source, budget, Cancellation.Never, { false }, {}, { standing },
+                useGuidance = true, useCuts = false).use { component ->
+                val session = SearchComponentSet(listOf(component)).session()
+                assertEquals(ComponentResult.Consistent, session.initialize())
+                assertEquals(SearchNodeDisposition.Expand, component.beforeBranch(session))
+                for (pin in listOf(false, true)) {
+                    val value = if (sense == ObjectiveSense.MAXIMIZE && pin) 3L else 2L
+                    standing = Sample(booleanArrayOf(sense == ObjectiveSense.MAXIMIZE && pin), longArrayOf(),
+                        doubleArrayOf(value.toDouble()), exactReals = listOf(BigFraction.ofLong(value))) to
+                        BigFraction.ofLong(value)
+                    assertEquals(ComponentResult.Consistent, session.push(SearchDecision.Bool(Lit.make(0, pin))))
+                    assertEquals(SearchNodeDisposition.Prune, component.beforeBranch(session))
+                    session.popTo(0)
+
+                    component.updateGlobalBound()
+
+                    if (!pin) assertNull(component.rootNumerical)
+                }
+
+                val expected = if (sense == ObjectiveSense.MINIMIZE) 2.0 else 3.0
+                assertEquals(expected, assertNotNull(assertNotNull(component.rootNumerical).bound), 0.000001)
+                assertNull(component.rootBound)
+                assertNull(component.completed())
+                assertEquals(0L, budget.measuredBoundCertificationWork)
+                assertEquals(0L, budget.measuredConflictCertificationWork)
+            }
+        }
+    }
+
+    @Test
+    fun `stopped numerical coverage should withhold global authority and retain its work`() {
+        for (stop in listOf("funding", "cancellation")) {
+            val b = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+            val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+            val scope = SourceScope(SourceRevision("numeric-coverage-stop", "linear"),
+                objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
+            val source = SourceProofContext(scope, setOf(b, x), mapOf(
+                "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE),
+                    BigFraction.ofLong(-2))),
+                "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(3))),
+            ), mapOf(x to BigFraction.ONE))
+            val funding = SourceLpFunding(10_000_000L, 64_000_000L).also { it.grant(10_000_000L) }
+            var cancelCoverage = false
+            var cancelled = false
+            val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical }, funding = funding,
+                onWork = { if (cancelCoverage && it.preparationWork > 0L) cancelled = true })
+            val standing = Sample(booleanArrayOf(false), longArrayOf(), doubleArrayOf(2.0),
+                exactReals = listOf(BigFraction.ofLong(2))) to BigFraction.ofLong(2)
+
+            LinearAuthorityTraversal(source, budget, Cancellation { cancelled }, { false }, {}, { standing },
+                useGuidance = true, useCuts = false).use { component ->
+                val session = SearchComponentSet(listOf(component)).session()
+                assertEquals(ComponentResult.Consistent, session.initialize())
+                for (pin in listOf(false, true)) {
+                    assertEquals(ComponentResult.Consistent, session.push(SearchDecision.Bool(Lit.make(0, pin))))
+                    assertEquals(SearchNodeDisposition.Prune, component.beforeBranch(session))
+                    session.popTo(0)
+                }
+                val work = budget.measuredPreparationWork
+                if (stop == "funding") funding.grant(0L) else cancelCoverage = true
+
+                component.updateGlobalBound()
+
+                assertNull(component.rootNumerical)
+                assertEquals(work + if (stop == "cancellation") 1L else 0L, budget.measuredPreparationWork)
+                cancelCoverage = false
+                cancelled = false
+                funding.grant(funding.remainingWork)
+                component.updateGlobalBound()
+                assertEquals(2.0, assertNotNull(component.rootNumerical).bound)
+                assertNull(component.rootBound)
+            }
+        }
+    }
+
+    @Test
+    fun `numerical frontier ranks should spend the current grant without creating exact evidence`() {
+        for (sense in listOf(ObjectiveSense.MINIMIZE, ObjectiveSense.MAXIMIZE)) {
+            val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+            val scope = SourceScope(SourceRevision("numeric-frontier-rank", "linear"),
+                objective = SourceObjective("x", sense))
+            val source = SourceProofContext(scope, setOf(x), mapOf(
+                "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE),
+                    BigFraction.ofLong(-2))),
+                "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(3))),
+            ), mapOf(x to BigFraction.ONE))
+            val value = if (sense == ObjectiveSense.MINIMIZE) 2L else 3L
+            val standing = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(value.toDouble()),
+                exactReals = listOf(BigFraction.ofLong(value))) to BigFraction.ofLong(value)
+            val funding = SourceLpFunding(10_000_000L, 64_000_000L).also { it.grant(10_000_000L) }
+            val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical }, funding = funding)
+
+            LinearAuthorityTraversal(source, budget, Cancellation.Never, { false }, {}, { standing },
+                useGuidance = true, useCuts = false).use { component ->
+                val session = SearchComponentSet(listOf(component)).session()
+                assertEquals(ComponentResult.Consistent, session.initialize())
+                assertEquals(SearchNodeDisposition.Prune, component.beforeBranch(session))
+                val expected = BigFraction.ofLong(if (sense == ObjectiveSense.MINIMIZE) value else -value)
+                val work = budget.measuredPreparationWork
+
+                assertEquals(expected, component.frontierRank())
+
+                assertTrue(budget.measuredPreparationWork > work)
+                funding.grant(0L)
+                assertNull(component.frontierRank())
+                assertNull(component.rootBound)
+                assertEquals(0L, budget.measuredBoundCertificationWork)
+            }
+        }
+    }
+
+    @Test
+    fun `numerical global coverage should exclude refuted alternatives`() {
+        for (allRefuted in listOf(false, true)) {
+            val b = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+            val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+            val scope = SourceScope(SourceRevision("numeric-global-refutation", "linear"),
+                objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
+            val source = SourceProofContext(scope, setOf(b, x), mapOf(
+                "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE),
+                    BigFraction.ofLong(-2))),
+                "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(3))),
+                "false" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE),
+                    BigFraction.ofLong(if (allRefuted) -4L else -2L)), guards = mapOf(0 to false)),
+                "true" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE),
+                    BigFraction.ofLong(-4)), guards = mapOf(0 to true)),
+            ), mapOf(x to BigFraction.ONE))
+            val standing = Sample(booleanArrayOf(false), longArrayOf(), doubleArrayOf(2.0),
+                exactReals = listOf(BigFraction.ofLong(2))) to BigFraction.ofLong(2)
+            val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical })
+
+            LinearAuthorityTraversal(source, budget, Cancellation.Never, { false }, {},
+                { standing.takeUnless { allRefuted } }, useGuidance = true, useCuts = false).use { component ->
+                val session = SearchComponentSet(listOf(component)).session()
+                assertEquals(ComponentResult.Consistent, session.initialize())
+                for (pin in listOf(false, true)) {
+                    assertEquals(ComponentResult.Consistent, session.push(SearchDecision.Bool(Lit.make(0, pin))))
+                    assertEquals(SearchNodeDisposition.Prune, component.beforeBranch(session))
+                    session.popTo(0)
+                }
+
+                component.updateGlobalBound()
+
+                val claim = assertNotNull(component.rootNumerical)
+                assertEquals(allRefuted, claim.infeasible)
+                assertEquals(if (allRefuted) null else 2.0, claim.bound)
+                assertNull(component.rootBound)
+                assertEquals(0L, budget.measuredConflictCertificationWork)
+            }
+        }
+    }
+
     @Test
     fun `an inherited numerical bound should prune a child without another LP query`() {
         val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)

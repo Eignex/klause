@@ -77,6 +77,12 @@ Numerical bounds reaching an incumbent within the LP tolerance, and numerical
 contradictions, can close a traversal node. These closures retain numerical counters
 and never create an exact source derivation. Candidate assignments still pass their
 original-source arithmetic check, independently of numerical deduction authority.
+Global numerical coverage combines every exhaustive alternative: the minimum of lower
+bounds for minimization, or the maximum of upper bounds for maximization. Refuted
+alternatives are neutral; an uncovered sibling prevents publication. A bounded scan
+pays node storage and scope checks from the current source grant and withholds a
+new claim after cancellation or exhaustion. The retained root claim and frontier
+ordering stay numerical; scalar conversion for ordering creates no exact evidence.
 
 Cut rounds retain the strongest available numerical bound independently of exact
 source evidence. A tighter numerical bound beyond the objective tolerance, or a
