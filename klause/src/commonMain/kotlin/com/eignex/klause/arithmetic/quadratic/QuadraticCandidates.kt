@@ -1,6 +1,7 @@
 package com.eignex.klause.arithmetic.quadratic
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.koblas.koblas
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -37,39 +38,66 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
     fun proposeActiveRows(model: QuadraticModel, start: List<Double>, iterations: Int = 32): List<Int>? {
         control.step()
         require(start.size == model.dimension && iterations >= 0)
-        val hessian = model.hessian.map { row -> row.map { it.toDouble() } }
-        val linear = model.linear.map { it.toDouble() }
+        val hessian = model.hessian.map { row -> DoubleArray(row.size) { row[it].toDouble() } }
+        val linear = model.linear.let { values -> DoubleArray(values.size) { values[it].toDouble() } }
         val rows = model.rows
-        val coefficients = rows.map { row -> row.coefficients.map { it.toDouble() } }
-        val rhs = rows.map { it.rhs.toDouble() }
-        val numbers = hessian.flatten() + linear + coefficients.flatten() + rhs + start
-        if (numbers.any { !it.isFinite() }) return null
+        val coefficients = rows.map { row ->
+            row.coefficients.let { values -> DoubleArray(values.size) { values[it].toDouble() } }
+        }
+        val rhs = DoubleArray(rows.size) { rows[it].rhs.toDouble() }
+        if (hessian.any { row -> row.any { !it.isFinite() } } || linear.any { !it.isFinite() } ||
+            coefficients.any { row -> row.any { !it.isFinite() } } || rhs.any { !it.isFinite() } ||
+            start.any { !it.isFinite() }
+        ) return null
         var norm = hessian.maxOfOrNull { row -> row.sumOf(::abs) } ?: 0.0
         for (row in coefficients) for (value in row) { control.step(); norm += 16.0 * value * value }
         if (!norm.isFinite()) return null
         val step = 1.0 / max(1.0, norm)
         val point = start.toDoubleArray()
+        val gradient = DoubleArray(point.size)
         repeat(iterations) {
-            val gradient = DoubleArray(point.size) { i ->
-                var value = linear[i]
-                for (j in point.indices) { control.step(); value += hessian[i][j] * point[j] }
-                value
-            }
+            for (i in point.indices) gradient[i] = dot(linear[i], hessian[i], point)
+            if (gradient.any { !it.isFinite() }) return null
             for (j in rows.indices) {
-                var residual = -rhs[j]
-                for (i in point.indices) { control.step(); residual += coefficients[j][i] * point[i] }
+                val residual = dot(-rhs[j], coefficients[j], point)
+                if (!residual.isFinite()) return null
                 if (rows[j].relation == QuadraticRowRelation.EQ || residual > 0.0) {
-                    for (i in point.indices) { control.step(); gradient[i] += 16.0 * residual * coefficients[j][i] }
+                    val penalty = 16.0 * residual
+                    if (!penalty.isFinite()) return null
+                    axpy(penalty, coefficients[j], gradient)
                 }
             }
-            for (i in point.indices) { control.step(); point[i] -= step * gradient[i] }
+            if (gradient.any { !it.isFinite() }) return null
+            axpy(-step, gradient, point)
             if (point.any { !it.isFinite() }) return null
         }
         return rows.indices.filter { j ->
-            var residual = -rhs[j]
-            for (i in point.indices) { control.step(); residual += coefficients[j][i] * point[i] }
+            val residual = dot(-rhs[j], coefficients[j], point)
+            if (!residual.isFinite()) return null
             rows[j].relation == QuadraticRowRelation.EQ || residual >= -1e-6
         }.also { control.poll() }
+    }
+
+    private fun dot(initial: Double, left: DoubleArray, right: DoubleArray): Double {
+        var result = initial
+        var offset = 0
+        while (offset < left.size) {
+            val count = minOf(KERNEL_SLICE, left.size - offset)
+            repeat(count) { control.step() }
+            result += koblas.dot(left, offset, right, offset, count)
+            offset += count
+        }
+        return result
+    }
+
+    private fun axpy(alpha: Double, source: DoubleArray, destination: DoubleArray) {
+        var offset = 0
+        while (offset < source.size) {
+            val count = minOf(KERNEL_SLICE, source.size - offset)
+            repeat(count) { control.step() }
+            koblas.axpy(destination, offset, alpha, source, offset, count)
+            offset += count
+        }
     }
 
     private fun eliminate(matrix: Array<Array<BigFraction>>): List<BigFraction>? {
@@ -96,5 +124,10 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
         val solution = MutableList(size) { BigFraction.ZERO }
         for ((i, column) in pivots.withIndex()) { control.step(); solution[column] = matrix[i][size] }
         return solution
+    }
+
+    private companion object {
+        // Precharging bounds cancellation latency without changing per-entry work or polling callbacks.
+        const val KERNEL_SLICE = 256
     }
 }
