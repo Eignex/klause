@@ -242,6 +242,14 @@ or a probe cap cannot supply a finite minimizing endpoint. Evaluation returns it
 visited work and refusal reason after cancellation, work exhaustion or numerical
 failure. This result is separate from exact source certificates.
 
+Scalar objective offsets project toward the lower side before floating evaluation.
+Root publication composes the source offset without adding a relative margin to
+that constant. Objective integrality uses objective and column-origin definitions,
+without scanning constraint rows for exact input validation in numerical mode;
+the inspection debits the containing grant. Unrepresentable integral source ranges
+withhold incumbent deductions. Reduced-cost gaps cancel the source offset before
+floating conversion, and their tolerance uses the remaining LP objective units.
+
 Optional simplex diagnostics retain bounded progress observations per numerical
 invocation. A retained invocation replaces its completed observations while
 compatible factors remain owned by the scoped solver. A paused invocation keeps

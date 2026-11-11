@@ -1468,6 +1468,10 @@ internal inline fun LpModel.forEachRationalColumn(j: Int, action: (Int, BigFract
 
 internal fun LpModel.hasIntegralObjective(): Boolean {
     if (!finiteExactInput()) return false
+    return hasIntegralObjectiveDefinition()
+}
+
+internal fun LpModel.hasIntegralObjectiveDefinition(): Boolean {
     exactState?.model?.let { source ->
         val scale = source.objective.scale.value.reciprocal()
         var constant = source.objective.constant.value * scale + source.objective.externalConstant.value

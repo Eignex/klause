@@ -107,7 +107,9 @@ private fun floatingLagrangianLowerBound(
     val arithmetic = FloatingBoundArithmetic(meter)
     if (!meter.visit()) return meter.refuse(LpFloatingBoundStop.WORK)
     if (duals.size != model.m) return meter.refuse(LpFloatingBoundStop.INPUT)
-    var bound = if (objective) model.objConstantD else 0.0
+    var bound = if (objective) {
+        model.exactConstant().lowerBoundDouble() ?: return meter.refuse(LpFloatingBoundStop.NON_FINITE)
+    } else 0.0
     if (!bound.isFinite()) return meter.refuse(LpFloatingBoundStop.NON_FINITE)
     for (row in 0 until model.m) {
         if (!meter.visit()) return meter.refuse(LpFloatingBoundStop.WORK)
@@ -163,7 +165,8 @@ private fun floatingLagrangianLowerBound(
     }
     model.exactState?.model?.objective?.takeIf { objective }?.let { source ->
         val scale = source.scale.approximation
-        val constant = source.externalConstant.approximation
+        val constant = source.externalConstant.value.lowerBoundDouble()
+            ?: return meter.refuse(LpFloatingBoundStop.NON_FINITE)
         if (!scale.isFinite() || scale <= 0.0 || !constant.isFinite()) {
             return meter.refuse(LpFloatingBoundStop.NON_FINITE)
         }

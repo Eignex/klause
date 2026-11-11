@@ -6,6 +6,7 @@ import com.eignex.klause.lp.engine.LpNumericalBound
 import com.eignex.klause.lp.engine.ceilLong
 import com.eignex.klause.lp.engine.floatingReducedCost
 import com.eignex.klause.lp.engine.floorLong
+import com.eignex.klause.lp.engine.hasIntegralObjectiveDefinition
 import com.eignex.klause.lp.engine.lowerBoundDouble
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationResult
@@ -17,7 +18,6 @@ import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.subExact
 import kotlin.math.abs
 import kotlin.math.floor
-import kotlin.math.nextDown
 import kotlin.math.nextUp
 
 @Suppress("LongParameterList", "CyclomaticComplexMethod", "LongMethod", "ReturnCount")
@@ -42,6 +42,7 @@ internal fun LpEngine.applyNumericalFixing(
     noteNumericalWork(mappingWork)
     if (cancellation()) return false
     val range = sourceObjectiveRange(relaxation)
+    if (range == null && model.hasIntegralObjectiveDefinition()) return false
     val incumbent = if (!bound.isFinite()) null else if (range != null) {
         val ceiling = sourceObjectiveCutoff(relaxation, bound, range)?.ceilLong() ?: return false
         if (ceiling == Long.MIN_VALUE) return false
@@ -50,10 +51,10 @@ internal fun LpEngine.applyNumericalFixing(
     val maximum = if (incumbent == null) objectiveCeiling ?: return false
         else objectiveCeiling?.let { if (it < incumbent) it else incumbent } ?: incumbent
     val full = BigFraction.ofDouble(lower.value)?.plus(BigFraction.ofLong(relaxation.objectiveConstant)) ?: return false
-    val upper = maximum.toDouble().nextUp()
-    val floorBound = full.lowerBoundDouble()?.nextDown() ?: return false
-    val tolerance = FLOAT_EVIDENCE_TOLERANCE * maxOf(1.0, abs(upper), abs(floorBound))
-    val gap = ((upper - floorBound).nextUp() + tolerance).nextUp()
+    val gapUpper = -((full - maximum).lowerBoundDouble() ?: return false)
+    val localMaximum = (maximum - BigFraction.ofLong(relaxation.objectiveConstant)).toDouble()
+    val tolerance = FLOAT_EVIDENCE_TOLERANCE * maxOf(1.0, abs(localMaximum), abs(lower.value))
+    val gap = (gapUpper + tolerance).nextUp()
     if (!gap.isFinite() || gap < 0.0) return false
     val reason = if (learn && objectiveVar >= 0 && objectiveAscending && range != null) {
         numericalFixingReason(relaxation, session, objectiveVar, maximum, cancellation)
