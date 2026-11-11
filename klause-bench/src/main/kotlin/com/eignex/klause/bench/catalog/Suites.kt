@@ -40,7 +40,7 @@ internal object Suites {
             SourceOwnershipSuite.suite + RewriteStructureSuite.suite + RewriteStructureSuite.canonicalSuite +
             ExactGlobalsSuite.suite +
             SourceEqualitySuite.suite +
-            IntegerAggregateSuite.suite
+            IntegerAggregateSuite.suite + QuadraticProposalSuite.suite
     }
 
     /** Discovered-on-demand suites over fetched external corpora. The provider runs the
