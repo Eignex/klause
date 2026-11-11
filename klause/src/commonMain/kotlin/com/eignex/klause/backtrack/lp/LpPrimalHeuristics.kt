@@ -371,8 +371,8 @@ internal fun pinIntTowardLp(
  * rounding, then retrying the rounding. The distance objective is exact (linear) over variables whose
  * rounded target sits at a declared bound — every Boolean and any integer rounded to its bound — and
  * omits interior integer targets, whose `|x − t|` is not linear; this only steers the search, never
- * affects soundness (a returned [Sample] is a fully-pinned, propagation-feasible assignment the caller
- * still re-evaluates). Stops at the first rounding admitted by [accept] or the round cap. A repeated rounding
+ * affects soundness (a returned [Sample] is a fully-pinned, propagation-feasible assignment that only
+ * steers the search). Stops at the first rounding admitted by [accept] or the round cap. A repeated rounding
  * (cycle) triggers a perturbation ([perturbRounding]) — flip the most-fractional
  * coordinates and keep pumping — up to [PUMP_MAX_RESTARTS] times before giving up. Re-solves prefer the
  * primal pass ([LpSolver.solvePrimal], phase-1 included) and fall back to the dual
@@ -448,8 +448,8 @@ private fun pumpKey(intTarget: LongArray, boolTarget: BooleanArray): String =
  * pump rounding **in place** — a Boolean flips its bit, an integer rounds the other way (toward the LP
  * value, clamped to its domain) — so a cycled pump escapes to a fresh rounding. When no coordinate is
  * fractional, a random sample of live coordinates flips instead. Pure steering: the pump
- * only proposes roundings that [pinToward] re-realizes and the caller re-evaluates, so this never
- * affects soundness.
+ * only proposes roundings that [pinToward] re-realizes and the search treats as value guidance, so this
+ * never affects soundness.
  */
 private fun LpEngine.perturbRounding(
     relaxation: LpRelaxation,

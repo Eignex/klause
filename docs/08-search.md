@@ -143,9 +143,9 @@ Minimization retains its first-run position while a private LP root layout prepa
 across slices. Paid construction stays in the worker's cumulative work, and a pause
 starts neither numerical consultation nor tree traversal. A pooled or previous incumbent is
 an engine result; before that work it is checked only against this run's own pins.
-Heuristic points from LP rounding, the feasibility pump and the clause walk are not
-propagated, so they set the root value order and saved phases instead of becoming
-incumbents; only a leaf the search reaches through its own propagation is one.
+Heuristic points from LP rounding, the feasibility pump and the clause walk are built
+outside the run's assumptions, leaf checks and real completion, so they set the root
+value order and saved phases instead of becoming incumbents; only a leaf the search reaches through its own propagation is one.
 The search and its preparation wrapper report an unfinished root
 layout as pending private preparation. Construction completion, cancellation and retirement follow the
 [LP ownership contract](17-linear-programming.md#root-preparation).

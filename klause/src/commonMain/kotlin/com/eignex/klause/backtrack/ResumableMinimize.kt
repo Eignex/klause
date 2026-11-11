@@ -175,7 +175,6 @@ internal class ResumableMinimize(
     private val startMark = TimeSource.Monotonic.markNow()
 
     // The allowance includes LP and propagation work so costly nodes consume proportionally more of a slice.
-    private var proposalPropagationWork = 0L
     private var clausePrimal: MonotoneClausePrimal? = null
     private var clausePrimalStarted = false
     private var clausePrimalCandidate: Sample? = null
@@ -185,7 +184,7 @@ internal class ResumableMinimize(
         { (if (::lpEngine.isInitialized) lpEngine.totalSolveWork() else 0L) + sink.lp.standaloneWork },
         {
             (if (::cp.isInitialized) session.work else preparedSession?.work ?: 0L) +
-                (if (::lpEngine.isInitialized) lpEngine.primalPropagationWork else 0L) + proposalPropagationWork
+                (if (::lpEngine.isInitialized) lpEngine.primalPropagationWork else 0L)
         },
         preparationBudget,
         ownsWorkDebt = ownsWorkDebt,
@@ -783,9 +782,7 @@ internal class ResumableMinimize(
                 }
                 if (rootLayoutPending) return StepEvent.Paused
             } else if (rootRoundingPending && !rootRoundingAttempted) {
-                rootPrimalWork(rootLpBudget())?.let {
-                    return StepEvent.Incumbent(it.withSourceSemantics(problem.semantics))
-                }
+                rootPrimalWork(rootLpBudget())
             }
             if (rootRoundingPending) {
                 slice.charge()
@@ -1003,8 +1000,8 @@ internal class ResumableMinimize(
         if (guideBy(proposal)) sink.search.clausalPrimalAccepted++
     }
 
-    // A heuristic point is not propagated, so it steers the next branches instead of standing as an incumbent; only
-    // a leaf the search reaches through its own propagation becomes one.
+    // A heuristic point is built outside this run's assumptions, leaf checks and real completion, so it steers the
+    // next branches; only a leaf the search reaches through its own propagation becomes an incumbent.
     private fun guideBy(proposal: Sample): Boolean {
         if (!::brancher.isInitialized || proposal.numBoolVars != problem.numBoolVars ||
             proposal.numIntVars != problem.numIntVars
@@ -1125,7 +1122,7 @@ internal class ResumableMinimize(
         // arm's (root propagation + shaving), before any incumbent-relative fixing runs.
         boundExchange.importGlobalVarBounds()
         boundExchange.publishGlobalVarBounds()
-        rootPrimalWork(rootToken)?.let { return it }
+        rootPrimalWork(rootToken)
         if (rootRoundingPending) return null
         if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null && params.componentFactory == null) {
             val before = lpEngine.primalSearchWork
@@ -1139,14 +1136,14 @@ internal class ResumableMinimize(
         return null
     }
 
-    private fun rootPrimalWork(rootToken: Cancellation): MinimizeResult.WithSample? {
+    private fun rootPrimalWork(rootToken: Cancellation) {
         rootRoundingAttempted = true
         if (!lpEngine.params.lpPlan.probe || lpEngine.lpRelaxer == null) {
             rootRoundingPending = false
             lpEngine.rootRoundingWarmStart = null
-            return null
+            return
         }
-        if (handoffRootTargets(rootToken)) return null
+        if (handoffRootTargets(rootToken)) return
         // The first rounding that could improve the incumbent stops the heuristic and steers the search.
         fun accept(proposal: Sample): Sample? {
             val outcome = when {
@@ -1162,13 +1159,12 @@ internal class ResumableMinimize(
             toleranceReals = params.toleranceCheck != null,
             accept = ::accept)
         rootRoundingPending = rounded == null && canResumeRootRounding()
-        if (rootRoundingPending) return null
+        if (rootRoundingPending) return
         lpEngine.rootRoundingWarmStart = null
         val seed = rounded ?: lpEngine.lpFeasibilityPump(objective, rootToken,
             initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null,
             accept = ::accept)
         seed?.let(::guideBy)
-        return null
     }
 
     private fun handoffRootTargets(rootToken: Cancellation): Boolean {
