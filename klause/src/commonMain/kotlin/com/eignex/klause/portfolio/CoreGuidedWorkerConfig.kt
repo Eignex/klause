@@ -21,24 +21,24 @@ internal class CoreGuidedWorkerConfig(
     private val maximumWork: Long? = null,
     private val maximumMillis: Long? = null,
     private val coreRefinement: CoreRefinementMode = CoreRefinementMode.NONE,
-    private val edit: ((BacktrackParams) -> BacktrackParams)? = null,
     private val lpMode: LpCertificationMode? = null,
+    private val edit: ((BacktrackParams) -> BacktrackParams)? = null,
 ) : WorkerConfig {
     override val label: String get() = "core-guided"
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
-        CoreGuidedWorkerConfig(budget, maximumWork, maximumMillis, coreRefinement, edit, lpMode)
+        CoreGuidedWorkerConfig(budget, maximumWork, maximumMillis, coreRefinement, lpMode, edit)
 
     override fun withCoreRefinement(mode: CoreRefinementMode): CoreGuidedWorkerConfig =
-        CoreGuidedWorkerConfig(nodeBudget, maximumWork, maximumMillis, mode, edit, lpMode)
+        CoreGuidedWorkerConfig(nodeBudget, maximumWork, maximumMillis, mode, lpMode, edit)
 
     internal fun withActiveTimeLimit(): CoreGuidedWorkerConfig =
-        CoreGuidedWorkerConfig(nodeBudget, maximumWork, 2_000L, coreRefinement, edit, lpMode)
+        CoreGuidedWorkerConfig(nodeBudget, maximumWork, 2_000L, coreRefinement, lpMode, edit)
 
     internal fun withWorkLimit(limit: Long): CoreGuidedWorkerConfig =
-        CoreGuidedWorkerConfig(nodeBudget, limit, null, coreRefinement, edit, lpMode)
+        CoreGuidedWorkerConfig(nodeBudget, limit, null, coreRefinement, lpMode, edit)
 
     fun withLpMode(mode: LpCertificationMode): CoreGuidedWorkerConfig =
-        CoreGuidedWorkerConfig(nodeBudget, maximumWork, maximumMillis, coreRefinement, edit, mode)
+        CoreGuidedWorkerConfig(nodeBudget, maximumWork, maximumMillis, coreRefinement, mode, edit)
 
     override fun materialize(
         problem: BakedProblem,
