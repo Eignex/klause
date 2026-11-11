@@ -4,7 +4,7 @@ import java.lang.management.ManagementFactory
 import java.util.Base64
 import java.util.concurrent.TimeUnit
 
-private const val CLI_CPU_CAPTURE_ENABLED = false
+private const val CLI_CPU_CAPTURE_ENABLED = true
 
 internal actual fun <T> captureCliCpu(operation: () -> T): T =
     captureCliCpuIf(CLI_CPU_CAPTURE_ENABLED, operation)
