@@ -97,6 +97,21 @@ class FloatEvidenceTest {
     }
 
     @Test
+    fun `a farkas ray meeting an open column should fold in the row that bounds it and stay citable`() {
+        val model = LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            val z = addOpenAboveVar(0L)
+            addRow(intArrayOf(z, x), longArrayOf(1L, -1L), Relation.GE, 1L)
+            addRow(intArrayOf(z), longArrayOf(1L), Relation.LE, 0L)
+        }.build(Sense.MINIMIZE)
+        val base = listOf(doubleArrayOf(1.0, 1.0), doubleArrayOf(1.0, -1.0)).first { floatFarkasRay(model, it) != null }
+
+        val rays = listOf(1.0 + 1e-3, 1.0 - 1e-3).map { floatFarkasRay(model, doubleArrayOf(base[0], base[1] * it)) }
+
+        assertTrue(rays.all { it != null && it.isNotEmpty() })
+    }
+
+    @Test
     fun `a rounded float farkas ray should never rest on an open side`() {
         val model = LpBuilder().apply {
             val x = addVar(0L, 1L)
@@ -131,17 +146,39 @@ class FloatEvidenceTest {
 
     @Test
     fun `a reduced cost beyond tolerance on an open side should be priced at the bound its row implies`() {
+        val certificate = assertNotNull(FloatDeductionCertificate.of(openColumnModel(), doubleArrayOf(0.5)))
+
+        assertEquals(-5e7, certificate.lowerBound, 1.0)
+    }
+
+    @Test
+    fun `a row-implied open side should cite its row and only the bound sides that row reads`() {
+        val certificate = assertNotNull(FloatDeductionCertificate.of(openColumnModel(), doubleArrayOf(0.5)))
+
+        assertTrue(certificate.dualNonzeroRow(0))
+        assertEquals(UPPER_SIDE, certificate.extraCitedSides(2) and BOTH_SIDES)
+    }
+
+    @Test
+    fun `a reduced cost within rounding on a side no row bounds should count as zero`() {
         val model = LpBuilder().apply {
             addVar(0L, 10L, cost = 1L)
-            val z = addOpenAboveVar(0L)
-            val u = addVar(0L, 100_000_000L)
-            addRow(intArrayOf(z, u), longArrayOf(1L, -1L), Relation.EQ, 100_000_000L)
+            val z = addRealVar(0.0, null, cost = 0.001)
+            val w = addRealVar(0.0, null, cost = 0.001)
+            addRow(intArrayOf(z, w), longArrayOf(1L, -1L), Relation.EQ, 0L)
         }.build(Sense.MINIMIZE)
 
-        val certificate = assertNotNull(FloatDeductionCertificate.of(model, doubleArrayOf(0.5)))
-
-        assertTrue(certificate.lowerBound <= 0.0)
-        assertTrue(certificate.dualNonzeroRow(0))
-        assertEquals(3, certificate.extraCitedSides(2))
+        assertNotNull(FloatDeductionCertificate.of(model, doubleArrayOf(0.001)))
     }
+
+    // min x over z - u = 1e8 with z open above and u in [0, 1e8]: the row bounds z by 2e8 through u's upper side.
+    private fun openColumnModel() = LpBuilder().apply {
+        addVar(0L, 10L, cost = 1L)
+        val z = addOpenAboveVar(0L)
+        val u = addVar(0L, 100_000_000L)
+        addRow(intArrayOf(z, u), longArrayOf(1L, -1L), Relation.EQ, 100_000_000L)
+    }.build(Sense.MINIMIZE)
 }
+
+private const val UPPER_SIDE = 2
+private const val BOTH_SIDES = 3

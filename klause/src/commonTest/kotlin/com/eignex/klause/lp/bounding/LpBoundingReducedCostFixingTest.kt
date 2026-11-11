@@ -9,6 +9,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.FloatDeductionCertificate
 import com.eignex.klause.lp.engine.IntegerCertificate
 import com.eignex.klause.lp.engine.LpBoundTrail
 import com.eignex.klause.lp.engine.LpBuilder
@@ -21,6 +22,7 @@ import com.eignex.klause.lp.engine.VarStatus
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.lp.engine.nodeDualCertificate
+import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
@@ -313,5 +315,33 @@ class LpBoundingReducedCostFixingTest {
                 learn = learn,
             )
         }
+    }
+
+    @Test
+    fun `a fixing reason should keep the bound sides a row-implied open side reads`() {
+        val problem = Problem(
+            0, 4, arrayOf(IntDomain(0, 10), IntDomain(0, 5), IntDomain(0, 100), IntDomain(0, 1)), arrayOf<Factor>(),
+        )
+        val session = PropagationSession(problem)
+        session.implyIntAtLeast(1, 1L)
+        session.implyIntAtMost(1, 4L)
+        val model = LpBuilder().apply {
+            addVar(0L, 10L, cost = 1L)
+            val y = addVar(1L, 4L)
+            val z = addOpenAboveVar(0L)
+            val w = addVar(0L, 1L)
+            addRow(intArrayOf(z, y, w), longArrayOf(1L, -1L, -1L), Relation.EQ, 2L)
+        }.build(Sense.MINIMIZE)
+        val relaxation = LpRelaxation(
+            model, intArrayOf(0, 1, 2, 3), BooleanArray(4), 0L, intArrayOf(0, 1, 2, 3), intArrayOf(),
+        )
+        val certificate = assertNotNull(FloatDeductionCertificate.of(model, doubleArrayOf(0.25)))
+
+        val reason = assertNotNull(reducedCostFixingReasons(relaxation, certificate, session, 0, 10L)).reasonFor(1)
+
+        val upper = assertNotNull(LpExplanation.boundPremiseLits(relaxation, session, 1, lowerSide = false))
+        val lower = assertNotNull(LpExplanation.boundPremiseLits(relaxation, session, 1, lowerSide = true))
+        assertTrue(upper.isNotEmpty() && upper.all { it in reason })
+        assertTrue(lower.none { it in reason })
     }
 }

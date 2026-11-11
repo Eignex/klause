@@ -331,30 +331,69 @@ private class RowView(private val exact: FloatEvidenceModel) {
     private val leastInfinite = IntArray(exact.m)
     private val mostInfinite = IntArray(exact.m)
     private val terms = IntArray(exact.m)
+    // Each row's terms as `column shl 1` plus one when the coefficient is positive, its slack included.
     private val members = Array(exact.m) { IntArrayList() }
+
+    // Per row and direction: the first term cited through it, or CITED_ALL once every read side is cited.
+    private val citedThrough = IntArray(2 * exact.m) { NONE_CITED }
 
     init {
         for (i in 0 until exact.m) add(i, exact.n + i, 1.0)
         for (j in 0 until exact.n) exact.forEachInColumn(j) { row, a -> add(row, j, a) }
     }
 
-    /** The columns of row [i], its slack included. */
-    fun columnsOf(i: Int): IntArrayList = members[i]
+    /** A bound one row implies for a column: the row, the column's coefficient in it and the value. */
+    class Implied(val row: Int, val coefficient: Double, val value: Double)
 
-    /** The tightest finite bound on [lowSide] of [j] that a single row implies, with that row, or null. */
-    fun impliedBy(j: Int, lowSide: Boolean): Pair<Double, Int>? {
-        var best: Pair<Double, Int>? = null
+    /**
+     * The tightest finite bound on [lowSide] of [j] that a single row implies. Rows whose validity a reason can cite
+     * are preferred; another row serves only when none of them bounds [j].
+     */
+    fun impliedBy(j: Int, lowSide: Boolean): Implied? {
+        var best: Implied? = null
+        var bestCitable: Implied? = null
         fun offer(i: Int, a: Double) {
             val value = implied(i, j, a, lowSide)
-            val current = best
-            if (value.isFinite() && (current == null || (lowSide == value > current.first))) best = value to i
+            if (!value.isFinite()) return
+            val candidate = Implied(i, a, value)
+            if (best.let { it == null || lowSide == value > it.value }) best = candidate
+            if (exact.rowCitable(i) && bestCitable.let { it == null || lowSide == value > it.value }) {
+                bestCitable = candidate
+            }
         }
         if (j >= exact.n) offer(j - exact.n, 1.0) else exact.forEachInColumn(j) { row, a -> offer(row, a) }
-        return best
+        return bestCitable ?: best
+    }
+
+    /**
+     * Report to [cite] every column side, with 1 for the lower and 2 for the upper, that [implied] reads for [j]: the
+     * side of each other term in its row that the row's least or greatest activity takes. A row is scanned once per
+     * direction; a later column bounded through it adds only the first column's read side.
+     */
+    fun citeReads(implied: Implied, j: Int, lowSide: Boolean, cite: (Int, Int) -> Unit) {
+        val fromMost = lowSide == implied.coefficient > 0
+        val slot = 2 * implied.row + if (fromMost) 0 else 1
+        val first = citedThrough[slot]
+        if (first == CITED_ALL || (first >= 0 && first ushr 1 == j)) return
+        if (first >= 0) {
+            citeRead(first, fromMost, cite)
+            citedThrough[slot] = CITED_ALL
+            return
+        }
+        val terms = members[implied.row]
+        for (k in 0 until terms.size) {
+            if (terms[k] ushr 1 == j) citedThrough[slot] = terms[k] else citeRead(terms[k], fromMost, cite)
+        }
+    }
+
+    private fun citeRead(term: Int, fromMost: Boolean, cite: (Int, Int) -> Unit) {
+        val column = term ushr 1
+        val upperSide = fromMost == (term and 1 == 1)
+        if (if (upperSide) upper[column].isFinite() else lower[column].isFinite()) cite(column, if (upperSide) 2 else 1)
     }
 
     private fun add(i: Int, j: Int, a: Double) {
-        members[i].add(j)
+        members[i].add((j shl 1) or if (a > 0) 1 else 0)
         val low = if (a > 0) a * lower[j] else a * upper[j]
         val high = if (a > 0) a * upper[j] else a * lower[j]
         // A subnormal coefficient carries no relative accuracy, so its term is as good as unbounded.
@@ -425,6 +464,8 @@ private class RowView(private val exact: FloatEvidenceModel) {
 }
 
 private const val MIN_NORMAL: Double = 2.2250738585072014e-308
+private const val NONE_CITED: Int = -1
+private const val CITED_ALL: Int = -2
 
 // An unshifted, unclamped source projection has the same numeric data as its exact working model. Rounded shifts
 // and probe endpoints require importing authority before solving; their projected feasible regions can differ.
@@ -455,6 +496,10 @@ private class FloatEvidenceModel(val model: LpModel) {
     fun rhs(row: Int): Double = source?.rhs(row)?.approximation ?: model.rhsD(row)
     fun origin(column: Int): Double = source?.column(column)?.origin?.approximation ?: model.loShiftD(column)
     fun fixed(column: Int): Boolean = model.fixed(column)
+
+    /** Whether a reason can cite row [i]'s validity: a global row, or one carrying its premises. */
+    fun rowCitable(i: Int): Boolean = source?.row(i)?.let { it.global || it.premises != null }
+        ?: (model.rowGlobal.getOrElse(i) { false } || model.rowPremises.getOrNull(i) != null)
     // A probe endpoint stands in for an open side.
     fun lower(column: Int): Double = if (model.hasFiniteLower(column) && !probeClamped(column, model.probeClampedLo)) {
         model.lowerD(column)
@@ -487,9 +532,10 @@ private class FloatEvidenceModel(val model: LpModel) {
  * ([LpSolveContext.numericalDeductions]). `L(y) = y·rhs + Σⱼ min_{[lⱼ,uⱼ]} dⱼ·zⱼ` bounds the objective for any
  * multipliers; here it is summed in binary64, lowered by that summation's rounding and by an absolute and
  * relative slack, so float noise above an integer never rounds an integral bound up. A reduced cost beyond its
- * rounding prices and cites its minimizing side; one within it prices both sides and cites the finite ones. An open
- * side is priced at the tightest bound a single row implies, citing that row and the finite sides of its columns.
- * Binary64 evaluation makes the deductions numerical. Reduced costs are in source units.
+ * summation's rounding prices and cites its minimizing side; one within it prices both sides and cites the finite
+ * ones. An open side is priced at the tightest bound a single row implies, citing that row and the sides the implied
+ * bound reads; a reduced cost within rounding on a side no row bounds counts as zero. Binary64 evaluation and that
+ * acceptance make the deductions numerical. Reduced costs are in source units.
  */
 internal class FloatDeductionCertificate private constructor(
     private val model: LpModel,
@@ -539,8 +585,8 @@ internal class FloatDeductionCertificate private constructor(
 
     companion object {
         /**
-         * The certificate [y] supports on [model], or null when a reduced cost meets a side no row bounds. [observer]
-         * sees the outcome as a node deduction phase.
+         * The certificate [y] supports on [model], or null when a reduced cost beyond its rounding meets a side no row
+         * bounds. [observer] sees the outcome as a node deduction phase.
          */
         fun of(model: LpModel, y: DoubleArray, observer: LpCertificationObserver? = null): FloatDeductionCertificate? {
             val timer = LpPhaseTimer(observer, LpSolvePhase.NODE_DEDUCTION)
@@ -568,17 +614,15 @@ internal class FloatDeductionCertificate private constructor(
             val sides = ByteArray(view.numVars)
             val citedRows = BooleanArray(view.m)
             val rows = lazy { RowView(view) }
-            // An open side is priced at the tightest bound one row implies; that row and both finite sides of every
-            // column in it are cited, which covers every premise the implied bound reads.
+            // An open side is priced at the tightest bound one row implies; that row and each side the implied bound
+            // reads are cited.
             fun implied(j: Int, lowSide: Boolean): Double? {
-                val (bound, row) = rows.value.impliedBy(j, lowSide) ?: return null
-                citedRows[row] = true
-                val columns = rows.value.columnsOf(row)
-                for (k in 0 until columns.size) {
-                    val other = columns[k]
-                    if (other != j) sides[other] = (sides[other].toInt() or finiteSides(view, other)).toByte()
+                val implied = rows.value.impliedBy(j, lowSide) ?: return null
+                citedRows[implied.row] = true
+                rows.value.citeReads(implied, j, lowSide) { column, side ->
+                    sides[column] = (sides[column].toInt() or side).toByte()
                 }
-                return bound
+                return implied.value
             }
             for (j in 0 until view.numVars) {
                 val (d, error) = reducedCost(view, duals, j)
@@ -657,9 +701,10 @@ private fun reducedCost(view: FloatEvidenceModel, y: DoubleArray, j: Int): Pair<
 /**
  * [ray] oriented and rounded to integer multipliers when, summed in binary64, it shows the rows of [model] cannot
  * hold inside its box: `ρ·rhs > Σⱼ max(ρ·Aⱼ·zⱼ)` by [FLOAT_EVIDENCE_TOLERANCE] times the terms' size. An open side
- * that the float ray meets is priced at the bound the other rows imply. The rounded ray is checked again against the
- * box alone, the sides an infeasibility clause cites; when it fails, the empty ray refutes without a citable
- * combination. The numerical counterpart of [certifyLpFarkas].
+ * that the float ray meets is priced at the bound another row implies, and that row is then folded into the ray so
+ * the column cancels. The rounded ray is checked again against the box alone, the sides an infeasibility clause
+ * cites, taking an open column within its rounding as cancelled; when it fails, the empty ray refutes without a
+ * citable combination. The numerical counterpart of [certifyLpFarkas].
  */
 @Suppress("ReturnCount")
 internal fun floatFarkasRay(model: LpModel, ray: DoubleArray): LongArray? {
@@ -674,13 +719,28 @@ internal fun floatFarkasRay(model: LpModel, ray: DoubleArray): LongArray? {
     val rows = lazy { RowView(view) }
     val normalized = DoubleArray(ray.size) { ray[it] / largest }
     val sign = farkasSign(view, normalized, rows) ?: return null
-    val rounded = roundDuals(model, DoubleArray(ray.size) { sign * normalized[it] })?.mult
+    val oriented = DoubleArray(ray.size) { sign * normalized[it] }
+    foldOpenColumns(view, oriented, rows)
+    val rounded = roundDuals(model, oriented)?.mult
     val citable = rounded?.takeIf { farkasSign(view, DoubleArray(it.size) { row -> it[row].toDouble() }, null) == 1 }
     return citable ?: LongArray(0)
 }
 
+// Each column the oriented ray meets on an open side takes the row implying that side into the ray with the weight
+// that cancels the column, which prices the side at the implied bound through rows a clause cites.
+private fun foldOpenColumns(view: FloatEvidenceModel, ray: DoubleArray, rows: Lazy<RowView>) {
+    for (j in 0 until view.numVars) {
+        var r = 0.0
+        if (j >= view.n) r = ray[j - view.n] else view.forEachInColumn(j) { row, a -> r += ray[row] * a }
+        if (r == 0.0 || (if (r > 0.0) view.upper(j) else view.lower(j)).isFinite()) continue
+        val implied = rows.value.impliedBy(j, lowSide = r < 0.0) ?: continue
+        ray[implied.row] -= r / implied.coefficient
+    }
+}
+
 // +1 when ρ·rhs exceeds every ρ·A·z in the box by the margin, -1 when it falls below every one, else null. Open
-// sides take their implied bounds from [rows] when given and refute nothing otherwise.
+// sides take their implied bounds from [rows] when given. Without them the ray is integral, and an open column whose
+// combination stays within the ray's rounding, one unit per coefficient it meets, counts as cancelled.
 @Suppress("ReturnCount", "CyclomaticComplexMethod")
 private fun farkasSign(view: FloatEvidenceModel, ray: DoubleArray, rows: Lazy<RowView>?): Int? {
     var activity = 0.0
@@ -693,14 +753,27 @@ private fun farkasSign(view: FloatEvidenceModel, ray: DoubleArray, rows: Lazy<Ro
     var least = 0.0
     for (j in 0 until view.numVars) {
         var r = 0.0
-        if (j >= view.n) r = ray[j - view.n] else view.forEachInColumn(j) { row, a -> r += ray[row] * a }
+        var reach = 0.0
+        if (j >= view.n) {
+            r = ray[j - view.n]
+            if (r != 0.0) reach = 1.0
+        } else {
+            view.forEachInColumn(j) { row, a ->
+                r += ray[row] * a
+                if (ray[row] != 0.0) reach += abs(a)
+            }
+        }
         if (r == 0.0) continue
         var lower = view.lower(j)
         var upper = view.upper(j)
-        if (rows != null && (!lower.isFinite() || !upper.isFinite())) {
-            val (low, high) = rows.value.impliedBounds(j)
-            lower = low
-            upper = high
+        if (!lower.isFinite() || !upper.isFinite()) {
+            if (rows == null) {
+                if (abs(r) <= reach) continue
+            } else {
+                val (low, high) = rows.value.impliedBounds(j)
+                lower = low
+                upper = high
+            }
         }
         val high = r * (if (r > 0.0) upper else lower)
         val low = r * (if (r > 0.0) lower else upper)

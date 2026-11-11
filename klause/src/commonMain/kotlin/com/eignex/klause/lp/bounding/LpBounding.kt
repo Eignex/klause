@@ -22,6 +22,7 @@ import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpDeductionCertificate
 import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpPhaseMetrics
 import com.eignex.klause.lp.engine.LpPhaseTimer
 import com.eignex.klause.lp.engine.LpProjectionStop
 import com.eignex.klause.lp.engine.LpRowBound
@@ -753,6 +754,7 @@ internal fun LpEngine.sparseSafePrune(
         if (rounded != null) {
             val reason = if (learn && cert != null && exactFloor != null && rounded == lpFloor) {
                 LpExplanation.objectiveBoundReason(boundRel, cert, session, sink.lp.certificationObserver(LpRoute.NODE))
+                    .also { sink.observeReason("OBJECTIVE", it != null) }
             } else {
                 null
             }
@@ -1041,6 +1043,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
     val reasonSupport = if (learn && objectiveVar >= 0 && objectiveAscending && sourceRange != null) {
         reducedCostFixingReasons(relaxation, cert, session, objectiveVar, checkNotNull(improvingMax.floorLong()),
             sink.lp.certificationObserver(LpRoute.NODE))
+            .also { sink.observeReason("FIXING", it != null) }
     } else {
         null
     }
@@ -1194,9 +1197,10 @@ internal class ReducedCostFixingReasons(
 
 /**
  * Build the complete reusable premise set for one certificate: all dual-weighted row premises, every
- * structural column's minimizing endpoint with nonzero reduced cost (including basic columns), and the
- * source-objective cutoff. For a single affine source objective `a·x + c`, the cutoff is converted to
- * the exact variable atom `x ≤ ⌊(improvingMax − c) / a⌋`; that atom must already hold. Null means some
+ * structural column's minimizing endpoint with nonzero reduced cost (including basic columns), every further side
+ * the certificate reads ([LpDeductionCertificate.extraCitedSides], kept in each fixing's reason, the fixed column's
+ * own included), and the source-objective cutoff. For a single affine source objective `a·x + c`, the cutoff is
+ * converted to the exact variable atom `x ≤ ⌊(improvingMax − c) / a⌋`; that atom must already hold. Null means some
  * premise cannot be named; the deduction may still be applied locally without a reusable reason.
  */
 internal fun reducedCostFixingReasons(
@@ -1938,7 +1942,11 @@ internal fun LpEngine.objectiveLowerBound(
  * empty numerical ray refutes the node without a combination a learned clause can cite.
  */
 internal fun LpEngine.infeasibilityRay(model: LpModel, floatRay: DoubleArray, sink: SolveStatsSink): LongArray? {
-    if (numericalDeductions) return floatFarkasRay(model, floatRay)
+    if (numericalDeductions) {
+        return floatFarkasRay(model, floatRay)?.also {
+            sink.observeDeduction(if (it.isEmpty()) "FARKAS_CLAUSELESS" else "FARKAS_CITABLE")
+        }
+    }
     return solveContext.certificationPolicy.acceptNullable(
         LpCertifier.EXACT_FARKAS,
         certifyLpFarkas(model.alsoCharged(this), floatRay, onRoute = {
@@ -1951,3 +1959,10 @@ internal fun LpEngine.infeasibilityRay(model: LpModel, floatRay: DoubleArray, si
         }, observer = sink.lp.certificationObserver(LpRoute.NODE)),
     )
 }
+
+// Learned-reason and conflict-clause outcomes, so how much learning each certification mode keeps is measurable.
+private fun SolveStatsSink.observeDeduction(outcome: String) =
+    lp.certificationObserver(LpRoute.NODE).observePhase(LpPhaseMetrics(LpSolvePhase.NODE_DEDUCTION, outcome, 0L))
+
+private fun SolveStatsSink.observeReason(kind: String, kept: Boolean) =
+    observeDeduction("${kind}_REASON_${if (kept) "KEPT" else "WITHHELD"}")
