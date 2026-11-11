@@ -50,7 +50,13 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
     }
     if (directional != null) return hints.selectVariable(directional, best, cancelled = { params.cancellation() })
     hints.selected(null)
-    return best
+    if (!hints.canCollectVariable) return best
+    return hints.selectCollectionVariable(best, isOpen = { variable ->
+        when (variable) {
+            is VarRef.Bool -> session.boolValue(variable.varId) == null
+            is VarRef.IntVar -> !session.intDomain(variable.varId).isFixed
+        }
+    }, cancelled = { params.cancellation() })
 }
 
 /** Minimum LP branch score (reduced-cost × fractionality) to override the configured selector; below

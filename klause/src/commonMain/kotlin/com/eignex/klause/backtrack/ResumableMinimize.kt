@@ -340,7 +340,12 @@ internal class ResumableMinimize(
     private val lpHints: LpHints? =
         if (params.lpPlan.branching) {
             LpHints(problem.numIntVars, problem.numBoolVars, params.lpDirectionalGains,
-                sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) })
+                sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) },
+                applyAdvice = false,
+                measuredCalibration = params.lpDirectionalGains,
+                currentVariableGains = if (params.lpDirectionalGains) { model, columns, splits, stamp ->
+                    lpEngine.branchDirectionalGains(model, columns, splits, stamp)
+                } else null)
         } else null
 
     private lateinit var cp: CpSearchComponent
@@ -1373,9 +1378,11 @@ internal class ResumableMinimize(
 
     /** LP guidance affects only branch order; the shared runner still owns every frame and retraction. */
     private inner class LpGuidedBranching : BacktrackBranching {
+        private val cancelled = { params.cancellation() }
+
         override fun onBranch(variable: VarRef) { lpHints?.branch(variable) }
 
-        override fun onCommit(decision: SearchDecision, depth: Int) { lpHints?.commit(decision, depth) }
+        override fun onCommit(decision: SearchDecision, depth: Int) { lpHints?.commit(decision, depth, cancelled) }
 
         override fun onRestart() {
             lpHints?.resetHistory()
@@ -1427,7 +1434,8 @@ internal class ResumableMinimize(
             }
             // Persistent LP fixings may use only a cutoff that survives every later repair.
             val lpBound = if (rebindable) externalBound else effectiveBound
-            lpHints?.beginNode(context.decisionLevel, lpBound)
+            lpHints?.beginNode(context.decisionLevel, lpBound,
+                currentComparisonsEnabled = incumbents.current() != null)
             if (restartRootTargetsPending && context.decisionLevel == 0 && incumbents.current() == null) {
                 restartRootTargetsPending = false
                 lpEngine.refreshRootPrimalTargets(session, params.cancellation)

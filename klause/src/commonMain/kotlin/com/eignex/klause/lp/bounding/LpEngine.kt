@@ -42,11 +42,15 @@ import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpCounterResults
+import com.eignex.klause.lp.engine.LpDirectionalGain
+import com.eignex.klause.lp.engine.LpDirectionalProbeSolver
 import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPhaseTimer
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpPrimalGuidance
+import com.eignex.klause.lp.engine.LpProbeDecline
+import com.eignex.klause.lp.engine.LpProbeMetrics
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.LpSolveSession
@@ -1209,6 +1213,116 @@ internal class LpEngine(
     internal var nodeSimplex: PersistentLpSolver? = null
     internal var nodeUsesTrail: Boolean = false
 
+    private var branchProbeChecks = 0
+    private var branchProbeAttempts = 0
+    private var branchProbeRemaining = 0L
+    private var branchProbePointStamp = -1L
+
+    internal fun branchDirectionalGains(
+        model: LpModel,
+        columns: IntArray,
+        splits: LongArray,
+        pointStamp: Long,
+    ): List<LpDirectionalGain>? {
+        sink.lp.observeDirectionalBranch("CURRENT_QUERY_CHECK")
+        val unavailable = when {
+            closed -> "OWNER"
+            branchProbeAttempts >= BRANCH_PROBE_QUERIES ||
+                (branchProbeAttempts > 0 && branchProbeRemaining <= 0L) -> "SPENT"
+            pointStamp >= 0L && pointStamp == branchProbePointStamp -> "REPEATED_POINT"
+            branchProbeChecks >= BRANCH_PROBE_CHECKS -> "ADMISSION_LIMIT"
+            columns.size != 2 || splits.size != 2 || pointStamp < 0L -> "SPLIT"
+            else -> null
+        }
+        if (unavailable != null) {
+            sink.lp.observeDirectionalBranch("CURRENT_QUERY_" + unavailable)
+            return null
+        }
+        val allowance = branchProbeAllowance(model) ?: return null
+        branchProbeAttempts++
+        branchProbePointStamp = pointStamp
+        sink.lp.observeDirectionalBranch("CURRENT_QUERY_ATTEMPT")
+        sink.lp.addDirectionalBranch("CURRENT_QUERY_GRANTED_WORK", allowance)
+        var observations = 0
+        var completed = 0
+        val observe: (LpProbeMetrics) -> Unit = { metrics ->
+            observations++
+            completed += metrics.completed
+            val work = metrics.work + BRANCH_PROBE_OBSERVATION_WORK
+            branchProbeRemaining -= work
+            noteNodeOverhead(work)
+            sink.lp.observeDirectionalBranch("CURRENT_QUERY_OBSERVATION")
+            sink.lp.addDirectionalBranch("CURRENT_QUERY_OBSERVATION_WORK", BRANCH_PROBE_OBSERVATION_WORK)
+            observeBranchProbe(metrics)
+        }
+        val gains = if (nodeUsesTrail) {
+            propagator.directionalGains(model, columns, splits, allowance, params.cancellation, observe)
+        } else {
+            val owner = nodeSimplex as? LpDirectionalProbeSolver
+            if (owner == null) {
+                observe(LpProbeMetrics(0L, 0L, 0, LpProbeDecline.OWNER))
+                null
+            } else owner.directionalGains(model, columns, splits, allowance, params.cancellation, observe)
+        }
+        val accepted = gains?.takeIf {
+            it.size == 2 && completed == 4 && observations <= BRANCH_PROBE_OBSERVATIONS &&
+                branchProbeRemaining >= 0L && !params.cancellation()
+        }
+        sink.lp.observeDirectionalBranch(if (accepted != null) "CURRENT_QUERY_AVAILABLE" else "CURRENT_QUERY_DECLINED")
+        return accepted
+    }
+
+    private fun branchProbeAllowance(model: LpModel): Long? {
+        branchProbeChecks++
+        sink.lp.observeDirectionalBranch("CURRENT_QUERY_ADMISSION")
+        sink.lp.addDirectionalBranch("CURRENT_QUERY_ADMISSION_WORK", BRANCH_PROBE_ADMISSION_WORK)
+        noteNodeOverhead(BRANCH_PROBE_ADMISSION_WORK)
+        val offered = minOf(MAX_NODE_WORK_OPS,
+            nodeQueryWorkBudget() ?: nodeWorkBudget().takeIf { it > 0L } ?: MIN_NODE_WORK_OPS)
+        val metricReserve = BRANCH_PROBE_OBSERVATIONS * BRANCH_PROBE_OBSERVATION_WORK
+        val followupWork = BRANCH_PROBE_FOLLOWUP_WORK
+        val nodeAllowance = offered - BRANCH_PROBE_ADMISSION_WORK - followupWork - metricReserve
+        val remaining = if (branchProbeAttempts == 0) nodeAllowance else branchProbeRemaining
+        val allowance = minOf(nodeAllowance, remaining - metricReserve)
+        val floor = 50L * model.numVars + 45L * model.m + 469L
+        sink.lp.addDirectionalBranch("CURRENT_QUERY_OFFERED_WORK", offered)
+        sink.lp.addDirectionalBranch("CURRENT_QUERY_SETUP_FLOOR", floor)
+        val refusal = when {
+            params.cancellation() -> "CANCELLED"
+            lpWorkAllowanceSpent(followupWork) -> "FUNDING_SPENT"
+            lpEffortGovernor.isDemoted -> "DEMOTED"
+            allowance <= floor -> "SETUP_UNFUNDED"
+            else -> null
+        }
+        if (refusal == null) {
+            if (branchProbeAttempts == 0) {
+                branchProbeRemaining = nodeAllowance
+                sink.lp.addDirectionalBranch("CURRENT_QUERY_LIFETIME_WORK", nodeAllowance)
+            }
+            return allowance
+        }
+        sink.lp.observeDirectionalBranch("CURRENT_QUERY_" + refusal)
+        return null
+    }
+
+    private fun observeBranchProbe(metrics: LpProbeMetrics) {
+        sink.lp.addDirectionalBranch("CURRENT_QUERY_PREPARATION_WORK", metrics.preparationWork)
+        sink.lp.addDirectionalBranch("CURRENT_QUERY_SOLVE_WORK", metrics.solveWork)
+        sink.lp.addDirectionalBranch("CURRENT_QUERY_CHILDREN", metrics.completed.toLong())
+        metrics.decline?.let { sink.lp.observeDirectionalBranch("CURRENT_QUERY_DECLINE_" + it.name) }
+        metrics.preflight?.let {
+            sink.lp.addDirectionalBranch("CURRENT_QUERY_WORKSPACE_WORK", it.workspaceWork)
+            sink.lp.addDirectionalBranch("CURRENT_QUERY_SCALAR_WORK", it.scalarWork)
+            sink.lp.addDirectionalBranch("CURRENT_QUERY_FACTOR_COPY_WORK", it.factorCopyWork)
+            sink.lp.addDirectionalBranch("CURRENT_QUERY_PREPARATION_OFFERED", it.offeredWork)
+            it.stop?.let { stop -> sink.lp.observeDirectionalBranch("CURRENT_QUERY_PREPARATION_STOP_" + stop.name) }
+        }
+        metrics.numerical?.let {
+            sink.lp.addDirectionalBranch("CURRENT_QUERY_SOLVE_GRANTED", it.workAllowance)
+            sink.lp.addDirectionalBranch("CURRENT_QUERY_PIVOTS", it.pivots.toLong())
+        }
+    }
+
     internal val cpAdapter = CpLpAdapter(this)
     internal val propagator = LpPropagator(
         cpAdapter,
@@ -1947,6 +2061,13 @@ private const val GATED_UPDATE_LIMIT = 400
 /** Floor on the adaptive node LP work budget ([LpWorkBudget]). A floor rather than an off switch: with a
  *  persistent basis a stopped solve is progress the next node resumes from, and it still bounds. */
 private const val MIN_NODE_WORK_OPS = 10_000L
+
+private const val BRANCH_PROBE_QUERIES = 4
+private const val BRANCH_PROBE_CHECKS = 32
+private const val BRANCH_PROBE_ADMISSION_WORK = 20L
+private const val BRANCH_PROBE_FOLLOWUP_WORK = 48L
+private const val BRANCH_PROBE_OBSERVATIONS = 8
+private const val BRANCH_PROBE_OBSERVATION_WORK = 32L
 
 /** Ceiling on the adaptive node LP work budget — roughly the cost of the most expensive solves measured
  *  on the XCSP3 COP corpus, so a runaway model cannot spend without limit. */

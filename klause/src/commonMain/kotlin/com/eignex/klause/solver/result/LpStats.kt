@@ -632,9 +632,15 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     fun directionalBranchCount(outcome: String): Long = directionalOutcomes[outcome] ?: 0L
 
     fun observeDirectionalBranch(outcome: String) {
+        addDirectionalBranch(outcome, 1L)
+    }
+
+    fun addDirectionalBranch(outcome: String, amount: Long) {
+        require(amount >= 0L)
+        if (amount == 0L) return
         if (directionalCalls == 0L) phases.getOrPut("DIRECTIONAL_BRANCH_NODE") { LpPhaseStats() }
         directionalCalls++
-        directionalOutcomes[outcome] = (directionalOutcomes[outcome] ?: 0L) + 1L
+        directionalOutcomes[outcome] = (directionalOutcomes[outcome] ?: 0L) + amount
     }
 
     fun observePrimalPhase(stage: String, outcome: String, nanos: Long, work: Long = 0L) {
