@@ -635,6 +635,11 @@ internal fun LpEngine.sparseSafePrune(
     val additionalCertificates = ArrayList<LpDeductionCertificate>(2)
     val numerical = if (numericalDeductions) FloatDeductionCertificate.of(boundRel.model, boundRes.duals) else null
     val cert = if (numericalDeductions) {
+        // The objective box and half the LP duals fix columns the LP duals leave free, as the exact alternatives do.
+        if (canFix) for (share in doubleArrayOf(0.0, 0.5)) {
+            val duals = DoubleArray(boundRes.duals.size) { boundRes.duals[it] * share }
+            FloatDeductionCertificate.of(boundRel.model, duals)?.let(additionalCertificates::add)
+        }
         numerical
     } else if ((learn && canPropagate) || canFix) {
         val observer = sink.lp.certificationObserver(LpRoute.NODE)
