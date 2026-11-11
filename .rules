@@ -139,7 +139,7 @@ Read `klause-bench/README.md` before benchmarking. In short:
   AllDifferent and multi-knapsack structure, energetic and flow feasibility over `Cumulative`. It
   reads factors, `ir`, `solver.objective`, and propagation state, and may read `lp.relaxation`
   views — never `lp.engine`. Needing the simplex is what puts a bound under `lp` instead.
-- `theory.difference`, `theory.lia`, and `theory.qflra` decide complete open-model fragments. They must
+- `theory.difference` and `theory.qflra` decide complete open-model fragments. They must
   not materialize finite CP domains.
 - `solver.pipeline` selects an open theory once and exposes one verdict surface. Frontends render
   assignments; they do not select or invoke concrete theories.

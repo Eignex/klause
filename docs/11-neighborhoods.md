@@ -285,9 +285,8 @@ starts a fresh tabu epoch while preserving cumulative write activity.
 
 ILS also receives zero-score snapshots at feasible stalls and completed descents.
 Those notifications classify the working walk and supply heuristic population
-anchors; they do not grant original-source witness admission. The engine's checked
-best remains a separate restart input. A source-feasible archive must validate its
-points against the original source and preserve that separation.
+anchors; they do not grant incumbent admission. The engine's accepted best remains a
+separate restart input.
 
 Retained ILS restarts over unconditional AllDifferent boards report searched-input
 outcomes after ordinary preparation and the enabled greedy-repair pass. Changed
@@ -332,8 +331,8 @@ inputs and working coordinates. Cancellation or a limit returns an explicit
 decline without partial freedoms. Selection retains only bounded diagnostics;
 it has no resumable cursor and does not renew an interrupted allowance.
 
-Before and during its bootstrap, ALNS checks a supplied assignment and the latest
-shared incumbent. A supplied assignment must cover all coordinates, satisfy the
+Before and during its bootstrap and before each iteration, ALNS acquires a supplied
+assignment and the latest shared incumbent. A supplied assignment must cover all coordinates, satisfy the
 current model and assumptions and pass the shared source witness checker. A shared
 incumbent is an engine result and is checked only against the current assumptions.
 ALNS re-evaluates either against its own objective. An interrupted check leaves the candidate

@@ -6,8 +6,8 @@ parsing and output semantics. The CLI adds no solving policy.
 
 ## CLI module
 
-`klause-cli` is multiplatform: shared dispatch and protocols live in `commonMain`,
-with JVM and POSIX actuals for `Platform.kt`. The JVM distribution requires JDK 25
+`klause-cli` is multiplatform: dispatch, protocols and `Platform.kt` live in
+`commonMain`, with platform services from `com.eignex:util`. The JVM distribution requires JDK 25
 or newer; native executables need no JVM. Build commands live in the
 [repository README](../README.md#build), and runtime numerical options in
 [numerical dependencies](18-exact-arithmetic.md#runtime-support).

@@ -1,7 +1,7 @@
 # 12. Portfolios
 
 A portfolio schedules retained workers over one source and objective. Workers share
-checked incumbents and certified deductions; the coordinator owns slice allocation,
+incumbents and certified deductions; the coordinator owns slice allocation,
 publication admission and cleanup. Prepared capabilities decide which arms can run,
 while proof scope decides which claims they may make.
 
@@ -36,7 +36,7 @@ fresh slots in that order; `arm=cbls-plateau/ils-basin` with
 Functional guidance is the ordinary default. Canonical guidance retains linear
 grading and proposals; geometric guidance retains linear grading with qualified,
 bounded cone-leaf proposals. It uses the same baked model, source identity and
-checked solution exchange. Unsupported cones retain canonical execution and
+solution exchange. Unsupported cones retain canonical execution and
 report a decline. Reseeding opens a fresh search, revalidating its live objective,
 network and conditions. These policies grant no bound, terminal, pool or warm-start
 authority beyond the worker's existing source contract.
@@ -201,6 +201,7 @@ remain declined; paused recovery keeps its progress under the same cumulative
 allowance. Preparation, residual solving, checking and retained allocation spend the
 companion's existing LP funding, and closure releases its residual owners. The
 control defaults to false and changes neither worker admission nor lifetimes.
+Planned: incumbent handoff to companions becomes the default.
 Advisory keys retain value snapshots without producer certificates. Unsupported
 symbolic payloads, integers outside the recovery scalar limit and keys beyond the
 remaining modeled allocation are refused before retention.
@@ -742,7 +743,7 @@ terminal admission and owns no retained solver state. The internal Boolean task
 executor keeps one repair handle per worker, including a direct Boolean satisfaction
 implementation, and rotates ordinary-sized bounded
 slices across disjoint tasks, reusing each private session for sibling cubes.
-Construction, reseeding, failed attempts, checks and retirement retain their
+Construction, reseeding, failed attempts and retirement retain their
 containing allowances and cumulative worker counters; it supplies no independent
 proof certificate. An internal portfolio coordinator
 keeps source bindings, seed positions and channel origins on the original workers.
@@ -1032,7 +1033,7 @@ propagate, and source-refuted claims remain quarantine faults.
 FlatZinc search hints select tiered variable and value heuristics without the
 free-search preset's phase saving or restarts. Optimization updates guidance only
 after admitting a complete improving incumbent; solution-guided selectors adopt
-better verified pooled incumbents when traversal resumes, keeping their trail and
+better pooled incumbents when traversal resumes, keeping their trail and
 learned state.
 
 Finite portfolios with numerical companions supply native guidance from the same
@@ -1205,8 +1206,7 @@ materialized. Weights and the bound use arbitrary-precision integers.
 Objective terms, residual-core updates, maximum-weight scans, core projection and
 query-pin selection retain private cursors across slices. A completed pin set stays
 with its query model across interrupted openings; resuming does not repeat its
-threshold scan. Preparation visits, point-check construction, verification
-propagation and private retirement spend the same cumulative worker allowance as
+threshold scan. Preparation visits and private retirement spend the same cumulative worker allowance as
 query traversal. Augmented queries retain the
 source's established root domains, deductions and captured projections; their
 additional constraints propagate in the query session.
@@ -1215,8 +1215,7 @@ assumption seeding across slices. Native clausal opening stays atomic; an
 interrupted opening retains its charges, model and selected pins and retries with
 the retained general preparer. This prevents repeated native construction from
 using every subsequent slice without reaching traversal.
-An interrupted point check keeps its candidate for the next slice; each attempt
-retains its construction and propagation charges. Closing discards query pins,
+Closing discards query pins,
 auxiliary buffers and preparation cursors while keeping completed observations.
 
 Curated single-lane mixed source execution selects an early reason-refined core
@@ -1268,7 +1267,7 @@ Curated eligibility reads the original objective, so an integer output alias doe
 not enable an additional default worker. Expansion and refused attempts spend the
 worker's containing preparation allowance.
 
-Published incumbents project away auxiliary selectors and pass the source check, and
+Published incumbents project away auxiliary selectors, and
 optimality requires exact equality between the original objective and the
 accumulated bound. Auxiliary clauses never enter shared channels. On a single lane
 with another complete worker, the core worker joins after the first incumbent once

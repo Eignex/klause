@@ -572,14 +572,14 @@ main/classpath/jvmArgs. Pass the scheduler profile's source, work, driver, recip
 and split arguments plus `seeds=1,3` and `cold-repeats=2`. Retain the output under
 `$OUT`; consult the lab's run guide for comparison and checking workflows.
 
-`lab/recipes/` contains the migrated lab recipes. `scripts/convert-lab-recipe.sh`
+`lab/recipes/` contains the lab recipes. `scripts/convert-lab-recipe.sh`
 translates legacy experiments or schedules from stdin without submitting them;
 exact legacy confirmation lists require a newly pinned SDK plan and are refused.
 
 Profiles use `scripts/lab-profile.sh` with a main class as their first argument.
 The recipe declares build tasks; the script owns CLI paths, corpus properties and
 recording options. After installing the bench, `scripts/draw-sets.sh <features-dir>
-<references.csv> <sets-dir> [set,...]` runs the migrated seeded named-set generator.
+<references.csv> <sets-dir> [set,...]` runs the seeded named-set generator.
 
 `bench.profile.CorpusStagingProfile` accepts `suite=ID problem=NAME sha256=HEX
 budget-ms=N repeats=2`. It compares packed reads, decoding with hashing, temporary
@@ -863,58 +863,6 @@ protected reasons through native/general compaction, and actual satisfaction and
 optimization workers consuming peer imports. They preserve the existing use-based
 reward drain. Sizing, retention age and targeted delivery are separate experiments.
 
-[9222](https://lab.eignex.com/jobs/9222) captures two repeats of `php4` and
-`sporttournament06` at `325dc8d256`, seed 17, one Linux/amd64 processor,
-4,000 work units and retained/reseed controls. Source hashes and installed
-library/CLI/runtime hashes match; path-sensitive build fingerprints remain in
-the records. Each `php4` case imports 17 clauses and drains 16 use-window credits;
-13 retained peer imports have consumed consequences. The pool holds 25 clauses
-with 372 payload bytes, while a consumer's seen filter peaks at 25 keys/576 bytes,
-its learned arena at 512 bytes and metadata at 1,344 bytes. Retirement reports
-zero seen capacity. Primitive samples describe sharing owners, whereas process
-RSS across the eight cases is 111,716–145,420 KiB and includes runtime and model state.
-
-The optimization reseed control retires the main native worker 32 times and the
-private ALNS repair owner 14 times. Its automatic recipe has only one
-clause-sharing backtrack worker, so it supplies no peer-clause import evidence.
-Both `php4` controls repeat their complete logical trace. Optimization stderr
-capture ends at 16,384 bytes: its captured complete events match across repeats,
-and incomplete final lines establish no scheduling divergence. Full-trace
-reproducibility is unqualified for those captures. Explicit clause-capable workers
-separate the sharing control from that mixed recipe.
-
-Preparation spends about 549 seconds, including 234 seconds waiting for a compiler.
-All eight native case records are present, but the containing 900-second job ends
-with `Whole-run deadline exhausted` before final artifact/check completion.
-The requested independent checks supply no receipts; native UNSAT and objective -6
-remain unchecked. Earlier HTTP400 schema rejections created no jobs. These records
-demonstrate accounting and consumption, not a speedup, independently checked proof,
-memory bound or basis for changing retention/delivery defaults.
-
-
-[9238](https://lab.eignex.com/jobs/9238) isolates two clause-capable CP workers on
-`sporttournament06` at `b81cc434e8`, with the existing `pb-learning=false`
-diagnostic control. All four native records retain a 156-byte learned payload,
-but no clause passes the export filter. The 1,200-second containing job expires
-after preparation, execution and finalization; no independent check receipt is
-available. This is an export-applicability negative, not peer-consumption evidence.
-
-[9257](https://lab.eignex.com/jobs/9257) captures the native/shared observation
-integration at `3d189f2d97` after the root-simplification integration, using the
-same two sources, explicit CP workers and one repeat per retained/reseed control.
-Both workers report `sharedLearningObserved=1`, 224 bytes of shared learned
-index capacity and 80 bytes of shared trail reason index capacity. The shared
-learned payload remains empty in these captures. Each `php4` control imports
-7 and 8 peer clauses; 7 and 4 retained peer imports respectively have consumed
-consequences. Both workers release their seen buffers. Optimization exports no
-clauses; the forced control reports 32 and 27 reseeds and objective -5, versus
--6 with retention. Its stderr is truncated, so complete work-trace equality
-is unqualified. Process RSS spans 115,544–131,072 KiB. Preparation includes
-315 seconds of compilation and 66 seconds of upload. Native case completion
-provides no independent check receipt or basis for a performance/default claim.
-Additional reason journal, event and root-retirement capacity fields are covered
-by CI at the later source revision.
-
 ## Propagation and explanation value
 
 `set=propagation-value-v1` retains scheduling, Table and mixed finite arithmetic
@@ -956,63 +904,6 @@ native verdicts separately from independent checks. A priority trial additionall
 needs periodic opportunities preventing starvation and lower total cost or improved
 checked outcomes before activation.
 
-[9243](https://lab.eignex.com/jobs/9243) compares the three controls at
-`8250ff0af5`, seed 17, one Linux/amd64 processor, 2,000 decisions per worker and a
-10-second CLI ceiling, with presolve and LP disabled. Source digests and installed
-CLI/library/runtime hash maps match within each triple; path-sensitive build
-fingerprints differ. Ordinary and attributed controls retain the same logical
-work and outcomes on all five successfully loaded sources.
-
-On `cyclic-mod3-sat`, 1,376 units of Table propagation and 1,037 units of lazy
-reason work produce 16 completed explanations, eight Table first-UIP visits and
-two consumed learned objects. Historical refinement adds 76 work units to the
-3,013-unit solve without an accepted improvement, changed search or objective.
-`overlap-tables-unsat` similarly spends eight extra refinement units without a
-changed outcome. On `magic-square-3`, 41 Linear explanation builds cost 380 work
-units; 26 Linear and four AllDifferent first-UIP visits contribute to the same
-four consumed objects. These overlapping credits cannot be summed. The linear
-knapsack control has four explanations but no first-UIP or consumption credit.
-Packed SAT on `php4` records 27 consumed clauses and five later-use events.
-These observations locate learning consumers and unsuccessful explanation work;
-they establish no counterfactual speedup.
-
-The nine feasible XCSP witnesses have valid source-matched SolutionChecker
-receipts, version `2.5.1+ca58fc79a42374d080aac4d1410874e748cf0a05`.
-Witness hashes match within each source's triple. Checker platform and resource
-details are unrecorded. The receipts establish feasibility; native optimality and
-UNSAT reports remain independently unverified.
-
-Preparation is part of this evidence: [9226](https://lab.eignex.com/jobs/9226)
-spends 895 seconds, including 476 waiting for a compiler, 249 compiling,
-120 selecting and 23 uploading, then exhausts its 900-second whole-run deadline.
-Its normal retry retains the exhausted deadline. Job 9243 reuses verified
-artifacts in 23 seconds, executes all 18 cases, and exhausts its 1,200-second
-containing deadline after worker completion; three scheduling controls fail
-loading compressed input. Source checking takes about 100 milliseconds per
-accepted witness. Complete finalization/retirement time is unqualified, and these
-single, cache-dependent observations support no throughput or RSS claim.
-
-[9270](https://lab.eignex.com/jobs/9270) completes the three frozen RCPSP controls
-at `76a5438832` after compressed-source staging. Source and installed build/runtime
-hashes match within the triple. Decoding takes 2–3 ms inside the 10-second source
-allowance; invocation and staged-file retirement take 10,498–10,539 ms, including
-JVM startup and output. All three witnesses pass the source checker in 160–250 ms.
-Their objectives are 118, 117 and 121 in control order. Optimization selects the
-timed finite CP portfolio, so these different search traces establish no causal
-performance comparison. The attributed case spends 30,633,861 scheduling work
-units, with 25,425 completed explanations, 12,349 first-UIP visits, 524 consumed
-objects and 137 later-use events. It records 38 untracked scheduling observations;
-bounded provenance does not cover every reason. Scheduling reasoning dominates
-charged propagation and has downstream consumers, without an established net gain.
-
-The focused job finishes in 501 seconds, including 440 preparing: 245 compiling,
-128 selecting, 12 archiving and 39 uploading. Its workers commit and request stop.
-The earlier [9258](https://lab.eignex.com/jobs/9258) loses a preparation worker and
-exhausts its containing 1,200-second allowance during recovery without solver cases.
-[9269](https://lab.eignex.com/jobs/9269) is rejected before allocation because its
-revision is detached by rebase. Failed preparation and recovery remain charged;
-no priority, refinement or attribution default change follows from these captures.
-
 ## LP capture and replay
 
 Ordinary open-linear controls use `param.open-linear-incremental=true|false` with
@@ -1052,40 +943,6 @@ Retained files and complete parent logs still require lab artifact publication.
 arms with those limits and snapshot checks, isolating replay variation from row
 scheduling. Open-work units count policy decisions and checks; they do not count
 primitive arithmetic operations or replace preparation and numerical timings.
-
-The prepared-factory strict-bound, backtrack and compatible-decline controls pass
-on JVM and Linux native at `2337dbd102`; the new JVM cases take at most 5 ms.
-Original PWD [9192](https://lab.eignex.com/jobs/9192) stops during cold corpus
-acquisition, and [9215](https://lab.eignex.com/jobs/9215) stops at the missing CLI
-provenance installation. Frozen-source [9230](https://lab.eignex.com/jobs/9230)
-reaches 3 of 8 boundaries in its cached control before the ten-second emergency
-deadline, reporting 3 deductions and 2 deferred numerical queries. Its delayed
-artifacts identify that limit failure; the incremental arm did not run.
-Diagnostic [9244](https://lab.eignex.com/jobs/9244) reproduces that control limit.
-With thirty-second deadlines, [9262](https://lab.eignex.com/jobs/9262) reaches the
-first boundary in both arms with identical exact states, shared pins and reasons.
-Incremental mode consumes 16 deduction events with 5 numerical deferrals and
-119,049 source-row visits, versus 396,676 control visits. After continuation,
-shared pins, reasons and source assertion levels still agree, but LP witness IDs
-and five point coordinates differ; the profile rejects that continuation replay.
-[9268](https://lab.eignex.com/jobs/9268) repeats the cached producer in both arms;
-its prefix and continuation snapshots agree. Both continuation snapshots are also
-byte-identical to the incremental continuation in 9262, with 37 cumulative
-deduction events and 18 checks. The first paired control's differing intermediate
-work is retained as an unqualified comparison; it establishes no scheduling or
-throughput attribution. At the matching first boundary, only 1,871 of 11,671
-Booleans are assigned, establishing consumption before source completion.
-Current-main [9272](https://lab.eignex.com/jobs/9272) at `7d687be9eb` passes both
-paired snapshot comparisons with forty-second deadlines and zero operation stops.
-Its incremental continuation records 37 cumulative deduction events with only
-2,267 of 11,671 Booleans assigned, 32,582 assertion invalidations and 63,444
-compatible decline reuses. Source-row visits are 260,909 versus 736,684 in the
-cached control. Linux amd64 JDK 25.0.4.1+1 runs under a hard one-core, 4,608 MiB
-cgroup allowance; the measured JVM uses a 3 GiB heap and Serial GC. Original
-source, installed build/runtime hashes and exact states accompany the lab record.
-These observations complete the original-source consumption audit for
-[#3844](https://github.com/Eignex/klause/issues/3844); they establish no default
-throughput or terminal claim. Admission stays opt-in.
 
 `lp-component-split` supplies existing separable MPS and MiniZinc sources plus
 `mzn-linked-8x24` as a connected control. For immutable node lifecycle controls use
@@ -1431,24 +1288,6 @@ coordinates still require completion and exact original-source checking before u
 source checking admits a center. Retain unsuccessful and paused preparation/proposal
 costs; continuation alone establishes no checked progress.
 
-[9455](https://lab.eignex.com/jobs/9455) records ordinary binary-admitted `dcmulti`
-at thirty seconds, seeds 1 and 3. In the connected seed-1 control, an incumbent is
-available at 14.29 seconds, repair first queries at 16.11 seconds and consumes its
-center at 28.10 seconds in a 28.49-second portfolio invocation. One repair candidate
-remains unresolved, with no accepted repair improvement. Completion has no offered
-incumbent in seed 3. The witness checks are `UNKNOWN` because the independent MPS
-parser rejects data after `ENDATA`; native values establish no checked benefit.
-
-[9366](https://lab.eignex.com/jobs/9366) exercises ordinary finite producers on
-`bell3a` and `bell5`, with completion off/on at `89d5153cd9`, seed 1, one core and
-thirty seconds. Each treatment records two numerical imports/uses and one repair
-import/use; both final treatment points pass the independent rational MPS checker.
-The `bell3a` control fails that checker's zero-tolerance row E3 check, and the checked
-`bell5` treatment objective is worse than its control. Preparation costs 546.5 CPU
-seconds separately from solving. These controls establish consumed completion,
-without qualifying activation or speed. Reconstructed-source qualification and
-current-head CI are retained with [the implementation](https://github.com/Eignex/klause/pull/3897).
-
 `param.companion-integers=true` trials bounded general-integer/continuous numerical
 companions on the ordinary finite route. `false` retains the binary-only gate.
 Both settings capture `admission` lines with fragment, objective, proof authority,
@@ -1466,45 +1305,6 @@ F1's work-driven mode remains available for finite integer/Boolean controls and
 rejects numerical companions; mixed numerical elapsed schedules are not reproducible
 work traces. S1's directional LP gains remain a separate opt-in branch control.
 Native completion flags do not independently validate proofs.
-
-[The admission contract](https://github.com/Eignex/klause/pull/3859) is exercised by
-[9267](https://lab.eignex.com/jobs/9267) and
-[9271](https://lab.eignex.com/jobs/9271) at `40f5f3353e`, whose tree matches its
-rebase merge `8b7b791202`. Both retain matched original source hashes, identical
-installed CLI/library and JDK artifact hashes, and Linux/amd64 resource receipts.
-The 24 reported witness records pass MIPLIB solchecker
-`1.0.4+eignex-lab-longnum-1`; its binary, patch, source and witness identities remain
-in the receipts. These checks validate points and original objective values under the recorded
-tolerance policy, not independently checked optimality or bounds.
-
-The ten-second run uses four MIPLIB 3 sources and five controls: automatic default,
-binary gate, general-integer trial, direct numerical frontier and broad companions.
-The trial admits `bell3a`, `bell5` and `flugpl`; `dcmulti` remains a binary admission
-control. Both companions receive real slices. The trial loses the `bell5` witness
-and worsens `bell3a` against the binary control. Grouped execution permits the last
-case to consume about 22 CPU-seconds in ten seconds of wall time, so these outcomes
-alone cannot establish a precise policy comparison.
-
-The follow-up runs `bell3a` and `bell5` at thirty seconds, seeds 1 and 3, with one
-core and serial execution. The trial and binary control each find four checked
-witnesses. Trial objectives improve once and worsen three times; peak RSS increases
-in three comparisons. User CPU time stays near thirty seconds per case. The longer
-budget recovers feasibility without a consistent quality or total-cost advantage.
-The numerical companion produces 101–134 native certified node bounds and records
-26–101 child-bound gains before retiring after 4.01–4.18 seconds of active work.
-It supplies no terminal completion or credited incumbent, and neither companion
-observes an imported incumbent. Construction, deferred queries, private retirement
-and source checking remain charged to the containing run.
-
-Keep the binary-only automatic gate and the opt-in general-integer control under
-these quotas. This decision concerns the tested admission policy; internal bounds
-and changed finite schedules do not establish consumed whole-source benefit.
-[9223](https://lab.eignex.com/jobs/9223) exhausts its allowance selecting the full
-MIPLIB 2017 archive; [9253](https://lab.eignex.com/jobs/9253) exhausts preparation
-after lease losses. Neither produces source outcomes. The successful runs retain
-about 397 seconds of cold preparation and nine seconds with reused artifacts,
-plus about 2.57 seconds of independent checking; failed preparation stays part of
-the investigation cost rather than becoming a solver regression.
 
 ## Prepared arithmetic learning
 
@@ -1559,35 +1359,6 @@ instrumented capture supplies neither independent
 source checking nor a throughput claim. Use an ordinary lab adapter comparison
 with source validation for whole-source outcomes; a missing consumer requires
 further source or integration diagnosis. Defaults and export scope remain separate.
-
-The [prepared-source regression](https://github.com/Eignex/klause/pull/3856) parses
-FlatZinc search annotations and uses ordinary solution-preserving preparation and
-production enumeration. The same guarded retained object owns different later
-upper bounds, then retires after its guard is negated. Twenty reconstructed source
-points satisfy both original relations. At `1a9a2cb15a`,
-[CI](https://github.com/Eignex/klause/actions/runs/40863068552) passes JVM, native
-and lint/docs; the prepared-source JVM test takes 62 ms.
-
-At `f7eeda662c`, [lab 9307](https://lab.eignex.com/jobs/9307) parses frozen original
-`MagicSquare-sum-06_c23` XCSP3 bytes with digest
-`f8bf86880a7020f41783f247b670c613f7a4615c640f5764210b630f20e53af2`.
-Ordinary preparation retains the overlapping linear sources. The trace includes
-the historical endpoint rows, complete fallback and an unguarded 16-term consequence,
-mapped to level 12 and stored as identity 0 / factor 1490. That same object forces
-variable 9 at most 19, then 16 after pick 48 and 15 after pick 49; sibling reuse also
-survives undo. The event cap cuts later observations, so retirement of this object
-is established by the prepared-source regression, not by the catalog trace.
-Catalog lifecycle counters report 16 admitted/consumed rows and 16 retired rows.
-
-Both arms retain seed 3, a 10-second deadline and `maxDecisions=4096`. The clause arm
-returns SAT with native reconstruction checks; the integer arm stops at its node
-limit as Unknown. Neither supplies independent source certification or a speedup.
-The containing run takes 282.799 seconds, including 87.923 seconds of compilation;
-the source command takes 33.769 seconds including output drain. Placement is automatic
-on macOS arm64, JDK 25.0.4.1+1, with advisory one-CPU / 4,608 MiB resource receipts.
-The smaller magic-square source's AllDifferent-only conflicts, compressed-byte
-hash refusal, worker network failure, earlier truncated captures and preparation
-timeouts retain their costs and provenance in the external campaign ledger.
 
 ## Clausal repair buffer comparison
 

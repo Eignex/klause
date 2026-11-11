@@ -1088,7 +1088,8 @@ counts, retaining isolation from later observations.
 [SearchStats](../klause/src/commonMain/kotlin/com/eignex/klause/solver/result/SearchStats.kt)
 and [CLI statistics](20-cli.md#statistics) define the exported fields.
 
----|---|
+| Field | Meaning |
+|---|---|
 | `propagations` | Finite Boolean, singleton, bound, hole and survivor-set deductions reported by completed search fixpoints; excludes decision and root pins |
 | `learned` | Learned consequences observed by the traversal, including native CP learning |
 | `caNotApplicable`, `caNonAsserting` | Native CP analyses declining a usable or asserting consequence; exported by every CLI format |

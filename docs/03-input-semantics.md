@@ -403,25 +403,6 @@ exact affine rows without floating multiplication. Boolean reification of these
 equalities is unsupported. Private grids use `GridProduct` and `GridPower` under
 their captured approximation policy.
 
----|---|---|
-| `Product` | Int × Int → Int | Finite integer propagation and search |
-| `RealProduct` | Finite Int × Real → Real | Fixing the integer operand gives an exact linear completion; unfixed operands can use LP relaxations |
-| `ContinuousProduct` | Real × Real → Real | Shared polynomial completion, with finite factors remaining in their engine projection |
-
-`factor.arithmetic.ContinuousProduct(a, b, result)` is the exact real equality
-`result = a * b`; repeated operands express squares and results can feed other
-products. The DSL exposes `(x * x * y) eq z`, `(x * y) eq 2.0` and affine operands
-such as `((x + 0.5) * y) eq z`, while `FloatTerm * Double` stays affine.
-`ContinuousRealEquality` lowers these into real columns, products and exact affine
-rows, reusing equal subexpressions and never folding multiplication in floating
-point. Equalities that need Boolean reification are rejected.
-
-Continuous products have no finite deduction or LP relaxation and only heuristic
-scores, so shared entry points route them through
-[shared polynomial completion](16-nonlinear-arithmetic.md#shared-model-composition)
-beside finite factors. Private grids lower them to `GridProduct` and `GridPower`
-instead.
-
 ---
 
 Previous: [2. Model representation and ownership](02-model.md) · [Contents](README.md) · Next: [4. Finite formats and FlatZinc](04-finite-formats.md)

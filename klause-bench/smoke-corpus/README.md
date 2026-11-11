@@ -3,7 +3,7 @@
 This directory contains small parser and solve
 fixtures grouped by format. Larger or non-redistributable collections are fetched
 through the catalog, with their license and exclusion policy in the collection
-declaration. See [corpus management](../README.md#catalog-and-corpus).
+declaration. See [corpus management](../README.md#corpus-and-build-identity).
 
 | Directory | Contents and origin |
 |---|---|
@@ -55,8 +55,8 @@ is rational coefficient syntax. Symbolic division, mixed integer sorts, negative
 powers, transcendental functions and multiple-query sessions have separate identities.
 The fetched QF_NRA archive preserves its per-family attribution/licenses and is
 not certified as polynomial by its logic tag. See the benchmark README for
-[named selection](../README.md#selection-and-named-sets) and
-[reference solving in klause-lab](../README.md#klause-lab).
+[named selection](../README.md#select-and-solve) and
+[reference solving in klause-lab](../README.md#run-through-eignex-lab).
 
 [Canonical source variants](qfnra-source-canonical-v1/manifest.json)
 retain degree-drop and equal-degree common-root cases with canonical `(- 1)`

@@ -180,13 +180,13 @@ publications while workers execute.
 direction, the execution model and owned assumption snapshots, plus an optional
 exact original condition that cannot change after binding.
 `CompletedEnginePublication` carries native root objective floors, integer windows
-and checked witnesses with their invocation and both endpoints;
+and witnesses with their invocation and both endpoints;
 `QuadraticWitnessPublication` adds the original point and exact objective. These
 publications manufacture no terminal result, and a certificate can be built only
 from an actual completed result or publication.
 
-`PortfolioWorker.bindSharingInvocation` binds the pool query separately from the
-worker's runtime. Consumers compare plan, execution identity, objective,
+`PortfolioWorker.bindSource` installs a `SourceWorkerBinding` whose sharing
+invocation binds the pool query separately from the worker's runtime. Consumers compare plan, execution identity, objective,
 restrictions and capture scope and require exact equality of values and endpoints. A more restricted worker can supply a feasible
 point but no global bound, and unbound workers withhold shared root deductions.
 

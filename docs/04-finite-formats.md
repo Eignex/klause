@@ -351,6 +351,10 @@ for continuous objectives. It never selects a grid; unsupported exact models
 decline. Overflow during lowering and integer constants that
 binary64 cannot represent decline with a diagnostic.
 
+Planned: the default float arm becomes numerical, accepting real completions
+within tolerance; `--exact` keeps the exact arm, and the grid remains for nonlinear
+components and the finite CP/LS view.
+
 #### Rounded FlatZinc bounds
 
 Exact mode checks mathematical arithmetic over parsed binary64 literals and keeps

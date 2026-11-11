@@ -110,8 +110,9 @@ certification. Incumbents retain checked original coordinates and objective unit
 
 ### Objectives and native arithmetic sources
 
-`OpenTheoryPipeline.minimize` accepts a finite `LinearObjective` or an exact
-`QuadraticObjectiveSpec`; `optimize` accepts affine objectives with continuous costs.
+`OpenTheoryRequest` binds a `LinearObjective`, including affine objectives with
+continuous costs, for `OpenTheoryPipeline.execute`; `SourceSetupRequest` binds an exact
+`QuadraticObjectiveSpec`.
 Complete traversal can prove optimality, nonattainment, unboundedness or
 infeasibility; local search and ALNS keep checked incumbents without global claims.
 `NonlinearIntegerProblem.pipelineRequest()` and SMT-LIB's `SmtLibProblem.source`

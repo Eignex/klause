@@ -4,8 +4,8 @@ Presolve fixes variables, rewrites relations and tightens bounds before search.
 Each reduction declares the preservation guarantee required by satisfaction,
 optimization, enumeration or counting, and retains source reconstruction. Preparation
 charges work to the [containing allowance](06-sessions.md#resource-allowances).
-[Source validation](#source-witness-validation) checks reconstructed engine points
-before publication.
+[Source validation](#source-witness-validation) checks coordinates that no engine
+enforced before publication.
 
 ## Pipeline
 
@@ -88,6 +88,7 @@ fixpoint and `aggressive` adds exhaustive probing, all within 16 rounds. Passes 
 be enabled or disabled by name, but a pass that would break the query's required guarantee stays
 disabled. Explicitly enabling a problem pass under `off` gives both schedules the
 default round cap; an explicit zero round cap still suppresses those schedules.
+Planned: component presolve reduces and solves each independent component separately.
 
 ### Rewrite representation controls
 

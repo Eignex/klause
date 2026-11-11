@@ -162,6 +162,7 @@ Template construction polls and charges the containing token, including failed
 attempts, and caps visits and retained storage at 262,144 modeled units each.
 An incomplete attempt publishes no snapshot. Compatible views share one atomic
 publication slot per source/finite scope, including temporary presolve bakes.
+Planned: template retention moves out of `PreparedFactorProjections` into an LP-owned preparation cache.
 Preparation and
 actual row/bound emission have separate observations in the existing LP phase ledger;
 they do not establish numerical result reuse or certified deduction consumption.
@@ -249,7 +250,7 @@ preceding immutable point; cancellation withholds publication. Checked cut
 infeasibility supplies no numeric gain. Directional history accepts only compatible
 retained model and row scopes; it adds no certification request.
 [Finite guidance](08-search.md#finite-lp-directional-guidance) owns selection and
-history lifetime.
+history lifetime. Planned: directional LP branching is active by default.
 
 An exact state appending one bound under the same source model copies only the
 changed bound side. The opposite side and unchanged conflict flags remain immutable
@@ -274,7 +275,8 @@ Objective changes retract dependent bounds, cuts and clauses, or restore an
 objective-independent region.
 
 The explicit `+sparse-trial` LP option selects a bounded root trial for compact
-closed unconditional linear sources. Emphasis levels leave it disabled. Admission bounds
+closed unconditional linear sources. Emphasis levels leave it disabled.
+Planned: sparse LP admission is active by default. Admission bounds
 source assembly, then inspects emitted nonzeros, connected-component dimensions,
 exact scalar width and row-intersection fill risk. The screen reads the same source-root
 boxes as the retained layout, without constructing a propagation fixpoint. Custom emitters decline before
@@ -346,10 +348,10 @@ or masked auxiliary proposal, source real variables or disabled LP branching
 withholds it.
 Retention and actual auxiliary value use have separate observations. The transfer
 carries no basis, certificate or numerical-owner authority; ordinary search keeps
-its alternatives and complete source checks. The first pinning attempt and its resumes
+its alternatives and leaf checks. The first pinning attempt and its resumes
 use the same private coordinate array, so a completed pin prefix belongs to that
 guide. Rounding uses the stored coordinates without another numerical solve; its
-propagation and source-publication checks still run. An incomplete or differently
+propagation and leaf checks still run. An incomplete or differently
 optimized point supplies no retained guidance.
 Rounding pins use probe fixpoints without materializing implication lists;
 an interrupted pin restores the last complete propagation state and withholds its proposal.
@@ -368,7 +370,7 @@ Retention renews no root, worker or invocation allowance.
 A pausable discrete worker with a decision allowance can transfer eligible retained
 coordinates directly to its ordinary complete traversal before private pinning.
 The transfer releases the private rounding state and supplies value preferences;
-the existing traversal owns backtracking and complete source checks. Masked child
+the existing traversal owns backtracking and leaf checks. Masked child
 coordinates can transfer without completing the numerical parent or the missing
 coordinates. LP branching opt-outs, LP tree mode and workers with no decision
 allowance retain the primal completion path. The handoff keeps the same storage,
@@ -395,7 +397,7 @@ to the remaining preparation and LP allowances inside the same one MiB guidance 
 Interrupted copies retain only visited value preferences and no component result.
 Completed component values precede retained root LP targets; uncached coordinates
 keep eligible root LP preferences. The ordinary frame stack keeps every alternative,
-and full source checks still own
+and leaf checks still own
 assignment acceptance. These values supply no bound, proof or LP-point authority.
 Capture observations retain initialization, completed copy and declined or interrupted work.
 Ordinary value use and the first value use after a restart have separate observations.
@@ -1600,12 +1602,13 @@ unboundedness. Ceiling an objective bound requires a proved integral objective
 lattice. Combine packages only when authority, scope and objective units match;
 exact rejection of one candidate is not a refutation of the model.
 
-Certificates expose exact multiplier snapshots, so
-[original-source capture](13-evidence.md) can consume them without adding model
+Certificates expose exact multiplier snapshots, so model-facing adapters can lift
+them into [source derivations](13-evidence.md) without adding model
 dependencies to the engine. `LpCertificationPolicy` is the immutable acceptance
 seam: certifiers always compute and report their observations, and the policy
 decides which results may be used. A source check grants no permission to accept a
-floating optimum.
+floating optimum. Planned: exact certification applies only under `--exact`; by default LP
+deductions use floating results within tolerances, keeping safe-bound pruning, with SMT always exact.
 
 Model-facing solves state an explicit claim: bound, contradiction, feasible completion or
 attained optimum. Bound requests use dual-only reconstruction without primal recovery;

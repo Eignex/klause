@@ -27,15 +27,15 @@ an incumbent tightens the cutoff. Accepted closures survive ordinary cancellatio
 
 An internal `BooleanProofScheduler` drives a fixed pool of retained repair workers
 through that board. Each worker keeps its lease and traversal across slices and
-reuses its prepared session across sibling cubes. Only sample-free exhausted
-queries close native coverage; checked witnesses leave their region open. Loss
+reuses its prepared session across sibling cubes. Only exhausted
+queries close native coverage; witnesses leave their region open. Loss
 retires private state and returns unresolved coverage while retaining work and
 statistics. Caller-condition replacement retires every worker and invalidates
 closures. Changed source or mapping identities require a fresh scheduler. The
 executor admits identity-mapped pure Boolean clause satisfaction only; objectives,
 numeric restrictions, symmetry reductions, unmarked cross-worker exchanges and additional
-components decline. A checked witness remains terminal until the caller condition
-changes; it cannot become a later sample-free refutation.
+components decline. A witness remains terminal until the caller condition
+changes; it cannot become a later refutation.
 The executor can use either constant-objective repair or a retained pure Boolean
 satisfaction traversal. Both retain conditioned state across siblings; satisfaction
 reseeding clears the preceding query verdict and trail without renewing its
@@ -147,6 +147,8 @@ LP rounding and the feasibility pump pin every variable through the arm's own pr
 pinned point that the leaf checks accept is a search leaf; after this run's pins and real completion
 it becomes an incumbent. A clause-walk point never passes that propagation, so it only sets the root
 value order and saved phases.
+Planned: a complete hint (clause-walk point, pooled incumbent or ALNS seed) is replayed as integer
+and Boolean value guidance whatever value selector the arm uses.
 The search and its preparation wrapper report an unfinished root
 layout as pending private preparation. Construction completion, cancellation and retirement follow the
 [LP ownership contract](17-linear-programming.md#root-preparation).

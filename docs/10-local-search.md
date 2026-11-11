@@ -2,8 +2,9 @@
 
 Local search changes assignments to reduce constraint violations and improve an
 objective. Incremental scores guide moves; maintained definitions keep functional
-outputs consistent. Candidates require [source validation](07-presolve.md#source-witness-validation)
-and arithmetic completion before publication. Unsuccessful search supplies no
+outputs consistent. Before publication a zero-violation candidate passes
+[source validation](07-presolve.md#source-witness-validation) of the relations the walk
+cannot score and arithmetic completion. Unsuccessful search supplies no
 refutation or optimum proof.
 
 Optional phase timing partitions active preparation, seeding, selection,
@@ -258,7 +259,7 @@ and two million reader entries. A maintained-network probe uses its saved coordi
 to score the actual changed Boolean leaves, then restores the committed state.
 Nested, mixed and opaque objective cones use the generic evaluator. The index
 supplies heuristic scores;
-source witness and objective checks retain admission authority. Maintenance checks
+complete grading and the canonical objective retain admission authority. Maintenance checks
 for the linear term view resume in batches of 256 definitions before move scoring.
 
 Invariants substitute a new value into every position that reads the moved
@@ -362,8 +363,8 @@ WCNF source can use the complete Boolean cost sweep captured with its objective.
 Every definition must be a priced flat Boolean fold over free leaves, and every priced term must have
 one unique definition. Capture admits at most one million Boolean coordinates,
 250,000 terms and two million literal readers, charging visits to preparation.
-The worker builds its network through ordinary resumable initialization; source
-validation and the canonical objective still admit incumbents. Existing move
+The worker builds its network through ordinary resumable initialization; complete
+grading and the canonical objective still admit incumbents. Existing move
 sweeps, other source formats, canonical or geometric guidance, ratcheted recipes
 and recipes without per-move invariants retain their selected definition view.
 

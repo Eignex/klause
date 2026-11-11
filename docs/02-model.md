@@ -281,6 +281,7 @@ nonlinear-integer (see [its chapter](16-nonlinear-arithmetic.md#solving-and-comp
 transcendental or declined. Preparation invents no finite bounds for open integer
 declarations: variables owned by an open theory never become finite CP domains,
 and continuous coordinates are never integer branch candidates.
+Planned: source preparation and execution converge on this one sealed payload.
 
 `LinearSourceProblem` retains the original rational terms, bounds, row sides,
 indicator pins and affine objective before normalization. Plans belong to the
