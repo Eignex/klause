@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.LP_WORK_PER_NODE
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.LinearAuthorityCapture
 import com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest
@@ -17,6 +18,7 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.result.LinearNumericalResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.BooleanBranching
@@ -40,6 +42,7 @@ internal data class LinearInvocationResult(
     val value: BigFraction?,
     val reason: TerminationReason,
     val stats: SolveStats,
+    val numerical: LinearNumericalResult? = null,
 )
 
 internal class LinearAuthorityInvocation(
@@ -93,7 +96,8 @@ internal class LinearAuthorityInvocation(
     private var consumedIncumbent: Sample? = null
     private var result: LinearInvocationResult? = null
     private val budget = SourceLpBudget(maxOperations = params.sourceLpOperations,
-        onWork = state.smt::observeSourceLp, funding = funding)
+        onWork = state.smt::observeSourceLp, funding = funding,
+        solveContext = { borrowedAuthority?.solveContext ?: LpSolveContext.Production })
     private val completion = if (params.sourceIncumbentCompletion)
         LinearIncumbentCompletion(budget, incumbentCompletionCheck, sharedCompletions) { stage, count ->
             val key = "numericalExternalCompletion$stage"
@@ -212,13 +216,15 @@ internal class LinearAuthorityInvocation(
                 }
             }
             val event = frontier?.next() ?: checkNotNull(run).next()
-            if (boundOrdered) component.updateGlobalBound()
+            if (boundOrdered || budget.context.certificationPolicy.numericalDeductions) component.updateGlobalBound()
             component.ray?.let { return finish(it, TerminationReason.SearchExhausted) }
             return when (event) {
                 SearchRunEvent.Paused -> null
                 SearchRunEvent.Exhausted -> {
                     val terminal = component.completed()
-                    finish(terminal, if (terminal == null) TerminationReason.Unsupported
+                    val numerical = numerical(complete = true)
+                    finish(terminal, if (terminal == null && numerical?.optimal != true &&
+                            numerical?.infeasible != true) TerminationReason.Unsupported
                         else TerminationReason.SearchExhausted)
                 }
                 is SearchRunEvent.Indeterminate -> finish(null, when {
@@ -298,7 +304,7 @@ internal class LinearAuthorityInvocation(
     val objectiveBound: SourceEvidence? get() = component.rootBound
 
     fun snapshot(reason: TerminationReason): LinearInvocationResult = result ?:
-        LinearInvocationResult(null, component.rootBound, incumbent, value, reason, stats)
+        LinearInvocationResult(null, component.rootBound, incumbent, value, reason, stats, numerical(false))
 
     private fun finish(terminal: SourceEvidence?, reason: TerminationReason): LinearInvocationResult {
         val cancelled = stop()
@@ -306,8 +312,15 @@ internal class LinearAuthorityInvocation(
         val stopped = if (cancelled) {
             if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled
         } else reason
-        result = LinearInvocationResult(accepted, component.rootBound, incumbent, value, stopped, stats)
+        result = LinearInvocationResult(accepted, component.rootBound, incumbent, value, stopped, stats,
+            numerical(complete = !cancelled))
         return requireNotNull(result)
+    }
+
+    private fun numerical(complete: Boolean): LinearNumericalResult? {
+        val claim = component.rootNumerical ?: return null
+        if (claim.infeasible && (!complete || incumbent != null)) return null
+        return LinearNumericalResult(claim, value, complete)
     }
 
     override fun close() {

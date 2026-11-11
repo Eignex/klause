@@ -57,7 +57,7 @@ internal class OpenSourceObjective(
             minimizedSource(pointValue), authority.stats, authority)
         val partial = LinearOptimizationResult(authority.scope, null, authority.bound, authority.incumbent,
             authority.value, if (stop()) stoppedReason else TerminationReason.Unsupported, authority.stats,
-            authority.semantics)
+            authority.semantics, authority.numerical?.partial(authority.value))
         return partial.openOptimum()
     }
 

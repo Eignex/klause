@@ -16245,6 +16245,21 @@ final class com.eignex.klause.solver.result/HeuristicStartStats { // com.eignex.
     final fun toString(): kotlin/String // com.eignex.klause.solver.result/HeuristicStartStats.toString|toString(){}[0]
 }
 
+final class com.eignex.klause.solver.result/LinearNumericalResult { // com.eignex.klause.solver.result/LinearNumericalResult|null[0]
+    final val bound // com.eignex.klause.solver.result/LinearNumericalResult.bound|{}bound[0]
+        final fun <get-bound>(): kotlin/Double? // com.eignex.klause.solver.result/LinearNumericalResult.bound.<get-bound>|<get-bound>(){}[0]
+    final val infeasible // com.eignex.klause.solver.result/LinearNumericalResult.infeasible|{}infeasible[0]
+        final fun <get-infeasible>(): kotlin/Boolean // com.eignex.klause.solver.result/LinearNumericalResult.infeasible.<get-infeasible>|<get-infeasible>(){}[0]
+    final val objectiveTolerance // com.eignex.klause.solver.result/LinearNumericalResult.objectiveTolerance|{}objectiveTolerance[0]
+        final fun <get-objectiveTolerance>(): kotlin/Double // com.eignex.klause.solver.result/LinearNumericalResult.objectiveTolerance.<get-objectiveTolerance>|<get-objectiveTolerance>(){}[0]
+    final val optimal // com.eignex.klause.solver.result/LinearNumericalResult.optimal|{}optimal[0]
+        final fun <get-optimal>(): kotlin/Boolean // com.eignex.klause.solver.result/LinearNumericalResult.optimal.<get-optimal>|<get-optimal>(){}[0]
+    final val relativeGap // com.eignex.klause.solver.result/LinearNumericalResult.relativeGap|{}relativeGap[0]
+        final fun <get-relativeGap>(): kotlin/Double? // com.eignex.klause.solver.result/LinearNumericalResult.relativeGap.<get-relativeGap>|<get-relativeGap>(){}[0]
+    final val scope // com.eignex.klause.solver.result/LinearNumericalResult.scope|{}scope[0]
+        final fun <get-scope>(): com.eignex.klause.solver.evidence/SourceScope // com.eignex.klause.solver.result/LinearNumericalResult.scope.<get-scope>|<get-scope>(){}[0]
+}
+
 final class com.eignex.klause.solver.result/LinearOptimizationResult { // com.eignex.klause.solver.result/LinearOptimizationResult|null[0]
     final val bound // com.eignex.klause.solver.result/LinearOptimizationResult.bound|{}bound[0]
         final fun <get-bound>(): com.eignex.klause.solver.evidence/SourceEvidence? // com.eignex.klause.solver.result/LinearOptimizationResult.bound.<get-bound>|<get-bound>(){}[0]
@@ -16252,6 +16267,8 @@ final class com.eignex.klause.solver.result/LinearOptimizationResult { // com.ei
         final fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence // com.eignex.klause.solver.result/LinearOptimizationResult.evidence.<get-evidence>|<get-evidence>(){}[0]
     final val incumbent // com.eignex.klause.solver.result/LinearOptimizationResult.incumbent|{}incumbent[0]
         final fun <get-incumbent>(): com.eignex.klause.solver/Sample? // com.eignex.klause.solver.result/LinearOptimizationResult.incumbent.<get-incumbent>|<get-incumbent>(){}[0]
+    final val numerical // com.eignex.klause.solver.result/LinearOptimizationResult.numerical|{}numerical[0]
+        final fun <get-numerical>(): com.eignex.klause.solver.result/LinearNumericalResult? // com.eignex.klause.solver.result/LinearOptimizationResult.numerical.<get-numerical>|<get-numerical>(){}[0]
     final val reason // com.eignex.klause.solver.result/LinearOptimizationResult.reason|{}reason[0]
         final fun <get-reason>(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.result/LinearOptimizationResult.reason.<get-reason>|<get-reason>(){}[0]
     final val scope // com.eignex.klause.solver.result/LinearOptimizationResult.scope|{}scope[0]

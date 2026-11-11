@@ -122,6 +122,7 @@ class NumericalLinearRequest internal constructor(
                 result.reason,
                 result.stats.copy(run = result.stats.run.copy(backend = "numerical-mip")),
                 context.semantics,
+                result.numerical.takeIf { complete },
             )
         }
     }
@@ -167,6 +168,7 @@ class NumericalLinearRequest internal constructor(
             result.reason,
             result.stats.copy(run = result.stats.run.copy(backend = "numerical-mip")),
             result.semantics,
+            result.numerical,
         )
     }
 

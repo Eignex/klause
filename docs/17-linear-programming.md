@@ -83,6 +83,11 @@ alternatives are neutral; an uncovered sibling prevents publication. A bounded s
 pays node storage and scope checks from the current source grant and withholds a
 new claim after cancellation or exhaustion. The retained root claim and frontier
 ordering stay numerical; scalar conversion for ordering creates no exact evidence.
+Invocation snapshots and linear results retain numerical deductions separately from
+exact terminals and bounds. Numerical completion reports infeasibility or incumbent
+optimality within the objective tolerance; finite numerical gaps use the context's
+original objective direction and units. Partial snapshots retain the bound without
+a completion status. Witness-only callers omit both exact and numerical deductions.
 
 Cut rounds retain the strongest available numerical bound independently of exact
 source evidence. A tighter numerical bound beyond the objective tolerance, or a

@@ -14308,10 +14308,20 @@ public final class com/eignex/klause/solver/result/HeuristicStartStats {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/result/LinearNumericalResult {
+	public final fun getBound ()Ljava/lang/Double;
+	public final fun getInfeasible ()Z
+	public final fun getObjectiveTolerance ()D
+	public final fun getOptimal ()Z
+	public final fun getRelativeGap ()Ljava/lang/Double;
+	public final fun getScope ()Lcom/eignex/klause/solver/evidence/SourceScope;
+}
+
 public final class com/eignex/klause/solver/result/LinearOptimizationResult {
 	public final fun getBound ()Lcom/eignex/klause/solver/evidence/SourceEvidence;
 	public final fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
 	public final fun getIncumbent ()Lcom/eignex/klause/solver/Sample;
+	public final fun getNumerical ()Lcom/eignex/klause/solver/result/LinearNumericalResult;
 	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public final fun getScope ()Lcom/eignex/klause/solver/evidence/SourceScope;
 	public final fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
