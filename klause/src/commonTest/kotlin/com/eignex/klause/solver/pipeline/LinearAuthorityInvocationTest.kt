@@ -63,6 +63,32 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
+    fun `numerical traversal should retain a checked point for coupled nondyadic equalities`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val sum = mapOf(real to BigFraction.ONE, other to BigFraction.ONE)
+        val balance = mapOf(real to BigFraction.MINUS_ONE, other to BigFraction.ofLong(2))
+        val source = SourceProofContext(scope, setOf(real, other), mapOf(
+            "sum-upper" to SourcePremise(SourceInequality(sum, BigFraction.ONE)),
+            "sum-lower" to SourcePremise(SourceInequality(sum.mapValues { it.value.negated() },
+                BigFraction.MINUS_ONE)),
+            "balance-upper" to SourcePremise(SourceInequality(balance, BigFraction.ZERO)),
+            "balance-lower" to SourcePremise(SourceInequality(balance.mapValues { it.value.negated() },
+                BigFraction.ZERO)),
+        ), sum)
+
+        val result = LinearAuthorityInvocation(source, TheoryParams(lpMode = LpCertificationMode.NUMERICAL,
+            sourceCuts = false, sourceLpOperations = 8, sourceLpWorkLimit = 1_000_000L),
+            boundOrdered = true).use { it.run { _, _ -> } }
+
+        val third = BigFraction.ofLong(3).reciprocal()
+        assertEquals(listOf(third + third, third), assertNotNull(result.incumbent).exactReals)
+        assertEquals(BigFraction.ONE, result.value)
+        assertTrue(assertNotNull(result.numerical).optimal)
+        assertNull(result.terminal)
+        assertNull(result.bound)
+    }
+
+    @Test
     fun `a borrowed numerical authority should publish numerical completion without exact evidence`() {
         for (sense in listOf(ObjectiveSense.MINIMIZE, ObjectiveSense.MAXIMIZE)) {
             val scoped = scope.copy(objective = SourceObjective("x", sense))
