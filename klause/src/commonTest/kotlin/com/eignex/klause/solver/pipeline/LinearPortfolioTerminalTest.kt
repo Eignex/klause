@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioIncumbents
@@ -75,7 +76,7 @@ class LinearPortfolioTerminalTest {
             realUpper = doubleArrayOf(1.0),
         )
         val foreign = EngineInvocation(request.preparedPlan, ModelIdentity.of(other, objective), scope = source.scope)
-        val descent = RationalTheoryDescent(model, objective, TheoryParams(), source)
+        val descent = RationalTheoryDescent(model, objective, TheoryParams(lpMode = LpCertificationMode.EXACT), source)
 
         assertFailsWith<IllegalArgumentException> { LinearPortfolioSearch(descent, foreign) }
 
@@ -120,7 +121,10 @@ class LinearPortfolioTerminalTest {
             executionAssumptions = Assumptions.None,
             scope = original.scope,
         )
-        val search = LinearPortfolioSearch(RationalTheoryDescent(pinnedModel, cost, TheoryParams(), original), runtime)
+        val search = LinearPortfolioSearch(
+            RationalTheoryDescent(pinnedModel, cost, TheoryParams(lpMode = LpCertificationMode.EXACT), original),
+            runtime,
+        )
 
         search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _ -> } }
 
@@ -280,7 +284,7 @@ class LinearPortfolioTerminalTest {
                     RationalTheoryDescent(
                         model,
                         objective,
-                        TheoryParams(cancellation = slot.cancellation),
+                        TheoryParams(lpMode = LpCertificationMode.EXACT, cancellation = slot.cancellation),
                         source,
                     ),
                     binding,
@@ -314,7 +318,7 @@ class LinearPortfolioTerminalTest {
                     RationalTheoryDescent(
                         model,
                         objective,
-                        TheoryParams(cancellation = slot.cancellation),
+                        TheoryParams(lpMode = LpCertificationMode.EXACT, cancellation = slot.cancellation),
                         source,
                     ),
                     foreign,
@@ -348,7 +352,7 @@ class LinearPortfolioTerminalTest {
                     RationalTheoryDescent(
                         model,
                         cost,
-                        TheoryParams(cancellation = slot.cancellation),
+                        TheoryParams(lpMode = LpCertificationMode.EXACT, cancellation = slot.cancellation),
                         original,
                     ),
                     runtime,
