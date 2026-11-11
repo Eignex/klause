@@ -31,6 +31,38 @@ class NumericalSelectionSnapshotTest {
     private val premise = SourceDerivation.Premise("row")
 
     @Test
+    fun `numerical cut captures should retain admission labels without fresh exact checks`() {
+        val source = SourceProofContext(generation, setOf(x), mapOf("row" to SourcePremise(row)),
+            mapOf(x to BigFraction.ONE))
+        val cutType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityCapturedCut")
+        val cut = cutType.declaredConstructors.single { !it.isSynthetic }.newInstance(
+            0, 0, row, SourceDerivation.Premise("native-row"), true, true, false, null, setOf(0), null,
+            false, true, true)
+        val requestType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest")
+        val projection = requestType.getDeclaredField("Full").apply { isAccessible = true }.get(null)
+        val queryType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityCapturedQuery")
+        val query = queryType.declaredConstructors.single { !it.isSynthetic }.newInstance(
+            0, source, source, listOf(x), emptyList<Any>(), emptySet<Int>(), mapOf(x to BigFraction.ZERO),
+            listOf(cut), emptyMap<String, Long>(), null, null, "point-unavailable", null, null, null, null,
+            "unknown", projection, generation, true)
+        val snapshot = NumericalSelectionSnapshot(Cancellation.Never)
+        val journal = snapshot.journal()
+        @Suppress("UNCHECKED_CAST")
+        val records = journal.javaClass.getDeclaredField("retained").apply { isAccessible = true }
+            .get(journal) as MutableList<Any>
+        records.add(query)
+
+        val captured = snapshot.capture(journal)
+
+        val record = captured.getValue("records").jsonArray.single().jsonObject
+        val capturedCut = record.getValue("cuts").jsonArray.single().jsonObject
+        assertEquals("true", capturedCut.getValue("admittedAtQuery").jsonPrimitive.content)
+        assertEquals("true", capturedCut.getValue("numericalAtQuery").jsonPrimitive.content)
+        assertEquals("false", capturedCut.getValue("checkedAtQuery").jsonPrimitive.content)
+        assertEquals("NOT_REQUESTED_NUMERICAL", capturedCut.getValue("freshNativeCheck").jsonPrimitive.content)
+    }
+
+    @Test
     fun `rejection cost should preserve cumulative attempt and phase values`() {
         val phaseType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityAggregatePhase")
         val phase = phaseType.enumConstants.single { (it as Enum<*>).name == "BoundRounding" }

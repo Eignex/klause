@@ -89,6 +89,7 @@ internal class NumericalFrontierSnapshot(
         val template = field(authority, "template")
         val retained = template?.let { field(it, "cuts") }
         val query = field(authority, "query")
+        val numericalCuts = query?.let { field(it, "numericalCuts") as Boolean } == true
         val queryContext = query?.let { field(it, "context") as SourceProofContext }
         val numeric = template?.let { field(it, "numeric") as SourceProofContext }
         val verifierContext = if (numeric == null || queryContext == null) null else SourceProofContext(
@@ -135,7 +136,8 @@ internal class NumericalFrontierSnapshot(
                         put("coefficients", coefficients(row.coefficients))
                         put("rhs", row.rhs.toString())
                         put("derivation", proof(derivation))
-                        put("sourceCheck", verifierContext?.let {
+                        put("numericalCutAdmission", numericalCuts)
+                        put("sourceCheck", if (numericalCuts) "NOT_REQUESTED_NUMERICAL" else verifierContext?.let {
                             SourceEvidenceVerifier(it).verify(SourceEvidence(it.scope,
                                 SourceClaim.Consequence(row), derivation), stop).toString()
                         })

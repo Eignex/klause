@@ -2,6 +2,8 @@ package com.eignex.klause.lp.optimization
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SourceLpFunding
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
@@ -31,6 +33,163 @@ class LinearAuthorityCutsTest {
     private val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
     private val scope = SourceScope(SourceRevision("rounding", "exact-affine"),
         objective = SourceObjective("sum", ObjectiveSense.MINIMIZE))
+
+    @Test
+    fun `native numerical cuts should be admitted without exact proof work`() {
+        val source = SourceProofContext(scope, setOf(x, y), mapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                y to BigFraction.ofLong(2)), BigFraction.ONE)),
+        ), emptyMap())
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical })
+        var exactWork = 0L
+
+        val query = assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never,
+            maximumCutProofSteps = 0, budget = budget, onCutWork = { exactWork += it }))
+
+        assertEquals(setOf(0), query.admittedCuts)
+        assertEquals(setOf(0), query.installedCuts)
+        assertTrue(query.checkedCuts.isEmpty())
+        assertTrue(query.numericalCuts)
+        assertEquals(0L, exactWork)
+        assertEquals(0L, budget.measuredBoundCertificationWork)
+        assertTrue(budget.measuredPreparationWork > 0L)
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        capture.record(source, query, template, null, LinearAuthorityResult())
+        val captured = capture.records.single().cuts.single()
+        assertTrue(captured.admitted)
+        assertTrue(captured.numerical)
+        assertFalse(captured.checked)
+    }
+
+    @Test
+    fun `exact cut admission should retain its complete proof allowance`() {
+        val source = SourceProofContext(scope, setOf(x, y), mapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                y to BigFraction.ofLong(2)), BigFraction.ONE)),
+        ), emptyMap())
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val budget = SourceLpBudget(solveContext = { LpSolveContext.Production })
+        var work = 0L
+
+        val query = assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never,
+            maximumCutProofSteps = 1, budget = budget, onCutWork = { work += it }))
+
+        assertTrue(query.admittedCuts.isEmpty())
+        assertTrue(query.checkedCuts.isEmpty())
+        assertFalse(query.numericalCuts)
+        assertTrue(work > 0L)
+    }
+
+    @Test
+    fun `numerical admission should decline supplied cuts without a native binding`() {
+        val row = SourceInequality(mapOf(x to BigFraction.ofLong(2), y to BigFraction.ofLong(2)), BigFraction.ONE)
+        val source = SourceProofContext(scope, setOf(x, y), mapOf("row" to SourcePremise(row)), emptyMap())
+        val supplied = LinearAuthorityCut(0, row, SourceDerivation.Premise("row"))
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never))
+            .withReplayCuts(listOf(supplied), Cancellation.Never) { _, _ -> }
+        val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical })
+
+        val query = assertNotNull(LinearAuthorityQuery.prepare(source, assertNotNull(template), Cancellation.Never,
+            budget = budget))
+
+        assertTrue(query.admittedCuts.isEmpty())
+        assertTrue(query.installedCuts.isEmpty())
+        assertTrue(query.checkedCuts.isEmpty())
+    }
+
+    @Test
+    fun `numerical cut bindings should reject foreign numeric definitions`() {
+        val source = SourceProofContext(scope, setOf(x, y), mapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                y to BigFraction.ofLong(2)), BigFraction.ONE)),
+        ), emptyMap())
+        val numeric = source.numericContext()
+        val cut = assertNotNull(LinearAuthorityCuts.prepare(numeric, Cancellation.Never)).rows.single()
+        val foreign = source.numericContext()
+        val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical })
+
+        val admitted = cut.admitsNumerically(foreign, budget, Cancellation.Never)
+
+        assertFalse(admitted)
+    }
+
+    @Test
+    fun `numerical cuts should require their original or stronger generation restrictions`() {
+        val restricted = scope.copy(condition = scope.condition.bound(x, BigFraction.ONE, true))
+        val numeric = SourceProofContext(restricted, setOf(x, y), mapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                y to BigFraction.ofLong(2)), BigFraction.ONE)),
+        ), emptyMap())
+        val cut = assertNotNull(LinearAuthorityCuts.prepare(numeric, Cancellation.Never)).rows.single()
+        val stronger = numeric.atScope(restricted.copy(
+            condition = restricted.condition.bound(x, BigFraction.ZERO, true)))
+        val weaker = numeric.atScope(scope)
+        val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical })
+
+        assertTrue(cut.admitsNumerically(stronger, budget, Cancellation.Never))
+        assertFalse(cut.admitsNumerically(weaker, budget, Cancellation.Never))
+    }
+
+    @Test
+    fun `inactive owner guards or pins should withhold numerical cut admission`() {
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val row = SourceInequality(mapOf(x to BigFraction.ofLong(2), y to BigFraction.ofLong(2)), BigFraction.ONE)
+        for (premise in listOf(
+            SourcePremise(row, guards = mapOf(0 to true)),
+            SourcePremise(row, guards = emptyMap(), integerPins = mapOf(x to BigFraction.ONE)),
+        )) {
+            val source = SourceProofContext(scope.copy(condition = SourceCondition(bools = mapOf(0 to false))),
+                setOf(x, y, bool), mapOf("row" to premise), emptyMap())
+            val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+            assertEquals(1, assertNotNull(template.cuts).rows.size)
+            val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical })
+
+            val query = assertNotNull(LinearAuthorityQuery.prepare(
+                source, template, Cancellation.Never, budget = budget))
+
+            assertTrue(query.admittedCuts.isEmpty())
+            assertTrue(query.installedCuts.isEmpty())
+        }
+    }
+
+    @Test
+    fun `unfunded scope comparisons should withhold numerical cut admission`() {
+        val source = SourceProofContext(scope.copy(condition = scope.condition.bound(x, BigFraction.ONE, true)),
+            setOf(x, y), mapOf(
+                "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    y to BigFraction.ofLong(2)), BigFraction.ONE)),
+            ), emptyMap())
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val child = source.atScope(source.scope.copy(
+            condition = source.scope.condition.bound(x, BigFraction.ZERO, true)))
+        val funding = SourceLpFunding(1L, 4096L).apply { grant(1L) }
+        val budget = SourceLpBudget(funding = funding, solveContext = { LpSolveContext.Numerical })
+
+        val query = assertNotNull(LinearAuthorityQuery.prepare(child, template, Cancellation.Never, budget = budget))
+
+        assertTrue(query.admittedCuts.isEmpty())
+        assertEquals(0L, budget.measuredBoundCertificationWork)
+    }
+
+    @Test
+    fun `cancelled numerical screening should retain work and withhold the query`() {
+        val source = SourceProofContext(scope, setOf(x, y), mapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                y to BigFraction.ofLong(2)), BigFraction.ONE)),
+        ), emptyMap())
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val funding = SourceLpFunding(1000L, 4096L).apply { grant(1000L) }
+        var cancelled = false
+        val budget = SourceLpBudget(funding = funding, solveContext = { LpSolveContext.Numerical },
+            onWork = { if (it.preparationWork > 0L) cancelled = true })
+
+        val query = LinearAuthorityQuery.prepare(source, template, Cancellation { cancelled }, budget = budget)
+
+        assertNull(query)
+        assertTrue(funding.spent > 0L)
+        assertEquals(0L, budget.measuredBoundCertificationWork)
+    }
 
     @Test
     fun `an unverified cut should withhold unconditional row layout admission`() {

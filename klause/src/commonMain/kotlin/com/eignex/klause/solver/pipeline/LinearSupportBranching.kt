@@ -56,7 +56,7 @@ internal class LinearSupportBranching(
         for (cut in query.cuts) {
             if (cancellation() || funding.paused) return fallback()
             funding.charge(1L + cut.inequality.supportSize)
-            if (!cut.installed || !cut.checked || !cut.ownerActive) continue
+            if (!cut.installed || !cut.admitted || !cut.ownerActive) continue
             val size = cut.inequality.supportSize
             if (size > supportSize) continue
             // A cut without a fractional candidate cannot change the selection, so its violation is never needed.
