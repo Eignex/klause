@@ -59,7 +59,9 @@ internal class LpClaimObservation(
     }
 
     override fun observePhase(metrics: LpPhaseMetrics) {
-        if (metrics.phase == LpSolvePhase.NUMERICAL_BOUND || metrics.phase == LpSolvePhase.NUMERICAL_CONFLICT) {
+        if (metrics.phase == LpSolvePhase.NUMERICAL_BOUND || metrics.phase == LpSolvePhase.NUMERICAL_CONFLICT ||
+            metrics.phase == LpSolvePhase.NUMERICAL_RECESSION
+        ) {
             charge(metrics.work)
         }
         delegate.observePhase(metrics)
@@ -73,6 +75,7 @@ internal class LpClaimObservation(
         val outcome = when {
             result.numerical != null -> when {
                 result.numerical.conflict != null -> "NUMERICAL_CONFLICT"
+                result.numerical.recession != null -> "NUMERICAL_RECESSION"
                 result.numerical.optimumWithinTolerance -> "NUMERICAL_OPTIMUM"
                 result.numerical.point != null -> "NUMERICAL_FEASIBLE"
                 result.numerical.bound != null -> "NUMERICAL_BOUND"

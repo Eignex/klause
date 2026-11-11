@@ -8,6 +8,7 @@ import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.validation.floatingOptimumAcceptance
 import com.eignex.klause.solver.validation.permitsToleranceOptimum
 import com.eignex.klause.solver.validation.verifyRealCoordinates
@@ -32,7 +33,7 @@ internal class LeafRealAcceptance(
         }
     }
 
-    fun leafResult(result: LpNumericalResult): LeafRealResult {
+    fun leafResult(result: LpNumericalResult, objective: LinearObjective?): LeafRealResult {
         if (cancellation()) return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
         if (result.conflict?.belongsTo(relaxation.model) == true) {
             val factors = IntHashSet()
@@ -49,9 +50,35 @@ internal class LeafRealAcceptance(
         }
         val point = acceptedPoint.takeIf { acceptedResult != null && result.point === acceptedResult }
             ?: return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
+        val recession = result.recession?.takeIf { it.belongsTo(relaxation.model) }
+        if (recession != null && objective != null) {
+            val ray = sourceDirection(recession.direction)
+            val exactPoint = point.exactReals ?: exactCoordinates(point.reals)
+            if (ray != null && exactPoint != null && !cancellation() &&
+                problem.provesUnbounded(objective, point.copy(exactReals = exactPoint), ray, cancellation)
+            ) {
+                return LeafRealResult(LpVerdict.UNBOUNDED, point.reals, exactPoint, ray, numerical = true)
+            }
+            if (cancellation()) return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
+        }
         val optimum = result.optimumWithinTolerance && result.bound?.belongsTo(relaxation.model) == true
         return LeafRealResult(if (optimum) LpVerdict.TOLERANCE_OPTIMUM else LpVerdict.FEASIBLE,
             point.reals, point.exactReals, numerical = true)
+    }
+
+    private fun sourceDirection(direction: DoubleArray): List<BigFraction>? {
+        if (direction.size.toLong() + problem.numRealVars > 262_144L) return null
+        return relaxation.realDirection(exactCoordinates(direction) ?: return null, problem)
+    }
+
+    private fun exactCoordinates(coordinates: DoubleArray): List<BigFraction>? {
+        val exact = ArrayList<BigFraction>(coordinates.size)
+        for (value in coordinates) {
+            cancellation.charge(1L)
+            if (cancellation()) return null
+            exact += BigFraction.ofDouble(value) ?: return null
+        }
+        return exact
     }
 
     private fun acceptNumerical(result: FloatLpResult): Boolean {

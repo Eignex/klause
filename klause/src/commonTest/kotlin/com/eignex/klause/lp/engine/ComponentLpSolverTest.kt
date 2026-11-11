@@ -15,6 +15,46 @@ import kotlin.test.assertTrue
 
 class ComponentLpSolverTest {
     @Test
+    fun `a recession snapshot should complete the other components`() {
+        val builder = LpBuilder()
+        val x = builder.addOpenAboveVar(0L, cost = -1L)
+        val y = builder.addVar(0L, 4L, cost = 1L)
+        val z = builder.addVar(0L, 4L, cost = 1L)
+        builder.addRow(intArrayOf(y), longArrayOf(1L), Relation.GE, 2L)
+        builder.addRow(intArrayOf(z), longArrayOf(1L), Relation.GE, 3L)
+        assertIs<ComponentLpSolver>(newLpSolver(builder.build(Sense.MINIMIZE))).use { owner ->
+            owner.configureRecessionCapture(true)
+
+            assertNull(owner.solve())
+
+            val candidate = assertNotNull(owner.recessionCandidate)
+            assertEquals(listOf(0.0, 2.0, 3.0), candidate.point.primal.toList())
+            assertEquals(1.0, candidate.direction[x])
+            assertEquals(0.0, candidate.direction[y])
+            assertEquals(0.0, candidate.direction[z])
+            assertFalse(candidate.point.optimal)
+        }
+    }
+
+    @Test
+    fun `an infeasible component should withhold a global recession snapshot`() {
+        val builder = LpBuilder()
+        builder.addOpenAboveVar(0L, cost = -1L)
+        val y = builder.addVar(0L, 1L)
+        val z = builder.addVar(0L, 1L)
+        builder.addRow(intArrayOf(y), longArrayOf(1L), Relation.GE, 2L)
+        builder.addRow(intArrayOf(z), longArrayOf(1L), Relation.GE, 0L)
+        assertIs<ComponentLpSolver>(newLpSolver(builder.build(Sense.MINIMIZE))).use { owner ->
+            owner.configureRecessionCapture(true)
+
+            assertNull(owner.solve())
+
+            assertNull(owner.recessionCandidate)
+            assertNotNull(owner.infeasibleRay)
+        }
+    }
+
+    @Test
     fun `paused numerical children expose only their returned predecessors`() {
         val builder = LpBuilder()
         repeat(3) {

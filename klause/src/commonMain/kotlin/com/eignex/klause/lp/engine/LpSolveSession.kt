@@ -33,6 +33,8 @@ internal class LpSolveSession(
             val previous = solver
             val current = prepare(model, cancellation, workLimit)
                 ?: return CertifiedLpResult(null, null, null, null, null, false, { null })
+            current.configureRecessionCapture(context.certificationPolicy.numericalDeductions && floatAccept != null &&
+                (claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.ATTAINED_OPTIMUM))
             observeQuery(model, current, current === previous, workLimit, claim,
                 floatOffset, floatAccept != null, refinementLimits)
             val result = try {
@@ -41,7 +43,7 @@ internal class LpSolveSession(
                 observer?.observeSolve(current.lastMetrics, current is ComponentLpSolverCapability)
             }
             return certification.certify(model, current, result, cancellation, observer, counterResults,
-                refinementLimits, floatAccept, floatOffset, claim)
+                numericalLimits(current, workLimit, refinementLimits), floatAccept, floatOffset, claim)
         } catch (primary: Throwable) {
             try {
                 releaseSolvers()
@@ -69,6 +71,8 @@ internal class LpSolveSession(
                 val previous = solver
                 val current = prepare(model, cancellation, workLimit)
                     ?: return@LpSolveCursor cancelledResult()
+                current.configureRecessionCapture(context.certificationPolicy.numericalDeductions && floatAccept != null &&
+                    (claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.ATTAINED_OPTIMUM))
                 observeQuery(model, current, current === previous, workLimit, claim,
                     floatOffset, floatAccept != null, null)
                 val stage = solveFloating(current, current === previous, cancellation, observer, workLimit)
@@ -82,6 +86,7 @@ internal class LpSolveSession(
                 checkpoint(current.lastMetrics.workOps)
                 if (cancellation()) return@LpSolveCursor cancelledResult()
                 certification.certify(model, current, result, cancellation, observer, null,
+                    refinementLimits = numericalLimits(current, workLimit, LpRefinementLimits()),
                     floatAccept = floatAccept, floatOffset = floatOffset, claim = claim)
             } catch (primary: Throwable) {
                 try {
@@ -172,6 +177,17 @@ internal class LpSolveSession(
     private fun cancelledResult(): CertifiedLpResult {
         releaseSolvers()
         return CertifiedLpResult(null, null, null, null, null, false, { null })
+    }
+
+    private fun numericalLimits(
+        current: LpSolver,
+        workLimit: Long,
+        limits: LpRefinementLimits,
+    ): LpRefinementLimits {
+        if (!context.certificationPolicy.numericalDeductions || workLimit == 0L) return limits
+        var remaining = workLimit - minOf(workLimit, current.lastMetrics.workOps)
+        remaining -= minOf(remaining, current.lastMetrics.preparationOps)
+        return limits.copy(maxWork = minOf(limits.maxWork, remaining))
     }
 
     private fun prepare(model: LpModel, cancellation: Cancellation, workLimit: Long): RetainedLpSolver? {

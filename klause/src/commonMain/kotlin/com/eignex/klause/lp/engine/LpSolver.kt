@@ -221,6 +221,11 @@ internal interface LpSolver : AutoCloseable {
      * unavailable; unboundedness also requires an independently checked feasible point. */
     val recessionDirection: DoubleArray? get() = null
 
+    // A requested snapshot supplies candidates, never feasibility, bound or cut authority.
+    fun configureRecessionCapture(enabled: Boolean) = Unit
+
+    val recessionCandidate: LpRecessionCandidate? get() = null
+
     /** Scaling eligibility, fallback and source-unit residuals for this numerical owner. */
     val scalingMetrics: LpScalingMetrics get() = LpScalingMetrics(decline = LpScalingDecline.DISABLED)
 
@@ -314,6 +319,8 @@ internal interface LpSolver : AutoCloseable {
 }
 
 internal class LpPrimalGuidance(val coordinates: DoubleArray, val known: BooleanArray)
+
+internal class LpRecessionCandidate(val point: FloatLpResult, val direction: DoubleArray)
 
 /**
  * An [LpSolver] whose independent component results can be certified without reconstructing one

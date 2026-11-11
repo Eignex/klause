@@ -44,6 +44,7 @@ import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpPhaseMetrics
+import com.eignex.klause.lp.engine.LpPhaseTimer
 import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.LpColumnId
 import com.eignex.klause.lp.engine.LpLayoutRemap
@@ -439,7 +440,14 @@ internal fun LpRelaxation.leafResult(
 ): LeafRealResult {
     certified.float?.let { sink?.observeComponentSplit(it.blocks) }
     if (cancellation()) return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
-    certified.numerical?.let { return acceptance.leafResult(it) }
+    certified.numerical?.let {
+        val timer = if (it.recession != null) {
+            LpPhaseTimer(sink?.certificationObserver(LpRoute.STANDALONE), LpSolvePhase.SOURCE_RECESSION_ACCEPTANCE)
+        } else null
+        val result = acceptance.leafResult(it, objective)
+        timer?.finish(result.verdict.name)
+        return result
+    }
     if (problem.factors.any { it is ContinuousProduct && it.finiteChoices?.hasGuards != true } &&
         certified.verdict != LpVerdict.INFEASIBLE) {
         return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
@@ -507,7 +515,7 @@ internal fun LpRelaxation.exactLeafResult(
  * The continuous part of an LP recession [direction], summing each split variable's `x⁺ − x⁻` columns, or null
  * when it moves a discrete column. A real variable no column carries does not move.
  */
-private fun LpRelaxation.realDirection(direction: List<BigFraction>, problem: Problem): List<BigFraction>? {
+internal fun LpRelaxation.realDirection(direction: List<BigFraction>, problem: Problem): List<BigFraction>? {
     val ray = MutableList(problem.numRealVars) { BigFraction.ZERO }
     for (col in direction.indices) {
         val r = colRealId.getOrElse(col) { -1 }

@@ -10,6 +10,7 @@ internal class LpNumericalResult(
     val optimumWithinTolerance: Boolean,
     val work: Long,
     val stop: LpFloatingBoundStop?,
+    val recession: LpNumericalRecession? = null,
 )
 
 @Suppress("ReturnCount")
@@ -26,6 +27,11 @@ internal fun numericalLpResult(
     require(workLimit >= 0L)
     if (cancellation()) return numericalResult(result, stop = LpFloatingBoundStop.CANCELLED)
     if (result == null) {
+        if (solver.lastTermination == LpFloatTermination.UNBOUNDED_CANDIDATE) {
+            solver.recessionCandidate?.let {
+                return numericalRecessionResult(model, it, workLimit, cancellation, observer, floatAccept)
+            }
+        }
         return numericalConflictResult(model, solver, workLimit, cancellation, observer)
     }
     val timer = LpPhaseTimer(observer, LpSolvePhase.NUMERICAL_BOUND)
@@ -42,6 +48,27 @@ internal fun numericalLpResult(
         abs(point.objective - bound.value) <=
         FLOAT_EVIDENCE_TOLERANCE * maxOf(1.0, abs(point.objective + floatOffset))
     return numericalResult(result, bound, point = point, optimum = optimum, work = checked.work, stop = checked.stop)
+}
+
+private fun numericalRecessionResult(
+    model: LpModel,
+    candidate: LpRecessionCandidate,
+    workLimit: Long,
+    cancellation: Cancellation,
+    observer: LpCertificationObserver?,
+    floatAccept: ((FloatLpResult) -> Boolean)?,
+): CertifiedLpResult {
+    val timer = LpPhaseTimer(observer, LpSolvePhase.NUMERICAL_RECESSION)
+    val checked = floatingRecession(model, candidate.direction, workLimit, cancellation)
+    timer.finish(checked.stop?.name ?: "ACCEPTED", checked.work)
+    if (cancellation()) return numericalResult(null, work = checked.work, stop = LpFloatingBoundStop.CANCELLED)
+    val acceptance = LpPhaseTimer(observer, LpSolvePhase.SOURCE_FLOAT_ACCEPTANCE)
+    val point = candidate.point.acceptedNumericalPoint(model, checked.stop, floatAccept, primalCandidate = true)
+    acceptance.finish(if (point == null) "REFUSED" else "ACCEPTED")
+    if (cancellation()) return numericalResult(null, work = checked.work, stop = LpFloatingBoundStop.CANCELLED)
+    val recession = if (point != null && checked.accepted) LpNumericalRecession(model, candidate.direction) else null
+    return numericalResult(candidate.point, point = point, work = checked.work,
+        stop = checked.stop, recession = recession)
 }
 
 private fun numericalConflictResult(
@@ -66,8 +93,10 @@ private fun FloatLpResult.acceptedNumericalPoint(
     model: LpModel,
     stop: LpFloatingBoundStop?,
     accept: ((FloatLpResult) -> Boolean)?,
+    primalCandidate: Boolean = false,
 ): FloatLpResult? = takeIf {
-    stop != LpFloatingBoundStop.WORK && optimal && objective.isFinite() &&
+    stop != LpFloatingBoundStop.WORK && stop != LpFloatingBoundStop.CANCELLED &&
+        (optimal || primalCandidate) && objective.isFinite() &&
         primal.size == model.n && primal.all(Double::isFinite) && accept?.invoke(it) == true
 }
 
@@ -79,7 +108,8 @@ private fun numericalResult(
     optimum: Boolean = false,
     work: Long = 0L,
     stop: LpFloatingBoundStop? = null,
+    recession: LpNumericalRecession? = null,
 ): CertifiedLpResult = CertifiedLpResult(
     result, null, null, null, null, false, { null },
-    numerical = LpNumericalResult(bound, conflict, point, optimum, work, stop),
+    numerical = LpNumericalResult(bound, conflict, point, optimum, work, stop, recession),
 )
