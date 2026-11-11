@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.meta.coreguided.CoreGuidedSearch
 import com.eignex.klause.meta.coreguided.CoreGuidedSolver
 import com.eignex.klause.meta.coreguided.CoreRefinementMode
@@ -20,20 +21,24 @@ internal class CoreGuidedWorkerConfig(
     private val maximumWork: Long? = null,
     private val maximumMillis: Long? = null,
     private val coreRefinement: CoreRefinementMode = CoreRefinementMode.NONE,
+    private val lpMode: LpCertificationMode? = null,
     private val edit: ((BacktrackParams) -> BacktrackParams)? = null,
 ) : WorkerConfig {
     override val label: String get() = "core-guided"
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
-        CoreGuidedWorkerConfig(budget, maximumWork, maximumMillis, coreRefinement, edit)
+        CoreGuidedWorkerConfig(budget, maximumWork, maximumMillis, coreRefinement, lpMode, edit)
 
     override fun withCoreRefinement(mode: CoreRefinementMode): CoreGuidedWorkerConfig =
-        CoreGuidedWorkerConfig(nodeBudget, maximumWork, maximumMillis, mode, edit)
+        CoreGuidedWorkerConfig(nodeBudget, maximumWork, maximumMillis, mode, lpMode, edit)
 
     internal fun withActiveTimeLimit(): CoreGuidedWorkerConfig =
-        CoreGuidedWorkerConfig(nodeBudget, maximumWork, 2_000L, coreRefinement, edit)
+        CoreGuidedWorkerConfig(nodeBudget, maximumWork, 2_000L, coreRefinement, lpMode, edit)
 
     internal fun withWorkLimit(limit: Long): CoreGuidedWorkerConfig =
-        CoreGuidedWorkerConfig(nodeBudget, limit, null, coreRefinement, edit)
+        CoreGuidedWorkerConfig(nodeBudget, limit, null, coreRefinement, lpMode, edit)
+
+    fun withLpMode(mode: LpCertificationMode): CoreGuidedWorkerConfig =
+        CoreGuidedWorkerConfig(nodeBudget, maximumWork, maximumMillis, coreRefinement, mode, edit)
 
     override fun materialize(
         problem: BakedProblem,
@@ -53,7 +58,8 @@ internal class CoreGuidedWorkerConfig(
         val workerLabel = "bt/$label"
         val event = onEvent?.let { sink -> { value: SearchEvent -> sink(workerLabel, value) } }
         val base = BacktrackPresets.satOptimized(seed + 1000L + index, inprocess = false, onEvent = event)
-        var params = (edit?.invoke(base) ?: base).copy(nodeBudget = nodeBudget)
+        val configured = edit?.invoke(base) ?: base
+        var params = configured.copy(nodeBudget = nodeBudget, lpMode = lpMode ?: configured.lpMode)
         lateinit var worker: PortfolioWorker
         val meter = SharingMeter()
         matched?.bounds?.let { bounds ->

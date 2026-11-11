@@ -286,7 +286,7 @@ internal class ResumableMinimize(
         if (exactObjectiveBoundSupplier?.invoke() != null) null else params.toleranceCheck
 
     private fun realLeafOwner(): LeafRealSolver = leafSolver ?: LeafRealSolver(
-        problem, objective, params.lpPlan.componentSplit, sink.lp, solver.lpSolveContext,
+        problem, objective, params.lpPlan.componentSplit, sink.lp, solver.lpContext(params),
         LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L),
     ).also {
         resources.own(it)
@@ -446,7 +446,7 @@ internal class ResumableMinimize(
         yield(Unit)
         lpEngine = resources.own(
             LpEngine(
-                problem, objective, params.lpParams(), sink, solver.lpSolveContext, deferred = true,
+                problem, objective, params.lpParams(), sink, solver.lpContext(params), deferred = true,
                 nodeWorkAllowance = {
                     if (pausable && !preparationPending && externalCutoff().isFinite()) {
                         slice.remainingLpWork()

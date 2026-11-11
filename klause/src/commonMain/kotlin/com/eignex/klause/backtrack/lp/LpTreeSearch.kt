@@ -117,7 +117,8 @@ internal fun LpEngine.lbTreeSearch(
                             LpVerdict.TOLERANCE_OPTIMUM -> Unit
                             else -> return false
                         }
-                        if (leaf.verdict == LpVerdict.TOLERANCE_OPTIMUM && toleranceCheck == null) return false
+                        if (leaf.verdict == LpVerdict.TOLERANCE_OPTIMUM && !leaf.numerical &&
+                            toleranceCheck == null) return false
                         sample = sample.copy(reals = leaf.reals, exactReals = leaf.exactReals)
                     }
                     if (token()) return false

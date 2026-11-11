@@ -9,6 +9,7 @@ import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -17,6 +18,63 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RevisedSimplexPrimalTest {
+    @Test
+    fun `a cancelled capture query should withhold its completed primal snapshot`() {
+        val builder = LpBuilder()
+        builder.addOpenAboveVar(0L, cost = -1L)
+        var cancelled = false
+        RevisedSimplex(builder.build(Sense.MINIMIZE)).use { owner ->
+            owner.configureRecessionCapture(true, Cancellation { cancelled })
+            assertNull(owner.solvePrimal())
+            assertNotNull(owner.recessionCandidate)
+
+            cancelled = true
+
+            assertNull(owner.recessionCandidate)
+        }
+    }
+
+    @Test
+    fun `a captured recession should move the coupled basic columns`() {
+        val builder = LpBuilder()
+        val x = builder.addOpenAboveVar(2L, cost = -1L)
+        val y = builder.addOpenAboveVar(0L)
+        builder.addRow(intArrayOf(x, y), longArrayOf(1L, -1L), Relation.EQ, 0L)
+        val model = builder.build(Sense.MINIMIZE)
+        RevisedSimplex(model).use { solver ->
+            solver.configureRecessionCapture(true)
+
+            assertNull(solver.solvePrimal())
+
+            val candidate = assertNotNull(solver.recessionCandidate)
+            assertEquals(candidate.point.primal[x], candidate.point.primal[y])
+            assertTrue(candidate.point.primal[x] >= 2.0)
+            assertTrue(candidate.direction[x] > 0.0)
+            assertEquals(candidate.direction[x], candidate.direction[y])
+            assertTrue(floatingRecession(model, candidate.direction, 1000L).accepted)
+        }
+    }
+
+    @Test
+    fun `requested recession capture should retain a point without claiming an optimum`() {
+        val builder = LpBuilder()
+        builder.addOpenAboveVar(2L, cost = -1L)
+        RevisedSimplex(builder.build(Sense.MINIMIZE)).use { solver ->
+            for (capture in listOf(false, true, false)) {
+                solver.configureRecessionCapture(capture)
+
+                assertNull(solver.solvePrimal())
+
+                assertEquals(LpFloatTermination.UNBOUNDED_CANDIDATE, solver.lastTermination)
+                if (capture) {
+                    val candidate = assertNotNull(solver.recessionCandidate)
+                    assertEquals(2.0, candidate.point.primal.single())
+                    assertTrue(candidate.direction.single() > 0.0)
+                    assertFalse(candidate.point.optimal)
+                } else assertNull(solver.recessionCandidate)
+            }
+        }
+    }
 
     @Test
     fun `primal stops should report their invocation caps`() {

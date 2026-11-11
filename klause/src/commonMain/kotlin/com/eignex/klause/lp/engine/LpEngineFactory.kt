@@ -2,6 +2,15 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.util.Cancellation
 
+/** Authority used for LP deductions, independently of a source format's numeric semantics. */
+enum class LpCertificationMode {
+    /** Floating deductions under the declared numerical tolerances. */
+    NUMERICAL,
+
+    /** Exact LP certification before deductions are consumed. */
+    EXACT,
+}
+
 /** Entering-column policy for feasibility solves with an exactly zero objective. */
 enum class LpZeroObjectivePricing {
     /** Select the finishing candidate with the largest pivot magnitude. */
@@ -131,5 +140,10 @@ internal data class LpSolveContext(
     companion object {
         val Production = LpSolveContext()
         val Numerical = LpSolveContext(certificationPolicy = NumericalLpCertificationPolicy)
+
+        fun forMode(mode: LpCertificationMode): LpSolveContext = when (mode) {
+            LpCertificationMode.NUMERICAL -> Numerical
+            LpCertificationMode.EXACT -> Production
+        }
     }
 }

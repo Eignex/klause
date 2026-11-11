@@ -21,7 +21,7 @@ import kotlin.time.TimeSource
 
 // Bounds and witnesses remain independently available even when neither proves attainment. ATTAINED_OPTIMUM is exact:
 // an exact witness meeting an exact bound. TOLERANCE_OPTIMUM is a float optimum the caller accepted under its own
-// tolerance semantics, whose primal and objective are not exact.
+// source semantics within the declared LP tolerance. It supplies no exact optimum certificate.
 internal enum class LpVerdict {
     CERTIFIED_BOUND,
     FEASIBLE,
@@ -208,24 +208,66 @@ private fun solveNumerically(
     floatAccept: ((FloatLpResult) -> Boolean)?,
     floatOffset: Double,
     claim: LpClaim,
-): CertifiedLpResult = newLpSolver(model, cancellation, componentSplit, context.engineFactory, pricing, workLimit)
-    .use { solver ->
-        solver.deferUnscaledSourceDiagnostics()
-        val result = try {
-            solver.solve(warm)
-        } finally {
-            observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolverCapability)
-        }
-        var remaining = deductionWork
-        if (workLimit > 0L) {
-            var sourceRemaining = workLimit - minOf(workLimit, solver.lastMetrics.workOps)
-            sourceRemaining -= minOf(sourceRemaining, solver.lastMetrics.preparationOps)
-            remaining = minOf(remaining, sourceRemaining)
-        }
-        val observation = observer?.let { LpClaimObservation(claim, it) }
-        numericalLpResult(model, solver, result, remaining, cancellation, observation,
-            floatAccept, floatOffset).also { observation?.finish(it) }
+): CertifiedLpResult {
+    val completion = floatAccept != null &&
+        (claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.ATTAINED_OPTIMUM)
+    val needsOpenProjection = completion && model.exactState == null &&
+        (model.probeClampedLo.any { it } || model.probeClampedHi.any { it })
+    val projection = if (needsOpenProjection) {
+        numericalOpenModel(model, minOf(deductionWork, if (workLimit > 0L) workLimit else Long.MAX_VALUE),
+            cancellation, observer)
+    } else NumericalOpenModel(model, 0L)
+    val working = projection.model ?: return CertifiedLpResult(null, null, null, null, null, false, { null })
+    val floatingWork = if (workLimit > 0L) workLimit - projection.work else 0L
+    if (workLimit > 0L && floatingWork <= 0L) {
+        return CertifiedLpResult(null, null, null, null, null, false, { null })
     }
+    return newLpSolver(working, cancellation, componentSplit, context.engineFactory, pricing, floatingWork)
+        .use { solver ->
+            solver.deferUnscaledSourceDiagnostics()
+            solver.configureRecessionCapture(completion, cancellation)
+            val result = try {
+                solver.solve(warm)
+            } finally {
+                observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolverCapability)
+            }
+            var remaining = deductionWork - minOf(deductionWork, projection.work)
+            if (workLimit > 0L) {
+                var sourceRemaining = floatingWork - minOf(floatingWork, solver.lastMetrics.workOps)
+                sourceRemaining -= minOf(sourceRemaining, solver.lastMetrics.preparationOps)
+                remaining = minOf(remaining, sourceRemaining)
+            }
+            val observation = observer?.let { LpClaimObservation(claim, it) }
+            numericalLpResult(model, solver, result, remaining, cancellation, observation,
+                floatAccept, floatOffset).also { observation?.finish(it) }
+        }
+}
+
+private class NumericalOpenModel(val model: LpModel?, val work: Long)
+
+private fun numericalOpenModel(
+    model: LpModel,
+    workLimit: Long,
+    cancellation: Cancellation,
+    observer: LpCertificationObserver?,
+): NumericalOpenModel {
+    val timer = LpPhaseTimer(observer, LpSolvePhase.SOURCE_OPEN_PROJECTION)
+    val meter = LpProjectionMeter(workLimit, 32L * 1024 * 1024, cancellation)
+    var working: LpModel? = null
+    try {
+        val extent = model.numVars.toLong() + model.n + model.m + model.csc.colVal.size
+        meter.reserve(32L * extent + 128L, 128L * extent + 512L, matrix = true)
+        val source = model.authoritativeModel()
+        meter.poll()
+        working = source?.let { LpExactState(it).toWorkingModel(meter) }
+        meter.poll()
+    } catch (_: LpProjectionStop) {
+        working = null
+    } finally {
+        timer.finish(if (working != null) "PROJECTED" else "DECLINED", meter.work)
+    }
+    return NumericalOpenModel(working, meter.work)
+}
 
 private fun sourceCertifiedResult(
     model: LpModel,
@@ -1468,6 +1510,10 @@ internal inline fun LpModel.forEachRationalColumn(j: Int, action: (Int, BigFract
 
 internal fun LpModel.hasIntegralObjective(): Boolean {
     if (!finiteExactInput()) return false
+    return hasIntegralObjectiveDefinition()
+}
+
+internal fun LpModel.hasIntegralObjectiveDefinition(): Boolean {
     exactState?.model?.let { source ->
         val scale = source.objective.scale.value.reciprocal()
         var constant = source.objective.constant.value * scale + source.objective.externalConstant.value

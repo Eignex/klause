@@ -82,20 +82,22 @@ class LpNumericalFixingTest {
 
     @Test
     fun `numerical fixing should retain affine objective units`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0, 40)), emptyArray())
-        val session = PropagationSession(problem)
-        val model = LpBuilder().apply { addVar(0L, 40L, cost = 2L) }.build(Sense.MINIMIZE)
-        val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false), 10L,
-            intArrayOf(0), intArrayOf())
-        val objective = LinearObjective(intCoefficients = longArrayOf(2L), constant = 10L)
-        val sink = SolveStatsSink(backend = "numerical-fixing")
-        LpEngine(problem, objective, LpParams(), sink, LpSolveContext.Numerical).use { engine ->
-            val lower = assertNotNull(engine.numericalObjectiveBound(model, doubleArrayOf(), Cancellation.Never))
+        for (constant in listOf(10L, 1_000_000_000_000L, -1_000_000_000_000L)) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 40)), emptyArray())
+            val session = PropagationSession(problem)
+            val model = LpBuilder().apply { addVar(0L, 40L, cost = 2L) }.build(Sense.MINIMIZE)
+            val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false), constant,
+                intArrayOf(0), intArrayOf())
+            val objective = LinearObjective(intCoefficients = longArrayOf(2L), constant = constant)
+            val sink = SolveStatsSink(backend = "numerical-fixing")
+            LpEngine(problem, objective, LpParams(), sink, LpSolveContext.Numerical).use { engine ->
+                val lower = assertNotNull(engine.numericalObjectiveBound(model, doubleArrayOf(), Cancellation.Never))
 
-            engine.applyNumericalFixing(relaxation, doubleArrayOf(), lower, 50.0, session,
-                0, true, null, Cancellation.Never, true)
+                engine.applyNumericalFixing(relaxation, doubleArrayOf(), lower, (constant + 40L).toDouble(), session,
+                    0, true, null, Cancellation.Never, true)
 
-            assertEquals(IntDomain(0, 19), session.intDomain(0))
+                assertEquals(IntDomain(0, 19), session.intDomain(0))
+            }
         }
     }
 

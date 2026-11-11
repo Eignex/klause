@@ -39,13 +39,14 @@ internal fun verifyRealCoordinates(
     model: Problem,
     sample: Sample,
     cancellation: Cancellation,
+    checkDiscrete: Boolean = true,
 ): Verification<Sample, Unit> {
     cancellation.charge(1L)
     if (cancellation()) return Verification.Indeterminate("source coordinate check cancelled")
-    if (model.factors.any { it is Distinct || it is AllDifferent } &&
+    if (checkDiscrete && model.factors.any { it is Distinct || it is AllDifferent } &&
         (sample.numIntVars != model.numIntVars || sample.numBoolVars != model.numBoolVars)
     ) return Verification.Rejected("assignment does not cover distinctness coordinates")
-    for ((id, factor) in model.factors.withIndex()) {
+    if (checkDiscrete) for ((id, factor) in model.factors.withIndex()) {
         cancellation.charge(1)
         if (cancellation()) return Verification.Indeterminate("source coordinate check cancelled")
         if (factor !is Abs && factor !is AffineAbs && factor !is AllDifferent &&

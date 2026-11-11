@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.CandidateCompletion
 import com.eignex.klause.localsearch.Completion
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
@@ -41,6 +42,16 @@ internal class LeafRealCompletion(
 ) : CandidateCompletion {
     constructor(problem: Problem, objective: LinearObjective?) : this(problem, objective, null)
 
+    constructor(
+        problem: Problem,
+        objective: LinearObjective?,
+        toleranceCheck: ((Sample) -> Boolean)?,
+        mode: LpCertificationMode,
+    ) : this(problem, objective, toleranceCheck,
+        if (mode == LpCertificationMode.EXACT && !toleranceCheck.permitsToleranceOptimum()) {
+            LpSolveContext.Production.copy(sparsePointRecovery = true)
+        } else LpSolveContext.forMode(mode))
+
     private val encoders = problem.selectedFactorProjections()
     private val encoding = LinearCompletionEncoding(encoders)
     private val absCompletion = if (problem.factors.any { it is RealAbs }) AbsRealCompletion(problem) else null
@@ -75,7 +86,9 @@ internal class LeafRealCompletion(
         val check = if (observeFloat == null) toleranceCheck else FiniteSourceAcceptance(
             { sample ->
                 observeFloat?.invoke(sample)
-                toleranceCheck?.invoke(sample) == true
+                toleranceCheck?.invoke(sample)
+                    ?: (verifyRealCoordinates(problem, sample, cancellation, checkDiscrete = false)
+                        is Verification.Accepted)
             },
             toleranceCheck.permitsToleranceOptimum(),
         )
@@ -91,8 +104,8 @@ internal class LeafRealCompletion(
                 Completion.Witness(candidate.copy(reals = real.reals, exactReals = real.exactReals), work)
 
             LpVerdict.TOLERANCE_OPTIMUM -> {
-                val completed = candidate.copy(reals = real.reals, exactReals = null)
-                if (toleranceCheck?.invoke(completed) == true && !cancellation()) {
+                val completed = candidate.copy(reals = real.reals, exactReals = real.exactReals)
+                if ((real.numerical || toleranceCheck?.invoke(completed) == true) && !cancellation()) {
                     Completion.Witness(completed, work)
                 } else Completion.Undecided(work)
             }

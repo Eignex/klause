@@ -23,15 +23,200 @@ import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LpRoute
+import com.eignex.klause.solver.result.LpStatsSink
+import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LeafRealSolverTest {
+    @Test
+    fun `a reconstructed boundary should not satisfy a strict source inequality`() {
+        val problem = Problem(0, 0, emptyArray(), arrayOf<Factor>(
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(-3.0),
+                LinearOp.LE, -1.0, strict = true),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val sample = Sample(booleanArrayOf(), longArrayOf())
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+
+        val fresh = leafRealFeasibility(problem, objective, sample, context = LpSolveContext.Numerical)
+        val retained = LeafRealSolver(problem, objective, context = LpSolveContext.Numerical).use { it.solve(sample) }
+
+        for (result in listOf(fresh, retained)) {
+            assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+            assertTrue(result.reals.isEmpty())
+        }
+    }
+
+    @Test
+    fun `cancellation during recession point acceptance should withhold the pair`() {
+        val problem = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val sample = Sample(booleanArrayOf(), longArrayOf())
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
+        var cancelled = false
+
+        val result = leafRealFeasibility(problem, objective, sample, context = LpSolveContext.Numerical,
+            cancellation = Cancellation { cancelled }, toleranceCheck = { cancelled = true; true })
+
+        assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+        assertTrue(result.reals.isEmpty())
+    }
+
+    @Test
+    fun `numerical completion should publish an unbounded pair only after source arithmetic accepts it`() {
+        val problem = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val sample = Sample(booleanArrayOf(), longArrayOf())
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
+        val sink = LpStatsSink(LpRoute.STANDALONE)
+
+        val fresh = leafRealFeasibility(problem, objective, sample, sink = sink, context = LpSolveContext.Numerical)
+        val retained = LeafRealSolver(problem, objective, sink = sink, context = LpSolveContext.Numerical)
+            .use { it.solve(sample) }
+
+        for (result in listOf(fresh, retained)) {
+            assertEquals(LpVerdict.UNBOUNDED, result.verdict)
+            assertTrue(result.numerical)
+            assertTrue(assertNotNull(result.exactReals).single() >= BigFraction.ZERO)
+            assertTrue(assertNotNull(result.direction).single() > BigFraction.ZERO)
+        }
+        val stats = sink.snapshot()
+        assertEquals(2L, stats.phases["SOURCE_RECESSION_ACCEPTANCE_STANDALONE"]?.outcomes?.get("UNBOUNDED"))
+        assertEquals(0.0, stats.exactPointFeasible.attempts.sum)
+        assertFalse(stats.phases.keys.any { it.startsWith("CLAIM_CONSUMPTION") })
+    }
+
+    @Test
+    fun `numerical leaf completion should separate exact point coordinates from LP authority`() {
+        val problem = Problem(0, 0, emptyArray(), arrayOf<Factor>(
+            Linear(longArrayOf(), intArrayOf(), doubleArrayOf(2.0), intArrayOf(0), LinearOp.EQ, 1L),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val sample = Sample(booleanArrayOf(), longArrayOf())
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val sink = LpStatsSink(LpRoute.STANDALONE)
+
+        val fresh = leafRealFeasibility(problem, objective, sample, sink = sink, context = LpSolveContext.Numerical)
+        val retained = LeafRealSolver(problem, objective, sink = sink, context = LpSolveContext.Numerical)
+            .use { it.solve(sample) }
+
+        for (result in listOf(fresh, retained)) {
+            assertEquals(LpVerdict.TOLERANCE_OPTIMUM, result.verdict)
+            assertEquals(BigFraction.ofDouble(0.5), result.exactReals?.single())
+            assertTrue(result.numerical)
+        }
+        val stats = sink.snapshot()
+        assertEquals(2L, stats.phases["NUMERICAL_CONSUMPTION_STANDALONE"]?.outcomes?.get("ATTAINED_OPTIMUM"))
+        assertFalse(stats.phases.keys.any { it.startsWith("CLAIM_CONSUMPTION") })
+        assertEquals(0.0, stats.integerCertify.attempts.sum)
+        assertEquals(0.0, stats.exactPointFeasible.attempts.sum)
+    }
+
+    @Test
+    fun `numerical leaf completion should honor source acceptance without exact fallback`() {
+        val problem = Problem(0, 0, emptyArray(), arrayOf<Factor>(
+            Linear(longArrayOf(), intArrayOf(), doubleArrayOf(3.0), intArrayOf(0), LinearOp.EQ, 1L),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val sample = Sample(booleanArrayOf(), longArrayOf())
+        val cases = listOf<Pair<((Sample) -> Boolean)?, LpVerdict>>(
+            null to LpVerdict.TOLERANCE_OPTIMUM,
+            { _: Sample -> false } to LpVerdict.INDETERMINATE,
+            { _: Sample -> true } to LpVerdict.TOLERANCE_OPTIMUM,
+        )
+        val sink = LpStatsSink(LpRoute.STANDALONE)
+
+        LeafRealSolver(problem, null, sink = sink, context = LpSolveContext.Numerical).use { owner ->
+            for ((check, expected) in cases) {
+                val result = owner.solve(sample, toleranceCheck = check)
+
+                assertEquals(expected, result.verdict)
+                if (check == null) assertEquals(BigFraction.ofLong(3L).reciprocal(), result.exactReals?.single())
+            }
+        }
+
+        val stats = sink.snapshot()
+        assertFalse(stats.phases.keys.any { it.startsWith("EXACT_") || it.startsWith("AUTHORITATIVE_IMPORT") })
+        assertEquals(0.0, stats.safeObjectiveLowerBound.attempts.sum)
+        assertEquals(0.0, stats.rationalOutcome.attempts.sum)
+    }
+
+    @Test
+    fun `cancellation during rational source admission should withhold the proposal`() {
+        val problem = Problem(0, 0, emptyArray(), arrayOf<Factor>(
+            Linear(longArrayOf(), intArrayOf(), doubleArrayOf(3.0), intArrayOf(0), LinearOp.EQ, 1L),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val third = BigFraction.ofLong(3L).reciprocal()
+        var cancelled = false
+        var checks = 0
+        val acceptance = FiniteSourceAcceptance({ point ->
+            checks++
+            if (point.exactReals?.single() != third) false else {
+                cancelled = true
+                true
+            }
+        }, false)
+        val sink = LpStatsSink(LpRoute.STANDALONE)
+
+        val result = leafRealFeasibility(problem, null, Sample(booleanArrayOf(), longArrayOf()),
+            cancellation = Cancellation { cancelled }, toleranceCheck = acceptance,
+            context = LpSolveContext.Numerical, sink = sink)
+
+        assertEquals(2, checks)
+        assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+        assertTrue(result.reals.isEmpty())
+        assertTrue(assertNotNull(sink.snapshot().phases["SOURCE_FLOAT_ACCEPTANCE_STANDALONE"]).work > 0L)
+    }
+
+    @Test
+    fun `numerical leaf conflicts should follow retained integer pins`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0L, 1L)), arrayOf<Factor>(
+            Linear(longArrayOf(1L), intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), LinearOp.EQ, 1L),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val sink = LpStatsSink(LpRoute.STANDALONE)
+        val results = mutableListOf<LeafRealResult>()
+
+        LeafRealSolver(problem, null, sink = sink, context = LpSolveContext.Numerical).use { owner ->
+            for (pin in listOf(0L, 1L, 0L)) results += owner.solve(Sample(booleanArrayOf(), longArrayOf(pin)))
+        }
+
+        assertEquals(listOf(LpVerdict.INFEASIBLE, LpVerdict.TOLERANCE_OPTIMUM, LpVerdict.INFEASIBLE),
+            results.map { it.verdict })
+        assertTrue(results.all { it.numerical })
+        assertEquals(setOf(0), results.first().refutingFactors.toSet())
+        val stats = sink.snapshot()
+        assertEquals(2L, stats.phases["NUMERICAL_CONSUMPTION_STANDALONE"]?.outcomes?.get("CONTRADICTION"))
+        assertFalse(stats.phases.keys.any { it.startsWith("CLAIM_CONSUMPTION") })
+        assertEquals(0.0, stats.exactFarkasRay.attempts.sum)
+    }
+
+    @Test
+    fun `cancellation during numerical source acceptance should withhold the point`() {
+        val problem = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val sample = Sample(booleanArrayOf(), longArrayOf())
+        var stopped = false
+        val sink = LpStatsSink(LpRoute.STANDALONE)
+
+        LeafRealSolver(problem, null, sink = sink, context = LpSolveContext.Numerical).use { owner ->
+            val cancelled = owner.solve(sample, Cancellation { stopped }, toleranceCheck = { stopped = true; true })
+            stopped = false
+            val completed = owner.solve(sample, toleranceCheck = { true })
+
+            assertEquals(LpVerdict.INDETERMINATE, cancelled.verdict)
+            assertEquals(LpVerdict.TOLERANCE_OPTIMUM, completed.verdict)
+        }
+
+        val stats = sink.snapshot()
+        assertEquals(1L, stats.phases["NUMERICAL_CONSUMPTION_STANDALONE"]?.outcomes?.get("ATTAINED_OPTIMUM"))
+        assertFalse(stats.phases.keys.any { it.startsWith("CLAIM_CONSUMPTION") })
+    }
+
     @Test
     fun `releasing pending completion should permit fresh pins without stale coordinates`() {
         val problem = Problem(

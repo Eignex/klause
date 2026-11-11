@@ -273,6 +273,7 @@ private fun FiniteSolveRequest.withSourceControls(
         deadlineExceeded = deadlineExceeded, onEvent = onEvent, onPortfolioEvent = onPortfolioEvent,
         onPortfolioFault = onPortfolioFault, prepareOnly = prepareOnly || preparationOnly,
         toleranceCheck = toleranceCheck,
+        lpMode = policy.lpMode ?: lpMode,
     )
 }
 
