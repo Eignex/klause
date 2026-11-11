@@ -4,6 +4,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLpPolicy
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
@@ -36,6 +37,34 @@ class LinearAuthorityInvocationTest {
         SourceRevision("conditioned-linear", "exact-affine"),
         objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
     )
+
+    @Test
+    fun `a borrowed numerical authority should publish numerical completion without exact evidence`() {
+        for (sense in listOf(ObjectiveSense.MINIMIZE, ObjectiveSense.MAXIMIZE)) {
+            val scoped = scope.copy(objective = SourceObjective("x", sense))
+            val source = SourceProofContext(scoped, setOf(real), mapOf(
+                "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
+                    BigFraction.ofLong(-2))),
+                "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(3))),
+            ), mapOf(real to BigFraction.ONE))
+            val funding = SourceLpFunding(10_000_000L, 64_000_000L)
+            val budget = SourceLpBudget(solveContext = { LpSolveContext.Numerical }, funding = funding)
+
+            LinearAuthority(budget, retainLp = true).use { authority ->
+                val result = LinearAuthorityInvocation(source, TheoryParams(sourceCuts = false),
+                    borrowedAuthority = authority, boundOrdered = true).use { it.run { _, _ -> } }
+
+                val numerical = assertNotNull(result.numerical)
+                val expected = if (sense == ObjectiveSense.MINIMIZE) 2.0 else 3.0
+                assertEquals(expected, numerical.bound)
+                assertTrue(numerical.optimal)
+                assertEquals(TerminationReason.SearchExhausted, result.reason)
+                assertNull(result.terminal)
+                assertNull(result.bound)
+                assertEquals(0L, budget.measuredBoundCertificationWork)
+            }
+        }
+    }
 
     @Test
     fun `a paid root relaxation should supply advisory guidance to its captured context`() {

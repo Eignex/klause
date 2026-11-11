@@ -79,7 +79,7 @@ internal class RationalTheoryDescent(
         val result = invocation.snapshot(TerminationReason.BudgetExhausted)
         val captured = requireNotNull(context)
         LinearOptimizationResult(captured.scope, null, result.bound, result.incumbent, result.value,
-            result.reason, result.stats, captured.semantics)
+            result.reason, result.stats, captured.semantics, result.numerical)
     }
     private var round: ResumableOpenTheory? = null
     private var incumbent: Sample? = null
@@ -137,6 +137,7 @@ internal class RationalTheoryDescent(
                 completed.reason,
                 completed.stats,
                 sourceContext.semantics,
+                completed.numerical,
             )
             linearResult = authority
             if (!numericalOnly && authority.terminal == null &&
@@ -288,6 +289,7 @@ internal class RationalTheoryDescent(
             snapshot.reason,
             snapshot.stats,
             captured.semantics,
+            snapshot.numerical,
         )
     }
 
@@ -381,6 +383,7 @@ internal class RationalTheoryDescent(
             reason,
             stats,
             captured.semantics,
+            linearResult?.numerical?.partial(checkedValue),
         )
     }
 

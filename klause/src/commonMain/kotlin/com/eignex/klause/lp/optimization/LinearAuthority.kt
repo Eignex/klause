@@ -84,6 +84,7 @@ internal class LinearAuthority(
         }
     }
     val funding: SourceLpFunding? get() = budget.funding
+    val solveContext get() = budget.context
     val preparations: Long get() = lp.preparations
     val reuses: Long get() = lp.reuses
     private var template: LinearAuthorityTemplate? = null

@@ -241,7 +241,8 @@ internal class FiniteNumericalCompanions private constructor(
                         TerminationReason.BudgetExhausted, stats))
                 }.also { objectiveBound = search.objectiveBound } ?: return null
                 val original = LinearOptimizationResult(context.scope, finished.terminal, finished.bound,
-                    finished.incumbent, finished.value, finished.reason, finished.stats, context.semantics)
+                    finished.incumbent, finished.value, finished.reason, finished.stats, context.semantics,
+                    finished.numerical)
                 result = finiteNumericalCompletion(original, context, global or limits.cancellation or limits.timeout)
                 return result
             }

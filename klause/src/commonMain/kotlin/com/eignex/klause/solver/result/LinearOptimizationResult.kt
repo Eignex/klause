@@ -9,7 +9,7 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceResultEvidence
 import com.eignex.klause.solver.evidence.SourceScope
 
-/** Exact source linear authority, with incumbent and bound retained independently of completion. */
+/** Source linear results with distinct exact and numerical deduction authority. */
 class LinearOptimizationResult internal constructor(
     /** Original source revision, restrictions, objective identity and direction. */
     val scope: SourceScope,
@@ -27,6 +27,8 @@ class LinearOptimizationResult internal constructor(
     val stats: SolveStats,
     /** Interpretation of the producing source context, independent of claim authority. */
     val semantics: EffectiveSourceSemantics? = null,
+    /** Numerical global deductions; these supply no exact derivation or independently validated proof. */
+    val numerical: LinearNumericalResult? = null,
 ) {
     /** Inspectable original-source derivations, including retained partial witness and bound data. */
     val evidence: SourceResultEvidence = SourceResultEvidence(scope, buildList {
