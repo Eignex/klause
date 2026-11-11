@@ -131,7 +131,7 @@ internal class ExactBasisMeter(val limits: ExactBasisLimits, private val cancell
                 ReconstructionDecline.WORK -> ExactBasisDecline.WORK
                 ReconstructionDecline.BITS -> ExactBasisDecline.BITS
                 ReconstructionDecline.DIMENSION -> ExactBasisDecline.DIMENSION
-                ReconstructionDecline.CANDIDATE -> ExactBasisDecline.CANDIDATE
+                ReconstructionDecline.CANDIDATE, ReconstructionDecline.POLICY -> ExactBasisDecline.CANDIDATE
                 ReconstructionDecline.INVALID_INPUT, ReconstructionDecline.NONFINITE -> ExactBasisDecline.INVALID_INPUT
             },
         )

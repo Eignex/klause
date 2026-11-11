@@ -216,7 +216,8 @@ internal class LinearAuthoritySession(
             val current = bind(packed, emittedObjective, active, { prepared.model }, scope, profile, appendRows)
                 ?: return@resumeSparse null
             completed?.let {
-                val usable = it.primal != null || it.bound != null || it.conflict != null
+                val usable = it.primal != null || it.bound != null || it.conflict != null ||
+                    it.numericalBound != null || it.numericalConflict != null
                 if (completedPolicy?.certificate == policy.certificate &&
                     (usable || completedPolicy?.floating == profile)) {
                     onLifecycle("QueryReused", 1L)
@@ -232,6 +233,7 @@ internal class LinearAuthoritySession(
                     policy.certificate, token, observer)
                     .also {
                         val work = it.certificateMetrics?.work ?: 0L
+                        budget.observe(floatWork = it.numericalWork)
                         if (it.termination == LpFloatTermination.INFEASIBLE_CANDIDATE) {
                             budget.observe(conflictCertification = work)
                         } else {
