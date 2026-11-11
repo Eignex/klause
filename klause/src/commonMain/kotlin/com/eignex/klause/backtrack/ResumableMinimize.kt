@@ -782,7 +782,9 @@ internal class ResumableMinimize(
                 }
                 if (rootLayoutPending) return StepEvent.Paused
             } else if (rootRoundingPending && !rootRoundingAttempted) {
-                rootPrimalWork(rootLpBudget())
+                rootPrimalWork(rootLpBudget())?.let {
+                    return StepEvent.Incumbent(it.withSourceSemantics(problem.semantics))
+                }
             }
             if (rootRoundingPending) {
                 slice.charge()
@@ -1000,8 +1002,7 @@ internal class ResumableMinimize(
         if (guideBy(proposal)) sink.search.clausalPrimalAccepted++
     }
 
-    // A heuristic point is built outside this run's assumptions, leaf checks and real completion, so it steers the
-    // next branches; only a leaf the search reaches through its own propagation becomes an incumbent.
+    // A clause-walk point never passed this arm's propagation, so it only steers the next branches.
     private fun guideBy(proposal: Sample): Boolean {
         if (!::brancher.isInitialized || proposal.numBoolVars != problem.numBoolVars ||
             proposal.numIntVars != problem.numIntVars
@@ -1027,34 +1028,43 @@ internal class ResumableMinimize(
     private fun revalidateInitialCandidate(): MinimizeResult.WithSample? {
         val sample = initialCandidate ?: return null
         initialCandidate = null
-        if (params.componentFactory != null) return null
         val token = if (params.cancellation.workScheduled()) params.cancellation else
             params.cancellation or Cancellation.after(LP_VERIFY_BUDGET)
-        if (token() || sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) return null
-        // The candidate is an engine result; only this run's own pins are a new obligation.
-        if (checkPointRestrictions(sample, params.assumptions, token) != null || token()) return null
-        val accepted = if (problem.numRealVars == 0) {
-            sample
-        } else {
-            val real = completeLeaf(sample, token)
-            if (real.verdict !in listOf(
-                    LpVerdict.FEASIBLE,
-                    LpVerdict.ATTAINED_OPTIMUM,
-                    LpVerdict.TOLERANCE_OPTIMUM,
-                    LpVerdict.UNBOUNDED,
-                )
-            ) {
-                return null
-            }
-            val completed = sample.copy(reals = real.reals, exactReals = real.exactReals)
-            if (real.verdict == LpVerdict.UNBOUNDED) {
-                if (!token()) unboundedLeaf = completed to checkNotNull(real.direction)
-                return null
-            }
-            completed
-        }
-        if (token()) return null
+        val accepted = engineLeaf(sample, token) ?: return null
         return recordIfImproving(accepted, objective.evaluate(accepted), startingWitness = !rebindable)
+    }
+
+    /**
+     * [sample] as a leaf of this run when an engine already propagated its discrete part outside this run's
+     * assumptions: only those pins and the real completion remain. A checked ray is kept in [unboundedLeaf].
+     * Null, with the reason given to [onDecline], when either refuses it or [token] stops it.
+     */
+    private fun engineLeaf(sample: Sample, token: Cancellation, onDecline: (String) -> Unit = {}): Sample? {
+        fun decline(outcome: String): Sample? {
+            onDecline(if (token()) "CANCELLED" else outcome)
+            return null
+        }
+        if (params.componentFactory != null) return decline("EXTRA_COMPONENTS")
+        if (token()) return decline("CANCELLED")
+        if (sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) {
+            return decline("INVALID_COORDINATES")
+        }
+        if (checkPointRestrictions(sample, params.assumptions, token) != null) return decline("PINS_REJECTED")
+        val leaf = if (problem.numRealVars == 0) sample else {
+            val real = completeLeaf(sample, token)
+            val completed = sample.copy(reals = real.reals, exactReals = real.exactReals)
+            when (real.verdict) {
+                LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.TOLERANCE_OPTIMUM -> completed
+
+                LpVerdict.UNBOUNDED -> {
+                    if (!token()) unboundedLeaf = completed to checkNotNull(real.direction)
+                    return decline("REAL_UNBOUNDED")
+                }
+
+                else -> return decline("REAL_${real.verdict.name}")
+            }
+        }
+        return if (token()) decline("CANCELLED") else leaf
     }
 
     private fun firstRunWorkBody(): MinimizeResult.WithSample? {
@@ -1122,7 +1132,7 @@ internal class ResumableMinimize(
         // arm's (root propagation + shaving), before any incumbent-relative fixing runs.
         boundExchange.importGlobalVarBounds()
         boundExchange.publishGlobalVarBounds()
-        rootPrimalWork(rootToken)
+        rootPrimalWork(rootToken)?.let { return it }
         if (rootRoundingPending) return null
         if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null && params.componentFactory == null) {
             val before = lpEngine.primalSearchWork
@@ -1136,35 +1146,35 @@ internal class ResumableMinimize(
         return null
     }
 
-    private fun rootPrimalWork(rootToken: Cancellation) {
+    private fun rootPrimalWork(rootToken: Cancellation): MinimizeResult.WithSample? {
         rootRoundingAttempted = true
         if (!lpEngine.params.lpPlan.probe || lpEngine.lpRelaxer == null) {
             rootRoundingPending = false
             lpEngine.rootRoundingWarmStart = null
-            return
+            return null
         }
-        if (handoffRootTargets(rootToken)) return
-        // The first rounding that could improve the incumbent stops the heuristic and steers the search.
+        if (handoffRootTargets(rootToken)) return null
+        var installed: MinimizeResult.WithSample? = null
+        // A rounding is a leaf of this arm's propagation; the first one to improve the incumbent stops the heuristic.
         fun accept(proposal: Sample): Sample? {
-            val outcome = when {
-                rootToken() -> "CANCELLED"
-                objective.evaluate(proposal) >= bestObj -> "NON_IMPROVING"
-                else -> "GUIDED"
+            val started = TimeSource.Monotonic.markNow()
+            var outcome = "IMPROVING"
+            try {
+                val leaf = engineLeaf(proposal, rootToken) { outcome = it } ?: return null
+                installed = recordIfImproving(leaf, objective.evaluate(leaf))
+                if (installed == null) outcome = if (rootToken()) "CANCELLED" else "NON_IMPROVING"
+                return leaf.takeIf { installed != null }
+            } finally {
+                sink.lp.observePrimalPhase("PRIMAL_PROPOSAL", outcome, started.elapsedNow().inWholeNanoseconds)
             }
-            sink.lp.observePrimalPhase("PRIMAL_PROPOSAL", outcome, 0L)
-            return proposal.takeIf { outcome == "GUIDED" }
         }
-        val rounded = lpEngine.lpRoundingProbe(objective, rootToken,
-            initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null,
-            toleranceReals = params.toleranceCheck != null,
-            accept = ::accept)
+        val initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null
+        val rounded = lpEngine.lpRoundingProbe(objective, rootToken, initial = initial, accept = ::accept)
         rootRoundingPending = rounded == null && canResumeRootRounding()
-        if (rootRoundingPending) return
+        if (rootRoundingPending) return null
         lpEngine.rootRoundingWarmStart = null
-        val seed = rounded ?: lpEngine.lpFeasibilityPump(objective, rootToken,
-            initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null,
-            accept = ::accept)
-        seed?.let(::guideBy)
+        if (rounded == null) lpEngine.lpFeasibilityPump(objective, rootToken, initial = initial, accept = ::accept)
+        return installed
     }
 
     private fun handoffRootTargets(rootToken: Cancellation): Boolean {
