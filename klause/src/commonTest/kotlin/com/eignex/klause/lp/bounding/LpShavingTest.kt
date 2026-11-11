@@ -9,6 +9,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.portfolio.BacktrackWorkerConfig
 import com.eignex.klause.portfolio.SharedObjectiveBound
 import com.eignex.klause.portfolio.SharedPools
@@ -52,13 +53,16 @@ class LpShavingTest {
             realLower = doubleArrayOf(0.0),
             realUpper = doubleArrayOf(1.0),
         )
-        val engine = LpEngine(
-            p,
-            LinearObjective(intCoefficients = longArrayOf(1L)),
-            LpParams(lpPlan = LpPlan(bounding = true)),
-            SolveStatsSink(backend = "shave"),
-        )
-        assertEquals(listOf(0), engine.redundantConstraints(Cancellation.Never))
+        for (mode in LpCertificationMode.entries) {
+            LpEngine(
+                p,
+                LinearObjective(intCoefficients = longArrayOf(1L)),
+                LpParams(lpPlan = LpPlan(bounding = true), lpMode = mode),
+                SolveStatsSink(backend = "shave"),
+            ).use { engine ->
+                assertEquals(listOf(0), engine.redundantConstraints(Cancellation.Never))
+            }
+        }
     }
 
     @Test

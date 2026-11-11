@@ -17,7 +17,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.selectedFactorProjections
-import com.eignex.klause.solver.validation.floatingOptimumAcceptance
 import com.eignex.klause.theory.finiteLinearModel
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.arrays.emptyDoubleArray
@@ -27,7 +26,7 @@ internal class LeafRealSolver(
     private val objective: LinearObjective?,
     componentSplit: Boolean = true,
     private val sink: LpStatsSink? = null,
-    context: LpSolveContext = LpSolveContext.Production,
+    private val context: LpSolveContext = LpSolveContext.Production,
     pricing: LpPricingOptions = LpPricingOptions(),
 ) : AutoCloseable {
     private val encoders = problem.selectedFactorProjections()
@@ -56,20 +55,20 @@ internal class LeafRealSolver(
         } catch (_: LpAssemblyCancelled) {
             null
         } ?: return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
+        val acceptance = LeafRealAcceptance(relaxation, problem, sample, toleranceCheck, cancellation,
+            context.certificationPolicy.numericalDeductions)
         val certified = solvers.solve(
             relaxation.model,
             cancellation = cancellation,
             workLimit = workLimit,
             observer = sink?.certificationObserver(LpRoute.STANDALONE),
-            floatAccept = toleranceCheck.floatingOptimumAcceptance()?.let { check ->
-                { result -> check(sample.copy(reals = relaxation.floatReals(result.primal, problem))) }
-            },
+            floatAccept = acceptance.predicate,
             floatOffset = relaxation.objectiveConstant.toDouble(),
             claim = if (objective == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM,
         )
-        return relaxation.leafResult(certified, problem, objective, sample, sink)
+        return relaxation.leafResult(certified, problem, objective, sample, sink, acceptance, cancellation)
             .checkedEncoding(encoded, sample, cancellation)
-            .also { it.observeConsumption(sink) }
+            .observedConsumption(sink, cancellation)
     }
 
     fun openSolve(
@@ -88,13 +87,13 @@ internal class LeafRealSolver(
             } catch (_: LpAssemblyCancelled) {
                 null
             } ?: return@LpSolveCursor LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
+            val acceptance = LeafRealAcceptance(relaxation, problem, sample, toleranceCheck, cancellation,
+                context.certificationPolicy.numericalDeductions)
             val certified = solvers.openSolve(
                 relaxation.model,
                 cancellation = cancellation,
                 observer = sink?.certificationObserver(LpRoute.STANDALONE),
-                floatAccept = toleranceCheck.floatingOptimumAcceptance()?.let { check ->
-                    { result -> check(sample.copy(reals = relaxation.floatReals(result.primal, problem))) }
-                },
+                floatAccept = acceptance.predicate,
                 floatOffset = relaxation.objectiveConstant.toDouble(),
                 claim = if (objective == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM,
             ).use { cursor ->
@@ -105,10 +104,9 @@ internal class LeafRealSolver(
                 }
                 (step as LpSolveStep.Completed<CertifiedLpResult>).value
             }
-            val result = relaxation.leafResult(certified, problem, objective, sample, sink)
+            val result = relaxation.leafResult(certified, problem, objective, sample, sink, acceptance, cancellation)
                 .checkedEncoding(encoded, sample, cancellation)
-            if (cancellation()) LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
-            else result.also { it.observeConsumption(sink) }
+            result.observedConsumption(sink, cancellation)
         }.also { activeSolve = it }
     }
 

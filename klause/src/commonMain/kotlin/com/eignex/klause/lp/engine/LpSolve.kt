@@ -21,7 +21,7 @@ import kotlin.time.TimeSource
 
 // Bounds and witnesses remain independently available even when neither proves attainment. ATTAINED_OPTIMUM is exact:
 // an exact witness meeting an exact bound. TOLERANCE_OPTIMUM is a float optimum the caller accepted under its own
-// tolerance semantics, whose primal and objective are not exact.
+// source semantics within the declared LP tolerance. It supplies no exact optimum certificate.
 internal enum class LpVerdict {
     CERTIFIED_BOUND,
     FEASIBLE,
@@ -1468,6 +1468,10 @@ internal inline fun LpModel.forEachRationalColumn(j: Int, action: (Int, BigFract
 
 internal fun LpModel.hasIntegralObjective(): Boolean {
     if (!finiteExactInput()) return false
+    return hasIntegralObjectiveDefinition()
+}
+
+internal fun LpModel.hasIntegralObjectiveDefinition(): Boolean {
     exactState?.model?.let { source ->
         val scale = source.objective.scale.value.reciprocal()
         var constant = source.objective.constant.value * scale + source.objective.externalConstant.value

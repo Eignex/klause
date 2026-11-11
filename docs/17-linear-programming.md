@@ -15,6 +15,12 @@ Numerical bounds and conflicts retain their current working-model identity and
 carry no exact certificate or exact support. Their work debits the consuming LP
 allowance, including refused attempts. Exact computation admission precedes the
 certificate producer; a numerical policy invokes no exact root certifier.
+`LpCertificationMode` is captured independently in caller policy, finite requests,
+search parameters and LP parameters. Explicit diagnostic solve contexts retain
+their own dependencies. Pre-bake checks, harvest and portfolio workers carry the
+captured mode without substituting recipe pools or heuristic edits. Root shaving, redundancy and implication probes use the
+selected authority and the remaining root grant; their integer source objectives
+are rounded before their bounds are consumed.
 Standalone and retained solves carry numerical packages separately from their exact
 verdict and proof fields. A numerical point requires the caller's source-acceptance
 predicate; a numerical optimum also requires its objective to meet the lower bound
@@ -249,6 +255,14 @@ numerical projection, then map to minimized source objective units. An open side
 or a probe cap cannot supply a finite minimizing endpoint. Evaluation returns its
 visited work and refusal reason after cancellation, work exhaustion or numerical
 failure. This result is separate from exact source certificates.
+
+Scalar objective offsets project toward the lower side before floating evaluation.
+Root publication composes the source offset without adding a relative margin to
+that constant. Objective integrality uses objective and column-origin definitions,
+without scanning constraint rows for exact input validation in numerical mode;
+the inspection debits the containing grant. Unrepresentable integral source ranges
+withhold incumbent deductions. Reduced-cost gaps cancel the source offset before
+floating conversion, and their tolerance uses the remaining LP objective units.
 
 Optional simplex diagnostics retain bounded progress observations per numerical
 invocation. A retained invocation replaces its completed observations while
@@ -1223,10 +1237,22 @@ ordinary numerical traversal under its remaining cumulative funding.
 
 ### Leaf completion
 
+Finite leaf completion consumes numerical results separately from exact proof
+packages. A numerical conflict belongs to its current working model and cites
+the active source factors; learned finite reasons also retain live bounds and row
+premises. A numerical point must pass the caller's source acceptance. Without
+tolerance acceptance, its binary-rational source coordinates must pass the retained
+arithmetic witness check. This check certifies neither a bound nor an optimum and
+does not invoke exact LP recovery or continuation. A refused point stays unknown.
+Exact point coordinates do not turn numerical LP authority into an exact certificate.
+A numerical optimum meets the numerical bound within the declared LP tolerance;
+its consumption has a separate observation from exact claims. Cancellation after
+acceptance or observation withholds the result.
+
 Finite optimization keeps a pinned real-leaf request across portfolio slices.
 The discrete assignment, assembled row authority, source encoding and required
-certification remain owned by that request. Numerical pauses preserve the live
-solve; a completed floating solve can wait for certification in a later slice.
+mode remain owned by that request. Numerical pauses preserve the live
+solve; exact mode can retain a completed floating solve for later certification.
 Source encoding and relaxation assembly are atomic preparation of the request.
 Neither pause consumes the discrete model or records an indeterminate region.
 Reseeding and shared objective-floor imports are deferred while completion is

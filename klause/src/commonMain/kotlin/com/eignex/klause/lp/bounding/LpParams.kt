@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.util.Cancellation
@@ -25,10 +26,12 @@ class LpParams(
     val randomSeed: Long? = null,
     /** Entering-column policy for exactly zero-objective LP solves. */
     val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+    /** Numerical deductions by default; exact certification when explicitly selected. */
+    val lpMode: LpCertificationMode = LpCertificationMode.NUMERICAL,
 ) {
     /** These params with [lpPlan] replaced (the resolved-plan swap [LpEngine] makes after auto-config). */
     fun copy(lpPlan: LpPlan = this.lpPlan): LpParams =
-        LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed, zeroObjectivePricing)
+        LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed, zeroObjectivePricing, lpMode)
 }
 
 /**

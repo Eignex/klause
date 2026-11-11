@@ -2,6 +2,7 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import kotlin.math.nextUp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -9,6 +10,27 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpFloatingBoundTest {
+    @Test
+    fun `wide objective constants should round toward a lower source bound`() {
+        for (value in listOf(-9007199254740993L, 9007199254740993L, Long.MIN_VALUE, Long.MAX_VALUE)) {
+            for (external in listOf(false, true)) {
+                val objective = ExactLpObjective(emptyList(),
+                    constant = ExactLpNumber.of(if (external) 0L else value),
+                    externalConstant = ExactLpNumber.of(if (external) value else 0L))
+                val source = ExactLpModel(emptyList(), emptyList(), emptyList(), emptyList(), objective)
+                val model = assertNotNull(LpExactState(source).toWorkingModel())
+
+                val result = floatingObjectiveLowerBound(model, doubleArrayOf())
+
+                val bound = assertNotNull(result.bound)
+                val exact = BigFraction.ofLong(value)
+                assertTrue(assertNotNull(BigFraction.ofDouble(bound)) <= exact)
+                assertTrue(assertNotNull(BigFraction.ofDouble(bound.nextUp())) > exact)
+                assertNull(result.stop)
+            }
+        }
+    }
+
     @Test
     fun `column pricing should retain scaled source objective units`() {
         val source = ExactLpModel(listOf(emptyList()), emptyList(),

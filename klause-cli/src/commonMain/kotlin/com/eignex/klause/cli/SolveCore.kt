@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.engine.LpCertificationMode
 import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
@@ -435,6 +436,7 @@ internal object SolveCore {
         return SourceExecutionPolicy(
             ceiling(common.lp), ceiling(defaultLp()), arms,
             common.lpPricing.takeIf { common.lpPricingExplicit }, explicitPresolve,
+            if (common.exact) LpCertificationMode.EXACT else LpCertificationMode.NUMERICAL,
         )
     }
 
