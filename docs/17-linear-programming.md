@@ -1609,10 +1609,11 @@ with peers, and shaving; fixing also tries the objective box (zero multipliers) 
 the duals. `floatFarkasRay` normalises a dual-unbounded ray and accepts it when its binary64
 Farkas margin exceeds the tolerance times the terms' size, pricing open sides at their
 row-implied bounds; the rounded integer ray must pass again against the box sides its
-clause cites. It backs infeasibility pruning, learned conflicts and presolve root
-infeasibility. Mixed row projections, strict-row solves and component bounds have no
-numerical form and are skipped. Optimality, infeasibility and bound claims resting on these
-deductions are numerical. Under exact certification every deduction uses the packages below.
+clause cites, or the node is refuted without a learned clause. It backs infeasibility
+pruning, learned conflicts and presolve root infeasibility. Mixed row projections, strict-row
+solves and component bounds have no numerical form and are skipped. Optimality, infeasibility
+and bound claims resting on these deductions are numerical. Under exact certification
+every deduction uses the packages below.
 
 ### Proof packages
 

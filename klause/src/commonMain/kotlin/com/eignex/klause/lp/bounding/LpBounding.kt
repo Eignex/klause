@@ -1929,7 +1929,10 @@ internal fun LpEngine.objectiveLowerBound(
     )
 }
 
-/** The infeasibility proof [floatRay] supports on [model]: numerical within tolerances, else an exact Farkas ray. */
+/**
+ * The infeasibility proof [floatRay] supports on [model]: numerical within tolerances, else an exact Farkas ray. An
+ * empty numerical ray refutes the node without a combination a learned clause can cite.
+ */
 internal fun LpEngine.infeasibilityRay(model: LpModel, floatRay: DoubleArray, sink: SolveStatsSink): LongArray? {
     if (numericalDeductions) return floatFarkasRay(model, floatRay)
     return solveContext.certificationPolicy.acceptNullable(

@@ -620,7 +620,8 @@ private fun reducedCost(view: FloatEvidenceModel, y: DoubleArray, j: Int): Pair<
  * [ray] oriented and rounded to integer multipliers when, summed in binary64, it shows the rows of [model] cannot
  * hold inside its box: `ρ·rhs > Σⱼ max(ρ·Aⱼ·zⱼ)` by [FLOAT_EVIDENCE_TOLERANCE] times the terms' size. An open side
  * that the float ray meets is priced at the bound the other rows imply. The rounded ray is checked again against the
- * box alone, the sides an infeasibility clause cites. The numerical counterpart of [certifyLpFarkas].
+ * box alone, the sides an infeasibility clause cites; when it fails, the empty ray refutes without a citable
+ * combination. The numerical counterpart of [certifyLpFarkas].
  */
 @Suppress("ReturnCount")
 internal fun floatFarkasRay(model: LpModel, ray: DoubleArray): LongArray? {
@@ -635,8 +636,9 @@ internal fun floatFarkasRay(model: LpModel, ray: DoubleArray): LongArray? {
     val rows = lazy { RowView(view) }
     val normalized = DoubleArray(ray.size) { ray[it] / largest }
     val sign = farkasSign(view, normalized, rows) ?: return null
-    val rounded = roundDuals(model, DoubleArray(ray.size) { sign * normalized[it] })?.mult ?: return null
-    return rounded.takeIf { farkasSign(view, DoubleArray(it.size) { row -> it[row].toDouble() }, null) == 1 }
+    val rounded = roundDuals(model, DoubleArray(ray.size) { sign * normalized[it] })?.mult
+    val citable = rounded?.takeIf { farkasSign(view, DoubleArray(it.size) { row -> it[row].toDouble() }, null) == 1 }
+    return citable ?: LongArray(0)
 }
 
 // +1 when ρ·rhs exceeds every ρ·A·z in the box by the margin, -1 when it falls below every one, else null. Open
