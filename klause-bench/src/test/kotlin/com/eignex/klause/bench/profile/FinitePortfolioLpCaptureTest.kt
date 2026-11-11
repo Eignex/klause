@@ -152,6 +152,42 @@ class FinitePortfolioLpCaptureTest {
         assertEquals(FinitePortfolioLpCapture.parameters(options + ("capture-mode" to "joint-before")), parameters)
         assertTrue("portfolio-progress=false" in parameters)
         assertTrue("companion-admission=ordinary" in parameters)
+        assertTrue(parameters.none { it.startsWith("source-refutation-center-step=") })
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `ordinary joint capture should forward explicit center progress`(enabled: Boolean) {
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "true", "capture-mode" to "joint-ordinary")
+        val expected = FinitePortfolioLpCapture.parameters(options) + "source-refutation-center-step=$enabled"
+
+        val parameters = FinitePortfolioLpCapture.parameters(
+            options + ("source-refutation-center-step" to enabled.toString()))
+
+        assertEquals(expected, parameters)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["yes", "1", "TRUE"])
+    fun `ordinary joint capture should reject invalid center progress values`(value: String) {
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "true", "capture-mode" to "joint-ordinary",
+            "source-refutation-center-step" to value)
+
+        assertFailsWith<IllegalArgumentException> { FinitePortfolioLpCapture.parameters(options) }
+    }
+
+    @ParameterizedTest
+    @CsvSource("portfolio,false", "portfolio,true", "joint-before,false", "joint-before,true")
+    fun `other capture modes should reject center progress selection`(mode: String, value: String) {
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "true", "capture-mode" to mode,
+            "source-refutation-center-step" to value)
+
+        val failure = assertFailsWith<IllegalArgumentException> { FinitePortfolioLpCapture.parameters(options) }
+
+        assertTrue(assertNotNull(failure.message).contains("requires joint-ordinary capture"))
     }
 
     @ParameterizedTest
