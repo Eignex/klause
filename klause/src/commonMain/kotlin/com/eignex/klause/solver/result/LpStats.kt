@@ -799,7 +799,8 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                         (metrics.phase == LpSolvePhase.NUMERICAL_BOUND ||
                             metrics.phase == LpSolvePhase.NUMERICAL_CONFLICT ||
                             metrics.phase == LpSolvePhase.NUMERICAL_RECESSION ||
-                            metrics.phase == LpSolvePhase.SOURCE_OPEN_PROJECTION)
+                            metrics.phase == LpSolvePhase.SOURCE_OPEN_PROJECTION ||
+                            metrics.phase == LpSolvePhase.SOURCE_FLOAT_ACCEPTANCE)
                     ) {
                         standaloneWorkOps += minOf(metrics.work, Long.MAX_VALUE - standaloneWorkOps)
                     }

@@ -60,7 +60,8 @@ internal class LpClaimObservation(
 
     override fun observePhase(metrics: LpPhaseMetrics) {
         if (metrics.phase == LpSolvePhase.NUMERICAL_BOUND || metrics.phase == LpSolvePhase.NUMERICAL_CONFLICT ||
-            metrics.phase == LpSolvePhase.NUMERICAL_RECESSION
+            metrics.phase == LpSolvePhase.NUMERICAL_RECESSION ||
+            metrics.phase == LpSolvePhase.SOURCE_FLOAT_ACCEPTANCE
         ) {
             charge(metrics.work)
         }
