@@ -143,9 +143,10 @@ Minimization retains its first-run position while a private LP root layout prepa
 across slices. Paid construction stays in the worker's cumulative work, and a pause
 starts neither numerical consultation nor tree traversal. A pooled or previous incumbent is
 an engine result; before that work it is checked only against this run's own pins.
-Heuristic points from LP rounding, the feasibility pump and the clause walk are built
-outside the run's assumptions, leaf checks and real completion, so they set the root
-value order and saved phases instead of becoming incumbents; only a leaf the search reaches through its own propagation is one.
+LP rounding and the feasibility pump pin every variable through the arm's own propagation, so a
+pinned point that the leaf checks accept is a search leaf; after this run's pins and real completion
+it becomes an incumbent. A clause-walk point never passes that propagation, so it only sets the root
+value order and saved phases.
 The search and its preparation wrapper report an unfinished root
 layout as pending private preparation. Construction completion, cancellation and retirement follow the
 [LP ownership contract](17-linear-programming.md#root-preparation).
@@ -157,9 +158,9 @@ preferences; unknown variables keep their ordinary fallback values. Guides witho
 known fractional targets keep their direct handoff. The private probe prepares its
 partition against its own root domains. After greedy directions decline, its bounded
 repair can revisit an earlier pin within that component while retaining completed
-earlier components and pending alternatives across slices. A completed proposal only
-steers values; backtracking completes the assignment, and only that leaf becomes an
-incumbent. This transfer carries no LP point, bound or proof authority into a leaf. Before its first incumbent, a retained
+earlier components and pending alternatives across slices. A completed proposal is a pinned
+leaf and is admitted like any other rounding. This transfer carries no LP point, bound or proof
+authority into a leaf. Before its first incumbent, a retained
 integer guide can keep decisions within one declared factor component of the
 undetermined columns at a time. Its preparation precedes additional node LP queries
 under the same funded allowance. A ready guide lets CP seek its first incumbent

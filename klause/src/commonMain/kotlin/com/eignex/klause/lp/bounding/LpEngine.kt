@@ -346,7 +346,7 @@ internal class LpEngine(
         if (!retainComponentValues) rootComponentValues = null
     }
 
-    // A heuristic point orders root values instead of becoming an incumbent; integer columns precede Boolean ones.
+    // A clause-walk point orders root values; integer columns precede Boolean ones.
     // A live root rounding owns the targets, and only component values it already knows take the point's values.
     internal fun guideRootValues(bools: BooleanArray, ints: LongArray) {
         if (bools.size != problem.numBoolVars || ints.size != problem.numIntVars) return
