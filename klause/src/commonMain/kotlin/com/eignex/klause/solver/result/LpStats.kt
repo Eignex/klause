@@ -795,6 +795,12 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
             val route = LpRoute.entries[index]
             object : LpCertificationObserver {
                 override fun observePhase(metrics: LpPhaseMetrics) {
+                    if (route == LpRoute.STANDALONE &&
+                        (metrics.phase == LpSolvePhase.NUMERICAL_BOUND ||
+                            metrics.phase == LpSolvePhase.NUMERICAL_CONFLICT)
+                    ) {
+                        standaloneWorkOps += minOf(metrics.work, Long.MAX_VALUE - standaloneWorkOps)
+                    }
                     val key = "${metrics.phase.name}_${route.name}"
                     val delta = LpPhaseStats(
                         1L,

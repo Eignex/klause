@@ -58,12 +58,26 @@ internal class LpClaimObservation(
         delegate.observeContinuation(metrics)
     }
 
+    override fun observePhase(metrics: LpPhaseMetrics) {
+        if (metrics.phase == LpSolvePhase.NUMERICAL_BOUND || metrics.phase == LpSolvePhase.NUMERICAL_CONFLICT) {
+            charge(metrics.work)
+        }
+        delegate.observePhase(metrics)
+    }
+
     fun refuse(reason: String) {
         refusal = reason
     }
 
     fun finish(result: CertifiedLpResult, reused: Boolean = false) {
         val outcome = when {
+            result.numerical != null -> when {
+                result.numerical.conflict != null -> "NUMERICAL_CONFLICT"
+                result.numerical.optimumWithinTolerance -> "NUMERICAL_OPTIMUM"
+                result.numerical.point != null -> "NUMERICAL_FEASIBLE"
+                result.numerical.bound != null -> "NUMERICAL_BOUND"
+                else -> result.numerical.stop?.name ?: "NO_NUMERICAL_PACKAGE"
+            }
             reused -> "REUSED"
             claim.satisfiedBy(result) -> "SATISFIED"
             result.verdict == LpVerdict.INFEASIBLE -> "CONTRADICTION"
