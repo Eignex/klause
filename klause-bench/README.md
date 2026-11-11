@@ -23,6 +23,9 @@ fails preparation instead of publishing a reduced comparison plan.
 Planning stages every selected source before sealing include-directory identities.
 Execution verifies the planned file and directory identities before each solve.
 
+Solver records retain reported numerical LP authority, objective tolerance and original-unit
+bound/gap metadata. Independent source validation remains separate from those reported claims.
+
 Declared-input planning uses the complete corpus-pack index even when only a subset
 of its members is materialized locally. Each solve verifies its planned input bytes.
 

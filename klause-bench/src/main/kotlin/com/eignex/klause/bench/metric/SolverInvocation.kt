@@ -433,6 +433,10 @@ internal object SolverInvocation {
 
                             line.startsWith(STAT_PREFIX) -> recordStat(line.removePrefix(STAT_PREFIX).trim())
 
+                            line.startsWith(RESULT_COMMENT_PREFIX) &&
+                                line.removePrefix(RESULT_COMMENT_PREFIX).substringBefore('=').trim() in
+                                LINEAR_RESULT_KEYS -> recordStat(line.removePrefix(RESULT_COMMENT_PREFIX).trim())
+
                             line.startsWith("% klause-exact: _objective = ") ||
                                 line.startsWith("% klause-coordinate: _objective = ") ->
                                 recordObjective(line.substringAfter('=').trim().removeSuffix(";").trim())
@@ -610,6 +614,11 @@ internal object SolverInvocation {
     private const val OBJECTIVE_KEY = "objective ="
     private const val MODEL_OBJECTIVE_KEY = "_objective"
     private const val STAT_PREFIX = "%%%mzn-stat:"
+    private const val RESULT_COMMENT_PREFIX = "% "
+    private val LINEAR_RESULT_KEYS = setOf(
+        "lpDeductionAuthority", "numericalObjectiveTolerance", "numericalObjectiveBoundDirection",
+        "numericalObjectiveBound", "numericalRelativeGap", "optimizationStatus",
+    )
     private const val ARM_PREFIX = "%%%klause-arm:"
 
     // XCSP3 competition output stream (klause-cli's `.xml` front-end).
