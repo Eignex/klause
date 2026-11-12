@@ -6,12 +6,6 @@ import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.util.collections.IntArrayList
 
 internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
-    val rows = learned.initializedStore
-    if (nativeEngine == null && rows != null) rows.usingObservation(sample) { observeSharingMemory(sample) }
-    else observeSharingMemory(sample)
-}
-
-private fun PropagationState.observeSharingMemory(sample: SharingMemoryObservation) {
     selectedRetirements.sharingMemory(sample)
     sample.owned(this, Long.SIZE_BYTES * 2L, true)
     val protected = protectedLearnedMemory(sample)

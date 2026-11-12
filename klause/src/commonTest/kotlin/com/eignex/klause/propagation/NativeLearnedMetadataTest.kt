@@ -8,19 +8,14 @@ import kotlin.test.assertTrue
 
 class NativeLearnedMetadataTest {
     @Test
-    fun `cached distant metadata pages should remain readable without a cold lookup`() {
+    fun `metadata pages past the initial page table should remain readable`() {
         val metadata = NativeLearnedMetadata()
-        repeat(2080) { metadata.add(it, false, -1, it.toLong() + 1L) }
-        metadata[16, NativeLearnedMetadata.LBD]
-        metadata[2064, NativeLearnedMetadata.LBD]
-        val budget = ReclamationPreparation(0L, 256L, { false }, {})
+        repeat(33_000) { metadata.add(it, false, -1, it.toLong() + 1L) }
 
-        val values = metadata.usingBudget(budget) {
-            listOf(metadata[16, NativeLearnedMetadata.LBD], metadata[2064, NativeLearnedMetadata.LBD])
-        }
+        val values = listOf(16, 2064, 32_784, 32_999).map { metadata[it, NativeLearnedMetadata.LBD] }
 
-        assertEquals(listOf(16, 2064), values)
-        assertEquals(0L, budget.work)
+        assertEquals(listOf(16, 2064, 32_784, 32_999), values)
+        assertEquals(17L, metadata.admission(16))
     }
 
     @Test

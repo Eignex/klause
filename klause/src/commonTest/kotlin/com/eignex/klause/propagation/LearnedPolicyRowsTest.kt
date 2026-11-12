@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 class LearnedPolicyRowsTest {
     @Test
     fun `queued metadata release should restore ownership beside a surviving first page`() {
-        val rows = LearnedPolicyRows(6, 8, true, null)
+        val rows = LearnedPolicyRows(6, 8, true)
         val clause = ClausePropagator(intArrayOf(0, 1), emptyIntArray(), intArrayOf(0, 2))
         repeat(16) { rows.add(16, 2, true, -1, it.toLong(), clause) }
         val bytes = rows.primitiveBytes
@@ -77,21 +77,20 @@ class LearnedPolicyRowsTest {
     }
 
     @Test
-    fun `an unfunded cold lookup should preserve metadata for a later grant`() {
+    fun `releasing every page past the initial page table should restore its ownership`() {
         val rows = NativeLearnedMetadata()
-        repeat(33_000) { rows.add(it, false, -1, it.toLong() + 1L) }
-        val budget = ReclamationPreparation(0L, 256L, { false }, {})
+        repeat(32_768) { rows.add(9, false, -1, it.toLong()) }
+        val bytes = rows.primitiveBytes
+        val references = rows.referenceCapacity
+        repeat(40_000) { rows.add(9, false, -1, it.toLong()) }
+        assertTrue(rows.referenceCapacity > references)
 
-        assertFailsWith<ReclamationPreparation.Deferred> {
-            rows.usingBudget(budget) { rows[16, NativeLearnedMetadata.LBD] }
-        }
+        for (index in 32_768 until 72_768) rows.release(index)
+        rows.sweepDirectory(ReclamationPreparation(1_000_000L, 256L, { false }, {}))
 
-        assertEquals(0L, budget.work)
-        val retry = ReclamationPreparation(16L, 256L, { false }, {})
-        val value = rows.usingBudget(retry) { rows[16, NativeLearnedMetadata.LBD] }
-        assertEquals(16, value)
-        assertTrue(retry.work in 1L..16L)
-        assertEquals(17L, rows.admission(16))
+        assertEquals(bytes, rows.primitiveBytes)
+        assertEquals(references, rows.referenceCapacity)
+        assertEquals(9, rows[32_767, NativeLearnedMetadata.LBD])
     }
 
     @Test

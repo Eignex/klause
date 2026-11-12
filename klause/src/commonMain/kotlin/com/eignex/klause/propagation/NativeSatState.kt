@@ -70,7 +70,7 @@ internal class NativeSatState(private val state: PropagationState) {
     // Per-learned-clause policy columns, parallel to the learned index — the native mirror of
     // LearnedClauseDb's forgetting/three-tier metadata. Recent use shares lifecycle storage;
     // permanent clauses survive every forget.
-    private val metadata = NativeLearnedMetadata(state)
+    private val metadata = NativeLearnedMetadata()
     private val learnedUnits = IntArrayList()
     private var unitsPending = false
     private val rechecks = IntArrayList()
@@ -252,10 +252,7 @@ internal class NativeSatState(private val state: PropagationState) {
         }
     }
 
-    internal fun sweepRetiredWatches(budget: ReclamationPreparation) =
-        metadata.usingBudget(budget) { sweepWatches(budget) }
-
-    private fun sweepWatches(budget: ReclamationPreparation) {
+    internal fun sweepRetiredWatches(budget: ReclamationPreparation) {
         if (retiredCount == 0) return
         if (watchCleanupEpoch < 0) {
             if (watchCleanupEpoch.inv() == retiredCount) return
@@ -499,10 +496,7 @@ internal class NativeSatState(private val state: PropagationState) {
 
     // Learned-clause policy accessors: the native mirror of the LearnedClauseDb columns.
 
-    internal fun sharingMemory(sample: SharingMemoryObservation, protected: SharingMemoryObservation.Seen<Int>) =
-        metadata.usingObservation(sample) { observeSharingMemory(sample, protected) }
-
-    private fun observeSharingMemory(sample: SharingMemoryObservation, protected: SharingMemoryObservation.Seen<Int>) {
+    internal fun sharingMemory(sample: SharingMemoryObservation, protected: SharingMemoryObservation.Seen<Int>) {
         repeat(3) { sample.step() }
         for (i in recheckHead until rechecks.size) {
             sample.step()
@@ -604,10 +598,8 @@ internal class NativeSatState(private val state: PropagationState) {
 
     internal fun <T> withOwnershipBudget(budget: ReclamationPreparation, operation: () -> T): T {
         val index = defaultCapIndex
-        return if (index == null) metadata.usingBudget(budget) { learnedPayloads.usingBudget(budget, operation) }
-        else index.usingBudget(budget) {
-            metadata.usingBudget(budget) { learnedPayloads.usingBudget(budget, operation) }
-        }
+        return if (index == null) learnedPayloads.usingBudget(budget, operation)
+        else index.usingBudget(budget) { learnedPayloads.usingBudget(budget, operation) }
     }
 
     private fun chargeCapMutation(index: NativeCapIndex, units: Long) {

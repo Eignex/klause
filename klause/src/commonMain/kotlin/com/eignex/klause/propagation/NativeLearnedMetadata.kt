@@ -2,8 +2,8 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.util.SharingMemoryObservation
 
-internal class NativeLearnedMetadata(state: PropagationState? = null) {
-    private val rows = LearnedPolicyRows(columns = 9, retiredFlag = 4, objectColumns = false, state = state)
+internal class NativeLearnedMetadata {
+    private val rows = LearnedPolicyRows(columns = 9, retiredFlag = 4, objectColumns = false)
     val size: Int get() = rows.size
     val primitiveBytes: Long get() = rows.primitiveBytes
     val referenceCapacity: Long get() = rows.referenceCapacity + 1L
@@ -26,9 +26,6 @@ internal class NativeLearnedMetadata(state: PropagationState? = null) {
     fun move(source: Int, target: Int): Long = rows.move(source, target)
     fun truncateTo(count: Int): Long = rows.truncateTo(count)
     fun prepareRemap(budget: ReclamationPreparation) = rows.prepareRemap(budget)
-    fun <T> usingBudget(budget: ReclamationPreparation, operation: () -> T): T = rows.usingBudget(budget, operation)
-    fun <T> usingObservation(sample: SharingMemoryObservation, operation: () -> T): T =
-        rows.usingObservation(sample, operation)
 
     fun sharingMemory(sample: SharingMemoryObservation, protectedRows: Boolean, protected: (Int) -> Boolean) {
         sample.ownedReferences(this, 1L, protectedRows)

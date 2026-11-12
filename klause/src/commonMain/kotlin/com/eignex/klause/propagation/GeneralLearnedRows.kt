@@ -3,7 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.util.SharingMemoryObservation
 
 internal class GeneralLearnedRows(state: PropagationState? = null) : AbstractList<LearnedPropagator>() {
-    private val rows = LearnedPolicyRows(columns = 6, retiredFlag = 8, objectColumns = true, state = state)
+    private val rows = LearnedPolicyRows(columns = 6, retiredFlag = 8, objectColumns = true)
     init { state?.let { it.preparationIndexWork += rows.preparationWork } }
     override val size: Int get() = rows.size
     val primitiveBytes: Long get() = rows.primitiveBytes
@@ -40,9 +40,6 @@ internal class GeneralLearnedRows(state: PropagationState? = null) : AbstractLis
     fun move(source: Int, target: Int): Long = rows.move(source, target)
     fun truncateTo(count: Int): Long = rows.truncateTo(count)
     fun prepareRemap(budget: ReclamationPreparation) = rows.prepareRemap(budget)
-    fun <T> usingBudget(budget: ReclamationPreparation, operation: () -> T): T = rows.usingBudget(budget, operation)
-    fun <T> usingObservation(sample: SharingMemoryObservation, operation: () -> T): T =
-        rows.usingObservation(sample, operation)
 
     fun sharingMemory(sample: SharingMemoryObservation, protectedRows: Boolean, protected: (Int) -> Boolean) {
         sample.ownedReferences(this, 1L, protectedRows)
