@@ -3,6 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.arrays.binarySearchInt
+import com.eignex.util.collections.LongHashSet
 import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.minus
 
@@ -232,7 +233,7 @@ internal class LpExactState internal constructor(
 
     // Checks the assertions from [from] on; the ones before it were checked when the state that shares them was built.
     private fun validateAssertions(from: Int) {
-        val witnesses = HashSet<Long>()
+        val witnesses = LongHashSet()
         for (index in from until activeAssertions.size) {
             val assertion = activeAssertions[index]
             require(assertion.column in 0 until baseModel.numVars && assertion.witness >= 0L)
@@ -244,7 +245,7 @@ internal class LpExactState internal constructor(
             require(assertion.depth == scopeMarks.count { it <= index })
             require(witnesses.add(assertion.witness))
         }
-        if (from > 0 && witnesses.isNotEmpty()) {
+        if (from > 0 && !witnesses.isEmpty()) {
             for (index in 0 until from) require(activeAssertions[index].witness !in witnesses)
         }
     }

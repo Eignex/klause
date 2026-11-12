@@ -4,12 +4,13 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.MutableIntLongMap
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.mulExact
 
 internal class AffineObjective(private val source: LinearObjective, private val cancellation: Cancellation) {
-    private val coefficients = HashMap<Int, Long>()
+    private val coefficients = MutableIntLongMap()
     private var constant = source.constant
     private var changed = false
     var interrupted = false
@@ -25,13 +26,13 @@ internal class AffineObjective(private val source: LinearObjective, private val 
                 }
             }
             val coefficient = source.intCoefficientValues[variable]
-            if (coefficient != 0L) coefficients[variable] = coefficient
+            if (coefficient != 0L) coefficients.put(variable, coefficient)
         }
     }
 
     fun permits(definition: Linear, pivot: Int): Boolean {
         val variable = definition.vars[pivot]
-        if (variable !in coefficients) return true
+        if (!coefficients.containsKey(variable)) return true
         if (definition.vars.size != 2) return false
         val row = definition.integerConstants ?: return false
         val coefficient = row.coeff(pivot)
@@ -41,20 +42,21 @@ internal class AffineObjective(private val source: LinearObjective, private val 
     }
 
     fun substitute(candidate: AffineSingletons.AffineCandidate): (() -> Unit)? {
-        if (candidate.x !in coefficients) return {}
+        if (!coefficients.containsKey(candidate.x)) return {}
         if (candidate.termVars.size != 1 || candidate.termCoeffs[0] != 1L) return null
         return substitution(candidate.x, candidate.termVars[0], candidate.constTerm)
     }
 
     private fun substitution(variable: Int, partner: Int, offset: Long): (() -> Unit)? {
-        val coefficient = coefficients[variable] ?: return {}
+        val coefficient = coefficients.getOrDefault(variable, 0L)
+        if (coefficient == 0L) return {}
         return try {
-            val nextCoefficient = addExact(coefficients[partner] ?: 0L, coefficient)
+            val nextCoefficient = addExact(coefficients.getOrDefault(partner, 0L), coefficient)
             val nextConstant = addExact(constant, mulExact(coefficient, offset))
             if (nextCoefficient == Long.MIN_VALUE || nextConstant == Long.MIN_VALUE) return null
             val commit: () -> Unit = {
                 coefficients.remove(variable)
-                if (nextCoefficient == 0L) coefficients.remove(partner) else coefficients[partner] = nextCoefficient
+                if (nextCoefficient == 0L) coefficients.remove(partner) else coefficients.put(partner, nextCoefficient)
                 constant = nextConstant
                 changed = true
             }
@@ -65,15 +67,16 @@ internal class AffineObjective(private val source: LinearObjective, private val 
     }
 
     fun protectRemaining(protected: IntHashSet) {
-        for (variable in coefficients.keys) protected.add(variable)
+        coefficients.forEach { variable, _ -> protected.add(variable) }
     }
 
     fun result(): LinearObjective? {
         if (!changed) return null
-        val size = maxOf(source.intCoefficientValues.size, (coefficients.keys.maxOrNull() ?: -1) + 1)
+        var size = source.intCoefficientValues.size
+        coefficients.forEach { variable, _ -> size = maxOf(size, variable + 1) }
         cancellation.charge(size.toLong())
         val values = LongArray(size)
-        for ((variable, coefficient) in coefficients) values[variable] = coefficient
+        coefficients.forEach { variable, coefficient -> values[variable] = coefficient }
         return source.copy(intCoefficients = values, constant = constant)
     }
 }

@@ -8,6 +8,7 @@ import com.eignex.klause.propagation.exclusionLiteral
 import com.eignex.klause.propagation.inDomainAt
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongHashSet
 
 /**
  * Reasons for [com.eignex.klause.factor.table.Mdd] deductions as cuts of the layered diagram over the domains at a
@@ -62,7 +63,7 @@ internal class MddExplainer(
             }
             return cut.literals()
         }
-        val supported = HashSet<Long>()
+        val supported = LongHashSet()
         cut.forEachRecord(pos) { src, sym, dst, _ ->
             if (cut.contains(pos, sym) && cut.fwd[pos][src] && cut.bwd[pos + 1][dst]) supported.add(sym)
         }

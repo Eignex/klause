@@ -11,14 +11,16 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.ScanMeter
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.MutableIntIntMap
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.isZero
 import com.eignex.util.numbers.rem
 
 internal class ParityInputRevision(problem: Problem, private val cancellation: Cancellation) {
-    private val boolColumns = HashMap<Int, Int>()
-    private val intColumns = HashMap<Int, Int>()
-    private val units = HashMap<Int, Int>()
+    private val boolColumns = MutableIntIntMap()
+    private val intColumns = MutableIntIntMap()
+    private val units = MutableIntIntMap()
     private var previousBools = emptyMap<Int, Int>()
     private var previousRanges = emptyMap<Int, Pair<Long?, Long?>>()
     private var dirty = true
@@ -78,12 +80,12 @@ internal class ParityInputRevision(problem: Problem, private val cancellation: C
         if (!dirty) return revision
         val work = ScanMeter(cancellation)
         val bools = HashMap<Int, Int>()
-        for (v in boolColumns.keys) {
+        boolColumns.forEach { v, _ ->
             if (!work.visit(1L)) return null
             bools[v] = booleanPremise(v, boolValue(v))
         }
         val ranges = HashMap<Int, Pair<Long?, Long?>>()
-        for (v in intColumns.keys) {
+        intColumns.forEach { v, _ ->
             if (!work.visit(1L)) return null
             ranges[v] = range(v)
         }
@@ -118,7 +120,7 @@ internal class ParityInputRevision(problem: Problem, private val cancellation: C
             is Xor -> {
                 revision++
                 dirty = true
-                val columns = HashSet<Int>()
+                val columns = IntHashSet()
                 for (lit in factor.literals) {
                     if (!work.visit(1L)) return false
                     val v = Lit.variable(lit)
@@ -132,7 +134,7 @@ internal class ParityInputRevision(problem: Problem, private val cancellation: C
                 val wide = factor.integralConstants ?: return true
                 revision++
                 dirty = true
-                val columns = HashSet<Int>()
+                val columns = IntHashSet()
                 for (k in factor.vars.indices) {
                     if (!work.visit(1L)) return false
                     val odd = narrow?.let { it.coeff(k) and 1L != 0L }
@@ -149,20 +151,20 @@ internal class ParityInputRevision(problem: Problem, private val cancellation: C
     }
 
     private fun recordColumns(
-        counts: MutableMap<Int, Int>,
-        columns: Set<Int>,
+        counts: MutableIntIntMap,
+        columns: IntHashSet,
         direction: Int,
         work: ScanMeter,
     ): Boolean {
-        for (v in columns) {
+        columns.forEach { v ->
             if (!work.visit(1L)) return false
             update(counts, v, direction)
         }
         return true
     }
 
-    private fun update(counts: MutableMap<Int, Int>, key: Int, direction: Int) {
-        val count = (counts[key] ?: 0) + direction
-        if (count == 0) counts.remove(key) else counts[key] = count
+    private fun update(counts: MutableIntIntMap, key: Int, direction: Int) {
+        val count = counts.getOrDefault(key, 0) + direction
+        if (count == 0) counts.remove(key) else counts.put(key, count)
     }
 }
