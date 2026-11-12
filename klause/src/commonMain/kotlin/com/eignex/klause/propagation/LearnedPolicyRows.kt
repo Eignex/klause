@@ -174,6 +174,11 @@ internal class LearnedPolicyRows(
         return page.values[slot * columns + column]
     }
 
+    // The array holding live row `index`, with column `c` at `rowOffset(index) + c`. An admission can replace it.
+    fun rowValues(index: Int): IntArray = checkNotNull(pageAt(index ushr PAGE_SHIFT)).values
+
+    fun rowOffset(index: Int): Int = (index and PAGE_MASK) * columns
+
     operator fun set(index: Int, column: Int, value: Int) {
         checkNotNull(pageAt(index ushr PAGE_SHIFT)).values[(index and PAGE_MASK) * columns + column] = value
     }
