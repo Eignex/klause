@@ -29,6 +29,10 @@ the default factory; `ComponentLpSolver` composes independent blocks for solving
 outside it, and consumers use interfaces and factories. See
 [system boundaries](01-introduction.md#system-architecture).
 
+Component discovery uses Util's dense disjoint set over structural columns sharing
+a row. Blocks retain first-seen column order; columns in no row stay outside child
+layouts and use their bounds directly.
+
 `lp.lattice` is a leaf over `util`, owning exact integer matrix reductions and
 triangular-block bounds. Its sparse fraction-free elimination polls cancellation
 between row combinations and after bounded chunks of support entries, charging
