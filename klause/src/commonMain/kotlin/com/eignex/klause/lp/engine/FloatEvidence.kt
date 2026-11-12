@@ -2,9 +2,14 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.mulExact
 import com.eignex.util.numbers.negate
 import com.eignex.util.numbers.signum
+import com.eignex.util.numbers.subExact
 import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLong
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.max
@@ -314,7 +319,7 @@ private fun magnitudeAbove(value: BigFraction): Double? =
  * with each row's least and greatest activity, to imply a column's range from the other columns' bounds. Every
  * implied bound is widened outward by the rounding its doubles can carry, so a range is never understated.
  */
-private class RowView(private val exact: FloatEvidenceModel) {
+internal class RowView(private val exact: FloatEvidenceModel) {
     private val lower = DoubleArray(exact.numVars) {
         exact.lower(it)
     }
@@ -333,9 +338,6 @@ private class RowView(private val exact: FloatEvidenceModel) {
     private val terms = IntArray(exact.m)
     // Each row's terms as `column shl 1` plus one when the coefficient is positive, its slack included.
     private val members = Array(exact.m) { IntArrayList() }
-
-    // Per row and direction: the first term cited through it, or CITED_ALL once every read side is cited.
-    private val citedThrough = IntArray(2 * exact.m) { NONE_CITED }
 
     init {
         for (i in 0 until exact.m) add(i, exact.n + i, 1.0)
@@ -367,22 +369,23 @@ private class RowView(private val exact: FloatEvidenceModel) {
 
     /**
      * Report to [cite] every column side, with 1 for the lower and 2 for the upper, that [implied] reads for [j]: the
-     * side of each other term in its row that the row's least or greatest activity takes. A row is scanned once per
-     * direction; a later column bounded through it adds only the first column's read side.
+     * side of each other term in its row that the row's least or greatest activity takes. [cache], two slots per row,
+     * holds the first column cited through each row and direction, so a row is scanned once per direction and a later
+     * column bounded through it adds only the first column's read side.
      */
-    fun citeReads(implied: Implied, j: Int, lowSide: Boolean, cite: (Int, Int) -> Unit) {
+    fun citeReads(implied: Implied, j: Int, lowSide: Boolean, cache: IntArray, cite: (Int, Int) -> Unit) {
         val fromMost = lowSide == implied.coefficient > 0
         val slot = 2 * implied.row + if (fromMost) 0 else 1
-        val first = citedThrough[slot]
+        val first = cache[slot]
         if (first == CITED_ALL || (first >= 0 && first ushr 1 == j)) return
         if (first >= 0) {
             citeRead(first, fromMost, cite)
-            citedThrough[slot] = CITED_ALL
+            cache[slot] = CITED_ALL
             return
         }
         val terms = members[implied.row]
         for (k in 0 until terms.size) {
-            if (terms[k] ushr 1 == j) citedThrough[slot] = terms[k] else citeRead(terms[k], fromMost, cite)
+            if (terms[k] ushr 1 == j) cache[slot] = terms[k] else citeRead(terms[k], fromMost, cite)
         }
     }
 
@@ -465,6 +468,9 @@ private class RowView(private val exact: FloatEvidenceModel) {
 
 private const val MIN_NORMAL: Double = 2.2250738585072014e-308
 private const val NONE_CITED: Int = -1
+
+// Exact folds one Farkas ray may take before its check; each scales the ray, so more rarely settle within a Long.
+private const val MAX_EXACT_FOLDS: Int = 8
 private const val CITED_ALL: Int = -2
 
 // An unshifted, unclamped source projection has the same numeric data as its exact working model. Rounded shifts
@@ -484,7 +490,7 @@ internal fun LpModel.floatProjectionAuthoritative(): Boolean {
         upper.indices.all { !hasUpper[it] || upper[it] in exactRange } && objConstant in exactRange
 }
 
-private class FloatEvidenceModel(val model: LpModel) {
+internal class FloatEvidenceModel(val model: LpModel) {
     private val source = model.exactState?.model
     val n: Int get() = model.n
     val m: Int get() = model.m
@@ -525,6 +531,13 @@ private class FloatEvidenceModel(val model: LpModel) {
             model.forEachInColumnD(column, action)
         }
     }
+}
+
+/** One node model's binary64 view and its row-implied bounds, shared by the certificates priced against it. */
+internal class FloatNodeView(val model: LpModel) {
+    val finite: Boolean by lazy { model.finiteExactInput() }
+    val evidence = FloatEvidenceModel(model)
+    val rows = lazy { RowView(evidence) }
 }
 
 /**
@@ -586,20 +599,27 @@ internal class FloatDeductionCertificate private constructor(
     companion object {
         /**
          * The certificate [y] supports on [model], or null when a reduced cost beyond its rounding meets a side no row
-         * bounds. [observer] sees the outcome as a node deduction phase.
+         * bounds. [observer] sees the outcome as a node deduction phase; [node] shares the binary64 view and row bounds
+         * with the other certificates priced on the same model.
          */
-        fun of(model: LpModel, y: DoubleArray, observer: LpCertificationObserver? = null): FloatDeductionCertificate? {
+        fun of(
+            model: LpModel,
+            y: DoubleArray,
+            observer: LpCertificationObserver? = null,
+            node: FloatNodeView = FloatNodeView(model),
+        ): FloatDeductionCertificate? {
             val timer = LpPhaseTimer(observer, LpSolvePhase.NODE_DEDUCTION)
             val declined = arrayOf("INPUT")
-            return build(model, y, declined).also {
+            return build(node, y, declined).also {
                 timer.finish(if (it != null) "FLOAT_COMPLETE" else "FLOAT_${declined[0]}")
             }
         }
 
         @Suppress("ReturnCount", "CyclomaticComplexMethod", "LongMethod")
-        private fun build(model: LpModel, y: DoubleArray, declined: Array<String>): FloatDeductionCertificate? {
-            if (y.size != model.m || !model.finiteExactInput()) return null
-            val view = FloatEvidenceModel(model)
+        private fun build(node: FloatNodeView, y: DoubleArray, declined: Array<String>): FloatDeductionCertificate? {
+            val model = node.model
+            if (y.size != model.m || !node.finite) return null
+            val view = node.evidence
             val scale = view.scale
             if (!(scale > 0.0) || !scale.isFinite()) return null
             val duals = repairedDuals(view, y) ?: return null
@@ -613,13 +633,14 @@ internal class FloatDeductionCertificate private constructor(
             val reduced = DoubleArray(view.numVars)
             val sides = ByteArray(view.numVars)
             val citedRows = BooleanArray(view.m)
-            val rows = lazy { RowView(view) }
+            val rows = node.rows
+            val cache = IntArray(2 * view.m) { NONE_CITED }
             // An open side is priced at the tightest bound one row implies; that row and each side the implied bound
             // reads are cited.
             fun implied(j: Int, lowSide: Boolean): Double? {
                 val implied = rows.value.impliedBy(j, lowSide) ?: return null
                 citedRows[implied.row] = true
-                rows.value.citeReads(implied, j, lowSide) { column, side ->
+                rows.value.citeReads(implied, j, lowSide, cache) { column, side ->
                     sides[column] = (sides[column].toInt() or side).toByte()
                 }
                 return implied.value
@@ -702,9 +723,10 @@ private fun reducedCost(view: FloatEvidenceModel, y: DoubleArray, j: Int): Pair<
  * [ray] oriented and rounded to integer multipliers when, summed in binary64, it shows the rows of [model] cannot
  * hold inside its box: `ρ·rhs > Σⱼ max(ρ·Aⱼ·zⱼ)` by [FLOAT_EVIDENCE_TOLERANCE] times the terms' size. An open side
  * that the float ray meets is priced at the bound another row implies, and that row is then folded into the ray so
- * the column cancels. The rounded ray is checked again against the box alone, the sides an infeasibility clause
- * cites, taking an open column within its rounding as cancelled; when it fails, the empty ray refutes without a
- * citable combination. The numerical counterpart of [certifyLpFarkas].
+ * the column cancels: first in binary64, then exactly on the integral ray, slacks first. The integral ray is checked
+ * again against the box alone, each column at the side the exact sign of its combination meets, which is the side an
+ * infeasibility clause cites; when it fails, the empty ray refutes without a citable combination. The numerical
+ * counterpart of [certifyLpFarkas].
  */
 @Suppress("ReturnCount")
 internal fun floatFarkasRay(model: LpModel, ray: DoubleArray): LongArray? {
@@ -720,16 +742,26 @@ internal fun floatFarkasRay(model: LpModel, ray: DoubleArray): LongArray? {
     val normalized = DoubleArray(ray.size) { ray[it] / largest }
     val sign = farkasSign(view, normalized, rows) ?: return null
     val oriented = DoubleArray(ray.size) { sign * normalized[it] }
-    foldOpenColumns(view, oriented, rows)
-    val rounded = roundDuals(model, oriented)?.mult
-    val citable = rounded?.takeIf { farkasSign(view, DoubleArray(it.size) { row -> it[row].toDouble() }, null) == 1 }
-    return citable ?: LongArray(0)
+    val open = openColumns(view)
+    foldOpenColumns(view, oriented, rows, open)
+    val rounded = roundDuals(model, oriented)?.mult ?: return LongArray(0)
+    val folded = foldExactly(model, view, rows, rounded, open) ?: return LongArray(0)
+    return folded.takeIf { refutesInBox(model, view, it) } ?: LongArray(0)
+}
+
+// Columns with an open side, slacks first: folding a structural column back into a cancelled slack's row would undo it.
+private fun openColumns(view: FloatEvidenceModel): IntArray {
+    val open = IntArrayList()
+    for (j in (view.n until view.numVars) + (0 until view.n)) {
+        if (!view.lower(j).isFinite() || !view.upper(j).isFinite()) open.add(j)
+    }
+    return open.toIntArray()
 }
 
 // Each column the oriented ray meets on an open side takes the row implying that side into the ray with the weight
 // that cancels the column, which prices the side at the implied bound through rows a clause cites.
-private fun foldOpenColumns(view: FloatEvidenceModel, ray: DoubleArray, rows: Lazy<RowView>) {
-    for (j in 0 until view.numVars) {
+private fun foldOpenColumns(view: FloatEvidenceModel, ray: DoubleArray, rows: Lazy<RowView>, open: IntArray) {
+    for (j in open) {
         var r = 0.0
         if (j >= view.n) r = ray[j - view.n] else view.forEachInColumn(j) { row, a -> r += ray[row] * a }
         if (r == 0.0 || (if (r > 0.0) view.upper(j) else view.lower(j)).isFinite()) continue
@@ -738,11 +770,95 @@ private fun foldOpenColumns(view: FloatEvidenceModel, ray: DoubleArray, rows: La
     }
 }
 
-// +1 when ρ·rhs exceeds every ρ·A·z in the box by the margin, -1 when it falls below every one, else null. Open
-// sides take their implied bounds from [rows] when given. Without them the ray is integral, and an open column whose
-// combination stays within the ray's rounding, one unit per coefficient it meets, counts as cancelled.
+// The same folds on the integral ray in exact arithmetic: a row joins with weight p/q, and the ray scales by q so it
+// stays integral. Null when a weight overflows or the folds do not settle; a column no row bounds is left to the check.
+@Suppress("ReturnCount")
+private fun foldExactly(
+    model: LpModel,
+    view: FloatEvidenceModel,
+    rows: Lazy<RowView>,
+    ray: LongArray,
+    open: IntArray,
+): LongArray? {
+    var current = ray
+    repeat(MAX_EXACT_FOLDS) {
+        var column = -1
+        var combination = BigFraction.ZERO
+        for (j in open) {
+            val r = exactCombination(model, current, j)
+            if (r.isZero || (if (r.signum() > 0) view.upper(j) else view.lower(j)).isFinite()) continue
+            column = j
+            combination = r
+            break
+        }
+        if (column < 0) return current
+        val implied = rows.value.impliedBy(column, lowSide = combination.signum() < 0) ?: return current
+        var coefficient = BigFraction.ZERO
+        model.forEachRationalColumn(column) { row, a -> if (row == implied.row) coefficient = a }
+        if (coefficient.isZero) return current
+        val weight = combination * coefficient.reciprocal()
+        if (!weight.num.fitsLong() || !weight.den.fitsLong()) return null
+        val scale = weight.den.toLong()
+        current = try {
+            LongArray(current.size) { mulExact(current[it], scale) }.also {
+                it[implied.row] = subExact(it[implied.row], weight.num.toLong())
+            }
+        } catch (_: CheckedLongOverflowException) {
+            return null
+        }
+    }
+    return null
+}
+
+// Whether the integral [ray] refutes the box with the Farkas margin, each column taken at the side the exact sign of
+// its combination meets; a nonzero combination meeting an open side refutes nothing.
+@Suppress("ReturnCount")
+internal fun refutesInBox(model: LpModel, view: FloatEvidenceModel, ray: LongArray): Boolean {
+    var activity = 0.0
+    var magnitude = 0.0
+    for (i in 0 until view.m) {
+        activity += ray[i] * view.rhs(i)
+        magnitude += abs(ray[i] * view.rhs(i))
+    }
+    var most = 0.0
+    for (j in 0 until view.numVars) {
+        var r = 0.0
+        var size = 0.0
+        var terms = 1
+        if (j >= view.n) {
+            r = ray[j - view.n].toDouble()
+            size = abs(r)
+        } else {
+            view.forEachInColumn(j) { row, a ->
+                r += ray[row] * a
+                size += abs(ray[row] * a)
+                terms++
+            }
+        }
+        // Binary64 decides a sign beyond its rounding; inside it the exact combination decides.
+        val exact = if (abs(r) > (terms + 4) * UNIT_ROUNDOFF * size) null else exactCombination(model, ray, j)
+        val sign = exact?.signum() ?: if (r > 0.0) 1 else -1
+        if (sign == 0) continue
+        if (exact != null) r = exact.toDouble()
+        val side = if (sign > 0) view.upper(j) else view.lower(j)
+        if (!side.isFinite()) return false
+        most += r * side
+        magnitude += abs(r * side)
+    }
+    return activity - most > FLOAT_EVIDENCE_TOLERANCE * magnitude
+}
+
+// ρ·A(j) exactly over the model's rational coefficients.
+private fun exactCombination(model: LpModel, ray: LongArray, j: Int): BigFraction {
+    var sum = BigFraction.ZERO
+    model.forEachRationalColumn(j) { row, a -> if (ray[row] != 0L) sum += a * BigFraction.ofLong(ray[row]) }
+    return sum
+}
+
+// +1 when ρ·rhs exceeds every ρ·A·z in the box by the margin, -1 when it falls below every one, else null; open sides
+// take their implied bounds from [rows].
 @Suppress("ReturnCount", "CyclomaticComplexMethod")
-private fun farkasSign(view: FloatEvidenceModel, ray: DoubleArray, rows: Lazy<RowView>?): Int? {
+private fun farkasSign(view: FloatEvidenceModel, ray: DoubleArray, rows: Lazy<RowView>): Int? {
     var activity = 0.0
     var magnitude = 0.0
     for (i in 0 until view.m) {
@@ -753,27 +869,14 @@ private fun farkasSign(view: FloatEvidenceModel, ray: DoubleArray, rows: Lazy<Ro
     var least = 0.0
     for (j in 0 until view.numVars) {
         var r = 0.0
-        var reach = 0.0
-        if (j >= view.n) {
-            r = ray[j - view.n]
-            if (r != 0.0) reach = 1.0
-        } else {
-            view.forEachInColumn(j) { row, a ->
-                r += ray[row] * a
-                if (ray[row] != 0.0) reach += abs(a)
-            }
-        }
+        if (j >= view.n) r = ray[j - view.n] else view.forEachInColumn(j) { row, a -> r += ray[row] * a }
         if (r == 0.0) continue
         var lower = view.lower(j)
         var upper = view.upper(j)
         if (!lower.isFinite() || !upper.isFinite()) {
-            if (rows == null) {
-                if (abs(r) <= reach) continue
-            } else {
-                val (low, high) = rows.value.impliedBounds(j)
-                lower = low
-                upper = high
-            }
+            val (low, high) = rows.value.impliedBounds(j)
+            lower = low
+            upper = high
         }
         val high = r * (if (r > 0.0) upper else lower)
         val low = r * (if (r > 0.0) lower else upper)

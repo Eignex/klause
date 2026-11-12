@@ -16,6 +16,7 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.FarkasRoute
 import com.eignex.klause.lp.engine.FloatDeductionCertificate
 import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.FloatNodeView
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
@@ -365,7 +366,7 @@ private fun LpEngine.solveSelectedCuts(
     sink.lp.observeInfeasiblePrune()
     observeCutRayUse(tightened, ray)
     LpClaim.CONTRADICTION.consumed(sink.lp.certificationObserver(LpRoute.NODE))
-    return LpCutOutcome.Pruned(if (learn) LpExplanation.infeasibilityClause(tightened, ray, session) else null)
+    return LpCutOutcome.Pruned(if (learn) learnedClause(tightened, ray, session, sink) else null)
 }
 
 private fun LpHintSink.recordPoint(relaxation: LpRelaxation, result: FloatLpResult) {
@@ -454,7 +455,7 @@ internal fun LpEngine.sparseSafePrune(
                     LpClaim.CONTRADICTION.consumed(sink.lp.certificationObserver(LpRoute.NODE))
                     hints?.recordInfeasible()
                     val clause = if (learn) {
-                        LpExplanation.infeasibilityClause(filter.relaxation, ray, session)
+                        learnedClause(filter.relaxation, ray, session, sink)
                     } else {
                         null
                     }
@@ -525,7 +526,7 @@ internal fun LpEngine.sparseSafePrune(
             hints?.recordInfeasible()
             // With learning, the Farkas ray becomes a bound-atom nogood for a 1UIP backjump;
             // null (auxiliary column / unbacked non-global row / constraint-only) prunes reason-less.
-            val clause = if (learn) LpExplanation.infeasibilityClause(relaxation, ray, session) else null
+            val clause = if (learn) learnedClause(relaxation, ray, session, sink) else null
             return LpNodeOutcome(true, null, clause)
         }
         return LpNodeOutcome(false, null)
@@ -634,14 +635,16 @@ internal fun LpEngine.sparseSafePrune(
     if (cancellation()) return LpNodeOutcome(false, null)
     activateCutAttribution(boundRel)
     val additionalCertificates = ArrayList<LpDeductionCertificate>(2)
-    val numerical = if (numericalDeductions) {
-        FloatDeductionCertificate.of(boundRel.model, boundRes.duals, sink.lp.certificationObserver(LpRoute.NODE))
-    } else null
+    val nodeView = if (numericalDeductions) FloatNodeView(boundRel.model) else null
+    val numerical = nodeView?.let {
+        FloatDeductionCertificate.of(boundRel.model, boundRes.duals, sink.lp.certificationObserver(LpRoute.NODE), it)
+    }
     val cert = if (numericalDeductions) {
         // The objective box and half the LP duals fix columns the LP duals leave free, as the exact alternatives do.
         if (canFix) for (share in doubleArrayOf(0.0, 0.5)) {
             val duals = DoubleArray(boundRes.duals.size) { boundRes.duals[it] * share }
-            FloatDeductionCertificate.of(boundRel.model, duals)?.let(additionalCertificates::add)
+            FloatDeductionCertificate.of(boundRel.model, duals, node = checkNotNull(nodeView))
+                ?.let(additionalCertificates::add)
         }
         numerical
     } else if ((learn && canPropagate) || canFix) {
@@ -1942,11 +1945,7 @@ internal fun LpEngine.objectiveLowerBound(
  * empty numerical ray refutes the node without a combination a learned clause can cite.
  */
 internal fun LpEngine.infeasibilityRay(model: LpModel, floatRay: DoubleArray, sink: SolveStatsSink): LongArray? {
-    if (numericalDeductions) {
-        return floatFarkasRay(model, floatRay)?.also {
-            sink.observeDeduction(if (it.isEmpty()) "FARKAS_CLAUSELESS" else "FARKAS_CITABLE")
-        }
-    }
+    if (numericalDeductions) return floatFarkasRay(model, floatRay)
     return solveContext.certificationPolicy.acceptNullable(
         LpCertifier.EXACT_FARKAS,
         certifyLpFarkas(model.alsoCharged(this), floatRay, onRoute = {
@@ -1966,3 +1965,13 @@ private fun SolveStatsSink.observeDeduction(outcome: String) =
 
 private fun SolveStatsSink.observeReason(kind: String, kept: Boolean) =
     observeDeduction("${kind}_REASON_${if (kept) "KEPT" else "WITHHELD"}")
+
+// The learned clause a Farkas ray supports, counted as citable or clause-less.
+private fun learnedClause(
+    relaxation: LpRelaxation,
+    ray: LongArray,
+    session: PropagationSession,
+    sink: SolveStatsSink,
+): IntArray? = LpExplanation.infeasibilityClause(relaxation, ray, session).also {
+    sink.observeDeduction(if (it != null) "FARKAS_CITABLE" else "FARKAS_CLAUSELESS")
+}
