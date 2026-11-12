@@ -26,7 +26,7 @@ internal class SeatedArm(val config: WorkerConfig, val role: ArmRole?, val neede
 /**
  * Seats a roster from declared roles. The best arm of a role is the first to declare it when the engines' ranks
  * are read one position at a time, in the order given. The roster takes the first arm of every pinned rank in
- * [lead] order, the best arm of every needed role, then fills by rank: the engines take turns, each seating
+ * lead order, the best arm of every needed role, then fills by rank: the engines take turns, each seating
  * its next arm. No step reads the roster size, so a smaller roster is a prefix of a larger one.
  */
 internal object PortfolioRoster {
