@@ -372,8 +372,8 @@ internal class NativeSatState(private val state: PropagationState) {
         val lits = if (h < baseCount) arena.lits else learnedPayloads[h - baseCount]
         val start = if (h < baseCount) arena.start(h) else 0
         val out = IntArray(len - 1)
-        lits.copyInto(out, 0, start, start + skip)
-        lits.copyInto(out, skip, start + skip + 1, start + len)
+        var next = 0
+        for (k in 0 until len) if (k != skip) out[next++] = lits[start + k]
         return out
     }
 
@@ -1239,8 +1239,18 @@ internal class NativeSatState(private val state: PropagationState) {
                 if (!baseClause) row[scan] = if (replacement + 1 == len) 0 else replacement + 1
                 val newLit = lits[start + replacement]
                 row[if (slot0IsFalse) watches else watches + 1] = replacement
-                state.work += watchRemovalWork(falseLit, wi)
-                removeWatchAt(falseLit, wi) // swap-pop; re-process wi without advancing
+                // Swap-pop; the moved posting is processed at the same index. Only a list under the cleanup
+                // cursor has scan state to keep.
+                if (falseLit == watchCleanupLiteral) {
+                    state.work += watchRemovalWork(falseLit, wi)
+                    removeWatchAt(falseLit, wi)
+                } else {
+                    work += entries.removalWork + 4L
+                    entries[wi] = entries[entries.size - 1]
+                    entries.removeLast()
+                    watchSizes[falseLit] = entries.size
+                    if (entries.size == 0) watchEntries[falseLit] = null
+                }
                 addWatch(newLit, h, otherLit)
                 continue
             }
@@ -1266,13 +1276,14 @@ internal class NativeSatState(private val state: PropagationState) {
         }
         val truth = boolTruth
         var found = -1
+        var inspected = 0L
         var k = scanStart
         // Backtracking can reopen a prefix that an earlier scan passed while every literal was false.
         var remaining = len
         while (remaining-- > 0) {
             if (k != lIdx && k != otherIdx) {
                 val lit = lits[start + k]
-                state.work++
+                inspected++
                 if (truth[Lit.variable(lit)].toInt() != 1 + (lit and 1)) {
                     found = k
                     break
@@ -1280,6 +1291,7 @@ internal class NativeSatState(private val state: PropagationState) {
             }
             if (++k == len) k = 0
         }
+        state.work += inspected
         return found
     }
 
