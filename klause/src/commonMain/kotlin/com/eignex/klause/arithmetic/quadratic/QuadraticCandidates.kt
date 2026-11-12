@@ -129,8 +129,8 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
 
     private companion object {
         val proposalEngine by lazy {
-            requireNotNull(BuiltinEngines.simd) { "Quadratic proposals require the JVM SIMD engine" }.also {
-                check(it.id == "jvm-simd")
+            BuiltinEngines.scalar.also {
+                check(it.id == "portable")
                 check(EngineImplementation.Dot in it.implementations && EngineImplementation.Axpy in it.implementations)
             }
         }
