@@ -19,8 +19,8 @@ direction.
 
 `QuadraticCandidates` uses floating penalty-gradient iterations only to propose
 active rows. Owned primitive buffers retain the Hessian, rows, point and gradient.
-Koblas dot and AXPY calls process slices of at most 256 entries, charging and polling
-each entry before its slice executes. Nonfinite inputs or iterates decline the
+Koblas dot and AXPY calls process complete vectors, charging and polling
+each entry before its call executes. Nonfinite inputs or iterates decline the
 proposal. Reduction rounding can change selected rows; it has no certificate
 authority. Selected rows and all equality rows form an exact rational KKT system;
 rank-revealing elimination rejects inconsistent systems and fixes free coordinates

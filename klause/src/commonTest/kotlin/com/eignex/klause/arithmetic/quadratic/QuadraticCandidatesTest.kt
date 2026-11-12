@@ -105,7 +105,7 @@ class QuadraticCandidatesTest {
     }
 
     @Test
-    fun `numerical rows should include a changed coordinate beyond a kernel slice`() {
+    fun `numerical rows should include a changed final coordinate in a large model`() {
         val dimension = 257
         val coefficients = List(dimension) { if (it == dimension - 1) q(1) else q(0) }
         val model = QuadraticModel(
@@ -141,7 +141,7 @@ class QuadraticCandidatesTest {
     }
 
     @Test
-    fun `exhausting work inside a numerical slice should withhold the proposal`() {
+    fun `exhausting work before a numerical kernel should withhold the proposal`() {
         val model = QuadraticModel(listOf(q(0), q(0)), listOf(listOf(q(2), q(0)), listOf(q(0), q(2))))
         val control = QuadraticControl(maximumWork = 2)
 
@@ -154,7 +154,7 @@ class QuadraticCandidatesTest {
     }
 
     @Test
-    fun `cancelling inside a numerical slice should withhold the proposal`() {
+    fun `cancelling before a numerical kernel should withhold the proposal`() {
         val model = QuadraticModel(listOf(q(0), q(0)), listOf(listOf(q(2), q(0)), listOf(q(0), q(2))))
         var charged = 0L
         val token = object : Cancellation {
