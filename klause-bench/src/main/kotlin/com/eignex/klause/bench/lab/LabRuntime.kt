@@ -36,11 +36,13 @@ internal object LabRuntime {
         }
         val report = context.outputDirectory.resolve("report")
         val measurement = p.getValue("measurement")
-        val recordsJfr = measurement in setOf("jfr", "compilation", "compilation+log")
+        val recordsJfr = measurement in setOf("jfr", "compilation", "compilation+log", "startup")
         val options = runtime + buildList {
             if (recordsJfr) {
                 val compilation = if (measurement == "jfr") "" else ",jdk.Compilation#threshold=0ms"
-                add("-XX:StartFlightRecording=filename=$report/cli.jfr,settings=profile$compilation,dumponexit=true")
+                val startup = if (measurement == "startup") startupSettings() else ""
+                add("-XX:StartFlightRecording=filename=$report/cli.jfr," +
+                    "settings=profile$compilation$startup,dumponexit=true")
             }
             if (measurement == "compilation+log") {
                 add("-XX:+UnlockDiagnosticVMOptions")
@@ -88,6 +90,20 @@ internal object LabRuntime {
         ) +
             context.corpusDirectory?.let { mapOf("LAB_CORPUS" to it.toString()) }.orEmpty() +
             (if (recordsJfr) mapOf("KLAUSE_LAB_PROFILE_DIR" to report.toString()) else emptyMap())
+    }
+
+    private fun startupSettings(): String {
+        val candidates = "com.eignex.klause.arithmetic.quadratic.QuadraticCandidates"
+        val certification = "com.eignex.klause.arithmetic.quadratic.QuadraticCertification"
+        val methods = listOf("::<clinit>", "com.eignex.koblas.engine.BuiltinEngines::getSimd") +
+            listOf("proposeActiveRows", "prepare", "improve", "activeRows", "stationary", "eliminate")
+                .map { "$candidates::$it" } +
+            listOf("bound", "optimum", "feasible", "evaluate", "positiveSemidefinite")
+                .map { "$certification::$it" }
+        return ",jdk.ClassLoad#enabled=true,jdk.ClassLoad#threshold=0ms,jdk.ClassDefine#enabled=true," +
+            "jdk.MethodTrace#enabled=true,jdk.MethodTrace#threshold=0ms," +
+            "jdk.MethodTrace#stackTrace=false,jdk.MethodTrace#filter=${methods.joinToString(";")}," +
+            "jdk.ExecutionSample#period=1ms"
     }
 
     fun process(context: BenchContext, argv: List<String>, environment: Map<String, String>): Int {

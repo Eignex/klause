@@ -51,7 +51,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
         val unknown = parameters.keys.filterNot { it in SELECTORS || it in OPTIONS || it.startsWith("param.") }
         require(unknown.isEmpty()) { "Unknown Klause bench parameters: $unknown" }
         require(engines.all { it in ENGINES }) { "Unknown engine; supported: $ENGINES" }
-        require(measurement in setOf("none", "resources", "jfr", "compilation", "compilation+log"))
+        require(measurement in setOf("none", "resources", "jfr", "compilation", "compilation+log", "startup"))
         require(heap in 512..memory - 1536) { "heap-mib must reserve 1536 MiB for harness and native memory" }
         require(gc in setOf("default", "serial", "parallel", "g1", "z"))
         require(wallTimeout <= 604800) { "Combined solve and compiler ceilings exceed the lab's seven-day case limit" }
