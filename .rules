@@ -89,7 +89,8 @@ Read `klause-bench/README.md` before benchmarking. In short:
 - KDoc on public API only. Use functional notation for math (`succ(i)`, not `succ[i]`); use `[Symbol]` for links.
 - Single-line conventional commits, no scope, no body/trailers:
   `feat: `, `fix: `, `chore: `, `refactor: `, `docs: `, `test: `.
-- PR body: follow `.github/pull_request_template.md`, with `Closes #NN` on its own line at the top.
+- PR body: follow `.github/pull_request_template.md`. Issues are optional; put `Closes #NN`
+  on its own line at the top only when the session was created to close that issue.
 - Issues: follow `.github/issue_template.md`. Keep them short, a few plain sentences,
   and link code/PRs instead of pasting.
 
