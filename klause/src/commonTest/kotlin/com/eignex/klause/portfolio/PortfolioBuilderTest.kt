@@ -221,9 +221,9 @@ class PortfolioBuilderTest {
 
         try {
             assertEquals(baseline.size, workers.size)
-            assertEquals("ls/cbls-primary-plateau/ils-basin", workers[2].label)
-            assertEquals("ls/cbls-plateau/ils-basin/objective-coordinates", workers[3].label)
-            assertTrue(workers[3].firstWitnessOnly)
+            assertEquals(1, workers.count { it.label == "ls/cbls-primary-plateau/ils-basin" })
+            val full = workers.single { it.label == "ls/cbls-plateau/ils-basin/objective-coordinates" }
+            assertTrue(full.firstWitnessOnly)
             assertTrue(workers.all { it.evidenceModel?.matches(view.canonicalModel) == true })
         } finally {
             workers.forEach { it.close() }
@@ -288,7 +288,7 @@ class PortfolioBuilderTest {
     }
 
     @Test
-    fun `annotated circuit diversity should have initial admission and complete source authority`() {
+    fun `an annotated roster should give its source order initial admission and complete source authority`() {
         val annotation = SearchHints(
             listOf(
                 SearchGroup(intArrayOf(), intArrayOf(0, 1, 2)),
@@ -308,7 +308,7 @@ class PortfolioBuilderTest {
             val workers = PortfolioBuilder.build(problem, scenario, objective)
 
             try {
-                val generic = workers.single { it.label == "bt/first-fail" }
+                val generic = workers.single { it.label == "bt/annotation" }
                 assertFalse(generic.improvementOnly)
                 assertEquals(ArmFamily.Backtrack, generic.family)
                 assertTrue(generic.permitsSourceProofs)
@@ -456,19 +456,6 @@ class PortfolioBuilderTest {
     }
 
     @Test
-    fun `sole complete core worker should join initial admission`() {
-        val problem = Problem(2, 0, emptyArray(), emptyArray()).bake()
-        val objective = LinearObjective(longArrayOf(1, 2))
-        val workers = PortfolioBuilder.build(problem, PortfolioScenario.sequential(Kind.COP, arms = 1), objective)
-
-        try {
-            assertFalse(workers.single { it.label == "bt/core-guided" }.improvementOnly)
-        } finally {
-            workers.forEach { it.close() }
-        }
-    }
-
-    @Test
     fun `explicit core selection should join initial admission`() {
         val problem = Problem(2, 0, emptyArray(), emptyArray()).bake()
         val objective = LinearObjective(longArrayOf(1, 2))
@@ -559,12 +546,7 @@ class PortfolioBuilderTest {
 
         try {
             assertEquals(
-                listOf(
-                    "ls/cbls-chain/ils-basin",
-                    "ls/cbls-chain-noinv/fixed",
-                    "ls/cbls-notabu/fixed",
-                    "ls/cbls-lonoise/fixed",
-                ),
+                listOf("ls/cbls-smooth/ils-basin", "ls/sa/adaptive-perturb", "ls/cbls-chain/ils-basin"),
                 workers.filter { it.improvementOnly && it.family == ArmFamily.LocalSearch }.map { it.label },
             )
             assertTrue(workers.filter { !it.improvementOnly }.any { it.label == "bt/satOptimized" })
@@ -586,7 +568,7 @@ class PortfolioBuilderTest {
     ).bake()
 
     @Test
-    fun `the default continuous optimization pool should append node LP after its incumbent workers`() {
+    fun `the default continuous optimization pool should seat node LP beside its incumbent workers`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
 
         val workers = PortfolioBuilder.build(
@@ -597,12 +579,11 @@ class PortfolioBuilderTest {
 
         try {
             assertEquals(
-                listOf("bt/satOptimized", "bt/conflictDriven", "bt/lp-default"),
+                listOf("bt/satOptimized", "bt/lp-default", "bt/conflictDriven"),
                 workers.filter { it.label.startsWith("bt/") }.map { it.label },
             )
-            assertEquals(4, workers.count { it.family == ArmFamily.LocalSearch })
-            assertEquals("bt/lp-default", workers.last().label)
-            assertFalse(workers.last().improvementOnly)
+            assertEquals(2, workers.count { it.family == ArmFamily.LocalSearch })
+            assertFalse(workers.single { it.label == "bt/lp-default" }.improvementOnly)
         } finally {
             workers.forEach { it.close() }
         }
@@ -618,8 +599,7 @@ class PortfolioBuilderTest {
         )
 
         try {
-            assertEquals("bt/lp-default", workers.last().label)
-            assertFalse(workers.last().improvementOnly)
+            assertFalse(workers.single { it.label == "bt/lp-default" }.improvementOnly)
         } finally {
             workers.forEach { it.close() }
         }
@@ -638,7 +618,7 @@ class PortfolioBuilderTest {
                     listOf("bt/satOptimized", "bt/conflictDriven"),
                     workers.filter { it.label.startsWith("bt/") }.map { it.label },
                 )
-                assertEquals(4, workers.count { it.family == ArmFamily.LocalSearch })
+                assertEquals(3, workers.count { it.family == ArmFamily.LocalSearch })
             } finally {
                 workers.forEach { it.close() }
             }

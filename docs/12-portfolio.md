@@ -1073,47 +1073,76 @@ Explicit private work zero disables it; caller scratch and private-byte settings
 the private preparation. Defaults live in
 [portfolio construction](../klause/src/commonMain/kotlin/com/eignex/klause/portfolio).
 
-### Model-specific worker recipes
+### Roles and the mixed roster
 
-Curated sequential mixed finite optimization pools diversify both neighborhoods and
-branching, without adding allowance:
+Every catalog arm declares the one role it covers in a roster:
 
-| Structure | Additional diversity |
+| Role | Arms |
 |---|---|
-| Scheduling | A primary-repair CBLS variant beside the full neighborhood, both using iterated local-search restarts |
-| Annotated circuit/subcircuit with first-fail/min values | Unrestricted first-fail beside the annotation's tiered scope |
-| Finite objective without an initial LP recipe | A restart-level bandit over variable/value selectors (`selector-switch`) beside the SAT guard |
+| `first-solution` | Local-search recipes on fixed, Luby or no restarts |
+| `learning-proof` | The SAT guard, the conflict-driven core and the clausal proof recipes |
+| `lp-bounding` | The LP recipes: default, aggressive, best-bound tree and conservative emphasis |
+| `objective-cores` | The core-guided worker |
+| `selector-diversity` | The source annotation and the recipes that change only the variable or value order |
+| `neighbourhood-improvement` | Hybrid ALNS and local-search recipes whose restarts perturb their incumbents |
 
-The latter two require at least six configured slots and preserve pool size.
+The model's kind and facts name the roles it needs, in seating order. A role named
+twice seats its two best arms; a role no eligible arm covers seats none.
 
-#### LP arm admission
+- Optimization needs a learning proof, then a first solution. Satisfaction needs them
+  in the opposite order: a sequential pool warms arms in roster order, local search
+  cannot close a trivial optimum, and its first solution ends a satisfaction run.
+- Every model needs LP bounding, seated when its relaxation offers an LP recipe
+  something to enable under the `--lp` ceiling.
+- Optimization needs neighbourhood improvement and objective cores. The core worker
+  is eligible when every objective term is Boolean, including exact views of 0/1
+  integer costs, and the model has no continuous columns.
+- A source annotation needs selector diversity, and its own search order ranks first
+  for it.
+- A finite-CP model without a relaxation needs selector diversity.
+- Optimization over pure integer linear rows with an integer objective needs LP
+  bounding twice, which seats the aggressive emphasis beside the default. Eligibility
+  reads complete unconditional row conjunctions with 64-bit integer constants,
+  including normalized exact source rows. A propagator-only symmetry factor preserves
+  it; at least one row conjunction is required, and every other factor must qualify.
+  An exact binary integer objective view retains it through its Boolean rows, value
+  channels and redundant difference propagation, and a binary equality objective
+  qualifies the same way; changed objective coefficients discard that capture. LP
+  preparation reads the same capture to retain ordinary bounding over
+  clause/cardinality rows under the existing dimension ceiling. See
+  [ordinary tableau admission](17-linear-programming.md).
 
-Curated sequential mixed finite optimization pools add LP-bounded backtrack workers
-for three structures, skipped when LP is unavailable, the pool is explicit or
-annotated, or execution is parallel or single-engine. See
-[ordinary tableau admission](17-linear-programming.md).
+A mixed roster reads three ranks: local search, complete search and, on an
+optimization that offers an objective and has more arms than cores, the one hybrid
+ALNS arm. Optimization reads local search first and satisfaction complete search
+first. The best arm of a role is the first to declare it when the ranks are read one
+position at a time. The roster seats the best arm of each needed role, then fills the
+remaining slots by rank: the engines take turns, each seating its next unseated arm.
+Neither step reads the pool size, so a smaller roster is a prefix of a larger one and
+the same rule serves every core count. A rank that runs out repeats its recipes on
+fresh seeds; the annotation, the core worker and ALNS never repeat. Seated arms
+count toward the configured pool size.
 
-- **Binary packing.** For nonnegative integer capacity rows with an objective that
-  rewards items, the default LP recipe takes the conflict-driven slot beside the SAT
-  guard.
-- **Integer linear models.** Pools of at least six slots over pure integer linear
-  rows with an integer objective append an aggressive LP companion, which also runs
-  under a cuts-off ceiling. Eligibility reads complete unconditional row conjunctions
-  with 64-bit integer constants, including normalized exact source rows. A
-  propagator-only symmetry factor preserves this eligibility; at least one row
-  conjunction is required, and every other factor must qualify. An exact binary
-  integer objective view retains this admission through its Boolean rows, value
-  channels and redundant difference propagation. Its captured source rows and costs
-  also preserve binary packing and equality recipes; changed objective coefficients
-  discard that capture. LP preparation reads the same capture to retain ordinary
-  bounding over clause/cardinality rows under the existing dimension ceiling.
-- **Continuous columns.** The default LP arm ranks after the SAT guard and
-  conflict-driven core and joins first-solution search under the ordinary bounded
-  slices for both finite and continuous objectives. Single-core pools reserve half the
-  scheduled time for it until the first incumbent when the objective is continuous.
-  An auxiliary LP arm without progress then receives a
-  [bounded evaluation](#auxiliary-incumbent-evaluation),
-  and an unproductive trial retires it without claiming exhaustion.
+Each rank is its catalog's credit order restricted to eligible recipes. Three leads
+depend on the model: clausal satisfaction ranks its balanced clause-only recipe and
+fixed-break probSAT first, pseudo-Boolean local search ranks the bandit flip walk and
+jump moves first, and scheduling optimization ranks the primary-repair plateau recipe
+beside the full one, both on iterated local-search restarts. An injected pool
+replaces its engine's rank with the selected recipes in the given order.
+
+Single-engine pools take the prefix of their engine's rank; a backtrack-only pool of
+at least two arms gives the annotation its last slot. A curated sequential mixed
+optimization pool larger than the default searches for its first solution with the
+default roster and admits the remaining arms after the first incumbent.
+
+Portfolio statistics report each arm's role as `role=` on its `arm.` line, and a
+selected `WorkerAdmission` event carries the same name.
+
+On continuous columns with a continuous objective, single-core pools reserve half
+the scheduled time for the default LP arm until the first incumbent. A default-size
+sequential pool over continuous columns evaluates that arm as an auxiliary: without
+progress it receives a [bounded evaluation](#auxiliary-incumbent-evaluation), and an
+unproductive trial retires it without claiming exhaustion.
 
 #### Satisfaction pools
 
@@ -1135,11 +1164,11 @@ all work also consumes the ordinary containing worker slice. Explicit maxSD keep
 its ordinary cancellation policy without a local work cap. [Search](08-search.md) owns probe restoration,
 coverage and accounting.
 
-Curated sequential mixed finite-CP satisfaction pools of at least six slots keep
-dom/wdeg and first-fail in the free and selector-switch slots when the selected
-complete workers contain no LP recipe. Wider pools swap an existing matching
-recipe into each slot. Pool size, local-search positions and containing allowances
-stay fixed; explicit, annotated and parallel pools keep their selected palettes.
+The satisfaction rank places dom/wdeg and first-fail ahead of the free engine and
+the selector bandit; the optimization rank places the selector bandit ahead of LinUCB
+and the free engine. A finite-CP roster without a relaxation therefore seats
+support ordering on an admitted Table model, dom/wdeg on other satisfaction models
+and the selector bandit on optimization.
 
 The satisfaction backtrack palette includes conservative LP after default and
 aggressive LP; applicability, model class and LP ceilings order and filter it. Root
@@ -1192,9 +1221,8 @@ later cores, preserving their blockers through weight splits. The weighted thres
 driver bisects the bounded cost range using cost-only assumptions; a refutation
 raises the bound only past the tested cutoff.
 
-Curated mixed finite optimization pools append a retained core-guided complete worker
-when every objective term is Boolean, including exact views of 0/1 integer costs,
-and the model has no continuous columns. Other finite integer constraints remain
+Mixed finite optimization rosters seat a retained core-guided complete worker for
+the `objective-cores` role. Other finite integer constraints remain
 admissible. Boolean cutoff consumers also accept this cost view. The
 worker assumes all positive residual objective terms false and asks for a satisfying
 assignment. A refutation returns a core: a set of terms at least one of which must be

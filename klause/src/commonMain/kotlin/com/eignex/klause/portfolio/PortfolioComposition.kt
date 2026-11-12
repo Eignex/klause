@@ -3,14 +3,9 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.NodeBudget
-import com.eignex.klause.backtrack.TierVarSelect
-import com.eignex.klause.backtrack.TieredVariableSelector
-import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
-import com.eignex.klause.lp.bounding.LpEmphasis
-import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.meta.coreguided.CoreRefinementMode
 import com.eignex.klause.propagation.BakedProblem
@@ -19,10 +14,9 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
-import kotlin.math.roundToInt
 
 /** Whether the problem is a constraint *optimization* (an objective to minimise) or a pure
- *  *satisfaction* problem. A portfolio axis; drives which arms are eligible and how a mixed pool is split. */
+ *  *satisfaction* problem. A portfolio axis; drives which arms are eligible and which roles a mixed roster needs. */
 enum class Kind {
     /** Constraint optimization — the model carries an objective to minimise. */
     COP,
@@ -50,7 +44,7 @@ enum class EngineMix {
  * A point in the portfolio configuration space. Its axes are **cores** (compute width) and **arms**
  * (pool size) — kept separate so they don't conflate — plus **kind** (COP vs CSP) and
  * **engine** (LS / backtrack / mixed / ALNS). [PortfolioComposition.compose] turns a scenario into an ordered
- * list of configured and applicable auxiliary arms, and [PortfolioBuilder.build] materialises it into runnable
+ * list of arms, and [PortfolioBuilder.build] materialises it into runnable
  * [PortfolioWorker]s — so every scenario flows through one construction path.
  *
  * [cores] is the number of lanes a [Portfolio] schedules the [arms] arms on, one segment at a time per lane.
@@ -65,7 +59,7 @@ enum class EngineMix {
 data class PortfolioScenario(
     /** Compute width. `1` selects the single-core sequential executor; `> 1` the parallel one. */
     val cores: Int,
-    /** Configured pool size, before applicable auxiliary arms. Independent of
+    /** Pool size. Independent of
      *  [cores]: when `arms < cores` a parallel track replicates the composed arms across the extra
      *  lanes (with distinct seeds); when `arms >= cores` every lane is a distinct composed arm. */
     val arms: Int,
@@ -100,9 +94,9 @@ data class PortfolioScenario(
      *  applicability filter under an override. */
     val btEdit: ((BacktrackParams) -> BacktrackParams)? = null,
     /** Optional model search-annotation arm: the [BacktrackParams] compiled from the model's
-     *  `int_search(...)` annotations. When present (and the pool carries ≥ 2 backtrack arms), it takes
-     *  the last backtrack slot so the free CP portfolio also follows the model's own search order,
-     *  while the class's leading complete recipe keeps slot 0. Ignored when [btPool] overrides the pool. */
+     *  `int_search(...)` annotations. A mixed roster seats it for selector diversity; a backtrack pool of
+     *  ≥ 2 arms gives it the last slot, so the class's leading complete recipe keeps slot 0. Ignored when
+     *  [btPool] overrides the pool. */
     val annotationArm: BacktrackParams? = null,
     /** Whether the backtrack arms share globally-valid LP cuts through a [SharedCutPool], the
      *  cut analogue of the always-on learned-clause pool. On by default; sound either way (only global
@@ -252,74 +246,73 @@ internal sealed interface WorkerConfig {
     ): PortfolioWorker
 }
 
-internal class PortfolioArmPlan(val arms: List<WorkerConfig>, val firstSolutionCount: Int)
+/** The seated arms, the role each declares, and how many of them search for the first solution. */
+internal class PortfolioArmPlan(
+    val arms: List<WorkerConfig>,
+    val firstSolutionCount: Int,
+    val roles: List<ArmRole?> = List(arms.size) { null },
+)
 
 /**
- * Selects and orders arms from [PortfolioScenario], including mixed-pool allocation.
+ * Selects and orders arms from [PortfolioScenario]. A mixed pool is a roster seated by [PortfolioRoster] from
+ * the roles [ArmRole.needed] names; a single-engine pool is the prefix of that engine's rank.
  * [PortfolioBuilder] materializes the selected arms.
  */
 internal object PortfolioComposition {
 
-    /** Fraction of a MIXED pool given to local-search arms (the rest go to backtrack).
-     *  COP leans LS (it streams good incumbents fast while backtrack tightens the bound); CSP leans
-     *  backtrack (only complete search proves UNSAT / reliably reaches a first feasible). */
-    fun lsShare(kind: Kind): Double = when (kind) {
-        Kind.COP -> 2.0 / 3.0
-        Kind.CSP -> 1.0 / 3.0
-    }
-
     /**
-     * The ordered arm list for [scenario]: [PortfolioScenario.arms] arms, with applicable hybrid-ALNS and
-     * continuous-row LP arms beside a curated sequential mixed optimization pool. The curated pools keep only
-     * the arms the model behind [facts] offers the needs of. A pool the caller chose outright — an injected one, or
-     * a single-engine mix — is built as asked, so a model it cannot run is declined rather than replaced.
+     * The ordered arm list for [scenario], [PortfolioScenario.arms] long. The curated ranks keep only the arms
+     * the model behind [facts] offers the needs of. A pool the caller chose outright — an injected one, or a
+     * single-engine mix — is built as asked, so a model it cannot run is declined rather than replaced.
      */
     fun compose(
         scenario: PortfolioScenario,
         facts: ProblemFacts = ProblemFacts.assumed(scenario.kind),
-    ): List<WorkerConfig> {
-        val arms = composeArms(scenario, facts).map {
-            if (scenario.numericalLp && it is BacktrackWorkerConfig) it.withNumericalLp() else it
-        }
-        val check = scenario.toleranceCheck ?: return arms
-        return arms.map {
-            when (it) {
-                is BacktrackWorkerConfig -> it.withToleranceCheck(check)
-                is LocalSearchWorkerConfig -> it.withToleranceCheck(check)
-                is AlnsWorkerConfig -> it.withToleranceCheck(check)
-                else -> it
-            }
-        }
-    }
+    ): List<WorkerConfig> = seated(scenario, facts).map { it.config }
 
+    /** [compose] with each arm's role. A curated sequential mixed optimization pool larger than the default
+     *  searches for its first solution with the default roster, which is its prefix. */
     internal fun plan(scenario: PortfolioScenario, facts: ProblemFacts): PortfolioArmPlan {
-        val composed = compose(scenario, facts)
-        if (scenario.cores != 1 || scenario.engine != EngineMix.MIXED || scenario.kind != Kind.COP ||
-            scenario.arms < PortfolioScenario.DEFAULT_ARMS || scenario.lsPool != null || scenario.btPool != null
-        ) {
-            return PortfolioArmPlan(composed, composed.size)
-        }
-        if (scenario.arms == PortfolioScenario.DEFAULT_ARMS) {
-            return PortfolioArmPlan(composed, composed.size)
-        }
-        // Keep the small pool's positions: materialization derives each arm's seed from its position.
-        val small = compose(scenario.copy(arms = PortfolioScenario.DEFAULT_ARMS), facts)
-        val remaining = composed.toMutableList()
-        val first = small.mapNotNull { arm ->
-            val index = remaining.indexOfFirst { it::class == arm::class && it.label == arm.label }
-            if (index >= 0) remaining.removeAt(index) else null
-        }
-        return PortfolioArmPlan(first + remaining, first.size)
+        val seated = seated(scenario, facts)
+        val deferred = scenario.cores == 1 && scenario.engine == EngineMix.MIXED && scenario.kind == Kind.COP &&
+            scenario.lsPool == null && scenario.btPool == null
+        val first = if (deferred) minOf(seated.size, PortfolioScenario.DEFAULT_ARMS) else seated.size
+        return PortfolioArmPlan(seated.map { it.config }, first, seated.map { it.role })
     }
 
-    private fun composeArms(scenario: PortfolioScenario, facts: ProblemFacts): List<WorkerConfig> {
+    private fun seated(scenario: PortfolioScenario, facts: ProblemFacts): List<SeatedArm> {
         val count = scenario.arms
-        return when (scenario.engine) {
-            EngineMix.LOCAL_SEARCH -> lsArms(scenario.kind, count, scenario.lsPool, scenario.nodeBudget, facts)
-            EngineMix.BACKTRACK -> btArms(scenario, count, facts)
+        val arms = when (scenario.engine) {
+            EngineMix.LOCAL_SEARCH ->
+                lsArms(scenario.kind, count, scenario.lsPool, scenario.nodeBudget, facts).map(::declared)
+            EngineMix.BACKTRACK -> btArms(scenario, count, facts).map(::declared)
             EngineMix.MIXED -> mixedArms(scenario, facts)
-            EngineMix.ALNS -> alnsArms(count, scenario.nodeBudget)
+            EngineMix.ALNS -> alnsArms(count, scenario.nodeBudget).map(::declared)
         }
+        val check = scenario.toleranceCheck
+        return arms.map { arm ->
+            val numerical = arm.config.let {
+                if (scenario.numericalLp && it is BacktrackWorkerConfig) it.withNumericalLp() else it
+            }
+            val checked = if (check == null) numerical else when (numerical) {
+                is BacktrackWorkerConfig -> numerical.withToleranceCheck(check)
+                is LocalSearchWorkerConfig -> numerical.withToleranceCheck(check)
+                is AlnsWorkerConfig -> numerical.withToleranceCheck(check)
+                else -> numerical
+            }
+            SeatedArm(checked, arm.role)
+        }
+    }
+
+    private fun declared(config: WorkerConfig): SeatedArm = SeatedArm(config, declaredRole(config))
+
+    // The role a config's catalog arm declares; a recipe the catalogs do not hold declares none.
+    private fun declaredRole(config: WorkerConfig): ArmRole? = when (config) {
+        is BacktrackWorkerConfig ->
+            if (config.label == ANNOTATION) ArmRole.SelectorDiversity else BacktrackCatalog.armOf(config.label)?.role
+        is LocalSearchWorkerConfig -> LocalSearchCatalog.armOf(config.label)?.role
+        is AlnsWorkerConfig -> ArmRole.NeighbourhoodImprovement
+        is CoreGuidedWorkerConfig -> ArmRole.ObjectiveCores
     }
 
     /** The [count] hybrid-ALNS arms, cycling the curated regimes ([AlnsProfile.Curated]) — the ALNS analog
@@ -348,58 +341,62 @@ internal object PortfolioComposition {
      *  (so the class's leading complete recipe keeps slot 0). Every resulting arm spends [PortfolioScenario.nodeBudget],
      *  which is applied to the composed pool so that capping a run does not also change which pool it composes. */
     private fun btArms(scenario: PortfolioScenario, count: Int, facts: ProblemFacts): List<BacktrackWorkerConfig> {
-        val lpCeiling = scenario.lpCeiling
         val btPool = scenario.btPool
-        val annotationArm = scenario.annotationArm
-        val nodeBudget = scenario.nodeBudget
-        val zeroObjectivePricing = scenario.zeroObjectivePricing
-        val edit = scenario.btEdit
-        val clausal = facts.profile.problemClass == ProblemClass.Sat
-        val boundedRoot = scenario.rootMaintenance && scenario.engine == EngineMix.BACKTRACK && annotationArm == null &&
-            (clausal || facts.profile.problemClass == ProblemClass.PseudoBoolean) && !facts.profile.optimizing
-        if (btPool != null) {
-            // The `--lp` ceiling bounds the pool, and an injected pool is still the pool: capping only the
-            // curated one leaves `--lp` silently ignored whenever the caller names its arms.
-            return List(count) {
-                BacktrackWorkerConfig(
-                    btPool[it % btPool.size]().editing(edit).capLp(lpCeiling).spending(nodeBudget),
-                    zeroObjectivePricing,
-                )
-            }
-        }
-        // Root cut harvesting spends a satisfaction arm's first slice before node refutation.
-        val curatedEdit: ((BacktrackParams) -> BacktrackParams)? = if (scenario.kind == Kind.CSP) {
-            { params ->
-                val rootParams = if (params.lpConfig == null) {
-                    params
-                } else {
-                    params.copy(lpPlan = params.lpPlan.copy(rootCutHarvest = false))
-                }
-                val defaults = if (boundedRoot) {
-                    rootParams.boundedRootMaintenance(
-                        warmupWork = if (clausal) 4096L else 0L,
-                        clausal = clausal,
-                    )
-                } else {
-                    rootParams
-                }
-                edit?.invoke(defaults) ?: defaults
-            }
-        } else {
-            edit
-        }
+        if (btPool != null) return List(count) { injected(scenario, btPool[it % btPool.size]) }
         val base = BacktrackWorkerConfig.diverse(
             scenario.kind,
             count,
-            lpCeiling,
-            nodeBudget,
-            zeroObjectivePricing,
+            scenario.lpCeiling,
+            scenario.nodeBudget,
+            scenario.zeroObjectivePricing,
             facts,
-            curatedEdit,
+            curatedEdit(scenario, facts),
         )
-        if (annotationArm == null || count < 2) return base
-        val annotation = BacktrackWorkerConfig.ofParams("annotation", annotationArm.copy(nodeBudget = nodeBudget))
-        return base.dropLast(1) + BacktrackWorkerConfig(annotation, zeroObjectivePricing)
+        val annotation = annotation(scenario)
+        return if (annotation == null || count < 2) base else base.dropLast(1) + annotation
+    }
+
+    // The `--lp` ceiling bounds the pool, and an injected pool is still the pool: capping only the curated one
+    // leaves `--lp` silently ignored whenever the caller names its arms.
+    private fun injected(scenario: PortfolioScenario, recipe: () -> BacktrackRecipe) = BacktrackWorkerConfig(
+        recipe().editing(scenario.btEdit).capLp(scenario.lpCeiling).spending(scenario.nodeBudget),
+        scenario.zeroObjectivePricing,
+    )
+
+    private fun annotation(scenario: PortfolioScenario): BacktrackWorkerConfig? {
+        val params = scenario.annotationArm ?: return null
+        return BacktrackWorkerConfig(
+            BacktrackWorkerConfig.ofParams(ANNOTATION, params.copy(nodeBudget = scenario.nodeBudget)),
+            scenario.zeroObjectivePricing,
+        )
+    }
+
+    // The edit every curated backtrack recipe is built through: [PortfolioScenario.btEdit] after the automatic
+    // satisfaction defaults.
+    private fun curatedEdit(scenario: PortfolioScenario, facts: ProblemFacts): ((BacktrackParams) -> BacktrackParams)? {
+        val edit = scenario.btEdit
+        if (scenario.kind != Kind.CSP) return edit
+        val clausal = facts.profile.problemClass == ProblemClass.Sat
+        val boundedRoot = scenario.rootMaintenance && scenario.engine == EngineMix.BACKTRACK &&
+            scenario.annotationArm == null &&
+            (clausal || facts.profile.problemClass == ProblemClass.PseudoBoolean) && !facts.profile.optimizing
+        // Root cut harvesting spends a satisfaction arm's first slice before node refutation.
+        return { params ->
+            val rootParams = if (params.lpConfig == null) {
+                params
+            } else {
+                params.copy(lpPlan = params.lpPlan.copy(rootCutHarvest = false))
+            }
+            val defaults = if (boundedRoot) {
+                rootParams.boundedRootMaintenance(
+                    warmupWork = if (clausal) 4096L else 0L,
+                    clausal = clausal,
+                )
+            } else {
+                rootParams
+            }
+            edit?.invoke(defaults) ?: defaults
+        }
     }
 
     private fun BacktrackParams.boundedRootMaintenance(
@@ -425,208 +422,81 @@ internal object PortfolioComposition {
         inprocessingWarmupWork = warmupWork,
     )
 
-    private fun mixedArms(scenario: PortfolioScenario, facts: ProblemFacts): List<WorkerConfig> {
-        // At least one of each engine once count ≥ 2; below that the single slot goes to LS (the
-        // fast first-incumbent engine).
-        val count = scenario.arms
-        val lsCount = (count * lsShare(scenario.kind)).roundToInt().coerceIn(if (count >= 2) 1 else count, count)
-        val btCount = count - lsCount
-        // Hybrid ALNS with CP repair joins a scheduled optimization pool whose model offers what it needs, on top
-        // of the arms: the policy shares time by family, so an extra arm takes no time from the others. It works
-        // around an incumbent, so a satisfaction model has nothing for it, and a pool with a core per arm keeps
-        // its cores.
-        val alns = scenario.kind == Kind.COP && scenario.cores < count && facts.offersAll(AlnsWorkerConfig.NEEDS)
-        val arms = ArrayList<WorkerConfig>(count + 1)
-        val local = if (lsCount > 0) {
-            val selected = lsArms(scenario.kind, lsCount, scenario.lsPool, scenario.nodeBudget, facts)
-            if (scenario.kind == Kind.COP && scenario.cores == 1 && scenario.lsPool == null &&
-                facts.profile.scheduling && selected.getOrNull(1)?.label == "cbls-plateau/ils-basin" &&
-                selected.first().label == "cbls/fixed"
-            ) {
-                val primary = LocalSearchWorkerConfig(
-                    LocalSearchCatalog.byLabel("cbls-primary-plateau/ils-basin"),
-                    scenario.nodeBudget,
-                    seedOffset = 1,
-                )
-                listOf(primary) + selected.drop(1)
+    /**
+     * The mixed roster: the ranks of both engines, and of hybrid ALNS on an optimization, seated by role.
+     * An optimization reads local search first, where incumbents drive the bound, and a satisfaction model
+     * complete search first, which only it can refute.
+     */
+    private fun mixedArms(scenario: PortfolioScenario, facts: ProblemFacts): List<SeatedArm> {
+        val local = localRank(scenario, facts)
+        val complete = completeRank(scenario, facts)
+        val ranks = when (scenario.kind) {
+            Kind.COP -> listOfNotNull(local, complete, neighbourhoodRank(scenario, facts))
+            Kind.CSP -> listOf(complete, local)
+        }
+        val needed = ArmRole.needed(
+            scenario.kind,
+            facts,
+            annotated = scenario.annotationArm != null && scenario.btPool == null,
+            relaxation = complete.arms.any { it.role == ArmRole.LpBounding },
+        )
+        return PortfolioRoster.seat(needed, ranks, scenario.arms)
+    }
+
+    private fun localRank(scenario: PortfolioScenario, facts: ProblemFacts): RosterRank {
+        val pool = scenario.lsPool
+        val budget = scenario.nodeBudget
+        if (pool != null) {
+            return RosterRank(pool.map { recipe ->
+                RosterCandidate(LocalSearchCatalog.armOf(recipe().label)?.role) {
+                    LocalSearchWorkerConfig(recipe(), budget)
+                }
+            })
+        }
+        return RosterRank(LocalSearchCatalog.rankedArms(scenario.kind, facts.profile).map { arm ->
+            RosterCandidate(arm.role) { LocalSearchWorkerConfig(LocalSearchCatalog.recipe(arm), budget) }
+        })
+    }
+
+    // The model's own search order leads the complete rank. It and the core worker hold private state, so
+    // neither repeats on a fresh seed.
+    private fun completeRank(scenario: PortfolioScenario, facts: ProblemFacts): RosterRank {
+        val pool = scenario.btPool
+        if (pool != null) {
+            return RosterRank(pool.map { recipe ->
+                RosterCandidate(BacktrackCatalog.armOf(recipe().label)?.role) { injected(scenario, recipe) }
+            })
+        }
+        val edit = curatedEdit(scenario, facts)
+        val catalog = BacktrackCatalog.rankedArms(scenario.kind, facts).map { arm ->
+            arm to if (arm == BacktrackArm.CoreGuided) {
+                RosterCandidate(arm.role) { CoreGuidedWorkerConfig(scenario.nodeBudget, edit = scenario.btEdit) }
             } else {
-                selected
+                RosterCandidate(arm.role) {
+                    BacktrackWorkerConfig(
+                        BacktrackCatalog.recipe(arm).editing(edit).capLp(scenario.lpCeiling)
+                            .spending(scenario.nodeBudget),
+                        scenario.zeroObjectivePricing,
+                    )
+                }
             }
-        } else {
-            emptyList()
         }
-        val backtrack = if (btCount > 0) {
-            val selected = btArms(scenario, btCount, facts)
-            when (scenario.kind) {
-                Kind.COP -> finiteDescentArms(scenario, facts, selected)
-                Kind.CSP -> finiteSatisfactionArms(scenario, facts, selected)
-            }
-        } else {
-            emptyList()
-        }
-        if (scenario.kind == Kind.COP) {
-            // Sequential portfolios warm every arm in list order. A complete arm must receive its first
-            // slice before the local-search incumbents, which cannot prove an optimum and otherwise delay
-            // a trivial optimization by the entire local-search warmup.
-            arms += backtrack
-            arms += local
-        } else {
-            arms += local
-            arms += backtrack
-        }
-        if (alns) arms += AlnsWorkerConfig(nodeBudget = scenario.nodeBudget)
-        annotationDiversityArm(scenario, facts, arms)?.let { arms += it }
-        // Appending retains the incumbent cores and every existing worker's seed position.
-        continuousLpArm(scenario, facts, arms)?.let { arms += it }
-        integerLinearLpArm(scenario, facts, arms)?.let { arms += it }
-        if (scenario.kind == Kind.COP && facts.booleanObjective && scenario.btPool == null &&
-            arms.none { it.label == BacktrackArm.CoreGuided.label }
-        ) {
-            arms += CoreGuidedWorkerConfig(scenario.nodeBudget, edit = scenario.btEdit)
-        }
-        return arms
-    }
-
-    private fun finiteSatisfactionArms(
-        scenario: PortfolioScenario,
-        facts: ProblemFacts,
-        selected: List<BacktrackWorkerConfig>,
-    ): List<BacktrackWorkerConfig> {
-        if (scenario.cores != 1 || scenario.kind != Kind.CSP || scenario.arms < PortfolioScenario.DEFAULT_ARMS ||
-            facts.profile.problemClass != ProblemClass.FiniteCp || scenario.btPool != null || scenario.lsPool != null ||
-            scenario.btEdit != null || scenario.annotationArm != null || selected.any { it.label.startsWith("lp-") }
-        ) {
-            return selected
-        }
-        val arms = selected.toMutableList()
-        for ((original, replacement) in listOf(
-            BacktrackArm.Free to BacktrackArm.DomWdeg,
-            BacktrackArm.SelectorSwitch to BacktrackArm.FirstFail,
-        )) {
-            val slot = arms.indexOfFirst { it.label == original.label }
-            if (slot < 0) continue
-            val existing = arms.indexOfFirst { it.label == replacement.label }
-            val displaced = arms[slot]
-            arms[slot] = if (existing >= 0) arms[existing] else BacktrackWorkerConfig(
-                BacktrackCatalog.byLabel(replacement.label).capLp(scenario.lpCeiling).spending(scenario.nodeBudget),
-                scenario.zeroObjectivePricing,
-            )
-            if (existing >= 0) arms[existing] = displaced
-        }
-        return arms
-    }
-
-    private fun annotationDiversityArm(
-        scenario: PortfolioScenario,
-        facts: ProblemFacts,
-        arms: List<WorkerConfig>,
-    ): BacktrackWorkerConfig? {
-        val annotation = scenario.annotationArm ?: return null
-        if (scenario.cores != 1 || scenario.kind != Kind.COP ||
-            scenario.arms < PortfolioScenario.DEFAULT_ARMS || scenario.lsPool != null ||
-            scenario.btPool != null || scenario.btEdit != null ||
-            facts.profile.problemClass != ProblemClass.FiniteCp || facts.binaryIntegers || !facts.circuit ||
-            arms.any { it.label == BacktrackArm.FirstFail.label }
-        ) {
-            return null
-        }
-        val tiers = (annotation.variableSelector as? TieredVariableSelector)?.tiers ?: return null
-        val first = tiers.firstOrNull { it.intVars.isNotEmpty() || it.boolVars.isNotEmpty() } ?: return null
-        if (first.intVars.isEmpty() || first.boolVars.isNotEmpty() ||
-            first.varSelect != TierVarSelect.SmallestDomain || tiers.any { it.valueSelector != IndomainMin }
-        ) {
-            return null
-        }
-        // Unrestricted branching complements source tiers without reversing their value preferences.
-        return BacktrackWorkerConfig(
-            BacktrackCatalog.byLabel(BacktrackArm.FirstFail.label)
-                .capLp(scenario.lpCeiling).spending(scenario.nodeBudget),
-            scenario.zeroObjectivePricing,
+        val source = annotation(scenario)?.let { RosterCandidate(ArmRole.SelectorDiversity) { it } }
+        return RosterRank(
+            listOfNotNull(source) + catalog.map { it.second },
+            repeating = catalog.filter { it.first != BacktrackArm.CoreGuided }.map { it.second },
         )
     }
 
-    private fun integerLinearLpArm(
-        scenario: PortfolioScenario,
-        facts: ProblemFacts,
-        arms: List<WorkerConfig>,
-    ): BacktrackWorkerConfig? {
-        if ((!facts.integerLinear && !facts.binaryEqualityObjective) ||
-            facts.continuousObjective || scenario.cores != 1 ||
-            scenario.kind != Kind.COP || scenario.arms < PortfolioScenario.DEFAULT_ARMS ||
-            scenario.lsPool != null || scenario.btPool != null || scenario.btEdit != null ||
-            scenario.annotationArm != null || arms.lastOrNull()?.label == "lp-default" ||
-            (facts.binaryPackingObjective && arms.any { it.label == "lp-default" }) ||
-            arms.any { it.label == "lp-aggressive" }
-        ) {
-            return null
+    // Hybrid ALNS with CP repair works around an incumbent, so a satisfaction model has nothing for it, and a
+    // pool with a core per arm keeps its cores.
+    private fun neighbourhoodRank(scenario: PortfolioScenario, facts: ProblemFacts): RosterRank? {
+        if (scenario.cores >= scenario.arms || !facts.offersAll(AlnsWorkerConfig.NEEDS)) return null
+        val arm = RosterCandidate(ArmRole.NeighbourhoodImprovement) {
+            AlnsWorkerConfig(nodeBudget = scenario.nodeBudget)
         }
-        val recipe = BacktrackCatalog.ranked(scenario.kind, facts).firstOrNull { it.label == "lp-aggressive" }
-            ?: return null
-        return BacktrackWorkerConfig(
-            recipe.capLp(scenario.lpCeiling).spending(scenario.nodeBudget),
-            scenario.zeroObjectivePricing,
-        )
+        return RosterRank(listOf(arm), repeating = emptyList())
     }
 
-    private fun finiteDescentArms(
-        scenario: PortfolioScenario,
-        facts: ProblemFacts,
-        selected: List<BacktrackWorkerConfig>,
-    ): List<BacktrackWorkerConfig> {
-        if (scenario.cores != 1 || scenario.kind != Kind.COP || scenario.arms < PortfolioScenario.DEFAULT_ARMS ||
-            facts.profile.problemClass != ProblemClass.FiniteCp ||
-            scenario.btPool != null || scenario.lsPool != null || scenario.btEdit != null ||
-            scenario.annotationArm != null || selected.take(2).any { it.label.startsWith("lp-") }
-        ) {
-            return selected
-        }
-        val conflict = selected.indexOfFirst { it.label == "conflictDriven" }
-        if (conflict < 0) return selected
-        if (facts.binaryPackingObjective &&
-            LpConfig.AUTO.cappedUnder(scenario.lpCeiling).resolved(LpTechnique.BOUNDING) &&
-            facts.offers(ArmNeed.Relaxation(LpEmphasis.DEFAULT))
-        ) {
-            val lp = selected.indexOfFirst { it.label == "lp-default" }
-            return selected.toMutableList().also { arms ->
-                arms[conflict] = if (lp >= 0) selected[lp] else BacktrackWorkerConfig(
-                    BacktrackCatalog.byLabel("lp-default").capLp(scenario.lpCeiling).spending(scenario.nodeBudget),
-                    scenario.zeroObjectivePricing,
-                )
-                if (lp >= 0) arms[lp] = selected[conflict]
-            }
-        }
-        val selector = selected.indexOfFirst { it.label == "selector-switch" }
-        // Restart-level heuristic diversity complements the SAT guard when no relaxation worker is available.
-        return selected.toMutableList().also { arms ->
-            if (selector >= 0) {
-                arms[conflict] = selected[selector]
-                arms[selector] = selected[conflict]
-            } else {
-                arms[conflict] = BacktrackWorkerConfig(
-                    BacktrackCatalog.byLabel("selector-switch").capLp(scenario.lpCeiling).spending(scenario.nodeBudget),
-                    scenario.zeroObjectivePricing,
-                )
-            }
-        }
-    }
-
-    private fun continuousLpArm(
-        scenario: PortfolioScenario,
-        facts: ProblemFacts,
-        arms: List<WorkerConfig>,
-    ): BacktrackWorkerConfig? {
-        if (!LpConfig.AUTO.cappedUnder(scenario.lpCeiling).resolved(LpTechnique.BOUNDING)) return null
-        if (scenario.cores != 1 || scenario.kind != Kind.COP || scenario.arms < PortfolioScenario.DEFAULT_ARMS ||
-            scenario.lsPool != null || scenario.btPool != null || !facts.profile.realColumns ||
-            arms.any { it.label == "lp-default" }
-        ) {
-            return null
-        }
-        val recipe = BacktrackCatalog.ranked(scenario.kind, facts).firstOrNull { it.label == "lp-default" }
-            ?: return null
-        return BacktrackWorkerConfig(
-            recipe.editing(scenario.btEdit).capLp(scenario.lpCeiling).spending(scenario.nodeBudget),
-            scenario.zeroObjectivePricing,
-        )
-    }
+    private const val ANNOTATION = "annotation"
 }

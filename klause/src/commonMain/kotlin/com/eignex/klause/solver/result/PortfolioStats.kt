@@ -98,6 +98,8 @@ data class ArmSchedule(
     val phases: List<PortfolioPhaseStats> = emptyList(),
     /** Factory, query, sharing opportunity and disposal lifecycle. */
     val lifecycle: PortfolioLifecycleStats = PortfolioLifecycleStats(),
+    /** The role the arm declares in its roster; null when it declares none. */
+    val role: String? = null,
 )
 
 /** Bounded diagnostics for an ordinary portfolio arm exception. */

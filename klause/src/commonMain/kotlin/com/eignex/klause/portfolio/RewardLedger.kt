@@ -254,6 +254,7 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
                 seen[label] = occurrence
                 ArmSchedule(
                     label = if (occurrence == 1) label else "$label#$occurrence",
+                    role = workers[arm].role?.label,
                     segments = segments[arm],
                     work = work[arm],
                     millis = millis[arm],

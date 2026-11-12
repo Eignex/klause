@@ -80,6 +80,9 @@ class PortfolioWorker private constructor(
 
     internal var restartingSearch: Boolean = false
 
+    /** The role this worker's arm declares in its roster, or null when it declares none. */
+    internal var role: ArmRole? = null
+
     internal var improvementOnly: Boolean = false
 
     internal var firstWitnessOnly: Boolean = false

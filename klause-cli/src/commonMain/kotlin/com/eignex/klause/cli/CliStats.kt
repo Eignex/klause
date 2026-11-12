@@ -406,6 +406,7 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
             " share$channel=us:${t.nanos / NANOS_PER_MICRO},out:${t.exported},in:${t.imported},dup:${t.duplicates}"
         }
         "arm.${arm.label}" to
+            arm.role?.let { "role=$it " }.orEmpty() +
             "segments=${arm.segments} work=${arm.work} ms=${arm.millis} reward=${round4(arm.meanReward)} " +
             "failures=${arm.failures} faults=${arm.faults} maxMs=${arm.maxMillis} " +
             "initMs=${arm.initializationMillis} reseeds=${arm.reseeds}" +
