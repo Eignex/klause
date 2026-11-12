@@ -1109,8 +1109,8 @@ twice seats its two best arms; a role no eligible arm covers seats none.
   preparation reads the same capture to retain ordinary bounding over
   clause/cardinality rows under the existing dimension ceiling. See
   [ordinary tableau admission](17-linear-programming.md).
-- A finite-CP model needs selector diversity: its branching order decides which
-  solutions complete search reaches.
+- A finite-CP model over 0/1 integers, or one without a relaxation, needs selector
+  diversity.
 
 A mixed roster reads three ranks: local search, complete search and, on an
 optimization that offers an objective and has more arms than cores, the one hybrid
@@ -1166,9 +1166,9 @@ coverage and accounting.
 
 The satisfaction rank places dom/wdeg and first-fail ahead of the free engine and
 the selector bandit; the optimization rank places the selector bandit ahead of LinUCB
-and the free engine. A finite-CP roster therefore seats
-support ordering on an admitted Table model, dom/wdeg on other satisfaction models
-and the selector bandit on optimization.
+and the free engine. A finite-CP roster that needs selector diversity therefore
+seats support ordering on an admitted Table model, dom/wdeg on other satisfaction
+models and the selector bandit on optimization.
 
 The satisfaction backtrack palette includes conservative LP after default and
 aggressive LP; applicability, model class and LP ceilings order and filter it. Root
