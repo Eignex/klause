@@ -34,7 +34,6 @@ internal class LocalSearchWorkerConfig private constructor(
     val nodeBudget: NodeBudget?,
     private val reportResiduals: Boolean,
     private val reportPhaseTimes: Boolean,
-    private val seedOffset: Int,
     private val numericalCompletion: Boolean,
     private val toleranceCheck: ((Sample) -> Boolean)?,
     private val bufferedPublications: Boolean,
@@ -46,34 +45,33 @@ internal class LocalSearchWorkerConfig private constructor(
         nodeBudget: NodeBudget? = null,
         reportResiduals: Boolean = false,
         reportPhaseTimes: Boolean = false,
-        seedOffset: Int = 0,
         numericalCompletion: Boolean = false,
-    ) : this(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset, numericalCompletion, null, false)
+    ) : this(recipe, nodeBudget, reportResiduals, reportPhaseTimes, numericalCompletion, null, false)
 
     fun withBufferedPublications(): LocalSearchWorkerConfig =
-        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset,
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes,
             numericalCompletion, toleranceCheck, true)
 
     fun withToleranceCheck(check: (Sample) -> Boolean): LocalSearchWorkerConfig =
-        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset,
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes,
             numericalCompletion, check, bufferedPublications)
 
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
-        LocalSearchWorkerConfig(recipe, budget, reportResiduals, reportPhaseTimes, seedOffset,
+        LocalSearchWorkerConfig(recipe, budget, reportResiduals, reportPhaseTimes,
             numericalCompletion, toleranceCheck, bufferedPublications)
 
     fun withNumericalCompletion(): LocalSearchWorkerConfig =
-        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset, true,
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, true,
             toleranceCheck, bufferedPublications)
 
     override val label: String get() = recipe.label
 
     override fun withLsResiduals(): LocalSearchWorkerConfig =
-        LocalSearchWorkerConfig(recipe, nodeBudget, true, reportPhaseTimes, seedOffset,
+        LocalSearchWorkerConfig(recipe, nodeBudget, true, reportPhaseTimes,
             numericalCompletion, toleranceCheck, bufferedPublications)
 
     override fun withLsPhaseTimes(): LocalSearchWorkerConfig =
-        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, true, seedOffset,
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, true,
             numericalCompletion, toleranceCheck, bufferedPublications)
 
     internal fun materializeObjectiveCoordinates(
@@ -156,7 +154,7 @@ internal class LocalSearchWorkerConfig private constructor(
         }.session()
         val workerLabel = "ls/$label"
         val params = LocalSearchParams(
-            randomSeed = seed + index + seedOffset,
+            randomSeed = seed + index,
             costShaping = CostShaping.Linear(lambda = lsLambda),
             // The per-move gradient view of the objective, when the model provides one.
             lsObjective = lsObjective,
