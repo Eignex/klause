@@ -556,7 +556,8 @@ diagnostic invocation; an incomplete trace cannot establish exhaustive applicabi
 
 Native forgetting starts at restart boundaries with a configured cap. A resumable
 root continues a pending window before branching while its row, heap or cleanup
-state advances. Each attempt keeps the same bounded work and scratch allowance and
+state advances, taking each further attempt inside the same slice until the slice
+expires. Each attempt keeps the same bounded work and scratch allowance and
 debits the containing slice. Cleanup polls cancellation before every bounded
 mutation. Its first 64 polls read the session and caller tokens; later polls read
 them once per 64, so a request arriving mid-window is observed within that many steps. A completed pass waits for the next restart before
