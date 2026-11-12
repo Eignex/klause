@@ -38,6 +38,13 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
     fun proposeActiveRows(model: QuadraticModel, start: List<Double>, iterations: Int = 32): List<Int>? {
         control.step()
         require(start.size == model.dimension && iterations >= 0)
+        val numeric = prepare(model, start) ?: return null
+        val point = start.toDoubleArray()
+        if (!improve(numeric, point, iterations)) return null
+        return activeRows(numeric, point)
+    }
+
+    private fun prepare(model: QuadraticModel, start: List<Double>): NumericalProposal? {
         val hessian = model.hessian.map { row -> DoubleArray(row.size) { row[it].toDouble() } }
         val linear = model.linear.let { values -> DoubleArray(values.size) { values[it].toDouble() } }
         val rows = model.rows
@@ -53,30 +60,53 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
         for (row in coefficients) for (value in row) { control.step(); norm += 16.0 * value * value }
         if (!norm.isFinite()) return null
         val step = 1.0 / max(1.0, norm)
-        val point = start.toDoubleArray()
+        return NumericalProposal(hessian, linear, rows, coefficients, rhs, step)
+    }
+
+    private fun improve(numeric: NumericalProposal, point: DoubleArray, iterations: Int): Boolean {
         val gradient = DoubleArray(point.size)
         repeat(iterations) {
-            for (i in point.indices) gradient[i] = dot(linear[i], hessian[i], point)
-            if (gradient.any { !it.isFinite() }) return null
-            for (j in rows.indices) {
-                val residual = dot(-rhs[j], coefficients[j], point)
-                if (!residual.isFinite()) return null
-                if (rows[j].relation == QuadraticRowRelation.EQ || residual > 0.0) {
-                    val penalty = 16.0 * residual
-                    if (!penalty.isFinite()) return null
-                    axpy(penalty, coefficients[j], gradient)
-                }
-            }
-            if (gradient.any { !it.isFinite() }) return null
-            axpy(-step, gradient, point)
-            if (point.any { !it.isFinite() }) return null
+            for (i in point.indices) gradient[i] = dot(numeric.linear[i], numeric.hessian[i], point)
+            if (gradient.any { !it.isFinite() } || !penalize(numeric, point, gradient)) return false
+            if (gradient.any { !it.isFinite() }) return false
+            axpy(-numeric.step, gradient, point)
+            if (point.any { !it.isFinite() }) return false
         }
-        return rows.indices.filter { j ->
-            val residual = dot(-rhs[j], coefficients[j], point)
-            if (!residual.isFinite()) return null
-            rows[j].relation == QuadraticRowRelation.EQ || residual >= -1e-6
-        }.also { control.poll() }
+        return true
     }
+
+    private fun penalize(numeric: NumericalProposal, point: DoubleArray, gradient: DoubleArray): Boolean {
+        for (j in numeric.rows.indices) {
+            val residual = dot(-numeric.rhs[j], numeric.coefficients[j], point)
+            if (!residual.isFinite()) return false
+            if (numeric.rows[j].relation == QuadraticRowRelation.EQ || residual > 0.0) {
+                val penalty = 16.0 * residual
+                if (!penalty.isFinite()) return false
+                axpy(penalty, numeric.coefficients[j], gradient)
+            }
+        }
+        return true
+    }
+
+    private fun activeRows(numeric: NumericalProposal, point: DoubleArray): List<Int>? {
+        val active = mutableListOf<Int>()
+        for (j in numeric.rows.indices) {
+            val residual = dot(-numeric.rhs[j], numeric.coefficients[j], point)
+            if (!residual.isFinite()) return null
+            if (numeric.rows[j].relation == QuadraticRowRelation.EQ || residual >= -1e-6) active += j
+        }
+        control.poll()
+        return active
+    }
+
+    private class NumericalProposal(
+        val hessian: List<DoubleArray>,
+        val linear: DoubleArray,
+        val rows: List<QuadraticRow>,
+        val coefficients: List<DoubleArray>,
+        val rhs: DoubleArray,
+        val step: Double,
+    )
 
     private fun dot(initial: Double, left: DoubleArray, right: DoubleArray): Double {
         if (left.isEmpty()) return initial
