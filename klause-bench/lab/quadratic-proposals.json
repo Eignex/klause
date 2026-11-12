@@ -1,0 +1,9 @@
+{
+  "main": "com.eignex.klause.bench.profile.QuadraticProposalAdapterKt",
+  "sourceHistory": "snapshot",
+  "classpath": ["klause-bench/build/install/klause-bench/lib/*"],
+  "buildTasks": [":klause-bench:installDist"],
+  "jvmArgs": ["-Xmx2048m", "-XX:ActiveProcessorCount=1", "-XX:+UseSerialGC", "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector"],
+  "runtime": {"java": 25, "tools": [], "environment": {}},
+  "workspaceInputs": [".git", "klause-bench/build/install"]
+}
