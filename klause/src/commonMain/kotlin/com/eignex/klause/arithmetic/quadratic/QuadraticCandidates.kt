@@ -1,7 +1,8 @@
 package com.eignex.klause.arithmetic.quadratic
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.koblas.koblas
+import com.eignex.koblas.engine.BuiltinEngines
+import com.eignex.koblas.engine.EngineImplementation
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -84,7 +85,7 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
         while (offset < left.size) {
             val count = minOf(KERNEL_SLICE, left.size - offset)
             repeat(count) { control.step() }
-            result += koblas.dot(left, offset, right, offset, count)
+            result += proposalEngine.dot(left, offset, right, offset, count)
             offset += count
         }
         return result
@@ -95,7 +96,7 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
         while (offset < source.size) {
             val count = minOf(KERNEL_SLICE, source.size - offset)
             repeat(count) { control.step() }
-            koblas.axpy(destination, offset, alpha, source, offset, count)
+            proposalEngine.axpy(destination, offset, alpha, source, offset, count)
             offset += count
         }
     }
@@ -127,6 +128,13 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
     }
 
     private companion object {
+        val proposalEngine by lazy {
+            requireNotNull(BuiltinEngines.simd) { "Quadratic proposals require the JVM SIMD engine" }.also {
+                check(it.id == "jvm-simd")
+                check(EngineImplementation.Dot in it.implementations && EngineImplementation.Axpy in it.implementations)
+            }
+        }
+
         // Precharging bounds cancellation latency without changing per-entry work or polling callbacks.
         const val KERNEL_SLICE = 256
     }
