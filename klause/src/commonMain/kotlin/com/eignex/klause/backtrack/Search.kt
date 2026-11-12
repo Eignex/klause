@@ -644,14 +644,24 @@ private class CpSatisfactionTraversalPolicy(
         return if (simplified == SearchRunDisposition.Continue) capContinuation(cursor, heap, operation) else simplified
     }
 
-    private fun capContinuation(cursor: Long, heap: Long, operation: Long): SearchRunDisposition =
-        if (session.nativeCapWindowPending && slice?.pauses() == true &&
-            (session.nativeCapContinuationCursor != cursor || session.nativeCapContinuationHeap != heap ||
-                session.nativeCapContinuationOperation != operation)) {
-            SearchRunDisposition.Pause
-        } else {
-            SearchRunDisposition.Continue
+    // A pending window that advanced takes its next bounded attempt inside the same slice. Yielding the slice at
+    // every restart would split the search into segments too short to earn their share of the schedule.
+    private fun capContinuation(cursor: Long, heap: Long, operation: Long): SearchRunDisposition {
+        var seenCursor = cursor
+        var seenHeap = heap
+        var seenOperation = operation
+        while (session.nativeCapWindowPending && slice?.pauses() == true &&
+            (session.nativeCapContinuationCursor != seenCursor || session.nativeCapContinuationHeap != seenHeap ||
+                session.nativeCapContinuationOperation != seenOperation)
+        ) {
+            if (params.cancellation()) return SearchRunDisposition.Pause
+            seenCursor = session.nativeCapContinuationCursor
+            seenHeap = session.nativeCapContinuationHeap
+            seenOperation = session.nativeCapContinuationOperation
+            forgetIfOverCap(session, params, inprocessing?.retainsPublication == true)
         }
+        return SearchRunDisposition.Continue
+    }
 
     private fun simplify(context: SearchContext, restart: Boolean): SearchRunDisposition {
         learnedMemory.run(session, params, inprocessing, sink?.search)
