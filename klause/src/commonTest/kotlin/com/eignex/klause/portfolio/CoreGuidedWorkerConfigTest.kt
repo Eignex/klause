@@ -160,4 +160,18 @@ class CoreGuidedWorkerConfigTest {
         handle.close()
         worker.close()
     }
+
+    @Test
+    fun `costs of one magnitude should count as uniform`() {
+        val cases = listOf(
+            LinearObjective(longArrayOf(1, 0, 1)) to true,
+            LinearObjective(longArrayOf(3, -3), intCoefficients = longArrayOf(3)) to true,
+            LinearObjective(longArrayOf(1, 2)) to false,
+            LinearObjective(longArrayOf(1), intCoefficients = longArrayOf(2)) to false,
+            LinearObjective(longArrayOf(0, 0)) to false,
+        )
+        for ((objective, expected) in cases) {
+            assertEquals(expected, objective.uniformCosts, "$objective")
+        }
+    }
 }

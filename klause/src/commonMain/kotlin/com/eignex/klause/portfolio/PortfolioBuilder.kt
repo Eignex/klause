@@ -150,7 +150,8 @@ object PortfolioBuilder {
                 ) else config
                 val admitted = when {
                     config is CoreGuidedWorkerConfig && deferCore ->
-                        scenario.diagnosticWorkLimit?.let { config.withWorkLimit(it) } ?: config.withActiveTimeLimit()
+                        scenario.diagnosticWorkLimit?.let { config.withWorkLimit(it) }
+                            ?: config.withActiveTimeLimit(objective?.uniformCosts == true)
                     observed is AlnsWorkerConfig && scenario.diagnosticWorkLimit != null ->
                         observed.withWorkScheduling()
                     else -> observed

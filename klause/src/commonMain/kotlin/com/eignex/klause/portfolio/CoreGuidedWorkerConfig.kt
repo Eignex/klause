@@ -29,8 +29,16 @@ internal class CoreGuidedWorkerConfig(
     override fun withCoreRefinement(mode: CoreRefinementMode): CoreGuidedWorkerConfig =
         CoreGuidedWorkerConfig(nodeBudget, maximumWork, maximumMillis, mode, edit)
 
-    internal fun withActiveTimeLimit(): CoreGuidedWorkerConfig =
-        CoreGuidedWorkerConfig(nodeBudget, maximumWork, 2_000L, coreRefinement, edit)
+    /** Bounds the worker's active time. Under [uniformCosts] every core raises the floor by the same step over
+     *  a short cost range, so the worker converges and keeps a longer lifetime; nonuniform costs split weights
+     *  and take the time from the incumbent search. */
+    internal fun withActiveTimeLimit(uniformCosts: Boolean): CoreGuidedWorkerConfig = CoreGuidedWorkerConfig(
+        nodeBudget,
+        maximumWork,
+        if (uniformCosts) UNIFORM_ACTIVE_MILLIS else ACTIVE_MILLIS,
+        coreRefinement,
+        edit,
+    )
 
     internal fun withWorkLimit(limit: Long): CoreGuidedWorkerConfig =
         CoreGuidedWorkerConfig(nodeBudget, limit, null, coreRefinement, edit)
@@ -81,3 +89,18 @@ internal class CoreGuidedWorkerConfig(
         return worker
     }
 }
+
+private const val ACTIVE_MILLIS = 2_000L
+private const val UNIFORM_ACTIVE_MILLIS = 12_000L
+
+/** Whether every nonzero Boolean and integer cost has the same magnitude. */
+internal val LinearObjective.uniformCosts: Boolean
+    get() {
+        var magnitude = 0L
+        for (cost in boolWeightValues.asSequence() + intCoefficientValues.asSequence()) {
+            if (cost == 0L) continue
+            val size = if (cost < 0L) -cost else cost
+            if (magnitude == 0L) magnitude = size else if (size != magnitude) return false
+        }
+        return magnitude != 0L
+    }
