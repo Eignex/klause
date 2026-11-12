@@ -71,7 +71,7 @@ class SourceSearchAdmissionTest {
     }
 
     @Test
-    fun `source circuit search should retain first fail admission after affine successor normalization`() {
+    fun `source circuit search should seat its annotation after affine successor normalization`() {
         for (predicate in listOf("circuit", "subcircuit")) {
             val program = parseFlatZinc(
                 "array [1..3] of var 1..3: p; var 0..2: cost; " +
@@ -103,9 +103,9 @@ class SourceSearchAdmissionTest {
                 assertEquals(VariableSelection.InputOrder, hints.tiers.last().varSelector)
                 assertIs<TieredVariableSelector>(annotation.variableSelector)
                 assertIs<SolutionGuided>(annotation.valueSelector)
-                val generic = workers.single { it.label == "bt/first-fail" }
-                assertFalse(generic.improvementOnly)
-                assertTrue(generic.permitsSourceProofs)
+                val source = workers.single { it.label == "bt/annotation" }
+                assertFalse(source.improvementOnly)
+                assertTrue(source.permitsSourceProofs)
             } finally {
                 workers.forEach { it.close() }
             }

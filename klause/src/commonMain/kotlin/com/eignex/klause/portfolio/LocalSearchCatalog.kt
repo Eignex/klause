@@ -23,6 +23,7 @@ import com.eignex.klause.localsearch.strategy.SimulatedAnnealing
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.localsearch.strategy.WalkSat
 import com.eignex.klause.solver.ProblemClass
+import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.util.ArmCatalog
 
 /**
@@ -235,6 +236,21 @@ object LocalSearchCatalog {
         return lead.filter { it in order } + order.filter { it !in lead }
     }
 
+    /** [rankedArms] for the model classified as [profile]. A scheduling optimization leads with the
+     *  primary-repair plateau neighbourhood beside the full one, both on iterated restarts. */
+    internal fun rankedArms(kind: Kind, profile: ProblemProfile): List<LocalSearchArm> {
+        val order = rankedArms(kind, profile.problemClass)
+        if (kind != Kind.COP || !profile.scheduling) return order
+        val lead = listOf(LocalSearchArm.CblsPrimaryPlateauIlsBasin, LocalSearchArm.CblsPlateauIlsBasin)
+        return lead + order.filter { it !in lead }
+    }
+
+    /** A fresh recipe for [arm]. */
+    internal fun recipe(arm: LocalSearchArm): LocalSearchRecipe = make(arm)
+
+    /** The arm named [label], or null for a recipe the catalog does not hold. */
+    internal fun armOf(label: String): LocalSearchArm? = LocalSearchArm.entries.firstOrNull { it.label == label }
+
     private val catalog = ArmCatalog(LocalSearchArm.entries, LocalSearchArm::label, ::make)
 
     /** A fresh recipe for the arm named [label] (the single string boundary). */
@@ -265,37 +281,38 @@ object LocalSearchCatalog {
 /**
  * Typed identity of every catalog arm — the catalog's keys. [LocalSearchCatalog.ranked] /
  * [LocalSearchCatalog.diverse] order and instantiate these per [Kind] via [LocalSearchCatalog]; [label]
- * is the external name (CLI / telemetry).
+ * is the external name (CLI / telemetry). [role] is what the arm covers in a roster: an arm whose restarts
+ * perturb its incumbents improves a neighbourhood, and every other arm searches for a first solution.
  */
-internal enum class LocalSearchArm(val label: String) {
-    CblsFixed("cbls/fixed"),
-    ProbsatPlain("probsat/plain"),
-    AdaptiveProbsatFixed("adaptive-probsat/fixed"),
-    CblsPlateauIlsBasin("cbls-plateau/ils-basin"),
-    CblsPrimaryPlateauIlsBasin("cbls-primary-plateau/ils-basin"),
-    CblsChainNoinvFixed("cbls-chain-noinv/fixed"),
-    CblsChainIlsBasin("cbls-chain/ils-basin"),
-    CblsPlateauSmoothFixed("cbls-plateau-smooth/fixed"),
-    CblsPlateauFixed("cbls-plateau/fixed"),
-    CblsSmoothIlsBasin("cbls-smooth/ils-basin"),
-    SaAdaptivePerturb("sa/adaptive-perturb"),
-    CblsStallslowFixed("cbls-stallslow/fixed"),
-    CblsLonoiseFixed("cbls-lonoise/fixed"),
-    WalksatCcLuby("walksat-cc/luby"),
-    CblsHinoiseFixed("cbls-hinoise/fixed"),
-    CblsNotabuFixed("cbls-notabu/fixed"),
-    SaFixed("sa/fixed"),
-    CblsPlateau64Fixed("cbls-plateau64/fixed"),
-    CblsRawFixed("cbls-raw/fixed"),
-    CblsTenure3Fixed("cbls-tenure3/fixed"),
-    CblsIlsBandit("cbls/ils-bandit"),
-    ProbsatBanditFixed("probsat-bandit/fixed"),
-    CblsImplicitFixed("cbls-implicit/fixed"),
-    CblsCliqueFixed("cbls-clique/fixed"),
-    FeasibilityJumpFixed("fjump/fixed"),
-    CblsFlipPropFixed("cbls-flipprop/fixed"),
-    CblsHotpairFixed("cbls-hotpair/fixed"),
-    CblsExtendedFixed("cbls-extended/fixed"),
-    SaReheatFixed("sa-reheat/fixed"),
-    SaPhasedFixed("sa-phased/fixed"),
+internal enum class LocalSearchArm(val label: String, val role: ArmRole) {
+    CblsFixed("cbls/fixed", ArmRole.FirstSolution),
+    ProbsatPlain("probsat/plain", ArmRole.FirstSolution),
+    AdaptiveProbsatFixed("adaptive-probsat/fixed", ArmRole.FirstSolution),
+    CblsPlateauIlsBasin("cbls-plateau/ils-basin", ArmRole.NeighbourhoodImprovement),
+    CblsPrimaryPlateauIlsBasin("cbls-primary-plateau/ils-basin", ArmRole.FirstSolution),
+    CblsChainNoinvFixed("cbls-chain-noinv/fixed", ArmRole.FirstSolution),
+    CblsChainIlsBasin("cbls-chain/ils-basin", ArmRole.NeighbourhoodImprovement),
+    CblsPlateauSmoothFixed("cbls-plateau-smooth/fixed", ArmRole.FirstSolution),
+    CblsPlateauFixed("cbls-plateau/fixed", ArmRole.FirstSolution),
+    CblsSmoothIlsBasin("cbls-smooth/ils-basin", ArmRole.NeighbourhoodImprovement),
+    SaAdaptivePerturb("sa/adaptive-perturb", ArmRole.NeighbourhoodImprovement),
+    CblsStallslowFixed("cbls-stallslow/fixed", ArmRole.FirstSolution),
+    CblsLonoiseFixed("cbls-lonoise/fixed", ArmRole.FirstSolution),
+    WalksatCcLuby("walksat-cc/luby", ArmRole.FirstSolution),
+    CblsHinoiseFixed("cbls-hinoise/fixed", ArmRole.FirstSolution),
+    CblsNotabuFixed("cbls-notabu/fixed", ArmRole.FirstSolution),
+    SaFixed("sa/fixed", ArmRole.FirstSolution),
+    CblsPlateau64Fixed("cbls-plateau64/fixed", ArmRole.FirstSolution),
+    CblsRawFixed("cbls-raw/fixed", ArmRole.FirstSolution),
+    CblsTenure3Fixed("cbls-tenure3/fixed", ArmRole.FirstSolution),
+    CblsIlsBandit("cbls/ils-bandit", ArmRole.NeighbourhoodImprovement),
+    ProbsatBanditFixed("probsat-bandit/fixed", ArmRole.FirstSolution),
+    CblsImplicitFixed("cbls-implicit/fixed", ArmRole.FirstSolution),
+    CblsCliqueFixed("cbls-clique/fixed", ArmRole.FirstSolution),
+    FeasibilityJumpFixed("fjump/fixed", ArmRole.FirstSolution),
+    CblsFlipPropFixed("cbls-flipprop/fixed", ArmRole.FirstSolution),
+    CblsHotpairFixed("cbls-hotpair/fixed", ArmRole.FirstSolution),
+    CblsExtendedFixed("cbls-extended/fixed", ArmRole.FirstSolution),
+    SaReheatFixed("sa-reheat/fixed", ArmRole.FirstSolution),
+    SaPhasedFixed("sa-phased/fixed", ArmRole.FirstSolution),
 }

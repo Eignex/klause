@@ -29,10 +29,11 @@ import com.eignex.klause.util.ArmCatalog
  * outside `klause` (the CLI) resolves named backtrack pools through here into `PortfolioScenario.btPool`.
  *
  * **Per-kind ranking** ([ranked]): SAT-optimized first (the pigeonhole guard), the conflict-driven
- * workhorse, the LP-intensity spread, LinUCB routing, the free engine, the restart-level selector portfolio,
- * and the dom-wdeg / first-fail / activity heuristic arms. A CSP ranks fewer LP arms and no LinUCB (it has no
- * bound to exploit). Clausal satisfaction leads with its clause-only proof recipe. A pool built for a
- * model keeps only the arms whose needs the model offers.
+ * workhorse, the LP-intensity spread from the default emphasis, then the selector arms: the restart-level
+ * selector portfolio, LinUCB routing and the free engine for optimization, dom-wdeg and first-fail for
+ * satisfaction. A CSP ranks fewer LP arms and no LinUCB (it has no bound to exploit). Clausal satisfaction
+ * leads with its clause-only proof recipe. A pool built for a model keeps only the arms whose needs the
+ * model offers.
  */
 object BacktrackCatalog {
 
@@ -197,13 +198,13 @@ object BacktrackCatalog {
     private val copOrder = listOf(
         BacktrackArm.SatOptimized,
         BacktrackArm.ConflictDriven,
-        BacktrackArm.LpAggressive,
         BacktrackArm.LpDefault,
+        BacktrackArm.LpAggressive,
         BacktrackArm.LpLbTree,
         BacktrackArm.LpConservative,
+        BacktrackArm.SelectorSwitch,
         BacktrackArm.LinUcb,
         BacktrackArm.Free,
-        BacktrackArm.SelectorSwitch,
         BacktrackArm.DomWdeg,
         BacktrackArm.FirstFail,
         BacktrackArm.Activity,
@@ -224,10 +225,10 @@ object BacktrackCatalog {
         BacktrackArm.LpDefault,
         BacktrackArm.LpAggressive,
         BacktrackArm.LpConservative,
-        BacktrackArm.Free,
-        BacktrackArm.SelectorSwitch,
         BacktrackArm.DomWdeg,
         BacktrackArm.FirstFail,
+        BacktrackArm.Free,
+        BacktrackArm.SelectorSwitch,
         BacktrackArm.Activity,
         BacktrackArm.ClausalBalanced,
         BacktrackArm.ClausalStable,
@@ -236,19 +237,6 @@ object BacktrackCatalog {
     private fun rankedArms(kind: Kind): List<BacktrackArm> = when (kind) {
         Kind.COP -> copOrder
         Kind.CSP -> cspOrder
-    }
-
-    /**
-     * [rankedArms] with [BacktrackArm.LpDefault] third when the model has continuous columns. A row that
-     * touches a real column never propagates in CP, so on such a model node LP is the only propagation those
-     * rows get. The two LP-free cores keep their slots for incumbent search; [PortfolioComposition]
-     * appends an applicable LP arm to a curated sequential mixed pool that has not admitted it.
-     */
-    private fun rankedArms(kind: Kind, realColumns: Boolean): List<BacktrackArm> {
-        val order = rankedArms(kind)
-        if (!realColumns) return order
-        val rest = order.filter { it != BacktrackArm.LpDefault }
-        return rest.take(2) + BacktrackArm.LpDefault + rest.drop(2)
     }
 
     private val catalog = ArmCatalog(BacktrackArm.entries, BacktrackArm::label, ::make)
@@ -262,28 +250,30 @@ object BacktrackCatalog {
     /** A fresh recipe for the arm named [label] (CLI `bt-arm=` boundary). */
     fun byLabel(label: String): BacktrackRecipe = catalog.byLabel(label)
 
-    /** One fresh recipe for every arm of [kind], in credit order; see [rankedArms] for [realColumns]. */
-    fun ranked(kind: Kind, realColumns: Boolean = false): List<BacktrackRecipe> =
-        catalog.ranked(rankedArms(kind, realColumns))
+    /** One fresh recipe for every arm of [kind], in credit order. */
+    fun ranked(kind: Kind): List<BacktrackRecipe> = catalog.ranked(rankedArms(kind))
 
     /** One fresh recipe for every arm of [kind] the model behind [facts] offers the needs of, in credit order. */
-    internal fun ranked(kind: Kind, facts: ProblemFacts): List<BacktrackRecipe> {
-        val order = rankedArms(kind, facts.profile.realColumns)
-        // Clausal satisfaction leads with its clause-only proof recipe. A finite-CP optimization pool over
-        // non-binary integers ranks LP second, beside its SAT guard: the LP arm finds witnesses the LP-free
-        // cores miss, without probing an entire intensity palette.
+    internal fun ranked(kind: Kind, facts: ProblemFacts): List<BacktrackRecipe> =
+        catalog.ranked(rankedArms(kind, facts))
+
+    /** The arms of [kind] the model behind [facts] offers the needs of, in credit order. Clausal satisfaction
+     *  leads with its clause-only proof recipe. */
+    internal fun rankedArms(kind: Kind, facts: ProblemFacts): List<BacktrackArm> {
+        val order = rankedArms(kind)
         val ranked = if (kind == Kind.CSP && facts.profile.problemClass == ProblemClass.Sat) {
             listOf(BacktrackArm.ClausalBalanced) + order.filter { it != BacktrackArm.ClausalBalanced }
-        } else if (kind == Kind.COP && facts.profile.problemClass == ProblemClass.FiniteCp &&
-            !facts.binaryIntegers
-        ) {
-            val rest = order.filter { it != BacktrackArm.LpDefault }
-            rest.take(1) + BacktrackArm.LpDefault + rest.drop(1)
         } else {
             order
         }
-        return catalog.ranked(ranked.filter { facts.eligibility(it.label, it.needs).admitted })
+        return ranked.filter { facts.eligibility(it.label, it.needs).admitted }
     }
+
+    /** A fresh recipe for [arm]. */
+    internal fun recipe(arm: BacktrackArm): BacktrackRecipe = make(arm)
+
+    /** The arm named [label], or null for a recipe the catalog does not hold. */
+    internal fun armOf(label: String): BacktrackArm? = BacktrackArm.entries.firstOrNull { it.label == label }
 
     /** Per-arm recipe factories for [kind], in credit order — each builds a fresh recipe (the factory
      *  shape the CLI feeds to `PortfolioScenario.btPool`). */
@@ -294,25 +284,30 @@ object BacktrackCatalog {
  * Typed identity of every backtrack catalog arm — the backtrack counterpart of
  * [LocalSearchArm]. [BacktrackCatalog] orders and instantiates these;
  * [label] is the external name (CLI `bt-arm=` / telemetry), kept in lockstep with the built
- * recipe's label. [needs] is what the arm needs from a model to differ from the arm it is built on.
+ * recipe's label. [role] is what the arm covers in a roster; [needs] is what the arm needs from a model to
+ * differ from the arm it is built on.
  */
-internal enum class BacktrackArm(val label: String, val needs: Set<ArmNeed> = emptySet()) {
-    SatOptimized("satOptimized"),
-    ClausalBalanced("clausal-balanced", setOf(ArmNeed.Clausal)),
-    ClausalStable("clausal-stable", setOf(ArmNeed.Clausal)),
-    ConflictDriven("conflictDriven"),
-    SupportAware("support-aware", setOf(ArmNeed.ExtensionalSupports)),
-    PropagationGuided("propagation-guided", setOf(ArmNeed.ExtensionalSupports)),
-    CoreGuided("core-guided", setOf(ArmNeed.BooleanObjective)),
-    LpAggressive("lp-aggressive", setOf(ArmNeed.Relaxation(LpEmphasis.AGGRESSIVE))),
-    LpDefault("lp-default", setOf(ArmNeed.Relaxation(LpEmphasis.DEFAULT))),
-    LpLbTree("lp-lbtree", setOf(ArmNeed.Objective, ArmNeed.Relaxation(LpEmphasis.DEFAULT))),
-    LpConservative("lp-conservative", setOf(ArmNeed.Relaxation(LpEmphasis.CONSERVATIVE))),
-    LinUcb("linucb"),
-    Free("free"),
-    SelectorSwitch("selector-switch"),
-    DomWdeg("domwdeg"),
-    FirstFail("first-fail"),
-    Activity("activity"),
-    ObjectiveGuided("objective-guided", setOf(ArmNeed.Objective)),
+internal enum class BacktrackArm(val label: String, val role: ArmRole, val needs: Set<ArmNeed> = emptySet()) {
+    SatOptimized("satOptimized", ArmRole.LearningProof),
+    ClausalBalanced("clausal-balanced", ArmRole.LearningProof, setOf(ArmNeed.Clausal)),
+    ClausalStable("clausal-stable", ArmRole.LearningProof, setOf(ArmNeed.Clausal)),
+    ConflictDriven("conflictDriven", ArmRole.LearningProof),
+    SupportAware("support-aware", ArmRole.SelectorDiversity, setOf(ArmNeed.ExtensionalSupports)),
+    PropagationGuided("propagation-guided", ArmRole.SelectorDiversity, setOf(ArmNeed.ExtensionalSupports)),
+    CoreGuided("core-guided", ArmRole.ObjectiveCores, setOf(ArmNeed.BooleanObjective)),
+    LpAggressive("lp-aggressive", ArmRole.LpBounding, setOf(ArmNeed.Relaxation(LpEmphasis.AGGRESSIVE))),
+    LpDefault("lp-default", ArmRole.LpBounding, setOf(ArmNeed.Relaxation(LpEmphasis.DEFAULT))),
+    LpLbTree(
+        "lp-lbtree",
+        ArmRole.LpBounding,
+        setOf(ArmNeed.Objective, ArmNeed.Relaxation(LpEmphasis.DEFAULT)),
+    ),
+    LpConservative("lp-conservative", ArmRole.LpBounding, setOf(ArmNeed.Relaxation(LpEmphasis.CONSERVATIVE))),
+    LinUcb("linucb", ArmRole.SelectorDiversity),
+    Free("free", ArmRole.SelectorDiversity),
+    SelectorSwitch("selector-switch", ArmRole.SelectorDiversity),
+    DomWdeg("domwdeg", ArmRole.SelectorDiversity),
+    FirstFail("first-fail", ArmRole.SelectorDiversity),
+    Activity("activity", ArmRole.SelectorDiversity),
+    ObjectiveGuided("objective-guided", ArmRole.SelectorDiversity, setOf(ArmNeed.Objective)),
 }

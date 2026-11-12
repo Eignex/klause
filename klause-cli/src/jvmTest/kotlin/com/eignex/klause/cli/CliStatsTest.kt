@@ -45,6 +45,17 @@ import kotlin.time.Duration
 
 class CliStatsTest {
     @Test
+    fun `arm output should lead with the role the arm declares`() {
+        val arm = ArmSchedule(label = "bt/lp-default", segments = 1, work = 1, meanReward = 0.0,
+            failures = 0, credit = emptyMap(), role = "lp-bounding")
+
+        val line = portfolioStatPairs(SolveStats(portfolio = PortfolioStats(arms = listOf(arm))))
+            .toMap().getValue("arm.bt/lp-default")
+
+        assertTrue(line.startsWith("role=lp-bounding segments=1 "))
+    }
+
+    @Test
     fun `arm output should distinguish queued incumbent offers checks and installations`() {
         val arm = ArmSchedule(label = "ls/cbls/fixed", segments = 1, work = 1, meanReward = 0.0,
             failures = 0, credit = emptyMap(), sharing = SharingStats(incumbents =

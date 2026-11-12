@@ -128,8 +128,7 @@ object PortfolioBuilder {
         val selectedSweep = views?.sweep ?: definitionalSweep
         val selectedObjective = views?.objective ?: lsObjective
         val count = maxOf(configs.size, scenario.cores)
-        val deferCore = scenario.cores == 1 && scenario.engine == EngineMix.MIXED &&
-            scenario.btPool == null && configs.any { it is BacktrackWorkerConfig }
+        val deferCore = scenario.cores == 1 && scenario.engine == EngineMix.MIXED && scenario.btPool == null
         val pools = poolsFor(
             scenario,
             problem,
@@ -184,6 +183,7 @@ object PortfolioBuilder {
                     selectedSweep, onEvent, pools,
                 )
                 worker.bindEvidence(ModelIdentity.of(problem, objective)).also {
+                    it.role = plan.roles[armId]
                     it.earlyCoreTrial = config is CoreGuidedWorkerConfig && deferCore && scenario.earlyCoreAdmission
                     it.retainInitialProofCoverage = config is CoreGuidedWorkerConfig && deferCore
                     it.improvementOnly = if (config is CoreGuidedWorkerConfig && deferCore) {
@@ -203,7 +203,7 @@ object PortfolioBuilder {
                         sourceMapping = if (privateCoordinates) WorkerSourceMapping.CHECKED_RECONSTRUCTION
                         else WorkerSourceMapping.WORKING_COORDINATES)
                     observe("portfolio", SearchEvent.WorkerAdmission(config.label, true,
-                        requirements.toString(), emptyList(), selected = true))
+                        requirements.toString(), emptyList(), selected = true, role = plan.roles[armId]?.label))
                 }
                 worker
             }

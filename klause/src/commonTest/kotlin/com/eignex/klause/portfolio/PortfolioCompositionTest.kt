@@ -21,25 +21,6 @@ import kotlin.test.assertTrue
 
 class PortfolioCompositionTest {
     @Test
-    fun `default table satisfaction pools should schedule one support aware worker within the containing allowance`() {
-        val budget = NodeBudget(limit = 100)
-        val facts = ProblemFacts(ProblemFacts.assumed(Kind.CSP).profile, extensionalSupports = true) { false }
-        for (engine in listOf(EngineMix.BACKTRACK, EngineMix.MIXED)) {
-            val scenario = PortfolioScenario.sequential(Kind.CSP, engine = engine).copy(nodeBudget = budget)
-
-            val plan = PortfolioComposition.plan(scenario, facts)
-            val complete = plan.arms.filterIsInstance<BacktrackWorkerConfig>()
-
-            assertEquals(scenario.arms, plan.arms.size)
-            assertEquals(listOf("satOptimized", "conflictDriven", "support-aware"), complete.take(3).map { it.label })
-            assertEquals("propagation-guided", complete[3].label)
-            val support = complete.single { it.label == "support-aware" }
-            assertSame(budget, support.recipe.build(3L, null).nodeBudget)
-            assertEquals(plan.arms.size, plan.firstSolutionCount)
-        }
-    }
-
-    @Test
     fun `an explicit table satisfaction pool should keep its selected recipes`() {
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.CSP).profile, extensionalSupports = true) { false }
         val scenario = PortfolioScenario.sequential(Kind.CSP).copy(
@@ -51,68 +32,6 @@ class PortfolioCompositionTest {
         assertTrue(arms.all { it.label == "conflictDriven" })
     }
 
-
-    @Test
-    fun `finite satisfaction should retain classical branching in the existing complete slots`() {
-        val facts = ProblemFacts(ProblemFacts.assumed(Kind.CSP).profile) { false }
-        for (count in listOf(6, 12)) {
-            val scenario = PortfolioScenario.sequential(Kind.CSP, arms = count)
-            val baseline = PortfolioComposition.compose(scenario.copy(btEdit = { it }), facts)
-
-            val plan = PortfolioComposition.plan(scenario, facts)
-            val complete = plan.arms.filterIsInstance<BacktrackWorkerConfig>()
-
-            assertEquals(
-                listOf("satOptimized", "conflictDriven", "domwdeg", "first-fail"),
-                complete.take(4).map { it.label },
-            )
-            assertEquals(1, complete.count { it.label == "domwdeg" })
-            assertEquals(1, complete.count { it.label == "first-fail" })
-            assertEquals(baseline.size, plan.arms.size)
-            assertEquals(
-                baseline.filterIsInstance<LocalSearchWorkerConfig>().map { it.label },
-                plan.arms.filterIsInstance<LocalSearchWorkerConfig>().map { it.label },
-            )
-            assertEquals(plan.arms.size, plan.firstSolutionCount)
-        }
-    }
-
-    @Test
-    fun `finite satisfaction diversity should preserve explicit parallel and small pools`() {
-        val scenario = PortfolioScenario.sequential(Kind.CSP)
-        val facts = ProblemFacts(ProblemFacts.assumed(Kind.CSP).profile) { false }
-        val other = ProblemFacts(ProblemFacts.assumed(Kind.CSP, ProblemClass.MixedInteger).profile) { false }
-        for (control in listOf(
-            scenario.copy(cores = 2),
-            scenario.copy(arms = 5),
-            scenario.copy(engine = EngineMix.BACKTRACK),
-            scenario.copy(btEdit = { it }),
-            scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("free") }),
-            scenario.copy(lsPool = listOf { LocalSearchCatalog.byLabel("cbls/fixed") }),
-            scenario.copy(annotationArm = BacktrackParams()),
-        )) {
-            val expected = PortfolioComposition.compose(control, other).filterIsInstance<BacktrackWorkerConfig>()
-
-            val selected = PortfolioComposition.compose(control, facts).filterIsInstance<BacktrackWorkerConfig>()
-
-            assertEquals(expected.map { it.label }, selected.map { it.label }, control.toString())
-        }
-    }
-
-    @Test
-    fun `satisfaction diversity should preserve LP recipes and other model classes`() {
-        val scenario = PortfolioScenario.sequential(Kind.CSP)
-        val cases = ProblemClass.entries.flatMap { problemClass ->
-            listOf(false, true).map { problemClass to it }
-        }.filter { (problemClass, relaxation) -> problemClass != ProblemClass.FiniteCp || relaxation }
-        for ((problemClass, relaxation) in cases) {
-            val facts = ProblemFacts(ProblemFacts.assumed(Kind.CSP, problemClass).profile) { relaxation }
-
-            val selected = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
-
-            assertEquals(BacktrackCatalog.ranked(Kind.CSP, facts).take(4).map { it.label }, selected.map { it.label })
-        }
-    }
 
     @Test
     fun `finite satisfaction diversity should spend the containing node allowance`() {
@@ -129,204 +48,6 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `annotated finite optimization should admit unrestricted first fail beside source search`() {
-        val annotation = SearchHints(
-            listOf(
-                SearchGroup(intArrayOf(), intArrayOf(0, 1)),
-                SearchGroup(intArrayOf(), intArrayOf(2), VariableSelection.InputOrder),
-            ),
-        ).toBacktrackParams(0, 3)
-        val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = annotation)
-        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { false }
-
-        val plan = PortfolioComposition.plan(scenario, facts)
-
-        assertEquals(listOf("satOptimized", "annotation"), plan.arms.take(2).map { it.label })
-        assertEquals("first-fail", plan.arms.last().label)
-        assertEquals(plan.arms.size, plan.firstSolutionCount)
-        val source = (plan.arms[1] as BacktrackWorkerConfig).recipe.build(1L, null)
-        assertSame(annotation.variableSelector, source.variableSelector)
-        assertSame(annotation.valueSelector, source.valueSelector)
-        val generic = (plan.arms.last() as BacktrackWorkerConfig).recipe.build(1L, null)
-        assertSame(SmallestDomain, generic.variableSelector)
-        assertSame(IndomainMin, generic.valueSelector)
-    }
-
-    @Test
-    fun `tiered first fail should retain unrestricted search diversity`() {
-        val annotation = SearchHints(listOf(SearchGroup(intArrayOf(), intArrayOf(1, 0))))
-            .toBacktrackParams(0, 3)
-        val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = annotation)
-
-        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { true }
-        val composed = PortfolioComposition.compose(scenario, facts)
-
-        assertEquals(1, composed.count { it.label == "first-fail" })
-        assertEquals(1, composed.count { it.label == "annotation" })
-    }
-
-    @Test
-    fun `annotation diversity should preserve other primary branching preferences`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP)
-        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { false }
-        val primaryTiers = listOf(
-            SearchGroup(intArrayOf(0), intArrayOf(), VariableSelection.InputOrder),
-            SearchGroup(intArrayOf(0), intArrayOf()),
-            SearchGroup(intArrayOf(), intArrayOf(0), VariableSelection.InputOrder),
-            SearchGroup(intArrayOf(), intArrayOf(0), valueSelector = ValueSelection.Maximum),
-        )
-        for (primary in primaryTiers) {
-            val annotation = SearchHints(listOf(primary, SearchGroup(intArrayOf(), intArrayOf(1, 2))))
-                .toBacktrackParams(1, 3)
-
-            val composed = PortfolioComposition.compose(scenario.copy(annotationArm = annotation), facts)
-
-            assertEquals(0, composed.count { it.label == "first-fail" })
-            assertEquals(1, composed.count { it.label == "annotation" })
-        }
-    }
-
-    @Test
-    fun `annotation diversity should preserve later source value preferences`() {
-        val annotation = SearchHints(
-            listOf(
-                SearchGroup(intArrayOf(), intArrayOf(0, 1)),
-                SearchGroup(intArrayOf(), intArrayOf(2), VariableSelection.InputOrder, ValueSelection.Maximum),
-            ),
-        ).toBacktrackParams(0, 3)
-        val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = annotation)
-        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { false }
-
-        val composed = PortfolioComposition.compose(scenario, facts)
-
-        assertEquals(0, composed.count { it.label == "first-fail" })
-        assertEquals(1, composed.count { it.label == "annotation" })
-    }
-
-    @Test
-    fun `empty source tiers should not hide the leading integer first fail preference`() {
-        val annotation = SearchHints(
-            listOf(
-                SearchGroup(intArrayOf(), intArrayOf(), VariableSelection.InputOrder),
-                SearchGroup(intArrayOf(), intArrayOf(0, 1)),
-            ),
-        ).toBacktrackParams(0, 3)
-        val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = annotation)
-        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { false }
-
-        val composed = PortfolioComposition.compose(scenario, facts)
-
-        assertEquals(1, composed.count { it.label == "first-fail" })
-    }
-
-    @Test
-    fun `unrestricted annotation should already supply first fail branching`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP).copy(
-            annotationArm = BacktrackParams(variableSelector = SmallestDomain, valueSelector = IndomainMin),
-        )
-
-        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { true }
-        val composed = PortfolioComposition.compose(scenario, facts)
-
-        assertEquals(0, composed.count { it.label == "first-fail" })
-        assertEquals(1, composed.count { it.label == "annotation" })
-    }
-
-    @Test
-    fun `annotation diversity should preserve explicit pools small counts and parallel composition`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP).copy(
-            annotationArm = SearchHints(listOf(SearchGroup(intArrayOf(), intArrayOf(0, 1))))
-                .toBacktrackParams(0, 3),
-        )
-        val controls = listOf(
-            scenario.copy(arms = 1),
-            scenario.copy(cores = 2),
-            scenario.copy(kind = Kind.CSP),
-            scenario.copy(engine = EngineMix.BACKTRACK),
-            scenario.copy(annotationArm = null),
-            scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("conflictDriven") }),
-            scenario.copy(lsPool = listOf { LocalSearchCatalog.byLabel("cbls/fixed") }),
-        )
-
-        for (control in controls) {
-            val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { true }
-            val composed = PortfolioComposition.compose(control, facts)
-
-            assertEquals(0, composed.count { it.label == "first-fail" }, control.toString())
-        }
-    }
-
-    @Test
-    fun `annotation diversity should require nonbinary finite circuit domains`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP).copy(
-            annotationArm = SearchHints(listOf(SearchGroup(intArrayOf(), intArrayOf(0, 1))))
-                .toBacktrackParams(0, 3),
-        )
-        val profile = ProblemFacts.assumed(Kind.COP).profile
-        val controls = ProblemClass.entries.filter { it != ProblemClass.FiniteCp }
-            .map { ProblemFacts(profile.copy(problemClass = it), circuit = true) { true } } +
-            listOf(
-                ProblemFacts(profile, binaryIntegers = true, circuit = true) { true },
-                ProblemFacts(profile) { true },
-            )
-
-        for (facts in controls) {
-            val composed = PortfolioComposition.compose(scenario, facts)
-
-            assertEquals(0, composed.count { it.label == "first-fail" })
-        }
-    }
-
-    @Test
-    fun `expanded annotated pools should admit first fail before any incumbent without duplicating it`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP).copy(
-            annotationArm = SearchHints(listOf(SearchGroup(intArrayOf(), intArrayOf(0, 1))))
-                .toBacktrackParams(0, 3),
-        )
-        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { false }
-        val small = PortfolioComposition.plan(scenario, facts)
-
-        for (count in listOf(9, 30)) {
-            val expanded = PortfolioComposition.plan(scenario.copy(arms = count), facts)
-
-            assertEquals(small.arms.map { it.label }, expanded.arms.take(small.arms.size).map { it.label })
-            assertEquals(1, expanded.arms.count { it.label == "first-fail" })
-            assertEquals(small.firstSolutionCount, expanded.firstSolutionCount)
-        }
-    }
-
-    @Test
-    fun `annotation diversity should spend the containing node allowance`() {
-        val budget = NodeBudget(limit = 100)
-        val scenario = PortfolioScenario.sequential(Kind.COP).copy(
-            annotationArm = SearchHints(listOf(SearchGroup(intArrayOf(), intArrayOf(0, 1))))
-                .toBacktrackParams(0, 3),
-            nodeBudget = budget,
-            lpCeiling = LpConfig.OFF,
-        )
-
-        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { true }
-        val composed = PortfolioComposition.compose(scenario, facts)
-
-        val generic = composed.filterIsInstance<BacktrackWorkerConfig>().single { it.label == "first-fail" }
-        assertSame(budget, generic.recipe.build(1L, null).nodeBudget)
-    }
-
-    @Test
-    fun `integer linear companion should preserve existing worker positions`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP)
-        val profile = ProblemFacts.assumed(Kind.COP).profile
-        val baseline = PortfolioComposition.compose(scenario, ProblemFacts(profile, binaryIntegers = true) { true })
-
-        val composed = PortfolioComposition.compose(
-            scenario,
-            ProblemFacts(profile, binaryIntegers = true, integerLinear = true) { true },
-        )
-
-        assertEquals(baseline.map { it.label } + "lp-aggressive", composed.map { it.label })
-    }
-
-    @Test
     fun `integer linear companion should remain available with cuts disabled`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, integerLinear = true) { true }
@@ -338,149 +59,6 @@ class PortfolioCompositionTest {
         )
 
         assertEquals(baseline.map { it.label }, composed.map { it.label })
-    }
-
-    @Test
-    fun `explicit and parallel integer linear pools should retain their composition`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP)
-        val profile = ProblemFacts.assumed(Kind.COP).profile
-        val baseline = ProblemFacts(profile) { true }
-        val integer = ProblemFacts(profile, integerLinear = true) { true }
-        for (control in listOf(
-            scenario.copy(cores = 2),
-            scenario.copy(engine = EngineMix.BACKTRACK),
-            scenario.copy(kind = Kind.CSP),
-            scenario.copy(arms = 5),
-            scenario.copy(btEdit = { it }),
-            scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("conflictDriven") }),
-            scenario.copy(lsPool = listOf { LocalSearchCatalog.byLabel("cbls/fixed") }),
-            scenario.copy(annotationArm = BacktrackParams()),
-        )) {
-            assertEquals(
-                PortfolioComposition.compose(control, baseline).map { it.label },
-                PortfolioComposition.compose(control, integer).map { it.label },
-            )
-        }
-    }
-
-    @Test
-    fun `Boolean objective pools should retain a core guided proof worker`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP)
-        val ordinary = ProblemFacts.assumed(Kind.COP)
-        val facts = ProblemFacts(ordinary.profile, booleanObjective = true) { true }
-
-        val selected = PortfolioComposition.compose(scenario, facts)
-
-        assertIs<CoreGuidedWorkerConfig>(selected.last())
-        assertEquals(
-            PortfolioComposition.compose(scenario, ordinary).map { it.label },
-            selected.dropLast(1).map { it.label },
-        )
-    }
-
-    @Test
-    fun `finite mixed optimization should admit selector diversity without a relaxation`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP)
-        val profile = ProblemFacts.assumed(Kind.COP).profile
-        val facts = ProblemFacts(profile) { false }
-
-        val plan = PortfolioComposition.plan(scenario, facts)
-
-        assertEquals(
-            listOf("satOptimized", "selector-switch"),
-            plan.arms.filterIsInstance<BacktrackWorkerConfig>().map { it.label },
-        )
-        assertEquals(4, plan.arms.count { it is LocalSearchWorkerConfig })
-    }
-
-    @Test
-    fun `explicit and continuous pools should keep selector switch out of the leading recipes`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP)
-        val profile = ProblemFacts.assumed(Kind.COP).profile
-        val finite = ProblemFacts(profile) { false }
-        val controls = listOf(
-            scenario.copy(cores = 2),
-            scenario.copy(engine = EngineMix.BACKTRACK),
-            scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("conflictDriven") }),
-            scenario.copy(annotationArm = BacktrackParams()),
-        )
-        val composed = controls.map { PortfolioComposition.compose(it, finite) } +
-            listOf(ProblemClass.MixedInteger, ProblemClass.Sat).map { problemClass ->
-                val facts = ProblemFacts(profile.copy(problemClass = problemClass)) { false }
-                PortfolioComposition.compose(scenario, facts)
-            }
-
-        for (arms in composed) {
-            assertTrue(arms.filterIsInstance<BacktrackWorkerConfig>().take(2).none { it.label == "selector-switch" })
-        }
-    }
-
-    @Test
-    fun `a pool with a relaxation should lead with the LP default recipe`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP)
-        val relaxation = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile) { true }
-
-        val labels = PortfolioComposition.compose(scenario, relaxation).take(2).map { it.label }
-
-        assertEquals(listOf("satOptimized", "lp-default"), labels)
-    }
-
-    @Test
-    fun `expanded finite pools should keep the admitted selector position without duplicating it`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP)
-        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile) { false }
-        val small = PortfolioComposition.plan(scenario, facts)
-
-        val expanded = PortfolioComposition.plan(scenario.copy(arms = 18), facts)
-
-        assertEquals(small.arms.map { it.label }, expanded.arms.take(small.arms.size).map { it.label })
-        assertEquals(1, expanded.arms.count { it.label == "selector-switch" })
-        assertEquals(1, expanded.arms.count { it.label == "conflictDriven" })
-    }
-
-    @Test
-    fun `expanded pools should retain the initial selector beside later relaxation recipes`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP)
-        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile) { it == LpEmphasis.CONSERVATIVE }
-        val small = PortfolioComposition.plan(scenario, facts)
-
-        val expanded = PortfolioComposition.plan(scenario.copy(arms = 12), facts)
-
-        assertEquals(small.arms.map { it.label }, expanded.arms.take(small.arms.size).map { it.label })
-        assertTrue(expanded.arms.any { it.label == "lp-conservative" })
-    }
-
-    @Test
-    fun `scheduled mixed optimization should pair primary and full plateau neighborhoods`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP)
-        val ordinary = ProblemFacts.assumed(Kind.COP)
-        val scheduling = ProblemFacts(ordinary.profile.copy(scheduling = true)) { true }
-        val baseline = PortfolioComposition.compose(scenario, ordinary).filterIsInstance<LocalSearchWorkerConfig>()
-
-        val paired = PortfolioComposition.compose(scenario, scheduling).filterIsInstance<LocalSearchWorkerConfig>()
-
-        assertEquals("cbls-primary-plateau/ils-basin", paired.first().label)
-        assertEquals("cbls-plateau/ils-basin", paired[1].label)
-        assertEquals(baseline.drop(1).map { it.label }, paired.drop(1).map { it.label })
-        assertEquals(baseline.size, paired.size)
-    }
-
-    @Test
-    fun `explicit parallel and single engine scheduling pools should retain their recipes`() {
-        val scenarios = listOf(
-            PortfolioScenario.sequential(Kind.CSP),
-            PortfolioScenario.parallel(4, Kind.COP),
-            PortfolioScenario.sequential(Kind.COP, engine = EngineMix.LOCAL_SEARCH),
-            PortfolioScenario.sequential(Kind.COP).copy(lsPool = listOf { LocalSearchCatalog.byLabel("cbls/fixed") }),
-        )
-        for (scenario in scenarios) {
-            val ordinary = ProblemFacts.assumed(scenario.kind)
-            val scheduling = ProblemFacts(ordinary.profile.copy(scheduling = true)) { true }
-
-            val selected = PortfolioComposition.compose(scenario, scheduling)
-
-            assertEquals(PortfolioComposition.compose(scenario, ordinary).map { it.label }, selected.map { it.label })
-        }
     }
 
     @Test
@@ -695,36 +273,6 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `expanding a sequential optimization pool should keep the small pool positions`() {
-        val small = PortfolioScenario.sequential(Kind.COP)
-        for (problemClass in listOf(ProblemClass.FiniteCp, ProblemClass.MixedInteger)) {
-            val facts = ProblemFacts.assumed(Kind.COP, problemClass)
-
-            val baseline = PortfolioComposition.plan(small, facts)
-            val expanded = PortfolioComposition.plan(small.copy(arms = 12), facts)
-
-            assertEquals(baseline.arms.map { it.label }, expanded.arms.take(baseline.arms.size).map { it.label })
-            assertEquals(baseline.firstSolutionCount, expanded.firstSolutionCount)
-            assertEquals(13, expanded.arms.size)
-        }
-    }
-
-    @Test
-    fun `retained LP should join first solution search for finite and continuous objectives`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP)
-        val profile = ProblemFacts.assumed(Kind.COP, ProblemClass.MixedInteger).profile
-
-        for (continuousObjective in listOf(false, true)) {
-            val facts = ProblemFacts(profile, continuousObjective = continuousObjective) { true }
-
-            val plan = PortfolioComposition.plan(scenario, facts)
-
-            assertEquals("lp-default", plan.arms.last().label)
-            assertEquals(plan.arms.size, plan.firstSolutionCount)
-        }
-    }
-
-    @Test
     fun `explicit and parallel pools should use every arm for a first solution`() {
         val scenarios = listOf(
             PortfolioScenario.sequential(Kind.CSP, arms = 12),
@@ -793,124 +341,224 @@ class PortfolioCompositionTest {
         assertSame(budget, annotation.recipe.build(1L, null).nodeBudget)
     }
 
+
     @Test
-    fun `binary packing should use one default LP in the existing backtrack slot`() {
+    fun `an optimization roster should seat one arm per needed role before filling by rank`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
-        val profile = ProblemFacts.assumed(Kind.COP).profile
-        val baseline = PortfolioComposition.compose(scenario, ProblemFacts(profile, binaryIntegers = true) { true })
-        for (ordinary in listOf(false, true)) {
-            val facts = ProblemFacts(
-                profile, binaryIntegers = true, integerLinear = ordinary, binaryPackingObjective = true,
-            ) { true }
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile) { true }
 
-            val composed = PortfolioComposition.compose(scenario, facts)
+        val plan = PortfolioComposition.plan(scenario, facts)
 
-            assertEquals(listOf("satOptimized", "lp-default"), composed.take(2).map { it.label })
-            assertEquals(baseline.drop(2).map { it.label }, composed.drop(2).map { it.label })
+        assertEquals(
+            listOf(
+                "satOptimized", "cbls/fixed", "lp-default", "alns-balanced", "cbls-plateau/ils-basin",
+                "conflictDriven",
+            ),
+            plan.arms.map { it.label },
+        )
+        assertEquals(
+            listOf(
+                ArmRole.LearningProof, ArmRole.FirstSolution, ArmRole.LpBounding, ArmRole.NeighbourhoodImprovement,
+                ArmRole.NeighbourhoodImprovement, ArmRole.LearningProof,
+            ),
+            plan.roles,
+        )
+    }
+
+    @Test
+    fun `a satisfaction roster should seat local search before its proof arm`() {
+        val scenario = PortfolioScenario.sequential(Kind.CSP)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.CSP).profile) { true }
+
+        val labels = PortfolioComposition.compose(scenario, facts).map { it.label }
+
+        assertEquals(
+            listOf(
+                "cbls/fixed", "satOptimized", "lp-default", "conflictDriven", "cbls-plateau/ils-basin",
+                "lp-aggressive",
+            ),
+            labels,
+        )
+    }
+
+    @Test
+    fun `a finite model without a relaxation should seat a selector arm`() {
+        val cases = listOf(
+            Kind.COP to listOf(
+                "satOptimized", "cbls/fixed", "alns-balanced", "selector-switch", "cbls-plateau/ils-basin",
+                "conflictDriven",
+            ),
+            Kind.CSP to listOf(
+                "cbls/fixed", "satOptimized", "domwdeg", "conflictDriven", "cbls-plateau/ils-basin", "first-fail",
+            ),
+        )
+        for ((kind, expected) in cases) {
+            val facts = ProblemFacts(ProblemFacts.assumed(kind).profile) { false }
+
+            val labels = PortfolioComposition.compose(PortfolioScenario.sequential(kind), facts).map { it.label }
+
+            assertEquals(expected, labels)
         }
     }
 
     @Test
-    fun `expanded binary packing pools should reuse the default LP recipe`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP).copy(arms = 24)
+    fun `selector diversity should be a finite model need`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemFacts.assumed(Kind.COP).profile
-        val baseline = ProblemFacts(profile, binaryIntegers = true) { true }
-        val packing = ProblemFacts(profile, binaryIntegers = true, binaryPackingObjective = true) { true }
+        for (problemClass in ProblemClass.entries.filter { it != ProblemClass.FiniteCp }) {
+            val facts = ProblemFacts(profile.copy(problemClass = problemClass)) { false }
 
-        val composed = PortfolioComposition.compose(scenario, packing)
+            val plan = PortfolioComposition.plan(scenario, facts)
 
-        assertEquals(listOf("satOptimized", "lp-default"), composed.take(2).map { it.label })
-        assertEquals(1, composed.count { it.label == "lp-default" })
-        assertEquals(PortfolioComposition.compose(scenario, baseline).size, composed.size)
+            assertFalse(ArmRole.SelectorDiversity in plan.roles, "$problemClass")
+        }
     }
 
     @Test
-    fun `binary packing should preserve explicit parallel and disabled LP composition`() {
+    fun `table satisfaction should seat support ordering for selector diversity`() {
+        val scenario = PortfolioScenario.sequential(Kind.CSP)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.CSP).profile, extensionalSupports = true) { false }
+
+        val labels = PortfolioComposition.compose(scenario, facts).map { it.label }
+
+        assertEquals(
+            listOf(
+                "cbls/fixed", "satOptimized", "support-aware", "conflictDriven", "cbls-plateau/ils-basin",
+                "propagation-guided",
+            ),
+            labels,
+        )
+    }
+
+    @Test
+    fun `a Boolean objective should seat the core worker`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, booleanObjective = true) { true }
+
+        val plan = PortfolioComposition.plan(scenario, facts)
+
+        val core = plan.arms.indexOfFirst { it is CoreGuidedWorkerConfig }
+        assertEquals(1, plan.arms.count { it is CoreGuidedWorkerConfig })
+        assertEquals(ArmRole.ObjectiveCores, plan.roles[core])
+        assertEquals(scenario.arms, plan.arms.size)
+    }
+
+    @Test
+    fun `pure integer rows should seat a second LP emphasis`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemFacts.assumed(Kind.COP).profile
-        val baseline = ProblemFacts(profile, binaryIntegers = true) { true }
-        val packing = ProblemFacts(profile, binaryIntegers = true, binaryPackingObjective = true) { true }
-        for (control in listOf(
-            scenario.copy(cores = 2),
-            scenario.copy(engine = EngineMix.BACKTRACK),
-            scenario.copy(kind = Kind.CSP),
-            scenario.copy(arms = 5),
-            scenario.copy(lpCeiling = LpConfig.OFF),
-            scenario.copy(btEdit = { it }),
-            scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("conflictDriven") }),
-            scenario.copy(lsPool = listOf { LocalSearchCatalog.byLabel("cbls/fixed") }),
-            scenario.copy(annotationArm = BacktrackParams()),
+        for (facts in listOf(
+            ProblemFacts(profile, integerLinear = true) { true },
+            ProblemFacts(profile, binaryIntegers = true, binaryEqualityObjective = true) { true },
         )) {
+            val labels = PortfolioComposition.compose(scenario, facts).map { it.label }
+
             assertEquals(
-                PortfolioComposition.compose(control, baseline).map { it.label },
-                PortfolioComposition.compose(control, packing).map { it.label },
+                listOf(
+                    "satOptimized", "cbls/fixed", "lp-default", "alns-balanced", "lp-aggressive",
+                    "cbls-plateau/ils-basin",
+                ),
+                labels,
             )
         }
     }
 
     @Test
-    fun `binary packing LP should spend the containing node allowance`() {
+    fun `a continuous objective should keep one LP emphasis`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemFacts.assumed(Kind.COP, ProblemClass.MixedInteger).profile
+        val facts = ProblemFacts(profile, continuousObjective = true, integerLinear = true) { true }
+
+        val plan = PortfolioComposition.plan(scenario, facts)
+
+        assertEquals(listOf("lp-default"), plan.arms.map { it.label }.filter { it.startsWith("lp-") })
+        assertEquals(plan.arms.size, plan.firstSolutionCount)
+    }
+
+    @Test
+    fun `an annotated model should seat its source order for selector diversity`() {
+        val annotation = BacktrackParams(variableSelector = SmallestDomain, valueSelector = IndomainMin)
         val budget = NodeBudget(limit = 100)
-        val scenario = PortfolioScenario.sequential(Kind.COP).copy(nodeBudget = budget)
-        val facts = ProblemFacts(
-            ProblemFacts.assumed(Kind.COP).profile, binaryIntegers = true, binaryPackingObjective = true,
-        ) { true }
+        for (kind in Kind.entries) {
+            val scenario = PortfolioScenario.sequential(kind).copy(annotationArm = annotation, nodeBudget = budget)
+            val facts = ProblemFacts(ProblemFacts.assumed(kind).profile) { true }
 
-        val composed = PortfolioComposition.compose(scenario, facts)
-        val lp = composed.filterIsInstance<BacktrackWorkerConfig>().single { it.label == "lp-default" }
+            val plan = PortfolioComposition.plan(scenario, facts)
 
-        assertSame(budget, lp.recipe.build(1L, null).nodeBudget)
-    }
-
-    @Test
-    fun `binary equality objectives should preserve existing worker positions with an LP companion`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP)
-        val profile = ProblemFacts.assumed(Kind.COP).profile
-        val baseline = PortfolioComposition.compose(scenario, ProblemFacts(profile, binaryIntegers = true) { true })
-        val facts = ProblemFacts(profile, binaryIntegers = true, binaryEqualityObjective = true) { true }
-
-        val composed = PortfolioComposition.compose(scenario, facts)
-
-        assertEquals(baseline.map { it.label } + "lp-aggressive", composed.map { it.label })
-    }
-
-    @Test
-    fun `binary equality objectives should preserve explicit parallel and disabled LP composition`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP)
-        val profile = ProblemFacts.assumed(Kind.COP).profile
-        for (control in listOf(
-            scenario.copy(cores = 2),
-            scenario.copy(engine = EngineMix.BACKTRACK),
-            scenario.copy(kind = Kind.CSP),
-            scenario.copy(arms = 5),
-            scenario.copy(lpCeiling = LpConfig.OFF),
-            scenario.copy(btEdit = { it }),
-            scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("conflictDriven") }),
-            scenario.copy(lsPool = listOf { LocalSearchCatalog.byLabel("cbls/fixed") }),
-            scenario.copy(annotationArm = BacktrackParams()),
-        )) {
-            val available = control.lpCeiling != LpConfig.OFF
-            val baseline = ProblemFacts(profile, binaryIntegers = true) { available }
-            val equality = ProblemFacts(profile, binaryIntegers = true, binaryEqualityObjective = true) { available }
-
-            assertEquals(
-                PortfolioComposition.compose(control, baseline).map { it.label },
-                PortfolioComposition.compose(control, equality).map { it.label },
-            )
+            val source = plan.arms.indexOfFirst { it.label == "annotation" }
+            assertEquals(1, plan.arms.count { it.label == "annotation" })
+            assertEquals(ArmRole.SelectorDiversity, plan.roles[source])
+            val params = (plan.arms[source] as BacktrackWorkerConfig).recipe.build(1L, null)
+            assertSame(SmallestDomain, params.variableSelector)
+            assertSame(budget, params.nodeBudget)
         }
     }
 
     @Test
-    fun `binary equality LP should spend the containing node allowance`() {
-        val budget = NodeBudget(limit = 100)
-        val scenario = PortfolioScenario.sequential(Kind.COP).copy(nodeBudget = budget)
-        val facts = ProblemFacts(
-            ProblemFacts.assumed(Kind.COP).profile, binaryIntegers = true, binaryEqualityObjective = true,
-        ) { true }
+    fun `a scheduling optimization should lead local search with the primary and full plateau pair`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val scheduling = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile.copy(scheduling = true)) { true }
 
-        val composed = PortfolioComposition.compose(scenario, facts)
-        val lp = composed.filterIsInstance<BacktrackWorkerConfig>().single { it.label == "lp-aggressive" }
+        val local = PortfolioComposition.compose(scenario, scheduling).filterIsInstance<LocalSearchWorkerConfig>()
 
-        assertSame(budget, lp.recipe.build(1L, null).nodeBudget)
+        assertEquals(listOf("cbls-primary-plateau/ils-basin", "cbls-plateau/ils-basin"), local.map { it.label })
+    }
+
+    @Test
+    fun `a smaller roster should be a prefix of a larger one at every core count`() {
+        val cases = listOf(
+            Kind.COP to ProblemFacts.assumed(Kind.COP),
+            Kind.COP to ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, booleanObjective = true) { false },
+            Kind.COP to ProblemFacts.assumed(Kind.COP, ProblemClass.MixedInteger),
+            Kind.CSP to ProblemFacts.assumed(Kind.CSP),
+            Kind.CSP to ProblemFacts.assumed(Kind.CSP, ProblemClass.Sat),
+        )
+        for ((kind, facts) in cases) {
+            val small = PortfolioComposition.compose(PortfolioScenario.sequential(kind), facts).map { it.label }
+            for ((cores, arms) in listOf(1 to 12, 4 to 8, 1 to 80)) {
+                val scenario = PortfolioScenario.parallel(cores, kind, arms = arms)
+
+                val large = PortfolioComposition.compose(scenario, facts).map { it.label }
+
+                assertEquals(arms, large.size)
+                assertEquals(small, large.take(small.size), "$kind cores=$cores arms=$arms")
+            }
+        }
+    }
+
+    @Test
+    fun `an expanded sequential optimization pool should search first with the default roster`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP, arms = 12)
+
+        val plan = PortfolioComposition.plan(scenario, ProblemFacts.assumed(Kind.COP))
+
+        assertEquals(12, plan.arms.size)
+        assertEquals(PortfolioScenario.DEFAULT_ARMS, plan.firstSolutionCount)
+    }
+
+    @Test
+    fun `an injected backtrack recipe should repeat beside the curated local search`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+            .copy(btPool = listOf { BacktrackCatalog.byLabel("conflictDriven") })
+
+        val labels = PortfolioComposition.compose(scenario).map { it.label }
+
+        assertEquals(
+            listOf(
+                "conflictDriven", "cbls/fixed", "alns-balanced", "cbls-plateau/ils-basin", "conflictDriven",
+                "cbls-smooth/ils-basin",
+            ),
+            labels,
+        )
+    }
+
+    @Test
+    fun `a pool with a core per arm should keep its cores from the neighbourhood arm`() {
+        val scenario = PortfolioScenario.parallel(4, Kind.COP)
+
+        val arms = PortfolioComposition.compose(scenario)
+
+        assertEquals(4, arms.size)
+        assertFalse(arms.any { it is AlnsWorkerConfig })
     }
 }
