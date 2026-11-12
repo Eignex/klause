@@ -43,6 +43,7 @@ import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.abs
 import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toDouble
 import com.eignex.util.numbers.toLongExact
