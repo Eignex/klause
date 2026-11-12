@@ -1,7 +1,7 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.util.Cancellation
-import com.eignex.kumulant.stream.Mutex
+import com.eignex.util.concurrent.Mutex
 
 internal class InvariantNetworkPreparation(
     sweep: DefinitionalSweep?,

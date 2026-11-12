@@ -9,7 +9,7 @@ import com.eignex.klause.solver.incumbent.ModelEvidenceVerifier
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.stream.Mutex
+import com.eignex.util.concurrent.Mutex
 
 /**
  * Cross-arm **globally-valid** decision-level-0 integer-variable bound tightenings of one portfolio — the

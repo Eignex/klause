@@ -24,7 +24,7 @@ import com.eignex.klause.solver.pipeline.PreparedSourceHints
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.stream.Mutex
+import com.eignex.util.concurrent.Mutex
 
 /**
  * Supplies finite recipes and shared immutable preparation to source portfolio construction.

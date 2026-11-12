@@ -5,7 +5,7 @@ import com.eignex.klause.theory.qfnra.PolynomialTheoryInvocation
 import com.eignex.klause.theory.qfnra.PolynomialTheoryService
 import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.util.Cancellation
-import com.eignex.kumulant.stream.Mutex
+import com.eignex.util.concurrent.Mutex
 
 internal class PolynomialInvocationScope(
     private val service: PolynomialTheoryService,

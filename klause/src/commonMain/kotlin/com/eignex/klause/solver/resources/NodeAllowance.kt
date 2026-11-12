@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.resources
 
-import com.eignex.kumulant.stream.Mutex
+import com.eignex.util.concurrent.Mutex
 
 internal class NodeAllowance private constructor(
     val limit: Long,

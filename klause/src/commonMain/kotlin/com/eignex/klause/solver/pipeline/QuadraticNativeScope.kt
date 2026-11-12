@@ -5,7 +5,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.QfNraStats
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.kumulant.stream.Mutex
+import com.eignex.util.concurrent.Mutex
 
 internal class QuadraticNativeScope private constructor(
     private val params: PolynomialTheoryParams,

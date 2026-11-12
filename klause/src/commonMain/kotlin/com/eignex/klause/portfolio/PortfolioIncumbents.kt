@@ -11,7 +11,7 @@ import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.VerifiedIncumbent
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.kumulant.stream.Mutex
+import com.eignex.util.concurrent.Mutex
 
 internal class PortfolioIncumbents<V>(
     val valueOf: (MinimizeResult.WithSample) -> V?,

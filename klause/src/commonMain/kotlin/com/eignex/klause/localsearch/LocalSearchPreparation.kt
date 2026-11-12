@@ -5,7 +5,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.util.Cancellation
-import com.eignex.kumulant.stream.Mutex
+import com.eignex.util.concurrent.Mutex
 
 internal class LocalSearchPreparation(
     problem: Problem,

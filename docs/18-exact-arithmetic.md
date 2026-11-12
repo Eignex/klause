@@ -245,7 +245,8 @@ Klause owns LU, reach, pivot policy, Forrest–Tomlin updates, checked arithmeti
 scratch lifetime, the norm over indexed dense workspace storage, and the workspace
 scatter, gather and pivot-candidate slices in `util.SparseSlices`. Koblas supplies
 validated CSC containers, structural transposes and vector/indexed kernels; Kumulant
-supplies online statistics and adaptive bandits.
+supplies online statistics and adaptive bandits. Eignex Util supplies primitive
+collections, array algorithms, exact integer primitives and synchronous locks.
 Neither selects models, routes or result semantics.
 
 The [root build](../build.gradle.kts) pins immutable timestamps for KMP roots and

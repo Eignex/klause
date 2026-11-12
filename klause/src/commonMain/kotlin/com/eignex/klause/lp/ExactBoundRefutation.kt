@@ -10,6 +10,7 @@ import com.eignex.util.numbers.abs
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.div
+import com.eignex.util.numbers.gcd
 import com.eignex.util.numbers.isZero
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.negate
@@ -73,12 +74,10 @@ internal fun exactBoundsInfeasible(
 private fun divisibilityFails(row: Row): Boolean {
     if (!row.equality || row.coeffs.isEmpty()) return false
     var g = BIG_ZERO
-    for (c in row.coeffs.values) g = gcd(g, c.abs())
+    for (c in row.coeffs.values) g = g.gcd(c)
     if (g.isZero() || g == BIG_ONE) return false
     return !(row.bound.remainderOf(g)).isZero()
 }
-
-private tailrec fun gcd(a: BigInt, b: BigInt): BigInt = if (b.isZero()) a else gcd(b, a.remainderOf(b))
 
 /** A row `Σ coeffs·vars ⟨op⟩ bound` in exact arithmetic, mutable so substitution can rewrite it. */
 private class Row(val coeffs: MutableMap<Int, BigInt>, var bound: BigInt, val equality: Boolean)

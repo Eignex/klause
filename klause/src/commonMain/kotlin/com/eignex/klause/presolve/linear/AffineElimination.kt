@@ -27,6 +27,7 @@ import com.eignex.klause.presolve.protectedStructureColumns
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.LongArrayList
@@ -811,13 +812,8 @@ internal object AffineSingletons {
 
     /** Index of the first entry of the ascending [eqIds] that is `>= from` (`eqIds.size` if none). */
     private fun lowerBound(eqIds: IntArray, from: Int): Int {
-        var lo = 0
-        var hi = eqIds.size
-        while (lo < hi) {
-            val mid = (lo + hi) ushr 1
-            if (eqIds[mid] < from) lo = mid + 1 else hi = mid
-        }
-        return lo
+        val index = eqIds.binarySearchInt(from)
+        return if (index >= 0) index else -index - 1
     }
 
     /**
