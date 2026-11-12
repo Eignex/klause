@@ -71,3 +71,9 @@ kotlin {
         }
     }
 }
+
+// A solve of seconds never repays the optimizing compiler, which otherwise takes about two fifths of one
+// processor throughout. JAVA_OPTS or KLAUSE_CLI_OPTS can raise the tier again for long runs.
+tasks.withType<CreateStartScripts>().configureEach {
+    doFirst { defaultJvmOpts = (defaultJvmOpts ?: emptyList()) + "-XX:TieredStopAtLevel=1" }
+}
