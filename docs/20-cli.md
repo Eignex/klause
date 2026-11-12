@@ -12,6 +12,11 @@ or newer; native executables need no JVM. Build commands live in the
 [repository README](../README.md#build), and runtime numerical options in
 [numerical dependencies](18-exact-arithmetic.md#runtime-support).
 
+The JVM launcher stops compilation at the fast compiler tier (`-XX:TieredStopAtLevel=1`): a solve of
+seconds ends before optimized code repays its compilation, which shares the solver's processors.
+`JAVA_OPTS` or `KLAUSE_CLI_OPTS` follow the launcher defaults, so `-XX:TieredStopAtLevel=4` there restores
+the optimizing tier for long runs.
+
 ## Formats and dispatch
 
 | Format name | Extensions | Output |

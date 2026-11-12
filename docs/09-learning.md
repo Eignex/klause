@@ -313,7 +313,7 @@ search work nor source completion.
 
 Propagation is two-watched-literal unit propagation over a trail pointer, without
 per-factor dispatch or integer order literals, reading a per-session truth byte per
-variable. Learned clauses own copied literal arrays in bounded reference pages,
+variable. A satisfied blocker settles a posting before its clause is read. Learned clauses own copied literal arrays in bounded reference pages,
 with a wrapping replacement-scan cursor per clause. Each page grows from one slot
 to its fixed maximum; full compaction trims a partial last page. Empty pages release their arrays
 without changing live clause handles. Reductions compact their handle and reference columns without
@@ -557,7 +557,9 @@ diagnostic invocation; an incomplete trace cannot establish exhaustive applicabi
 Native forgetting starts at restart boundaries with a configured cap. A resumable
 root continues a pending window before branching while its row, heap or cleanup
 state advances. Each attempt keeps the same bounded work and scratch allowance and
-debits the containing slice. A completed pass waits for the next restart before
+debits the containing slice. Cleanup polls cancellation before every bounded
+mutation. Its first 64 polls read the session and caller tokens; later polls read
+them once per 64, so a request arriving mid-window is observed within that many steps. A completed pass waits for the next restart before
 aging tiers again; an unfunded attempt permits search to proceed. Continuation
 reads existing ranking state without adding retained storage. Reaching the active
 quota still completes the pending pass; it does not start another tier epoch.
@@ -640,13 +642,15 @@ General retirement replaces its payload with an inert stable-ID slot and release
 its watch-position payload, integer-row cache entry and applicable deferred/diagnostic
 aliases. General and Native metadata share a paged owner with at most sixteen rows
 per page. General pages include propagator and mutable-payload references. The first
-page belongs directly to its owner; later pages use a bounded sparse index. Fixed
-startup ownership belongs to state preparation, and admissions fund subsequent
-growth and index insertion. Lookups debit the active maintenance or observation
-grant, or the containing propagation ledger. A fixed-size page cache avoids repeated
-lookups during ranking, with 128 reference slots for General metadata and 2048 for
-Native metadata. Initialization work and reference ownership include the allocated
-cache length. Header unlinking clears its cache slot before releasing the page.
+page belongs directly to its owner; later pages belong to a bounded sparse index that
+owns their release. A page table reaches every installed page by its index without
+visiting that index, so a read takes the same path whatever the store has grown to.
+Its first chunk covers 128 pages for General metadata and 2048 for Native metadata;
+that chunk and other fixed startup ownership belong to state preparation. A later
+chunk exists while one of its pages does. Admissions fund page growth, index
+insertion, each new chunk and growth of the chunk directory. Releasing the last page
+of a later chunk releases the chunk and trims the directory. Header unlinking clears
+the page's table slot before releasing the page.
 Native learned payloads cache 2048 page lookups, including absent pages, with fixed
 primitive index tags. Both arrays and their owner references belong to state
 preparation and ownership accounting, separately from payload-row reference capacity.
@@ -658,7 +662,7 @@ permanent rows or looking up another page. Retained import/use counters survive
 released metadata. Empty arrays release within their row transaction; empty headers
 and index branches wait for separately funded unlinking. Revived pages survive
 unlinking without renumbering live handles.
-Stale watches skip retired slots, and their capacity remains owned until its funded cleanup. Selection and subsequent retired-slot compaction share
+Retired postings stay owned until propagation or funded cleanup removes them. Selection and subsequent retired-slot compaction share
 one work grant; compaction keeps every active row and receives only its remainder.
 Root simplification transfers its fresh residual literal array into the learned store;
 other admissions copy borrowed literal arrays. Native learned-watch cleanup scans
@@ -670,13 +674,12 @@ another learned retirement requires a scan. Metadata release precedes watch scan
 so permanent postings cannot delay its progress. Appended retirements extend the page
 queue. Candidate-array trimming receives a separate funded copy transaction and
 retains spare capacity when its work or scratch does not fit.
-Propagation preserves live watcher order by promoting the next live posting into a
-retired hole. A local cursor skips already examined retired postings, so the scan
-and promotions take linear work without a copy buffer or retained cursor. Each
-examined posting debits its read and metadata lookup; promotion debits one read,
-two writes and any cleanup-cursor rewind before mutation. Retired tails release
-through the ordinary posting-removal debit before active relocation chooses its
-last live watcher. Funded cleanup keeps its read and write cursors across slices.
+Every retirement flags the posting lists of its two watched literals. Propagation
+entering a flagged list first drops its retired postings in one ordered pass,
+debiting each read, move and released page, and a cleanup scan suspended on that
+list starts over. Live postings keep their order, so the sweep that follows visits
+live postings only. A learned clause visit reads its watch positions and scan
+cursor from one metadata row. Funded cleanup keeps its read and write cursors across slices.
 It checks the tail before filling retired holes and releases empty posting pages
 through the same owner.
 Capacity changes replace the disjoint metadata pool identity. A protected row retains
