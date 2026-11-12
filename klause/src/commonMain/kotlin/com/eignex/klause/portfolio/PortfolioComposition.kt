@@ -434,12 +434,8 @@ internal object PortfolioComposition {
             Kind.COP -> listOfNotNull(local, complete, neighbourhoodRank(scenario, facts))
             Kind.CSP -> listOf(complete, local)
         }
-        val needed = ArmRole.needed(
-            scenario.kind,
-            facts,
-            annotated = scenario.annotationArm != null && scenario.btPool == null,
-            relaxation = complete.arms.any { it.role == ArmRole.LpBounding },
-        )
+        val annotated = scenario.annotationArm != null && scenario.btPool == null
+        val needed = ArmRole.needed(scenario.kind, facts, annotated)
         return PortfolioRoster.seat(needed, ranks, scenario.arms)
     }
 

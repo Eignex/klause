@@ -351,15 +351,15 @@ class PortfolioCompositionTest {
 
         assertEquals(
             listOf(
-                "satOptimized", "cbls/fixed", "lp-default", "alns-balanced", "cbls-plateau/ils-basin",
-                "conflictDriven",
+                "satOptimized", "cbls/fixed", "lp-default", "alns-balanced", "selector-switch",
+                "cbls-plateau/ils-basin",
             ),
             plan.arms.map { it.label },
         )
         assertEquals(
             listOf(
                 ArmRole.LearningProof, ArmRole.FirstSolution, ArmRole.LpBounding, ArmRole.NeighbourhoodImprovement,
-                ArmRole.NeighbourhoodImprovement, ArmRole.LearningProof,
+                ArmRole.SelectorDiversity, ArmRole.NeighbourhoodImprovement,
             ),
             plan.roles,
         )
@@ -374,15 +374,15 @@ class PortfolioCompositionTest {
 
         assertEquals(
             listOf(
-                "cbls/fixed", "satOptimized", "lp-default", "conflictDriven", "cbls-plateau/ils-basin",
-                "lp-aggressive",
+                "cbls/fixed", "satOptimized", "lp-default", "domwdeg", "conflictDriven",
+                "cbls-plateau/ils-basin",
             ),
             labels,
         )
     }
 
     @Test
-    fun `a finite model without a relaxation should seat a selector arm`() {
+    fun `a finite model without a relaxation should seat a selector arm before filling`() {
         val cases = listOf(
             Kind.COP to listOf(
                 "satOptimized", "cbls/fixed", "alns-balanced", "selector-switch", "cbls-plateau/ils-basin",
@@ -456,7 +456,7 @@ class PortfolioCompositionTest {
             assertEquals(
                 listOf(
                     "satOptimized", "cbls/fixed", "lp-default", "alns-balanced", "lp-aggressive",
-                    "cbls-plateau/ils-basin",
+                    "selector-switch",
                 ),
                 labels,
             )

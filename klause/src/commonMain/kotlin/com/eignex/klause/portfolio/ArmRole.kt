@@ -35,14 +35,14 @@ internal enum class ArmRole(
         /**
          * The roles the model behind [facts] needs, in seating order. A role named twice seats its two best
          * arms, and a role no eligible arm covers seats none. [annotated] says the model carries its own search
-         * order, and [relaxation] that some arm can bound it with the LP.
+         * order.
          *
          * An optimization seats its complete arm first: a sequential pool warms arms in order, and local search
          * cannot close a trivial optimum. A satisfaction model seats local search first, whose first solution
-         * ends the run. A finite model without a relaxation gets its diversity from the branching order instead,
-         * and pure integer rows pay for a second LP emphasis.
+         * ends the run. A finite model's branching order decides which solutions complete search reaches, and
+         * pure integer rows pay for a second LP emphasis.
          */
-        fun needed(kind: Kind, facts: ProblemFacts, annotated: Boolean, relaxation: Boolean): List<ArmRole> =
+        fun needed(kind: Kind, facts: ProblemFacts, annotated: Boolean): List<ArmRole> =
             buildList {
                 if (kind == Kind.COP) {
                     add(LearningProof)
@@ -57,12 +57,12 @@ internal enum class ArmRole(
                     add(ObjectiveCores)
                 }
                 if (annotated) add(SelectorDiversity)
-                if (facts.profile.problemClass == ProblemClass.FiniteCp && !relaxation) add(SelectorDiversity)
                 if (kind == Kind.COP && !facts.continuousObjective &&
                     (facts.integerLinear || facts.binaryEqualityObjective)
                 ) {
                     add(LpBounding)
                 }
+                if (facts.profile.problemClass == ProblemClass.FiniteCp) add(SelectorDiversity)
             }
     }
 }
