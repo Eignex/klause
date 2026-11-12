@@ -544,9 +544,12 @@ internal class CumulativePropagator(
          * them until they do, and the capacity they exceed.
          */
         fun overloadAt(t: Long, except: Int, room: Long = capMax()) {
-            val covering = (0 until n).filter { it != except && coversPoint(it, t) }.sortedByDescending { resMin(it) }
+            val covering = IntArrayList()
+            for (k in 0 until n) if (k != except && coversPoint(k, t)) covering.add(k)
+            val order = argsortBy(covering.size) { a, b -> resMin(covering[b]).compareTo(resMin(covering[a])) }
             var load = 0L
-            for (k in covering) {
+            for (position in order) {
+                val k = covering[position]
                 if (load > room) break
                 covers(k, t)
                 load += resMin(k)
@@ -602,8 +605,12 @@ internal class CumulativePropagator(
         private fun lct(k: Int): Long = lst(k) + durMin(k)
         private fun energy(k: Int): Long = durMin(k) * resMin(k)
 
-        private fun theta(tau: Long, except: Int): List<Int> = (0 until n).filter {
-            it != except && present(it) && durMin(it) > 0 && resMin(it) > 0 && lct(it) <= tau
+        private fun theta(tau: Long, except: Int): IntArray {
+            val tasks = IntArrayList()
+            for (k in 0 until n) {
+                if (k != except && present(k) && durMin(k) > 0 && resMin(k) > 0 && lct(k) <= tau) tasks.add(k)
+            }
+            return tasks.toIntArray()
         }
 
         // Task [k] lies in the window from [from] to [tau] with at least its least energy.
@@ -617,8 +624,9 @@ internal class CumulativePropagator(
         }
 
         // The est-suffix of [set] that maximizes `C·est + energy`, as its threshold and members.
-        private fun envelopeSubset(set: List<Int>, cap: Long): Pair<Long, List<Int>> {
-            val sorted = set.sortedByDescending { est(it) }
+        private fun envelopeSubset(set: IntArray, cap: Long): Pair<Long, IntArray> {
+            val order = argsortBy(set.size) { a, b -> est(set[b]).compareTo(est(set[a])) }
+            val sorted = IntArray(set.size) { set[order[it]] }
             var energy = 0L
             var best = Long.MIN_VALUE
             var bestEst = 0L
@@ -630,7 +638,9 @@ internal class CumulativePropagator(
                     bestEst = est(x)
                 }
             }
-            return bestEst to sorted.filter { est(it) >= bestEst }
+            val subset = IntArrayList()
+            for (x in sorted) if (est(x) >= bestEst) subset.add(x)
+            return bestEst to subset.toIntArray()
         }
 
         /** The tasks completing by [tau] carry more energy than the capacity can place after their threshold. */
@@ -656,7 +666,8 @@ internal class CumulativePropagator(
             val theta = theta(tau, i)
             val (e1, overflow) = envelopeSubset(theta + i, cap)
             for (k in overflow) if (k == i) startGe(i, e1) else inWindow(k, e1, tau)
-            val byEstDesc = theta.sortedByDescending { est(it) }
+            val order = argsortBy(theta.size) { a, b -> est(theta[b]).compareTo(est(theta[a])) }
+            val byEstDesc = IntArray(theta.size) { theta[order[it]] }
             var energy = 0L
             var windowEnd = Long.MIN_VALUE
             var best = Long.MIN_VALUE

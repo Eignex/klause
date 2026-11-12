@@ -99,14 +99,15 @@ internal object MddTableComposition {
         counts[0] = 1
         val starts = IntArray(mdd.seq.size + 1)
         val records = LongArrayList()
-        var current = arrayListOf(pair(mdd.initial, 0))
+        var current = LongArrayList().also { it.add(pair(mdd.initial, 0)) }
         var states = 1
         var restricted = false
         for (layer in mdd.seq.indices) {
             starts[layer] = records.size
-            val next = ArrayList<Long>()
+            val next = LongArrayList()
             val ids = MutableLongIntMap()
-            for ((source, key) in current.withIndex()) {
+            for (source in 0 until current.size) {
+                val key = current[source]
                 if (!visit()) return null
                 val original = (key ushr 32).toInt()
                 val node = key.toInt()

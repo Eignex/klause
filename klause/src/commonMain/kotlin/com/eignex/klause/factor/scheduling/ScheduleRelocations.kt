@@ -11,7 +11,9 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.OptionalPresence
 import com.eignex.klause.localsearch.positiveScaledBinaryDefinition
+import com.eignex.util.arrays.argsortBy
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
 
 /**
  * Compaction and reorder moves for a satisfied [Cumulative]. A task moves to the earliest start that
@@ -184,15 +186,18 @@ internal class ScheduleRelocations(
      */
     private fun compactBlock(tasks: IntArrayList) {
         if (tasks.size < 2) return
-        val order = tasks.toIntArray().sortedBy { state.assignment.intValue(own.starts[it]) }
+        val order = argsortBy(tasks.size) { a, b ->
+            state.assignment.intValue(own.starts[tasks[a]]).compareTo(state.assignment.intValue(own.starts[tasks[b]]))
+        }
         val first = if (order.size <= BLOCK_CAP) 0 else state.rng.nextInt(order.size - BLOCK_CAP + 1)
         val placements = ArrayList<Placement>()
         val timelines = ArrayList<CumulativeLsState>()
-        val before = ArrayList<Long>()
+        val before = LongArrayList()
         var floor = Long.MIN_VALUE
         var admitted = false
         try {
-            for (i in order.subList(first, minOf(order.size, first + BLOCK_CAP))) {
+            for (position in first until minOf(order.size, first + BLOCK_CAP)) {
+                val i = tasks[order[position]]
                 val task = taskAt(own.starts[i]) ?: continue
                 val target = earliestStart(task, NO_CHOICE, 0L, floor)
                 floor = target ?: task.current
@@ -350,7 +355,7 @@ internal class ScheduleRelocations(
         if (cost > reads) return false
         reads -= cost.toInt()
         val timelines = ArrayList<CumulativeLsState>()
-        val before = ArrayList<Long>()
+        val before = LongArrayList()
         for (placement in placements) {
             for (footprint in placement.task.footprints) {
                 if (timelines.none { it === footprint.ls }) {
