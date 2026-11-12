@@ -102,7 +102,7 @@ fun OpenTheoryPipeline.minimize(
     require(cores > 0)
     val publication = QuadraticPublicationObserver(onAccepted)
     return publication.execute {
-        val native = QuadraticNativeScope(params.polynomial)
+        val native = QuadraticNativeScope(params.polynomial, concurrent = cores > 1 && engine != FiniteEngine.FIXED)
         var result: QuadraticOptimizationResult = QuadraticOptimizationResult.Unknown(
             null, native.reason(), sense, SolveStats.EMPTY,
         )

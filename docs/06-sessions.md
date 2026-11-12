@@ -409,16 +409,22 @@ own interruption boundary.
 
 ### Mechanism and compatibility
 
-`solver.resources.NodeAllowance` owns the synchronized decision/move ledger, native
+`solver.resources.NodeAllowance` owns the decision/move ledger, native
 instruction conversion and quota partitioning. `backtrack.NodeBudget` is the
 published facade; each facade forwards to one allowance without copying counters.
+Shared counters use exact saturating integer cells with the atomic backend used by
+Kumulant's relaxed concurrency mode; single-threaded arithmetic scopes use plain
+variables. Counter reads and charges acquire no mutex. Concurrent snapshots can
+span several charges; completed charges remain exact after workers join. Quota
+registration alone uses a mutex, and capacity is read before registration.
 `Cancellation` and `WorkMeter` live in `util` and contain no portfolio pricing; units
 come from the caller's adapter, and solver policy owns conversions and result
 semantics.
 
 Polynomial native polls read the shared allowance, worker quota and representation
-stops together under their ledger lock, then inspect containing predicates outside
-the lock. Encoder preparation latches an observed stop for that capture while
+stops without locking, then inspect containing predicates. Representation declines
+use published reference cells; worker registration uses a separate mutex. Encoder
+preparation latches an observed stop for that capture while
 forwarding live deadlines and work meters to its parent.
 
 ---

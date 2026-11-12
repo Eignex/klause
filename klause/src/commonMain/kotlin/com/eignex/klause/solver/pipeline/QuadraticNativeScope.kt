@@ -1,11 +1,15 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.arithmetic.polynomial.PolynomialResource
+import com.eignex.klause.solver.resources.WorkCounter
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.QfNraStats
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.kumulant.core.Concurrency
+import com.eignex.util.concurrent.AtomicCells
 import com.eignex.util.concurrent.Mutex
+import com.eignex.util.concurrent.SerialCells
 
 internal class QuadraticNativeScope private constructor(
     private val params: PolynomialTheoryParams,
@@ -13,47 +17,23 @@ internal class QuadraticNativeScope private constructor(
     private val root: QuadraticNativeScope?,
     private val maximumWorkerWork: Long?,
 ) {
-    constructor(params: PolynomialTheoryParams) : this(params, Ledger(), null, null)
+    constructor(params: PolynomialTheoryParams, concurrent: Boolean = true) :
+        this(params, Ledger(if (concurrent) Concurrency.Relaxed else Concurrency.None), null, null)
 
     private val stop = params.timeout or params.cancellation
-    private var polynomialWork = 0L
-    private var quadraticWork = 0L
-    private var projected = 0L
-    private var lifted = 0L
-    private var dyadicAttempts: Long? = null
-    private var dyadicBases: Long? = null
-    private var coupledWorkDeclines: Long? = null
-    private var dyadicPreExtractionDeclines: Long? = null
+    private val counters = Counters(ledger.concurrency)
     private val workers = mutableMapOf<Int, QuadraticNativeScope>()
-    private var representationDecline: PolynomialTheoryResource? = null
-    val resource: PolynomialTheoryResource? get() = ledger.lock.withLock { representationDecline }
-    val declinedResource: PolynomialTheoryResource? get() = ledger.lock.withLock {
-        representationDecline ?: workers.values.firstNotNullOfOrNull { it.representationDecline }
-    }
-    val work: Long get() = ledger.lock.withLock {
-        if (root == null) ledger.work else sum(polynomialWork, quadraticWork)
-    }
-    val numericalWork: Long get() = ledger.lock.withLock {
-        if (root == null) ledger.quadraticWork else quadraticWork
-    }
-    val polynomialStats: PolynomialTheoryStats get() = ledger.lock.withLock {
-        if (root == null) PolynomialTheoryStats(ledger.projected, ledger.lifted, ledger.polynomialWork,
-            ledger.dyadicAttempts, ledger.dyadicBases, ledger.coupledWorkDeclines, ledger.dyadicPreExtractionDeclines)
-        else PolynomialTheoryStats(projected, lifted, polynomialWork,
-            dyadicAttempts, dyadicBases, coupledWorkDeclines, dyadicPreExtractionDeclines)
-    }
-    val exhausted: Boolean get() = ledger.lock.withLock {
-        params.maximumWork?.let { ledger.work >= it } == true ||
-            maximumWorkerWork?.let { sum(polynomialWork, quadraticWork) >= it } == true
-    }
-    val stopped: Boolean get() {
-        val limited = ledger.lock.withLock {
-            params.maximumWork?.let { ledger.work >= it } == true ||
-                maximumWorkerWork?.let { sum(polynomialWork, quadraticWork) >= it } == true ||
-                representationDecline != null || root?.representationDecline != null
-        }
-        return limited || stop()
-    }
+    private val representationDecline = ledger.cells.newReference<PolynomialTheoryResource?>(null)
+    val resource: PolynomialTheoryResource? get() = representationDecline.load()
+    val declinedResource: PolynomialTheoryResource? get() = resource ?: ledger.lock.withLock {
+        workers.values.toList()
+    }.firstNotNullOfOrNull { it.resource }
+    val work: Long get() = if (root == null) ledger.counters.work else counters.work
+    val numericalWork: Long get() = (if (root == null) ledger.counters else counters).quadraticWork.value
+    val polynomialStats: PolynomialTheoryStats get() = (if (root == null) ledger.counters else counters).stats()
+    val exhausted: Boolean get() = params.maximumWork?.let { ledger.counters.work >= it } == true ||
+        maximumWorkerWork?.let { counters.work >= it } == true
+    val stopped: Boolean get() = exhausted || resource != null || root?.resource != null || stop()
     val polynomial: Cancellation = Token(quadratic = false)
     val numerical: Cancellation = Token(quadratic = true)
 
@@ -68,35 +48,17 @@ internal class QuadraticNativeScope private constructor(
 
     fun phaseCancellation(worker: Cancellation, share: Double): Cancellation = (polynomial or worker).shorten(share)
 
-    fun observe(stats: QfNraStats) = ledger.lock.withLock {
-        projected = sum(projected, stats.projectedPolynomials)
-        lifted = sum(lifted, stats.liftedCells)
-        ledger.projected = sum(ledger.projected, stats.projectedPolynomials)
-        ledger.lifted = sum(ledger.lifted, stats.liftedCells)
-        stats.dyadicAttempts?.let {
-            dyadicAttempts = sum(dyadicAttempts ?: 0, it)
-            ledger.dyadicAttempts = sum(ledger.dyadicAttempts ?: 0, it)
-        }
-        stats.dyadicBases?.let {
-            dyadicBases = sum(dyadicBases ?: 0, it)
-            ledger.dyadicBases = sum(ledger.dyadicBases ?: 0, it)
-        }
-        stats.coupledWorkDeclines?.let {
-            coupledWorkDeclines = sum(coupledWorkDeclines ?: 0, it)
-            ledger.coupledWorkDeclines = sum(ledger.coupledWorkDeclines ?: 0, it)
-        }
-        stats.dyadicPreExtractionDeclines?.let {
-            dyadicPreExtractionDeclines = sum(dyadicPreExtractionDeclines ?: 0, it)
-            ledger.dyadicPreExtractionDeclines = sum(ledger.dyadicPreExtractionDeclines ?: 0, it)
-        }
+    fun observe(stats: QfNraStats) {
+        counters.observe(stats)
+        ledger.counters.observe(stats)
     }
 
-    fun decline(resource: PolynomialResource) = ledger.lock.withLock {
-        representationDecline = when (resource) {
+    fun decline(resource: PolynomialResource) {
+        representationDecline.store(when (resource) {
             PolynomialResource.DENSE_COEFFICIENTS -> PolynomialTheoryResource.DenseCoefficients
             PolynomialResource.MATRIX_CELLS -> PolynomialTheoryResource.MatrixCells
             PolynomialResource.DEGREE_OVERFLOW -> PolynomialTheoryResource.DegreeOverflow
-        }
+        })
     }
 
     fun reason(): TerminationReason = when {
@@ -111,30 +73,46 @@ internal class QuadraticNativeScope private constructor(
         override fun workMeter(): WorkMeter = this
         override fun charge(units: Long) {
             require(units >= 0)
-            ledger.lock.withLock {
-                if (quadratic) {
-                    quadraticWork = sum(quadraticWork, units)
-                    ledger.quadraticWork = sum(ledger.quadraticWork, units)
-                } else {
-                    polynomialWork = sum(polynomialWork, units)
-                    ledger.polynomialWork = sum(ledger.polynomialWork, units)
-                }
+            if (quadratic) {
+                counters.quadraticWork.add(units)
+                ledger.counters.quadraticWork.add(units)
+            } else {
+                counters.polynomialWork.add(units)
+                ledger.counters.polynomialWork.add(units)
             }
             stop.charge(units)
         }
     }
 
-    private class Ledger {
-        val lock = Mutex()
-        var polynomialWork = 0L
-        var quadraticWork = 0L
-        var projected = 0L
-        var lifted = 0L
-        var dyadicAttempts: Long? = null
-        var dyadicBases: Long? = null
-        var coupledWorkDeclines: Long? = null
-        var dyadicPreExtractionDeclines: Long? = null
-        val work: Long get() = sum(polynomialWork, quadraticWork)
+    private class Ledger(val concurrency: Concurrency) {
+        val cells = if (concurrency == Concurrency.None) SerialCells else AtomicCells
+        val lock = Mutex(concurrent = concurrency != Concurrency.None)
+        val counters = Counters(concurrency)
+    }
+
+    private class Counters(concurrency: Concurrency) {
+        val polynomialWork = WorkCounter(concurrency)
+        val quadraticWork = WorkCounter(concurrency)
+        private val projected = WorkCounter(concurrency)
+        private val lifted = WorkCounter(concurrency)
+        private val dyadicAttempts = WorkCounter(concurrency, -1L)
+        private val dyadicBases = WorkCounter(concurrency, -1L)
+        private val coupledWorkDeclines = WorkCounter(concurrency, -1L)
+        private val dyadicPreExtractionDeclines = WorkCounter(concurrency, -1L)
+        val work: Long get() = sum(polynomialWork.value, quadraticWork.value)
+
+        fun observe(stats: QfNraStats) {
+            projected.add(stats.projectedPolynomials)
+            lifted.add(stats.liftedCells)
+            stats.dyadicAttempts?.let(dyadicAttempts::add)
+            stats.dyadicBases?.let(dyadicBases::add)
+            stats.coupledWorkDeclines?.let(coupledWorkDeclines::add)
+            stats.dyadicPreExtractionDeclines?.let(dyadicPreExtractionDeclines::add)
+        }
+
+        fun stats() = PolynomialTheoryStats(projected.value, lifted.value, polynomialWork.value,
+            dyadicAttempts.value.takeIf { it >= 0L }, dyadicBases.value.takeIf { it >= 0L },
+            coupledWorkDeclines.value.takeIf { it >= 0L }, dyadicPreExtractionDeclines.value.takeIf { it >= 0L })
     }
 }
 

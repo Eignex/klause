@@ -10,8 +10,9 @@ import com.eignex.util.concurrent.Mutex
 internal class PolynomialInvocationScope(
     private val service: PolynomialTheoryService,
     private val params: PolynomialTheoryParams,
+    concurrent: Boolean = true,
 ) {
-    private val native = QuadraticNativeScope(params)
+    private val native = QuadraticNativeScope(params, concurrent)
     private val lock = Mutex()
     private var decline: PolynomialTheoryResource? = null
     val resource: PolynomialTheoryResource? get() = lock.withLock { decline }

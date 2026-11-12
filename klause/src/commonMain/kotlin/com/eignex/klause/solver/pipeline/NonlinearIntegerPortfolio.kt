@@ -20,7 +20,7 @@ internal class NonlinearIntegerPortfolio(
         if (!plan.capabilities.admission(engine).runnable) return PolynomialTheoryExecution(
             OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY), PolynomialTheoryStats())
         val polynomial = params.polynomial
-        val scope = QuadraticNativeScope(polynomial)
+        val scope = QuadraticNativeScope(polynomial, concurrent = cores > 1)
         val identity = ModelIdentity.of(request.problem)
         val binding = EngineInvocation(plan, identity, sourceAssumptions = polynomial.strategy.assumptions)
         val workers = ArrayList<NonlinearIntegerInvocation>()

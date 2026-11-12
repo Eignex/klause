@@ -7,6 +7,23 @@ import kotlin.test.assertTrue
 
 class NodeBudgetConcurrencyTest {
     @Test
+    fun `parallel decisions and moves should preserve fractional aggregate prices`() {
+        val budget = NodeBudget(900L)
+        val quotas = budget.quotas(4)
+
+        val workers = quotas.map { quota -> thread {
+            repeat(100) {
+                quota.spend()
+                quota.spendMoves(1L)
+            }
+        } }
+        workers.forEach { it.join() }
+
+        assertEquals(900L, budget.spent)
+        assertTrue(quotas.all { it.spent == 225L && it.exhausted() })
+    }
+
+    @Test
     fun `parallel quotas should retain every completed native charge`() {
         val budget = NodeBudget(400L)
         val quotas = budget.quotas(4)

@@ -12,7 +12,7 @@ import com.eignex.klause.solver.resources.NodeAllowance
  * Built-in parallel portfolios partition the remaining allowance into persistent worker quotas.
  * Unused quota is not transferred to another worker. Completed atomic work can overshoot a quota;
  * that work remains charged and cancellation stops later operations at their polling boundaries.
- * Aggregation is synchronized, but concurrent scheduling is not reproducible.
+ * Charges use exact atomic counters; concurrent scheduling is not reproducible.
  */
 class NodeBudget private constructor(internal val allowance: NodeAllowance) {
     /** Create a solve allowance, including an already exhausted zero allowance. */
