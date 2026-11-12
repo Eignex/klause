@@ -1,9 +1,7 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.factor.table.Table
-import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -52,8 +50,6 @@ internal class ProblemFacts(
     val continuousObjective: Boolean = false,
     val integerLinear: Boolean = false,
     val booleanObjective: Boolean = false,
-    val circuit: Boolean = false,
-    val binaryPackingObjective: Boolean = false,
     val binaryEqualityObjective: Boolean = false,
     val extensionalSupports: Boolean = false,
     val construction: WorkerConstructionCost = WorkerConstructionCost(0, 0),
@@ -102,10 +98,6 @@ internal class ProblemFacts(
                     problem.numRealVars, problem.factors.size),
                 observer = observer,
                 binaryIntegers = binary,
-                binaryPackingObjective = (binary && problem.hasPackingObjective(objective)) ||
-                    binarySource?.let {
-                        it.problem.binaryIntegers && it.problem.hasPackingObjective(it.objective)
-                    } == true,
                 binaryEqualityObjective = (binary && problem.hasBinaryEqualityObjective(objective)) ||
                     binarySource?.let {
                         it.problem.binaryIntegers && it.problem.hasBinaryEqualityObjective(it.objective)
@@ -126,7 +118,6 @@ internal class ProblemFacts(
                     CoreGuidedSearch.eligible(problem, it) &&
                         it.boolWeightValues.any { weight -> weight != 0L }
                 } == true,
-                circuit = problem.factors.any { it is Circuit },
                 extensionalSupports = profile.problemClass == ProblemClass.FiniteCp && !profile.optimizing &&
                     problem.factors.any { factor ->
                         factor is Table && factor.hi == null && factor.arity in 2..32 && factor.numTuples <= 65_536 &&
@@ -158,33 +149,6 @@ internal val Problem.binaryIntegers: Boolean
         intBounds.hasLower(it) && intBounds.hasUpper(it) &&
             intBounds.lower(it) >= 0L && intBounds.upper(it) <= 1L
     }
-
-private fun Problem.hasPackingObjective(objective: LinearObjective?): Boolean {
-    if (numBoolVars != 0 || numRealVars != 0 || numIntVars == 0 || objective == null) return false
-    if (objective.boolWeightValues.any { it != 0L } || objective.realCoefficientValues.any { it != 0.0 } ||
-        objective.intCoefficientValues.size > numIntVars ||
-        objective.intCoefficientValues.none { it < 0L } || objective.intCoefficientValues.any { it > 0L }
-    ) {
-        return false
-    }
-    return factors.isNotEmpty() && factors.all { it.isBinaryPackingCapacity() }
-}
-
-private fun Factor.isBinaryPackingCapacity(): Boolean {
-    val form = linearForm as? LinearForm.Conjunction ?: return false
-    val row = form.rows.singleOrNull() ?: return false
-    if (!row.isLongUnconditional || !row.isIntegerOnly || row.relation != LinearOp.LE || row.bound < 0L) return false
-    var firstPositive = -1
-    var coupled = false
-    for (k in 0 until row.size) {
-        val coefficient = row.coeff(k)
-        if (coefficient < 0L) return false
-        if (coefficient > 0L) {
-            if (firstPositive < 0) firstPositive = row.ref(k) else if (row.ref(k) != firstPositive) coupled = true
-        }
-    }
-    return coupled
-}
 
 private fun Problem.hasBinaryEqualityObjective(objective: LinearObjective?): Boolean {
     if (numBoolVars != 0 || numRealVars != 0 || numIntVars == 0 || objective == null) return false

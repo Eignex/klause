@@ -612,8 +612,8 @@ Selection considers efficacy, parallelism,
 orthogonality, age and row caps; separators check actual column integrality, so
 continuous columns decline. Root harvesting caps retained cuts at the original row
 count, and root and node separation keep their round, depth, pool and work
-allowances. The [portfolio](12-portfolio.md#lp-arm-admission) decides when
-an aggressive LP companion runs.
+allowances. The [portfolio](12-portfolio.md#roles-and-the-mixed-roster) decides when
+the aggressive LP emphasis is seated.
 
 Cut family identity follows portable proofs and retained rows without contributing
 to proof authority or deduplication. Finite root and node phases name the ordinary,

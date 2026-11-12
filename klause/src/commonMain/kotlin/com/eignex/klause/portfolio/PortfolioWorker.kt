@@ -80,8 +80,8 @@ class PortfolioWorker private constructor(
 
     internal var restartingSearch: Boolean = false
 
-    /** The role this worker's arm declares in its roster, or null when it declares none. */
-    internal var role: ArmRole? = null
+    /** The role this worker's arm fills in its roster, or its rank fill; null outside a composed roster. */
+    internal var role: String? = null
 
     internal var improvementOnly: Boolean = false
 

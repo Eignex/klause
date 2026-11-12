@@ -46,8 +46,9 @@ coordinate can supply a private protected-coordinate view to the curated full
 local-search slot. This applies to `Diffn` models without `Element` alternatives,
 where primary and full neighborhoods offer the same repairs. The slot runs the full
 plateau recipe; the primary retains the rewritten model. Protected aliases guide
-infeasible repairs; the canonical objective orders feasible incumbents. The view retires at the next scheduling boundary after the first
-global witness, so canonical workers handle incumbent improvement. No arms or
+infeasible repairs; the canonical objective orders feasible incumbents. The view
+retires at the next scheduling boundary after the first global witness, so
+canonical workers handle incumbent improvement. No arms or
 allowances are added. Custom local-search recipes, named backtrack pools, explicit
 arm counts and explicit presolve keep the selected representation.
 
@@ -1078,12 +1079,12 @@ Every catalog arm declares the one role it covers in a roster:
 
 | Role | Arms |
 |---|---|
-| `first-solution` | Local-search recipes on fixed, Luby or no restarts |
+| `first-solution` | Local-search recipes on fixed, Luby or no restarts, and the primary-repair plateau recipe |
 | `learning-proof` | The SAT guard, the conflict-driven core and the clausal proof recipes |
 | `lp-bounding` | The LP recipes: default, aggressive, best-bound tree and conservative emphasis |
 | `objective-cores` | The core-guided worker |
 | `selector-diversity` | The source annotation and the recipes that change only the variable or value order |
-| `neighbourhood-improvement` | Hybrid ALNS and local-search recipes whose restarts perturb their incumbents |
+| `neighbourhood-improvement` | Hybrid ALNS and the other local-search recipes whose restarts perturb their incumbents |
 
 The model's kind and facts name the roles it needs, in seating order. A role named
 twice seats its two best arms; a role no eligible arm covers seats none.
@@ -1118,8 +1119,9 @@ ALNS arm. Optimization reads local search first and satisfaction complete search
 first. The best arm of a role is the first to declare it when the ranks are read one
 position at a time. The roster seats the best arm of each needed role, then fills the
 remaining slots by rank: the engines take turns, each seating its next unseated arm.
-Neither step reads the pool size, so a smaller roster is a prefix of a larger one and
-the same rule serves every core count. A rank that runs out repeats its recipes on
+Neither step reads the pool size or the core count, so among pools with more arms
+than cores a smaller roster is a prefix of a larger one. A pool with a core per arm
+reads no ALNS rank and is seated by the same rule. A rank that runs out repeats its recipes on
 fresh seeds; the annotation, the core worker and ALNS never repeat. Seated arms
 count toward the configured pool size.
 
@@ -1128,15 +1130,20 @@ depend on the model: clausal satisfaction ranks its balanced clause-only recipe 
 fixed-break probSAT first, pseudo-Boolean local search ranks the bandit flip walk and
 jump moves first, and scheduling optimization ranks the primary-repair plateau recipe
 beside the full one, both on iterated local-search restarts. An injected pool
-replaces its engine's rank with the selected recipes in the given order.
+replaces its engine's rank with the selected recipes in the given order, and its
+first recipe is seated ahead of the needed roles: complete search first on an
+optimization, local search first on satisfaction.
 
-Single-engine pools take the prefix of their engine's rank; a backtrack-only pool of
+Single-engine pools take the prefix of their engine's rank, without the scheduling
+lead; a backtrack-only pool of
 at least two arms gives the annotation its last slot. A curated sequential mixed
 optimization pool larger than the default searches for its first solution with the
 default roster and admits the remaining arms after the first incumbent.
 
-Portfolio statistics report each arm's role as `role=` on its `arm.` line, and a
-selected `WorkerAdmission` event carries the same name.
+Portfolio statistics report each arm's seat as `role=` on its `arm.` line: the role
+the arm was seated for, or `rank/` and its declared role when it filled a slot by
+rank, as every arm of a single-engine pool does. A selected `WorkerAdmission` event
+carries the same name.
 
 On continuous columns with a continuous objective, single-core pools reserve half
 the scheduled time for the default LP arm until the first incumbent. A default-size

@@ -36,7 +36,7 @@ internal data class AlnsProfile(
         private fun profile(label: String, destroy: Pair<Double, Double>, worsening: Double, cooling: Double) =
             AlnsProfile(label, destroy.first, destroy.second, worsening, cooling)
 
-        /** The regime the standalone [AlnsWorkerConfig] arm (e.g. the last slot of a mixed portfolio) uses. */
+        /** The regime the standalone [AlnsWorkerConfig] arm (e.g. the neighbourhood arm of a mixed roster) uses. */
         val Default: AlnsProfile = Curated.first()
     }
 }

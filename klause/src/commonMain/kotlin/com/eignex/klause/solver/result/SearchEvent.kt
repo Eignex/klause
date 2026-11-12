@@ -56,7 +56,8 @@ sealed interface SearchEvent {
         val declines: List<String>,
         /** Whether composition selected this eligible recipe for materialization. */
         val selected: Boolean = false,
-        /** The role a selected recipe declares in its roster; null when it declares none. */
+        /** The role a selected recipe fills in its roster, or `rank/` and the role it declares when it filled a
+         *  slot by rank; null for other admissions. */
         val role: String? = null,
     ) : SearchEvent
 

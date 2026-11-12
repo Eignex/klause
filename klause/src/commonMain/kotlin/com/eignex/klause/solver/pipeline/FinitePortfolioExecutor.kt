@@ -259,8 +259,7 @@ internal fun FinitePipeline.portfolioExecutor(
             }
         }
         val probes = if (scenario.cores == 1 && scenario.engine == EngineMix.MIXED && scenario.kind == Kind.COP &&
-            scenario.btPool == null && scenario.lsPool == null && profile.realColumns &&
-            scenario.arms == PortfolioScenario.DEFAULT_ARMS
+            scenario.btPool == null && scenario.lsPool == null && profile.realColumns && !scenario.explicitArms
         ) {
             workers.indices.filter { arm -> workers[arm].label == "bt/lp-default" }.toSet()
         } else {

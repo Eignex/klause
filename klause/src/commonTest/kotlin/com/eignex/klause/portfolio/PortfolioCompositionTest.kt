@@ -4,11 +4,6 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.SmallestDomain
-import com.eignex.klause.backtrack.toBacktrackParams
-import com.eignex.klause.ir.SearchGroup
-import com.eignex.klause.ir.SearchHints
-import com.eignex.klause.ir.ValueSelection
-import com.eignex.klause.ir.VariableSelection
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.solver.ProblemClass
@@ -32,7 +27,6 @@ class PortfolioCompositionTest {
         assertTrue(arms.all { it.label == "conflictDriven" })
     }
 
-
     @Test
     fun `finite satisfaction diversity should spend the containing node allowance`() {
         val budget = NodeBudget(limit = 100)
@@ -48,7 +42,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `integer linear companion should remain available with cuts disabled`() {
+    fun `a cuts-off ceiling should keep the second LP emphasis seated`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, integerLinear = true) { true }
         val baseline = PortfolioComposition.compose(scenario, facts)
@@ -341,7 +335,6 @@ class PortfolioCompositionTest {
         assertSame(budget, annotation.recipe.build(1L, null).nodeBudget)
     }
 
-
     @Test
     fun `an optimization roster should seat one arm per needed role before filling by rank`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
@@ -444,22 +437,102 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `pure integer rows should seat a second LP emphasis and binary ones a selector arm`() {
+    fun `pure integer rows should seat a second LP emphasis`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemFacts.assumed(Kind.COP).profile
-        val cases = listOf(
-            ProblemFacts(profile, integerLinear = true) { true } to "cbls-plateau/ils-basin",
-            ProblemFacts(profile, binaryIntegers = true, binaryEqualityObjective = true) { true } to
-                "selector-switch",
-        )
-        for ((facts, last) in cases) {
+        for (facts in listOf(
+            ProblemFacts(profile, integerLinear = true) { true },
+            ProblemFacts(profile, binaryIntegers = true, binaryEqualityObjective = true) { true },
+        )) {
             val labels = PortfolioComposition.compose(scenario, facts).map { it.label }
 
             assertEquals(
-                listOf("satOptimized", "cbls/fixed", "lp-default", "alns-balanced", "lp-aggressive", last),
-                labels,
+                listOf("satOptimized", "cbls/fixed", "lp-default", "alns-balanced", "lp-aggressive"),
+                labels.take(5),
             )
         }
+    }
+
+    @Test
+    fun `a role needed twice should seat one arm when only one is eligible`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemFacts.assumed(Kind.COP).profile
+        val facts = ProblemFacts(profile, integerLinear = true) { it == LpEmphasis.CONSERVATIVE }
+
+        val plan = PortfolioComposition.plan(scenario, facts)
+
+        assertEquals(listOf("lp-conservative"), plan.arms.map { it.label }.filter { it.startsWith("lp-") })
+        assertEquals(scenario.arms, plan.arms.size)
+    }
+
+    @Test
+    fun `a finite model over binary integers should seat a selector arm beside its relaxation`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, binaryIntegers = true) { true }
+
+        val plan = PortfolioComposition.plan(scenario, facts)
+
+        val selector = plan.arms.indexOfFirst { it.label == "selector-switch" }
+        assertEquals("selector-diversity", plan.seats[selector])
+        assertTrue(plan.arms.any { it.label == "lp-default" })
+    }
+
+    @Test
+    fun `a seat should report the role it fills or its rank fill`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile) { true }
+
+        val plan = PortfolioComposition.plan(scenario, facts)
+
+        assertEquals(
+            listOf(
+                "learning-proof", "first-solution", "lp-bounding", "neighbourhood-improvement",
+                "rank/neighbourhood-improvement", "rank/learning-proof",
+            ),
+            plan.seats,
+        )
+    }
+
+    @Test
+    fun `a single engine pool should report every seat as a rank fill`() {
+        val scenarios = listOf(
+            PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK, arms = 3),
+            PortfolioScenario.sequential(Kind.COP, engine = EngineMix.LOCAL_SEARCH, arms = 3),
+            PortfolioScenario.sequential(Kind.COP, engine = EngineMix.ALNS, arms = 3),
+        )
+        for (scenario in scenarios) {
+            val plan = PortfolioComposition.plan(scenario, ProblemFacts.assumed(Kind.COP))
+
+            assertTrue(plan.seats.all { it.startsWith("rank/") }, "${scenario.engine} ${plan.seats}")
+        }
+    }
+
+    @Test
+    fun `a pinned recipe should be seated in the smallest mixed pool`() {
+        val complete = PortfolioScenario.sequential(Kind.COP, arms = 2)
+            .copy(btPool = listOf { BacktrackCatalog.byLabel("domwdeg") })
+        val local = PortfolioScenario.sequential(Kind.COP, arms = 2)
+            .copy(lsPool = listOf { LocalSearchCatalog.byLabel("walksat-cc/luby") })
+
+        val pinnedComplete = PortfolioComposition.compose(complete).map { it.label }
+        val pinnedLocal = PortfolioComposition.compose(local).map { it.label }
+
+        assertEquals(listOf("domwdeg", "cbls/fixed"), pinnedComplete)
+        assertEquals(listOf("walksat-cc/luby", "satOptimized"), pinnedLocal)
+    }
+
+    @Test
+    fun `an injected local search recipe should repeat beside the curated complete arms`() {
+        val scenario = PortfolioScenario.sequential(Kind.CSP)
+            .copy(lsPool = listOf { LocalSearchCatalog.byLabel("cbls/fixed") })
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.CSP).profile) { true }
+
+        val labels = PortfolioComposition.compose(scenario, facts).map { it.label }
+
+        assertEquals(
+            listOf("cbls/fixed", "satOptimized", "lp-default", "conflictDriven", "cbls/fixed", "lp-aggressive"),
+            labels,
+        )
     }
 
     @Test
@@ -504,7 +577,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `a smaller roster should be a prefix of a larger one at every core count`() {
+    fun `a smaller roster should be a prefix of a larger one among pools with more arms than cores`() {
         val cases = listOf(
             Kind.COP to ProblemFacts.assumed(Kind.COP),
             Kind.COP to ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, booleanObjective = true) { false },

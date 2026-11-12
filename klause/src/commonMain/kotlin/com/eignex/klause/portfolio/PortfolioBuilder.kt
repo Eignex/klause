@@ -115,7 +115,7 @@ object PortfolioBuilder {
             if (it is LocalSearchWorkerConfig) it.withBufferedPublications() else it
         } else timed
         require(!scenario.earlyCoreAdmission || configs.any { it is CoreGuidedWorkerConfig }) {
-            "core-early requires an eligible Boolean objective core worker"
+            "core-early requires a roster that seats an eligible Boolean objective core worker"
         }
         val strategies = configs.mapNotNull { config ->
             when (config) {
@@ -183,7 +183,7 @@ object PortfolioBuilder {
                     selectedSweep, onEvent, pools,
                 )
                 worker.bindEvidence(ModelIdentity.of(problem, objective)).also {
-                    it.role = plan.roles[armId]
+                    it.role = plan.seats[armId]
                     it.earlyCoreTrial = config is CoreGuidedWorkerConfig && deferCore && scenario.earlyCoreAdmission
                     it.retainInitialProofCoverage = config is CoreGuidedWorkerConfig && deferCore
                     it.improvementOnly = if (config is CoreGuidedWorkerConfig && deferCore) {
@@ -203,7 +203,7 @@ object PortfolioBuilder {
                         sourceMapping = if (privateCoordinates) WorkerSourceMapping.CHECKED_RECONSTRUCTION
                         else WorkerSourceMapping.WORKING_COORDINATES)
                     observe("portfolio", SearchEvent.WorkerAdmission(config.label, true,
-                        requirements.toString(), emptyList(), selected = true, role = plan.roles[armId]?.label))
+                        requirements.toString(), emptyList(), selected = true, role = plan.seats[armId]))
                 }
                 worker
             }
