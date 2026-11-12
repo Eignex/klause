@@ -4,7 +4,7 @@ import com.eignex.kumulant.core.Concurrency
 import com.eignex.util.concurrent.AtomicCells
 
 // Allowances need exact integer saturation; floating-point statistical sums lose unit debits above 2^53.
-internal class WorkCounter(concurrency: Concurrency, initial: Long = 0L) {
+internal class WorkCounter(val concurrency: Concurrency = Concurrency.None, initial: Long = 0L) {
     private var serial = initial
     private val shared = if (concurrency == Concurrency.None) null else AtomicCells.newLong(initial)
 

@@ -414,8 +414,10 @@ instruction conversion and quota partitioning. `backtrack.NodeBudget` is the
 published facade; each facade forwards to one allowance without copying counters.
 Shared counters use exact saturating integer cells with the atomic backend used by
 Kumulant's relaxed concurrency mode; single-threaded arithmetic scopes use plain
-variables. Counter reads and charges acquire no mutex. Concurrent snapshots can
-span several charges; completed charges remain exact after workers join. Quota
+variables. Each `WorkCounter` retains its fixed `concurrency` mode and defaults to
+`Concurrency.None`, following Kumulant's stat contract. Counter reads and charges
+acquire no mutex. Concurrent snapshots can span several charges; completed charges
+remain exact after workers join. Quota
 registration alone uses a mutex, and capacity is read before registration.
 `Cancellation` and `WorkMeter` live in `util` and contain no portfolio pricing; units
 come from the caller's adapter, and solver policy owns conversions and result
