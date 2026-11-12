@@ -679,7 +679,8 @@ entering a flagged list first drops its retired postings in one ordered pass,
 debiting each read, move and released page, and a cleanup scan suspended on that
 list starts over. Live postings keep their order, so the sweep that follows visits
 live postings only. A learned clause visit reads its watch positions and scan
-cursor from one metadata row. Funded cleanup keeps its read and write cursors across slices.
+cursor from one metadata row. A sweep debits its posting and truth reads when it
+leaves the list or pins a literal, with the same total as one debit per read. Funded cleanup keeps its read and write cursors across slices.
 It checks the tail before filling retired holes and releases empty posting pages
 through the same owner.
 Capacity changes replace the disjoint metadata pool identity. A protected row retains
