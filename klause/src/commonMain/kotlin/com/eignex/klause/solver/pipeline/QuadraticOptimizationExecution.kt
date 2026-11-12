@@ -65,7 +65,7 @@ fun OpenTheoryPipeline.minimize(
     onAccepted: ((QuadraticIncumbentPublication) -> Unit)?,
 ): QuadraticOptimizationExecution {
     require(cores > 0)
-    val native = QuadraticNativeScope(params)
+    val native = QuadraticNativeScope(params, concurrent = cores > 1 && engine != FiniteEngine.FIXED)
     var acceptedSource: QuadraticIncumbentPublication? = null
     val publication = QuadraticPublicationObserver { accepted ->
         request.reconstructSource(accepted.incumbent, params, native.polynomial)?.let { point ->

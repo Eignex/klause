@@ -239,7 +239,7 @@ private fun minimizePolynomial(
         )
     }
     val shared = request.resolvedModel()
-    val scope = PolynomialInvocationScope(shared.service, params)
+    val scope = PolynomialInvocationScope(shared.service, params, concurrent = cores > 1 && engine != FiniteEngine.FIXED)
     val completed = PolynomialStrategyAdapters(operation, shared, scope, params.strategy, stop, cores)
         .minimize(objective, engine)
     val result = when (completed) {
@@ -319,7 +319,7 @@ private fun executePolynomial(
         return incomplete(TerminationReason.Unsupported, PolynomialTheoryStats(), SolveStats.EMPTY)
     }
     val shared = request.resolvedModel()
-    val scope = PolynomialInvocationScope(shared.service, params)
+    val scope = PolynomialInvocationScope(shared.service, params, concurrent = cores > 1 && engine != FiniteEngine.FIXED)
     val solved = PolynomialStrategyAdapters(request.preparedPlan, shared, scope, params.strategy, stop, cores)
         .solve(engine)
     val result = solved.withStats(request.preparationStats(solved.stats))
