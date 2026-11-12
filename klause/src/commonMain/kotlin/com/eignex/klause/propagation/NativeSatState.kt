@@ -1212,7 +1212,8 @@ internal class NativeSatState(private val state: PropagationState) {
             val len = if (baseClause) arena.length(h) else lits.size
             // One row lookup serves the watch positions and scan cursor of a learned clause.
             val row = if (baseClause) watchPos else metadata.rowValues(h - baseCount)
-            val watches = if (baseClause) 2 * h else metadata.rowOffset(h - baseCount) + NativeLearnedMetadata.WATCH_FIRST
+            val watches = if (baseClause) 2 * h
+            else metadata.rowOffset(h - baseCount) + NativeLearnedMetadata.WATCH_FIRST
             val i0 = row[watches]
             val i1 = row[watches + 1]
             val slot0IsFalse = lits[start + i0] == falseLit
