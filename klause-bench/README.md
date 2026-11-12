@@ -29,7 +29,7 @@ make no source-solving or independent correctness claim.
 controls and retains its complete compilation log. `warmup-ms` and `sample-ms`
 set the warmup and each of five measurement windows; defaults are 1500 and 300.
 
-`measurement=startup` records JVM 25 method traces for class initialization, quadratic
+`measurement=startup` records JVM 25 method traces for selected engine class initializers, quadratic
 proposals and exact certification, alongside class loading and 1 ms execution samples.
 It instruments the CLI and is for attribution; use `measurement=resources` for timing comparisons.
 
