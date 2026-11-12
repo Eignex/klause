@@ -197,9 +197,8 @@ class RetainedLinearQueriesTest {
     }
 
     @Test
-    fun `a root representation decline should exhaust retained queries without reopening the source`() {
+    fun `a source decline should exhaust retained queries without reopening the source`() {
         val source = Problem(1, 0, emptyArray(), emptyArray())
-        var openings = 0
         val registration = PreparedSearchRegistration(
             source,
             ExecutionComponentDescriptor(
@@ -210,24 +209,50 @@ class RetainedLinearQueriesTest {
                 emptyList(),
             ),
         ) {
-            openings++
             listOf(object : SearchComponent {
                 override fun initialize(context: SearchContext): ComponentResult = ComponentResult.Indeterminate
             })
         }
         val prepared = PreparedSearchRegistrations(source, listOf(registration))
-        val queries = RetainedLinearQueries(source, TheoryParams(), null) { stop, _ ->
-            prepared.open(Long.MAX_VALUE, stop, SearchLearnedDbParams(), null, null)
+        val declines = listOf<(Cancellation) -> PlannedSearch?>(
+            { stop -> prepared.open(Long.MAX_VALUE, stop, SearchLearnedDbParams(), null, null) },
+            { null },
+        )
+        for (decline in declines) {
+            var openings = 0
+            val queries = RetainedLinearQueries(source, TheoryParams(), null) { stop, _ ->
+                openings++
+                decline(stop)
+            }
+
+            queries.use {
+                assertFalse(it.prepareBooleanCenter(Cancellation.Never))
+                val result = it.check(
+                    ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never,
+                )
+
+                assertEquals(ExactNeighborhoodResult.Undecided, result)
+                assertTrue(it.declined)
+                assertTrue(it.exhausted)
+                assertEquals(1, openings)
+            }
+        }
+    }
+
+    @Test
+    fun `a source preparation stopped by its token should leave retained queries reopenable`() {
+        val source = Problem(1, 0, emptyArray(), emptyArray())
+        var stopped = false
+        val queries = RetainedLinearQueries(source, TheoryParams(), null) { _, _ ->
+            stopped = true
+            null
         }
 
         queries.use {
-            assertFalse(it.prepareBooleanCenter(Cancellation.Never))
-            val result = it.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never)
+            assertFalse(it.prepareBooleanCenter(Cancellation { stopped }))
 
-            assertEquals(ExactNeighborhoodResult.Undecided, result)
-            assertTrue(it.declined)
-            assertTrue(it.exhausted)
-            assertEquals(1, openings)
+            assertFalse(it.declined)
+            assertFalse(it.exhausted)
         }
     }
 

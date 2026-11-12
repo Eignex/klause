@@ -37,6 +37,7 @@ internal class FiniteExactNeighborhood(
     private val geometry = OpenExactNeighborhood(source.withIntDomains(source.rootIntDomainsInPlace), params, objective)
     private var adapter: OpenExactNeighborhood? = null
     val exhausted: Boolean get() = adapter?.exhausted == true
+    val declined: Boolean get() = adapter?.declined == true
 
     private fun prepare(cancellation: Cancellation): OpenExactNeighborhood? {
         adapter?.let { return it }
@@ -117,6 +118,7 @@ internal fun finiteExactNeighborhoodWorker(
     }
     worker = exactNeighborhoodWorker(if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood",
         armId, objective, Cancellation.Never, exhausted = { retained?.exhausted == true },
+        declined = { retained?.declined == true },
         open = { adapter().search(adaptive, seed) })
         .bindEvidence(ModelIdentity.of(source, objective), provesResults = false)
     return worker

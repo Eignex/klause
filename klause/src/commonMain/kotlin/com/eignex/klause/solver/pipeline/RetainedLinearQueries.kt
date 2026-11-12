@@ -159,7 +159,11 @@ internal class RetainedLinearQueries(
     @Suppress("TooGenericExceptionCaught") // Invocation cleanup preserves an arbitrary primary failure.
     private fun prepared(): PlannedSearch? {
         planned?.let { return it }
-        val created = open(scope.stop, state) ?: return null
+        // Preparing the same source repeats its decline, so only a stop leaves the source reopenable.
+        val created = open(scope.stop, state) ?: run {
+            sourceDeclined = !scope.stop()
+            return null
+        }
         var retained = false
         var failure: Throwable? = null
         try {
@@ -171,7 +175,7 @@ internal class RetainedLinearQueries(
                     return created
                 }
                 is ComponentResult.Conflict -> sourceRefuted = true
-                // A representation decline is a property of the source, so a later query would decline the same way.
+                // A root representation decline belongs to the source, so a later query would decline the same way.
                 ComponentResult.Indeterminate -> sourceDeclined = !scope.stop() &&
                     created.session.executionControls.stopCause == SearchStopCause.RepresentationDecline
             }
