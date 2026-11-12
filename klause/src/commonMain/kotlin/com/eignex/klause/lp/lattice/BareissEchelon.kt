@@ -6,10 +6,10 @@ import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.abs
 import com.eignex.util.numbers.div
+import com.eignex.util.numbers.gcd
 import com.eignex.util.numbers.isZero
 import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.minus
-import com.eignex.util.numbers.remainderOf
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.unaryMinus
 
@@ -112,7 +112,7 @@ internal fun bareissEchelon(
             if (cancellation()) return BareissEchelon(emptyList(), IntArray(0))
             cancellation.charge(LATTICE_WORK_WEIGHT)
             val factor = w[q][c]
-            val g = gcdOf(pivotValue, factor)
+            val g = pivotValue.gcd(factor)
             val scaleQ = pivotValue / g
             val scaleP = factor / g
             if (limits != null && (!productFits(w[q], scaleQ, rhs?.get(q), limits.maxBits) ||
@@ -227,7 +227,7 @@ private fun combine(
 private fun content(row: SparseIntRow, extra: BigInt?): BigInt {
     var g = extra?.abs() ?: BIG_ZERO
     for (v in row.value) {
-        g = gcdOf(g, v)
+        g = g.gcd(v)
         if (g == BIG_ONE) return BIG_ONE
     }
     return if (g.isZero()) BIG_ONE else g
@@ -235,8 +235,6 @@ private fun content(row: SparseIntRow, extra: BigInt?): BigInt {
 
 private fun divide(row: SparseIntRow, by: BigInt): SparseIntRow =
     SparseIntRow(row.index, Array(row.index.size) { row.value[it] / by })
-
-private tailrec fun gcdOf(a: BigInt, b: BigInt): BigInt = if (b.isZero()) a.abs() else gcdOf(b, a.remainderOf(b))
 
 // Work units per big-integer entry an elimination step touches, against one simplex op: routing time per unit
 // over the calibration sample's models that reached the reduction (QF_LIA), ~4e-3 ms.

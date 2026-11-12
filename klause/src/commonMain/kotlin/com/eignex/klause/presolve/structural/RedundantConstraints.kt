@@ -24,13 +24,13 @@ import com.eignex.klause.presolve.SubsumeState
 import com.eignex.klause.presolve.asSourceDelta
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.ScanMeter
-import com.eignex.kumulant.math.splitmix64
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.MutableIntLongMap
 import com.eignex.util.collections.MutableIntObjectMap
 import com.eignex.util.collections.MutableLongIntMap
 import com.eignex.util.collections.MutableLongObjectMap
+import com.eignex.util.hash.splitmix64
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.addExact
 

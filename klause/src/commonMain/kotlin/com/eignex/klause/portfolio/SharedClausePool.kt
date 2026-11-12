@@ -8,10 +8,10 @@ import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.klause.util.SharingMemorySnapshot
 import com.eignex.klause.util.SharingMemoryStatus
-import com.eignex.kumulant.stream.Mutex
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.LongHashSet
 import com.eignex.util.collections.hashTableCapacity
+import com.eignex.util.concurrent.Mutex
 import com.eignex.util.hash.fibonacciHash
 
 /**

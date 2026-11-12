@@ -1,7 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.stream.Mutex
+import com.eignex.util.concurrent.Mutex
 
 /**
  * What each arm's shared contributions did for the pool: a clause taking part in another arm's conflict or unit, a

@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.util.Cancellation
-import com.eignex.kumulant.stream.Mutex
+import com.eignex.util.concurrent.Mutex
 
 /**
  * The components selected for one solver engine from its source model.

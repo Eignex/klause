@@ -5,10 +5,10 @@ import com.eignex.klause.lp.cut.CutSharing
 import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.stream.Mutex
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongHashSet
+import com.eignex.util.concurrent.Mutex
 
 /**
  * An append-only, de-duplicated pool of portfolio-portable [SharedCut]s shared across the LP-bearing

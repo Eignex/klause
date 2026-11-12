@@ -9,7 +9,7 @@ import com.eignex.klause.solver.incumbent.ModelEvidenceVerifier
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.stream.Mutex
+import com.eignex.util.concurrent.Mutex
 
 /**
  * The cross-arm objective **lower** bound of one minimisation portfolio — the dual of the

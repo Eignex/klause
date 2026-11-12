@@ -11,7 +11,7 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.kumulant.stream.Mutex
+import com.eignex.util.concurrent.Mutex
 
 internal fun TranscendentalProblem.prepareTranscendentalExecutionPlan(): PreparedSourcePlan = PreparedSourcePlan(
     this, PreparedExecution.Transcendental(this),
