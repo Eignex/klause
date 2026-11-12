@@ -3,6 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntDisjointSet
 
 /**
  * Component-decomposed LP solve: when the structural columns split into independent blocks (two
@@ -872,15 +873,7 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     projection?.reserve(5L * n + 4L * m + 4L * rowIndex.colIdx.size + 1L,
         16L * n + 12L * m, matrix = true)
     // Union-find over columns sharing a row.
-    val parent = IntArray(n) { it }
-    fun find(x: Int): Int {
-        var r = x
-        while (parent[r] != r) {
-            parent[r] = parent[parent[r]]
-            r = parent[r]
-        }
-        return r
-    }
+    val partition = IntDisjointSet(n)
     val inRow = BooleanArray(n)
     var rowOnlyRows = 0
     for (i in 0 until m) {
@@ -891,13 +884,12 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
             rowOnlyRows++
             continue
         }
-        val root = find(rowIndex.colIdx[from])
+        val root = partition.find(rowIndex.colIdx[from])
         inRow[rowIndex.colIdx[from]] = true
         for (p in from + 1 until to) {
             val j = rowIndex.colIdx[p]
             inRow[j] = true
-            val rj = find(j)
-            if (rj != root) parent[rj] = root
+            partition.union(j, root)
         }
     }
     // Order components by first-seen root; a model with a single row-coupled block stays monolithic.
@@ -905,7 +897,7 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     var blocks = 0
     for (j in 0 until n) {
         if (!inRow[j]) continue
-        val root = find(j)
+        val root = partition.find(j)
         if (blockOf[root] < 0) blockOf[root] = blocks++
     }
     if (blocks < 2) return null
@@ -913,11 +905,11 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     val children = blocks + if (rowOnlyRows > 0) 1 else 0
     projection?.reserve(n.toLong() + m, 128L * children + 8L * (n.toLong() + m), matrix = true)
     val blockCols = Array(children) { IntArrayList() }
-    for (j in 0 until n) if (inRow[j]) blockCols[blockOf[find(j)]].add(j)
+    for (j in 0 until n) if (inRow[j]) blockCols[blockOf[partition.find(j)]].add(j)
     val blockRows = Array(children) { IntArrayList() }
     for (i in 0 until m) {
         val from = rowIndex.rowPtr[i]
-        val block = if (from == rowIndex.rowPtr[i + 1]) blocks else blockOf[find(rowIndex.colIdx[from])]
+        val block = if (from == rowIndex.rowPtr[i + 1]) blocks else blockOf[partition.find(rowIndex.colIdx[from])]
         blockRows[block].add(i)
     }
     val isolated = IntArrayList()
