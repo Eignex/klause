@@ -475,6 +475,7 @@ internal class OpenPortfolio(
                         local.cancellation or local.timeout,
                         timeout = local.timeout,
                         exhausted = { adapter.exhausted },
+                        declined = { adapter.declined },
                         open = {
                             adapter.search(
                                 adaptive,

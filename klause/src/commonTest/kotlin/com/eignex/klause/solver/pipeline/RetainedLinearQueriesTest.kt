@@ -197,6 +197,41 @@ class RetainedLinearQueriesTest {
     }
 
     @Test
+    fun `a root representation decline should exhaust retained queries without reopening the source`() {
+        val source = Problem(1, 0, emptyArray(), emptyArray())
+        var openings = 0
+        val registration = PreparedSearchRegistration(
+            source,
+            ExecutionComponentDescriptor(
+                "root",
+                ComponentResponsibility.BOOLEAN,
+                emptyList(),
+                emptyList(),
+                emptyList(),
+            ),
+        ) {
+            openings++
+            listOf(object : SearchComponent {
+                override fun initialize(context: SearchContext): ComponentResult = ComponentResult.Indeterminate
+            })
+        }
+        val prepared = PreparedSearchRegistrations(source, listOf(registration))
+        val queries = RetainedLinearQueries(source, TheoryParams(), null) { stop, _ ->
+            prepared.open(Long.MAX_VALUE, stop, SearchLearnedDbParams(), null, null)
+        }
+
+        queries.use {
+            assertFalse(it.prepareBooleanCenter(Cancellation.Never))
+            val result = it.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never)
+
+            assertEquals(ExactNeighborhoodResult.Undecided, result)
+            assertTrue(it.declined)
+            assertTrue(it.exhausted)
+            assertEquals(1, openings)
+        }
+    }
+
+    @Test
     fun `failed root initialization should preserve its failure and release every peer`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())
         val primary = IllegalArgumentException("initialization")

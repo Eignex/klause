@@ -48,6 +48,7 @@ internal fun linearNeighborhoodInvocation(
             worker = exactNeighborhoodWorker(if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood",
                 index,
                 objective, stop, timeout = params.timeout, exhausted = { adapter.exhausted },
+                declined = { adapter.declined },
                 open = { adapter.search(adaptive, slot.seed,
                     maximumImprovementMoves = if (adaptive) params.alnsIterations.toLong() else null) })
                 .bindEvidence(identity, provesResults = false)

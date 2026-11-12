@@ -77,6 +77,7 @@ internal class OpenExactNeighborhood(
         else state.candidateHints(projection.ownership, projection.model, stop)
     }, open = ::open)
     val exhausted: Boolean get() = queries.exhausted
+    val declined: Boolean get() = queries.declined
     val work: Long get() = queries.work
     val stats: SolveStats get() = queries.stats
     val preparationWork: Long get() = encodingPreparationWork + (components?.preparationWork ?: 0)

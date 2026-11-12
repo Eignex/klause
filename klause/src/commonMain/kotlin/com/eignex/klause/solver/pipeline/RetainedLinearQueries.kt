@@ -27,6 +27,7 @@ import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
+import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
@@ -50,6 +51,7 @@ internal class RetainedLinearQueries(
     private val scope = ConditionedQueryScope(params.timeout or params.cancellation)
     private var planned: PlannedSearch? = null
     private var sourceRefuted = false
+    private var sourceDeclined = false
     private var checking = false
     private var closed = false
     private val marker = object : SearchTheoryDecision {}
@@ -57,7 +59,8 @@ internal class RetainedLinearQueries(
     val stats: SolveStats get() = SolveStats(openTheory = state.work.snapshot(), smt = state.smt.snapshot(),
         openTheoryClauses = planned?.session?.learnedClauseStats() ?: state.clauses, openHints = state.hints,
         search = state.progress(planned?.session))
-    val exhausted: Boolean get() = !state.work.hasAllowance() ||
+    val declined: Boolean get() = sourceDeclined
+    val exhausted: Boolean get() = sourceDeclined || !state.work.hasAllowance() ||
         state.work.acceptedChecks >= params.maxLeaves
 
     fun <T> withCondition(condition: ExactNeighborhoodCondition, cancellation: Cancellation, action: () -> T): T {
@@ -168,7 +171,9 @@ internal class RetainedLinearQueries(
                     return created
                 }
                 is ComponentResult.Conflict -> sourceRefuted = true
-                ComponentResult.Indeterminate -> Unit
+                // A representation decline is a property of the source, so a later query would decline the same way.
+                ComponentResult.Indeterminate -> sourceDeclined = !scope.stop() &&
+                    created.session.executionControls.stopCause == SearchStopCause.RepresentationDecline
             }
             return null
         } catch (primary: Throwable) {
