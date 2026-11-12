@@ -19,6 +19,7 @@ direction.
 
 `QuadraticCandidates` uses floating penalty-gradient iterations only to propose
 active rows. Owned primitive buffers retain the Hessian, rows, point and gradient.
+Preparation builds the floating model before separate iteration and row-selection routines use it.
 Koblas dot and AXPY calls process complete vectors, charging and polling
 each entry before its call executes. Nonfinite inputs or iterates decline the
 proposal. Reduction rounding can change selected rows; it has no certificate
