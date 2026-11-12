@@ -351,15 +351,15 @@ class PortfolioCompositionTest {
 
         assertEquals(
             listOf(
-                "satOptimized", "cbls/fixed", "lp-default", "alns-balanced", "selector-switch",
-                "cbls-plateau/ils-basin",
+                "satOptimized", "cbls/fixed", "lp-default", "alns-balanced", "cbls-plateau/ils-basin",
+                "conflictDriven",
             ),
             plan.arms.map { it.label },
         )
         assertEquals(
             listOf(
                 ArmRole.LearningProof, ArmRole.FirstSolution, ArmRole.LpBounding, ArmRole.NeighbourhoodImprovement,
-                ArmRole.SelectorDiversity, ArmRole.NeighbourhoodImprovement,
+                ArmRole.NeighbourhoodImprovement, ArmRole.LearningProof,
             ),
             plan.roles,
         )
@@ -374,8 +374,8 @@ class PortfolioCompositionTest {
 
         assertEquals(
             listOf(
-                "cbls/fixed", "satOptimized", "lp-default", "domwdeg", "conflictDriven",
-                "cbls-plateau/ils-basin",
+                "cbls/fixed", "satOptimized", "lp-default", "conflictDriven", "cbls-plateau/ils-basin",
+                "lp-aggressive",
             ),
             labels,
         )
@@ -444,20 +444,19 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `pure integer rows should seat a second LP emphasis`() {
+    fun `pure integer rows should seat a second LP emphasis and binary ones a selector arm`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemFacts.assumed(Kind.COP).profile
-        for (facts in listOf(
-            ProblemFacts(profile, integerLinear = true) { true },
-            ProblemFacts(profile, binaryIntegers = true, binaryEqualityObjective = true) { true },
-        )) {
+        val cases = listOf(
+            ProblemFacts(profile, integerLinear = true) { true } to "cbls-plateau/ils-basin",
+            ProblemFacts(profile, binaryIntegers = true, binaryEqualityObjective = true) { true } to
+                "selector-switch",
+        )
+        for ((facts, last) in cases) {
             val labels = PortfolioComposition.compose(scenario, facts).map { it.label }
 
             assertEquals(
-                listOf(
-                    "satOptimized", "cbls/fixed", "lp-default", "alns-balanced", "lp-aggressive",
-                    "selector-switch",
-                ),
+                listOf("satOptimized", "cbls/fixed", "lp-default", "alns-balanced", "lp-aggressive", last),
                 labels,
             )
         }
