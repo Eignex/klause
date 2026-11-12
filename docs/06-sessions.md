@@ -353,7 +353,8 @@ Arithmetic work uses native units inside the containing solve. A conditioned che
 receives only the invocation's remaining allowance; branches and retries never
 renew it. Native work is forwarded once to the caller meter, separately from decision
 charges. Parallel slots retain their quota across reopening. Representation decline
-stops one worker; containing stops cancel all.
+stops one worker as `Unsupported`, and a retained query that declines at its root
+is never reopened; containing stops cancel all.
 
 Retained numerical source queries reserve one LP operation per changed authority.
 Consultations of the same suspended query retain its reservation and cumulative

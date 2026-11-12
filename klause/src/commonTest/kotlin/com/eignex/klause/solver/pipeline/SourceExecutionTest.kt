@@ -51,6 +51,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class SourceExecutionTest {
     @Test
@@ -230,6 +231,26 @@ class SourceExecutionTest {
         assertTrue(native.work > 0)
         assertTrue(native.exhausted)
         assertEquals(TerminationReason.BudgetExhausted, params.sourceVerificationReason(native.polynomial))
+    }
+
+    @Test
+    fun `open engines should decline a row without a finite projection instead of stalling`() {
+        val tiny = "(/ 1.0 1" + "0".repeat(400) + ".0)"
+        val text = "(declare-const x Real) (assert (<= 0.0 x)) (assert (<= x 1.0)) " +
+            "(assert (>= (* $tiny x) 0.1))"
+        for (engine in listOf(FiniteEngine.MIXED, FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                SmtLib.parse(text).source, ExecutionOperation.SATISFY, engine,
+            ))
+
+            val result = assertIs<SourceExecutionResult.Linear>(SourceSetup.execute(SourceExecutionRequest(
+                invocation, theory = TheoryParams(timeout = Cancellation.after(30.seconds)),
+            )))
+
+            val satisfy = assertIs<OpenTheoryExecution.Satisfy>(result.result)
+            val outcome = assertIs<OpenTheoryResult.Unknown>(satisfy.result)
+            assertEquals(TerminationReason.Unsupported, outcome.reason, "$engine")
+        }
     }
 
     @Test
