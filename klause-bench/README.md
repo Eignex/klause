@@ -20,6 +20,12 @@ costs and report repeated infrastructure losses separately.
 Each requested selection must match at least one source. A selection with no matches
 fails preparation instead of publishing a reduced comparison plan.
 
+`lab/quadratic-proposals.json` measures production quadratic active-row proposals before
+exact reconstruction. Set `dimensions=2,16,64,256,257,512,1024` and `tokens=never,metered`.
+It records cold and warmed calls, work, polls, allocations, SIMD providers, raw and
+256-sliced vector kernels, and a separate post-measurement JFR capture. These diagnostics
+make no source-solving or independent correctness claim.
+
 Planning stages every selected source before sealing include-directory identities.
 Execution verifies the planned file and directory identities before each solve.
 
