@@ -40,7 +40,7 @@ class NativeWatchEntriesTest {
         entries.truncateTo(0)
 
         assertEquals(0, entries.size)
-        assertEquals(16L, entries.primitiveBytes)
+        assertEquals(17L, entries.primitiveBytes)
     }
 
     @Test
@@ -51,7 +51,7 @@ class NativeWatchEntriesTest {
 
         val memory = assertNotNull(sample.snapshot { entries.sharingMemory(sample) { false } }.completeValues)
 
-        assertEquals(16L, memory.getValue("ownedPrimitiveBytes"))
+        assertEquals(17L, memory.getValue("ownedPrimitiveBytes"))
     }
 
     @Test

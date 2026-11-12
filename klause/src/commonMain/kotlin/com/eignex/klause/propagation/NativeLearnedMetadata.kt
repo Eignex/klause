@@ -14,6 +14,8 @@ internal class NativeLearnedMetadata {
 
     operator fun get(index: Int, column: Int): Int = rows[index, column]
     operator fun set(index: Int, column: Int, value: Int) { rows[index, column] = value }
+    fun rowValues(index: Int): IntArray = rows.rowValues(index)
+    fun rowOffset(index: Int): Int = rows.rowOffset(index)
     fun admission(index: Int): Long = rows.admission(index)
     fun add(lbd: Int, permanent: Boolean, origin: Int, admission: Long) =
         rows.add(0, lbd, permanent, origin, admission, null)

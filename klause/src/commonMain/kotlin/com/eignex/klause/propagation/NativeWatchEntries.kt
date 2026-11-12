@@ -8,7 +8,10 @@ internal class NativeWatchEntries(initialCapacity: Int = 0) {
     var size = 0
         private set
     var retirementEpoch = 0
-    val primitiveBytes: Long get() = 16L + capacityWords * Long.SIZE_BYTES
+
+    /** Set by every retirement of a clause posted here; cleared once propagation drops the retired postings. */
+    var holdsRetired = false
+    val primitiveBytes: Long get() = 17L + capacityWords * Long.SIZE_BYTES
     val referenceSlots: Long get() = pages.size + 1L
 
     init {
@@ -101,7 +104,7 @@ internal class NativeWatchEntries(initialCapacity: Int = 0) {
             }
         }
         val retained = protectedWords > 0L
-        sample.ownedPool(this, primitiveBytes, if (retained) 16L + protectedWords * Long.SIZE_BYTES else 0L)
+        sample.ownedPool(this, primitiveBytes, if (retained) 17L + protectedWords * Long.SIZE_BYTES else 0L)
         sample.ownedReferences(this, 1L, retained)
         sample.ownedReferences(pages, pages.size.toLong(), retained)
         return primitiveBytes

@@ -119,6 +119,9 @@ internal class NativeSatState(private val state: PropagationState) {
         check(factor in 0 until baseCount)
         val retired = retiredRootSources ?: IntHashSet().also { retiredRootSources = it }
         retired.add(factor)
+        if (arena.length(factor) < 2) return
+        watchEntries[litOf(factor, watchPos[2 * factor])]?.holdsRetired = true
+        watchEntries[litOf(factor, watchPos[2 * factor + 1])]?.holdsRetired = true
     }
 
     private var initialized = false
@@ -229,27 +232,35 @@ internal class NativeSatState(private val state: PropagationState) {
         if (scan != watchCleanupScan) watchCleanupScan = scan
     }
 
-    private fun nextLiveWatch(lit: Int, start: Int): Int {
-        val entries = checkNotNull(watchEntries[lit])
-        var index = start
-        while (index < watchSizes[lit]) {
+    // Live postings keep their order, so the sweep that follows meets them as it would without the retired ones.
+    private fun dropRetiredPostings(lit: Int, entries: NativeWatchEntries) {
+        var write = 0
+        for (read in 0 until watchSizes[lit]) {
             state.work++
-            if (!isRetired(entries[index].toInt())) return index
-            index++
+            val entry = entries[read]
+            if (isRetired(entry.toInt())) continue
+            if (write != read) {
+                state.work++
+                entries[write] = entry
+            }
+            write++
         }
-        return index
+        state.work += entries.truncationWork(write) + 3L
+        entries.truncateTo(write)
+        watchSizes[lit] = write
+        entries.holdsRetired = false
+        if (write == 0) watchEntries[lit] = null
+        // A suspended cleanup scan of this list starts over on the compacted postings.
+        if (lit == watchCleanupLiteral) {
+            watchCleanupIndex = 0
+            watchCleanupScan = 0
+        }
     }
 
-    private fun trimRetiredWatchTail(lit: Int, index: Int) {
-        if (retiredCount == 0 && retiredRootSources == null) return
-        val entries = checkNotNull(watchEntries[lit])
-        while (watchSizes[lit] - 1 > index) {
-            state.work++
-            val last = watchSizes[lit] - 1
-            if (!isRetired(entries[last].toInt())) return
-            state.work += watchRemovalWork(lit, last)
-            removeWatchAt(lit, last)
-        }
+    private fun flagRetiredPostings(index: Int) {
+        val literals = learnedPayloads[index]
+        watchEntries[literals[metadata[index, NativeLearnedMetadata.WATCH_FIRST]]]?.holdsRetired = true
+        watchEntries[literals[metadata[index, NativeLearnedMetadata.WATCH_SECOND]]]?.holdsRetired = true
     }
 
     internal fun sweepRetiredWatches(budget: ReclamationPreparation) {
@@ -747,6 +758,7 @@ internal class NativeSatState(private val state: PropagationState) {
             budget.visit(24L)
             budget.visit(0L)
             markRetiredWatchLists(watched)
+            flagRetiredPostings(index)
             learnedPayloads.release(index)
             metadata[index, NativeLearnedMetadata.STAGES] = metadata[index, NativeLearnedMetadata.STAGES] or RETIRED
             state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
@@ -826,6 +838,7 @@ internal class NativeSatState(private val state: PropagationState) {
         if (owner?.hasIndexedRows == true) owner.prepareUntrackedRetirement(retiredCount + 1, budget)
         budget.visit(40L + (if (defaultCapIndex == null) 0L else 1L))
         budget.visit(0L)
+        flagRetiredPostings(index)
         learnedPayloads.release(index)
         metadata[index, NativeLearnedMetadata.STAGES] = metadata[index, NativeLearnedMetadata.STAGES] or RETIRED
         state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
@@ -941,9 +954,11 @@ internal class NativeSatState(private val state: PropagationState) {
         val remap = IntArray(learnedCount)
         state.work += learnedCount
         var survivors = 0
+        var retiredSurvivors = false
         for (i in 0 until learnedCount) {
             state.work++
             remap[i] = if (retained[i]) survivors++ else -1
+            if (retained[i] && retiredOf(i)) retiredSurvivors = true
         }
         if (survivors == learnedCount) return
         state.work += state.selectedRetirements.remapWork
@@ -970,6 +985,7 @@ internal class NativeSatState(private val state: PropagationState) {
             val entries = watchEntries[lit] ?: continue
             state.work++
             entries.retirementEpoch = 1
+            if (retiredSurvivors) entries.holdsRetired = true
             var w = 0
             for (r in 0 until watchSizes[lit]) {
                 state.work++
@@ -1174,34 +1190,17 @@ internal class NativeSatState(private val state: PropagationState) {
 
     /** Process every clause watching [falseLit] (which just became false). Returns false on conflict. */
     private fun propagateFalse(falseLit: Int): Boolean {
-        val entries = watchEntries[falseLit] ?: return true
+        var entries = watchEntries[falseLit] ?: return true
+        if (entries.holdsRetired) {
+            dropRetiredPostings(falseLit, entries)
+            entries = watchEntries[falseLit] ?: return true
+        }
         var wi = 0
-        var liveScan = 0
         while (wi < watchSizes[falseLit]) {
             state.work++
             val entry = entries[wi]
             val h = entry.toInt()
-            if (isRetired(h)) {
-                // Unprocessed slots before the scan cursor contain only retired postings.
-                val next = nextLiveWatch(falseLit, maxOf(wi + 1, liveScan))
-                liveScan = next + 1
-                if (next < watchSizes[falseLit]) {
-                    val rewind = falseLit == watchCleanupLiteral && wi < watchCleanupIndex
-                    val cleanupIndex = if (rewind) wi else watchCleanupIndex
-                    val resetScan = falseLit == watchCleanupLiteral && watchCleanupReadIndex > cleanupIndex
-                    state.work += 3L + (if (rewind) 1L else 0L) + (if (resetScan) 1L else 0L)
-                    entries[wi] = entries[next]
-                    entries[next] = entry
-                    if (rewind) watchCleanupIndex = wi
-                    if (resetScan) watchCleanupScan = cleanupIndex
-                } else {
-                    while (watchSizes[falseLit] > wi) {
-                        state.work += watchRemovalWork(falseLit, watchSizes[falseLit] - 1)
-                        removeWatchAt(falseLit, watchSizes[falseLit] - 1)
-                    }
-                }
-                continue
-            }
+            // A satisfied blocker settles the posting without reading the clause.
             val blocker = (entry ushr 32).toInt()
             if (litTrue(blocker)) {
                 wi++
@@ -1211,8 +1210,11 @@ internal class NativeSatState(private val state: PropagationState) {
             val lits = if (baseClause) arena.lits else learnedPayloads[h - baseCount]
             val start = if (baseClause) arena.start(h) else 0
             val len = if (baseClause) arena.length(h) else lits.size
-            val i0 = watchPosition(h, 0)
-            val i1 = watchPosition(h, 1)
+            // One row lookup serves the watch positions and scan cursor of a learned clause.
+            val row = if (baseClause) watchPos else metadata.rowValues(h - baseCount)
+            val watches = if (baseClause) 2 * h else metadata.rowOffset(h - baseCount) + NativeLearnedMetadata.WATCH_FIRST
+            val i0 = row[watches]
+            val i1 = row[watches + 1]
             val slot0IsFalse = lits[start + i0] == falseLit
             val lIdx = if (slot0IsFalse) i0 else i1
             val otherIdx = if (slot0IsFalse) i1 else i0
@@ -1222,16 +1224,13 @@ internal class NativeSatState(private val state: PropagationState) {
                 wi++
                 continue
             }
-            val scanStart = if (baseClause) 0 else metadata[h - baseCount, NativeLearnedMetadata.SCAN]
+            val scan = watches + NativeLearnedMetadata.SCAN - NativeLearnedMetadata.WATCH_FIRST
+            val scanStart = if (baseClause) 0 else row[scan]
             val replacement = findNonFalse(lits, start, len, lIdx, otherIdx, scanStart)
             if (replacement >= 0) {
-                trimRetiredWatchTail(falseLit, wi)
-                if (!baseClause) {
-                    metadata[h - baseCount, NativeLearnedMetadata.SCAN] =
-                        if (replacement + 1 == len) 0 else replacement + 1
-                }
+                if (!baseClause) row[scan] = if (replacement + 1 == len) 0 else replacement + 1
                 val newLit = lits[start + replacement]
-                setWatchPosition(h, if (slot0IsFalse) 0 else 1, replacement)
+                row[if (slot0IsFalse) watches else watches + 1] = replacement
                 state.work += watchRemovalWork(falseLit, wi)
                 removeWatchAt(falseLit, wi) // swap-pop; re-process wi without advancing
                 addWatch(newLit, h, otherLit)
