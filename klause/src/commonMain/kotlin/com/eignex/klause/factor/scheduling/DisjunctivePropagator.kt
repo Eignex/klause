@@ -701,7 +701,8 @@ internal class DisjunctivePropagator(
 
         // The tasks of [set] from the earliest-completion threshold that maximizes their earliest completion.
         private fun ectSubset(set: IntArrayList, reversed: Boolean): Pair<Long, IntArrayList> {
-            val sorted = (0 until set.size).map { set[it] }.sortedByDescending { eft(it, reversed) }
+            val order = argsortBy(set.size) { a, b -> eft(set[b], reversed).compareTo(eft(set[a], reversed)) }
+            val sorted = IntArray(set.size) { set[order[it]] }
             var energy = 0L
             var best = Long.MIN_VALUE
             var bestEst = 0L
