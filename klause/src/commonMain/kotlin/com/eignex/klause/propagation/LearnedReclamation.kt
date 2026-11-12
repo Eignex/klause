@@ -82,17 +82,10 @@ internal class CleanupCancellation(private val token: () -> Boolean) : () -> Boo
 
 internal fun <T> PropagationState.withLearnedOwnershipBudget(budget: ReclamationPreparation, operation: () -> T): T {
     nativeEngine?.let { return it.withOwnershipBudget(budget, operation) }
-    val rows = learned.initializedStore
-    return if (rows != null) rows.usingBudget(budget, operation) else operation()
+    return operation()
 }
 
 internal fun PropagationState.sweepRetiredLearnedMemory(budget: ReclamationPreparation) {
-    val rows = learned.initializedStore
-    if (nativeEngine == null && rows != null) rows.usingBudget(budget) { sweepRetiredOwners(budget) }
-    else sweepRetiredOwners(budget)
-}
-
-private fun PropagationState.sweepRetiredOwners(budget: ReclamationPreparation) {
     nativeEngine?.sweepRetiredMetadata(budget)
     nativeEngine?.sweepRetiredWatches(budget)
     sweepRetiredGeneralIntegerRows(budget)
@@ -103,15 +96,6 @@ private fun PropagationState.sweepRetiredOwners(budget: ReclamationPreparation) 
 }
 
 internal fun PropagationState.prepareReclamation(
-    budget: ReclamationPreparation,
-    keep: (Int, Int) -> Boolean,
-): BooleanArray {
-    val rows = learned.initializedStore
-    return if (nativeEngine == null && rows != null) rows.usingBudget(budget) { prepareOwnedRows(budget, keep) }
-    else prepareOwnedRows(budget, keep)
-}
-
-private fun PropagationState.prepareOwnedRows(
     budget: ReclamationPreparation,
     keep: (Int, Int) -> Boolean,
 ): BooleanArray {
