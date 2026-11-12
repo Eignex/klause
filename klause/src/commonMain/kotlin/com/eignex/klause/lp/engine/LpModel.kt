@@ -7,6 +7,7 @@ import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.arrays.emptyLongArray
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.LongArrayList
 import com.eignex.util.collections.MutableIntDoubleMap
 import com.eignex.util.collections.MutableIntLongMap
@@ -492,15 +493,15 @@ internal class LpBuilder {
 
     // Structural columns whose lower/upper bound is the finite [LP_UNBOUNDED_PROBE] stand-in for ±∞
     // ([addFreeVar]); surfaced on the built model as probeClampedLo/Hi. Empty in the common case.
-    private val clampedLoCols = HashSet<Int>()
-    private val clampedHiCols = HashSet<Int>()
+    private val clampedLoCols = IntHashSet()
+    private val clampedHiCols = IntHashSet()
 
     /** Structural columns added by [addOpenAboveVar]: genuinely `[lo, +∞)`, so they carry no upper. */
-    private val openAboveCols = HashSet<Int>()
+    private val openAboveCols = IntHashSet()
 
     // LP-only continuous columns and their real bounds/cost — the double data the [LpDoubleView] is built
     // from. Empty for the pure-integer core, which never materializes a double view.
-    private val continuousCols = HashSet<Int>()
+    private val continuousCols = IntHashSet()
     private val contLo = MutableIntDoubleMap()
     private val contHi = MutableIntDoubleMap()
     private val contCost = MutableIntDoubleMap()
@@ -744,7 +745,7 @@ internal class LpBuilder {
             hasUpper[sc] = rows[i].rel == Relation.EQ
         }
 
-        val doubleView = if (continuousCols.isNotEmpty() || anyRealRow) buildDoubleView(n, m, signedSense) else null
+        val doubleView = if (!continuousCols.isEmpty() || anyRealRow) buildDoubleView(n, m, signedSense) else null
 
         return LpModel(
             n = n, m = m, csc = csc,
