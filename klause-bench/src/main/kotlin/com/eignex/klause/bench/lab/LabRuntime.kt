@@ -95,7 +95,14 @@ internal object LabRuntime {
     private fun startupSettings(): String {
         val candidates = "com.eignex.klause.arithmetic.quadratic.QuadraticCandidates"
         val certification = "com.eignex.klause.arithmetic.quadratic.QuadraticCertification"
-        val methods = listOf("::<clinit>", "com.eignex.koblas.engine.BuiltinEngines::getSimd") +
+        val initializers = listOf(candidates, "com.eignex.koblas.engine.BuiltinEngines",
+            "com.eignex.koblas.internal.jvm25.simd.SimdVectorLeaves",
+            "com.eignex.koblas.internal.jvm25.simd.SimdOps",
+            "com.eignex.koblas.internal.jvm25.simd.SimdVectorKernelsKt",
+            "com.eignex.koblas.internal.jvm25.simd.SimdSpeciesKt",
+            "jdk.incubator.vector.DoubleVector", "jdk.incubator.vector.LongVector", "jdk.incubator.vector.IntVector")
+        val methods = initializers.map { "$it::<clinit>" } +
+            listOf("com.eignex.koblas.engine.BuiltinEngines::getSimd") +
             listOf("proposeActiveRows", "prepare", "improve", "activeRows", "stationary", "eliminate")
                 .map { "$candidates::$it" } +
             listOf("bound", "optimum", "feasible", "evaluate", "positiveSemidefinite")
