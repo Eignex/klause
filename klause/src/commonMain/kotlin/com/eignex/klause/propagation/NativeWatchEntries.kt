@@ -45,6 +45,33 @@ internal class NativeWatchEntries(initialCapacity: Int = 0) {
             return 1L + directoryGrowth + pageGrowth
         }
 
+    // One pass appends the value and returns the work `appendWork` prices for it.
+    fun append(value: Long): Long {
+        val index = size ushr PAGE_SHIFT
+        val slot = size and PAGE_MASK
+        var work = 1L
+        if (index >= pages.size) {
+            work += pages.size * 3L + 1L
+            pages = pages.copyOf(maxOf(pages.size * 2, index + 1))
+        }
+        var page = pages[index]
+        if (page == null) {
+            work += 6L
+            page = LongArray(1)
+            pages[index] = page
+            capacityWords++
+        } else if (slot >= page.size) {
+            val capacity = minOf(PAGE_SIZE, page.size * 2)
+            work += capacity * 2L + page.size + 4L
+            capacityWords += capacity - page.size
+            page = page.copyOf(capacity)
+            pages[index] = page
+        }
+        page[slot] = value
+        size++
+        return work
+    }
+
     fun add(value: Long) {
         val index = size ushr PAGE_SHIFT
         val slot = size and PAGE_MASK

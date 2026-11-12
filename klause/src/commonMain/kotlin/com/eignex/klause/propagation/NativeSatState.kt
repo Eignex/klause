@@ -205,8 +205,7 @@ internal class NativeSatState(private val state: PropagationState) {
             state.work++
             NativeWatchEntries().also { watchEntries[lit] = it }
         }
-        state.work += entries.appendWork
-        entries.add(packWatch(handle, blocker))
+        state.work += entries.append(packWatch(handle, blocker))
         watchSizes[lit] = entries.size
     }
 
@@ -1088,8 +1087,11 @@ internal class NativeSatState(private val state: PropagationState) {
     }
 
     private fun recheck(cancellation: Cancellation): Boolean {
+        val pollable = cancellation !== Cancellation.Never
+        var checked = 0
         while (recheckHead < rechecks.size) {
-            if (cancellation !== Cancellation.Never && cancellation()) {
+            // One poll opens the queue; a long queue polls again at the propagation interval.
+            if (pollable && (checked++ and CANCEL_POLL_MASK) == 0 && cancellation()) {
                 state.runCancelled = true
                 return false
             }
@@ -1195,14 +1197,17 @@ internal class NativeSatState(private val state: PropagationState) {
             dropRetiredPostings(falseLit, entries)
             entries = watchEntries[falseLit] ?: return true
         }
+        // Posting and truth reads are charged once per exit instead of one ledger write each.
+        val truth = boolTruth
+        var work = 0L
         var wi = 0
         while (wi < watchSizes[falseLit]) {
-            state.work++
             val entry = entries[wi]
             val h = entry.toInt()
             // A satisfied blocker settles the posting without reading the clause.
             val blocker = (entry ushr 32).toInt()
-            if (litTrue(blocker)) {
+            work += 2L
+            if (truth[Lit.variable(blocker)].toInt() == 2 - (blocker and 1)) {
                 wi++
                 continue
             }
@@ -1220,7 +1225,9 @@ internal class NativeSatState(private val state: PropagationState) {
             val lIdx = if (slot0IsFalse) i0 else i1
             val otherIdx = if (slot0IsFalse) i1 else i0
             val otherLit = lits[start + otherIdx]
-            if (litTrue(otherLit)) {
+            val otherTruth = truth[Lit.variable(otherLit)].toInt()
+            work++
+            if (otherTruth == 2 - (otherLit and 1)) {
                 entries[wi] = packWatch(h, otherLit) // refresh the blocker to the satisfying literal
                 wi++
                 continue
@@ -1237,13 +1244,16 @@ internal class NativeSatState(private val state: PropagationState) {
                 addWatch(newLit, h, otherLit)
                 continue
             }
-            if (litFalse(otherLit)) {
+            state.work += work + 1L
+            work = 0L
+            if (otherTruth == 1 + (otherLit and 1)) {
                 recordConflict(h)
                 return false
             }
             if (!pinUnit(h, otherIdx)) return false
             wi++
         }
+        state.work += work
         return true
     }
 
@@ -1254,16 +1264,23 @@ internal class NativeSatState(private val state: PropagationState) {
             val remaining = 3 - lIdx - otherIdx
             return if (!litFalse(lits[start + remaining])) remaining else -1
         }
-        for (k in scanStart until len) {
-            if (k == lIdx || k == otherIdx) continue
-            if (!litFalse(lits[start + k])) return k
-        }
+        val truth = boolTruth
+        var found = -1
+        var k = scanStart
         // Backtracking can reopen a prefix that an earlier scan passed while every literal was false.
-        for (k in 0 until scanStart) {
-            if (k == lIdx || k == otherIdx) continue
-            if (!litFalse(lits[start + k])) return k
+        var remaining = len
+        while (remaining-- > 0) {
+            if (k != lIdx && k != otherIdx) {
+                val lit = lits[start + k]
+                state.work++
+                if (truth[Lit.variable(lit)].toInt() != 1 + (lit and 1)) {
+                    found = k
+                    break
+                }
+            }
+            if (++k == len) k = 0
         }
-        return -1
+        return found
     }
 
     private companion object {
