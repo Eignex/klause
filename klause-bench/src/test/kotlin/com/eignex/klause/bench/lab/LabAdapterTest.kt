@@ -278,11 +278,12 @@ class LabAdapterTest {
         }
     }
 
-    @Test
-    fun `runtime artifacts retain exact options for paths containing spaces`() {
+    @ParameterizedTest
+    @ValueSource(strings = ["compilation+log", "startup"])
+    fun `runtime artifacts retain exact options for paths containing spaces`(measurement: String) {
         val root = Files.createTempDirectory("lab runtime ")
         try {
-            val settings = LabSettings(mapOf("measurement" to "compilation+log", "debug" to "false", "gc" to "serial"))
+            val settings = LabSettings(mapOf("measurement" to measurement, "debug" to "false", "gc" to "serial"))
             val case = BenchCase("case", settings.caseParameters("cp", 7), settings.resources())
             val environment = LabRuntime.environment(
                 case,
@@ -291,7 +292,7 @@ class LabAdapterTest {
             val args = Files.readString(root.resolve("out with spaces/cli.args"))
             val preflight = Files.readString(root.resolve("out with spaces/preflight.args"))
             assertTrue(args.contains("-XX:StartFlightRecording=filename="))
-            assertTrue(args.contains("-XX:+LogCompilation"))
+            assertEquals(measurement == "compilation+log", args.contains("-XX:+LogCompilation"))
             assertFalse(preflight.contains("StartFlightRecording"))
             assertEquals("false", environment["KLAUSE_DEBUG"])
         } finally {
@@ -300,7 +301,7 @@ class LabAdapterTest {
     }
 
     @ParameterizedTest
-    @CsvSource("none,false", "resources,false", "jfr,true", "compilation,true", "compilation+log,true")
+    @CsvSource("none,false", "resources,false", "jfr,true", "compilation,true", "compilation+log,true", "startup,true")
     fun `only recorded CLI processes should request an in process profile summary`(
         measurement: String,
         recordsJfr: Boolean,
