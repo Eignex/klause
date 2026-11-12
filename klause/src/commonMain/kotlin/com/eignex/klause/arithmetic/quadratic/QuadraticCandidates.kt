@@ -80,25 +80,13 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
     }
 
     private fun dot(initial: Double, left: DoubleArray, right: DoubleArray): Double {
-        var result = initial
-        var offset = 0
-        while (offset < left.size) {
-            val count = minOf(KERNEL_SLICE, left.size - offset)
-            repeat(count) { control.step() }
-            result += proposalEngine.dot(left, offset, right, offset, count)
-            offset += count
-        }
-        return result
+        repeat(left.size) { control.step() }
+        return initial + proposalEngine.dot(left, 0, right, 0, left.size)
     }
 
     private fun axpy(alpha: Double, source: DoubleArray, destination: DoubleArray) {
-        var offset = 0
-        while (offset < source.size) {
-            val count = minOf(KERNEL_SLICE, source.size - offset)
-            repeat(count) { control.step() }
-            proposalEngine.axpy(destination, offset, alpha, source, offset, count)
-            offset += count
-        }
+        repeat(source.size) { control.step() }
+        proposalEngine.axpy(destination, 0, alpha, source, 0, source.size)
     }
 
     private fun eliminate(matrix: Array<Array<BigFraction>>): List<BigFraction>? {
@@ -135,7 +123,5 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
             }
         }
 
-        // Precharging bounds cancellation latency without changing per-entry work or polling callbacks.
-        const val KERNEL_SLICE = 256
     }
 }
