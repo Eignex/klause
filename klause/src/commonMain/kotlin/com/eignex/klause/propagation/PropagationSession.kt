@@ -1144,7 +1144,7 @@ class PropagationSession private constructor(
     ): Boolean {
         val before = learnedClauseCount
         val published = state.forgetLearnedClauses(maxWork, maxScratchBytes,
-            cancelled = { cancelRequested || cancelled() }, keep = keep)
+            cancelled = cleanupCancellation(cancelled), keep = keep)
         if (learnedClauseCount != before) learnedClauseRevision++
         return published
     }
@@ -1240,8 +1240,10 @@ class PropagationSession private constructor(
         cancelled: () -> Boolean,
     ): ReclamationPreparation {
         require(maxWork >= 0L && maxScratchBytes >= 0L)
-        return ReclamationPreparation(maxWork, maxScratchBytes, { cancelRequested || cancelled() }) { owner.work += it }
+        return ReclamationPreparation(maxWork, maxScratchBytes, cleanupCancellation(cancelled)) { owner.work += it }
     }
+
+    private fun cleanupCancellation(cancelled: () -> Boolean) = CleanupCancellation { cancelRequested || cancelled() }
 
     internal val nativeCapWindowPending: Boolean get() = state.nativeEngine?.capWindowPending == true
     internal val nativeCapTraversalVisits: Long get() = state.nativeEngine?.capTraversalVisits ?: 0L
@@ -1261,10 +1263,9 @@ class PropagationSession private constructor(
         if (retainedState == null || decisionLevel != 0 || fixpointCancelled || isUnsatAtRoot ||
             inprocessingRootPending
         ) return 0
-        val retired = state.nativeEngine?.maintainCapWindow(cap, maxWork, maxScratchBytes,
-            { cancelRequested || cancelled() }, canDrop, keep, nativePolicy)
-            ?: state.maintainGeneralCapWindow(cap, maxWork, maxScratchBytes,
-                { cancelRequested || cancelled() }, canDrop, keep)
+        val polled = cleanupCancellation(cancelled)
+        val retired = state.nativeEngine?.maintainCapWindow(cap, maxWork, maxScratchBytes, polled, canDrop, keep,
+            nativePolicy) ?: state.maintainGeneralCapWindow(cap, maxWork, maxScratchBytes, polled, canDrop, keep)
         if (retired > 0) learnedClauseRevision++
         return retired
     }

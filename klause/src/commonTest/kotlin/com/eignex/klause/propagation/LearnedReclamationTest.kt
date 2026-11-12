@@ -20,6 +20,32 @@ import kotlin.test.assertTrue
 
 class LearnedReclamationTest {
     @Test
+    fun `a short cleanup window should observe a cancellation at its next poll`() {
+        var requested = false
+        val cancelled = CleanupCancellation { requested }
+        repeat(8) { assertFalse(cancelled()) }
+        requested = true
+
+        assertTrue(cancelled())
+    }
+
+    @Test
+    fun `a long cleanup window should observe a cancellation within its poll interval`() {
+        var requested = false
+        var reads = 0
+        val cancelled = CleanupCancellation { reads++; requested }
+        repeat(1024) { assertFalse(cancelled()) }
+        val settled = reads
+        requested = true
+
+        val polls = (1..64).first { cancelled() }
+
+        assertTrue(settled < 128)
+        assertTrue(polls <= 64)
+        assertTrue(cancelled())
+    }
+
+    @Test
     fun `native compaction should retain a large payload within index scratch`() {
         val session = PropagationSession(Problem(4096, 0, emptyArray(),
             arrayOf(Clause(intArrayOf(0, 1)))), nativeSat = true)

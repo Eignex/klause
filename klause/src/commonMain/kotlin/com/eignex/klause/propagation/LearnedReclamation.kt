@@ -62,6 +62,24 @@ internal class ReclamationPreparation(
     private companion object { const val ATOMIC_PRICE = 32L }
 }
 
+// Cleanup polls before every bounded mutation, a few work units apart. A short window keeps every poll; a long
+// one reads its token once per interval, so the deadline clocks stay off the cost of each step and a request
+// is still observed within that many steps.
+internal class CleanupCancellation(private val token: () -> Boolean) : () -> Boolean {
+    private var polls = 0
+    private var requested = false
+
+    override fun invoke(): Boolean {
+        if (requested) return true
+        val poll = polls++
+        if (poll >= INTERVAL && poll and (INTERVAL - 1) != 0) return false
+        requested = token()
+        return requested
+    }
+
+    private companion object { const val INTERVAL = 64 }
+}
+
 internal fun <T> PropagationState.withLearnedOwnershipBudget(budget: ReclamationPreparation, operation: () -> T): T {
     nativeEngine?.let { return it.withOwnershipBudget(budget, operation) }
     val rows = learned.initializedStore

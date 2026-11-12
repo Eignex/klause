@@ -22,20 +22,27 @@ internal fun forgetIfOverCap(
     if (protectedPublication) return
     val cap = params.maxLearnedClauses ?: return
     val startWork = session.work
+    val cancelled = { params.cancellation() }
     if (session.activeLearnedClauseCount > cap || session.nativeCapWindowPending) {
-        forgetWindow(session, params, cap, startWork)
+        forgetWindow(session, params, cap, startWork, cancelled)
     }
     if (session.learnedClauseCount > session.activeLearnedClauseCount) {
         session.compactLearnedClauses(
             (params.learnedMemoryWork - (session.work - startWork)).coerceAtLeast(0L),
-            params.learnedMemoryScratchBytes, { params.cancellation() }) { _, _ -> true }
+            params.learnedMemoryScratchBytes, cancelled) { _, _ -> true }
     }
 }
 
-private fun forgetWindow(session: PropagationSession, params: BacktrackParams, cap: Int, startWork: Long) {
+private fun forgetWindow(
+    session: PropagationSession,
+    params: BacktrackParams,
+    cap: Int,
+    startWork: Long,
+    cancelled: () -> Boolean,
+) {
     val retired = session.maintainCapWindow(cap,
         (params.learnedMemoryWork - (session.work - startWork)).coerceAtLeast(0L),
-        params.learnedMemoryScratchBytes, { params.cancellation() }, { index ->
+        params.learnedMemoryScratchBytes, cancelled, { index ->
             !session.learnedClausePermanent(index) && session.learnedClauseLbd(index) > params.lbdGlueThreshold &&
                 (!params.tieredLearnedDb || (session.learnedClauseTier(index) == ClauseTier.LOCAL &&
                     !session.learnedClauseUsedSinceReduction(index)))
