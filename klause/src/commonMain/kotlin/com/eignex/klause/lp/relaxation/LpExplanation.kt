@@ -225,6 +225,13 @@ internal object LpExplanation {
         val lits = IntArrayList()
         val seen = IntHashSet()
         val rows = (0 until model.m).filter { ray[it] != 0L }.toIntArray()
+        // A cited row's slack must rest on its unbranched source side, as for a dual certificate's rows.
+        model.exactState?.let { state ->
+            for (row in rows) {
+                val support = state.activeSide(model.slackCol(row), ray[row] > 0L) ?: return null
+                if (support.witness >= 0L || support.side.premises != null) return null
+            }
+        }
         if (!addRowPremiseLits(lits, seen, relaxation, rows, session)) return null
         for (col in relaxation.colVarId.indices) {
             val sign = rayColumnSign(model, ray, col) ?: return null

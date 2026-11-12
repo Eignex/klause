@@ -1,5 +1,11 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.relaxation.LpExplanation
+import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.propagation.PropagationSession
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -106,9 +112,27 @@ class FloatEvidenceTest {
         }.build(Sense.MINIMIZE)
         val base = listOf(doubleArrayOf(1.0, 1.0), doubleArrayOf(1.0, -1.0)).first { floatFarkasRay(model, it) != null }
 
+        val relaxation = LpRelaxation(model, intArrayOf(0, 1), BooleanArray(2), 0L, intArrayOf(0, 1), intArrayOf())
+        val session = PropagationSession(Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 100)), arrayOf<Factor>()))
+
         val rays = listOf(1.0 + 1e-3, 1.0 - 1e-3).map { floatFarkasRay(model, doubleArrayOf(base[0], base[1] * it)) }
 
-        assertTrue(rays.all { it != null && it.isNotEmpty() })
+        assertTrue(rays.all { LpExplanation.infeasibilityClause(relaxation, assertNotNull(it), session) != null })
+    }
+
+    @Test
+    fun `an integral farkas ray should be checked at the finite side its exact combination meets`() {
+        val source = assertNotNull(
+            LpBuilder().apply {
+                val x = addOpenAboveVar(-1_000_000L)
+                addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, -2_000_000L)
+            }.build(Sense.MINIMIZE).authoritativeModel(),
+        )
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+
+        val refuted = listOf(1L, -1L).filter { refutesInBox(model, FloatEvidenceModel(model), longArrayOf(it)) }
+
+        assertTrue(refuted.isEmpty())
     }
 
     @Test
