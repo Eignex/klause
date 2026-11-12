@@ -25,6 +25,9 @@ exact reconstruction. Set `dimensions=2,16,64,256,257,512,1024` and `tokens=neve
 It records cold and warmed calls, work, polls, allocations, SIMD providers, raw and
 256-sliced vector kernels, and a separate post-measurement JFR capture. These diagnostics
 make no source-solving or independent correctness claim.
+`compiler-mode=default|inline-nullchecks|isolate-dot|both` selects child-JVM inlining
+controls and retains its complete compilation log. `warmup-ms` and `sample-ms`
+set the warmup and each of five measurement windows; defaults are 1500 and 300.
 
 Planning stages every selected source before sealing include-directory identities.
 Execution verifies the planned file and directory identities before each solve.

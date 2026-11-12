@@ -9,13 +9,24 @@ import com.eignex.koblas.engine.EngineImplementation
 import com.eignex.lab.bench.*
 import java.lang.management.ManagementFactory
 import java.nio.file.Files
+import java.nio.file.Path
+import java.io.File
+import java.util.concurrent.TimeUnit
 import jdk.jfr.Configuration
 import jdk.jfr.Recording
 import jdk.jfr.consumer.RecordingFile
 import kotlinx.serialization.json.*
+import kotlinx.serialization.encodeToString
 
 /** Isolated proposal and kernel diagnostics; timings carry no source-verdict authority. */
 fun main(args: Array<String>) {
+    if (args.firstOrNull() == "probe") {
+        val case = BenchProtocol.json.decodeFromString<BenchCase>(Files.readString(Path.of(args[1])))
+        val context = BenchContext(Path.of(args[2]))
+        val result = QuadraticProposalSuite.measure(case, context)
+        Files.writeString(context.outputDirectory.resolve("probe-result.json"), BenchProtocol.json.encodeToString(result))
+        return
+    }
     val output = System.out
     System.setOut(System.err)
     BenchCli.execute(QuadraticProposalSuite, args, stdout = output)
@@ -27,20 +38,55 @@ internal object QuadraticProposalSuite : BenchSuite {
     override fun describe() = BenchDescriptor("quadratic-proposal-profile", "Cold and warm production proposals")
 
     override fun plan(request: BenchRequest): List<BenchCase> {
-        require(request.parameters.keys.all { it in setOf("dimensions", "tokens") })
+        require(request.parameters.keys.all { it in setOf("dimensions", "tokens", "compiler-mode", "warmup-ms", "sample-ms") })
+        val compiler = request.parameters["compiler-mode"] ?: "default"
+        require(compiler in setOf("default", "inline-nullchecks", "isolate-dot", "both"))
+        val warmup = (request.parameters["warmup-ms"] ?: "1500").toLong().also { require(it in 250..30000) }
+        val sample = (request.parameters["sample-ms"] ?: "300").toLong().also { require(it in 100..10000) }
         val dimensions = (request.parameters["dimensions"] ?: "2,16,64,256,512").split(',').map(String::toInt)
         val tokens = (request.parameters["tokens"] ?: "never,metered").split(',')
         require(dimensions.isNotEmpty() && dimensions.distinct().size == dimensions.size && dimensions.all { it in 2..1024 })
         require(tokens.isNotEmpty() && tokens.distinct().size == tokens.size && tokens.all { it in setOf("never", "metered") })
         return dimensions.flatMap { dimension -> tokens.map { token ->
             val id = "quadratic-proposal/$dimension/$token"
-            BenchCase(id, mapOf("dimension" to "$dimension", "token" to token),
+            BenchCase(id, mapOf("dimension" to "$dimension", "token" to token, "compiler-mode" to compiler,
+                "warmup-ms" to "$warmup", "sample-ms" to "$sample"),
                 BenchResources(1, 3072, 180), attributes = mapOf("pairKey" to id, "comparisonKey" to id, "problem" to id,
                     "suite" to "quadratic-proposal-profile", "recordSchema" to "quadratic-proposal-profile-v1"))
         } }
     }
 
     override fun run(case: BenchCase, context: BenchContext): BenchResult {
+        Files.writeString(context.outputDirectory.resolve("probe-case.json"), BenchProtocol.json.encodeToString(case))
+        val compiler = case.parameters.getValue("compiler-mode")
+        val options = buildList {
+            addAll(listOf("-Xmx2048m", "-XX:ActiveProcessorCount=1", "-XX:+UseSerialGC",
+                "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector",
+                "-XX:+UnlockDiagnosticVMOptions", "-XX:+LogCompilation",
+                "-XX:LogFile=${context.outputDirectory.resolve("compilation.xml")}"))
+            if (compiler == "inline-nullchecks" || compiler == "both") {
+                add("-XX:CompileCommand=inline,kotlin.jvm.internal.Intrinsics::checkNotNull")
+                add("-XX:CompileCommand=inline,kotlin.jvm.internal.Intrinsics::checkNotNullExpressionValue")
+            }
+            if (compiler == "isolate-dot" || compiler == "both") {
+                add("-XX:CompileCommand=dontinline,com.eignex.koblas.internal.jvm25.simd.SimdOps::dot*")
+            }
+        }
+        val argv = listOf(File(System.getProperty("java.home"), "bin/java").absolutePath) + options + listOf(
+            "-cp", System.getProperty("java.class.path"), "com.eignex.klause.bench.profile.QuadraticProposalAdapterKt",
+            "probe", context.outputDirectory.resolve("probe-case.json").toString(), context.outputDirectory.toString())
+        Files.writeString(context.outputDirectory.resolve("probe-command.json"), buildJsonArray { argv.forEach { add(it) } }.toString())
+        val process = ProcessBuilder(argv).redirectErrorStream(true)
+            .redirectOutput(context.outputDirectory.resolve("probe.log").toFile()).start()
+        try {
+            check(process.waitFor(160, TimeUnit.SECONDS)) { "Proposal diagnostic timed out" }
+            check(process.exitValue() == 0) { "Proposal diagnostic failed; see probe.log" }
+        } finally { if (process.isAlive) process.destroyForcibly() }
+        val result = BenchProtocol.json.decodeFromString<BenchResult>(Files.readString(context.outputDirectory.resolve("probe-result.json")))
+        return result.copy(artifacts = context.artifacts())
+    }
+
+    fun measure(case: BenchCase, context: BenchContext): BenchResult {
         val dimension = case.parameters.getValue("dimension").toInt()
         val access = ProposalAccess(dimension, case.parameters.getValue("token") == "metered")
         val cold = access.sample(0)
@@ -51,8 +97,8 @@ internal object QuadraticProposalSuite : BenchSuite {
                 Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
                 Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType)
         val selected = access.selectedEngine()
-        access.sample(1500)
-        val samples = List(5) { access.sample(300) }
+        access.sample(case.parameters.getValue("warmup-ms").toLong())
+        val samples = List(5) { access.sample(case.parameters.getValue("sample-ms").toLong()) }
         val expected = samples.first().work
         check(samples.all { it.work == expected && it.selected == cold.selected })
         val kernels = buildJsonArray {
@@ -71,9 +117,15 @@ internal object QuadraticProposalSuite : BenchSuite {
             } ?: "<missing>" }.groupingBy { it }.eachCount().entries.sortedByDescending { it.value }
         val details = buildJsonObject {
             put("dimension", dimension); put("rows", dimension * 2); put("iterations", 32)
+            put("compilerMode", case.parameters.getValue("compiler-mode"))
             put("token", case.parameters.getValue("token")); put("selectedProposalEngine", selected)
             put("javaVersion", System.getProperty("java.version"))
             put("jvmArguments", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
+            val flags = ManagementFactory.getPlatformMXBean(com.sun.management.HotSpotDiagnosticMXBean::class.java)
+            putJsonObject("jitOptions") {
+                for (key in listOf("CompilationMode", "TieredCompilation", "TieredStopAtLevel", "CICompilerCount",
+                    "MaxInlineLevel", "MaxInlineSize", "FreqInlineSize")) put(key, flags.getVMOption(key).value)
+            }
             put("simdDotProvider", provider.invoke(null, engine, EngineImplementation.Dot, dimension, 1, 1, true, false).toString())
             put("simdAxpyProvider", provider.invoke(null, engine, EngineImplementation.Axpy, dimension, 1, 1, true, false).toString())
             put("cold", cold.json()); putJsonArray("warm") { samples.forEach { add(it.json()) } }
