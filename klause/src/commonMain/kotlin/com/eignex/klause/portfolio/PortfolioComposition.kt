@@ -246,11 +246,13 @@ internal sealed interface WorkerConfig {
     ): PortfolioWorker
 }
 
-/** The seated arms, the role each declares, and how many of them search for the first solution. */
+/** The seated arms, the role each declares, how the record names each seat, and how many of them search for
+ *  the first solution. */
 internal class PortfolioArmPlan(
     val arms: List<WorkerConfig>,
     val firstSolutionCount: Int,
-    val roles: List<ArmRole?> = List(arms.size) { null },
+    val roles: List<ArmRole?>,
+    val seats: List<String>,
 )
 
 /**
@@ -277,7 +279,7 @@ internal object PortfolioComposition {
         val deferred = scenario.cores == 1 && scenario.engine == EngineMix.MIXED && scenario.kind == Kind.COP &&
             scenario.lsPool == null && scenario.btPool == null
         val first = if (deferred) minOf(seated.size, PortfolioScenario.DEFAULT_ARMS) else seated.size
-        return PortfolioArmPlan(seated.map { it.config }, first, seated.map { it.role })
+        return PortfolioArmPlan(seated.map { it.config }, first, seated.map { it.role }, seated.map { it.report })
     }
 
     private fun seated(scenario: PortfolioScenario, facts: ProblemFacts): List<SeatedArm> {
@@ -300,7 +302,7 @@ internal object PortfolioComposition {
                 is AlnsWorkerConfig -> numerical.withToleranceCheck(check)
                 else -> numerical
             }
-            SeatedArm(checked, arm.role)
+            SeatedArm(checked, arm.role, arm.needed)
         }
     }
 
@@ -434,10 +436,12 @@ internal object PortfolioComposition {
             Kind.COP -> listOfNotNull(local, complete, neighbourhoodRank(scenario, facts))
             Kind.CSP -> listOf(complete, local)
         }
+        // A pinned arm warms in the order its role would: complete search first on an optimization.
+        val lead = if (scenario.kind == Kind.COP) listOf(complete, local) else listOf(local, complete)
         val annotated = scenario.annotationArm != null && scenario.btPool == null
         val relaxation = complete.arms.any { it.role == ArmRole.LpBounding }
         val needed = ArmRole.needed(scenario.kind, facts, annotated, relaxation)
-        return PortfolioRoster.seat(needed, ranks, scenario.arms)
+        return PortfolioRoster.seat(needed, ranks, scenario.arms, lead)
     }
 
     private fun localRank(scenario: PortfolioScenario, facts: ProblemFacts): RosterRank {
@@ -448,7 +452,7 @@ internal object PortfolioComposition {
                 RosterCandidate(LocalSearchCatalog.armOf(recipe().label)?.role) {
                     LocalSearchWorkerConfig(recipe(), budget)
                 }
-            })
+            }, pinned = true)
         }
         return RosterRank(LocalSearchCatalog.rankedArms(scenario.kind, facts.profile).map { arm ->
             RosterCandidate(arm.role) { LocalSearchWorkerConfig(LocalSearchCatalog.recipe(arm), budget) }
@@ -462,7 +466,7 @@ internal object PortfolioComposition {
         if (pool != null) {
             return RosterRank(pool.map { recipe ->
                 RosterCandidate(BacktrackCatalog.armOf(recipe().label)?.role) { injected(scenario, recipe) }
-            })
+            }, pinned = true)
         }
         val edit = curatedEdit(scenario, facts)
         val catalog = BacktrackCatalog.rankedArms(scenario.kind, facts).map { arm ->

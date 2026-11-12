@@ -34,7 +34,7 @@ import kotlin.random.Random
  *
  * [profile] fixes this arm's regime — its destroy-size band and acceptance temperature; a diverse ALNS
  * engine cycles [AlnsProfile.Curated] via [diverse]. The default regime is used for the standalone arm
- * (e.g. the last slot of a mixed portfolio).
+ * (e.g. the neighbourhood arm of a mixed roster).
  *
  * [nodeBudget] is the solve-spanning node allowance. This arm builds its repair [BacktrackParams] itself
  * rather than drawing a [com.eignex.klause.backtrack.BacktrackRecipe] from the pool, so it has to be

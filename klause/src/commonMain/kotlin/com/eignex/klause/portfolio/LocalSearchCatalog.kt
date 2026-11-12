@@ -282,7 +282,8 @@ object LocalSearchCatalog {
  * Typed identity of every catalog arm — the catalog's keys. [LocalSearchCatalog.ranked] /
  * [LocalSearchCatalog.diverse] order and instantiate these per [Kind] via [LocalSearchCatalog]; [label]
  * is the external name (CLI / telemetry). [role] is what the arm covers in a roster: an arm whose restarts
- * perturb its incumbents improves a neighbourhood, and every other arm searches for a first solution.
+ * perturb its incumbents improves a neighbourhood, and every other arm searches for a first solution. The
+ * primary-repair plateau arm is the exception: it leads a scheduling roster as its first-solution arm.
  */
 internal enum class LocalSearchArm(val label: String, val role: ArmRole) {
     CblsFixed("cbls/fixed", ArmRole.FirstSolution),

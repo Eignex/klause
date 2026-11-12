@@ -98,7 +98,8 @@ data class ArmSchedule(
     val phases: List<PortfolioPhaseStats> = emptyList(),
     /** Factory, query, sharing opportunity and disposal lifecycle. */
     val lifecycle: PortfolioLifecycleStats = PortfolioLifecycleStats(),
-    /** The role the arm declares in its roster; null when it declares none. */
+    /** The role the arm fills in its roster, or `rank/` and the role it declares when it filled a slot by rank;
+     *  null outside a composed roster. */
     val role: String? = null,
 )
 

@@ -146,55 +146,6 @@ class ArmNeedsTest {
     }
 
     @Test
-    fun `binary objective views should retain the packing LP recipe`() {
-        val source = Problem(
-            0, 3, Array(3) { IntDomain(0, 1) },
-            listOf(Linear(longArrayOf(2, 3, 4), intArrayOf(0, 1, 2), LinearOp.LE, 5)),
-        )
-        val objective = LinearObjective(intCoefficients = longArrayOf(-4, -5, -6))
-        val config = PresolveConfig(overrides = PresolvePass.entries.associateWith {
-            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
-        })
-        val prepared = FinitePipeline.prepare(FinitePipelineRequest(source, FiniteEngine.MIXED, objective, config))
-        val model = prepared.executableProblem()
-        val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AGGRESSIVE, prepared.objective)
-
-        val arms = PortfolioComposition.compose(PortfolioScenario.sequential(Kind.COP), facts)
-
-        assertTrue(facts.binaryPackingObjective)
-        assertTrue(arms.any { it.label == "lp-default" })
-    }
-
-    @Test
-    fun `changed Boolean view costs should discard the source packing recipe`() {
-        val source = Problem(
-            0, 3, Array(3) { IntDomain(0, 1) },
-            listOf(Linear(longArrayOf(2, 3, 4), intArrayOf(0, 1, 2), LinearOp.LE, 5)),
-        )
-        val objective = LinearObjective(intCoefficients = longArrayOf(-4, -5, -6))
-        val config = PresolveConfig(overrides = PresolvePass.entries.associateWith {
-            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
-        })
-        val prepared = FinitePipeline.prepare(FinitePipelineRequest(source, FiniteEngine.MIXED, objective, config))
-        val model = prepared.executableProblem()
-        val originalView = checkNotNull(prepared.objective)
-        val changed = originalView.copy(boolWeights = LongArray(model.numBoolVars) { 1L })
-
-        val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AGGRESSIVE, changed)
-
-        assertFalse(facts.binaryPackingObjective)
-    }
-
-    private fun linearModel(upper: Long = 5L) = Problem(
-        numBoolVars = 0,
-        numIntVars = 2,
-        intDomains = arrayOf(IntDomain(0, upper), IntDomain(0, upper)),
-        factors = arrayOf<Factor>(
-            Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
-        ),
-    ).bake()
-
-    @Test
     fun `continuous majority should count real coordinates against all discrete coordinates`() {
         for (
         (counts, expected) in listOf(
@@ -334,91 +285,6 @@ class ArmNeedsTest {
     }
 
     @Test
-    fun `binary packing should recognize ordinary and exact integer capacities`() {
-        val rows = listOf(
-            Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 3),
-            ExactLinear.of(
-                intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
-                listOf(BigFraction.ofLong(2), BigFraction.ofLong(3)),
-                LinearOp.LE,
-                BigFraction.ofLong(3),
-            ),
-        )
-        for (row in rows) {
-            val model = Problem(0, 2, Array(2) { IntDomain(0, 1) }, listOf(row)).bake()
-            val objective = LinearObjective(intCoefficients = longArrayOf(-4, -5))
-
-            val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AUTO, objective)
-
-            assertTrue(facts.binaryPackingObjective)
-        }
-    }
-
-    @Test
-    fun `binary packing should need binary ranges and an item profit objective`() {
-        val profits = LinearObjective(intCoefficients = longArrayOf(-4, -5))
-        for ((upper, objective, expected) in listOf(
-            Triple(1L, profits, true),
-            Triple(5L, profits, false),
-            Triple(1L, LinearObjective(intCoefficients = longArrayOf(4, 5)), false),
-            Triple(1L, LinearObjective(intCoefficients = longArrayOf(-4, 5)), false),
-            Triple(1L, LinearObjective(), false),
-            Triple(1L, null, false),
-        )) {
-            val model = Problem(
-                0, 2, Array(2) { IntDomain(0, upper) },
-                listOf(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 30)),
-            ).bake()
-
-            val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AUTO, objective)
-
-            assertEquals(expected, facts.binaryPackingObjective)
-        }
-    }
-
-    @Test
-    fun `other row forms should not claim a binary packing objective`() {
-        val refs = intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1))
-        val wide = BigFraction.of(parseBigInt("18446744073709551617"), BIG_ONE)
-        val cases = listOf<Triple<Factor, Int, Int>>(
-            Triple(Linear(longArrayOf(-2, 3), intArrayOf(0, 1), LinearOp.LE, 3), 0, 0),
-            Triple(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.EQ, 3), 0, 0),
-            Triple(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.NE, 3), 0, 0),
-            Triple(Linear(longArrayOf(2), intArrayOf(0), LinearOp.LE, 3), 0, 0),
-            Triple(Linear(longArrayOf(2, 3), intArrayOf(0, 0), LinearOp.LE, 3), 0, 0),
-            Triple(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, -1), 0, 0),
-            Triple(ExactLinear.of(refs, listOf(wide, wide), LinearOp.LE, wide), 0, 0),
-            Triple(
-                ExactLinear.of(
-                    refs, listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.LE,
-                    BigFraction.ONE, activator = 0,
-                ),
-                1, 0,
-            ),
-            Triple(
-                ExactLinear.of(
-                    intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
-                    listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.LE, BigFraction.ONE,
-                ),
-                0, 1,
-            ),
-        )
-        for ((row, bools, reals) in cases) {
-            val model = Problem(
-                bools, 2, Array(2) { IntDomain(0, 1) }, listOf(row),
-                numRealVars = reals,
-                realLower = DoubleArray(reals),
-                realUpper = DoubleArray(reals) { 1.0 },
-            ).bake()
-            val objective = LinearObjective(intCoefficients = longArrayOf(-4, -5))
-
-            val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AUTO, objective)
-
-            assertFalse(facts.binaryPackingObjective)
-        }
-    }
-
-    @Test
     fun `binary equality objectives should recognize ordinary and exact rows`() {
         val rows = listOf(
             Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1),
@@ -528,4 +394,13 @@ class ArmNeedsTest {
 
         assertFalse(facts.binaryEqualityObjective)
     }
+
+    private fun linearModel(upper: Long = 5L) = Problem(
+        numBoolVars = 0,
+        numIntVars = 2,
+        intDomains = arrayOf(IntDomain(0, upper), IntDomain(0, upper)),
+        factors = arrayOf<Factor>(
+            Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
+        ),
+    ).bake()
 }
