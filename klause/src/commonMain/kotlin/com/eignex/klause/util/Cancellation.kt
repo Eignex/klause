@@ -137,11 +137,11 @@ private class OrCancellation(
     other: Cancellation,
     private val combined: ComparableTimeMark?,
     private val meter: WorkMeter?,
-    private val accountingOwner: Cancellation?,
+    accountingOwner: Cancellation?,
 ) : SchedulingCancellation, ArithmeticCancellation {
     override val workScheduled: Boolean = self.workScheduled() || other.workScheduled()
-    private val left = self
-    private val right = other
+    private val accountingOwner: Cancellation? = if (accountingOwner is OrCancellation) accountingOwner.accountingOwner
+        else accountingOwner
     private val tokens: Array<Cancellation> = buildList<Cancellation> {
         if (self is OrCancellation) {
             for (token in self.tokens) appendOrdered(token)
@@ -165,7 +165,7 @@ private class OrCancellation(
     override fun arithmeticSource(): ArithmeticWorkSource? {
         val accounting = when {
             accountingOwner != null -> accountingOwner.arithmeticSource()
-            left.arithmeticSource() != null && right.arithmeticSource() != null ->
+            tokens.all { it.arithmeticSource() != null } ->
                 unmeteredArithmetic(this::isCancelled)
             else -> null
         }

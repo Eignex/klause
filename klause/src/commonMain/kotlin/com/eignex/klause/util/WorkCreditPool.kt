@@ -70,12 +70,14 @@ internal class WorkCreditPool(val limit: Long?, val concurrency: Concurrency = C
         ((cap - spent).coerceAtLeast(0L) - reserved).coerceAtLeast(0L)
 }
 
+@Suppress("TooGenericExceptionCaught") // failed parent admission must return every child reservation
 internal fun reserveWork(
     maximum: Int,
     pools: List<WorkCreditPool>,
     parent: ArithmeticWorkSource?,
     committed: (Int) -> Unit,
 ): WorkReservation? {
+    val containingOwner = parent?.takeIf { it.metered }
     val reservations = ArrayList<WorkReservation>()
     var capacity = maximum
     for (pool in pools) {
@@ -88,12 +90,12 @@ internal fun reserveWork(
         capacity = minOf(capacity, grant.capacity)
     }
     val containing = try {
-        parent?.reserve(capacity)
+        containingOwner?.reserve(capacity)
     } catch (failure: Throwable) {
         reservations.forEach { it.settle(0) }
         throw failure
     }
-    if (parent != null && containing == null) {
+    if (containingOwner != null && containing == null) {
         reservations.forEach { it.settle(0) }
         return null
     }

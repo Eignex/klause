@@ -108,7 +108,9 @@ internal class PolynomialArithmetic(
         while (!remainder.isZero) {
             step()
             val term = remainder.terms.last()
-            val monomial = requireNotNull(term.monomial.quotient(lead.monomial)) { "nonexact polynomial division" }
+            val monomial = requireNotNull(term.monomial.quotient(lead.monomial)) {
+                "nonexact polynomial division"
+            }
             val next = Polynomial.of(listOf(PolynomialTerm(monomial, term.coefficient * lead.coefficient.reciprocal())))
             quotient = add(quotient, next)
             val pending = prepareMultiply(next, divisor)

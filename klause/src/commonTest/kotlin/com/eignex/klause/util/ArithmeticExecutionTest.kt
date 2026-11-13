@@ -31,6 +31,29 @@ class ArithmeticExecutionTest {
     }
 
     @Test
+    fun `an observed stop should remain latched until the active operation exits`() {
+        assertFailsWith<IllegalStateException> {
+            execution.operation {
+                stopped = true
+                assertFailsWith<IllegalStateException> { execution.checkpoint() }
+                stopped = false
+            }
+        }
+
+        assertEquals(0L, pool.spent)
+    }
+
+    @Test
+    fun `an opaque checkpoint should permit a later caller invocation`() {
+        var cancelled = true
+        val opaque = ArithmeticExecution(Cancellation { cancelled }) { error("cancelled") }
+        assertFailsWith<IllegalStateException> { opaque.checkpoint() }
+        cancelled = false
+
+        opaque.checkpoint()
+    }
+
+    @Test
     fun `nested operations should settle only admitted work at exit`() {
         execution.operation {
             repeat(3) { execution.step() }
