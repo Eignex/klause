@@ -12,13 +12,12 @@ import com.eignex.klause.arithmetic.quadratic.QuadraticRow
 import com.eignex.klause.arithmetic.quadratic.QuadraticRowRelation
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
 
 internal fun preparePolynomialQuadraticRefutation(
     atoms: List<PolynomialAtom>,
     arithmetic: PolynomialArithmetic,
-): Iterator<Boolean?> = sequence {
-    val control = QuadraticControl(Cancellation { arithmetic.step(); false }, maximumMatrixCells = null)
+): Iterator<Boolean?> = arithmetic.execution.iterator(sequence {
+    val control = QuadraticControl(maximumMatrixCells = null, execution = arithmetic.execution)
     val candidates = QuadraticCandidates(control)
     val checker = QuadraticCertification(control)
     for (atom in atoms) {
@@ -51,7 +50,7 @@ internal fun preparePolynomialQuadraticRefutation(
         yield(null)
     }
     yield(false)
-}.iterator()
+}.iterator())
 
 private fun quadraticOrientations(atom: PolynomialAtom, arithmetic: PolynomialArithmetic): List<PolynomialAtom> {
     arithmetic.step()

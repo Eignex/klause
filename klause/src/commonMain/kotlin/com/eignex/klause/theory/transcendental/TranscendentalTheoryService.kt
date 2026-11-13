@@ -23,8 +23,14 @@ import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.theory.qfnra.solveQfNra
+import com.eignex.klause.util.ArithmeticCancellation
+import com.eignex.klause.util.ArithmeticWorkSource
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkCreditPool
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.WorkReservation
+import com.eignex.klause.util.arithmeticSource
+import com.eignex.klause.util.reserveWork
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigInt
 
@@ -66,21 +72,30 @@ internal class TranscendentalTheoryService(
     maximumBits: Int = 65536,
     private val polynomialLimits: PolynomialLimits = PolynomialLimits(),
 ) {
-    var work: Long = 0
-        private set
+    private val pool = WorkCreditPool(maximumWork)
+    private val parentAccounting = cancellation.arithmeticSource()
+    val work: Long get() = pool.spent
     var representationDeclined: Boolean = false
         private set
     val exhausted: Boolean get() = maximumWork?.let { work >= it } == true || representationDeclined
     private var worker = Cancellation.Never
     private val meter = WorkMeter { units ->
         require(units >= 0)
-        work += minOf(units, Long.MAX_VALUE - work)
+        pool.debit(units)
         cancellation.charge(units)
     }
-    private val stop = object : Cancellation {
+    private val stop: ArithmeticCancellation = object : ArithmeticCancellation {
         override fun isCancelled(): Boolean = cancellation() || worker() || exhausted
         override fun workMeter(): WorkMeter = meter
         override fun deadline() = cancellation.deadline()
+        override fun arithmeticSource(): ArithmeticWorkSource? {
+            if (cancellation.workMeter() != null && parentAccounting == null) return null
+            return object : ArithmeticWorkSource {
+                override fun isCancelled(): Boolean = stop.isCancelled()
+                override fun reserve(maximum: Int): WorkReservation? =
+                    reserveWork(maximum, listOf(pool), parentAccounting) {}
+            }
+        }
     }
     private val transcendental = TranscendentalArithmetic(stop, maximumBits)
     private val arithmetic = ExactRealArithmetic(

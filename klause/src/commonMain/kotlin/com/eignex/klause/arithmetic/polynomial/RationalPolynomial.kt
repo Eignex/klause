@@ -35,24 +35,28 @@ internal data class RationalInterval(val lower: BigFraction, val upper: BigFract
 internal data class SquareFreeFactor(val polynomial: RationalPolynomial, val multiplicity: Int)
 
 internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic = PolynomialArithmetic()) {
-    fun add(left: RationalPolynomial, right: RationalPolynomial): RationalPolynomial = RationalPolynomial(
-        List(arithmetic.denseSize(maxOf(left.degree, right.degree))) {
-            arithmetic.step()
-            left[it] + right[it]
-        },
-    )
+    fun add(left: RationalPolynomial, right: RationalPolynomial): RationalPolynomial = arithmetic.execution.operation {
+        RationalPolynomial(
+            List(arithmetic.denseSize(maxOf(left.degree, right.degree))) {
+                arithmetic.step()
+                left[it] + right[it]
+            },
+        )
+    }
 
-    fun scale(value: RationalPolynomial, coefficient: BigFraction): RationalPolynomial {
+    fun scale(value: RationalPolynomial, coefficient: BigFraction): RationalPolynomial =
+        arithmetic.execution.operation {
         arithmetic.step()
-        return RationalPolynomial(value.coefficients.map {
+        return@operation RationalPolynomial(value.coefficients.map {
             arithmetic.step()
             it * coefficient
         })
     }
 
-    fun multiply(left: RationalPolynomial, right: RationalPolynomial): RationalPolynomial {
+    fun multiply(left: RationalPolynomial, right: RationalPolynomial): RationalPolynomial =
+        arithmetic.execution.operation {
         arithmetic.step()
-        if (left.isZero || right.isZero) return RationalPolynomial.ZERO
+        if (left.isZero || right.isZero) return@operation RationalPolynomial.ZERO
         if (left.degree > Int.MAX_VALUE - right.degree) {
             throw PolynomialResourceLimit(PolynomialResource.DEGREE_OVERFLOW)
         }
@@ -61,21 +65,21 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
             arithmetic.step()
             result[i + j] = result[i + j] + left[i] * right[j]
         }
-        return RationalPolynomial(result)
+        return@operation RationalPolynomial(result)
     }
 
-    fun derivative(value: RationalPolynomial): RationalPolynomial {
+    fun derivative(value: RationalPolynomial): RationalPolynomial = arithmetic.execution.operation {
         arithmetic.step()
         arithmetic.denseSize((value.degree - 1).coerceAtLeast(-1))
-        return RationalPolynomial((1..value.degree).map {
+        return@operation RationalPolynomial((1..value.degree).map {
             arithmetic.step()
             value[it] * BigFraction.ofLong(it.toLong())
         })
     }
 
-    fun evaluate(value: RationalPolynomial, at: BigFraction): BigFraction {
+    fun evaluate(value: RationalPolynomial, at: BigFraction): BigFraction = arithmetic.execution.operation {
         arithmetic.step()
-        if (value.degree <= 0 || at.isZero) return value[0]
+        if (value.degree <= 0 || at.isZero) return@operation value[0]
         val coefficients = value.coefficients
         var denominator = BIG_ONE
         for (coefficient in coefficients) {
@@ -92,10 +96,11 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
         }
         val result = BigFraction.of(numerator, denominator * pointDenominator)
         arithmetic.step()
-        return result
+        return@operation result
     }
 
-    fun divide(left: RationalPolynomial, right: RationalPolynomial): Pair<RationalPolynomial, RationalPolynomial> {
+    fun divide(left: RationalPolynomial, right: RationalPolynomial): Pair<RationalPolynomial, RationalPolynomial> =
+        arithmetic.execution.operation {
         require(!right.isZero)
         arithmetic.step()
         val quotient = MutableList(arithmetic.denseSize((left.degree - right.degree).coerceAtLeast(-1))) {
@@ -114,21 +119,22 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
             }
             remainder = RationalPolynomial(terms)
         }
-        return RationalPolynomial(quotient) to remainder
+        return@operation RationalPolynomial(quotient) to remainder
     }
 
-    fun divideExact(left: RationalPolynomial, right: RationalPolynomial): RationalPolynomial {
+    fun divideExact(left: RationalPolynomial, right: RationalPolynomial): RationalPolynomial =
+        arithmetic.execution.operation {
         val (quotient, remainder) = divide(left, right)
         require(remainder.isZero) { "nonexact polynomial division" }
-        return quotient
+        return@operation quotient
     }
 
-    fun monic(value: RationalPolynomial): RationalPolynomial {
+    fun monic(value: RationalPolynomial): RationalPolynomial = arithmetic.execution.operation {
         arithmetic.step()
-        return if (value.isZero) value else scale(value, value[value.degree].reciprocal())
+        return@operation if (value.isZero) value else scale(value, value[value.degree].reciprocal())
     }
 
-    fun gcd(left: RationalPolynomial, right: RationalPolynomial): RationalPolynomial {
+    fun gcd(left: RationalPolynomial, right: RationalPolynomial): RationalPolynomial = arithmetic.execution.operation {
         arithmetic.step()
         var a = left
         var b = right
@@ -138,15 +144,15 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
             a = b
             b = remainder
         }
-        return monic(a)
+        return@operation monic(a)
     }
 
     fun squareFree(value: RationalPolynomial): RationalPolynomial =
         if (value.degree <= 0) monic(value) else monic(divideExact(value, gcd(value, derivative(value))))
 
-    fun squareFreeFactors(value: RationalPolynomial): List<SquareFreeFactor> {
+    fun squareFreeFactors(value: RationalPolynomial): List<SquareFreeFactor> = arithmetic.execution.operation {
         arithmetic.step()
-        if (value.degree <= 0) return emptyList()
+        if (value.degree <= 0) return@operation emptyList()
         var common = gcd(value, derivative(value))
         var remaining = divideExact(monic(value), common)
         var multiplicity = 1
@@ -160,10 +166,10 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
             common = divideExact(common, shared)
             multiplicity++
         }
-        return result
+        return@operation result
     }
 
-    fun sturm(value: RationalPolynomial): List<RationalPolynomial> {
+    fun sturm(value: RationalPolynomial): List<RationalPolynomial> = arithmetic.execution.operation {
         require(value.degree > 0)
         val result = mutableListOf(squareFree(value))
         result.add(derivative(result[0]))
@@ -173,7 +179,7 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
             if (remainder.isZero) break
             result.add(scale(remainder, BigFraction.MINUS_ONE))
         }
-        return result
+        return@operation result
     }
 
     private fun variations(sequence: List<RationalPolynomial>, at: BigFraction): Int {
@@ -188,10 +194,11 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
         return result
     }
 
-    fun countOpen(sequence: List<RationalPolynomial>, interval: RationalInterval): Int {
+    fun countOpen(sequence: List<RationalPolynomial>, interval: RationalInterval): Int =
+        arithmetic.execution.operation {
         arithmetic.step()
-        if (interval.isPoint) return 0
-        return variations(sequence, interval.lower) - variations(sequence, interval.upper) -
+        if (interval.isPoint) return@operation 0
+        return@operation variations(sequence, interval.lower) - variations(sequence, interval.upper) -
             if (evaluate(sequence[0], interval.upper).isZero) 1 else 0
     }
 
@@ -200,14 +207,14 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
      * bound and counting roots in each open interval with the Sturm sequence. A root of a linear
      * polynomial, or one hit by a bisection point, comes back as a point interval.
      */
-    fun isolate(value: RationalPolynomial): List<RationalInterval> {
+    fun isolate(value: RationalPolynomial): List<RationalInterval> = arithmetic.execution.operation {
         arithmetic.step()
         require(!value.isZero) { "zero polynomial has no finite root list" }
-        if (value.degree == 0) return emptyList()
+        if (value.degree == 0) return@operation emptyList()
         val polynomial = squareFree(value)
         if (polynomial.degree == 1) {
             val root = polynomial[0].negated() * polynomial[1].reciprocal()
-            return listOf(RationalInterval(root, root))
+            return@operation listOf(RationalInterval(root, root))
         }
         val sequence = sturm(polynomial)
         var bound = BigFraction.ONE
@@ -238,15 +245,16 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
             pending.add(RationalInterval(midpoint, interval.upper))
             pending.add(RationalInterval(interval.lower, midpoint))
         }
-        return roots.sortedWith { left, right -> left.lower.compareTo(right.lower) }
+        return@operation roots.sortedWith { left, right -> left.lower.compareTo(right.lower) }
     }
 
-    fun refine(polynomial: RationalPolynomial, interval: RationalInterval): RationalInterval {
+    fun refine(polynomial: RationalPolynomial, interval: RationalInterval): RationalInterval =
+        arithmetic.execution.operation {
         arithmetic.step()
-        if (interval.isPoint) return interval
+        if (interval.isPoint) return@operation interval
         val midpoint = (interval.lower + interval.upper) * BigFraction.ofLong(2).reciprocal()
-        if (evaluate(polynomial, midpoint).isZero) return RationalInterval(midpoint, midpoint)
+        if (evaluate(polynomial, midpoint).isZero) return@operation RationalInterval(midpoint, midpoint)
         val left = RationalInterval(interval.lower, midpoint)
-        return if (countOpen(sturm(polynomial), left) == 1) left else RationalInterval(midpoint, interval.upper)
+        return@operation if (countOpen(sturm(polynomial), left) == 1) left else RationalInterval(midpoint, interval.upper)
     }
 }

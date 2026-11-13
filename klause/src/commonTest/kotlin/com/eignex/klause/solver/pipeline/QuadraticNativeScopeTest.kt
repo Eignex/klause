@@ -1,19 +1,59 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.arithmetic.polynomial.Polynomial
+import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialResource
 import com.eignex.klause.theory.qfnra.QfNraStats
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.arithmeticSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
 class QuadraticNativeScopeTest {
+    @Test
+    fun `unused sibling reservations should not manufacture native exhaustion`() {
+        val scope = QuadraticNativeScope(PolynomialTheoryParams(maximumWork = 5))
+        val first = assertNotNull(scope.worker(0).polynomial.arithmeticSource())
+        val second = assertNotNull(scope.worker(1).numerical.arithmeticSource())
+        val held = assertNotNull(first.reserve(5))
+
+        assertNull(second.reserve(1))
+        assertFalse(scope.stopped)
+        assertEquals(0L, scope.work)
+        held.settle(2)
+        val remaining = assertNotNull(second.reserve(5))
+        remaining.settle(3)
+
+        assertTrue(scope.stopped)
+        assertEquals(5L, scope.work)
+        assertEquals(2L, scope.polynomialStats.workSpent)
+        assertEquals(3L, scope.numericalWork)
+    }
+
+    @Test
+    fun `batched arithmetic should retain worker quota across reopening`() {
+        val scope = QuadraticNativeScope(PolynomialTheoryParams(maximumWork = 100), concurrent = false)
+        val worker = scope.worker(0, maximumWork = 3)
+        val arithmetic = PolynomialArithmetic(worker.polynomial)
+        arithmetic.multiply(Polynomial.ONE, Polynomial.ONE)
+
+        assertFailsWith<PolynomialInterrupted> { arithmetic.multiply(Polynomial.ONE, Polynomial.ONE) }
+        val reopened = scope.worker(0, maximumWork = 3)
+
+        assertEquals(3L, reopened.work)
+        assertTrue(reopened.stopped)
+        assertFalse(scope.stopped)
+    }
+
     @Test
     fun `native polling should preserve timeout and external predicate order`() {
         val visited = ArrayList<Int>()

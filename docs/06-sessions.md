@@ -428,7 +428,16 @@ registration alone uses a mutex, and capacity is read before registration.
 come from the caller's adapter, and solver policy owns conversions and result
 semantics.
 
-Polynomial native polls read the shared allowance, worker quota and representation
+Arithmetic allowance cursors reserve bounded credit from persistent worker and
+containing `WorkCreditPool`s. Reserved capacity is distinct from spent work; a
+sibling holding credit can delay admission without establishing exhaustion. A cursor
+returns unused capacity and settles used units exactly once before handoff, pause
+or exit, including exceptional exits. Each containing meter receives the same
+admitted native units once. Unlimited pools still retain exact saturating charges.
+Serial pools use plain integer variables; shared pools update spent and reserved
+capacity together through relaxed atomic compare-and-set, without a mutex.
+
+Polynomial native checkpoints read the shared allowance, worker quota and representation
 stops without locking, then inspect containing predicates. Representation declines
 use published reference cells; worker registration uses a separate mutex. Encoder
 preparation latches an observed stop for that capture while

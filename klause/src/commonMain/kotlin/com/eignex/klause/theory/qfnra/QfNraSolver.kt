@@ -20,8 +20,14 @@ import com.eignex.klause.theory.qfnra.PolynomialSigns.NEGATIVE_SIGN
 import com.eignex.klause.theory.qfnra.PolynomialSigns.POSITIVE_SIGN
 import com.eignex.klause.theory.qfnra.PolynomialSigns.ZERO_SIGN
 import com.eignex.klause.theory.qfnra.PolynomialSigns.relationSigns
+import com.eignex.klause.util.ArithmeticCancellation
+import com.eignex.klause.util.ArithmeticWorkSource
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkCreditPool
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.WorkReservation
+import com.eignex.klause.util.arithmeticSource
+import com.eignex.klause.util.reserveWork
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.magnitudeBitLength
@@ -477,7 +483,7 @@ internal class QfNraQuery(
     }
 }
 
-internal class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMeter {
+internal class QfNraWork(private val params: QfNraParams) : ArithmeticCancellation, WorkMeter {
     var projectedPolynomials: Long = 0
     var liftedCells: Long = 0
     var dyadicAttempts: Long = 0
@@ -492,7 +498,9 @@ internal class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMe
     var equationalRootLevels: Long? = null
     private var coupledWorkDeclines: Long = 0
     private var dyadicPreExtractionDeclines: Long = 0
-    private var spent: Long = 0
+    private val pool = WorkCreditPool(params.maximumWork)
+    private val parentAccounting = params.cancellation.arithmeticSource()
+    private val spent: Long get() = pool.spent
     val spentWork: Long get() = spent
     private var probeEnd: Long? = null
     private var coupledEnd: Long? = null
@@ -507,9 +515,21 @@ internal class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMe
     }
     override fun deadline() = params.cancellation.deadline()
     override fun workMeter(): WorkMeter = this
+    override fun arithmeticSource(): ArithmeticWorkSource? {
+        if (params.cancellation.workMeter() != null && parentAccounting == null) return null
+        return object : ArithmeticWorkSource {
+            override fun isCancelled(): Boolean = this@QfNraWork.isCancelled()
+            override fun reserve(maximum: Int): WorkReservation? {
+                val end = listOfNotNull(probeEnd, coupledEnd).minOrNull()
+                val capacity = end?.let { minOf(maximum.toLong(), (it - spent).coerceAtLeast(0L)).toInt() } ?: maximum
+                if (capacity == 0) return null
+                return reserveWork(capacity, listOf(pool), parentAccounting) {}
+            }
+        }
+    }
     override fun charge(units: Long) {
         require(units >= 0)
-        spent = if (units > Long.MAX_VALUE - spent) Long.MAX_VALUE else spent + units
+        pool.debit(units)
         params.cancellation.charge(units)
     }
     fun probe(block: () -> QfNraAssignment?): QfNraAssignment? {

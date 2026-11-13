@@ -14,20 +14,20 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
     private var currentRootCount: RootCount? = null
     private var previousRootCount: RootCount? = null
 
-    fun rational(value: BigFraction): AlgebraicReal {
+    fun rational(value: BigFraction): AlgebraicReal = arithmetic.execution.operation {
         arithmetic.step()
-        return AlgebraicReal(
+        return@operation AlgebraicReal(
             RationalPolynomial(listOf(value.negated(), BigFraction.ONE)),
             1,
             RationalInterval(value, value),
         )
     }
 
-    fun roots(polynomial: RationalPolynomial): List<AlgebraicReal> {
+    fun roots(polynomial: RationalPolynomial): List<AlgebraicReal> = arithmetic.execution.operation {
         val defining = univariate.squareFree(polynomial)
         val intervals = univariate.isolate(defining)
         if (intervals.any { arithmetic.step(); !it.isPoint }) rememberRootCount(defining, intervals.size)
-        return intervals.mapIndexed { index, interval ->
+        return@operation intervals.mapIndexed { index, interval ->
             AlgebraicReal(defining, index + 1, interval)
         }
     }
@@ -68,7 +68,11 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         value.image,
     )
 
-    fun compare(left: AlgebraicReal, right: AlgebraicReal): Int {
+    fun compare(left: AlgebraicReal, right: AlgebraicReal): Int = arithmetic.execution.operation {
+        compareValue(left, right)
+    }
+
+    private fun compareValue(left: AlgebraicReal, right: AlgebraicReal): Int {
         arithmetic.step()
         if (left === right) return 0
         if (left.definingPolynomial == right.definingPolynomial && left.rootIndex == right.rootIndex) return 0
@@ -124,11 +128,11 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
 
     fun sign(value: AlgebraicReal): Int = compareRational(value, BigFraction.ZERO)
 
-    fun sampleBetween(lower: AlgebraicReal?, upper: AlgebraicReal?): BigFraction {
+    fun sampleBetween(lower: AlgebraicReal?, upper: AlgebraicReal?): BigFraction = arithmetic.execution.operation {
         arithmetic.step()
-        if (lower == null && upper == null) return BigFraction.ZERO
-        if (lower == null) return checkNotNull(upper).lowerBound - BigFraction.ONE
-        if (upper == null) return lower.upperBound + BigFraction.ONE
+        if (lower == null && upper == null) return@operation BigFraction.ZERO
+        if (lower == null) return@operation checkNotNull(upper).lowerBound - BigFraction.ONE
+        if (upper == null) return@operation lower.upperBound + BigFraction.ONE
         require(compare(lower, upper) < 0) { "sector boundaries must be strictly ordered" }
         var a: AlgebraicReal = lower
         var b: AlgebraicReal = upper
@@ -136,10 +140,14 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
             a = refine(a)
             b = refine(b)
         }
-        return (a.upperBound + b.lowerBound) * BigFraction.ofLong(2).reciprocal()
+        return@operation (a.upperBound + b.lowerBound) * BigFraction.ofLong(2).reciprocal()
     }
 
-    fun signAt(polynomial: RationalPolynomial, value: AlgebraicReal): Int {
+    fun signAt(polynomial: RationalPolynomial, value: AlgebraicReal): Int = arithmetic.execution.operation {
+        signAtValue(polynomial, value)
+    }
+
+    private fun signAtValue(polynomial: RationalPolynomial, value: AlgebraicReal): Int {
         arithmetic.step()
         value.rational?.let { return univariate.evaluate(polynomial, it).signum() }
         enclosedSign {
@@ -161,16 +169,16 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         }
     }
 
-    fun evaluate(polynomial: RationalPolynomial, value: AlgebraicReal): AlgebraicReal {
+    fun evaluate(polynomial: RationalPolynomial, value: AlgebraicReal): AlgebraicReal = arithmetic.execution.operation {
         arithmetic.step()
-        value.rational?.let { return rational(univariate.evaluate(polynomial, it)) }
+        value.rational?.let { return@operation rational(univariate.evaluate(polynomial, it)) }
         val remainder = univariate.divide(polynomial, value.definingPolynomial).second
-        if (remainder.degree <= 0) return rational(remainder[0])
-        if (remainder == RationalPolynomial.X) return value
-        if (remainder.degree == 1) return affine(value, remainder[1], remainder[0])
+        if (remainder.degree <= 0) return@operation rational(remainder[0])
+        if (remainder == RationalPolynomial.X) return@operation value
+        if (remainder.degree == 1) return@operation affine(value, remainder[1], remainder[0])
         value.image?.let { image ->
             try {
-                return evaluate(composeImage(remainder, image), image.base)
+                return@operation evaluate(composeImage(remainder, image), image.base)
             } catch (_: PolynomialResourceLimit) {
                 // The captured base can be wider than the scalar admitted by this caller.
             }
@@ -184,7 +192,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
             current = refine(current)
             enclosure
         }
-        return captureImage(result, value, remainder)
+        return@operation captureImage(result, value, remainder)
     }
 
     fun negate(value: AlgebraicReal): AlgebraicReal = affine(value, BigFraction.MINUS_ONE, BigFraction.ZERO)
@@ -211,20 +219,20 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         return captureImage(result, value, RationalPolynomial(listOf(offset, scale)))
     }
 
-    fun add(left: AlgebraicReal, right: AlgebraicReal): AlgebraicReal {
+    fun add(left: AlgebraicReal, right: AlgebraicReal): AlgebraicReal = arithmetic.execution.operation {
         arithmetic.step()
-        left.rational?.let { return evaluate(RationalPolynomial(listOf(it, BigFraction.ONE)), right) }
-        right.rational?.let { return evaluate(RationalPolynomial(listOf(it, BigFraction.ONE)), left) }
-        sharedImage(left, right, product = false)?.let { return it }
-        if (compare(left, right) == 0) return evaluate(RationalPolynomial.of(0, 2), left)
-        if (compare(left, negate(right)) == 0) return rational(BigFraction.ZERO)
+        left.rational?.let { return@operation evaluate(RationalPolynomial(listOf(it, BigFraction.ONE)), right) }
+        right.rational?.let { return@operation evaluate(RationalPolynomial(listOf(it, BigFraction.ONE)), left) }
+        sharedImage(left, right, product = false)?.let { return@operation it }
+        if (compare(left, right) == 0) return@operation evaluate(RationalPolynomial.of(0, 2), left)
+        if (compare(left, negate(right)) == 0) return@operation rational(BigFraction.ZERO)
         val first = lift(left.definingPolynomial, 0)
         val replacement = arithmetic.subtract(Polynomial.variable(1), Polynomial.variable(0))
         val second = arithmetic.substitute(lift(right.definingPolynomial, 0), 0, replacement)
         val annihilator = extract(arithmetic.resultant(first, second, 0), 1)
         var a = left
         var b = right
-        return select(annihilator) {
+        return@operation select(annihilator) {
             val enclosure = intervalAdd(a.interval, b.interval)
             a = refine(a)
             b = refine(b)
@@ -232,19 +240,19 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         }
     }
 
-    fun subtract(left: AlgebraicReal, right: AlgebraicReal): AlgebraicReal {
+    fun subtract(left: AlgebraicReal, right: AlgebraicReal): AlgebraicReal = arithmetic.execution.operation {
         arithmetic.step()
-        sharedImage(left, right, product = false, subtract = true)?.let { return it }
-        if (compare(left, right) == 0) return rational(BigFraction.ZERO)
-        return add(left, negate(right))
+        sharedImage(left, right, product = false, subtract = true)?.let { return@operation it }
+        if (compare(left, right) == 0) return@operation rational(BigFraction.ZERO)
+        return@operation add(left, negate(right))
     }
 
-    fun multiply(left: AlgebraicReal, right: AlgebraicReal): AlgebraicReal {
+    fun multiply(left: AlgebraicReal, right: AlgebraicReal): AlgebraicReal = arithmetic.execution.operation {
         arithmetic.step()
-        left.rational?.let { return evaluate(RationalPolynomial(listOf(BigFraction.ZERO, it)), right) }
-        right.rational?.let { return evaluate(RationalPolynomial(listOf(BigFraction.ZERO, it)), left) }
-        sharedImage(left, right, product = true)?.let { return it }
-        if (compare(left, right) == 0) return evaluate(RationalPolynomial.of(0, 0, 1), left)
+        left.rational?.let { return@operation evaluate(RationalPolynomial(listOf(BigFraction.ZERO, it)), right) }
+        right.rational?.let { return@operation evaluate(RationalPolynomial(listOf(BigFraction.ZERO, it)), left) }
+        sharedImage(left, right, product = true)?.let { return@operation it }
+        if (compare(left, right) == 0) return@operation evaluate(RationalPolynomial.of(0, 0, 1), left)
         val first = lift(left.definingPolynomial, 0)
         val degree = right.definingPolynomial.degree
         val second = Polynomial.of(right.definingPolynomial.coefficients.mapIndexed { index, coefficient ->
@@ -253,7 +261,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         val annihilator = extract(arithmetic.resultant(first, second, 0), 1)
         var a = left
         var b = right
-        return select(annihilator) {
+        return@operation select(annihilator) {
             val enclosure = intervalMultiply(a.interval, b.interval)
             a = refine(a)
             b = refine(b)
@@ -261,12 +269,12 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         }
     }
 
-    fun reciprocal(value: AlgebraicReal): AlgebraicReal {
+    fun reciprocal(value: AlgebraicReal): AlgebraicReal = arithmetic.execution.operation {
         require(sign(value) != 0) { "reciprocal of zero" }
-        value.rational?.let { return rational(it.reciprocal()) }
+        value.rational?.let { return@operation rational(it.reciprocal()) }
         val annihilator = RationalPolynomial(value.definingPolynomial.coefficients.asReversed())
         var current = value
-        return select(annihilator) {
+        return@operation select(annihilator) {
             while (current.interval.lower.signum() <= 0 && current.interval.upper.signum() >= 0) {
                 current = refine(current)
             }
@@ -360,7 +368,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         return AlgebraicReal(result.definingPolynomial, result.rootIndex, result.interval, image)
     }
 
-    fun power(value: AlgebraicReal, exponent: Int): AlgebraicReal {
+    fun power(value: AlgebraicReal, exponent: Int): AlgebraicReal = arithmetic.execution.operation {
         require(exponent >= 0)
         var result = rational(BigFraction.ONE)
         var base = value
@@ -371,7 +379,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
             remaining = remaining ushr 1
             if (remaining != 0) base = multiply(base, base)
         }
-        return result
+        return@operation result
     }
 
     fun evaluate(polynomial: Polynomial, coordinates: Map<Int, AlgebraicReal>): AlgebraicReal =
@@ -467,14 +475,15 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         return result
     }
 
-    fun specialize(polynomial: Polynomial, variable: Int, coordinates: Map<Int, AlgebraicReal>): AlgebraicPolynomial {
+    fun specialize(polynomial: Polynomial, variable: Int, coordinates: Map<Int, AlgebraicReal>): AlgebraicPolynomial =
+        arithmetic.execution.operation {
         val coefficients = arithmetic.coefficients(polynomial, variable)
         val captured = captureSpecialization(coefficients, coordinates)
-            ?: return this.polynomial(coefficients.map { evaluate(it, coordinates) })
+            ?: return@operation this.polynomial(coefficients.map { evaluate(it, coordinates) })
         val expressions = captured.coefficients
         var size = expressions.size
         while (size > 0 && signAt(expressions[size - 1], captured.base) == 0) size--
-        return AlgebraicPolynomial(AlgebraicSpecialization(captured.base, expressions.take(size)))
+        return@operation AlgebraicPolynomial(AlgebraicSpecialization(captured.base, expressions.take(size)))
     }
 
     private fun captureSpecialization(
@@ -548,19 +557,20 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         }
     }
 
-    fun polynomial(coefficients: List<AlgebraicReal>): AlgebraicPolynomial {
+    fun polynomial(coefficients: List<AlgebraicReal>): AlgebraicPolynomial = arithmetic.execution.operation {
         arithmetic.step()
         var size = coefficients.size
         while (size > 0 && sign(coefficients[size - 1]) == 0) size--
-        return AlgebraicPolynomial(coefficients.take(size))
+        return@operation AlgebraicPolynomial(coefficients.take(size))
     }
 
-    fun evaluate(polynomial: AlgebraicPolynomial, value: AlgebraicReal): AlgebraicReal {
+    fun evaluate(polynomial: AlgebraicPolynomial, value: AlgebraicReal): AlgebraicReal =
+        arithmetic.execution.operation {
         var result = rational(BigFraction.ZERO)
         for (coefficient in polynomial.coefficients(this).asReversed()) {
             result = add(multiply(result, value), coefficient)
         }
-        return result
+        return@operation result
     }
 
     fun signAt(polynomial: AlgebraicPolynomial, value: AlgebraicReal): Int =
@@ -573,11 +583,11 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
             result
         } ?: sign(evaluate(polynomial, value))
 
-    fun roots(polynomial: AlgebraicPolynomial): List<AlgebraicReal> {
+    fun roots(polynomial: AlgebraicPolynomial): List<AlgebraicReal> = arithmetic.execution.operation {
         arithmetic.step()
         require(!polynomial.isZero) { "zero polynomial has no finite root list" }
-        if (polynomial.degree == 0) return emptyList()
-        polynomial.specialization?.let { return CorrelatedAlgebraicRoots(this).roots(it) }
+        if (polynomial.degree == 0) return@operation emptyList()
+        polynomial.specialization?.let { return@operation CorrelatedAlgebraicRoots(this).roots(it) }
         // Independent coefficient conjugates give a superset of roots. The leading coefficient's
         // annihilator excludes zero, ensuring every conjugate polynomial retains positive degree.
         val coefficients = polynomial.coefficients(this)
@@ -589,7 +599,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         }
         if (rational.size == coefficients.size) {
             arithmetic.denseSize(polynomial.degree)
-            return roots(RationalPolynomial(rational))
+            return@operation roots(RationalPolynomial(rational))
         }
         val variable = coefficients.size
         var relation = Polynomial.ZERO
@@ -608,7 +618,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
             relation = arithmetic.resultant(lift(defining, index), relation, index)
         }
         val annihilator = extract(relation, variable)
-        return roots(annihilator).filter { signAt(polynomial, it) == 0 }
+        return@operation roots(annihilator).filter { signAt(polynomial, it) == 0 }
     }
 
     private fun select(polynomial: RationalPolynomial, enclosure: () -> RationalInterval): AlgebraicReal {
