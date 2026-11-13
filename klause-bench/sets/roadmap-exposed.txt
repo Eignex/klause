@@ -1,0 +1,66 @@
+# Sources that roadmap lanes have exposed to outcomes. A lane adds a source here when it runs it and
+# never picks a held-out from this set. Related encodings and permutations share exposure, so a MIPLIB
+# source is listed under every committed edition that carries its name.
+# `pp08acuts` is recorded as exposed but matches no committed corpus-index entry under that spelling.
+# MIPLIB
+miplib3/gt2
+miplib2017/gt2
+miplib3/stein27
+miplib3/lseu
+miplib3/mod008
+miplib3/mod010
+miplib2017/mod010
+miplib3/p0033
+miplib3/p0201
+miplib2017/p0201
+miplib3/p0282
+miplib3/p0548
+miplib3/mas74
+miplib2003/mas74
+miplib2017/mas74
+miplib3/mas76
+miplib2003/mas76
+miplib2017/mas76
+miplib3/l152lav
+miplib2017/enlight_hard
+miplib3/enigma
+miplib3/pk1
+miplib2003/pk1
+miplib2017/pk1
+miplib3/bell3a
+miplib3/bell5
+miplib3/misc07
+miplib2003/misc07
+miplib2017/misc07
+miplib3/modglob
+miplib2003/modglob
+miplib2017/timtab1CUTS
+miplib3/egout
+miplib3/rgn
+miplib3/cap6000
+miplib2003/cap6000
+miplib2017/cap6000
+miplib3/rentacar
+miplib2017/rentacar
+miplib2010/neos-1440225
+miplib2010/neos-807456
+miplib2010/neos858960
+miplib2017/neos859080
+miplib2017/neos-2624317-amur
+miplib2017/neos-1516309
+miplib2017/neos-3696678-lyvia
+# XCSP3
+xcsp3-csp/MagicSquare-sum-06_c23
+xcsp3-cop/EchelonStock2-A02_c22
+xcsp3-cop/VRP_LC-09-05-10-s2_c24
+xcsp3-cop/VRP_LC-09-05-10-s3_c24
+xcsp3-cop/CarpetCutting-test05_c23
+xcsp3-cop/GBACP-UD04_c23
+# SAT
+satlib/ai/hoos/Shortcuts/UF250.1065.100/uf250-0100
+satlib/UUF250.1065.100/uuf250-014
+satlib/UUF250.1065.100/uuf250-016
+satlib/UUF250.1065.100/uuf250-020
+satlib/UUF250.1065.100/uuf250-032
+satlib/UUF250.1065.100/uuf250-046
+satlib/UUF250.1065.100/uuf250-082

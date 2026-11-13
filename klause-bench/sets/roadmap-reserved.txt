@@ -1,0 +1,8 @@
+# Sources reserved as held-outs: no roadmap lane has run them. A lane picks its held-outs here and
+# moves a source to roadmap-exposed when it runs it.
+miplib3/qiu
+miplib2003/qiu
+miplib2010/qiu
+miplib2017/qiu
+miplib2017/sorrell8
+miplib2017/h80x6320
