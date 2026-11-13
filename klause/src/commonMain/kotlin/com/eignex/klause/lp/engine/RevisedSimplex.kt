@@ -924,7 +924,6 @@ internal class RevisedSimplex(
     }
 
     internal fun sparseAxpy(destination: DoubleArray, alpha: Double, column: Int) {
-        if (alpha == 0.0) return
         val from = colPtr[column]
         val until = colPtr[column + 1]
         if (until - from <= MAX_SCALAR_COLUMN_ENTRIES) {

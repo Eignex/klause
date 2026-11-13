@@ -55,7 +55,7 @@ class RevisedSimplexPricingTest {
                 for (alpha in listOf(0.0, -0.0, 2.0, -2.0, Double.POSITIVE_INFINITY, Double.NaN)) {
                     val destination = DoubleArray(rows) { -0.0 }
                     val expected = destination.copyOf()
-                    if (alpha != 0.0) model.forEachInColumnD(0) { row, value -> expected[row] += alpha * value }
+                    model.forEachInColumnD(0) { row, value -> expected[row] += alpha * value }
 
                     solver.sparseAxpy(destination, alpha, 0)
 
