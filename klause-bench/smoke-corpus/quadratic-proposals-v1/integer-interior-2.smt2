@@ -1,0 +1,7 @@
+(set-logic QF_NIA)
+(declare-const i Int)
+(declare-const j Int)
+(assert (>= i 0))
+(assert (>= j 0))
+(minimize (+ (* (- i 1) (- i 1)) (* (- j 2) (- j 2))))
+(check-sat)

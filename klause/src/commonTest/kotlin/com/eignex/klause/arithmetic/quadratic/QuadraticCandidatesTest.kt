@@ -1,8 +1,11 @@
 package com.eignex.klause.arithmetic.quadratic
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
@@ -78,6 +81,135 @@ class QuadraticCandidatesTest {
         val candidate = assertNotNull(candidates.stationary(model, active))
 
         assertNotNull(QuadraticCertification().bound(model, candidate))
+    }
+
+    @Test
+    fun `coupled numerical rows should reconstruct a certified constrained optimum`() {
+        val model = QuadraticModel(
+            listOf(q(-4), q(-6)),
+            listOf(listOf(q(2), q(1)), listOf(q(1), q(2))),
+            rows = listOf(
+                QuadraticRow(listOf(q(-1), q(0)), q(-2), QuadraticRowRelation.LE),
+                QuadraticRow(listOf(q(0), q(-1)), q(10), QuadraticRowRelation.LE),
+                QuadraticRow(listOf(q(1), q(1)), q(5), QuadraticRowRelation.EQ),
+            ),
+        )
+        val candidates = QuadraticCandidates()
+        val checker = QuadraticCertification()
+
+        val active = assertNotNull(candidates.proposeActiveRows(model, listOf(0.0, 5.0)))
+        val candidate = assertNotNull(candidates.stationary(model, active))
+        val optimum = assertNotNull(checker.optimum(assertNotNull(checker.bound(model, candidate))))
+
+        assertEquals(listOf(q(2), q(3)), optimum.point)
+    }
+
+    @Test
+    fun `empty numerical model should select active constant rows`() {
+        val model = QuadraticModel(
+            emptyList(), emptyList(),
+            rows = listOf(
+                QuadraticRow(emptyList(), q(0), QuadraticRowRelation.EQ),
+                QuadraticRow(emptyList(), q(1), QuadraticRowRelation.LE),
+                QuadraticRow(emptyList(), q(0), QuadraticRowRelation.LE),
+            ),
+        )
+
+        val active = QuadraticCandidates().proposeActiveRows(model, emptyList(), iterations = 1)
+
+        assertEquals(listOf(0, 2), active)
+    }
+
+    @Test
+    fun `numerical rows should include a changed final coordinate in a large model`() {
+        val dimension = 257
+        val coefficients = List(dimension) { if (it == dimension - 1) q(1) else q(0) }
+        val model = QuadraticModel(
+            List(dimension) { q(0) },
+            List(dimension) { row -> List(dimension) { column -> if (row == column) q(2) else q(0) } },
+            rows = listOf(
+                QuadraticRow(coefficients.map { it.negated() }, q(-2), QuadraticRowRelation.LE),
+                QuadraticRow(coefficients, q(1) * q(2).reciprocal(), QuadraticRowRelation.LE),
+            ),
+        )
+
+        val active = QuadraticCandidates().proposeActiveRows(model, List(dimension) { 0.0 }, iterations = 1)
+
+        assertEquals(listOf(0, 1), active)
+    }
+
+    @Test
+    fun `numerical proposal should charge its containing work meter`() {
+        val model = QuadraticModel(
+            listOf(q(0)), listOf(listOf(q(2))),
+            rows = listOf(QuadraticRow(listOf(q(-1)), q(-2), QuadraticRowRelation.LE)),
+        )
+        var charged = 0L
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+        val candidates = QuadraticCandidates(QuadraticControl(token))
+
+        assertNotNull(candidates.proposeActiveRows(model, listOf(0.0), iterations = 1))
+
+        assertEquals(7L, charged)
+    }
+
+    @Test
+    fun `exhausting work before a numerical kernel should withhold the proposal`() {
+        val model = QuadraticModel(listOf(q(0), q(0)), listOf(listOf(q(2), q(0)), listOf(q(0), q(2))))
+        val control = QuadraticControl(maximumWork = 2)
+
+        val stop = assertFailsWith<QuadraticInterrupted> {
+            QuadraticCandidates(control).proposeActiveRows(model, listOf(1.0, 1.0), iterations = 1)
+        }
+
+        assertEquals(QuadraticStop.WORK_LIMIT, stop.reason)
+        assertEquals(2L, control.work)
+    }
+
+    @Test
+    fun `cancelling before a numerical kernel should withhold the proposal`() {
+        val model = QuadraticModel(listOf(q(0), q(0)), listOf(listOf(q(2), q(0)), listOf(q(0), q(2))))
+        var charged = 0L
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = charged >= 2L
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+
+        val stop = assertFailsWith<QuadraticInterrupted> {
+            QuadraticCandidates(QuadraticControl(token)).proposeActiveRows(model, listOf(1.0, 1.0), iterations = 1)
+        }
+
+        assertEquals(QuadraticStop.CANCELLED, stop.reason)
+        assertEquals(2L, charged)
+    }
+
+    @Test
+    fun `nonfinite starting coordinates should decline a numerical proposal`() {
+        val model = QuadraticModel(listOf(q(0)), listOf(listOf(q(2))))
+
+        for (value in listOf(Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)) {
+            assertNull(QuadraticCandidates().proposeActiveRows(model, listOf(value)))
+        }
+    }
+
+    @Test
+    fun `nonfinite gradients should decline a numerical proposal`() {
+        val model = QuadraticModel(listOf(q(0)), listOf(listOf(q(2))))
+
+        assertNull(QuadraticCandidates().proposeActiveRows(model, listOf(Double.MAX_VALUE), iterations = 1))
+    }
+
+    @Test
+    fun `nonfinite final row images should decline a numerical proposal`() {
+        val model = QuadraticModel(
+            listOf(q(0)), listOf(listOf(q(2))),
+            rows = listOf(QuadraticRow(listOf(q(2)), q(0), QuadraticRowRelation.LE)),
+        )
+
+        assertNull(QuadraticCandidates().proposeActiveRows(model, listOf(Double.MAX_VALUE), iterations = 0))
     }
 
     private fun q(value: Long): BigFraction = BigFraction.ofLong(value)
