@@ -433,7 +433,9 @@ class Portfolio(
             is SolveResult.Unsat -> r.copy(stats = stats)
 
             else -> if (run.allRetired) {
-                SolveResult.Unknown(unsettledReason(verdicts), stats)
+                SolveResult.Unknown(PortfolioReduction.unsettledReason(
+                    verdicts.filterIsInstance<SolveResult.Unknown>().map { it.reason },
+                ), stats)
             } else {
                 SolveResult.Unknown(if (run.workLimitReached) TerminationReason.BudgetExhausted
                     else TerminationReason.Cancelled, stats)
@@ -492,6 +494,7 @@ class Portfolio(
         var callbackFailure: Throwable? = null
         var unbounded: MinimizeResult.Unbounded? = null
         var exhausted = false
+        val stopReasons = ArrayList<TerminationReason>()
         var terminalPublished = false
         var acceptedVersion = 0L
 
@@ -805,6 +808,11 @@ class Portfolio(
                         (PortfolioReduction.isExhausted(terminal) || terminal is MinimizeResult.Unbounded)
                     )
                 ) {
+                    when (val stopped = terminal) {
+                        is MinimizeResult.Unknown -> stopReasons.add(stopped.reason)
+                        is MinimizeResult.BestFound -> stopReasons.add(stopped.reason)
+                        else -> Unit
+                    }
                     run.retire(arm, retirementCause(failure))
                 }
             }
@@ -812,7 +820,12 @@ class Portfolio(
         val stats = run.folded()
         unbounded?.let { return it.copy(stats = stats) }
         // Cancellation or retirement stopped a still-open search: keep the incumbent (BestFound) or report Unknown.
-        return PortfolioReduction.terminal(incumbents.projected(), dirty = !exhausted, stats)
+        val reason = when {
+            run.allRetired -> PortfolioReduction.unsettledReason(stopReasons)
+            run.workLimitReached -> TerminationReason.BudgetExhausted
+            else -> TerminationReason.Cancelled
+        }
+        return PortfolioReduction.terminal(incumbents.projected(), dirty = !exhausted, reason, stats)
     }
 
     private fun verifyWitness(worker: PortfolioWorker, sample: Sample, value: Double?): Verification<Sample, Double?> {
@@ -1721,17 +1734,6 @@ class Portfolio(
 
     /** Geometric growth shared by every slice axis (millis and work): grow by [sliceGrowth], never past [cap]. */
     private fun grow(current: Long, cap: Long): Long = (current * sliceGrowth).toLong().coerceAtMost(cap)
-
-    /** Why a satisfaction run whose every arm retired undecided settles nothing: an arm that declined a feature it
-     *  cannot decide wins, so a caller can fall back to a backend that can. */
-    private fun unsettledReason(verdicts: List<SolveResult>): TerminationReason {
-        val reasons = verdicts.filterIsInstance<SolveResult.Unknown>().map { it.reason }
-        return if (TerminationReason.Unsupported in reasons) {
-            TerminationReason.Unsupported
-        } else {
-            reasons.firstOrNull() ?: TerminationReason.Cancelled
-        }
-    }
 
     override fun close() {
         workers.forEach { runCatching { it.close() } }

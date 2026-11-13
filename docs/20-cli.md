@@ -89,6 +89,11 @@ or reinterpreting a native refutation. Linear sources such as MPS render through
 `OutputProtocol.onLinearSourceResult`, which pairs the native result with its
 original-unit qualification.
 
+An incomplete verdict reports its recorded stop cause before proof-pool admission
+diagnostics: wall timeout, fixed work exhaustion, cancellation, unsupported feature
+or operation, required representation decline, or search exhaustion without a global
+proof. A representation decline does not mean that a search budget was exhausted.
+
 ## Flags
 
 Solver-control flags are common to every mode; `--help` lists every parameter.

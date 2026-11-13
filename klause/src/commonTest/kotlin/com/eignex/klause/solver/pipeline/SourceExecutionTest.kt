@@ -238,7 +238,7 @@ class SourceExecutionTest {
         val tiny = "(/ 1.0 1" + "0".repeat(400) + ".0)"
         val text = "(declare-const x Real) (assert (<= 0.0 x)) " +
             "(assert (>= (* $tiny x) 0.1))"
-        for (engine in listOf(FiniteEngine.MIXED, FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
+        for (engine in listOf(FiniteEngine.BACKTRACK, FiniteEngine.MIXED, FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
             val invocation = SourceSetup.prepare(SourceSetupRequest(
                 SmtLib.parse(text).source, ExecutionOperation.SATISFY, engine,
             ))
@@ -249,7 +249,7 @@ class SourceExecutionTest {
 
             val satisfy = assertIs<OpenTheoryExecution.Satisfy>(result.result)
             val outcome = assertIs<OpenTheoryResult.Unknown>(satisfy.result)
-            assertEquals(TerminationReason.Unsupported, outcome.reason, "$engine")
+            assertEquals(TerminationReason.RepresentationDeclined, outcome.reason, "$engine")
         }
     }
 

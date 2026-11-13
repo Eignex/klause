@@ -23,11 +23,12 @@ enum class TerminationReason {
     Cancelled,
 
     /**
-     * The backend cannot handle a feature this problem uses, so it declines rather than returning a
-     * possibly-unsound verdict — e.g. local search over a model it cannot score soundly. The caller falls
-     * back to a backend that supports the feature.
+     * The backend does not implement a required feature or operation. Another backend may support it.
      */
     Unsupported,
+
+    /** A required representation or exact check declined while executing an admitted model. */
+    RepresentationDeclined,
 
     /**
      * Complete-backend search space fully explored — no further work to do — but the
@@ -48,9 +49,8 @@ enum class TerminationReason {
  *  - [Found] — a satisfying assignment.
  *  - [Infeasible] — only returned by complete backends that proved no satisfying
  *    assignment exists.
- *  - [Unknown] — incomplete result (budget / timeout / cancellation). Local-search
- *    backends return this when they couldn't reach feasibility within the budget;
- *    complete backends return it when they were cut off mid-search.
+ *  - [Unknown] — incomplete result with its [TerminationReason], including resource
+ *    stops, cancellation, unsupported features and representation declines.
  */
 sealed interface SampleResult {
     /** Effective source interpretation, or null for an unbound result. */

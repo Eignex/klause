@@ -322,7 +322,7 @@ retained queries.
 operation allowance and representation decline. A local operation stop clears when
 the next operation begins, without renewing containing allowances. Timeout takes
 precedence over allowances, which take precedence over external cancellation and
-local decline. Open routing maps representation decline to `Unsupported` and
+local decline. Open routing maps representation decline to `RepresentationDeclined` and
 operation, check, decision and work stops to `BudgetExhausted`. Slice pauses are
 lifecycle events, never refutations.
 
@@ -360,7 +360,7 @@ renew it. Native work is forwarded once to the caller meter, separately from dec
 charges. Parallel slots retain their quota across reopening. Representation decline
 stops one worker; containing stops cancel all. A retained exact neighborhood query
 that declines while preparing or initializing its source never reopens it, and its
-worker reports `Unsupported`.
+worker reports `RepresentationDeclined`.
 
 Retained numerical source queries reserve one LP operation per changed authority.
 Consultations of the same suspended query retain its reservation and cumulative

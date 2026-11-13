@@ -5,6 +5,11 @@ incumbents and certified deductions; the coordinator owns slice allocation,
 publication admission and cleanup. Prepared capabilities decide which arms can run,
 while proof scope decides which claims they may make.
 
+When every arm retires undecided, satisfaction and optimization retain the same
+stop reason: `Unsupported` takes precedence over `RepresentationDeclined`, followed
+by the other recorded worker reasons. An unfinished optimization keeps its verified
+incumbent with that reason; an arm decline alone does not imply budget exhaustion.
+
 ## Invocations and recipes
 
 Finite, linear open, polynomial, nonlinear-integer, quadratic and transcendental

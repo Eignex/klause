@@ -15,13 +15,18 @@ class VerdictContextTest(private val reason: TerminationReason, private val expe
             arrayOf(TerminationReason.Timeout, "wall timeout"),
             arrayOf(TerminationReason.BudgetExhausted, "fixed work exhausted"),
             arrayOf(TerminationReason.Cancelled, "cancelled"),
+            arrayOf(TerminationReason.Unsupported, "unsupported feature or operation"),
+            arrayOf(TerminationReason.RepresentationDeclined, "required representation declined"),
+            arrayOf(TerminationReason.SearchExhausted, "search exhausted without a global proof"),
         )
     }
 
     @Test
-    fun `absent worker admission should retain the actual resource cause`() {
-        val context = VerdictContext(terminationReason = reason, completePool = null)
+    fun `worker admission should retain the actual stop cause`() {
+        for (complete in listOf(null, false, true)) {
+            val context = VerdictContext(terminationReason = reason, completePool = complete)
 
-        assertEquals(expected, context.softVerdictCause())
+            assertEquals(expected, context.softVerdictCause())
+        }
     }
 }

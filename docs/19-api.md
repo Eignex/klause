@@ -117,6 +117,9 @@ Complete traversal can prove optimality, nonattainment, unboundedness or
 infeasibility; local search and ALNS keep checked incumbents without global claims.
 `NonlinearIntegerProblem.pipelineRequest()` and SMT-LIB's `SmtLibProblem.source`
 expose the native arithmetic sources through the same verdict and witness surface.
+Incomplete results retain a `TerminationReason`: `Unsupported` names an unimplemented
+feature or operation, while `RepresentationDeclined` names a required representation
+or exact check that declined for an admitted model. Neither promises a fallback backend.
 Coverage is defined by [nonlinear integer](16-nonlinear-arithmetic.md),
 [polynomial composition](16-nonlinear-arithmetic.md#shared-model-composition) and
 [quadratic representation](02-model.md#quadratic-objective-representation).
