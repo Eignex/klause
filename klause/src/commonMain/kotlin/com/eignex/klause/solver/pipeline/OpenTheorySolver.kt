@@ -575,7 +575,7 @@ class OpenTheoryEngine internal constructor(
                     cause == SearchStopCause.OperationAllowance -> TerminationReason.BudgetExhausted
 
                 cause == SearchStopCause.Cancelled -> TerminationReason.Cancelled
-                cause == SearchStopCause.RepresentationDecline -> TerminationReason.Unsupported
+                cause == SearchStopCause.RepresentationDecline -> TerminationReason.RepresentationDeclined
 
                 else -> TerminationReason.Cancelled
             },

@@ -578,15 +578,14 @@ internal class VerdictContext(
     val completePool: Boolean? = null,
 )
 
-/**
- * The cause of a soft verdict: out of time, out of a pool that could have proved anything, or neither —
- * in which case the caller learns only that it was not reached.
- */
 internal fun VerdictContext.softVerdictCause(): String = when {
-    completePool == false -> "no arm in the pool can prove a verdict"
+    terminationReason == TerminationReason.Unsupported -> "unsupported feature or operation"
+    terminationReason == TerminationReason.RepresentationDeclined -> "required representation declined"
     terminationReason == TerminationReason.Timeout -> "wall timeout"
     terminationReason == TerminationReason.BudgetExhausted -> "fixed work exhausted"
     terminationReason == TerminationReason.Cancelled -> "cancelled"
+    terminationReason == TerminationReason.SearchExhausted -> "search exhausted without a global proof"
+    completePool == false -> "no arm in the pool can prove a verdict"
     budgetExhausted -> "budget exhausted"
     else -> "search stopped without a verdict"
 }

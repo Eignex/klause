@@ -35,6 +35,38 @@ import kotlin.time.TestTimeSource
 
 class PortfolioLifecycleTest {
     @Test
+    fun `unsettled optimization should retain a declined arm reason without a limit`() {
+        for (reason in listOf(TerminationReason.Unsupported, TerminationReason.RepresentationDeclined)) {
+            val workers = listOf(TerminationReason.BudgetExhausted, reason).mapIndexed { index, stop ->
+                trackingWorker("worker-$index", index, TrackingResumableSearch(MinimizeResult.Unknown(stop)))
+            }
+
+            val result = Portfolio.thompson(workers).use { it.minimize() }
+
+            assertEquals(reason, assertIs<MinimizeResult.Unknown>(result).reason)
+        }
+    }
+
+    @Test
+    fun `an unsettled incumbent should retain the declined arm reason`() {
+        val sample = Sample(BooleanArray(0), LongArray(0))
+        for (reason in listOf(TerminationReason.Unsupported, TerminationReason.RepresentationDeclined)) {
+            val first = TrackingResumableSearch(
+                MinimizeResult.Unknown(TerminationReason.BudgetExhausted),
+                MinimizeResult.BestFound(sample, 0.0, TerminationReason.BudgetExhausted),
+            )
+            val second = TrackingResumableSearch(MinimizeResult.Unknown(reason))
+            val workers = listOf(trackingWorker("incumbent", 0, first), trackingWorker("declined", 1, second))
+
+            val result = Portfolio.thompson(workers).use { it.minimize() }
+
+            val found = assertIs<MinimizeResult.BestFound>(result)
+            assertEquals(reason, found.reason)
+            assertEquals(sample, found.sample)
+        }
+    }
+
+    @Test
     fun `run duration should include every one shot segment and witness verification`() {
         for (optimize in listOf(false, true)) {
             val clock = TestTimeSource()

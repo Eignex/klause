@@ -21,7 +21,7 @@ witnesses and incumbents; its failure never refutes the source.
 | Optimal | A feasible assignment and a matching bound or exhaustive proof |
 | Unbounded | A source-valid proof of unlimited objective improvement; a feasible point alone is insufficient |
 | Best found | A feasible incumbent without an optimum proof |
-| UNKNOWN | No definitive claim; retain the unsupported, cancellation or resource cause |
+| UNKNOWN | No definitive claim; retain the unsupported feature, representation decline, cancellation or resource cause |
 
 A zero heuristic score, a relaxation candidate or satisfaction of an approximated
 model never justifies an exact claim. Approximation and configured tolerance have

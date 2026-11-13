@@ -19,6 +19,28 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `cancellation after exact conflict certification should withhold the result`() {
+        var cancelled = false
+        val observer = object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+            override fun observePhase(metrics: LpPhaseMetrics) {
+                cancelled = true
+            }
+        }
+        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 2048, BIG_ONE))
+        LpScopedSolver(LpExactState(lowerBoundModel()), Cancellation { cancelled }).use { owner ->
+            assertTrue(owner.assertBound(0, false, ExactLpSide(huge), 17L))
+
+            val result = owner.solve(observer = observer)
+
+            assertNull(result)
+            assertNull(owner.lastResult)
+        }
+    }
+
+    @Test
     fun `unprojectable bound conflicts should retain their witnesses and retract`() {
         val source = assertNotNull(LpBuilder().apply { addVar(0, 1) }.build(Sense.MINIMIZE).authoritativeModel())
         val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 2048, BIG_ONE))

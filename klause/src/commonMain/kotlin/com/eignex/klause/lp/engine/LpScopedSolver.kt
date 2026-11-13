@@ -285,6 +285,7 @@ internal class LpScopedSolver(
         if (closed || token()) return null
         if (state.conflict != null) discardFloatProgress()
         certifyBoundConflict(state, token, context.certificationPolicy, observer, claim)?.let {
+            if (token()) return null
             lastResult = it
             lastMetrics = LpSolveMetrics()
             lastFloatTermination = null

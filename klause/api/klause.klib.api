@@ -971,6 +971,7 @@ final enum class com.eignex.klause.solver.result/SharingChannel : kotlin/Enum<co
 final enum class com.eignex.klause.solver.result/TerminationReason : kotlin/Enum<com.eignex.klause.solver.result/TerminationReason> { // com.eignex.klause.solver.result/TerminationReason|null[0]
     enum entry BudgetExhausted // com.eignex.klause.solver.result/TerminationReason.BudgetExhausted|null[0]
     enum entry Cancelled // com.eignex.klause.solver.result/TerminationReason.Cancelled|null[0]
+    enum entry RepresentationDeclined // com.eignex.klause.solver.result/TerminationReason.RepresentationDeclined|null[0]
     enum entry SearchExhausted // com.eignex.klause.solver.result/TerminationReason.SearchExhausted|null[0]
     enum entry Timeout // com.eignex.klause.solver.result/TerminationReason.Timeout|null[0]
     enum entry Unsupported // com.eignex.klause.solver.result/TerminationReason.Unsupported|null[0]

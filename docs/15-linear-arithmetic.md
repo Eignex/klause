@@ -41,7 +41,8 @@ an atom only moves a bound.
 
 Bound intersection retains exact sides even when they have no finite binary64
 projection. Crossed sides yield a conflict with both premises before numerical
-preparation; a consistent unprojectable system can still decline its numerical check.
+preparation; a consistent unprojectable system can still decline its numerical check
+with `RepresentationDeclined`.
 
 A term is normalized before lookup: zero coefficients are dropped and the first
 remaining coefficient is scaled to one, flipping the bound direction for a negative

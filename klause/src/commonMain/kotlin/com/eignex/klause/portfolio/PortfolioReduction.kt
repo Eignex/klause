@@ -13,6 +13,12 @@ import com.eignex.klause.solver.result.TerminationReason
  */
 internal object PortfolioReduction {
 
+    fun unsettledReason(reasons: List<TerminationReason>): TerminationReason = when {
+        TerminationReason.Unsupported in reasons -> TerminationReason.Unsupported
+        TerminationReason.RepresentationDeclined in reasons -> TerminationReason.RepresentationDeclined
+        else -> reasons.firstOrNull() ?: TerminationReason.Cancelled
+    }
+
     /** Merge every result's counters into one [SolveStats] — the pool's total cost, not the
      *  winner's. [stats] projects the per-result counters (results carry no common supertype). */
     fun <T> foldStats(results: List<T>, stats: (T) -> SolveStats): SolveStats =
@@ -53,24 +59,29 @@ internal object PortfolioReduction {
 
     /**
      * The four-way optimisation terminal: given the run's verified [incumbent] (null when none was ever
-     * installed) and whether the run stopped [dirty] (timed out or cancelled before proving the space
-     * covered, i.e. any worker not [isExhausted]), classify the outcome. Clean exhaustion with an incumbent
+     * installed) and whether the run stopped [dirty] (without proving the space covered, i.e. any worker
+     * not [isExhausted]), classify the outcome. Clean exhaustion with an incumbent
      * is Optimal; clean without one is Infeasible; a dirty stop keeps the incumbent as BestFound or, with
      * none, reports Unknown. Taking one snapshot rather than a (sample, bound) pair is what keeps a reported
      * bound from belonging to a different assignment than the sample reported beside it.
      */
-    fun terminal(incumbent: VerifiedIncumbent<Sample, Double>?, dirty: Boolean, stats: SolveStats): MinimizeResult =
+    fun terminal(
+        incumbent: VerifiedIncumbent<Sample, Double>?,
+        dirty: Boolean,
+        reason: TerminationReason,
+        stats: SolveStats,
+    ): MinimizeResult =
         when {
             incumbent != null && dirty -> MinimizeResult.BestFound(
                 incumbent.assignment,
                 incumbent.objective,
-                TerminationReason.BudgetExhausted,
+                reason,
                 stats,
             )
 
             incumbent != null -> MinimizeResult.Optimal(incumbent.assignment, incumbent.objective, stats)
 
-            dirty -> MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
+            dirty -> MinimizeResult.Unknown(reason, stats)
 
             else -> MinimizeResult.Infeasible(stats = stats)
         }

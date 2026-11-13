@@ -28,7 +28,7 @@ internal fun exactNeighborhoodWorker(
         if (millis == Long.MAX_VALUE) Cancellation.Never else Cancellation.after(millis.milliseconds)
     fun reason(global: Cancellation) = if (timeout()) TerminationReason.Timeout
         else if ((lifetime or global)()) TerminationReason.Cancelled
-        else if (declined()) TerminationReason.Unsupported
+        else if (declined()) TerminationReason.RepresentationDeclined
         else TerminationReason.BudgetExhausted
     if (objective == null) return PortfolioWorker.ofSolve(label, armId, countsInstructions = true,
         resumable = {

@@ -15995,6 +15995,7 @@ public final class com/eignex/klause/solver/result/SourceLpWorkStats {
 public final class com/eignex/klause/solver/result/TerminationReason : java/lang/Enum {
 	public static final field BudgetExhausted Lcom/eignex/klause/solver/result/TerminationReason;
 	public static final field Cancelled Lcom/eignex/klause/solver/result/TerminationReason;
+	public static final field RepresentationDeclined Lcom/eignex/klause/solver/result/TerminationReason;
 	public static final field SearchExhausted Lcom/eignex/klause/solver/result/TerminationReason;
 	public static final field Timeout Lcom/eignex/klause/solver/result/TerminationReason;
 	public static final field Unsupported Lcom/eignex/klause/solver/result/TerminationReason;
