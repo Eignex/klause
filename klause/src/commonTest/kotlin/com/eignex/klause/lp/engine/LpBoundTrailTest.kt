@@ -114,12 +114,12 @@ class LpBoundTrailTest {
         val trail = LpBoundTrail(model)
         val before = trail.state
         var polls = 0
-        val during = Cancellation { ++polls >= 3 }
+        val during = Cancellation { ++polls >= 2 }
 
         assertFalse(trail.assertBound(0, false, ExactLpSide(zero), 1L, during))
 
         assertSame(before, trail.state)
-        assertEquals(3, polls)
+        assertEquals(2, polls)
         assertFalse(trail.assertBound(2, false, ExactLpSide(zero), 1L))
         assertFalse(trail.assertBound(0, false, ExactLpSide(zero), -1L))
         assertFalse(trail.pop(1))
@@ -231,7 +231,7 @@ class LpBoundTrailTest {
     }
 
     @Test
-    fun `unprojectable donors should be repaired by the first accepted assertion`() {
+    fun `unprojectable donors should retain exact assertions in either order`() {
         val zero = ExactLpNumber.of(0L)
         val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 2048, BIG_ONE))
         val source = ExactLpModel(
@@ -243,7 +243,6 @@ class LpBoundTrailTest {
         )
         for (repairFirst in listOf(false, true)) {
             val trail = LpBoundTrail(source)
-            val before = trail.state
             val updates = listOf(
                 LpBoundAssertion(0, false, ExactLpSide(zero), 0, 0),
                 LpBoundAssertion(1, true, ExactLpSide(zero), 1, 0),
@@ -251,14 +250,9 @@ class LpBoundTrailTest {
 
             val result = trail.assertBounds(updates)
 
-            if (repairFirst) {
-                assertEquals(LpBoundBatchResult.Applied(2), result)
-                assertEquals(listOf(0, 1), trail.state.changedColumns)
-                assertNotNull(trail.state.toWorkingModel())
-            } else {
-                assertIs<LpBoundBatchResult.Declined>(result)
-                assertSame(before, trail.state)
-            }
+            assertEquals(LpBoundBatchResult.Applied(2), result)
+            assertEquals(listOf(0, 1), trail.state.changedColumns)
+            assertNotNull(trail.state.toWorkingModel())
         }
     }
 

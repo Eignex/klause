@@ -234,9 +234,9 @@ class SourceExecutionTest {
     }
 
     @Test
-    fun `open engines should decline a row without a finite projection instead of stalling`() {
+    fun `open engines should decline a consistent row without a finite projection`() {
         val tiny = "(/ 1.0 1" + "0".repeat(400) + ".0)"
-        val text = "(declare-const x Real) (assert (<= 0.0 x)) (assert (<= x 1.0)) " +
+        val text = "(declare-const x Real) (assert (<= 0.0 x)) " +
             "(assert (>= (* $tiny x) 0.1))"
         for (engine in listOf(FiniteEngine.MIXED, FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
             val invocation = SourceSetup.prepare(SourceSetupRequest(

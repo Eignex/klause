@@ -7,6 +7,7 @@ import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.numbers.BIG_ONE
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -17,6 +18,52 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
+    @Test
+    fun `unprojectable bound conflicts should retain their witnesses and retract`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0, 1) }.build(Sense.MINIMIZE).authoritativeModel())
+        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 2048, BIG_ONE))
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            assertNotNull(owner.solve())
+            assertTrue(owner.push())
+
+            assertTrue(owner.assertBound(0, false, ExactLpSide(huge), 17L))
+            val result = assertNotNull(owner.solve())
+
+            assertEquals(LpVerdict.INFEASIBLE, result.verdict)
+            val support = assertNotNull(result.conflictSupport)
+            assertSame(owner.state, support.state)
+            assertEquals(listOf(17L, -2L), support.sides.map { it.witness })
+            assertNull(owner.state.toWorkingModel())
+            assertTrue(owner.pop(0))
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, assertNotNull(owner.solve()).verdict)
+        }
+    }
+
+    @Test
+    fun `unprojectable assertions should remain available for a later contradictory batch`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(), ExactLpObjective(listOf(zero)))
+        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 2048, BIG_ONE))
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            assertNotNull(owner.solve())
+            assertTrue(owner.push())
+            assertTrue(owner.assertBound(0, false, ExactLpSide(huge), 17L))
+            assertNull(owner.state.conflict)
+
+            val applied = owner.assertBounds(listOf(
+                LpBoundAssertion(0, true, ExactLpSide(zero), 18L, 1),
+            ))
+
+            assertEquals(1, applied.count)
+            val result = assertNotNull(owner.solve())
+            assertEquals(LpVerdict.INFEASIBLE, result.verdict)
+            assertEquals(listOf(17L, 18L), assertNotNull(result.conflictSupport).sides.map { it.witness })
+            assertTrue(owner.pop(0))
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, assertNotNull(owner.solve()).verdict)
+        }
+    }
+
     @Test
     fun `floating query capture should retain adopted bounds and numerical limits`() {
         var observed: LpQueryObservation? = null

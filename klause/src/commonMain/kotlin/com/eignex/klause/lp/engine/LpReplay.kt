@@ -782,6 +782,7 @@ internal object LpExactReplay {
                 }
             }
             require(accepted) { "unsupported exact replay transition at event $index" }
+            require(trail.state.canProjectWorkingModel()) { "exact replay event $index has no supported projection" }
         }
     }
 }

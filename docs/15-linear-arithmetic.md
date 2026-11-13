@@ -39,6 +39,10 @@ normalized multi-column term gets one slack column defined by an equality row, s
 every asserted atom becomes a bound on a single column, and asserting or retracting
 an atom only moves a bound.
 
+Bound intersection retains exact sides even when they have no finite binary64
+projection. Crossed sides yield a conflict with both premises before numerical
+preparation; a consistent unprojectable system can still decline its numerical check.
+
 A term is normalized before lookup: zero coefficients are dropped and the first
 remaining coefficient is scaled to one, flipping the bound direction for a negative
 scale. `2x + 4y <= 6` and `-x - 2y >= -3` therefore share one slack column. Terms

@@ -106,6 +106,7 @@ internal fun solveAndCertify(
     claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
 ): CertifiedLpResult {
     val state = LpExactState(model)
+    certifyBoundConflict(state, cancellation, context.certificationPolicy, observer, claim)?.let { return it }
     val working = state.toWorkingModel()
     if (working == null || (warm != null && !warm.validFor(model))) {
         counterResults?.declineStorage()
@@ -129,6 +130,39 @@ internal fun solveAndCertify(
         refinementLimits = refinementLimits,
         claim = claim,
     )
+}
+
+internal fun certifyBoundConflict(
+    state: LpExactState,
+    cancellation: Cancellation,
+    policy: LpCertificationPolicy,
+    observer: LpCertificationObserver?,
+    claim: LpClaim,
+): CertifiedLpResult? {
+    val conflict = state.conflict ?: return null
+    val observation = observer as? LpClaimObservation ?: observer?.let { LpClaimObservation(claim, it) }
+    fun stopped(): Boolean = cancellation().also { if (it) observation?.refuse("CANCELLED") }
+    val accepted = if (stopped()) null else {
+        observation?.observe(LpCertifier.EXACT_FARKAS, true, LpCertifierCost.Reported)
+        policy.acceptNullable(LpCertifier.EXACT_FARKAS, conflict)?.takeUnless { stopped() }.also {
+            if (it == null && !stopped()) observation?.refuse("POLICY_REFUSED")
+        }
+    }
+    val support = accepted?.let {
+        val row = it.column - state.model.n
+        LpExactSupport(
+            state,
+            if (row >= 0) listOf(row to state.model.row(row)) else emptyList(),
+            listOf(it.lower, it.upper).map { side ->
+                LpExactCitedSide(side.column, side.upper, side.side, side.witness)
+            },
+        )
+    }
+    return CertifiedLpResult(
+        null, null, null, null, null, false, { null },
+        boundConflict = accepted,
+        conflictSupport = support,
+    ).also { if (observer !is LpClaimObservation) observation?.finish(it, false) }
 }
 
 // Float termination hints never determine the proof strength. A float solve stopped by [workLimit] (0: unbounded)
@@ -483,37 +517,7 @@ private fun certifyLpResultWithin(
     ).also { capturedTarget = it }
     if (state != null) {
         if (stopped()) return CertifiedLpResult(null, null, null, null, null, false, { null })
-        state.conflict?.let {
-            observer?.observe(LpCertifier.EXACT_FARKAS, true, LpCertifierCost.Reported)
-            val accepted = policy.acceptNullable(LpCertifier.EXACT_FARKAS, it)?.takeUnless { stopped() }
-            if (accepted == null && !stopped()) (observer as? LpClaimObservation)?.refuse("POLICY_REFUSED")
-            val support = accepted?.let { conflict ->
-                LpExactSupport(
-                    state,
-                    if (conflict.column < model.n) {
-                        emptyList()
-                    } else {
-                        val row = conflict.column - model.n
-                        listOf(row to state.model.row(row))
-                    },
-                    listOf(
-                        LpExactCitedSide(conflict.column, false, conflict.lower.side, conflict.lower.witness),
-                        LpExactCitedSide(conflict.column, true, conflict.upper.side, conflict.upper.witness),
-                    ),
-                )
-            }
-            return CertifiedLpResult(
-                null,
-                null,
-                null,
-                null,
-                null,
-                false,
-                { null },
-                boundConflict = accepted,
-                conflictSupport = support,
-            )
-        }
+        certifyBoundConflict(state, cancellation, policy, observer, claim)?.let { return it }
         if (result != null && (solver.solvedExactState !== state || result.exactState !== state)) {
             (observer as? LpClaimObservation)?.refuse("UNSUPPORTED_SCOPE")
             return CertifiedLpResult(null, null, null, null, null, false, { null })
