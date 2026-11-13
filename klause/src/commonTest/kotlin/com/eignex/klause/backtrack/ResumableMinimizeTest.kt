@@ -7,6 +7,7 @@ import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
@@ -17,6 +18,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.Basis
@@ -44,6 +46,8 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentExchange
@@ -57,6 +61,7 @@ import com.eignex.klause.solver.search.SearchBranchAttemptObserver
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
+import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.cancelledWhen
 import kotlin.random.Random
@@ -196,6 +201,25 @@ internal object FiniteCutoffKnapsackFixture {
 }
 
 class ResumableMinimizeTest {
+
+    @Test
+    fun `a selected source projection should keep an exactly checked completion that tolerance rejects`() {
+        val problem = Problem(0, 0, emptyArray(), arrayOf<Factor>(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ofLong(3L)),
+                LinearOp.GE, BigFraction.ONE),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY)).bake(FactorProjectionProviders.Default)
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
+        val params = BacktrackParams(toleranceCheck = FiniteSourceAcceptance({ false }, true),
+            lpPlan = LpPlan(componentSplit = false))
+
+        val result = BacktrackSolver(problem).resumable(objective, params).use { search ->
+            search.runSlice(Cancellation.Never, Long.MAX_VALUE, 50_000L) { }
+        }
+
+        val unbounded = assertIs<MinimizeResult.Unbounded>(result)
+        assertTrue(assertNotNull(unbounded.sample.exactReals).single() * BigFraction.ofLong(3L) >= BigFraction.ONE)
+    }
 
     @Test
     fun `component repair revisits earlier pins before passing root coordinates to search`() {
