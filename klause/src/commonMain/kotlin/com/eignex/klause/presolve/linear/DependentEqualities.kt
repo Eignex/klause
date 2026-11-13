@@ -33,7 +33,7 @@ internal object DependentEqualities {
     private val limits = EchelonLimits(maxRowEntries = 4096, maxTotalEntries = 262144, maxBits = 4096)
 
     fun dropImplied(problem: Problem, cancellation: Cancellation): SourceDelta {
-        if (problem.semantics.effective.feasibilityTolerance?.isExact == false) return SourceDelta()
+        if (problem.semantics.relaxesRows(problem.numRealVars)) return SourceDelta()
         val columns = LinkedHashMap<Int, Int>()
         val droppableFactorOf = ArrayList<Int>()
         val rows = ArrayList<SparseIntRow>()

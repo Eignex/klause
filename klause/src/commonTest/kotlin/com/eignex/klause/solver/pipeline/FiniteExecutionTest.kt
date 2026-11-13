@@ -3,12 +3,17 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.formats.flatzinc.prepareSourceExecution
+import com.eignex.klause.formats.flatzinc.sourceAttachment
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SearchGroup
 import com.eignex.klause.ir.SearchHints
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.Sample
@@ -23,6 +28,45 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
 class FiniteExecutionTest {
+    // Binary64 `0.01 * 200` exceeds the declared bound `2.0` by `3/72057594037927936`.
+    private val roundedBound = """
+        var 0.0..2.0: y;
+        var 200..200: n;
+        var 0.0..200.0: nf;
+        constraint int2float(n, nf);
+        constraint float_lin_eq([0.01, -1.0], [nf, y], 0.0);
+        solve satisfy;
+    """.trimIndent()
+
+    private fun solveFlatZinc(overrides: SemanticOverrides, onSample: (Sample) -> Unit = {}): FiniteSolveVerdict {
+        val program = parseFlatZinc(roundedBound, semanticOverrides = overrides)
+        val invocation = program.prepareSourceExecution(SourceSetupRequest(program.sourceAttachment(),
+            ExecutionOperation.SATISFY, FiniteEngine.FIXED))
+        val request = SourceExecutionPolicy().finiteRequest(invocation.finiteShape(), FiniteEngine.FIXED,
+            presolveConfig = PresolveConfig.NONE, cancellation = Cancellation.after(1.seconds))
+
+        val result = FinitePipeline.solve(request, FiniteSolveCallbacks(onSample, {}))
+
+        return assertIs<FiniteSolveOutcome.Completed>(result.outcome).verdict
+    }
+
+    @Test
+    fun `a FlatZinc real completion should be accepted within the declared tolerance`() {
+        val samples = ArrayList<Sample>()
+
+        val verdict = solveFlatZinc(SemanticOverrides(), samples::add)
+
+        assertEquals(FiniteSolveVerdict.SAT, verdict)
+        assertNull(samples.single().exactReals)
+    }
+
+    @Test
+    fun `a zero FlatZinc tolerance should refute a completion only the slack admits`() {
+        val verdict = solveFlatZinc(SemanticOverrides(feasibilityTolerance = SourceTolerance()))
+
+        assertEquals(FiniteSolveVerdict.UNSAT, verdict)
+    }
+
     @Test
     fun `adaptive companion repair should reject unknown modes and missing completion`() {
         for (settings in listOf("companion-repair=never", "companion-repair=adaptive")) {

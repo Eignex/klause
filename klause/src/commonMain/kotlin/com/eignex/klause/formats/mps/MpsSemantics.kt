@@ -5,13 +5,11 @@ import com.eignex.klause.ir.NumericAuthority
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
-import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.UndeclaredIntegerBounds
 import com.eignex.klause.ir.UndeclaredRealBounds
+import com.eignex.klause.ir.numericalSourceTolerance
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
-import com.eignex.util.numbers.BIG_ONE
-import com.eignex.util.numbers.bigIntOf
 
 /** Decimal authority, wholly unranged declaration defaults and source feasibility slack. */
 val mpsSemantics: SourceSemantics = SourceSemantics(
@@ -19,10 +17,7 @@ val mpsSemantics: SourceSemantics = SourceSemantics(
     numericAuthority = NumericAuthority.DECIMAL_LITERALS,
     undeclaredIntegers = UndeclaredIntegerBounds(0, 1),
     undeclaredReals = UndeclaredRealBounds(lower = SemanticRational.ZERO),
-    feasibilityTolerance = SourceTolerance(
-        absolute = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000L)),
-        relative = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000L)),
-    ),
+    feasibilityTolerance = numericalSourceTolerance,
 )
 
 internal fun MpsModel.effectiveVariableBounds(

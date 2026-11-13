@@ -3,6 +3,7 @@ package com.eignex.klause.solver.validation
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
+import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearForm
@@ -13,6 +14,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.Term
+import com.eignex.klause.lp.ExactWitness
+import com.eignex.klause.lp.exactComparison
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
@@ -91,6 +94,15 @@ private fun toleranceRow(
     cancellation: Cancellation,
 ): Boolean? {
     if (row.strict || row.activator != LinearRow.ALWAYS || row.relation == LinearOp.NE) return null
+    return slackedRow(row, sample, policy, cancellation)
+}
+
+private fun slackedRow(
+    row: LinearRow,
+    sample: Sample,
+    policy: SourceTolerance,
+    cancellation: Cancellation,
+): Boolean? {
     val constants = row.constants
     val bound = when (constants) {
         is IntegralConstants -> BigFraction.of(constants.exactBound, BIG_ONE)
@@ -132,3 +144,85 @@ private fun toleranceRow(
 }
 
 private fun BigFraction.magnitude(): BigFraction = if (this < BigFraction.ZERO) negated() else this
+
+// Acceptance of real completions within the tolerance the source declares. It is null when that tolerance is
+// zero or absent, when there is no real coordinate, or when a real relation is neither linear rows nor a finite
+// membership: completion then stays exact, so a nonlinear real relation never reads the slack.
+//
+// A non-strict active row reads the slack, and a finite membership admits a value within the slack of a member.
+// A strict row, a disequality or a row whose activator is false has no slack to read, so it must hold exactly.
+// Factors over integers and Booleans alone are left to the engine that enforces them.
+internal fun capturedRealAcceptance(source: Problem, cancellation: Cancellation): FiniteSourceAcceptance? {
+    val policy = source.semantics.effective.feasibilityTolerance
+    if (policy == null || policy.isExact || source.numRealVars == 0) return null
+    val relations = ArrayList<Factor>()
+    for (factor in source.factors) {
+        if (factor.variables.reals.isEmpty()) continue
+        val rows = factor is LinearIndicator ||
+            factor.linearForm.let { it is LinearForm.Conjunction || it is LinearForm.Disjunction }
+        if (!rows && factor !is RealFiniteDomain) return null
+        relations += factor
+    }
+    return FiniteSourceAcceptance(
+        { sample -> acceptsWithinTolerance(source, relations, sample, policy, cancellation) },
+        permitsToleranceOptimum = true,
+    )
+}
+
+private fun acceptsWithinTolerance(
+    source: Problem,
+    relations: List<Factor>,
+    sample: Sample,
+    policy: SourceTolerance,
+    cancellation: Cancellation,
+): Boolean {
+    if (sample.numRealVars != source.numRealVars || sample.numIntVars != source.numIntVars ||
+        sample.numBoolVars != source.numBoolVars
+    ) return false
+    val reals = sample.exactReals ?: List(source.numRealVars) {
+        BigFraction.ofDouble(sample.approximateRealValue(it)) ?: return false
+    }
+    val point = if (sample.exactReals != null) sample else sample.copy(exactReals = reals)
+    for (id in reals.indices) {
+        cancellation.charge(1)
+        if (cancellation()) return false
+        val lower = BigFraction.ofDouble(source.realLower[id])
+        val upper = BigFraction.ofDouble(source.realUpper[id])
+        if ((lower != null && reals[id] < lower - capturedSourceSlack(policy, lower)) ||
+            (upper != null && reals[id] > upper + capturedSourceSlack(policy, upper))
+        ) return false
+    }
+    val witness = object : ExactWitness {
+        override fun truth(boolVar: Int): Boolean = point.boolValue(boolVar)
+        override fun at(column: Int): BigFraction = if (column < source.numRealVars) reals[column] else {
+            BigFraction.of(point.exactIntValue(column - source.numRealVars), BIG_ONE)
+        }
+    }
+    fun holds(row: LinearRow): Boolean {
+        cancellation.charge(row.size.toLong() + 1L)
+        if (cancellation()) return false
+        val active = row.activator == LinearRow.ALWAYS || witness.truth(row.activator)
+        if (active && !row.strict && row.relation != LinearOp.NE) {
+            slackedRow(row, point, policy, cancellation)?.let { return it }
+        }
+        return row.exactComparison(source.numRealVars, active, witness::truth).holdsAt(witness)
+    }
+    for (factor in relations) {
+        cancellation.charge(1)
+        if (cancellation()) return false
+        val valid = if (factor is LinearIndicator) {
+            point.exactIntValue(factor.indicator) != bigIntOf(if (factor.whenOne) 1L else 0L) || holds(factor.row)
+        } else if (factor is RealFiniteDomain) {
+            (0 until factor.size).any { index ->
+                val member = checkNotNull(BigFraction.ofDouble(factor.valueAt(index)))
+                (reals[factor.variable] - member).magnitude() <= capturedSourceSlack(policy, member)
+            }
+        } else when (val form = factor.linearForm) {
+            is LinearForm.Conjunction -> form.rows.all(::holds)
+            is LinearForm.Disjunction -> form.rows.any(::holds)
+            else -> false
+        }
+        if (!valid) return false
+    }
+    return !cancellation()
+}

@@ -367,6 +367,22 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
         }
     }
 
+    // The float acceptance step alone: a refused or non-optimal point decides nothing and starts no exact work.
+    fun acceptFloat(
+        model: LpModel,
+        result: FloatLpResult?,
+        cancellation: Cancellation,
+        observer: LpCertificationObserver?,
+        floatAccept: (FloatLpResult) -> Boolean,
+        floatOffset: Double,
+    ): FloatLpResult? {
+        if (result == null || !result.optimal || cancellation()) return null
+        val timer = LpPhaseTimer(observer, LpSolvePhase.FLOAT_ACCEPTANCE)
+        val float = floatOptimum(model, result, floatAccept, floatOffset, cancellation, observer)
+        timer.finish(if (float != null) "ACCEPTED" else "REFUSED")
+        return float
+    }
+
     private fun certifyWithin(
         model: LpModel,
         solver: LpSolver,
