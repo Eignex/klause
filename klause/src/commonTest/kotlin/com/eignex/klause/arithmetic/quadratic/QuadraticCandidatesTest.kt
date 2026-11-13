@@ -105,6 +105,22 @@ class QuadraticCandidatesTest {
     }
 
     @Test
+    fun `empty numerical model should select active constant rows`() {
+        val model = QuadraticModel(
+            emptyList(), emptyList(),
+            rows = listOf(
+                QuadraticRow(emptyList(), q(0), QuadraticRowRelation.EQ),
+                QuadraticRow(emptyList(), q(1), QuadraticRowRelation.LE),
+                QuadraticRow(emptyList(), q(0), QuadraticRowRelation.LE),
+            ),
+        )
+
+        val active = QuadraticCandidates().proposeActiveRows(model, emptyList(), iterations = 1)
+
+        assertEquals(listOf(0, 2), active)
+    }
+
+    @Test
     fun `numerical rows should include a changed final coordinate in a large model`() {
         val dimension = 257
         val coefficients = List(dimension) { if (it == dimension - 1) q(1) else q(0) }

@@ -145,5 +145,4 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
         for ((i, column) in pivots.withIndex()) { control.step(); solution[column] = matrix[i][size] }
         return solution
     }
-
 }
