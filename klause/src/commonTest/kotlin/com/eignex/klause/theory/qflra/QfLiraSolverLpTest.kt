@@ -43,6 +43,7 @@ import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
+import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SourceBoundAtom
@@ -266,7 +267,8 @@ class QfLiraSolverLpTest {
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
                 assertEquals(!Lit.isPositive(excluded.literal), session.boolValue(excluded.literal ushr 1))
             }
-            val result = assertIs<SearchResult.Satisfied>(session.solve(source.numBoolVars))
+            val result = assertIs<SearchRunEvent.Satisfied>(session.openConditionedRun(source.numBoolVars).next())
+            assertEquals(true, session.boolValue(0))
             val values = assertNotNull(result.model.valueOf(component.assignmentKey)).ints
             for (excluded in listOf(transformed, free)) {
                 val atom = assertIs<SourceBoundAtom>(excluded.payload)
@@ -523,8 +525,9 @@ class QfLiraSolverLpTest {
                     }
                 }
             }
-            assertEquals(1, factory.created, scenario)
-            assertEquals(1, factory.closed, scenario)
+            val expected = if (scenario == "conflict") 0 else 1
+            assertEquals(expected, factory.created, scenario)
+            assertEquals(expected, factory.closed, scenario)
         }
     }
 
