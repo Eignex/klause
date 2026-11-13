@@ -2,7 +2,6 @@ package com.eignex.klause.arithmetic.quadratic
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.koblas.koblas
-import kotlin.math.abs
 import kotlin.math.max
 
 internal class QuadraticCandidates(private val control: QuadraticControl = QuadraticControl()) {
@@ -56,8 +55,8 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
             coefficients.any { row -> row.any { !it.isFinite() } } || rhs.any { !it.isFinite() } ||
             start.any { !it.isFinite() }
         ) return null
-        var norm = hessian.maxOfOrNull { row -> row.sumOf(::abs) } ?: 0.0
-        for (row in coefficients) for (value in row) { control.step(); norm += 16.0 * value * value }
+        var norm = hessian.maxOfOrNull { row -> koblas.asum(row, 0, row.size) } ?: 0.0
+        for (row in coefficients) norm += 16.0 * dot(0.0, row, row)
         if (!norm.isFinite()) return null
         val step = 1.0 / max(1.0, norm)
         return NumericalProposal(hessian, linear, rows, coefficients, rhs, step)
