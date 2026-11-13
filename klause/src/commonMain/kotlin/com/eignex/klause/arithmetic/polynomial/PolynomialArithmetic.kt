@@ -28,6 +28,14 @@ internal class PolynomialArithmetic(
 
     fun step() = execution.step()
 
+    fun step(left: BigFraction, right: BigFraction = BigFraction.ZERO) {
+        step()
+        if (!execution.batching) return
+        val leftBits = maxOf(left.num.magnitudeBitLength(), left.den.magnitudeBitLength()).toLong()
+        val rightBits = maxOf(right.num.magnitudeBitLength(), right.den.magnitudeBitLength()).toLong()
+        if (leftBits + rightBits > 4096) execution.boundary()
+    }
+
     fun checkpoint() = execution.checkpoint()
 
     fun add(left: Polynomial, right: Polynomial): Polynomial = execution.operation {
@@ -47,7 +55,7 @@ internal class PolynomialArithmetic(
     fun scale(value: Polynomial, coefficient: BigFraction): Polynomial = execution.operation {
         step()
         return@operation Polynomial.of(value.terms.map {
-            step()
+            step(it.coefficient, coefficient)
             PolynomialTerm(it.monomial, it.coefficient * coefficient)
         })
     }
@@ -66,7 +74,7 @@ internal class PolynomialArithmetic(
     }
 
     private fun product(left: PolynomialTerm, right: PolynomialTerm): PolynomialTerm {
-        step()
+        step(left.coefficient, right.coefficient)
         for (variable in left.monomial.variables) {
             if (right.monomial.exponent(variable) > Int.MAX_VALUE - left.monomial.exponent(variable)) {
                 throw PolynomialResourceLimit(PolynomialResource.DEGREE_OVERFLOW)
@@ -111,7 +119,8 @@ internal class PolynomialArithmetic(
             val monomial = requireNotNull(term.monomial.quotient(lead.monomial)) {
                 "nonexact polynomial division"
             }
-            val next = Polynomial.of(listOf(PolynomialTerm(monomial, term.coefficient * lead.coefficient.reciprocal())))
+            val coefficient = term.coefficient * lead.coefficient.reciprocal()
+            val next = Polynomial.of(listOf(PolynomialTerm(monomial, coefficient)))
             quotient = add(quotient, next)
             val pending = prepareMultiply(next, divisor)
             var product: Polynomial? = null
@@ -160,7 +169,7 @@ internal class PolynomialArithmetic(
         step()
         return@operation Polynomial.of(buildList {
             for ((monomial, coefficient) in value.terms) {
-                step()
+                step(coefficient)
                 val degree = monomial.exponent(variable)
                 if (degree == 0) continue
                 val quotient = checkNotNull(monomial.quotient(Monomial.of(mapOf(variable to 1))))

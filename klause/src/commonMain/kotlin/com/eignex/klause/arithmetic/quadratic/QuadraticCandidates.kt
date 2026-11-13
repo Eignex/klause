@@ -142,11 +142,17 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
             matrix[row] = matrix[pivot]
             matrix[pivot] = swap
             val scale = matrix[row][column].reciprocal()
-            for (j in column..size) { control.step(); matrix[row][j] = matrix[row][j] * scale }
+            for (j in column..size) {
+                control.exactStep(matrix[row][j], scale)
+                matrix[row][j] = matrix[row][j] * scale
+            }
             for (i in 0 until size) {
                 if (i == row) continue
                 val factor = matrix[i][column]
-                for (j in column..size) { control.step(); matrix[i][j] = matrix[i][j] - factor * matrix[row][j] }
+                for (j in column..size) {
+                    control.exactStep(matrix[i][j], factor, matrix[row][j])
+                    matrix[i][j] = matrix[i][j] - factor * matrix[row][j]
+                }
             }
             pivots += column
             row++

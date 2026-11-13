@@ -1,7 +1,9 @@
 package com.eignex.klause.arithmetic.quadratic
 
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ArithmeticExecution
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.numbers.magnitudeBitLength
 
 internal enum class QuadraticStop { CANCELLED, WORK_LIMIT, MATRIX_LIMIT }
 internal class QuadraticInterrupted(val reason: QuadraticStop) : RuntimeException()
@@ -32,6 +34,21 @@ internal class QuadraticControl(
             if (work != Long.MAX_VALUE) work++
         }
     }
+
+    fun exactStep(
+        first: BigFraction,
+        second: BigFraction = BigFraction.ZERO,
+        third: BigFraction = BigFraction.ZERO,
+        fourth: BigFraction = BigFraction.ZERO,
+    ) {
+        step()
+        if (execution.batching && bits(first) + bits(second) + bits(third) + bits(fourth) > 4096) {
+            execution.boundary()
+        }
+    }
+
+    private fun bits(value: BigFraction): Long =
+        maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength()).toLong()
 
     fun matrix(size: Int) {
         execution.boundary()

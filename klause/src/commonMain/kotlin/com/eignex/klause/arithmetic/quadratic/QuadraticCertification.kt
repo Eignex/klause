@@ -11,7 +11,7 @@ internal class QuadraticCertification(private val control: QuadraticControl = Qu
         val hessian = model.hessian
         var value = model.constant + dot(model.linear, point)
         for (i in point.indices) for (j in point.indices) {
-            control.step()
+            control.exactStep(point[i], hessian[i][j], point[j])
             value += half * point[i] * hessian[i][j] * point[j]
         }
         return@operation value
@@ -47,14 +47,15 @@ internal class QuadraticCertification(private val control: QuadraticControl = Qu
         for (i in point.indices) {
             var gradient = linear[i] + dot(hessian[i], point)
             for (j in rows.indices) {
-                control.step()
-                gradient += multipliers[j] * rows[j].coefficients[i]
+                val coefficient = rows[j].coefficients[i]
+                control.exactStep(multipliers[j], coefficient)
+                gradient += multipliers[j] * coefficient
             }
             if (!gradient.isZero) return@operation null
         }
         var value = evaluate(model, point)
         for (i in rows.indices) {
-            control.step()
+            control.exactStep(multipliers[i])
             value += multipliers[i] * (dot(rows[i].coefficients, point) - rows[i].rhs)
         }
         control.poll()
@@ -111,7 +112,7 @@ internal class QuadraticCertification(private val control: QuadraticControl = Qu
         var curvature = BigFraction.ZERO
         var slope = dot(model.linear, direction)
         for (i in direction.indices) {
-            control.step()
+            control.exactStep(direction[i])
             curvature += direction[i] * dot(hessian[i], direction)
             slope += direction[i] * dot(hessian[i], base)
         }
@@ -135,7 +136,7 @@ internal class QuadraticCertification(private val control: QuadraticControl = Qu
                 }
             } else {
                 for (j in i + 1 until matrix.size) for (k in j until matrix.size) {
-                    control.step()
+                    control.exactStep(matrix[j][k], matrix[j][i], matrix[i][k], pivot)
                     val entry = matrix[j][k] - matrix[j][i] * matrix[i][k] * pivot.reciprocal()
                     matrix[j][k] = entry
                     matrix[k][j] = entry
@@ -150,7 +151,7 @@ internal class QuadraticCertification(private val control: QuadraticControl = Qu
         require(left.size == right.size)
         var value = BigFraction.ZERO
         for (i in left.indices) {
-            control.step()
+            control.exactStep(left[i], right[i])
             value += left[i] * right[i]
         }
         return value

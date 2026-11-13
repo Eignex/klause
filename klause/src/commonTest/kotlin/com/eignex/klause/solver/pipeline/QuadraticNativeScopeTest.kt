@@ -1,13 +1,18 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.arithmetic.polynomial.Monomial
 import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialResource
+import com.eignex.klause.arithmetic.polynomial.PolynomialTerm
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.qfnra.QfNraStats
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.arithmeticSource
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -19,6 +24,24 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
 class QuadraticNativeScopeTest {
+    @Test
+    fun `large coefficient products should observe containing stops before the next batch`() {
+        lateinit var scope: QuadraticNativeScope
+        scope = QuadraticNativeScope(PolynomialTheoryParams(
+            maximumWork = 100,
+            cancellation = Cancellation { scope.work >= 2L },
+        ), concurrent = false)
+        val coefficient = BigFraction.of(parseBigInt("1" + "0".repeat(1300)), BIG_ONE)
+        val polynomial = Polynomial.of(List(8) {
+            PolynomialTerm(Monomial.of(mapOf(0 to it)), coefficient)
+        })
+        val arithmetic = PolynomialArithmetic(scope.polynomial)
+
+        assertFailsWith<PolynomialInterrupted> { arithmetic.multiply(polynomial, polynomial) }
+
+        assertEquals(2L, scope.work)
+    }
+
     @Test
     fun `unused sibling reservations should not manufacture native exhaustion`() {
         val scope = QuadraticNativeScope(PolynomialTheoryParams(maximumWork = 5))
