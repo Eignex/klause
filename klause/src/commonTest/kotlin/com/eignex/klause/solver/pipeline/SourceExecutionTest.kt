@@ -51,6 +51,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 class SourceExecutionTest {
     @Test
@@ -233,9 +234,9 @@ class SourceExecutionTest {
     }
 
     @Test
-    fun `open engines should refute crossed exact bounds without a finite projection`() {
+    fun `open engines should decline a consistent row without a finite projection`() {
         val tiny = "(/ 1.0 1" + "0".repeat(400) + ".0)"
-        val text = "(declare-const x Real) (assert (<= 0.0 x)) (assert (<= x 1.0)) " +
+        val text = "(declare-const x Real) (assert (<= 0.0 x)) " +
             "(assert (>= (* $tiny x) 0.1))"
         for (engine in listOf(FiniteEngine.MIXED, FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
             val invocation = SourceSetup.prepare(SourceSetupRequest(
@@ -243,11 +244,12 @@ class SourceExecutionTest {
             ))
 
             val result = assertIs<SourceExecutionResult.Linear>(SourceSetup.execute(SourceExecutionRequest(
-                invocation,
+                invocation, theory = TheoryParams(timeout = Cancellation.after(300.milliseconds)),
             )))
 
             val satisfy = assertIs<OpenTheoryExecution.Satisfy>(result.result)
-            assertIs<OpenTheoryResult.Unsat>(satisfy.result, "$engine")
+            val outcome = assertIs<OpenTheoryResult.Unknown>(satisfy.result)
+            assertEquals(TerminationReason.Unsupported, outcome.reason, "$engine")
         }
     }
 

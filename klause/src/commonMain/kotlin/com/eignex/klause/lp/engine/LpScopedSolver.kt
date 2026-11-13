@@ -283,9 +283,11 @@ internal class LpScopedSolver(
     ): CertifiedLpResult? {
         requireAvailable()
         if (closed || token()) return null
+        if (state.conflict != null) discardFloatProgress()
         certifyBoundConflict(state, token, context.certificationPolicy, observer, claim)?.let {
             lastResult = it
             lastMetrics = LpSolveMetrics()
+            lastFloatTermination = null
             return it
         }
         val attempt = solveFloat(warm, token) ?: return null

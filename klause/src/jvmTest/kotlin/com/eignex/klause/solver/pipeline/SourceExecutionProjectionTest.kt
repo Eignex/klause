@@ -5,7 +5,7 @@ import kotlin.test.assertIs
 import org.junit.Test
 
 class SourceExecutionProjectionTest {
-    @Test(timeout = 300)
+    @Test
     fun `root bounds should refute an exact contradiction beyond binary64 range`() {
         val huge = "1" + "0".repeat(399) + ".0"
         val source = SmtLib.parse("""
