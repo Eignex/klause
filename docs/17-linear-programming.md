@@ -1609,7 +1609,7 @@ owns these checks.
 
 `LpSolveContext.numericalDeductions` selects how finite search and presolve consume
 LP results. The mode follows the format: the finite pipeline sets it only when the source
-declares a positive feasibility tolerance, which today is MPS by default. SMT-LIB, the
+declares a positive feasibility tolerance, which MPS and FlatZinc do by default. SMT-LIB, the
 other formats, sources without a declared tolerance and `--exact`, which zeroes the
 tolerance, keep exact certification. Open theories, source LP optimization and real leaf
 completion never read it; leaf witnesses follow the source tolerance.

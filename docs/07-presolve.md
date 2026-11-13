@@ -650,7 +650,9 @@ Dependent-equality removal uses fraction-free elimination over unconditional exa
 integer, real and mixed equalities and refutes rationally inconsistent blocks. Tagged
 source coordinates keep the namespaces disjoint. Integral constants retain arbitrary
 width; finite binary64 constants are read as exact rationals and their denominators
-are cleared. Nonzero source feasibility tolerance excludes the pass. It drops only factors whose
+are cleared. Nonzero source feasibility tolerance excludes the pass wherever the slack can
+relax a row: always for a source without a float interpretation, and for a source that types
+its floats once it has a real coordinate. It drops only factors whose
 whole meaning is one redundant equality; conjunctions and relaxations can supply
 premises but remain intact. Binary partition equations retain their propagation and
 branching structure, including scaled equations equivalent to `sum(x_i) = 1` over

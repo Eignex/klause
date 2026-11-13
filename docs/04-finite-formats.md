@@ -201,14 +201,14 @@ fields feed the same local search weights and presolve symmetry gate as
 
 FlatZinc is MiniZinc's flat constraint language. The frontend keeps source names,
 constraints, search annotations and output reconstruction. Float components retain
-exact arithmetic or declared grid semantics; grid refutations and optima apply only
-to that finite interpretation.
+their source arithmetic, accepted within the declared tolerance or exactly, or declared
+grid semantics; grid refutations and optima apply only to that finite interpretation.
 
 ### Declared semantics and caller ranges
 
 `flatZincSemantics` declares binary64 literal authority, a default grid policy,
-`[-1000000, 1000000]` for unranged integer declarations and open endpoints for
-unranged floats. Parsing resolves `SemanticOverrides` before declaration planning
+`[-1000000, 1000000]` for unranged integer declarations, open endpoints for
+unranged floats and `SourceTolerance(absolute=1/10000000, relative=1/10000000)`. Parsing resolves `SemanticOverrides` before declaration planning
 and keeps both defaults and effective policy in `FlatZincProgram.semantics`.
 
 Endpoint replacements apply only to unranged scalar and array declarations; an
@@ -345,15 +345,25 @@ candidates as grid witnesses, and completed search reports the grid optimum or
 refutation. Grid relations (`GridArrayMinMax`, `GridAbs`,
 `GridProduct`, `GridPower`) keep their step, origin and nearest-bucket rounding.
 
-`--exact` preserves continuous variables and open bounds, routes linear
+The original arm is numerical under the declared tolerance. Finite LP deductions are
+[numerical](17-linear-programming.md#numerical-and-exact-deductions), and a real
+completion needs no exact certificate when every real declaration, every linear row
+over a real coordinate and every finite membership holds within the slack, which rows
+measure as [MPS rows do](05-arithmetic-formats.md#tolerance-publication). Strict
+rows, disequalities and rows whose reifying Boolean is false hold exactly at the
+accepted point, and relations over integers and Booleans alone never read the slack.
+`capturedRealAcceptance` owns this check. A refused point continues into exact
+completion. A source with a product, power, absolute value, extremum or selection over
+reals has no acceptance, so its completions stay exact, and sources routed to a
+[linear theory](15-linear-arithmetic.md) are decided exactly. Completed search
+reports its optimum or refutation under this numerical policy.
+
+`--exact` zeroes the tolerance, so completion and LP certification are exact. It
+preserves continuous variables and open bounds, routes linear
 satisfaction through the shared real/mixed theory and requires exact certification
 for continuous objectives. It never selects a grid; unsupported exact models
 decline. Overflow during lowering and integer constants that
 binary64 cannot represent decline with a diagnostic.
-
-Planned: the default float arm becomes numerical, accepting real completions
-within tolerance; `--exact` keeps the exact arm, and the grid remains for nonlinear
-components and the finite CP/LS view.
 
 #### Rounded FlatZinc bounds
 
@@ -361,7 +371,8 @@ Exact mode checks mathematical arithmetic over parsed binary64 literals and keep
 every declared bound. For example, binary64 `0.01 * 200` exceeds `2.0` by
 `3/72057594037927936`: rounding the result to `2.0` violates the defining row.
 A compiler-rounded integer image crossing a declared bound therefore declines exact
-mode; default compilation records the approximation and uses the grid. See
+mode. The default original arm accepts the rounded image within the tolerance, and the
+compatibility view records the approximation and uses the grid. See
 [FlatZincFloatPolicy](../klause/src/commonMain/kotlin/com/eignex/klause/formats/flatzinc/FlatZincFloatPolicy.kt).
 
 ### MiniZinc output rendering
@@ -372,6 +383,8 @@ irrational coordinates use `root(index;[c0,c1,...])`, naming the selected real r
 of the rational polynomial in ascending coefficient order. Decimal assignments are
 display approximations; an irrational display uses the midpoint of its captured
 isolating interval. The fraction or root description retains source authority.
+A completion accepted within tolerance carries binary64 coordinates only, so its
+block has decimal assignments and no exact comments.
 Mixed exact/grid witnesses add
 `% klause-coordinate:` and `% klause-float-component:` comments with each grid
 point's binary64 value and approximation reason. With a selected finite grid,

@@ -27,7 +27,7 @@ model like any other source and qualifies results under its captured certificati
 | Source | Numeric authority |
 |---|---|
 | Library IR and schema DSL | Declared integers, binary64 rational real coefficients and explicit exact objective coefficients |
-| FlatZinc and compiled MiniZinc | Exact float components use binary64 rational literals; grid components retain their declared approximation |
+| FlatZinc and compiled MiniZinc | Float components use binary64 rational literals, accepted within the declared tolerance or exactly at zero tolerance; grid components retain their declared approximation |
 | SMT-LIB | Exact numerals, lexical scopes and original declarations; no invented integer domains |
 | MPS | Original decimals, indicator conditions and objective units; tolerance publication and exact certification are distinct |
 | XCSP3 | Finite integer arithmetic only |
