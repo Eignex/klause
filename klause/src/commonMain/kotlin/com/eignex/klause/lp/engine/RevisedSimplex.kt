@@ -12,6 +12,7 @@ import com.eignex.klause.simplex.basis.BasisSolveQuality
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.BasisUpdate
 import com.eignex.klause.simplex.basis.IndexedVector
+import com.eignex.klause.simplex.basis.MAX_SCALAR_COLUMN_ENTRIES
 import com.eignex.klause.simplex.basis.RationalBasisOrder
 import com.eignex.klause.simplex.basis.SymbolicLu
 import com.eignex.klause.util.Cancellation
@@ -605,10 +606,16 @@ internal class RevisedSimplex(
     }
 
     // Uncharged pricing reads the current owner so an unscaled fallback cannot retain a retired CSC generation.
-    internal fun columnDot(y: DoubleArray, j: Int): Double = if (j < n) {
-        koblas.dotColumn(columns, j, y)
-    } else {
-        y[j - n]
+    internal fun columnDot(y: DoubleArray, j: Int): Double {
+        if (j >= n) return y[j - n]
+        val from = colPtr[j]
+        val until = colPtr[j + 1]
+        if (until - from <= MAX_SCALAR_COLUMN_ENTRIES) {
+            var value = 0.0
+            for (at in from until until) value += colVal[at] * y[rowIdx[at]]
+            return value
+        }
+        return koblas.dotColumn(columns, j, y)
     }
 
     /** `y · A_j` for the dual vector [y], charged to the work meter. */
@@ -907,26 +914,24 @@ internal class RevisedSimplex(
 
     private fun denseColumn(column: Int): DoubleArray = qualityRhs.also { dense ->
         dense.fill(0.0)
-        koblas.scatter(
-            rowIdx,
-            colPtr[column],
-            colVal,
-            colPtr[column],
-            columnNnz(column),
-            dense,
-        )
+        val from = colPtr[column]
+        val until = colPtr[column + 1]
+        if (until - from <= MAX_SCALAR_COLUMN_ENTRIES) {
+            for (at in from until until) dense[rowIdx[at]] = colVal[at]
+        } else {
+            koblas.scatter(rowIdx, from, colVal, from, until - from, dense)
+        }
     }
 
-    private fun sparseAxpy(destination: DoubleArray, alpha: Double, column: Int) {
-        koblas.axpy(
-            rowIdx,
-            colPtr[column],
-            colVal,
-            colPtr[column],
-            columnNnz(column),
-            alpha,
-            destination,
-        )
+    internal fun sparseAxpy(destination: DoubleArray, alpha: Double, column: Int) {
+        if (alpha == 0.0) return
+        val from = colPtr[column]
+        val until = colPtr[column + 1]
+        if (until - from <= MAX_SCALAR_COLUMN_ENTRIES) {
+            for (at in from until until) destination[rowIdx[at]] += alpha * colVal[at]
+        } else {
+            koblas.axpy(rowIdx, from, colVal, from, until - from, alpha, destination)
+        }
     }
 
     /** `B x = b` for a dense right-hand side, into [out] through [carrier]. */

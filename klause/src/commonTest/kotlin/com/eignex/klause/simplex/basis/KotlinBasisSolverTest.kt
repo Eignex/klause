@@ -15,6 +15,30 @@ import kotlin.test.assertTrue
 
 class KotlinBasisSolverTest {
     @Test
+    fun `quality checks should retain short sparse column products in both directions`() {
+        for (size in listOf(3, 4, 8)) {
+            val source = SparseMatrix.ofColumns(size, size, List(size) { column ->
+                (column until size).map { row -> row to if (row == column) 2.0 else 1.0 }
+            })
+            val values = DoubleArray(size) { if (it % 2 == 0) 1.0 else -2.0 }
+            val solution = IndexedVector(size).also { it.scatter(values) }
+            KotlinBasisSolver(source).use { solver ->
+                assertTrue(solver.refactorize(IntArray(size) { it }))
+                for (transpose in listOf(false, true)) {
+                    val rhs = DoubleArray(size)
+                    for (column in 0 until size) {
+                        source.forEachInColumn(column) { row, value ->
+                            if (transpose) rhs[column] += value * values[row] else rhs[row] += value * values[column]
+                        }
+                    }
+
+                    assertEquals(BasisSolveQuality(0.0, 0.0), solver.solveQuality(rhs, solution, transpose))
+                }
+            }
+        }
+    }
+
+    @Test
     fun `updated factor forks preserve independent sibling bases and lifetimes`() {
         val source = ftSource("dense", 8)
         val parentBasis = IntArray(8) { it }

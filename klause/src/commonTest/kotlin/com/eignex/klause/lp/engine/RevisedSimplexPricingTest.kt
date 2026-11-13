@@ -16,6 +16,59 @@ import kotlin.test.assertTrue
 
 class RevisedSimplexPricingTest {
     @Test
+    fun `short column pricing should retain stored arithmetic for finite and nonfinite duals`() {
+        for (rows in listOf(3, 4, 8)) {
+            val builder = LpBuilder()
+            builder.addRealVar(0.0, 10.0)
+            repeat(rows) { row ->
+                builder.addRealRow(intArrayOf(0), doubleArrayOf(if (row == 1) -2.0 else 1.0), Relation.LE, 10.0)
+            }
+            val model = builder.build(Sense.MINIMIZE)
+            assertNotNull(model.doubleView).colVal[2] = 0.0
+            val duals = listOf(
+                DoubleArray(rows) { row -> if (row == 0) 1e16 else if (row == 1) 5e15 else 1.0 },
+                DoubleArray(rows) { row -> if (row == 2) Double.POSITIVE_INFINITY else 1.0 },
+                DoubleArray(rows) { row -> if (row == rows - 1) Double.NaN else -0.0 },
+            )
+            RevisedSimplex(model, scalingOptions = LpScalingOptions(enabled = false)).use { solver ->
+                for (y in duals) {
+                    var expected = 0.0
+                    model.forEachInColumnD(0) { row, value -> expected += value * y[row] }
+
+                    assertEquals(expected.toBits(), solver.columnDot(y, 0).toBits(), "rows $rows")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `short column accumulation should retain stored arithmetic for finite and nonfinite multipliers`() {
+        for (rows in listOf(3, 4, 8)) {
+            val builder = LpBuilder()
+            builder.addRealVar(0.0, 10.0)
+            repeat(rows) { row ->
+                builder.addRealRow(intArrayOf(0), doubleArrayOf(if (row == 1) -2.0 else 1.0), Relation.LE, 10.0)
+            }
+            val model = builder.build(Sense.MINIMIZE)
+            assertNotNull(model.doubleView).colVal[2] = 0.0
+            RevisedSimplex(model, scalingOptions = LpScalingOptions(enabled = false)).use { solver ->
+                for (alpha in listOf(0.0, -0.0, 2.0, -2.0, Double.POSITIVE_INFINITY, Double.NaN)) {
+                    val destination = DoubleArray(rows) { -0.0 }
+                    val expected = destination.copyOf()
+                    if (alpha != 0.0) model.forEachInColumnD(0) { row, value -> expected[row] += alpha * value }
+
+                    solver.sparseAxpy(destination, alpha, 0)
+
+                    for (row in destination.indices) {
+                        assertEquals(expected[row].toBits(), destination[row].toBits(),
+                            "rows $rows alpha $alpha row $row")
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     fun `column pricing should match stored entry arithmetic including empty and zero columns`() {
         val builder = LpBuilder()
         repeat(3) { builder.addRealVar(0.0, 10.0) }

@@ -6,6 +6,9 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
+// Small stored columns avoid backend dispatch without widening unbounded scalar work.
+internal const val MAX_SCALAR_COLUMN_ENTRIES: Int = 8
+
 internal data class BasisSolveWork(
     val first: TriangularSolveWork,
     val second: TriangularSolveWork,
@@ -560,17 +563,9 @@ internal class KotlinBasisSolver private constructor(
                 val start = sourcePointers[column]
                 val count = sourcePointers[column + 1] - start
                 if (transpose) {
-                    product[j] = solution.dot(sourceRows, start, sourceValues, start, count)
+                    product[j] = qualityColumnDot(solution, start, count)
                 } else {
-                    koblas.axpy(
-                        sourceRows,
-                        start,
-                        sourceValues,
-                        start,
-                        count,
-                        solution[j],
-                        product,
-                    )
+                    addQualityColumn(solution[j], start, count)
                 }
             }
         }
@@ -584,6 +579,22 @@ internal class KotlinBasisSolver private constructor(
             scale = max(scale, max(abs(product[i]), abs(rhs[i])))
         }
         return BasisSolveQuality(residual, residual / scale)
+    }
+
+    private fun qualityColumnDot(solution: IndexedVector, start: Int, count: Int): Double {
+        if (count > MAX_SCALAR_COLUMN_ENTRIES) return solution.dot(sourceRows, start, sourceValues, start, count)
+        var result = 0.0
+        for (at in start until start + count) result += sourceValues[at] * solution[sourceRows[at]]
+        return result
+    }
+
+    private fun addQualityColumn(alpha: Double, start: Int, count: Int) {
+        if (alpha == 0.0) return
+        if (count <= MAX_SCALAR_COLUMN_ENTRIES) {
+            for (at in start until start + count) qualityProduct[sourceRows[at]] += alpha * sourceValues[at]
+            return
+        }
+        koblas.axpy(sourceRows, start, sourceValues, start, count, alpha, qualityProduct)
     }
 
     override val factorCopy: BasisFactorCopy?
