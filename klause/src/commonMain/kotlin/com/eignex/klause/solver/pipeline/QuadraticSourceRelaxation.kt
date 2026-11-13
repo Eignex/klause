@@ -25,7 +25,10 @@ import com.eignex.klause.theory.qfnra.polynomialPointFixings
 import com.eignex.klause.theory.qfnra.solvePolynomialObjectiveImage
 import com.eignex.klause.theory.qfnra.tryConvexPolynomialOptimum
 import com.eignex.klause.theory.qfnra.tryPolynomialIntegerRecession
+import com.eignex.klause.util.ArithmeticCancellation
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.arithmeticSource
+import com.eignex.klause.util.withCheckpoint
 
 internal sealed interface QuadraticRelaxationResult {
     data class Minimum(
@@ -49,7 +52,8 @@ internal class QuadraticSourceRelaxation(
 ) {
     private val limits = PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells)
     private var operation: Cancellation = Cancellation.Never
-    private fun token(parent: Cancellation): Cancellation = object : Cancellation {
+    private fun token(parent: Cancellation): Cancellation = object : ArithmeticCancellation {
+        override fun arithmeticSource() = parent.arithmeticSource()?.withCheckpoint(this::isCancelled)
         override fun isCancelled(): Boolean = parent() || operation()
         override fun workMeter() = parent.workMeter()
         override fun deadline() = parent.deadline()?.let { outer ->

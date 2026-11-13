@@ -32,8 +32,11 @@ import com.eignex.klause.solver.result.QuadraticObjectiveBound
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.ArithmeticCancellation
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.arithmeticSource
+import com.eignex.klause.util.withCheckpoint
 import com.eignex.util.concurrent.Mutex
 
 internal class QuadraticPortfolioInvocation(
@@ -52,7 +55,8 @@ internal class QuadraticPortfolioInvocation(
     private val identity = ModelIdentity.of(plan.originalSource, objective)
     private val expected = sourceInvocation
     private val external = params.timeout or params.cancellation
-    private val verification = object : Cancellation {
+    private val verification = object : ArithmeticCancellation {
+        override fun arithmeticSource() = native.polynomial.arithmeticSource()?.withCheckpoint(this::isCancelled)
         override fun isCancelled(): Boolean = native.stopped
         override fun deadline() = external.deadline()
         override fun workMeter(): WorkMeter? = native.polynomial.workMeter()

@@ -66,8 +66,10 @@ fun interface Cancellation {
     infix fun or(other: Cancellation): Cancellation {
         val self = this
         val combined = earlierDeadline(self.deadline(), other.deadline())
-        val meter = self.workMeter() ?: other.workMeter()
-        return OrCancellation(self, other, combined, meter)
+        val first = self.workMeter()
+        val meter = first ?: other.workMeter()
+        val accountingOwner = if (first != null) self else if (meter != null) other else null
+        return OrCancellation(self, other, combined, meter, accountingOwner)
     }
 
     /** Cancel only when both sides cancel — useful for "user requested AND budget
@@ -106,9 +108,10 @@ fun interface Cancellation {
          * Cancel once [deadline] has passed. Deadline-backed (exposes [Cancellation.deadline]), so it
          * composes with [shorten]. Backed by [TimeSource.Monotonic] via the caller's mark.
          */
-        fun until(deadline: ComparableTimeMark): Cancellation = object : ClockOnlyCancellation {
+        fun until(deadline: ComparableTimeMark): Cancellation = object : ClockOnlyCancellation, ArithmeticCancellation {
             override fun isCancelled(): Boolean = deadline.hasPassedNow()
             override fun deadline(): ComparableTimeMark = deadline
+            override fun arithmeticSource(): ArithmeticWorkSource = unmeteredArithmetic(this::isCancelled)
         }
 
         /**
@@ -134,8 +137,11 @@ private class OrCancellation(
     other: Cancellation,
     private val combined: ComparableTimeMark?,
     private val meter: WorkMeter?,
-) : SchedulingCancellation {
+    private val accountingOwner: Cancellation?,
+) : SchedulingCancellation, ArithmeticCancellation {
     override val workScheduled: Boolean = self.workScheduled() || other.workScheduled()
+    private val left = self
+    private val right = other
     private val tokens: Array<Cancellation> = buildList<Cancellation> {
         if (self is OrCancellation) {
             for (token in self.tokens) appendOrdered(token)
@@ -156,6 +162,15 @@ private class OrCancellation(
 
     override fun deadline(): ComparableTimeMark? = combined
     override fun workMeter(): WorkMeter? = meter
+    override fun arithmeticSource(): ArithmeticWorkSource? {
+        val accounting = when {
+            accountingOwner != null -> accountingOwner.arithmeticSource()
+            left.arithmeticSource() != null && right.arithmeticSource() != null ->
+                unmeteredArithmetic(this::isCancelled)
+            else -> null
+        }
+        return accounting?.withCheckpoint(this::isCancelled)
+    }
 }
 
 private fun MutableList<Cancellation>.appendOrdered(token: Cancellation) {

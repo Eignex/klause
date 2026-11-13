@@ -1,6 +1,7 @@
 package com.eignex.klause.arithmetic.transcendental
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.ArithmeticExecution
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.magnitudeBitLength
 
@@ -8,27 +9,23 @@ internal class TranscendentalInterrupted : RuntimeException()
 internal class TranscendentalResourceLimit : RuntimeException()
 
 internal class TranscendentalArithmetic(
-    private val cancellation: Cancellation = Cancellation.Never,
+    cancellation: Cancellation = Cancellation.Never,
     private val maximumBits: Int = 65536,
     private val maximumWork: Long? = null,
 ) {
+    val execution = ArithmeticExecution(cancellation) { throw TranscendentalInterrupted() }
     var work: Long = 0
         private set
 
     init { require(maximumBits > 0 && (maximumWork == null || maximumWork >= 0)) }
 
     fun step() {
-        poll()
-        if ((maximumWork != null && work >= maximumWork) || work == Long.MAX_VALUE) {
-            throw TranscendentalResourceLimit()
+        execution.step {
+            if ((maximumWork != null && work >= maximumWork) || work == Long.MAX_VALUE) {
+                throw TranscendentalResourceLimit()
+            }
+            work++
         }
-        work++
-        cancellation.charge(1)
-        poll()
-    }
-
-    private fun poll() {
-        if (cancellation()) throw TranscendentalInterrupted()
     }
 
     private fun bits(value: BigFraction): Long =
@@ -40,45 +37,47 @@ internal class TranscendentalArithmetic(
         if (bits(left) + bits(right) + 1 > maximumBits) throw TranscendentalResourceLimit()
     }
 
-    fun add(left: BigFraction, right: BigFraction): BigFraction {
+    fun add(left: BigFraction, right: BigFraction): BigFraction = execution.operation {
         prepare(left, right)
-        return left + right
+        return@operation left + right
     }
 
-    fun multiply(left: BigFraction, right: BigFraction): BigFraction {
+    fun multiply(left: BigFraction, right: BigFraction): BigFraction = execution.operation {
         prepare(left, right)
-        return left * right
+        return@operation left * right
     }
 
-    fun divide(left: BigFraction, right: BigFraction): BigFraction {
+    fun divide(left: BigFraction, right: BigFraction): BigFraction = execution.operation {
         prepare(left, right)
-        return left * right.reciprocal()
+        return@operation left * right.reciprocal()
     }
 
-    fun add(left: RationalEnclosure, right: RationalEnclosure): RationalEnclosure = RationalEnclosure(
+    fun add(left: RationalEnclosure, right: RationalEnclosure): RationalEnclosure = execution.operation {
+        RationalEnclosure(
         add(left.lower, right.lower), add(left.upper, right.upper),
-    )
-
-    fun negate(value: RationalEnclosure): RationalEnclosure {
-        step()
-        return RationalEnclosure(value.upper.negated(), value.lower.negated())
+        )
     }
 
-    fun multiply(left: RationalEnclosure, right: RationalEnclosure): RationalEnclosure {
+    fun negate(value: RationalEnclosure): RationalEnclosure = execution.operation {
+        step()
+        return@operation RationalEnclosure(value.upper.negated(), value.lower.negated())
+    }
+
+    fun multiply(left: RationalEnclosure, right: RationalEnclosure): RationalEnclosure = execution.operation {
         val products = listOf(
             multiply(left.lower, right.lower), multiply(left.lower, right.upper),
             multiply(left.upper, right.lower), multiply(left.upper, right.upper),
         )
-        return RationalEnclosure(products.reduce { a, b -> minimum(a, b) }, products.reduce { a, b -> maximum(a, b) })
+        return@operation RationalEnclosure(products.reduce { a, b -> minimum(a, b) }, products.reduce { a, b -> maximum(a, b) })
     }
 
-    fun reciprocal(value: RationalEnclosure): RationalEnclosure {
+    fun reciprocal(value: RationalEnclosure): RationalEnclosure = execution.operation {
         step()
         require(!value.contains(BigFraction.ZERO))
-        return RationalEnclosure(divide(BigFraction.ONE, value.upper), divide(BigFraction.ONE, value.lower))
+        return@operation RationalEnclosure(divide(BigFraction.ONE, value.upper), divide(BigFraction.ONE, value.lower))
     }
 
-    fun power(value: RationalEnclosure, exponent: Int): RationalEnclosure {
+    fun power(value: RationalEnclosure, exponent: Int): RationalEnclosure = execution.operation {
         require(exponent >= 0)
         step()
         var result = RationalEnclosure.point(BigFraction.ONE)
@@ -89,12 +88,12 @@ internal class TranscendentalArithmetic(
             remaining = remaining ushr 1
             if (remaining != 0) base = multiply(base, base)
         }
-        return result
+        return@operation result
     }
 
-    fun exp(value: RationalEnclosure, terms: Int): RationalEnclosure = RationalEnclosure(
-        expPoint(value.lower, terms).lower, expPoint(value.upper, terms).upper,
-    )
+    fun exp(value: RationalEnclosure, terms: Int): RationalEnclosure = execution.operation {
+        RationalEnclosure(expPoint(value.lower, terms).lower, expPoint(value.upper, terms).upper)
+    }
 
     private fun expPoint(value: BigFraction, terms: Int): RationalEnclosure {
         validateTerms(terms)
@@ -122,10 +121,10 @@ internal class TranscendentalArithmetic(
         return result
     }
 
-    fun log(value: RationalEnclosure, terms: Int): RationalEnclosure {
+    fun log(value: RationalEnclosure, terms: Int): RationalEnclosure = execution.operation {
         validateTerms(terms)
         require(value.lower.signum() > 0) { "log enclosure requires positive arguments" }
-        return RationalEnclosure(logPoint(value.lower, terms).lower, logPoint(value.upper, terms).upper)
+        return@operation RationalEnclosure(logPoint(value.lower, terms).lower, logPoint(value.upper, terms).upper)
     }
 
     private fun logPoint(value: BigFraction, terms: Int): RationalEnclosure {
@@ -162,10 +161,10 @@ internal class TranscendentalArithmetic(
         return RationalEnclosure(lower, add(lower, tail))
     }
 
-    fun pi(terms: Int): RationalEnclosure {
+    fun pi(terms: Int): RationalEnclosure = execution.operation {
         validateTerms(terms)
         // atan(1/2) + atan(1/3) = pi/4: tangent addition gives 1 and both angles lie in (0, pi/4).
-        return multiply(add(atanUnit(divide(BigFraction.ONE, q(2)), terms),
+        return@operation multiply(add(atanUnit(divide(BigFraction.ONE, q(2)), terms),
             atanUnit(divide(BigFraction.ONE, q(3)), terms)), RationalEnclosure.point(q(4)))
     }
 
@@ -183,8 +182,12 @@ internal class TranscendentalArithmetic(
         else RationalEnclosure(add(sum, next.negated()), sum)
     }
 
-    fun sin(value: RationalEnclosure, terms: Int): RationalEnclosure = trig(value, terms, cosine = false)
-    fun cos(value: RationalEnclosure, terms: Int): RationalEnclosure = trig(value, terms, cosine = true)
+    fun sin(value: RationalEnclosure, terms: Int): RationalEnclosure = execution.operation {
+        trig(value, terms, cosine = false)
+    }
+    fun cos(value: RationalEnclosure, terms: Int): RationalEnclosure = execution.operation {
+        trig(value, terms, cosine = true)
+    }
 
     private fun trig(value: RationalEnclosure, terms: Int, cosine: Boolean): RationalEnclosure {
         validateTerms(terms)

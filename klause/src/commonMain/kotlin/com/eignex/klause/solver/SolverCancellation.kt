@@ -1,8 +1,12 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.util.ArithmeticCancellation
+import com.eignex.klause.util.ArithmeticWorkSource
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.SchedulingCancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.arithmeticSource
+import com.eignex.klause.util.withCheckpoint
 import com.eignex.klause.util.workScheduled
 import kotlin.time.ComparableTimeMark
 
@@ -18,9 +22,14 @@ internal fun Cancellation.withLifetime(lifetime: Cancellation): Cancellation = S
     (this as? ScopedCancellation)?.invocation ?: this, lifetimeCancellation() or lifetime,
 )
 
-private class ScopedCancellation(val invocation: Cancellation, val lifetime: Cancellation) : SchedulingCancellation {
+private class ScopedCancellation(val invocation: Cancellation, val lifetime: Cancellation) :
+    SchedulingCancellation, ArithmeticCancellation {
     override val workScheduled: Boolean get() = invocation.workScheduled() || lifetime.workScheduled()
     override fun isCancelled(): Boolean = lifetime() || invocation()
     override fun deadline(): ComparableTimeMark? = listOfNotNull(lifetime.deadline(), invocation.deadline()).minOrNull()
     override fun workMeter(): WorkMeter? = invocation.workMeter() ?: lifetime.workMeter()
+    override fun arithmeticSource(): ArithmeticWorkSource? {
+        val accounting = if (invocation.workMeter() != null) invocation else lifetime
+        return accounting.arithmeticSource()?.withCheckpoint(this::isCancelled)
+    }
 }

@@ -4,8 +4,14 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialResource
 import com.eignex.klause.solver.resources.WorkCounter
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.QfNraStats
+import com.eignex.klause.util.ArithmeticCancellation
+import com.eignex.klause.util.ArithmeticWorkSource
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkCreditPool
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.WorkReservation
+import com.eignex.klause.util.arithmeticSource
+import com.eignex.klause.util.reserveWork
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.util.concurrent.AtomicCells
 import com.eignex.util.concurrent.Mutex
@@ -18,21 +24,23 @@ internal class QuadraticNativeScope private constructor(
     private val maximumWorkerWork: Long?,
 ) {
     constructor(params: PolynomialTheoryParams, concurrent: Boolean = true) :
-        this(params, Ledger(if (concurrent) Concurrency.Relaxed else Concurrency.None), null, null)
+        this(params, Ledger(params.maximumWork, if (concurrent) Concurrency.Relaxed else Concurrency.None), null, null)
 
     private val stop = params.timeout or params.cancellation
     private val counters = Counters(ledger.concurrency)
+    private val quota = maximumWorkerWork?.let { WorkCreditPool(it, ledger.concurrency) }
+    private val pools = listOfNotNull(quota, ledger.pool)
+    private val parentAccounting = stop.arithmeticSource()
     private val workers = mutableMapOf<Int, QuadraticNativeScope>()
     private val representationDecline = ledger.cells.newReference<PolynomialTheoryResource?>(null)
     val resource: PolynomialTheoryResource? get() = representationDecline.load()
     val declinedResource: PolynomialTheoryResource? get() = resource ?: ledger.lock.withLock {
         workers.values.toList()
     }.firstNotNullOfOrNull { it.resource }
-    val work: Long get() = if (root == null) ledger.counters.work else counters.work
+    val work: Long get() = if (root == null) ledger.pool.spent else counters.work
     val numericalWork: Long get() = (if (root == null) ledger.counters else counters).quadraticWork.value
     val polynomialStats: PolynomialTheoryStats get() = (if (root == null) ledger.counters else counters).stats()
-    val exhausted: Boolean get() = params.maximumWork?.let { ledger.counters.work >= it } == true ||
-        maximumWorkerWork?.let { counters.work >= it } == true
+    val exhausted: Boolean get() = ledger.pool.exhausted || quota?.exhausted == true
     val stopped: Boolean get() = exhausted || resource != null || root?.resource != null || stop()
     val polynomial: Cancellation = Token(quadratic = false)
     val numerical: Cancellation = Token(quadratic = true)
@@ -67,12 +75,28 @@ internal class QuadraticNativeScope private constructor(
         else -> TerminationReason.BudgetExhausted
     }
 
-    private inner class Token(private val quadratic: Boolean) : Cancellation, WorkMeter {
+    private inner class Token(private val quadratic: Boolean) : ArithmeticCancellation, WorkMeter {
         override fun isCancelled(): Boolean = stopped
         override fun deadline() = stop.deadline()
         override fun workMeter(): WorkMeter = this
         override fun charge(units: Long) {
             require(units >= 0)
+            ledger.pool.debit(units)
+            quota?.debit(units)
+            record(units)
+            stop.charge(units)
+        }
+
+        override fun arithmeticSource(): ArithmeticWorkSource? {
+            if (stop.workMeter() != null && parentAccounting == null) return null
+            return object : ArithmeticWorkSource {
+                override fun isCancelled(): Boolean = stopped
+                override fun reserve(maximum: Int): WorkReservation? =
+                    reserveWork(maximum, pools, parentAccounting) { record(it.toLong()) }
+            }
+        }
+
+        private fun record(units: Long) {
             if (quadratic) {
                 counters.quadraticWork.add(units)
                 ledger.counters.quadraticWork.add(units)
@@ -80,14 +104,14 @@ internal class QuadraticNativeScope private constructor(
                 counters.polynomialWork.add(units)
                 ledger.counters.polynomialWork.add(units)
             }
-            stop.charge(units)
         }
     }
 
-    private class Ledger(val concurrency: Concurrency) {
+    private class Ledger(maximumWork: Long?, val concurrency: Concurrency) {
         val cells = if (concurrency == Concurrency.None) SerialCells else AtomicCells
         val lock = Mutex(concurrent = concurrency != Concurrency.None)
         val counters = Counters(concurrency)
+        val pool = WorkCreditPool(maximumWork, concurrency)
     }
 
     private class Counters(concurrency: Concurrency) {

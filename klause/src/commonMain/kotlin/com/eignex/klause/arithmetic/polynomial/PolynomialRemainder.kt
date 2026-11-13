@@ -19,7 +19,7 @@ internal class PolynomialRemainder(divisors: List<Polynomial>, private val arith
         }
     }
 
-    fun prepare(polynomial: Polynomial): Iterator<Polynomial?> = sequence {
+    fun prepare(polynomial: Polynomial): Iterator<Polynomial?> = arithmetic.execution.iterator(sequence {
         if (generators.isEmpty()) {
             arithmetic.step()
             yield(polynomial)
@@ -55,7 +55,7 @@ internal class PolynomialRemainder(divisors: List<Polynomial>, private val arith
         }
         arithmetic.step()
         yield(Polynomial.of(remainder))
-    }.iterator()
+    }.iterator())
 
     private fun candidates(monomial: Monomial): Sequence<RemainderDivisor> = sequence {
         val buckets = ArrayList<List<RemainderDivisor>>()

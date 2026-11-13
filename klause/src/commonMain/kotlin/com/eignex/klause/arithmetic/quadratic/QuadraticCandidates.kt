@@ -5,7 +5,7 @@ import com.eignex.koblas.koblas
 import kotlin.math.max
 
 internal class QuadraticCandidates(private val control: QuadraticControl = QuadraticControl()) {
-    fun stationary(model: QuadraticModel, activeRows: List<Int>): QuadraticStationaryCertificate? {
+    fun stationary(model: QuadraticModel, activeRows: List<Int>): QuadraticStationaryCertificate? = control.operation {
         control.step()
         val rows = model.rows
         require(activeRows.distinct().size == activeRows.size && activeRows.all { it in rows.indices })
@@ -27,20 +27,20 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
             matrix[i][size] = linear[i].negated()
         }
         for ((j, row) in selected.withIndex()) { control.step(); matrix[model.dimension + j][size] = rows[row].rhs }
-        val solution = eliminate(matrix) ?: return null
+        val solution = eliminate(matrix) ?: return@operation null
         val multipliers = MutableList(rows.size) { BigFraction.ZERO }
         for ((j, row) in selected.withIndex()) { control.step(); multipliers[row] = solution[model.dimension + j] }
         control.poll()
-        return QuadraticStationaryCertificate(solution.take(model.dimension), multipliers)
+        return@operation QuadraticStationaryCertificate(solution.take(model.dimension), multipliers)
     }
 
-    fun proposeActiveRows(model: QuadraticModel, start: List<Double>, iterations: Int = 32): List<Int>? {
+    fun proposeActiveRows(model: QuadraticModel, start: List<Double>, iterations: Int = 32): List<Int>? = control.operation(64) {
         control.step()
         require(start.size == model.dimension && iterations >= 0)
-        val numeric = prepare(model, start) ?: return null
+        val numeric = prepare(model, start) ?: return@operation null
         val point = start.toDoubleArray()
-        if (!improve(numeric, point, iterations)) return null
-        return activeRows(numeric, point)
+        if (!improve(numeric, point, iterations)) return@operation null
+        return@operation activeRows(numeric, point)
     }
 
     private fun prepare(model: QuadraticModel, start: List<Double>): NumericalProposal? {
