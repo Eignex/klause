@@ -267,6 +267,7 @@ class QfLiraSolverLpTest {
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
                 assertEquals(!Lit.isPositive(excluded.literal), session.boolValue(excluded.literal ushr 1))
             }
+            assertEquals(2, session.learnedClauseCount)
             val result = assertIs<SearchRunEvent.Satisfied>(session.openConditionedRun(source.numBoolVars).next())
             assertEquals(true, session.boolValue(0))
             val values = assertNotNull(result.model.valueOf(component.assignmentKey)).ints
@@ -280,7 +281,6 @@ class QfLiraSolverLpTest {
                 }
                 assertTrue(if (atom.upper) activity > atom.threshold else activity < atom.threshold)
             }
-            assertEquals(2, session.learnedClauseCount)
         }
     }
 

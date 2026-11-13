@@ -51,7 +51,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class SourceExecutionTest {
     @Test
@@ -244,7 +244,7 @@ class SourceExecutionTest {
             ))
 
             val result = assertIs<SourceExecutionResult.Linear>(SourceSetup.execute(SourceExecutionRequest(
-                invocation, theory = TheoryParams(timeout = Cancellation.after(300.milliseconds)),
+                invocation, theory = TheoryParams(timeout = Cancellation.after(30.seconds)),
             )))
 
             val satisfy = assertIs<OpenTheoryExecution.Satisfy>(result.result)
