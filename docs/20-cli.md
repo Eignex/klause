@@ -142,9 +142,10 @@ this is separate from heap measurements and diagnostic payload-category sums.
   Arms choose intensity below it. `--lp-pricing` selects zero-objective
   entering policy. Native arithmetic routes reject explicit LP flags.
 - `--exact`: continuous float interpretation and zero source tolerance for the
-  format's declared policies; zero tolerance also certifies finite LP deductions exactly,
-  which are otherwise [numerical](17-linear-programming.md#numerical-and-exact-deductions)
-  for MPS.
+  format's declared policies. MPS and FlatZinc declare a positive tolerance, so their
+  finite LP deductions are [numerical](17-linear-programming.md#numerical-and-exact-deductions)
+  and their real completions are accepted within it; zero tolerance certifies both
+  exactly. Formats without a declared tolerance are exact either way.
   Unsupported exact lowering declines explicitly.
 - `--param <key>=<value>`: repeatable engine parameters. Unknown keys exit with
   status 2. The families are CP and LS strategy settings, portfolio slice policy
