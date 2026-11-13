@@ -34,7 +34,9 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
         return@operation QuadraticStationaryCertificate(solution.take(model.dimension), multipliers)
     }
 
-    fun proposeActiveRows(model: QuadraticModel, start: List<Double>, iterations: Int = 32): List<Int>? = control.operation(64) {
+    fun proposeActiveRows(
+        model: QuadraticModel, start: List<Double>, iterations: Int = 32,
+    ): List<Int>? = control.operation(64) {
         control.step()
         require(start.size == model.dimension && iterations >= 0)
         val numeric = prepare(model, start) ?: return@operation null
@@ -44,6 +46,7 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
     }
 
     private fun prepare(model: QuadraticModel, start: List<Double>): NumericalProposal? {
+        control.execution.boundary()
         val hessian = model.hessian.map { row -> DoubleArray(row.size) { row[it].toDouble() } }
         val linear = model.linear.let { values -> DoubleArray(values.size) { values[it].toDouble() } }
         val rows = model.rows
@@ -63,6 +66,7 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
     }
 
     private fun improve(numeric: NumericalProposal, point: DoubleArray, iterations: Int): Boolean {
+        control.execution.boundary()
         val gradient = DoubleArray(point.size)
         repeat(iterations) {
             for (i in point.indices) gradient[i] = dot(numeric.linear[i], numeric.hessian[i], point)

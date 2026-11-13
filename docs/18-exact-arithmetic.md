@@ -38,8 +38,9 @@ active rows. Owned primitive buffers retain the Hessian, rows, point and gradien
 Preparation builds the floating model before separate iteration and row-selection routines use it.
 Koblas ASUM computes Hessian row magnitudes and DOT computes squared constraint-row
 magnitudes for the numerical step size.
-Koblas dot and AXPY calls process complete vectors, charging and polling
-each entry before its call executes. Nonfinite inputs or iterates decline the
+Koblas dot and AXPY calls process complete vectors, admitting one work unit per
+entry before each call. Owned controls batch containing checks independently of
+these debits. Nonfinite inputs or iterates decline the
 proposal. Reduction rounding can change selected rows; it has no certificate
 authority. Selected rows and all equality rows form an exact rational KKT system;
 rank-revealing elimination rejects inconsistent systems and fixes free coordinates
