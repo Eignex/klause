@@ -80,10 +80,6 @@ internal class LpBoundTrail(initial: LpExactState) {
             if (comparison == null || (if (assertion.upper) comparison < 0 else comparison > 0) ||
                 (comparison == 0 && assertion.side.strict && !previous.side.strict)
             ) {
-                val number = assertion.side.number
-                if (!(number.ieeeBits?.let { Double.fromBits(it) } ?: number.value.toDouble()).isFinite()) {
-                    return LpBoundBatchResult.Declined(count + 1)
-                }
                 sides[assertion.column] = assertion
             }
             count++
@@ -448,7 +444,7 @@ internal class LpBoundTrail(initial: LpExactState) {
     ).also { if (matrixRevision == state.matrixRevision) it.inheritProjection(state) }
 
     private fun commit(next: LpExactState, token: Cancellation): Boolean {
-        if (token() || !next.canProjectWorkingModel() || token()) return false
+        if (token()) return false
         state = next
         return true
     }

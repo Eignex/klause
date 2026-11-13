@@ -181,9 +181,7 @@ internal class LpScopedSolver(
         if (result is LpBoundBatchResult.Declined || next.state === state) return result
         discardFloatProgress()
         try {
-            val current = solver
-            if (current != null && !current.adopt(next.state, token)) return LpBoundBatchResult.Declined(result.count)
-            if (current == null && token()) return LpBoundBatchResult.Declined(result.count)
+            if (!adoptNumerical(next.state, token)) return LpBoundBatchResult.Declined(result.count)
         } catch (primary: Throwable) {
             try {
                 close()
@@ -216,9 +214,7 @@ internal class LpScopedSolver(
             return true
         }
         if (initial !== state) discardFloatProgress()
-        val current = solver
-        if (current != null && !current.adopt(initial, token)) return false
-        if (current == null && token()) return false
+        if (!adoptNumerical(initial, token)) return false
         publish(LpBoundTrail(initial))
         return true
     }
@@ -285,6 +281,13 @@ internal class LpScopedSolver(
         sparsePointRecovery: Boolean = false,
         claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
     ): CertifiedLpResult? {
+        requireAvailable()
+        if (closed || token()) return null
+        certifyBoundConflict(state, token, context.certificationPolicy, observer, claim)?.let {
+            lastResult = it
+            lastMetrics = LpSolveMetrics()
+            return it
+        }
         val attempt = solveFloat(warm, token) ?: return null
         val certified = certifyLpResult(
             requireNotNull(state.ownerWorkingModel()),
@@ -573,11 +576,24 @@ internal class LpScopedSolver(
         if (next.state.matrixRevision != state.matrixRevision) {
             return replace(next, token, append, compaction)
         }
-        val current = solver
-        if (current != null && !current.adopt(next.state, token)) return false
-        if (current == null && token()) return false
+        if (!adoptNumerical(next.state, token)) return false
         publish(next)
         return true
+    }
+
+    private fun adoptNumerical(next: LpExactState, token: Cancellation): Boolean {
+        val current = solver ?: return !token()
+        if (next.canProjectWorkingModel(token)) return current.adopt(next, token)
+        if (token()) return false
+        retireNumerical()
+        return !token()
+    }
+
+    private fun retireNumerical() {
+        val current = solver ?: return
+        recordPendingAppendSolve(current)
+        solver = null
+        closeOwner(current)
     }
 
     internal fun requireAvailable() {
@@ -672,6 +688,13 @@ internal class LpScopedSolver(
         append: Boolean,
         compaction: LpLayoutRemap? = null,
     ): Boolean {
+        if (!next.state.canProjectWorkingModel(token)) {
+            if (token()) return false
+            retireNumerical()
+            if (token()) return false
+            publish(next)
+            return true
+        }
         var replacementWorkLimit = workLimit
         val components = solver as? ComponentLpSolver
         if (append && compaction == null && components != null) {

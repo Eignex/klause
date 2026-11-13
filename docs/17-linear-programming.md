@@ -1173,6 +1173,9 @@ the ordinary encoding retains its existing wire format.
 intersects assertions exactly and keeps a source premise for each accepted side.
 Batches publish witnesses only for a committed prefix; crossed bounds cite both
 sides, and pop restores bounds and deactivates scoped rows.
+Exact trail edits do not require a floating projection. An incompatible projection
+retires the floating owner, while crossed sides are certified directly against the
+exact state and acceptance policy. A later projectable state can prepare a fresh owner.
 
 A nonbasic bound change updates the basic values by `-B^-1 A(j) delta(x(j))`; pop
 reseats nonbasics and recomputes `x(B) = B^-1 (b - N x(N))`. Compatible edits and
