@@ -48,12 +48,14 @@ internal class ArithmeticExecution(
 ) {
     private val source = cancellation.arithmeticSource()
     private var depth = 0
-    private var quantum = 8
+    private var quantum = 32
     private var reservation: WorkReservation? = null
     private var used = 0
     private var stopped = false
 
-    inline fun <T> operation(quantum: Int = 8, body: () -> T): T {
+    val batching: Boolean get() = depth != 0
+
+    inline fun <T> operation(quantum: Int = 32, body: () -> T): T {
         if (!begin(quantum)) return body()
         var failure: Throwable? = null
         try {
@@ -68,7 +70,14 @@ internal class ArithmeticExecution(
 
     fun begin(quantum: Int): Boolean {
         require(quantum > 0)
-        if (depth != 0 || source == null || cancellation === Cancellation.Never) return false
+        if (depth != 0) {
+            if (quantum < this.quantum) {
+                checkpoint()
+                this.quantum = quantum
+            }
+            return false
+        }
+        if (source == null || cancellation === Cancellation.Never) return false
         this.quantum = quantum
         stopped = false
         checkpoint()
@@ -88,7 +97,7 @@ internal class ArithmeticExecution(
         }
     }
 
-    fun step(beforeDebit: () -> Unit = {}) {
+    internal inline fun step(beforeDebit: () -> Unit = {}) {
         if (cancellation === Cancellation.Never) {
             beforeDebit()
             return

@@ -20,6 +20,12 @@ costs and report repeated infrastructure losses separately.
 Each requested selection must match at least one source. A selection with no matches
 fails preparation instead of publishing a reduced comparison plan.
 
+`bench.profile.ArithmeticCancellationProfile` runs deterministic arithmetic controls.
+Build its JVM classpath with `:klause:stageLpProfileJvm`, then invoke
+`com.eignex.klause.bench.profile.ArithmeticCancellationProfile` with `throughput` or
+`latency` through a lab profile command. It emits tab-separated work, output checksums,
+wall and thread CPU observations; retain the same harness, runtime and warmup in both arms.
+
 Planning stages every selected source before sealing include-directory identities.
 Execution verifies the planned file and directory identities before each solve.
 

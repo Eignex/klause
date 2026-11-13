@@ -7,7 +7,10 @@ and charge work to the containing token.
 
 `util.ArithmeticExecution` separates native work admission from cancellation
 checkpoints. An owned arithmetic operation uses a local cursor: floating proposal
-loops checkpoint after at most 64 admitted units, exact kernels after at most eight.
+loops checkpoint after at most 64 admitted units, quadratic certification after at
+most eight, and polynomial and enclosure kernels after at most 32. Coefficient
+operations whose combined operand size exceeds 4096 bits force a checkpoint before
+the exact primitive.
 Entry, allocation admission, callback handoff, prepared-cursor suspension and all
 exits settle spent work and check the live containing stop. Nested methods share
 the cursor; retained state holds no unused credit while paused. A stopped operation

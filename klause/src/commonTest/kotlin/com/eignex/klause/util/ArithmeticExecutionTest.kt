@@ -65,6 +65,23 @@ class ArithmeticExecutionTest {
     }
 
     @Test
+    fun `a smaller nested quantum should bound work admitted before a stop`() {
+        assertFailsWith<IllegalStateException> {
+            execution.operation(64) {
+                repeat(5) { execution.step() }
+                execution.operation(2) {
+                    repeat(10) { index ->
+                        if (index == 1) stopped = true
+                        execution.step()
+                    }
+                }
+            }
+        }
+
+        assertEquals(7L, pool.spent)
+    }
+
+    @Test
     fun `exceptional exits should release unused capacity and retain spent work`() {
         val failure = IllegalArgumentException("arithmetic failed")
 

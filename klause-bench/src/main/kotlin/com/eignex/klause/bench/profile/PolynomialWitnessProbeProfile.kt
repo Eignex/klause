@@ -89,7 +89,7 @@ internal object PolynomialWitnessProbeProfile {
         private val stats = queryType.getMethod("getStats")
         private val work = queryType.getDeclaredField("work").apply { isAccessible = true }
         private val workType = Class.forName(prefix + "QfNraWork")
-        private val spent = workType.getDeclaredField("spent").apply { isAccessible = true }
+        private val spent = workType.getMethod("getSpentWork")
         private val coupledEnd = workType.getDeclaredField("coupledEnd").apply { isAccessible = true }
         private val probeEnd = workType.getDeclaredField("probeEnd").apply { isAccessible = true }
         private val fixings = Class.forName(prefix + "PolynomialPointFixingsKt").methods.single {
@@ -98,7 +98,7 @@ internal object PolynomialWitnessProbeProfile {
 
         fun workCheckpoint(owner: Any): ProbeStop? {
             val boundary = coupledEnd.get(owner) as? Long ?: return null
-            val charged = spent.getLong(owner)
+            val charged = spent.invoke(owner) as Long
             if (charged < boundary) return null
             return ProbeStop(
                 charged,

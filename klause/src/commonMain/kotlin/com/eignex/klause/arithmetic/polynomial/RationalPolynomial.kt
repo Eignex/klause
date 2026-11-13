@@ -5,6 +5,7 @@ import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.div
 import com.eignex.util.numbers.gcd
+import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.times
 
@@ -38,7 +39,7 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
     fun add(left: RationalPolynomial, right: RationalPolynomial): RationalPolynomial = arithmetic.execution.operation {
         RationalPolynomial(
             List(arithmetic.denseSize(maxOf(left.degree, right.degree))) {
-                arithmetic.step()
+                arithmetic.step(left[it], right[it])
                 left[it] + right[it]
             },
         )
@@ -48,7 +49,7 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
         arithmetic.execution.operation {
         arithmetic.step()
         return@operation RationalPolynomial(value.coefficients.map {
-            arithmetic.step()
+            arithmetic.step(it, coefficient)
             it * coefficient
         })
     }
@@ -62,7 +63,7 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
         }
         val result = MutableList(arithmetic.denseSize(left.degree + right.degree)) { BigFraction.ZERO }
         for (i in 0..left.degree) for (j in 0..right.degree) {
-            arithmetic.step()
+            arithmetic.step(left[i], right[j])
             result[i + j] = result[i + j] + left[i] * right[j]
         }
         return@operation RationalPolynomial(result)
@@ -72,7 +73,7 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
         arithmetic.step()
         arithmetic.denseSize((value.degree - 1).coerceAtLeast(-1))
         return@operation RationalPolynomial((1..value.degree).map {
-            arithmetic.step()
+            arithmetic.step(value[it])
             value[it] * BigFraction.ofLong(it.toLong())
         })
     }
@@ -83,13 +84,15 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
         val coefficients = value.coefficients
         var denominator = BIG_ONE
         for (coefficient in coefficients) {
-            arithmetic.step()
+            arithmetic.step(coefficient)
+            if (arithmetic.execution.batching && denominator.magnitudeBitLength() > 4096) arithmetic.checkpoint()
             denominator = denominator / denominator.gcd(coefficient.den) * coefficient.den
         }
         var numerator = BIG_ZERO
         var pointDenominator = BIG_ONE
         for (index in coefficients.indices.reversed()) {
             arithmetic.step()
+            if (arithmetic.execution.batching && numerator.magnitudeBitLength() > 4096) arithmetic.checkpoint()
             val coefficient = coefficients[index]
             numerator = numerator * at.num + coefficient.num * (denominator / coefficient.den) * pointDenominator
             if (index > 0) pointDenominator *= at.den
@@ -114,7 +117,7 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
             quotient[shift] = coefficient
             val terms = remainder.coefficients.toMutableList()
             for (i in 0..right.degree) {
-                arithmetic.step()
+                arithmetic.step(coefficient, right[i])
                 terms[shift + i] = terms[shift + i] - coefficient * right[i]
             }
             remainder = RationalPolynomial(terms)

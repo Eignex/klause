@@ -34,7 +34,9 @@ internal class TranscendentalArithmetic(
     private fun prepare(left: BigFraction, right: BigFraction) {
         step()
         // Cross products are bounded before allocation, even when later cancellation would reduce them.
-        if (bits(left) + bits(right) + 1 > maximumBits) throw TranscendentalResourceLimit()
+        val productBits = bits(left) + bits(right) + 1
+        if (productBits > maximumBits) throw TranscendentalResourceLimit()
+        if (productBits > 4096) execution.boundary()
     }
 
     fun add(left: BigFraction, right: BigFraction): BigFraction = execution.operation {

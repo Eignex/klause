@@ -35,7 +35,8 @@ import kotlin.time.Duration.Companion.nanoseconds
 internal object ArithmeticCancellationProfile {
     private val cpu = ManagementFactory.getThreadMXBean()
     private val workloads = listOf("float1", "float16", "float64", "float256", "exact8", "exact16",
-        "polynomial8", "polynomial24", "rational16", "rational64", "exp4", "exp12")
+        "polynomial8", "polynomial24", "rational16", "rational64", "exp4", "exp12",
+        "large-exact", "large-quadratic")
     @Volatile private var sink = 0
 
     @JvmStatic
@@ -77,6 +78,7 @@ internal object ArithmeticCancellationProfile {
     }
 
     private fun kernel(name: String, token: Cancellation): () -> Int = when {
+        name.startsWith("large-") -> latencyKernel(name, token)
         name.startsWith("float") -> {
             val n = name.removePrefix("float").toInt()
             val model = QuadraticModel(List(n) { q((it % 7 - 3).toLong()) }, List(n) { i ->
@@ -120,14 +122,18 @@ internal object ArithmeticCancellationProfile {
     }
 
     private fun repetitions(name: String): Int = when {
+        name.startsWith("large-") -> 1
         name == "float256" -> 2
         name == "float64" -> 16
         name == "float1" -> 2048
         name.startsWith("float") -> 128
-        name.startsWith("exact") -> 64
-        name.startsWith("polynomial") -> 32
-        name.startsWith("rational") -> 128
-        else -> 4
+        name.startsWith("exact") -> 512
+        name == "polynomial8" -> 256
+        name.startsWith("polynomial") -> 64
+        name == "rational16" -> 2048
+        name.startsWith("rational") -> 512
+        name == "exp4" -> 1024
+        else -> 64
     }
 
     private fun measure(name: String, mode: String) {
@@ -138,7 +144,7 @@ internal object ArithmeticCancellationProfile {
         val setupNanos = System.nanoTime() - setup
         val count = repetitions(name)
         repeat(4) { repeat(count) { check(run() == expected) } }
-        val warmUntil = cpu.currentThreadCpuTime + 100_000_000L
+        val warmUntil = cpu.currentThreadCpuTime + 500_000_000L
         do { repeat(count) { check(run() == expected) } } while (cpu.currentThreadCpuTime < warmUntil)
         repeat(5) { sample ->
             val beforeWork = accounting.work
@@ -179,9 +185,8 @@ internal object ArithmeticCancellationProfile {
     }
 
     private fun latency() {
-        for (family in listOf("float256", "polynomial24", "exp12", "large-exact")) {
-            val warm = if (family == "large-exact") largeExact(Cancellation.Never)
-                else kernel(family, Cancellation.Never)
+        for (family in listOf("float256", "polynomial24", "exp12", "large-exact", "large-quadratic")) {
+            val warm = latencyKernel(family, Cancellation.Never)
             repeat(16) { sink = warm() }
             for (kind in listOf("flag", "deadline")) repeat(100) { trial ->
                 val flag = AtomicBoolean()
@@ -195,8 +200,7 @@ internal object ArithmeticCancellationProfile {
                 val liveDeadline = AtomicReference(Cancellation.Never)
                 val token = Cancellation { flag.get() || liveDeadline.get()() }
                 val accounting = Accounting("owned", token)
-                val run = if (family == "large-exact") largeExact(accounting.token)
-                    else kernel(family, accounting.token)
+                val run = latencyKernel(family, accounting.token)
                 val worker = thread {
                     ready.countDown()
                     start.await()
@@ -233,6 +237,20 @@ internal object ArithmeticCancellationProfile {
                 println("latency\t$family\t$kind\t$trial\t$wall\t$consumedCpu\t${accounting.work}")
             }
         }
+    }
+
+    private fun latencyKernel(family: String, token: Cancellation): () -> Int = when (family) {
+        "large-exact" -> largeExact(token)
+        "large-quadratic" -> {
+            val numerator = parseBigInt("9".repeat(2048))
+            val denominator = parseBigInt("1" + "0".repeat(2048) + "7")
+            val value = BigFraction.of(numerator, denominator)
+            val model = QuadraticModel(List(2) { value }, List(2) { List(2) { value } })
+            val point = List(2) { value }
+            val checker = QuadraticCertification(QuadraticControl(token))
+            ({ checker.evaluate(model, point).hashCode() })
+        }
+        else -> kernel(family, token)
     }
 
     private fun largeExact(token: Cancellation): () -> Int {
