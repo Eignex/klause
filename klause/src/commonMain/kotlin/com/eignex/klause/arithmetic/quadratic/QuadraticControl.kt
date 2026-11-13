@@ -29,10 +29,14 @@ internal class QuadraticControl(
     inline fun <T> operation(quantum: Int = 8, body: () -> T): T = execution.operation(quantum, body)
 
     fun step() {
-        execution.step {
-            if (maximumWork != null && work >= maximumWork) throw QuadraticInterrupted(QuadraticStop.WORK_LIMIT)
-            if (work != Long.MAX_VALUE) work++
-        }
+        if (execution.unchecked) debit() else meteredStep()
+    }
+
+    private fun meteredStep() = execution.step { debit() }
+
+    private fun debit() {
+        if (maximumWork != null && work >= maximumWork) throw QuadraticInterrupted(QuadraticStop.WORK_LIMIT)
+        if (work != Long.MAX_VALUE) work++
     }
 
     fun exactStep(

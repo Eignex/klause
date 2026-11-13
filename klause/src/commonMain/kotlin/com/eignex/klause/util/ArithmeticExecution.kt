@@ -47,6 +47,7 @@ internal class ArithmeticExecution(
     private val interrupted: () -> Nothing,
 ) {
     private val source = cancellation.arithmeticSource()
+    val unchecked: Boolean = cancellation === Cancellation.Never
     private var depth = 0
     private var quantum = 32
     private var reservation: WorkReservation? = null
@@ -132,15 +133,15 @@ internal class ArithmeticExecution(
     }
 
     fun checkpoint() {
+        if (unchecked) return
         settle()
-        if (cancellation === Cancellation.Never) return
         val cancelled = source?.isCancelled() ?: cancellation()
         if (depth != 0) stopped = stopped || cancelled
         if (cancelled || (depth != 0 && stopped)) interrupted()
     }
 
     fun boundary() {
-        if (source != null) checkpoint()
+        if (!unchecked && source != null) checkpoint()
     }
 
     @Suppress("IteratorNotThrowingNoSuchElementException") // next delegates the wrapped iterator's exhaustion contract

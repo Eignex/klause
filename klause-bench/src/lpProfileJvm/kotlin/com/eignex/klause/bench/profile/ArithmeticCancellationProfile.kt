@@ -188,7 +188,8 @@ internal object ArithmeticCancellationProfile {
         for (family in listOf("float256", "polynomial24", "exp12", "large-exact", "large-quadratic")) {
             val warm = latencyKernel(family, Cancellation.Never)
             repeat(16) { sink = warm() }
-            for (kind in listOf("flag", "deadline")) repeat(100) { trial ->
+            for (kind in listOf("flag", "deadline")) repeat(120) { attempt ->
+                val trial = attempt - 20
                 val flag = AtomicBoolean()
                 val ready = CountDownLatch(1)
                 val start = CountDownLatch(1)
@@ -196,7 +197,7 @@ internal object ArithmeticCancellationProfile {
                 val requestCpu = AtomicLong()
                 val observed = AtomicLong()
                 val observedCpu = AtomicLong()
-                val offset = 250_000L * (1 + trial % 8)
+                val offset = 250_000L * (1 + attempt % 8)
                 val liveDeadline = AtomicReference(Cancellation.Never)
                 val token = Cancellation { flag.get() || liveDeadline.get()() }
                 val accounting = Accounting("owned", token)
@@ -234,7 +235,7 @@ internal object ArithmeticCancellationProfile {
                 val consumedCpu = if (kind == "flag") {
                     (observedCpu.get() - requestCpu.get()).coerceAtLeast(0)
                 } else -1
-                println("latency\t$family\t$kind\t$trial\t$wall\t$consumedCpu\t${accounting.work}")
+                if (trial >= 0) println("latency\t$family\t$kind\t$trial\t$wall\t$consumedCpu\t${accounting.work}")
             }
         }
     }
