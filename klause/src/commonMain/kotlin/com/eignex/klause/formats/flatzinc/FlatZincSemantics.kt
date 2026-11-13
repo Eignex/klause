@@ -12,8 +12,10 @@ import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.UndeclaredIntegerBounds
 import com.eignex.klause.ir.UndeclaredRealBounds
+import com.eignex.klause.ir.numericalSourceTolerance
 import com.eignex.klause.lowering.approximateGridValue
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.numbers.BIG_ONE
@@ -28,6 +30,7 @@ val flatZincSemantics: SourceSemantics = SourceSemantics(
     floats = FloatSemantics.Grid(DEFAULT_FLOAT_BUCKETS, DEFAULT_FLOAT_SCALE),
     undeclaredIntegers = UndeclaredIntegerBounds(-MINIZINC_UNBOUNDED_DEFAULT, MINIZINC_UNBOUNDED_DEFAULT),
     undeclaredReals = UndeclaredRealBounds(),
+    feasibilityTolerance = numericalSourceTolerance,
 )
 
 internal class FlatZincSemantics(
@@ -47,6 +50,7 @@ internal class FlatZincSemantics(
                     semanticFloat(unboundedFloatLo), semanticFloat(unboundedFloatHi),
                 ),
             ),
+            feasibilityTolerance = if (exactFloats) SourceTolerance() else flatZincSemantics.feasibilityTolerance,
             undeclaredIntegers = UndeclaredIntegerBounds(
                 unboundedIntLo ?: defaults.lower,
                 unboundedIntHi ?: defaults.upper,

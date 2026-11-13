@@ -29,6 +29,7 @@ import com.eignex.kumulant.stat.summary.SumResult
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.io.PrintStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -122,6 +123,34 @@ class CliModeVerdictTest {
 
             assertEquals(!bounded, "optimizationStatus=unattained-infimum" in out, out)
             assertEquals(!bounded, "objectiveBound=" in out, out)
+        }
+    }
+
+    @Test
+    fun `the exact flag should refute a FlatZinc float bound that only tolerance admits`() {
+        val source = File.createTempFile("rounded-bound", ".fzn").apply {
+            writeText("var 0.0..2.0: y :: output_var; var 200..200: n; var 0.0..200.0: nf; " +
+                "constraint int2float(n,nf); constraint float_lin_eq([0.01,-1.0],[nf,y],0.0); solve satisfy;")
+        }
+        try {
+            for ((args, terminal) in listOf(
+                emptyArray<String>() to "==========", arrayOf("--exact") to "=====UNSATISFIABLE=====",
+            )) {
+                val common = CommonOptions().apply {
+                    engine = "cp"
+                    parallel = 1
+                    randomSeed = 17
+                }
+                parseArgs(args, commonFlagSpecs(common)) {}
+                val session = MiniZincMode.newSession()
+                val solvable = session.load(source.absolutePath, common)
+
+                val out = capture { SolveCore.solve(solvable, common, session.output(common)) }
+
+                assertTrue(terminal in out.lines(), out)
+            }
+        } finally {
+            source.delete()
         }
     }
 

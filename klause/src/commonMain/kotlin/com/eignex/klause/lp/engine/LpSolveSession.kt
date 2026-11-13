@@ -52,6 +52,39 @@ internal class LpSolveSession(
         }
     }
 
+    // A float solve whose optimum [floatAccept] admits, or null; it never continues into exact certification.
+    fun solveFloat(
+        model: LpModel,
+        cancellation: Cancellation,
+        workLimit: Long,
+        observer: LpCertificationObserver?,
+        floatAccept: (FloatLpResult) -> Boolean,
+        floatOffset: Double,
+    ): FloatLpResult? {
+        check(!closed) { "LP solve session is closed" }
+        check(activeSolve == null) { "LP solve session is suspended" }
+        require(workLimit >= 0L)
+        try {
+            val previous = solver
+            val current = prepare(model, cancellation, workLimit) ?: return null
+            observeQuery(model, current, current === previous, workLimit, LpClaim.FEASIBLE_COMPLETION,
+                floatOffset, true, LpRefinementLimits())
+            val result = try {
+                if (current === previous) current.resolveBounds(LpFloatAllowance(workLimit, 0)) else current.solve()
+            } finally {
+                observer?.observeSolve(current.lastMetrics, current is ComponentLpSolverCapability)
+            }
+            return certification.acceptFloat(model, result, cancellation, observer, floatAccept, floatOffset)
+        } catch (primary: Throwable) {
+            try {
+                releaseSolvers()
+            } catch (cleanup: Throwable) {
+                if (cleanup !== primary) primary.addSuppressed(cleanup)
+            }
+            throw primary
+        }
+    }
+
     fun openSolve(
         model: LpModel,
         cancellation: Cancellation = Cancellation.Never,

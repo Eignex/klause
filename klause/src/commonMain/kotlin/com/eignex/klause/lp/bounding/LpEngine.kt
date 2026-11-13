@@ -1512,6 +1512,29 @@ internal class LpEngine(
         }.also { it.observeConsumption(sink.lp) }
     }
 
+    // The float completion of the leaf that [toleranceCheck] accepts, or null. A refusal starts no exact work,
+    // which leaves the caller its own exact completion.
+    fun leafFloatCompletion(session: PropagationSession, toleranceCheck: (Sample) -> Boolean): Sample? {
+        requireOpen()
+        if (residualOversized) return null
+        val check = toleranceCheck.floatingOptimumAcceptance() ?: return null
+        val relaxer = selectedSourceRelaxation ?: lpRelaxer ?: return null
+        val relaxation = nodeRelaxation(relaxer, session) ?: return null
+        val model = relaxation.model
+        val solver = leafSolver ?: LpSolveSession(solveContext, pricingOptions, params.lpPlan.componentSplit)
+            .also { leafSolver = it }
+        val float = solver.solveFloat(
+            model,
+            params.cancellation,
+            leafWorkBudget(model),
+            sink.lp.certificationObserver(LpRoute.STANDALONE),
+            { result -> check(leafSample(session, relaxation.floatReals(result.primal, problem))) },
+            relaxation.objectiveConstant.toDouble(),
+        ) ?: return null
+        sink.lp.observeComponentSplit(float.blocks)
+        return leafSample(session, relaxation.floatReals(float.primal, problem))
+    }
+
     private fun leafSample(session: PropagationSession, reals: DoubleArray): Sample = Sample(
         BooleanArray(problem.numBoolVars) { session.boolValue(it) ?: false },
         LongArray(problem.numIntVars) { session.intDomain(it).min },

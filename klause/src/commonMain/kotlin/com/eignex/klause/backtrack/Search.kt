@@ -68,6 +68,7 @@ import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.search.completedSearchSample
+import com.eignex.klause.solver.validation.permitsToleranceOptimum
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.AbsRealCompletion
 import com.eignex.klause.util.Cancellation
@@ -1087,6 +1088,9 @@ private class ResidualRealComponent(
             it is RealAbs || it is RealFiniteDomain ||
                 (it is ContinuousProduct && it.finiteChoices != null && !it.finiteChoices.hasGuards)
         }) AbsRealCompletion(problem) else null
+    // A finite membership is the one exact-completion relation a float leaf point can satisfy within tolerance.
+    private val floatMembership = toleranceCheck.permitsToleranceOptimum() &&
+        problem.factors.none { it is RealAbs || it is ContinuousProduct }
     private val solveContext = solveContext
     private var absWork = 0L
     private val engine = LpEngine(
@@ -1109,6 +1113,13 @@ private class ResidualRealComponent(
         completed = null
         if (context.cancelled()) return ComponentCheck.Indeterminate
         absCompletion?.let { completion ->
+            if (toleranceCheck != null && floatMembership) {
+                engine.leafFloatCompletion(cp.session, toleranceCheck)?.let { sample ->
+                    completed = sample
+                    return ComponentCheck.Feasible
+                }
+                if (context.cancelled()) return ComponentCheck.Indeterminate
+            }
             val discrete = Sample(BooleanArray(problem.numBoolVars) { cp.session.boolValue(it) ?: false },
                 LongArray(problem.numIntVars) { cp.session.intDomain(it).min })
             val stop = context.executionControls.cancellation

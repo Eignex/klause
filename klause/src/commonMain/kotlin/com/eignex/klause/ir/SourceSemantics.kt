@@ -1,5 +1,7 @@
 package com.eignex.klause.ir
 
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.isZero
 import com.eignex.util.numbers.signum
 
@@ -106,6 +108,12 @@ data class SourceTolerance(
     /** Whether no source feasibility slack is permitted. */
     val isExact: Boolean get() = absolute.numerator.isZero() && relative.numerator.isZero()
 }
+
+// Slack of the formats that accept numerical results by default.
+internal val numericalSourceTolerance: SourceTolerance = SourceTolerance(
+    absolute = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000L)),
+    relative = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000L)),
+)
 
 /**
  * Declared source defaults. Optional policies are absent when that semantic has no meaning
@@ -223,6 +231,11 @@ class EffectiveSourceSemantics internal constructor(
      */
     val isApproximate: Boolean
         get() = effective.floats is FloatSemantics.Grid || effective.feasibilityTolerance?.isExact == false
+
+    // A format that types its floats states integer and Boolean relations exactly, so its slack reaches only
+    // relations over a real coordinate; an untyped decimal format reads every row within the slack.
+    internal fun relaxesRows(realCoordinates: Int): Boolean =
+        effective.feasibilityTolerance?.isExact == false && (effective.floats == null || realCoordinates > 0)
 }
 
 /** Immutable source declaration policy, independent of a strategy or execution projection. */

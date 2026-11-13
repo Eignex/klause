@@ -51,6 +51,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.withPresolve
 import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.solver.validation.LinearSourceCheck
+import com.eignex.klause.solver.validation.capturedRealAcceptance
 import com.eignex.klause.solver.validation.permitsToleranceOptimum
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration
@@ -620,7 +621,9 @@ internal fun FinitePipeline.solve(
         it.source.semantics.effective.feasibilityTolerance?.isExact == false
     } ?: true
     val sourceCheck: ((Sample) -> Boolean)? = if (linearSource == null) {
-        request.toleranceCheck?.let { check ->
+        (request.toleranceCheck ?: invocation?.takeIf { gridPublication == null }?.let {
+            capturedRealAcceptance(it.source.problem, stop)
+        })?.let { check ->
             FiniteSourceAcceptance(check, permitsToleranceOptimum && check.permitsToleranceOptimum(),
                 (check as? FiniteSourceAcceptance)?.objective)
         }

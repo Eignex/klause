@@ -7,6 +7,7 @@ import com.eignex.klause.ir.BoundsOverride
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.UndeclaredIntegerBounds
 import com.eignex.klause.ir.UndeclaredRealBounds
 import com.eignex.klause.propagation.bake
@@ -25,6 +26,20 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FlatZincSemanticsTest {
+    @Test
+    fun `default semantics should declare a positive feasibility tolerance`() {
+        val program = parseFlatZinc("var 0.0..1.0: x; solve satisfy;")
+
+        assertFalse(assertNotNull(program.semantics.effective.feasibilityTolerance).isExact)
+    }
+
+    @Test
+    fun `exact floats should zero the feasibility tolerance`() {
+        val program = parseFlatZinc("var 0.0..1.0: x; solve satisfy;", exactFloats = true)
+
+        assertEquals(SourceTolerance(), program.semantics.effective.feasibilityTolerance)
+    }
+
     @Test
     fun `default integer declarations should retain the declared FlatZinc range`() {
         for (declaration in listOf("var int: x;", "array[1..2] of var int: x;")) {

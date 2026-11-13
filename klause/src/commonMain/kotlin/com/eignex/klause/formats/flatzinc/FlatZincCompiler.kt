@@ -146,7 +146,10 @@ internal class FlatZincCompiler(
         floatChoiceLimit = floatChoiceLimit,
         booleanZeroSumClauseLimit = booleanZeroSumClauseLimit,
         forFloatPlanning = true,
-        semanticOverrides = semanticOverrides.copy(floats = sourceSemantics.effective.floats),
+        semanticOverrides = semanticOverrides.copy(
+            floats = sourceSemantics.effective.floats,
+            feasibilityTolerance = sourceSemantics.effective.feasibilityTolerance,
+        ),
     ).also { it.processDeclarations() }
 
     internal fun processDeclarations() {

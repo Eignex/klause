@@ -3,6 +3,7 @@ package com.eignex.klause.presolve.linear
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
@@ -144,6 +145,16 @@ class DependentEqualitiesTest {
             feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1))).resolve())
 
         assertTrue(dropped(p).isEmpty)
+    }
+
+    @Test
+    fun `a typed float source without real coordinates should keep nominal row deductions`() {
+        val p = Problem(0, 3, Array(3) { IntDomain(0, 10) }, listOf(
+            eq(intArrayOf(1), intArrayOf(0), 1), eq(intArrayOf(1), intArrayOf(0), 2),
+        ), semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Continuous,
+            feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1))).resolve())
+
+        assertTrue(dropped(p).infeasible)
     }
 
     @Test
