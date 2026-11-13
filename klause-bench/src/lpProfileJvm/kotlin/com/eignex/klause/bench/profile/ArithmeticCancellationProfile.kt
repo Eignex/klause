@@ -122,10 +122,11 @@ internal object ArithmeticCancellationProfile {
     private fun repetitions(name: String): Int = when {
         name == "float256" -> 2
         name == "float64" -> 16
+        name == "float1" -> 2048
         name.startsWith("float") -> 128
-        name.startsWith("exact") -> 32
-        name.startsWith("polynomial") -> 16
-        name.startsWith("rational") -> 64
+        name.startsWith("exact") -> 64
+        name.startsWith("polynomial") -> 32
+        name.startsWith("rational") -> 128
         else -> 4
     }
 
@@ -137,6 +138,8 @@ internal object ArithmeticCancellationProfile {
         val setupNanos = System.nanoTime() - setup
         val count = repetitions(name)
         repeat(4) { repeat(count) { check(run() == expected) } }
+        val warmUntil = cpu.currentThreadCpuTime + 100_000_000L
+        do { repeat(count) { check(run() == expected) } } while (cpu.currentThreadCpuTime < warmUntil)
         repeat(5) { sample ->
             val beforeWork = accounting.work
             val beforeCpu = cpu.currentThreadCpuTime
@@ -177,6 +180,9 @@ internal object ArithmeticCancellationProfile {
 
     private fun latency() {
         for (family in listOf("float256", "polynomial24", "exp12", "large-exact")) {
+            val warm = if (family == "large-exact") largeExact(Cancellation.Never)
+                else kernel(family, Cancellation.Never)
+            repeat(16) { sink = warm() }
             for (kind in listOf("flag", "deadline")) repeat(100) { trial ->
                 val flag = AtomicBoolean()
                 val ready = CountDownLatch(1)
@@ -221,14 +227,18 @@ internal object ArithmeticCancellationProfile {
                 worker.join(10_000)
                 check(!worker.isAlive && observed.get() != 0L)
                 val wall = (observed.get() - request.get()).coerceAtLeast(0)
-                val consumedCpu = if (kind == "flag") (observedCpu.get() - requestCpu.get()).coerceAtLeast(0) else -1
+                val consumedCpu = if (kind == "flag") {
+                    (observedCpu.get() - requestCpu.get()).coerceAtLeast(0)
+                } else -1
                 println("latency\t$family\t$kind\t$trial\t$wall\t$consumedCpu\t${accounting.work}")
             }
         }
     }
 
     private fun largeExact(token: Cancellation): () -> Int {
-        val value = BigFraction.of(parseBigInt("9".repeat(2048)), parseBigInt("1" + "0".repeat(2048) + "7"))
+        val numerator = parseBigInt("9".repeat(2048))
+        val denominator = parseBigInt("1" + "0".repeat(2048) + "7")
+        val value = BigFraction.of(numerator, denominator)
         val polynomial = Polynomial.of(List(8) { PolynomialTerm(Monomial.of(mapOf(0 to it)), value) })
         val arithmetic = PolynomialArithmetic(token)
         return { arithmetic.multiply(polynomial, polynomial).hashCode() }

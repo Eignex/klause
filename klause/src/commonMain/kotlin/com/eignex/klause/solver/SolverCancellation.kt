@@ -29,7 +29,9 @@ private class ScopedCancellation(val invocation: Cancellation, val lifetime: Can
     override fun deadline(): ComparableTimeMark? = listOfNotNull(lifetime.deadline(), invocation.deadline()).minOrNull()
     override fun workMeter(): WorkMeter? = invocation.workMeter() ?: lifetime.workMeter()
     override fun arithmeticSource(): ArithmeticWorkSource? {
-        val accounting = if (invocation.workMeter() != null) invocation else lifetime
-        return accounting.arithmeticSource()?.withCheckpoint(this::isCancelled)
+        val invocationSource = invocation.arithmeticSource() ?: return null
+        val lifetimeSource = lifetime.arithmeticSource() ?: return null
+        val accounting = if (invocation.workMeter() != null) invocationSource else lifetimeSource
+        return accounting.withCheckpoint(this::isCancelled)
     }
 }

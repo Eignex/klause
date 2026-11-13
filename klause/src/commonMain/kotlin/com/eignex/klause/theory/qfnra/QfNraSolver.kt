@@ -516,7 +516,7 @@ internal class QfNraWork(private val params: QfNraParams) : ArithmeticCancellati
     override fun deadline() = params.cancellation.deadline()
     override fun workMeter(): WorkMeter = this
     override fun arithmeticSource(): ArithmeticWorkSource? {
-        if (params.cancellation.workMeter() != null && parentAccounting == null) return null
+        if (parentAccounting == null) return null
         return object : ArithmeticWorkSource {
             override fun isCancelled(): Boolean = this@QfNraWork.isCancelled()
             override fun reserve(maximum: Int): WorkReservation? {

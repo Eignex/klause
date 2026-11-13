@@ -255,6 +255,7 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
         val midpoint = (interval.lower + interval.upper) * BigFraction.ofLong(2).reciprocal()
         if (evaluate(polynomial, midpoint).isZero) return@operation RationalInterval(midpoint, midpoint)
         val left = RationalInterval(interval.lower, midpoint)
-        return@operation if (countOpen(sturm(polynomial), left) == 1) left else RationalInterval(midpoint, interval.upper)
+        return@operation if (countOpen(sturm(polynomial), left) == 1) left
+            else RationalInterval(midpoint, interval.upper)
     }
 }

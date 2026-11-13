@@ -41,6 +41,7 @@ internal fun unmeteredArithmetic(stopped: () -> Boolean): ArithmeticWorkSource =
 }
 
 // A cursor belongs to one arithmetic owner. Scope exit settles every admitted debit, including exceptional exits.
+@Suppress("TooGenericExceptionCaught") // settlement must preserve arbitrary primary and cleanup failures
 internal class ArithmeticExecution(
     private val cancellation: Cancellation,
     private val interrupted: () -> Nothing,
@@ -77,12 +78,13 @@ internal class ArithmeticExecution(
 
     fun end(failure: Throwable?) {
         check(depth == 1)
-        depth = 0
         try {
             checkpoint()
         } catch (cleanup: Throwable) {
             if (failure == null) throw cleanup
             if (cleanup !== failure) failure.addSuppressed(cleanup)
+        } finally {
+            depth = 0
         }
     }
 
@@ -124,14 +126,15 @@ internal class ArithmeticExecution(
         settle()
         if (cancellation === Cancellation.Never) return
         val cancelled = source?.isCancelled() ?: cancellation()
-        stopped = stopped || cancelled
-        if (stopped) interrupted()
+        if (depth != 0) stopped = stopped || cancelled
+        if (cancelled || (depth != 0 && stopped)) interrupted()
     }
 
     fun boundary() {
         if (source != null) checkpoint()
     }
 
+    @Suppress("IteratorNotThrowingNoSuchElementException") // next delegates the wrapped iterator's exhaustion contract
     fun <T> iterator(values: Iterator<T>): Iterator<T> = object : Iterator<T> {
         override fun hasNext(): Boolean = operation { values.hasNext() }
         override fun next(): T = operation { values.next() }

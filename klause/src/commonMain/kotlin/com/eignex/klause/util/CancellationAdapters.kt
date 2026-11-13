@@ -12,11 +12,12 @@ internal fun cancelledWhen(
     workScheduledOf: () -> Boolean = { false },
     cancelled: () -> Boolean,
 ): Cancellation =
-    object : SchedulingCancellation {
+    object : SchedulingCancellation, ArithmeticCancellation {
         override fun isCancelled(): Boolean = cancelled()
 
         override fun deadline(): ComparableTimeMark? = deadlineOf()
         override val workScheduled: Boolean get() = workScheduledOf()
+        override fun arithmeticSource(): ArithmeticWorkSource = unmeteredArithmetic(this::isCancelled)
     }
 
 internal interface SchedulingCancellation : Cancellation {

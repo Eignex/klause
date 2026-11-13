@@ -40,6 +40,7 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
         control.step()
         require(start.size == model.dimension && iterations >= 0)
         val numeric = prepare(model, start) ?: return@operation null
+        control.execution.boundary()
         val point = start.toDoubleArray()
         if (!improve(numeric, point, iterations)) return@operation null
         return@operation activeRows(numeric, point)
@@ -47,10 +48,14 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
 
     private fun prepare(model: QuadraticModel, start: List<Double>): NumericalProposal? {
         control.execution.boundary()
-        val hessian = model.hessian.map { row -> DoubleArray(row.size) { row[it].toDouble() } }
+        val hessian = model.hessian.map { row ->
+            control.execution.boundary()
+            DoubleArray(row.size) { row[it].toDouble() }
+        }
         val linear = model.linear.let { values -> DoubleArray(values.size) { values[it].toDouble() } }
         val rows = model.rows
         val coefficients = rows.map { row ->
+            control.execution.boundary()
             row.coefficients.let { values -> DoubleArray(values.size) { values[it].toDouble() } }
         }
         val rhs = DoubleArray(rows.size) { rows[it].rhs.toDouble() }
@@ -58,7 +63,10 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
             coefficients.any { row -> row.any { !it.isFinite() } } || rhs.any { !it.isFinite() } ||
             start.any { !it.isFinite() }
         ) return null
-        var norm = hessian.maxOfOrNull { row -> koblas.asum(row, 0, row.size) } ?: 0.0
+        var norm = hessian.maxOfOrNull { row ->
+            control.execution.boundary()
+            koblas.asum(row, 0, row.size)
+        } ?: 0.0
         for (row in coefficients) norm += 16.0 * dot(0.0, row, row)
         if (!norm.isFinite()) return null
         val step = 1.0 / max(1.0, norm)

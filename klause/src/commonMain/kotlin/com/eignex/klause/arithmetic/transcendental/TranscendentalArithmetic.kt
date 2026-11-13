@@ -68,7 +68,9 @@ internal class TranscendentalArithmetic(
             multiply(left.lower, right.lower), multiply(left.lower, right.upper),
             multiply(left.upper, right.lower), multiply(left.upper, right.upper),
         )
-        return@operation RationalEnclosure(products.reduce { a, b -> minimum(a, b) }, products.reduce { a, b -> maximum(a, b) })
+        return@operation RationalEnclosure(
+            products.reduce { a, b -> minimum(a, b) }, products.reduce { a, b -> maximum(a, b) },
+        )
     }
 
     fun reciprocal(value: RationalEnclosure): RationalEnclosure = execution.operation {
