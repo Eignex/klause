@@ -1512,8 +1512,8 @@ validated column dot. Pricing reads the installed CSC arrays without column copi
 an unscaled fallback refreshes those arrays with its matrix and retires the basis
 backend. Stored zeros and current coefficient values retain stored-entry arithmetic.
 
-Sparse accumulation treats a zero multiplier as a no-op. Columns with at most eight
-entries update their stored rows directly from the current CSC arrays; larger columns
+Sparse accumulation evaluates every stored product, including zero multipliers.
+Columns with at most eight entries update their stored rows directly from the current CSC arrays; larger columns
 use the validated backend. Quality-column scatter clears its private RHS buffer and
 copies at most eight stored entries directly; larger columns use the validated scatter
 backend. Basis-quality dot products and accumulation use the same bounded scalar

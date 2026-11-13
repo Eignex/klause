@@ -589,7 +589,6 @@ internal class KotlinBasisSolver private constructor(
     }
 
     private fun addQualityColumn(alpha: Double, start: Int, count: Int) {
-        if (alpha == 0.0) return
         if (count <= MAX_SCALAR_COLUMN_ENTRIES) {
             for (at in start until start + count) qualityProduct[sourceRows[at]] += alpha * sourceValues[at]
             return
