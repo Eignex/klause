@@ -203,6 +203,19 @@ class QuadraticCandidatesTest {
     }
 
     @Test
+    fun `nonfinite constraint magnitudes should decline a numerical proposal`() {
+        val coefficient = (1..9).fold(q(1)) { value, _ -> value * q(Long.MAX_VALUE) }
+        val model = QuadraticModel(
+            listOf(q(0)), listOf(listOf(q(2))),
+            rows = listOf(QuadraticRow(listOf(coefficient), q(0), QuadraticRowRelation.EQ)),
+        )
+
+        val active = QuadraticCandidates().proposeActiveRows(model, listOf(0.0), iterations = 0)
+
+        assertNull(active)
+    }
+
+    @Test
     fun `nonfinite final row images should decline a numerical proposal`() {
         val model = QuadraticModel(
             listOf(q(0)), listOf(listOf(q(2))),
