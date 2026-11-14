@@ -145,6 +145,7 @@ class SelectedFloatGridTest {
         )).invocation
         val shape = invocation.finiteShape()
 
+        assertSame(invocation, shape.sourceInvocation)
         assertSame(attachment, invocation.source)
         assertSame(source, invocation.source.originalSource)
         assertSame(canonical, invocation.preparedPlan)

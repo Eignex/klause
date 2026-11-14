@@ -88,23 +88,24 @@ class PreparedSourceInvocation internal constructor(
     /** Captured private grid geometry, when an explicit finite consumer selected it. */
     val floatProjection: SourceFloatProjection? get() = floatGrid?.metadata
 
-    private val finite: FiniteSolveShape? = if (floatGrid != null) gridShape(floatGrid) else {
-        (route as? SourceProblemRoute.Finite)?.let { selected ->
-            val objective = selection.finiteObjective
-            FiniteSolveShape(
-                problem = selected.problem,
-                optimize = operation == ExecutionOperation.OPTIMIZE,
-                maximize = request.maximize,
-                localSearchObjective = null,
-                linearObjective = objective,
-                objectiveIntVar = objective?.singleIntObjective()?.varId,
-                definitionalSweep = null,
-                searchHints = selection.finiteSearchHints,
-                componentPlan = selected.componentPlan,
-                preparedPlan = selected.preparedPlan,
-            )
-        }
-    }?.also { it.bindSourceInvocation(this) }
+    private val finite: FiniteSolveShape? = (if (floatGrid != null) gridShape(floatGrid) else originalShape())
+        ?.also { it.bindSourceInvocation(this) }
+
+    private fun originalShape(): FiniteSolveShape? = (route as? SourceProblemRoute.Finite)?.let { selected ->
+        val objective = selection.finiteObjective
+        FiniteSolveShape(
+            problem = selected.problem,
+            optimize = operation == ExecutionOperation.OPTIMIZE,
+            maximize = request.maximize,
+            localSearchObjective = null,
+            linearObjective = objective,
+            objectiveIntVar = objective?.singleIntObjective()?.varId,
+            definitionalSweep = null,
+            searchHints = selection.finiteSearchHints,
+            componentPlan = selected.componentPlan,
+            preparedPlan = selected.preparedPlan,
+        )
+    }
 
     private fun gridShape(binding: SelectedFloatGridBinding): FiniteSolveShape {
         require(binding.consumer.selection === selection) { "grid consumer belongs to a different source invocation" }
