@@ -1,7 +1,6 @@
 # Sources that roadmap lanes have exposed to outcomes. A lane adds a source here when it runs it and
 # never picks a held-out from this set. Related encodings and permutations share exposure, so a MIPLIB
 # source is listed under every committed edition that carries its name.
-# `pp08acuts` is recorded as exposed but matches no committed corpus-index entry under that spelling.
 # MIPLIB
 miplib3/gt2
 miplib2017/gt2
@@ -36,6 +35,8 @@ miplib3/modglob
 miplib2003/modglob
 miplib2017/timtab1CUTS
 miplib3/egout
+miplib3/pp08aCUTS
+miplib2003/pp08aCUTS
 miplib3/rgn
 miplib3/cap6000
 miplib2003/cap6000
@@ -49,6 +50,19 @@ miplib2017/neos859080
 miplib2017/neos-2624317-amur
 miplib2017/neos-1516309
 miplib2017/neos-3696678-lyvia
+# Encodings of the MIPLIB sources above in other formats. The pb-comp-2025 archive also carries
+# bell3a, p0201 and pp08aCUTS under `PB24/`, which no suite selects.
+pb-comp/normalized-PB06/OPT-LIN/mps-v2-20-10/MIPLIB/miplib/normalized-mps-v2-20-10-lseu
+pb-comp/normalized-PB06/OPT-LIN/mps-v2-20-10/MIPLIB/miplib/normalized-mps-v2-20-10-mod008
+pb-comp/normalized-PB06/OPT-LIN/mps-v2-20-10/MIPLIB/miplib/normalized-mps-v2-20-10-p0548
+maxsat-weighted/pseudoBoolean_wt-normalized-mps-v2-20-10-mod010.opb.msat
+smtlib-qflia/miplib2003/cap6000.sat
+smtlib-qflra/miplib/pk1--1
+smtlib-qflra/miplib/pk1-0
+smtlib-qflra/miplib/pk1-11
+smtlib-qflra/miplib/pk1-20
+smtlib-qflra/miplib/pk1-50
+smtlib-qflra/miplib/pk1-100
 # XCSP3
 xcsp3-csp/MagicSquare-sum-06_c23
 xcsp3-cop/EchelonStock2-A02_c22

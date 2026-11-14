@@ -6,3 +6,4 @@ miplib2010/qiu
 miplib2017/qiu
 miplib2017/sorrell8
 miplib2017/h80x6320
+# The pb-comp-2025 archive carries an encoding of sorrell8 under `PB24/`, which no suite selects.
