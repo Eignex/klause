@@ -322,7 +322,7 @@ internal object ResidualSnapshots {
     }
 
     private fun model(bools: Int, factors: List<Factor>): Problem =
-        Problem(bools, 0, emptyArray(), factors.toTypedArray())
+        Problem.of(bools, 0, emptyArray(), factors.toTypedArray())
 
     @Suppress("LongParameterList")
     private fun conditionIdentity(

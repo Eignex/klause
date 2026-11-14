@@ -78,7 +78,7 @@ internal object CoefficientLiftingProfile {
             op,
             sign * if (productive) 2L * width else width.toLong() - 1L,
         )
-        val problem = Problem(0, width, Array(width) { IntDomain(0, 1) }, listOf(row)).bake()
+        val problem = Problem.of(0, width, Array(width) { IntDomain(0, 1) }, listOf(row)).bake()
         check(problem.factors.single() === row)
         for (v in 0 until width) {
             val domain = problem.rootIntDomain(v)

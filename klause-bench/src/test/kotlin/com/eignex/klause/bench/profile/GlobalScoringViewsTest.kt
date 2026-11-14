@@ -26,7 +26,7 @@ import org.junit.jupiter.params.provider.ValueSource
 class GlobalScoringViewsTest {
     @Test
     fun `pairwise grading changes the collision gradient while retaining native proposals`() {
-        val problem = Problem(0, 4, Array(4) { IntDomain(0, 3) }, arrayOf(AllDifferent(intArrayOf(0, 1, 2, 3))))
+        val problem = Problem.of(0, 4, Array(4) { IntDomain(0, 3) }, arrayOf(AllDifferent(intArrayOf(0, 1, 2, 3))))
         val native = LocalSearchState(LocalSearchModel.open(problem), Random(7))
         val pairwise = pairwise(problem)
         for (state in listOf(native, pairwise)) {
@@ -48,7 +48,7 @@ class GlobalScoringViewsTest {
     fun `pairwise deltas preserve repeated coordinates optional polarity and excepted values`() {
         val factor = AllDifferent(intArrayOf(0, 0, 1, 2),
             intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(0, true), Lit.make(1, true)), longArrayOf(0))
-        val problem = Problem(2, 3, Array(3) { IntDomain(0, 2) }, arrayOf(factor))
+        val problem = Problem.of(2, 3, Array(3) { IntDomain(0, 2) }, arrayOf(factor))
         val state = pairwise(problem)
         state.assignment.setBool(0, true)
         state.assignment.setBool(1, false)
@@ -75,7 +75,7 @@ class GlobalScoringViewsTest {
     fun `integer probes reconcile every aliased value under each presence assignment`(presence: Int) {
         val factor = AllDifferent(intArrayOf(0, 0, 1, 2),
             intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(0, true), Lit.make(1, true)), longArrayOf(0))
-        val state = pairwise(Problem(2, 3, Array(3) { IntDomain(0, 2) }, arrayOf(factor)))
+        val state = pairwise(Problem.of(2, 3, Array(3) { IntDomain(0, 2) }, arrayOf(factor)))
         state.assignment.setBool(0, presence and 1 != 0)
         state.assignment.setBool(1, presence and 2 != 0)
         for (a in 0L..2L) for (b in 0L..2L) for (c in 0L..2L) {
@@ -220,7 +220,7 @@ class GlobalScoringViewsTest {
     @Test
     fun `oversized distinctness keeps native scoring and an explicit decline`() {
         val count = GlobalScoringViews.MAX_ARITY + 1
-        val problem = Problem(0, count, Array(count) { IntDomain(0, count.toLong()) },
+        val problem = Problem.of(0, count, Array(count) { IntDomain(0, count.toLong()) },
             arrayOf(AllDifferent(IntArray(count) { it })))
         val selection = GlobalScoringViews.pairwise(problem, LocalSearchProblem(problem))
 
@@ -235,7 +235,7 @@ class GlobalScoringViewsTest {
     }
 
     private fun state(factor: Factor): LocalSearchState = LocalSearchState(LocalSearchModel.open(
-        Problem(0, 3, Array(3) { IntDomain(0, 7) }, arrayOf(factor))), Random(7))
+        Problem.of(0, 3, Array(3) { IntDomain(0, 7) }, arrayOf(factor))), Random(7))
 
     companion object {
         private lateinit var groundControls: Map<Boolean, List<LocalSearchState>>
@@ -250,7 +250,7 @@ class GlobalScoringViewsTest {
                 val roundTrip = assertIs<Table>(GlobalScoringViews.alternate(diagram).factor)
                 listOf(table, diagram, roundTrip).map { factor ->
                     LocalSearchState(LocalSearchModel.open(
-                        Problem(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf(factor))),
+                        Problem.of(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf(factor))),
                         Random(7))
                 }
             }

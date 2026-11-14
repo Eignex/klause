@@ -52,7 +52,7 @@ internal object ResidualReplayControls {
                 if (stop()) throw CancellationException()
                 it.remap(remapping)
             }
-            val baked = Problem(vars.size, 0, emptyArray(), local.toTypedArray()).bake(stop)
+            val baked = Problem.of(vars.size, 0, emptyArray(), local.toTypedArray()).bake(stop)
             val objective = LinearObjective(LongArray(vars.size) { weights.getOrElse(vars[it]) { 0L } })
             val solving = System.nanoTime()
             val base = BacktrackPresets.satOptimized(randomSeed = seed, cancellation = stop)

@@ -270,7 +270,7 @@ class CliStatsTest {
     @Test
     fun `presolve should print native construction separately from converted phase work`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
-        Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyList()).bake(budget.orSpent(Cancellation.Never))
+        Problem.of(0, 1, arrayOf(IntDomain(0, 3)), emptyList()).bake(budget.orSpent(Cancellation.Never))
         val stats = SolveStats(
             presolve = PresolveStats(
                 effort = presolveEffortStats(PresolveConfig.NONE, budget, Duration.ZERO),

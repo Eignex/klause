@@ -58,7 +58,7 @@ internal object ExtensionalCycleProjection {
                 }
                 val ready = projections.filterNotNull()
                 val delta = if (ready.size == 3) {
-                    Presolve.composeExtensional(problem.withFactors(ready.map { it.table }.toTypedArray()), token)
+                    Presolve.composeExtensional(problem.withFactors(ready.map { it.table }), token)
                 } else null
                 val consumed = if (delta != null && !token()) ready.map { projection ->
                     val after = delta.addedFactors.filterIsInstance<Table>()

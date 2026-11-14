@@ -19,7 +19,7 @@ import org.junit.jupiter.params.provider.ValueSource
 class LearnedResidualRestrictionsTest {
     @Test
     fun `a released session should decline residual inspection`() {
-        val session = PropagationSession(Problem(2, 0, emptyArray(), emptyArray()))
+        val session = PropagationSession(Problem.of(2, 0, emptyArray(), emptyArray()))
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
         session.javaClass.declaredMethods.single {
             it.name.startsWith("releaseRetainedState") && it.parameterCount == 0
@@ -39,7 +39,7 @@ class LearnedResidualRestrictionsTest {
         val factors = cycles.flatMap { vs -> vs.indices.map { i ->
             Clause(intArrayOf(Lit.make(vs[i], true), Lit.make(vs[(i + 1) % 5], true)))
         } }
-        val session = PropagationSession(Problem(10, 0, emptyArray(), factors.toTypedArray()), nativeSat = false)
+        val session = PropagationSession(Problem.of(10, 0, emptyArray(), factors.toTypedArray()), nativeSat = false)
         session.addLearnedPb(LongArray(10) { 1L }, IntArray(10) { Lit.make(it, false) }, 5L, 1, permanent = true)
         val recorder = ConditionalComponentTrace.Recorder(session.problem, Long.MAX_VALUE, 0)
 
@@ -56,7 +56,7 @@ class LearnedResidualRestrictionsTest {
 
     @Test
     fun `established PB weight should discharge its free bridge`() {
-        val problem = Problem(5, 0, emptyArray(), arrayOf(
+        val problem = Problem.of(5, 0, emptyArray(), arrayOf(
             Clause(intArrayOf(Lit.make(1, true), Lit.make(3, true))),
             Clause(intArrayOf(Lit.make(2, true), Lit.make(4, true))),
         ))
@@ -77,7 +77,7 @@ class LearnedResidualRestrictionsTest {
     @ValueSource(booleans = [false, true])
     fun `retention should not suppress source valid permanent or ordinary clause incidence`(native: Boolean) {
             val source = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
-            val session = PropagationSession(Problem(4, 0, emptyArray(), arrayOf(source)), nativeSat = native)
+            val session = PropagationSession(Problem.of(4, 0, emptyArray(), arrayOf(source)), nativeSat = native)
             session.addLearnedClause(source, 2, permanent = true)
             session.addLearnedClause(Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))), 2)
 
@@ -90,7 +90,7 @@ class LearnedResidualRestrictionsTest {
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `undo and compaction should read the current store rather than cached entry identities`(native: Boolean) {
-            val session = PropagationSession(Problem(4, 0, emptyArray(), emptyArray()), nativeSat = native)
+            val session = PropagationSession(Problem.of(4, 0, emptyArray(), emptyArray()), nativeSat = native)
             session.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))), 2)
             session.addLearnedClause(Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))), 2)
             session.pinBool(2, true)
@@ -108,7 +108,7 @@ class LearnedResidualRestrictionsTest {
 
     @Test
     fun `PB support should include terms outside its covering watch set`() {
-        val session = PropagationSession(Problem(4, 0, emptyArray(), emptyArray()), nativeSat = false)
+        val session = PropagationSession(Problem.of(4, 0, emptyArray(), emptyArray()), nativeSat = false)
         session.addLearnedPb(longArrayOf(10, 1, 1, 1), IntArray(4) { Lit.make(it, true) }, 1, 2)
 
         val observed = LearnedResidualRestrictions.inspect(session)
@@ -118,7 +118,7 @@ class LearnedResidualRestrictionsTest {
 
     @Test
     fun `an unnameable atom should withhold complete enforcing incidence`() {
-        val session = PropagationSession(Problem(1, 1, arrayOf(IntDomain(0, 2)), emptyArray()))
+        val session = PropagationSession(Problem.of(1, 1, arrayOf(IntDomain(0, 2)), emptyArray()))
         val atom = session.boundGeLit(0, 1, positive = true)
         session.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), atom)), 2)
 
@@ -129,7 +129,7 @@ class LearnedResidualRestrictionsTest {
 
     @Test
     fun `interrupted and capped observations should decline completeness`() {
-        val session = PropagationSession(Problem(3, 0, emptyArray(), emptyArray()))
+        val session = PropagationSession(Problem.of(3, 0, emptyArray(), emptyArray()))
         session.addLearnedClause(Clause(IntArray(3) { Lit.make(it, true) }), 3)
 
         assertEquals("interrupted", LearnedResidualRestrictions.inspect(session, Cancellation { true }).decline)

@@ -296,7 +296,7 @@ object ScopedComponentProfile {
                 parseBigInt((cutoff - BigInteger.ONE - residual.constant).toString()),
             )
         }
-        val model = Problem(residual.weights.size, 0, emptyArray(), factors.toTypedArray())
+        val model = Problem.of(residual.weights.size, 0, emptyArray(), factors.toTypedArray())
             .bake(cancellation = allowance.stop)
         val base = BacktrackPresets.satOptimized(randomSeed = seed, cancellation = allowance.stop)
         val decisions = ArrayList<JsonObject>()

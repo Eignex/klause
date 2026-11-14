@@ -56,7 +56,7 @@ class CliModePresolveTest {
 
     @Test
     fun `finite linear preparation summaries should partition implied factors by class`() {
-        val problem = Problem(
+        val problem = Problem.of(
             numBoolVars = 0,
             numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 1)),

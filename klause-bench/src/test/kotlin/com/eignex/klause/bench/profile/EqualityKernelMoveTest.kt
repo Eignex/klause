@@ -74,7 +74,7 @@ class EqualityKernelMoveTest {
 
     @Test
     fun `maintained outputs cannot be dropped from an equality direction`() {
-        val problem = Problem(
+        val problem = Problem.of(
             0,
             2,
             Array(2) { IntDomain(0, 2) },
@@ -179,7 +179,7 @@ class EqualityKernelMoveTest {
 
     @Test
     fun `every retained global is graded before a source point is accepted`() {
-        val problem = Problem(
+        val problem = Problem.of(
             0,
             2,
             Array(2) { IntDomain(0, 2) },
@@ -207,7 +207,7 @@ class EqualityKernelMoveTest {
 
     @Test
     fun `a complete kernel move is applied and the checked center is restored`() {
-        val problem = Problem(
+        val problem = Problem.of(
             0,
             2,
             Array(2) { IntDomain(0, 2) },
@@ -238,7 +238,7 @@ class EqualityKernelMoveTest {
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `an unsuccessful source check during consumption restores the checked center`(throws: Boolean) {
-        val problem = Problem(
+        val problem = Problem.of(
             0,
             2,
             Array(2) { IntDomain(0, 2) },

@@ -441,7 +441,7 @@ internal object Suites {
         factors.add(AllDifferent(IntArray(nDiffs) { m + it }, domainMin = 1, domainSize = maxLen))
         // Symmetry break: first gap shorter than last (d_first - d_last <= -1).
         factors.add(Linear(intArrayOf(1, -1), intArrayOf(m, m + nDiffs - 1), LinearOp.LE, -1))
-        return Problem(numBoolVars = 0, numIntVars = numInt, intDomains = domains, factors = factors.toTypedArray())
+        return Problem.of(numBoolVars = 0, numIntVars = numInt, intDomains = domains, factors = factors.toTypedArray())
     }
 
     private val slackAllDifferent = suite("slack-alldiff", "Slack all_different (Golomb rulers; Hall-prone)") {
@@ -456,7 +456,7 @@ internal object Suites {
         license = "internal"
 
         inCode("threeClauses", Category.SAT, Expected.Sat) {
-            Problem(
+            Problem.of(
                 numBoolVars = 4,
                 numIntVars = 0,
                 intDomains = emptyArray(),
@@ -468,7 +468,7 @@ internal object Suites {
             )
         }
         inCode("cardXor", Category.SAT, Expected.Sat) {
-            Problem(
+            Problem.of(
                 numBoolVars = 4,
                 numIntVars = 0,
                 intDomains = emptyArray(),
@@ -483,7 +483,7 @@ internal object Suites {
             )
         }
         inCode("pseudoBoolean", Category.SAT, Expected.Sat) {
-            Problem(
+            Problem.of(
                 numBoolVars = 4,
                 numIntVars = 0,
                 intDomains = emptyArray(),
@@ -504,7 +504,7 @@ internal object Suites {
             )
         }
         inCode("linearLE", Category.CSP, Expected.Sat) {
-            Problem(
+            Problem.of(
                 numBoolVars = 0,
                 numIntVars = 2,
                 intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
@@ -516,7 +516,7 @@ internal object Suites {
             )
         }
         inCode("permutation3", Category.CSP, Expected.Sat) {
-            Problem(
+            Problem.of(
                 numBoolVars = 0,
                 numIntVars = 3,
                 intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
@@ -524,7 +524,7 @@ internal object Suites {
             )
         }
         inCode("mixedBoolInt", Category.CSP, Expected.Sat) {
-            Problem(
+            Problem.of(
                 numBoolVars = 2,
                 numIntVars = 1,
                 intDomains = arrayOf(IntDomain(0, 3)),
@@ -535,7 +535,7 @@ internal object Suites {
             )
         }
         inCode("cardinalityStress", Category.SAT, Expected.Sat) {
-            Problem(
+            Problem.of(
                 numBoolVars = 8,
                 numIntVars = 0,
                 intDomains = emptyArray(),
@@ -550,7 +550,7 @@ internal object Suites {
             )
         }
         inCode("pbReifiedMix", Category.SAT, Expected.Sat) {
-            Problem(
+            Problem.of(
                 numBoolVars = 6,
                 numIntVars = 0,
                 intDomains = emptyArray(),
@@ -594,7 +594,7 @@ internal object Suites {
             )
         }
         inCode("smallRandom3sat", Category.SAT, Expected.Sat) {
-            Problem(
+            Problem.of(
                 numBoolVars = 12,
                 numIntVars = 0,
                 intDomains = emptyArray(),
@@ -633,7 +633,7 @@ internal object Suites {
             )
         }
         inCode("budgetCampaign", Category.ASSIGNMENT, Expected.Sat) {
-            Problem(
+            Problem.of(
                 numBoolVars = 3,
                 numIntVars = 1,
                 intDomains = arrayOf(IntDomain(0, 100)),
@@ -654,7 +654,7 @@ internal object Suites {
         }
 
         inCode("clauseContradiction", Category.UNSAT, Expected.Unsat) {
-            Problem(
+            Problem.of(
                 numBoolVars = 1,
                 numIntVars = 0,
                 intDomains = emptyArray(),
@@ -665,7 +665,7 @@ internal object Suites {
             )
         }
         inCode("intEqContradiction", Category.UNSAT, Expected.Unsat) {
-            Problem(
+            Problem.of(
                 numBoolVars = 0,
                 numIntVars = 1,
                 intDomains = arrayOf(IntDomain(0, 3)),
@@ -676,7 +676,7 @@ internal object Suites {
             )
         }
         inCode("pigeonhole", Category.UNSAT, Expected.Unsat) {
-            Problem(
+            Problem.of(
                 numBoolVars = 0,
                 numIntVars = 3,
                 intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)),

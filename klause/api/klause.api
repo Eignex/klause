@@ -4094,14 +4094,7 @@ public final class com/eignex/klause/ir/PolynomialRelation : java/lang/Enum {
 }
 
 public class com/eignex/klause/ir/Problem : com/eignex/klause/ir/SourceSemanticsOwner {
-	public fun <init> (IILcom/eignex/klause/ir/SourceIntDomains;[Lcom/eignex/klause/ir/Factor;[ZZI[D[DLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
-	public synthetic fun <init> (IILcom/eignex/klause/ir/SourceIntDomains;[Lcom/eignex/klause/ir/Factor;[ZZI[D[DLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun <init> (II[Lcom/eignex/klause/ir/IntDomain;Ljava/util/List;[ZZI[D[D[Z[ZLcom/eignex/util/collections/Bits;Lcom/eignex/util/collections/Bits;Lcom/eignex/klause/ir/IntBounds;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
-	public synthetic fun <init> (II[Lcom/eignex/klause/ir/IntDomain;Ljava/util/List;[ZZI[D[D[Z[ZLcom/eignex/util/collections/Bits;Lcom/eignex/util/collections/Bits;Lcom/eignex/klause/ir/IntBounds;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun <init> (II[Lcom/eignex/klause/ir/IntDomain;[Lcom/eignex/klause/ir/Factor;[ZZI[D[D[Z[ZLcom/eignex/util/collections/Bits;Lcom/eignex/util/collections/Bits;Lcom/eignex/klause/ir/IntBounds;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
-	public synthetic fun <init> (II[Lcom/eignex/klause/ir/IntDomain;[Lcom/eignex/klause/ir/Factor;[ZZI[D[D[Z[ZLcom/eignex/util/collections/Bits;Lcom/eignex/util/collections/Bits;Lcom/eignex/klause/ir/IntBounds;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun <init> (ILcom/eignex/klause/ir/IntBounds;[Lcom/eignex/klause/ir/Factor;[ZZI[D[DLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
-	public synthetic fun <init> (ILcom/eignex/klause/ir/IntBounds;[Lcom/eignex/klause/ir/Factor;[ZZI[D[DLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final field Companion Lcom/eignex/klause/ir/Problem$Companion;
 	public final fun getDeclaredIntDomains ()Lcom/eignex/klause/ir/SourceIntDomains;
 	public final fun getFactors ()[Lcom/eignex/klause/ir/Factor;
 	public final fun getHasSymmetryBreaking ()Z
@@ -4116,10 +4109,21 @@ public class com/eignex/klause/ir/Problem : com/eignex/klause/ir/SourceSemantics
 	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public final fun getSettings ()Lcom/eignex/klause/ir/ProblemSettings;
 	public final fun intDomainOrNull (I)Lcom/eignex/klause/ir/IntDomain;
-	public final fun withFactors ([Lcom/eignex/klause/ir/Factor;[Z)Lcom/eignex/klause/ir/Problem;
-	public static synthetic fun withFactors$default (Lcom/eignex/klause/ir/Problem;[Lcom/eignex/klause/ir/Factor;[ZILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
+	public final fun withFactors (Ljava/util/List;[Z)Lcom/eignex/klause/ir/Problem;
+	public static synthetic fun withFactors$default (Lcom/eignex/klause/ir/Problem;Ljava/util/List;[ZILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
 	public final fun withIntDomains ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/Problem;
 	public final fun withSettings (Lcom/eignex/klause/ir/ProblemSettings;)Lcom/eignex/klause/ir/Problem;
+}
+
+public final class com/eignex/klause/ir/Problem$Companion {
+	public final fun of (IILcom/eignex/klause/ir/SourceIntDomains;[Lcom/eignex/klause/ir/Factor;[ZZI[D[DLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/ir/Problem;
+	public final fun of (II[Lcom/eignex/klause/ir/IntDomain;Ljava/util/List;[ZZI[D[D[Z[ZLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/ir/Problem;
+	public final fun of (II[Lcom/eignex/klause/ir/IntDomain;[Lcom/eignex/klause/ir/Factor;[ZZI[D[D[Z[ZLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/ir/Problem;
+	public final fun of (ILcom/eignex/klause/ir/IntBounds;[Lcom/eignex/klause/ir/Factor;[ZZI[D[DLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/ir/Problem;
+	public static synthetic fun of$default (Lcom/eignex/klause/ir/Problem$Companion;IILcom/eignex/klause/ir/SourceIntDomains;[Lcom/eignex/klause/ir/Factor;[ZZI[D[DLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
+	public static synthetic fun of$default (Lcom/eignex/klause/ir/Problem$Companion;II[Lcom/eignex/klause/ir/IntDomain;Ljava/util/List;[ZZI[D[D[Z[ZLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
+	public static synthetic fun of$default (Lcom/eignex/klause/ir/Problem$Companion;II[Lcom/eignex/klause/ir/IntDomain;[Lcom/eignex/klause/ir/Factor;[ZZI[D[D[Z[ZLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
+	public static synthetic fun of$default (Lcom/eignex/klause/ir/Problem$Companion;ILcom/eignex/klause/ir/IntBounds;[Lcom/eignex/klause/ir/Factor;[ZZI[D[DLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
 }
 
 public final class com/eignex/klause/ir/ProblemSettings {

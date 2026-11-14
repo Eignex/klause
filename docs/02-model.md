@@ -13,10 +13,14 @@ the propagation session; a declaration assigns no engine ownership. Domain table
 record whether their endpoint storage is stable or shares a live array. Views
 carrying a shared table retain that distinction even when their model type changes.
 
-`Problem` arrays and `Factor` payloads are borrowed read-only: their producer keeps
-them unchanged while any model, plan, lazy operation or proof uses them. A rewrite
-creates a fresh source scope. Custom factors keep their membership and structural
-keys stable.
+A `Problem` owns its structural arrays. `Problem.of` and the list form of
+`withFactors` capture the factor array, implied mask and real bounds once; internal
+builders transfer freshly built arrays through internal constructors without a copy
+and never write them afterwards. Reads return that storage without allocating, and
+readers never write it. `Factor` payloads stay borrowed read-only: every factor,
+built-in or custom, keeps its payload, membership and structural key unchanged while
+any model, plan, lazy operation or proof uses it. A rewrite creates a fresh source
+scope.
 
 Real coordinates are declared the same way. `RealFiniteDomain` retains an immutable
 finite set of exact binary64 values for one real coordinate, and a selected finite

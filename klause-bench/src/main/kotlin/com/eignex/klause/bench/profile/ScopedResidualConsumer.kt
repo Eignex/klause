@@ -322,7 +322,7 @@ object ScopedResidualConsumer {
         ) return Opening(null, "prepared-root-incumbent-unavailable")
         val factors = root.factors.toMutableList()
         implied.forEachBool { v, value -> factors += Clause(intArrayOf(Lit.make(v, value))) }
-        val source = Problem(root.numBoolVars, 0, emptyArray(), factors.toTypedArray(),
+        val source = Problem.of(root.numBoolVars, 0, emptyArray(), factors.toTypedArray(),
             settings = root.settings, semantics = root.semantics)
         val rhs = BigInteger(cutoff.strictUpper) - BigInteger.ONE - BigInteger.valueOf(objective.constant)
         val budget = PseudoBoolean(
@@ -330,7 +330,7 @@ object ScopedResidualConsumer {
             IntArray(weights.size) { Lit.make(it, true) }, PbOp.LE,
             parseBigInt(rhs.toString()),
         )
-        val constrained = Problem(root.numBoolVars, 0, emptyArray(), (factors + budget).toTypedArray(),
+        val constrained = Problem.of(root.numBoolVars, 0, emptyArray(), (factors + budget).toTypedArray(),
             settings = root.settings, semantics = root.semantics)
             .bake(allowance.stop)
         if (allowance.stop()) return Opening(null, "root-propagation-allowance")

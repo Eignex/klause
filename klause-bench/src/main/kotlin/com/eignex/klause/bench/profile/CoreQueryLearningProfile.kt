@@ -131,7 +131,7 @@ internal object CoreQueryLearningProfile {
                         }
                         val beginBytes = bean.getThreadAllocatedBytes(thread)
                         val begin = System.nanoTime()
-                        val target = if (replay && available.isNotEmpty()) Problem(
+                        val target = if (replay && available.isNotEmpty()) Problem.of(
                             captured.model.numBoolVars, 0, emptyArray(),
                             captured.model.factors.toList() + available.map(::Clause),
                             settings = captured.model.settings, semantics = captured.model.semantics,
@@ -217,7 +217,7 @@ internal object CoreQueryLearningProfile {
                 }.toString())
                 output.flush()
             }
-            val conditioned = Problem(2, 0, emptyArray(), arrayOf(
+            val conditioned = Problem.of(2, 0, emptyArray(), arrayOf(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             )).bake()
             val rejectedUnit = BacktrackSolver(conditioned).solve(BacktrackParams(

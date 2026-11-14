@@ -88,7 +88,7 @@ internal object ScopedComponentSearch {
                     PbOp.LE,
                     parseBigInt((threshold - BigInteger.ONE).toString()),
                 )
-                val problem = Problem(scope.weights.size, 0, emptyArray(), factors.toTypedArray())
+                val problem = Problem.of(scope.weights.size, 0, emptyArray(), factors.toTypedArray())
                     .bake(cancellation = allowance.stop)
                 val built = System.nanoTime()
                 buildNanos += built - start
