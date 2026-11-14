@@ -57,7 +57,7 @@ internal class ArithmeticExecution(
     val batching: Boolean get() = depth != 0
 
     inline fun <T> operation(quantum: Int = 32, body: () -> T): T {
-        if (!begin(quantum)) return body()
+        val entered = begin(quantum)
         var failure: Throwable? = null
         try {
             return body()
@@ -65,7 +65,7 @@ internal class ArithmeticExecution(
             failure = caught
             throw caught
         } finally {
-            end(failure)
+            if (entered) end(failure)
         }
     }
 
