@@ -90,20 +90,11 @@ internal class TranscendentalPortfolioInvocation(
                     nodeBudget = slot.nodeBudget,
                     strategy = strategyParams.copy(
                         assumptions = binding.assumptions,
-                        backtrack = strategyParams.backtrack.copy(
-                            randomSeed = slot.seed,
+                        backtrack = slot.backtrack(strategyParams.backtrack).copy(
                             assumptions = Assumptions.None,
-                            maxDecisions = slot.nativeAllowance(strategyParams.backtrack.maxDecisions),
                             maxInstructions = strategyParams.backtrack.maxInstructions?.let(slot::nativeAllowance),
-                            nodeBudget = slot.nodeBudget,
                         ),
-                        localSearch = strategyParams.localSearch.copy(
-                            randomSeed = slot.seed,
-                            assumptions = Assumptions.None,
-                            maxFlips = slot.heuristicAllowance(strategyParams.localSearch.maxFlips),
-                            maxInstructions = strategyParams.localSearch.maxInstructions?.let(slot::heuristicAllowance),
-                            nodeBudget = slot.nodeBudget,
-                        ),
+                        localSearch = slot.localSearch(strategyParams.localSearch).copy(assumptions = Assumptions.None),
                         alnsIterations = slot.heuristicAllowance(strategyParams.alnsIterations.toLong()).toInt(),
                     ),
                 )

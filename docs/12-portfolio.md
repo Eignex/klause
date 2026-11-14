@@ -19,8 +19,10 @@ seed offsets, parallel quotas, scheduler controls, result verification and clean
 mutable services registered with a slot close when the slot is released, and each
 replica gets private state. ALNS operator choices and inner repair seeds derive
 from its worker seed in ordinary and diagnostic schedules. Native reservations
-divide the complete family's allowance across its slots. Heuristic-only factories carry witness authority, and
-`FIXED` rejects multiple cores.
+divide the complete family's allowance across its slots. A slot binds backtrack and
+local-search controls to its seed, decision, flip and instruction shares and node
+quota; theory-specific limits keep their own work currencies. Heuristic-only
+factories carry witness authority, and `FIXED` rejects multiple cores.
 
 `SourceExecutionPolicy` sets finite arm defaults and LP ceilings before worker
 construction; explicit `arms`, `ls` or `bt` settings take precedence. Native
@@ -98,7 +100,9 @@ Curated backtrack filtering reports unmet model needs; selected finite recipes r
 their actual worker authority. Explicit named recipes bypass automatic filtering.
 An explicit arm count, including the default-sized count, prevents automatic numerical
 companions. A missing complete affine capture declines both companions without
-removing finite workers.
+removing finite workers. `FiniteCompanionArms` owns companion admission, construction,
+arm order, preparation telemetry and scheduler shares; the finite portfolio only
+seats the arms it returns.
 
 The numerical companion retains its checked root-global bound across pauses and
 retirement. Finite results carry this evidence separately from additive counters.
