@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalAtomicApi::class)
-
 package com.eignex.klause.solver
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
@@ -21,28 +19,23 @@ import com.eignex.klause.lp.BuiltInRelaxationProjectionProvider
 import com.eignex.klause.lp.LinearLpProjection
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.RelaxationProjection
-import com.eignex.klause.lp.relaxation.LpPreparationAdmission
-import com.eignex.klause.lp.relaxation.LpPreparationNamespace
-import com.eignex.klause.lp.relaxation.LpPreparationState
-import com.eignex.klause.lp.relaxation.LpPreparationTemplates
+import com.eignex.klause.lp.relaxation.LpPreparationCache
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.FactorProjectionPreparation
 import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.SelectedProjectionChecks
-import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.BigInt
-import kotlin.concurrent.atomics.AtomicReference
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /**
  * Immutable source-associated mechanism selection. Factories are retained, never mutable workspaces;
  * each engine opens its own projections. Rewrites require a new binding; checked source deletions
- * can retain descriptors through their explicit factor mapping.
+ * can retain descriptors through their explicit factor mapping. LP template retention belongs to an
+ * LP-owned preparation cache that compatible views inherit.
  */
 class PreparedFactorProjections internal constructor(
     /** Canonical model whose factor indices these selections describe. */
@@ -58,93 +51,9 @@ class PreparedFactorProjections internal constructor(
     private val encoders: Map<EncodingTarget, Array<Encoder>> = providers.encodingTargets.associateWith { target ->
         Array(problem.numFactors) { providers.encoder.select(problem.factors[it], target) }
     },
+    /** LP template retention, shared with the compatible views this selection was derived from. */
+    internal val lpPreparation: LpPreparationCache = LpPreparationCache(),
 ) {
-    private var lpTemplateNamespace = LpPreparationNamespace()
-    private var lpTemplateRows: Any = Any()
-    private var lpSourceTemplateCache = AtomicReference<LpPreparationState?>(null)
-    private var lpFiniteTemplateCache = AtomicReference<LpPreparationState?>(null)
-
-    private val lpTemplateCache: AtomicReference<LpPreparationState?>
-        get() = if (problem is BakedProblem) lpFiniteTemplateCache else lpSourceTemplateCache
-
-    internal val lpPreparationStorageUnits: Long
-        get() = when (val current = lpTemplateCache.load()) {
-            is LpPreparationTemplates -> current.storageUnits
-            is LpPreparationAdmission -> LpPreparationAdmission.STORAGE_UNITS
-            is LpPreparationNamespace -> 1L
-            null -> 0L
-        }
-
-    internal fun prepareLpTemplates(
-        objective: LinearObjective?, token: Cancellation, reuseIndexes: Boolean = true,
-        reuseMetadata: Boolean = false,
-        earned: Boolean = false,
-        compileBoundRows: Boolean = false,
-        onWork: (Long) -> Unit = {},
-    ): LpPreparationTemplates? {
-        if (earned && (problem.numRealVars != 0 || !builtInRelaxation)) return null
-        val cache = lpTemplateCache
-        val previous = cache.load()
-        val old = (previous as? LpPreparationTemplates)?.takeIf { it.sharesScope(lpTemplateNamespace, problem) }
-        val demand = (previous as? LpPreparationAdmission)?.takeIf { it.matches(lpTemplateNamespace, problem) }
-        var work = 0L
-        val next: LpPreparationState? = try {
-            if (earned) {
-                token.charge(1L)
-                work++
-            }
-            if (token() || (earned && old == null && (demand == null || demand.paidUnits < demand.requiredUnits))) {
-                null
-            } else {
-                val prepared = LpPreparationTemplates.prepare(this, lpTemplateNamespace, lpTemplateRows, objective,
-                    old, token, { work += it }, reuseIndexes, reuseMetadata,
-                    if (earned && old == null) checkNotNull(demand).paidUnits else null, compileBoundRows)
-                if (prepared == null && earned && demand != null && !token()) {
-                    token.charge(LpPreparationAdmission.STORAGE_UNITS)
-                    work += LpPreparationAdmission.STORAGE_UNITS
-                    if (token()) null else demand.afterFailure(lpTemplateNamespace, problem)
-                } else prepared
-            }
-        } finally {
-            onWork(work)
-        }
-        if (token() || next == null) return null
-        cache.compareAndSet(previous, next)
-        return next as? LpPreparationTemplates
-    }
-
-    internal fun recordLpConstruction(completedUnits: Long, token: Cancellation, onWork: (Long) -> Unit): Boolean {
-        if (completedUnits <= 0L || problem.numRealVars != 0 || !builtInRelaxation || token()) return false
-        val cache = lpTemplateCache
-        val previous = cache.load()
-        if ((previous as? LpPreparationTemplates)?.sharesScope(lpTemplateNamespace, problem) == true) return false
-        val old = (previous as? LpPreparationAdmission)?.takeIf { it.matches(lpTemplateNamespace, problem) }
-        if (previous !== lpTemplateNamespace && old == null) {
-            try {
-                token.charge(1L)
-            } finally {
-                onWork(1L)
-            }
-            return !token() && cache.compareAndSet(previous, lpTemplateNamespace)
-        }
-        val paid = old?.paidUnits ?: 0L
-        val nextPaid = paid + minOf(completedUnits, Long.MAX_VALUE - paid)
-        val next = try {
-            token.charge(LpPreparationAdmission.STORAGE_UNITS)
-            if (token()) null else if (old == null) LpPreparationAdmission(lpTemplateNamespace, problem, nextPaid)
-            else LpPreparationAdmission(lpTemplateNamespace, problem, nextPaid, old.requiredUnits)
-        } finally {
-            onWork(LpPreparationAdmission.STORAGE_UNITS)
-        }
-        return !token() && next != null && cache.compareAndSet(previous, next)
-    }
-
-    private fun inheritLpTemplates(source: PreparedFactorProjections): PreparedFactorProjections = apply {
-        lpTemplateNamespace = source.lpTemplateNamespace
-        lpSourceTemplateCache = source.lpSourceTemplateCache
-        lpFiniteTemplateCache = source.lpFiniteTemplateCache
-    }
-
     /** Immutable whole-relation selection in this canonical source's factor namespace. */
     fun encoder(factorId: Int, target: EncodingTarget): Encoder = encoders.getValue(target)[factorId]
 
@@ -203,11 +112,15 @@ class PreparedFactorProjections internal constructor(
         view.numBoolVars == problem.numBoolVars && view.numIntVars == problem.numIntVars &&
         view.numRealVars == problem.numRealVars && view.numFactors == problem.numFactors &&
         view.factors.indices.all { view.factors[it] === problem.factors[it] }
-    ) projected(view, IntArray(view.numFactors) { it }).also {
-        it.lpTemplateRows = lpTemplateRows
-    } else forProblem(view).inheritLpTemplates(this)
+    ) projected(view, IntArray(view.numFactors) { it }, sameRowLayout = true)
+    else PreparedFactorProjections(view, providers, lpPreparation = lpPreparation.inherited(sameRowLayout = false))
 
-    internal fun projected(view: Problem, factorIndices: IntArray, remap: VarRemap? = null): PreparedFactorProjections {
+    internal fun projected(
+        view: Problem,
+        factorIndices: IntArray,
+        remap: VarRemap? = null,
+        sameRowLayout: Boolean = false,
+    ): PreparedFactorProjections {
         require(factorIndices.size == view.numFactors && factorIndices.all { it in problem.factors.indices }) {
             "projection factor mapping differs from its prepared source"
         }
@@ -218,7 +131,8 @@ class PreparedFactorProjections internal constructor(
             encoders.mapValues { (_, selected) -> Array(factorIndices.size) {
                 val encoder = selected[factorIndices[it]]
                 if (remap == null) encoder else encoder.remapped(remap)
-            } }).also { if (remap == null) it.inheritLpTemplates(this) }
+            } },
+            if (remap == null) lpPreparation.inherited(sameRowLayout) else LpPreparationCache())
     }
 
     internal fun retained(mapping: RetainedFactors): PreparedFactorProjections {
