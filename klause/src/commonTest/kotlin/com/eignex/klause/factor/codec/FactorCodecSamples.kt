@@ -77,7 +77,7 @@ private fun ratio(num: Long, den: Long) = BigFraction.of(bigIntOf(num), bigIntOf
 
 internal fun factorCodecSamples(): List<Pair<String, Factor>> = listOf(
     "exactRealEquality" to com.eignex.klause.factor.arithmetic.ExactRealEquality(
-        SourceRealId(0), com.eignex.klause.formats.json.ExactRealJson.decodeFromString("""{"exp":"1"}"""),
+        SourceRealId(0), com.eignex.klause.arithmetic.json.ExactRealJson.decodeFromString("""{"exp":"1"}"""),
     ),
     "clause" to Clause(intArrayOf(lit(0), lit(1, false))),
     "cardinality" to Cardinality(intArrayOf(lit(0), lit(1), lit(2)), 1, 2),

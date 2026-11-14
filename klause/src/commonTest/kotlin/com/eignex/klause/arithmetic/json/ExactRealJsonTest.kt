@@ -1,4 +1,4 @@
-package com.eignex.klause.formats.json
+package com.eignex.klause.arithmetic.json
 
 import com.eignex.klause.arithmetic.real.compareExactly
 import kotlinx.serialization.json.Json

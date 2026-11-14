@@ -1,4 +1,4 @@
-package com.eignex.klause.factor.codec
+package com.eignex.klause.arithmetic.json
 
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.simplex.exact.BigFraction

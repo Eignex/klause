@@ -1,4 +1,4 @@
-package com.eignex.klause.formats.json
+package com.eignex.klause.arithmetic.json
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
@@ -14,7 +14,6 @@ import com.eignex.klause.arithmetic.real.RealDomainInvalid
 import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
 import com.eignex.klause.arithmetic.transcendental.TranscendentalInterrupted
 import com.eignex.klause.arithmetic.transcendental.TranscendentalResourceLimit
-import com.eignex.klause.factor.codec.BigFractionSerializer
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import kotlinx.serialization.json.*

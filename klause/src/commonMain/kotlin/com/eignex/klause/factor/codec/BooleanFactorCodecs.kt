@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.codec
 
+import com.eignex.klause.arithmetic.json.BigIntSerializer
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.Cardinality

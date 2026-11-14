@@ -1,3 +1,11 @@
+public final class com/eignex/klause/arithmetic/json/ExactRealJson {
+	public static final field INSTANCE Lcom/eignex/klause/arithmetic/json/ExactRealJson;
+	public final fun decodeFromJsonElement (Lkotlinx/serialization/json/JsonElement;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+	public final fun decodeFromString (Ljava/lang/String;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+	public final fun encodeToJsonElement (Lcom/eignex/klause/arithmetic/real/ExactRealValue;)Lkotlinx/serialization/json/JsonElement;
+	public final fun encodeToString (Lcom/eignex/klause/arithmetic/real/ExactRealValue;)Ljava/lang/String;
+}
+
 public final class com/eignex/klause/arithmetic/polynomial/AlgebraicReal {
 	public final fun getDefiningCoefficients ()Ljava/util/List;
 	public final fun getLowerBound ()Lcom/eignex/klause/simplex/exact/BigFraction;
@@ -77,7 +85,6 @@ public final class com/eignex/klause/arithmetic/real/ExactRealValue {
 public final class com/eignex/klause/arithmetic/real/ExactRealValuesKt {
 	public static final fun approximate (Lcom/eignex/klause/arithmetic/real/ExactRealValue;)D
 	public static final fun compareExactly (Lcom/eignex/klause/arithmetic/real/ExactRealValue;Lcom/eignex/klause/arithmetic/real/ExactRealValue;)Ljava/lang/Integer;
-	public static final fun exactRealValue (Lcom/eignex/klause/solver/Sample;I)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
 	public static final fun toExactRealValue (Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
 	public static final fun toExactRealValue (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
 }
@@ -2822,14 +2829,6 @@ public final class com/eignex/klause/formats/flatzinc/SolveDirective$Satisfy : c
 
 public final class com/eignex/klause/formats/flatzinc/UnsupportedFlatZincException : com/eignex/klause/formats/flatzinc/FlatZincParseException {
 	public fun <init> (Ljava/lang/String;II)V
-}
-
-public final class com/eignex/klause/formats/json/ExactRealJson {
-	public static final field INSTANCE Lcom/eignex/klause/formats/json/ExactRealJson;
-	public final fun decodeFromJsonElement (Lkotlinx/serialization/json/JsonElement;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
-	public final fun decodeFromString (Ljava/lang/String;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
-	public final fun encodeToJsonElement (Lcom/eignex/klause/arithmetic/real/ExactRealValue;)Lkotlinx/serialization/json/JsonElement;
-	public final fun encodeToString (Lcom/eignex/klause/arithmetic/real/ExactRealValue;)Ljava/lang/String;
 }
 
 public class com/eignex/klause/formats/json/JsonFormatException : com/eignex/klause/formats/FormatException {
@@ -11114,6 +11113,10 @@ public final class com/eignex/klause/solver/Sample {
 	public final fun hammingDistanceTo (Lcom/eignex/klause/solver/Sample;)I
 	public fun hashCode ()I
 	public final fun intValue (I)J
+}
+
+public final class com/eignex/klause/solver/SampleExactRealsKt {
+	public static final fun exactRealValue (Lcom/eignex/klause/solver/Sample;I)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
 }
 
 public final class com/eignex/klause/solver/ScoringCapability : java/lang/Enum {
