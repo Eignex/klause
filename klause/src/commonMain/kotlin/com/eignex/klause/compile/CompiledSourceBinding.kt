@@ -45,9 +45,11 @@ internal class CompiledSourceBinding(
     private val variables = variables.toList()
     private val declaredRepresentations = representations.toMap()
     private val truncatedRows = truncatedRows.toSet()
-    private val viewDefinition: Lazy<FloatGridDefinition?> = lazy { prepareCompatibility() }
-    private val viewColumns by lazy { viewDefinition.value?.columns()?.associateBy { it.source.index }.orEmpty() }
-    val compatibilityProblem: Problem get() = viewDefinition.value?.target ?: originalProblem
+    private val compatibilityDefinition: Lazy<FloatGridDefinition?> = lazy { prepareCompatibility() }
+    private val compatibilityColumns by lazy {
+        compatibilityDefinition.value?.columns()?.associateBy { it.source.index }.orEmpty()
+    }
+    val compatibilityProblem: Problem get() = compatibilityDefinition.value?.target ?: originalProblem
 
     fun attachment(): SourceAttachment = SourceAttachment(originalProblem, emptyList(), null, variables)
 
@@ -66,7 +68,7 @@ internal class CompiledSourceBinding(
 
     fun compatibilityColumn(name: String): FloatGridColumn? {
         val source = realNames[name] ?: return null
-        return viewColumns[source]
+        return compatibilityColumns[source]
     }
 
     fun compatibilityIntegerNames(): Map<String, Int> = integerNames + realNames.mapNotNull { (name, _) ->
@@ -74,7 +76,7 @@ internal class CompiledSourceBinding(
     }.toMap()
 
     fun compatibilityRealNames(): Map<String, Int> {
-        val definition = viewDefinition.value ?: return realNames.toMap()
+        val definition = compatibilityDefinition.value ?: return realNames.toMap()
         return realNames.mapNotNull { (name, source) ->
             definition.retainedReal(source).takeIf { it >= 0 }?.let { name to it }
         }.toMap()
@@ -83,7 +85,8 @@ internal class CompiledSourceBinding(
     fun isOriginal(sample: Sample): Boolean {
         val frame = sample.coordinateFrame
         if (frame === originalProblem) return true
-        require(frame == null || (viewDefinition.isInitialized() && frame === viewDefinition.value?.target)) {
+        val compatible = compatibilityDefinition.isInitialized() && frame === compatibilityDefinition.value?.target
+        require(frame == null || compatible) {
             "assignment belongs to a different compiled coordinate frame"
         }
         return false
@@ -103,12 +106,12 @@ internal class CompiledSourceBinding(
         val integers = MutableList<QuadraticVariable?>(problem.numIntVars) { id ->
             if (id < originalProblem.numIntVars) QuadraticVariable.Int(SourceIntId(id)) else null
         }
-        viewDefinition.value?.columns()?.forEach {
+        compatibilityDefinition.value?.columns()?.forEach {
             integers[it.coordinate.variable] = QuadraticVariable.Real(it.source)
         }
         val reals = MutableList<QuadraticVariable?>(problem.numRealVars) { null }
         for (id in 0 until originalProblem.numRealVars) {
-            val target = viewDefinition.value?.retainedReal(id) ?: id
+            val target = compatibilityDefinition.value?.retainedReal(id) ?: id
             if (target >= 0) reals[target] = QuadraticVariable.Real(SourceRealId(id))
         }
         val booleans = List<QuadraticVariable?>(problem.numBoolVars) { id ->
