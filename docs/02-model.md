@@ -279,7 +279,7 @@ coordinate mappings, component descriptors and objective direction. Its sealed
 payload is finite/linear (`ComponentPlan`), polynomial (`SharedPolynomialModel`),
 nonlinear-integer (see [its chapter](16-nonlinear-arithmetic.md#solving-and-composition)),
 transcendental or declined. That payload is the plan's only route representation:
-the diagnostic `kind` and `decline` read it, and rebinding an objective never
+`kind` and `decline` both read it, and rebinding an objective never
 changes it. Preparation invents no finite bounds for open integer
 declarations: variables owned by an open theory never become finite CP domains,
 and continuous coordinates are never integer branch candidates.

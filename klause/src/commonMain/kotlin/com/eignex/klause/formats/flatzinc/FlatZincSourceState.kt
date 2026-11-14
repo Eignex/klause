@@ -212,7 +212,7 @@ private fun originalArray(array: FlatZincArray, definition: FloatGridDefinition)
     return array.copy(varIds = IntArray(converted.size) { converted[it].varId }, floatBucketings = converted)
 }
 
-/** Attach original real source declarations without requesting a compatibility finite view. */
+/** Attach original real source declarations without requesting a finite compatibility view. */
 fun FlatZincProgram.sourceAttachment(): SourceAttachment = retainedSource?.attachment()
     ?: SourceAttachment(problem, definitionHints, searchHints?.toSearchHints())
 
