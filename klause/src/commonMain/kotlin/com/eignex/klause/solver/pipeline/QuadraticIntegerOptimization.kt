@@ -135,13 +135,8 @@ fun OpenTheoryPipeline.minimize(
                             maximumMoves = slot.heuristicAllowance(params.maximumMoves),
                             polynomial = controls.copy(maximumWork = null, cancellation = scope.polynomial,
                                 strategy = controls.strategy.copy(
-                                    backtrack = controls.strategy.backtrack.copy(randomSeed = slot.seed,
-                                        maxDecisions = slot.nativeAllowance(controls.strategy.backtrack.maxDecisions),
-                                        nodeBudget = slot.nodeBudget),
-                                    localSearch = controls.strategy.localSearch.copy(randomSeed = slot.seed,
-                                        maxFlips = slot.heuristicAllowance(controls.strategy.localSearch.maxFlips),
-                                        maxInstructions = controls.strategy.localSearch.maxInstructions
-                                            ?.let(slot::heuristicAllowance), nodeBudget = slot.nodeBudget))))
+                                    backtrack = slot.backtrack(controls.strategy.backtrack),
+                                    localSearch = slot.localSearch(controls.strategy.localSearch))))
                         val selected = when (arm) {
                             0 -> FiniteEngine.BACKTRACK
                             1 -> FiniteEngine.LOCAL_SEARCH

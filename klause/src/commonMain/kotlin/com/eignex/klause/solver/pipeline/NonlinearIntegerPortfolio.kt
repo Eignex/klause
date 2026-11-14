@@ -39,14 +39,8 @@ internal class NonlinearIntegerPortfolio(
                 val strategy = polynomial.strategy
                 val controls = params.copy(
                     polynomial = polynomial.copy(cancellation = native.polynomial, maximumWork = null,
-                        strategy = strategy.copy(
-                            backtrack = strategy.backtrack.copy(randomSeed = slot.seed,
-                                maxDecisions = slot.nativeAllowance(strategy.backtrack.maxDecisions),
-                                nodeBudget = slot.nodeBudget),
-                            localSearch = strategy.localSearch.copy(randomSeed = slot.seed,
-                                maxFlips = slot.heuristicAllowance(strategy.localSearch.maxFlips),
-                                maxInstructions = strategy.localSearch.maxInstructions?.let(slot::heuristicAllowance),
-                                nodeBudget = slot.nodeBudget))),
+                        strategy = strategy.copy(backtrack = slot.backtrack(strategy.backtrack),
+                            localSearch = slot.localSearch(strategy.localSearch))),
                     maximumCandidates = slot.nativeAllowance(params.maximumCandidates),
                     maximumMoves = slot.heuristicAllowance(params.maximumMoves), nodeBudget = slot.nodeBudget,
                 )
