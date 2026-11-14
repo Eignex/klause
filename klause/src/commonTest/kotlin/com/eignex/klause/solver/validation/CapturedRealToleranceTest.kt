@@ -84,10 +84,40 @@ class CapturedRealToleranceTest {
     }
 
     @Test
-    fun `a nonlinear real relation should leave completion exact`() {
+    fun `a nonlinear relation in every real component should leave completion exact`() {
         val product = source(ContinuousProduct(0, 0, 1), reals = 2)
 
         assertNull(capturedRealAcceptance(product, Cancellation.Never))
+    }
+
+    @Test
+    fun `a nonlinear relation in another component should leave a row within the slack accepted`() {
+        val accepts = assertNotNull(
+            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), ContinuousProduct(1, 1, 2), reals = 3),
+                Cancellation.Never),
+        )
+
+        assertTrue(accepts(point(0.3, 0.5, 0.25)))
+    }
+
+    @Test
+    fun `a nonlinear relation should hold exactly in its own component`() {
+        val accepts = assertNotNull(
+            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), ContinuousProduct(1, 1, 2), reals = 3),
+                Cancellation.Never),
+        )
+
+        assertFalse(accepts(point(0.25, 0.5, 0.3)))
+    }
+
+    @Test
+    fun `a row sharing a component with a nonlinear relation should hold exactly`() {
+        val accepts = assertNotNull(
+            capturedRealAcceptance(source(row(LinearOp.EQ, 0.45), ContinuousProduct(0, 0, 1), reals = 3),
+                Cancellation.Never),
+        )
+
+        assertFalse(accepts(point(0.5, 0.25, 0.0)))
     }
 
     @Test

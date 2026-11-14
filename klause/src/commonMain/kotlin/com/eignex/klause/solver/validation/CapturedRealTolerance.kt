@@ -21,6 +21,8 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntDisjointSet
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 
@@ -146,32 +148,46 @@ private fun slackedRow(
 private fun BigFraction.magnitude(): BigFraction = if (this < BigFraction.ZERO) negated() else this
 
 // Acceptance of real completions within the tolerance the source declares. It is null when that tolerance is
-// zero or absent, when there is no real coordinate, or when a real relation is neither linear rows nor a finite
-// membership: completion then stays exact, so a nonlinear real relation never reads the slack.
+// zero or absent, when there is no real coordinate, or when no real component reads the slack.
 //
-// A non-strict active row reads the slack, and a finite membership admits a value within the slack of a member.
-// A strict row, a disequality or a row whose activator is false has no slack to read, so it must hold exactly.
-// Factors over integers and Booleans alone are left to the engine that enforces them.
+// Real coordinates that share a relation form a component, and each component is judged on its own. In a component
+// whose relations are all linear rows and finite memberships, a non-strict active row reads the slack and a finite
+// membership admits a value within the slack of a member. A strict row, a disequality or a row whose activator is
+// false has no slack to read, so it must hold exactly. A component with any other real relation holds exactly,
+// declarations included, so a nonlinear relation never reads the slack and never decides how an unrelated
+// component is judged. Factors over integers and Booleans alone are left to the engine that enforces them.
 internal fun capturedRealAcceptance(source: Problem, cancellation: Cancellation): FiniteSourceAcceptance? {
     val policy = source.semantics.effective.feasibilityTolerance
     if (policy == null || policy.isExact || source.numRealVars == 0) return null
-    val relations = ArrayList<Factor>()
-    for (factor in source.factors) {
-        if (factor.variables.reals.isEmpty()) continue
-        val rows = factor is LinearIndicator ||
-            factor.linearForm.let { it is LinearForm.Conjunction || it is LinearForm.Disjunction }
-        if (!rows && factor !is RealFiniteDomain) return null
-        relations += factor
+    val relations = IntArrayList()
+    val components = IntDisjointSet(source.numRealVars)
+    for ((id, factor) in source.factors.withIndex()) {
+        val reals = factor.variables.reals
+        if (reals.isEmpty()) continue
+        for (real in reals) components.union(reals[0], real)
+        relations.add(id)
     }
+    val checked = relations.toIntArray()
+    val exactRoots = BooleanArray(source.numRealVars)
+    for (id in checked) {
+        val factor = source.factors[id]
+        if (!factor.readsCapturedSlack()) exactRoots[components.find(factor.variables.reals[0])] = true
+    }
+    val exact = BooleanArray(source.numRealVars) { exactRoots[components.find(it)] }
+    if (exact.all { it }) return null
     return FiniteSourceAcceptance(
-        { sample -> acceptsWithinTolerance(source, relations, sample, policy, cancellation) },
+        { sample -> acceptsWithinTolerance(source, checked, exact, sample, policy, cancellation) },
         permitsToleranceOptimum = true,
     )
 }
 
+private fun Factor.readsCapturedSlack(): Boolean = this is LinearIndicator || this is RealFiniteDomain ||
+    linearForm.let { it is LinearForm.Conjunction || it is LinearForm.Disjunction }
+
 private fun acceptsWithinTolerance(
     source: Problem,
-    relations: List<Factor>,
+    relations: IntArray,
+    exact: BooleanArray,
     sample: Sample,
     policy: SourceTolerance,
     cancellation: Cancellation,
@@ -183,13 +199,14 @@ private fun acceptsWithinTolerance(
         BigFraction.ofDouble(sample.approximateRealValue(it)) ?: return false
     }
     val point = if (sample.exactReals != null) sample else sample.copy(exactReals = reals)
+    fun slack(id: Int, bound: BigFraction) = if (exact[id]) BigFraction.ZERO else capturedSourceSlack(policy, bound)
     for (id in reals.indices) {
         cancellation.charge(1)
         if (cancellation()) return false
         val lower = BigFraction.ofDouble(source.realLower[id])
         val upper = BigFraction.ofDouble(source.realUpper[id])
-        if ((lower != null && reals[id] < lower - capturedSourceSlack(policy, lower)) ||
-            (upper != null && reals[id] > upper + capturedSourceSlack(policy, upper))
+        if ((lower != null && reals[id] < lower - slack(id, lower)) ||
+            (upper != null && reals[id] > upper + slack(id, upper))
         ) return false
     }
     val witness = object : ExactWitness {
@@ -207,16 +224,19 @@ private fun acceptsWithinTolerance(
         }
         return row.exactComparison(source.numRealVars, active, witness::truth).holdsAt(witness)
     }
-    for (factor in relations) {
+    for (id in relations) {
         cancellation.charge(1)
         if (cancellation()) return false
-        val valid = if (factor is LinearIndicator) {
-            point.exactIntValue(factor.indicator) != bigIntOf(if (factor.whenOne) 1L else 0L) || holds(factor.row)
-        } else if (factor is RealFiniteDomain) {
+        val factor = source.factors[id]
+        val valid = if (factor is RealFiniteDomain) {
             (0 until factor.size).any { index ->
                 val member = checkNotNull(BigFraction.ofDouble(factor.valueAt(index)))
-                (reals[factor.variable] - member).magnitude() <= capturedSourceSlack(policy, member)
+                (reals[factor.variable] - member).magnitude() <= slack(factor.variable, member)
             }
+        } else if (exact[factor.variables.reals[0]]) {
+            checkExactRealRelation(id, factor, point, reals, cancellation) == null
+        } else if (factor is LinearIndicator) {
+            point.exactIntValue(factor.indicator) != bigIntOf(if (factor.whenOne) 1L else 0L) || holds(factor.row)
         } else when (val form = factor.linearForm) {
             is LinearForm.Conjunction -> form.rows.all(::holds)
             is LinearForm.Disjunction -> form.rows.any(::holds)

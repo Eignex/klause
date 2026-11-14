@@ -29,12 +29,14 @@ import kotlin.time.Duration.Companion.seconds
 
 class FiniteExecutionTest {
     // Binary64 `0.01 * 200` exceeds the declared bound `2.0` by `3/72057594037927936`.
-    private val roundedBound = """
+    private fun roundedBound(declarations: String, constraints: String) = """
         var 0.0..2.0: y;
         var 200..200: n;
         var 0.0..200.0: nf;
+        $declarations
         constraint int2float(n, nf);
         constraint float_lin_eq([0.01, -1.0], [nf, y], 0.0);
+        $constraints
         solve satisfy;
     """.trimIndent()
 
@@ -42,8 +44,10 @@ class FiniteExecutionTest {
         overrides: SemanticOverrides,
         engine: FiniteEngine = FiniteEngine.FIXED,
         onSample: (Sample) -> Unit = {},
+        declarations: String = "",
+        constraints: String = "",
     ): FiniteSolveVerdict {
-        val program = parseFlatZinc(roundedBound, semanticOverrides = overrides)
+        val program = parseFlatZinc(roundedBound(declarations, constraints), semanticOverrides = overrides)
         val invocation = program.prepareSourceExecution(SourceSetupRequest(program.sourceAttachment(),
             ExecutionOperation.SATISFY, engine))
         val request = SourceExecutionPolicy().finiteRequest(invocation.finiteShape(), engine,
@@ -74,6 +78,22 @@ class FiniteExecutionTest {
             assertEquals(FiniteSolveVerdict.SAT, verdict, "$engine")
             assertNull(samples.last().exactReals, "$engine")
         }
+    }
+
+    @Test
+    fun `an unrelated real selection should keep a FlatZinc completion within the declared tolerance`() {
+        val verdict = solveFlatZinc(SemanticOverrides(), declarations = "var 0.0..1.0: c; var 1..2: i;",
+            constraints = "constraint array_float_element(i, [0.25, 0.5], c);")
+
+        assertEquals(FiniteSolveVerdict.SAT, verdict)
+    }
+
+    @Test
+    fun `a nonlinear real relation over a row that needs the slack should keep its component exact`() {
+        val verdict = solveFlatZinc(SemanticOverrides(), declarations = "var 0.0..2.0: b;",
+            constraints = "constraint float_abs(y, b);")
+
+        assertEquals(FiniteSolveVerdict.UNSAT, verdict)
     }
 
     @Test
