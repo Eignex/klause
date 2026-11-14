@@ -16,6 +16,7 @@ import com.eignex.klause.lp.relaxation.LpRetainedSources
 import com.eignex.klause.lp.relaxation.RelaxationDomains
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.relaxation.authoritativeWithTemplates
+import com.eignex.klause.lp.relaxation.lpPreparationStorageUnits
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.FactorProjectionProviders

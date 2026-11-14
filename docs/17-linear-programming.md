@@ -170,8 +170,12 @@ Template construction polls and charges the containing token, including failed
 attempts, and caps visits and retained storage at 262,144 modeled units each.
 An incomplete attempt publishes no snapshot. Compatible views share one atomic
 publication slot per source/finite scope, including temporary presolve bakes.
-Planned: template retention moves out of `PreparedFactorProjections` into an LP-owned preparation cache.
-Preparation and
+`lp.relaxation.LpPreparationCache` owns retention, admission, construction funding
+and namespace inheritance; a selected factor projection only carries its cache.
+Engine views and unremapped projections inherit the namespace and slots, and only
+a view with checked ordered factor identities keeps the row-layout token. Appended,
+replaced or remapped selections start a fresh cache, so their factors never meet a
+predecessor's templates. Preparation and
 actual row/bound emission have separate observations in the existing LP phase ledger;
 they do not establish numerical result reuse or certified deduction consumption.
 Template observations accumulate fixed scalar totals per owning sink; immutable
