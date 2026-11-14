@@ -155,6 +155,31 @@ class CliModeVerdictTest {
     }
 
     @Test
+    fun `incomplete engines should accept a FlatZinc float bound that tolerance admits`() {
+        val source = File.createTempFile("rounded-bound", ".fzn").apply {
+            writeText("var 0.0..2.0: y :: output_var; var 200..200: n; var 0.0..200.0: nf; " +
+                "constraint int2float(n,nf); constraint float_lin_eq([0.01,-1.0],[nf,y],0.0); solve satisfy;")
+        }
+        try {
+            for (name in listOf("localsearch", "alns")) {
+                val common = CommonOptions().apply {
+                    engine = name
+                    parallel = 1
+                    randomSeed = 17
+                }
+                val session = MiniZincMode.newSession()
+                val solvable = session.load(source.absolutePath, common)
+
+                val out = capture { SolveCore.solve(solvable, common, session.output(common)) }
+
+                assertTrue("y = 2.0;" in out.lines() && "=====UNSATISFIABLE=====" !in out, "$name: $out")
+            }
+        } finally {
+            source.delete()
+        }
+    }
+
+    @Test
     fun `a declared grid solution should report completed search within grid scope`() {
         val program = parseFlatZinc("var 0.0..1.0: x :: output_var; " +
             "constraint float_le(x,0.5); solve satisfy;", floatBuckets = 3)
