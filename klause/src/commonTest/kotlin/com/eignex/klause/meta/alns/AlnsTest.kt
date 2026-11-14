@@ -1250,24 +1250,14 @@ class AlnsTest {
 
     @Test
     fun `alns should offer its accepted incumbents to the shared exchange`() {
-        val factor = Cardinality.exactlyOne(
-            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
-        )
-        val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
         val exchange = IncumbentExchange.minimizing<Sample>()
-        val alns = Alns(
-            inner = LocalSearchSolver(problem.bake()),
-            minDestroyFraction = 0.5,
-            maxDestroyFraction = 0.5,
-            maxIterations = 8,
-            acceptance = AcceptanceCriterion.BetterOrEqual,
-            pooledIncumbents = exchange,
-        )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
+
+        val sample = selectAlns(exchange).minimize(selectObjective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L))
+            .assignment
+
         assertNotNull(sample)
         val standing = assertNotNull(exchange.current(), "at least the initial incumbent must be installed")
-        assertEquals(objective.evaluate(sample), standing.objective)
+        assertEquals(selectObjective.evaluate(sample), standing.objective)
     }
 
     @Test
