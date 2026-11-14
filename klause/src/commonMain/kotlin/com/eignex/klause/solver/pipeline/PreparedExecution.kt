@@ -138,7 +138,6 @@ internal class PreparedOperationBinding(
     val maximize: Boolean = false,
     val quadraticObjective: QuadraticObjectiveSpec? = null,
     val quadraticSense: ObjectiveSense = ObjectiveSense.MINIMIZE,
-    val decline: PreparedPlanDecline? = null,
     val workingLinearObjective: LinearObjective? = null,
 ) {
     fun supportedBy(source: PreparedSourceStructure): Boolean {
@@ -172,40 +171,5 @@ internal class PreparedOperationBinding(
             return false
         }
         return execution !is PreparedExecution.Transcendental
-    }
-}
-
-internal fun legacyPreparedExecution(
-    originalSource: Any,
-    model: Problem?,
-    kind: PreparedExecutionKind,
-    componentPlan: ComponentPlan?,
-    polynomialModel: SharedPolynomialModel?,
-    decline: PreparedPlanDecline?,
-): PreparedExecution = when (kind) {
-    PreparedExecutionKind.FINITE_LINEAR -> PreparedExecution.FiniteLinear(
-        requireNotNull(model),
-        requireNotNull(componentPlan),
-    )
-
-    PreparedExecutionKind.POLYNOMIAL -> PreparedExecution.Polynomial(requireNotNull(polynomialModel))
-
-    PreparedExecutionKind.NONLINEAR_INTEGER -> PreparedExecution.NonlinearInteger(
-        originalSource as NonlinearIntegerProblem,
-    )
-
-    PreparedExecutionKind.TRANSCENDENTAL -> PreparedExecution.Transcendental(originalSource as TranscendentalProblem)
-
-    PreparedExecutionKind.DECLINED -> if (decline == PreparedPlanDecline.CONTINUOUS_LINEAR_OBJECTIVE &&
-        polynomialModel != null
-    ) {
-        PreparedExecution.Polynomial(polynomialModel)
-    } else {
-        PreparedExecution.Declined(
-            requireNotNull(model),
-            requireNotNull(decline),
-            polynomialModel?.let { PreparedExecution.Polynomial(it) }
-                ?: componentPlan?.let { PreparedExecution.FiniteLinear(requireNotNull(model), it) },
-        )
     }
 }

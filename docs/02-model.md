@@ -278,10 +278,11 @@ arithmetic language; a factor class alone does not require polynomial traversal.
 coordinate mappings, component descriptors and objective direction. Its sealed
 payload is finite/linear (`ComponentPlan`), polynomial (`SharedPolynomialModel`),
 nonlinear-integer (see [its chapter](16-nonlinear-arithmetic.md#solving-and-composition)),
-transcendental or declined. Preparation invents no finite bounds for open integer
+transcendental or declined. That payload is the plan's only route representation:
+the diagnostic `kind` and `decline` read it, and rebinding an objective never
+changes it. Preparation invents no finite bounds for open integer
 declarations: variables owned by an open theory never become finite CP domains,
 and continuous coordinates are never integer branch candidates.
-Planned: source preparation and execution converge on this one sealed payload.
 
 `LinearSourceProblem` retains the original rational terms, bounds, row sides,
 indicator pins and affine objective before normalization. Plans belong to the

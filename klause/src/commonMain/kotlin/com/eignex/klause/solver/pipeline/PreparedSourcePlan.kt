@@ -103,9 +103,6 @@ enum class PreparedPlanDecline {
     /** A continuous source factor has no exact polynomial encoding. */
     POLYNOMIAL_ENCODING,
 
-    /** The linear objective weighs continuous columns; rebinding a supported objective keeps the source completion. */
-    CONTINUOUS_LINEAR_OBJECTIVE,
-
     /** An open source column or factor has no complete owner. */
     UNOWNED_SOURCE_COMPONENT,
 }
@@ -144,49 +141,6 @@ class PreparedSourcePlan private constructor(
         PreparedOperationBinding(objective, maximize),
     )
 
-    internal constructor(
-        originalSource: Any,
-        model: Problem?,
-        kind: PreparedExecutionKind,
-        componentPlan: ComponentPlan?,
-        polynomialModel: SharedPolynomialModel?,
-        components: List<ExecutionComponentDescriptor>,
-        sourceBoolCount: Int,
-        sourceIntCount: Int,
-        sourceRealCount: Int,
-        objective: LinearObjective? = null,
-        maximize: Boolean = false,
-        decline: PreparedPlanDecline? = null,
-        integerCoordinates: List<Int> = (0 until sourceIntCount).toList(),
-        realCoordinates: List<Int> = (0 until sourceRealCount).toList(),
-        operations: Set<ExecutionOperation> = sourceOperations,
-        quadraticObjective: QuadraticObjectiveSpec? = null,
-        quadraticSense: ObjectiveSense = ObjectiveSense.MINIMIZE,
-        factorProjections: PreparedFactorProjections? = componentPlan?.factorProjections
-            ?: model?.let { FactorProjectionProviders.Default.prepare(it) },
-    ) : this(
-        PreparedSourceStructure(
-            originalSource,
-            legacyPreparedExecution(
-                originalSource,
-                model,
-                kind,
-                componentPlan,
-                polynomialModel,
-                decline,
-            ),
-            components, sourceBoolCount, sourceIntCount, sourceRealCount,
-            integerCoordinates, realCoordinates, operations, factorProjections,
-        ),
-        PreparedOperationBinding(
-            objective,
-            maximize,
-            quadraticObjective,
-            quadraticSense,
-            decline.takeIf { it == PreparedPlanDecline.CONTINUOUS_LINEAR_OBJECTIVE },
-        ),
-    )
-
     internal val execution: PreparedExecution get() = preparation.execution
     internal val sourceModel: Problem? get() = preparation.sourceModel
     internal val operationKinds: Set<ExecutionOperation> get() = preparation.operations
@@ -197,12 +151,8 @@ class PreparedSourcePlan private constructor(
     /** Canonical factor model, absent for a native source retaining its own representation. */
     val model: Problem? get() = execution.model
 
-    /** Representation selected for execution. */
-    val kind: PreparedExecutionKind get() = if (operation.decline != null) {
-        PreparedExecutionKind.DECLINED
-    } else {
-        execution.kind
-    }
+    /** Diagnostic category of the selected execution payload. */
+    val kind: PreparedExecutionKind get() = execution.kind
 
     /** Finite/linear projection data, including a retained projection from declined preparation. */
     val componentPlan: ComponentPlan? get() = execution.componentPlan
@@ -233,7 +183,6 @@ class PreparedSourcePlan private constructor(
             maximize,
             quadraticObjective,
             quadraticSense,
-            operation.decline,
             objective,
         ),
     )
@@ -241,8 +190,8 @@ class PreparedSourcePlan private constructor(
     /** Direction of [objective]. */
     val maximize: Boolean get() = operation.maximize
 
-    /** Explicit preparation cause; an operation decline does not erase structural preparation. */
-    val decline: PreparedPlanDecline? get() = operation.decline ?: execution.decline
+    /** Explicit preparation cause carried by the selected execution payload. */
+    val decline: PreparedPlanDecline? get() = execution.decline
 
     /** Exact quadratic source objective captured for this operation, or null. */
     val quadraticObjective: QuadraticObjectiveSpec? get() = operation.quadraticObjective
