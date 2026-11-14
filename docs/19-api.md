@@ -193,8 +193,9 @@ storage. A location is valid only with its owning model, projection or layout.
 
 ## Snapshot and buffer ownership
 
-Source structures stay borrowed read-only; samples and exact assignments own their
-coordinates. Changing coordinates discards acceptance and requires a fresh check.
+`Problem.of` captures a model's structural arrays and factor payloads stay borrowed
+read-only; samples and exact assignments own their coordinates. Changing coordinates
+discards acceptance and requires a fresh check.
 [Model ownership](02-model.md#published-assignments-and-objectives) defines the full
 buffer, objective and lifetime contract.
 

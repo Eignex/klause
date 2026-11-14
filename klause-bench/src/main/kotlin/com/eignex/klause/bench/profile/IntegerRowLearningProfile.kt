@@ -40,7 +40,7 @@ internal object IntegerRowLearningProfile {
             val yDomain = IntDomain(0, 12).let { if (hole == null) it else it.excludeValue(hole) }
             val source = "2*x+y-z<=0; 2*x-y<=0; x=0..6; y=0..12; z=0..24" +
                 if (hole == null) "" else "; y!=$hole"
-            val problem = Problem(0, 3, arrayOf(IntDomain(0, 6), yDomain, IntDomain(0, 24)), arrayOf(
+            val problem = Problem.of(0, 3, arrayOf(IntDomain(0, 6), yDomain, IntDomain(0, 24)), arrayOf(
                 Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
                 Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
             ))

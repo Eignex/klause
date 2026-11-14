@@ -282,7 +282,7 @@ class MiniZincModeTest(private val direction: String) {
 
     @Test
     fun `prepared finite dispatch should retain its source invocation objective units and routing costs`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray())
+        val source = Problem.of(0, 1, arrayOf(IntDomain(0, 2)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(3), constant = 7)
         val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
             ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK, objective, maximize = direction == "maximize"))

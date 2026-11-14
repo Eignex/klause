@@ -71,13 +71,13 @@ internal object GuardedIntegerRowProfile {
     }
 
     private fun source(truth: Boolean, element: Boolean): Problem = if (element) {
-        Problem(0, 6, arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 12), IntDomain(0, 12),
+        Problem.of(0, 6, arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 12), IntDomain(0, 12),
             IntDomain(0, 24), IntDomain(0, 1)), arrayOf(
                 Element(5, 3, longArrayOf(1, 2), true, 0),
                 Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 4), LinearOp.LE, 0),
                 Linear(intArrayOf(2, -1), intArrayOf(0, 3), LinearOp.LE, 0),
             ))
-    } else Problem(1, 3,
+    } else Problem.of(1, 3,
         arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
             ReifiedLinear(0, intArrayOf(2, 1, -1), intArrayOf(0, 1, 2),
                 if (truth) LinearOp.LE else LinearOp.GE, if (truth) 0 else 1),
@@ -190,7 +190,8 @@ internal object GuardedIntegerRowProfile {
             if (element) it[5] = IntDomain(0, 0)
         }
         val guarded = (if (element) source else
-            source.withFactors(source.factors + Clause(intArrayOf(Lit.make(0, truth))))).withIntDomains(domains)
+            source.withFactors(source.factors.asList() + Clause(intArrayOf(Lit.make(0, truth)))))
+            .withIntDomains(domains)
         val stop = Cancellation.after(10.seconds)
         val budget = PresolveBudget(1_000_000L)
         val prepared = FinitePipeline.prepare(FinitePipelineRequest(guarded, FiniteEngine.BACKTRACK,

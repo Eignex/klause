@@ -27,7 +27,7 @@ import org.junit.jupiter.params.provider.ValueSource
 class ChannelTrajectoryTest {
     @Test
     fun `reconstructed source columns can load outside placeholder execution domains`() {
-        val problem = Problem(0, 2, arrayOf(IntDomain(0, 0), IntDomain(0, 2)), emptyArray())
+        val problem = Problem.of(0, 2, arrayOf(IntDomain(0, 0), IntDomain(0, 2)), emptyArray())
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         val coordinates = VarRemap(intArrayOf(), intArrayOf(-1, 1))
         val reconstruct = { sample: Sample ->
@@ -44,7 +44,7 @@ class ChannelTrajectoryTest {
 
     @Test
     fun `searched channel moves report a changed source destination`() {
-        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)),
+        val problem = Problem.of(1, 1, arrayOf(IntDomain(0, 1)),
             arrayOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)))
         val sweep = assertNotNull(DefinitionalSweep.fromSource(problem,
             listOf(DefinitionHint.BooleanValue(0, Lit.make(0, true)))))
@@ -67,7 +67,7 @@ class ChannelTrajectoryTest {
     @ParameterizedTest
     @ValueSource(booleans = [true, false])
     fun `source loading should reject synchronization that changes a supplied predicate`(maintained: Boolean) {
-        val problem = Problem(1, 1, arrayOf(IntDomain(-1, 2)), emptyArray())
+        val problem = Problem.of(1, 1, arrayOf(IntDomain(-1, 2)), emptyArray())
         val model = LocalSearchModel.open(problem)
         val state = LocalSearchState(model, Random(0))
         val coordinates = VarRemap(intArrayOf(0), intArrayOf(0))

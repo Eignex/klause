@@ -133,7 +133,7 @@ internal object RealBooleanCutProfile {
     }
 
     private fun source(refutation: Boolean, out: File): SourceProofContext {
-        val model = Problem(1, 0, emptyArray(), buildList {
+        val model = Problem.of(1, 0, emptyArray(), buildList {
             for (id in 0..1) add(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(id),
                 doubleArrayOf(1.0), LinearOp.LE, 0.0))
             for (sign in listOf(-1.0, 1.0)) add(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),

@@ -57,7 +57,7 @@ internal object IntegerReasonReroutingProfile {
             if (arm == "numeric-surrogate") {
                 selected.add(Linear(intArrayOf(scale + 1, -1), intArrayOf(0, 2), LinearOp.LE, 0))
             }
-            val problem = Problem(0, 4, arrayOf(IntDomain(0, scale.toLong()), IntDomain(0, scale.toLong()),
+            val problem = Problem.of(0, 4, arrayOf(IntDomain(0, scale.toLong()), IntDomain(0, scale.toLong()),
                 IntDomain(0, scale.toLong() * (scale + 1)), IntDomain(0, scale.toLong() * (scale + 1))),
                 selected.toTypedArray())
             val native = PropagationSession(problem, pbLearning = false)
