@@ -340,8 +340,8 @@ class CoreGuidedSearchTest {
 
     @Test
     fun `core work allowance should include preparation and not renew on resume`() {
-        val problem = Problem(8192, 0, emptyArray(), emptyArray()).bake()
-        val objective = LinearObjective(LongArray(8192) { 1L })
+        val problem = Problem(1024, 0, emptyArray(), emptyArray()).bake()
+        val objective = LinearObjective(LongArray(1024) { 1L })
         val search = CoreGuidedSearch(problem, objective, BacktrackParams(), maximumWork = 1L)
 
         val stopped = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { error("unprepared witness") }

@@ -504,7 +504,7 @@ class PortfolioLanesTest {
                 withInstructionBudget = { p, limit -> p.copy(maxInstructions = limit) },
             )
         }
-        val stop = TimeSource.Monotonic.markNow() + Duration.parse("100ms")
+        val stop = TimeSource.Monotonic.markNow() + Duration.parse("50ms")
 
         val r = Portfolio.thompson(arms, lanes = 2).use { it.minimize(cancellation = { stop.hasPassedNow() }) }
 

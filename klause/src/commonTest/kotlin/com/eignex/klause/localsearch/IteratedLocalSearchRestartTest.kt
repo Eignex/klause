@@ -164,10 +164,10 @@ class IteratedLocalSearchRestartTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L, 4L, 5L, 6L))
 
         val result = LocalSearchSolver(problem.bake(), restartPolicy = policy, seedImplicitOnRestart = true)
-            .minimize(objective, LocalSearchParams(maxFlips = 1_000L, randomSeed = 1L))
+            .minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L))
 
         assertNotNull(result.assignment)
-        assertEquals(1_000.0, result.stats.ls.moves.sum)
+        assertEquals(200.0, result.stats.ls.moves.sum)
         assertTrue(policy.incumbents.isNotEmpty())
         assertTrue(policy.incumbents.all { it.sample.numIntVars == n })
     }

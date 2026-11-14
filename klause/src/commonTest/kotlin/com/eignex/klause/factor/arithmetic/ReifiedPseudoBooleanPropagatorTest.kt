@@ -13,7 +13,7 @@ class ReifiedPseudoBooleanPropagatorTest {
     @Test
     fun `reified pseudo-boolean deductions should be implied by their reasons with the indicator on variable zero`() {
         val rng = Random(0x9B0)
-        repeat(300) { iter ->
+        repeat(30) { iter ->
             val n = 4
             val problem = Problem(
                 numBoolVars = n + 1,

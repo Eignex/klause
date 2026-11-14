@@ -516,17 +516,17 @@ class Xcsp3GlobalsTest {
         val parsed = Xcsp3.parse(
             """
             <instance><variables><var id="x">0..1</var><var id="y">0..1</var>
-            <array id="a" size="[2]">0..5</array><array id="b" size="[2]">0..4</array></variables><constraints>
-            <binPacking><list>x y</list><sizes>2 3</sizes><loads>a[]</loads></binPacking>
-            <binPacking><list>x</list><sizes>4</sizes><loads>b[]</loads></binPacking>
+            <array id="a" size="[2]">0..3</array><array id="b" size="[2]">0..1</array></variables><constraints>
+            <binPacking><list>x y</list><sizes>1 2</sizes><loads>a[]</loads></binPacking>
+            <binPacking><list>x</list><sizes>1</sizes><loads>b[]</loads></binPacking>
             </constraints><objectives><minimize type="sum">eq(x,1) eq(1,y)</minimize></objectives></instance>
             """.trimIndent(),
         )
 
         assertEquals(4, parsed.problem.numBoolVars)
         assertEquals(
-            setOf(listOf(0L, 0L, 5L, 0L, 4L, 0L), listOf(0L, 1L, 2L, 3L, 4L, 0L),
-                listOf(1L, 0L, 3L, 2L, 0L, 4L), listOf(1L, 1L, 0L, 5L, 0L, 4L)),
+            setOf(listOf(0L, 0L, 3L, 0L, 1L, 0L), listOf(0L, 1L, 1L, 2L, 1L, 0L),
+                listOf(1L, 0L, 2L, 1L, 0L, 1L), listOf(1L, 1L, 0L, 3L, 0L, 1L)),
             solutions(parsed, 6),
         )
     }
