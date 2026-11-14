@@ -32,6 +32,7 @@ import com.eignex.klause.solver.pipeline.PolynomialTheoryStats
 import com.eignex.klause.solver.pipeline.PreparedPlanDecline
 import com.eignex.klause.solver.pipeline.PreparedSourceInvocation
 import com.eignex.klause.solver.pipeline.QuadraticOptimizationExecution
+import com.eignex.klause.solver.pipeline.SelectedFloatGridPreparation
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceExecutionCallbacks
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
@@ -39,6 +40,7 @@ import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceFiniteControls
 import com.eignex.klause.solver.pipeline.SourceIncumbentPublication
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.SourceRouteSelection
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
@@ -94,11 +96,10 @@ class SourceStrategy internal constructor(
             if (timeout() || stop.deadline()?.hasPassedNow() == true) TerminationReason.Timeout
             else TerminationReason.Cancelled, stats,
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
+        val invocation = SourceSetup.prepareWithGrid(SourceSetupRequest(
             sourceAttachment(), ExecutionOperation.SATISFY, engine,
             providers = projectionProviders, cancellation = stop,
-        ))
-        compiledSchema?.sourceBinding?.selectView(invocation)
+        ), ::selectPrivateGrid)
         var finiteWitness: Sample? = null
         val execution = SourceSetup.execute(
             SourceExecutionRequest(
@@ -216,7 +217,7 @@ class SourceStrategy internal constructor(
         val scope = scope(polynomial, theory)
         if (scope.stop()) return scope.unknown()
         if (!scope.supportsSource()) return scope.unsupported()
-        val invocation = SourceSetup.prepare(
+        val invocation = SourceSetup.prepareWithGrid(
             SourceSetupRequest(
                 sourceAttachment(),
                 ExecutionOperation.SATISFY,
@@ -225,9 +226,9 @@ class SourceStrategy internal constructor(
                 cancellation = scope.stop,
                 boundCancellation = scope.stop,
             ),
+            ::selectPrivateGrid,
             polynomialCancellation = scope.polynomialPreparation(),
         )
-        compiledSchema?.sourceBinding?.selectView(invocation)
         val route = invocation.engineRoute
         if (scope.stop()) return scope.unknown()
         val result = when (route) {
@@ -422,7 +423,8 @@ class SourceStrategy internal constructor(
         )
         if (scope.stop()) return incomplete(scope.unknown().reason)
         if (!scope.supportsSource()) return incomplete(TerminationReason.Unsupported)
-        val invocation = SourceSetup.prepare(
+        var stoppedBeforeGrid = false
+        val invocation = SourceSetup.prepareWithGrid(
             SourceSetupRequest(
                 sourceAttachment(),
                 ExecutionOperation.OPTIMIZE,
@@ -433,10 +435,13 @@ class SourceStrategy internal constructor(
                 cancellation = scope.stop,
                 boundCancellation = scope.stop,
             ),
+            { selection ->
+                stoppedBeforeGrid = scope.stop()
+                if (stoppedBeforeGrid) null else selectPrivateGrid(selection)
+            },
             polynomialCancellation = scope.polynomialPreparation(),
         )
-        if (scope.stop()) return incomplete(scope.unknown().reason)
-        compiledSchema?.sourceBinding?.selectView(invocation)
+        if (stoppedBeforeGrid) return incomplete(scope.unknown().reason)
         val route = invocation.engineRoute
         if (route is SourceProblemRoute.UnsupportedOpen &&
             route.preparedPlan.decline == PreparedPlanDecline.RESOURCE
@@ -467,6 +472,9 @@ class SourceStrategy internal constructor(
 
     private fun sourceAttachment(): SourceAttachment = compiledSchema?.sourceBinding?.attachment()
         ?: SourceAttachment(source)
+
+    private fun selectPrivateGrid(selection: SourceRouteSelection): SelectedFloatGridPreparation? =
+        compiledSchema?.sourceBinding?.selectView(selection)
 
     private fun unsupportedQuadratic(
         sense: ObjectiveSense,

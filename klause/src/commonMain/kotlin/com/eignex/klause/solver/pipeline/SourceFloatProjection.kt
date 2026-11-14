@@ -35,7 +35,7 @@ class SourceFloatProjection internal constructor(binding: SelectedFloatGridBindi
     val declaredGridSemantics: Boolean = binding.consumer.declaredGridSemantics
 
     /** Original source attachment, whose real declarations remain authoritative. */
-    val source: SourceAttachment = binding.consumer.invocation.source
+    val source: SourceAttachment = binding.consumer.selection.source
 
     /** Borrowed read-only private model; its integer bucket IDs are not original integer IDs. */
     val privateProblem: Problem = binding.projection.problem
@@ -67,7 +67,7 @@ class SourceFloatProjection internal constructor(binding: SelectedFloatGridBindi
     val objectiveOffset: SemanticRational? = binding.objective?.offset?.semantic()
 
     /** Whether native minimization negates the projected source objective. */
-    val maximize: Boolean = binding.consumer.invocation.request.maximize
+    val maximize: Boolean = binding.consumer.selection.request.maximize
 }
 
 /** Native private-grid result retained independently of publication claim qualification. */

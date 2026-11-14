@@ -19,7 +19,6 @@ import com.eignex.klause.theory.EncoderSupport
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -33,16 +32,15 @@ class SelectedFloatGridTest {
             intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.5)), numRealVars = 1,
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+        val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source),
             ExecutionOperation.ENUMERATE, FiniteEngine.MIXED))
-        assertIs<SourceProblemRoute.OpenTheory>(invocation.route)
+        assertIs<SourceProblemRoute.OpenTheory>(selection.route)
 
-        assertEquals(false, SourceSetup.preservesOriginalCompleteArm(invocation))
-        val selected = SourceSetup.prepareSelectedFloatGrid(invocation, listOf(FloatGridVariable(SourceRealId(0))),
+        assertEquals(false, SourceSetup.preservesOriginalCompleteArm(selection))
+        val selected = SourceSetup.prepareSelectedFloatGrid(selection, listOf(FloatGridVariable(SourceRealId(0))),
             FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY)
 
-        assertIs<SelectedFloatGridPreparation.Prepared>(selected)
-        assertNotNull(invocation.floatProjection)
+        assertNotNull(assertIs<SelectedFloatGridPreparation.Prepared>(selected).invocation.floatProjection)
     }
 
     @Test
@@ -56,19 +54,15 @@ class SelectedFloatGridTest {
                 val objective = if (operation == ExecutionOperation.OPTIMIZE) {
                     LinearObjective(realCoefficients = doubleArrayOf(1.0))
                 } else null
-                val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source), operation,
+                val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source), operation,
                     engine, objective, maximize = objective != null))
-                val canonical = invocation.preparedPlan
-                assertTrue(ExecutionStrategy.COMPLETE in assertNotNull(invocation.admission).arms)
+                assertTrue(ExecutionStrategy.COMPLETE in assertNotNull(selection.admission).arms)
 
                 val result = assertIs<SelectedFloatGridPreparation.Declined>(SourceSetup.prepareSelectedFloatGrid(
-                    invocation, listOf(FloatGridVariable(SourceRealId(0))),
+                    selection, listOf(FloatGridVariable(SourceRealId(0))),
                     FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY))
 
                 assertEquals(SelectedGridDecline.CONSUMER, result.cause)
-                assertNull(invocation.floatProjection)
-                assertSame(canonical, invocation.enginePlan)
-                assertSame(invocation.route, invocation.engineRoute)
             }
         }
     }
@@ -84,13 +78,13 @@ class SelectedFloatGridTest {
                 if (factor.variables.reals.isNotEmpty()) Encoder(EncoderSupport.UNSUPPORTED)
                 else BuiltInEncoderProvider.select(factor, target)
             })
-            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+            val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source),
                 ExecutionOperation.SATISFY, engine, providers = providers))
-            assertTrue(ExecutionStrategy.COMPLETE !in assertNotNull(invocation.admission).arms)
+            assertTrue(ExecutionStrategy.COMPLETE !in assertNotNull(selection.admission).arms)
 
-            assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(
-                invocation, listOf(FloatGridVariable(SourceRealId(0))),
-                FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY))
+            val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(
+                selection, listOf(FloatGridVariable(SourceRealId(0))),
+                FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY)).invocation
 
             assertNotNull(invocation.floatProjection)
             assertSame(source, invocation.source.originalSource)
@@ -103,13 +97,13 @@ class SelectedFloatGridTest {
             val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
                 realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
                 semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
-            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+            val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source),
                 ExecutionOperation.SATISFY, engine))
-            assertTrue(ExecutionStrategy.COMPLETE in assertNotNull(invocation.admission).arms)
+            assertTrue(ExecutionStrategy.COMPLETE in assertNotNull(selection.admission).arms)
 
-            assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(
-                invocation, listOf(FloatGridVariable(SourceRealId(0))),
-                FloatGridConsumerPurpose.FINITE_COMPATIBILITY))
+            val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(
+                selection, listOf(FloatGridVariable(SourceRealId(0))),
+                FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
 
             assertNotNull(invocation.floatProjection)
         }
@@ -121,15 +115,13 @@ class SelectedFloatGridTest {
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
         val request = SourceSetupRequest(SourceAttachment(source), ExecutionOperation.SATISFY, FiniteEngine.MIXED)
-        val invocation = PreparedSourceInvocation(request, SourceProblemRoute.Refuted, Cancellation.Never)
+        val selection = SourceRouteSelection(request, SourceProblemRoute.Refuted, Cancellation.Never)
 
         val result = assertIs<SelectedFloatGridPreparation.Declined>(SourceSetup.prepareSelectedFloatGrid(
-            invocation, listOf(FloatGridVariable(SourceRealId(0))),
+            selection, listOf(FloatGridVariable(SourceRealId(0))),
             FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY))
 
         assertEquals(SelectedGridDecline.SOURCE_REFUTED, result.cause)
-        assertSame(SourceProblemRoute.Refuted, invocation.engineRoute)
-        assertNull(invocation.floatProjection)
     }
 
     @Test
@@ -144,16 +136,16 @@ class SelectedFloatGridTest {
             BuiltInEncoderProvider.select(factor, target)
         })
         val attachment = SourceAttachment(source)
-        val invocation = SourceSetup.prepare(SourceSetupRequest(attachment, ExecutionOperation.SATISFY,
+        val selection = SourceSetup.selectRoute(SourceSetupRequest(attachment, ExecutionOperation.SATISFY,
             FiniteEngine.BACKTRACK, providers = providers))
-        val canonical = assertNotNull(invocation.preparedPlan)
+        val canonical = assertNotNull(selection.preparedPlan)
 
-        val selected = assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(
-            invocation, listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY,
-        ))
-        val shape = selected.invocation.finiteShape()
+        val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(
+            selection, listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY,
+        )).invocation
+        val shape = invocation.finiteShape()
 
-        assertSame(invocation, selected.invocation)
+        assertSame(invocation, shape.sourceInvocation)
         assertSame(attachment, invocation.source)
         assertSame(source, invocation.source.originalSource)
         assertSame(canonical, invocation.preparedPlan)
@@ -184,40 +176,19 @@ class SelectedFloatGridTest {
     }
 
     @Test
-    fun `a grid cannot replace a finite view after its shape has escaped`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
-            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
-            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
-        val shape = invocation.finiteShape()
-
-        assertFailsWith<IllegalArgumentException> {
-            SourceSetup.prepareSelectedFloatGrid(invocation, listOf(FloatGridVariable(SourceRealId(0))),
-                FloatGridConsumerPurpose.FINITE_COMPATIBILITY)
-        }
-
-        assertSame(shape, invocation.finiteShape())
-        assertNull(invocation.floatGrid)
-    }
-
-    @Test
     fun `a continuous policy should decline only the requested private view`() {
         val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Continuous).resolve())
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+        val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source),
             ExecutionOperation.SATISFY, FiniteEngine.LOCAL_SEARCH))
-        val canonical = invocation.preparedPlan
 
         val result = assertIs<SelectedFloatGridPreparation.Declined>(SourceSetup.prepareSelectedFloatGrid(
-            invocation, listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.HEURISTIC_VIEW,
+            selection, listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.HEURISTIC_VIEW,
         ))
 
         assertEquals(SelectedGridDecline.PROJECTION, result.cause)
         assertEquals(FloatGridDecline.POLICY, result.projectionCause)
-        assertSame(canonical, invocation.preparedPlan)
-        assertNull(invocation.floatGrid)
     }
 
     @Test
@@ -226,22 +197,21 @@ class SelectedFloatGridTest {
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
         var stopped = false
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+        val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source),
             ExecutionOperation.SATISFY, FiniteEngine.LOCAL_SEARCH, cancellation = Cancellation { stopped }))
         stopped = true
 
         val result = assertIs<SelectedFloatGridPreparation.Declined>(SourceSetup.prepareSelectedFloatGrid(
-            invocation, listOf(FloatGridVariable(SourceRealId(0))),
+            selection, listOf(FloatGridVariable(SourceRealId(0))),
             FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY,
         ))
         stopped = false
         val repeated = assertIs<SelectedFloatGridPreparation.Declined>(SourceSetup.prepareSelectedFloatGrid(
-            invocation, listOf(FloatGridVariable(SourceRealId(0))),
+            selection, listOf(FloatGridVariable(SourceRealId(0))),
             FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY,
         ))
 
         assertEquals(SelectedGridDecline.RESOURCE, result.cause)
         assertEquals(SelectedGridDecline.RESOURCE, repeated.cause)
-        assertNull(invocation.floatGrid)
     }
 }
