@@ -13384,7 +13384,6 @@ public final class com/eignex/klause/solver/pipeline/PreparedExecutionKind : jav
 }
 
 public final class com/eignex/klause/solver/pipeline/PreparedPlanDecline : java/lang/Enum {
-	public static final field CONTINUOUS_LINEAR_OBJECTIVE Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
 	public static final field OPEN_POLYNOMIAL_INTEGER Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
 	public static final field POLYNOMIAL_ENCODING Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
 	public static final field RESOURCE Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;

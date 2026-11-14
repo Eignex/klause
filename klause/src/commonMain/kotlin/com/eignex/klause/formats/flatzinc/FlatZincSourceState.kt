@@ -28,16 +28,16 @@ internal class FlatZincGridGeometry(
 internal class FlatZincSourceState(
     val original: FlatZincProgram,
     private val declaredReals: Int,
-    private val selectLegacy: () -> Map<String, FloatRepresentation>,
+    private val selectRepresentations: () -> Map<String, FloatRepresentation>,
     sharedGeometry: Lazy<FlatZincGridGeometry>? = null,
-    private val fixedLegacy: FlatZincProgram? = null,
+    private val fixedCompatibility: FlatZincProgram? = null,
     private val projectSearch: (FlatZincProgram) -> FlatZincSearchHints? = { it.searchHints },
 ) {
     private val geometryOwner = sharedGeometry ?: lazy { prepareGeometry() }
     val geometry: FlatZincGridGeometry get() = geometryOwner.value
     internal val materialized: Boolean get() = geometryOwner.isInitialized()
-    val legacy: FlatZincProgram by lazy {
-        fixedLegacy ?: withSearch(projectedProgram(original, geometry))
+    val compatibility: FlatZincProgram by lazy {
+        fixedCompatibility ?: withSearch(projectedProgram(original, geometry))
     }
 
     private fun withSearch(program: FlatZincProgram): FlatZincProgram =
@@ -70,7 +70,7 @@ internal class FlatZincSourceState(
     ): Pair<Map<String, FloatRepresentation>, List<FloatGridVariable>>? {
         cancellation.charge(original.problem.numFactors.toLong() + original.problem.numRealVars)
         if (cancellation()) return null
-        val representations = selectLegacy()
+        val representations = selectRepresentations()
         if (cancellation()) return null
         val components = IntDisjointSet(original.problem.numRealVars)
         for (factor in original.problem.factors) {
@@ -116,25 +116,24 @@ internal class FlatZincSourceState(
         val binding = invocation.floatGrid ?: return original
         val view = FlatZincGridGeometry(binding.projection.mapping.definition(), original.floatRepresentations)
         val program = withSearch(projectedProgram(original, view))
-        return program.suppliedCopy().retainSource(FlatZincSourceState(original, declaredReals, selectLegacy,
+        return program.suppliedCopy().retainSource(FlatZincSourceState(original, declaredReals, selectRepresentations,
             lazyOf(view), program, projectSearch))
     }
 
     fun copyFor(copied: FlatZincProgram): FlatZincSourceState? {
-        if (copied.problem !== legacy.problem || copied.semantics !== original.semantics) return null
+        if (copied.problem !== compatibility.problem || copied.semantics !== original.semantics) return null
         val definition = geometry.definition
         val sourceCopy = if (definition == null) copied.suppliedCopy() else {
-            copiedSourceProgram(original, legacy, copied, definition, sourceSearch(copied)) ?: return null
+            copiedSourceProgram(original, compatibility, copied, definition, sourceSearch(copied)) ?: return null
         }
-        val search = if (copied.searchHints === legacy.searchHints) projectSearch else { program: FlatZincProgram ->
-            program.searchHints
-        }
-        return FlatZincSourceState(sourceCopy, declaredReals, selectLegacy, geometryOwner, copied.suppliedCopy(),
-            search)
+        val copiedSearch = { program: FlatZincProgram -> program.searchHints }
+        val search = if (copied.searchHints === compatibility.searchHints) projectSearch else copiedSearch
+        return FlatZincSourceState(sourceCopy, declaredReals, selectRepresentations, geometryOwner,
+            copied.suppliedCopy(), search)
     }
 
     private fun sourceSearch(copied: FlatZincProgram): FlatZincSearchHints? =
-        if (copied.searchHints === legacy.searchHints) original.searchHints else {
+        if (copied.searchHints === compatibility.searchHints) original.searchHints else {
             copied.searchHints?.let { hints ->
                 val tiers = hints.tiers.mapNotNull { tier ->
                     val integers = tier.intVars.filter { it in 0 until original.problem.numIntVars }.toIntArray()
@@ -147,27 +146,27 @@ internal class FlatZincSourceState(
 
 private fun copiedSourceProgram(
     original: FlatZincProgram,
-    legacy: FlatZincProgram,
+    compatibility: FlatZincProgram,
     copied: FlatZincProgram,
     definition: FloatGridDefinition,
     sourceSearch: FlatZincSearchHints?,
 ): FlatZincProgram? {
     val floats = LinkedHashMap<String, FloatBucketing>()
     for ((name, value) in copied.floatVarsByName) {
-        floats[name] = if (value === legacy.floatVarsByName[name]) {
+        floats[name] = if (value === compatibility.floatVarsByName[name]) {
             original.floatVarsByName[name] ?: return null
         } else originalBucketing(value, definition) ?: return null
     }
     val arrays = LinkedHashMap<String, FlatZincArray>()
     for ((name, array) in copied.arraysByName) {
-        arrays[name] = if (array === legacy.arraysByName[name]) {
+        arrays[name] = if (array === compatibility.arraysByName[name]) {
             original.arraysByName[name] ?: return null
         } else originalArray(array, definition) ?: return null
     }
     return FlatZincProgram(original.problem, copied.solve, copied.boolVarsByName,
         copied.intVarsByName.filter { (name, id) -> name !in floats && id < original.problem.numIntVars },
         floats, arrays, copied.outputItems, sourceSearch, copied.enumLabelsByVar, copied.setVarsByName,
-        if (copied.floatRepresentations === legacy.floatRepresentations) original.floatRepresentations
+        if (copied.floatRepresentations === compatibility.floatRepresentations) original.floatRepresentations
         else floats.mapValues { (_, value) -> FloatRepresentation(value.varId, null) },
         copied.semantics, copied.definitionHints)
 }
@@ -213,7 +212,7 @@ private fun originalArray(array: FlatZincArray, definition: FloatGridDefinition)
     return array.copy(varIds = IntArray(converted.size) { converted[it].varId }, floatBucketings = converted)
 }
 
-/** Attach original real source declarations without requesting a legacy finite view. */
+/** Attach original real source declarations without requesting a compatibility finite view. */
 fun FlatZincProgram.sourceAttachment(): SourceAttachment = retainedSource?.attachment()
     ?: SourceAttachment(problem, definitionHints, searchHints?.toSearchHints())
 

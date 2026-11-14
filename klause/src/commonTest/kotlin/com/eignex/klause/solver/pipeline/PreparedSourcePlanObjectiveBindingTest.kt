@@ -120,34 +120,6 @@ class PreparedSourcePlanObjectiveBindingTest {
     }
 
     @Test
-    fun `objective decline should keep the polynomial structure for a supported rebind`() {
-        val source = Problem(
-            0,
-            0,
-            emptyArray(),
-            arrayOf(ContinuousProduct(0, 0, 0)),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(1.0),
-        )
-        val prepared = source.prepareExecutionPlan()
-        val legacy = PreparedSourcePlan(
-            source, source, PreparedExecutionKind.DECLINED, null,
-            prepared.polynomialModel, prepared.components, 0, 0, 1,
-            decline = PreparedPlanDecline.CONTINUOUS_LINEAR_OBJECTIVE,
-        )
-        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
-
-        val rebound = legacy.withObjective(objective)
-
-        assertEquals(PreparedExecutionKind.DECLINED, legacy.kind)
-        assertEquals(PreparedExecutionKind.POLYNOMIAL, rebound.kind)
-        assertNull(rebound.decline)
-        assertSame(source, rebound.model)
-        assertTrue(rebound.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.OPTIMIZE).runnable)
-    }
-
-    @Test
     fun `quadratic rebinding should keep exact source units but drop an earlier affine objective`() {
         val source = SmtLibPolynomial.parse(
                 "(declare-const x Real) (assert (= (* x x) 2))",

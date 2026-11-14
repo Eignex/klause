@@ -326,8 +326,8 @@ Canonical compilation retains original real declarations and exact real relation
 `FlatZincProgram.sourceProgram` and `sourceAttachment()` expose that frame without
 a grid. A grid policy only permits a private view. Automatic execution prefers an
 admitted original complete arm and runs the grid view only when none exists. The
-legacy `problem` getter and `prepareFiniteCompatibility` request the finite
-compatibility view explicitly.
+`problem` getter and `prepareFiniteCompatibility` request the finite compatibility
+view explicitly.
 
 Supported float operations retain exact relations: strict and reified comparisons,
 `RealAbs`, `RealArrayMinMax`, constant-array `RealElement`, constant scaling and
