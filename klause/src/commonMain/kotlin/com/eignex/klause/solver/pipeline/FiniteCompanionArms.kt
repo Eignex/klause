@@ -31,7 +31,7 @@ internal class FiniteCompanionArms private constructor(
     private val controls: FiniteCompanionControls,
     private val admission: FiniteCompanionAdmission?,
     private val preparation: FiniteNumericalCompanions.Preparation?,
-    val companions: FiniteNumericalCompanions?,
+    private val companions: FiniteNumericalCompanions?,
 ) {
     /** Canonical incumbents the finite workers accept from the companions. */
     val incumbents: PortfolioIncumbents<BigFraction>? get() = companions?.incumbents

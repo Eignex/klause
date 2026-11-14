@@ -30,14 +30,8 @@ internal class QuadraticStrategyAdapters(
             .execute(onAccepted = { publication?.accepted(it.objective, it.version) }) { arm, slot, scope, read ->
                 val controls = params.copy(maximumWork = null, cancellation = scope.polynomial,
                     strategy = params.strategy.copy(
-                        backtrack = params.strategy.backtrack.copy(randomSeed = slot.seed,
-                            maxDecisions = slot.nativeAllowance(params.strategy.backtrack.maxDecisions),
-                            nodeBudget = slot.nodeBudget),
-                        localSearch = params.strategy.localSearch.copy(randomSeed = slot.seed,
-                            maxFlips = slot.heuristicAllowance(params.strategy.localSearch.maxFlips),
-                            maxInstructions = params.strategy.localSearch.maxInstructions
-                                ?.let(slot::heuristicAllowance),
-                            nodeBudget = slot.nodeBudget)))
+                        backtrack = slot.backtrack(params.strategy.backtrack),
+                        localSearch = slot.localSearch(params.strategy.localSearch)))
                 val selected = when (arm) {
                     0 -> FiniteEngine.BACKTRACK
                     1 -> FiniteEngine.LOCAL_SEARCH
