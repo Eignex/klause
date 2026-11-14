@@ -48,7 +48,7 @@ class CliInvocationStatsTest {
 
     @Test
     fun `declared theory and reported backend should stay distinct from the selected pipeline`() {
-        val model = Problem(
+        val model = Problem.of(
             0,
             0,
             emptyArray(),
@@ -70,7 +70,7 @@ class CliInvocationStatsTest {
 
     @Test
     fun `heuristic execution should retain the source theory separately from its backend`() {
-        val model = Problem(0, 0, emptyArray(), emptyList(), numRealVars = 1,
+        val model = Problem.of(0, 0, emptyArray(), emptyList(), numRealVars = 1,
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
         val common = CommonOptions().apply { engine = "ls" }

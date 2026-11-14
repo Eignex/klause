@@ -8,6 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class ProblemTest {
@@ -119,4 +120,35 @@ class ProblemTest {
         }
     }
 
+    @Test
+    fun `of should keep its model when the caller later writes the arrays it passed`() {
+        val clause = Clause(intArrayOf(Lit.make(0, true)))
+        val factors = arrayOf<Factor>(clause)
+        val implied = booleanArrayOf(false)
+        val lower = doubleArrayOf(0.0)
+        val upper = doubleArrayOf(1.0)
+        val problem = Problem.of(1, 0, emptyArray(), factors, impliedFactorMask = implied, numRealVars = 1,
+            realLower = lower, realUpper = upper)
+
+        factors[0] = Clause(intArrayOf(Lit.make(0, false)))
+        implied[0] = true
+        lower[0] = -1.0
+        upper[0] = 2.0
+
+        assertSame(clause, problem.factors[0])
+        assertFalse(problem.impliedFactorMask!![0])
+        assertEquals(0.0, problem.realLower[0])
+        assertEquals(1.0, problem.realUpper[0])
+    }
+
+    @Test
+    fun `withFactors should keep its rows when the caller later writes the list it passed`() {
+        val source = Problem.of(1, 0, emptyArray(), emptyList())
+        val rows = mutableListOf<Factor>(Clause(intArrayOf(Lit.make(0, true))))
+
+        val rewritten = source.withFactors(rows)
+        rows.clear()
+
+        assertEquals(1, rewritten.numFactors)
+    }
 }

@@ -134,7 +134,7 @@ class TrajectoryViewTest {
     }
 
     private fun view(scale: Long, seed: Long): TrajectoryView {
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 4) }, arrayOf(
+        val problem = Problem.of(0, 2, Array(2) { IntDomain(0, 4) }, arrayOf(
             Linear(longArrayOf(scale, -scale), intArrayOf(0, 1), LinearOp.EQ, 0),
         ))
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(seed))

@@ -17,7 +17,7 @@ import kotlin.time.Duration
 class CliPresolveStatsTest {
     @Test
     fun `summary keys should stay bounded and ordered when the ledger repeats`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)),
+        val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 10)),
             listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7)))
         val budget = PresolveBudget(Long.MAX_VALUE)
         val config = PresolveConfig.parse("off,+strengthen,+bve")
