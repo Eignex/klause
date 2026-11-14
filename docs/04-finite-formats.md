@@ -352,8 +352,10 @@ over a real coordinate and every finite membership holds within the slack, which
 measure as [MPS rows do](05-arithmetic-formats.md#tolerance-publication). Strict
 rows, disequalities and rows whose reifying Boolean is false hold exactly at the
 accepted point, and relations over integers and Booleans alone never read the slack.
-`capturedRealAcceptance` owns this check. A refused point continues into exact
-completion. Local-search and ALNS workers
+`capturedRealAcceptance` owns this check. A backtrack leaf offers its float completion
+first, including on models with an absolute value or product over reals, whose exact
+completion is a search; a refused point continues into exact completion with its verdict
+unchanged. Local-search and ALNS workers
 [complete candidates](11-neighborhoods.md#continuous-candidate-completion) through the
 same acceptance, so every engine accepts the same points. Real coordinates that share
 a relation form a component, and acceptance judges each component on its own. A
