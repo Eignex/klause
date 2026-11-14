@@ -353,8 +353,10 @@ measure as [MPS rows do](05-arithmetic-formats.md#tolerance-publication). Strict
 rows, disequalities and rows whose reifying Boolean is false hold exactly at the
 accepted point, and relations over integers and Booleans alone never read the slack.
 `capturedRealAcceptance` owns this check. A refused point continues into exact
-completion. A source with a product, power, absolute value, extremum or selection over
-reals has no acceptance, so its completions stay exact, and sources routed to a
+completion. Local-search and ALNS workers
+[complete candidates](11-neighborhoods.md#continuous-candidate-completion) through the
+same acceptance, so every engine accepts the same points. A source with a product,
+power, absolute value, extremum or selection over reals has no acceptance, so its completions stay exact, and sources routed to a
 [linear theory](15-linear-arithmetic.md) are decided exactly. Completed search
 reports its optimum or refutation under this numerical policy.
 
@@ -371,8 +373,9 @@ Exact mode checks mathematical arithmetic over parsed binary64 literals and keep
 every declared bound. For example, binary64 `0.01 * 200` exceeds `2.0` by
 `3/72057594037927936`: rounding the result to `2.0` violates the defining row.
 A compiler-rounded integer image crossing a declared bound therefore declines exact
-mode. The default original arm accepts the rounded image within the tolerance, and the
-compatibility view records the approximation and uses the grid. See
+mode. An image within the declared slack of its bound keeps its original representation,
+and the original arm accepts it within the tolerance under every engine. An image beyond
+the slack records the approximation, and the compatibility view uses the grid. See
 [FlatZincFloatPolicy](../klause/src/commonMain/kotlin/com/eignex/klause/formats/flatzinc/FlatZincFloatPolicy.kt).
 
 ### MiniZinc output rendering
