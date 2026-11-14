@@ -8,7 +8,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-class RealProductInvariantTest {
+class RealRowInvariantTest {
     @Test
     fun `overflowing mixed product should never receive zero numerical violation`() {
         val source = Problem(
