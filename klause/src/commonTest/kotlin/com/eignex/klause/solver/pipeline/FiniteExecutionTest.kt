@@ -80,12 +80,28 @@ class FiniteExecutionTest {
         }
     }
 
-    @Test
-    fun `an unrelated real selection should keep a FlatZinc completion within the declared tolerance`() {
-        val verdict = solveFlatZinc(SemanticOverrides(), declarations = "var 0.0..1.0: c; var 1..2: i;",
-            constraints = "constraint array_float_element(i, [0.25, 0.5], c);")
+    private val unrelatedNonlinear = listOf(
+        "constraint float_abs(a, b);",
+        "constraint array_float_element(i, [0.25, 0.5], b);",
+    )
 
-        assertEquals(FiniteSolveVerdict.SAT, verdict)
+    private fun solveWithUnrelated(relation: String, overrides: SemanticOverrides) = solveFlatZinc(overrides,
+        declarations = "var -1.0..1.0: a; var 0.0..1.0: b; var 1..2: i;", constraints = relation)
+
+    @Test
+    fun `an unrelated nonlinear real relation should keep a FlatZinc completion within the declared tolerance`() {
+        val verdicts = unrelatedNonlinear.associateWith { solveWithUnrelated(it, SemanticOverrides()) }
+
+        assertEquals(unrelatedNonlinear.associateWith { FiniteSolveVerdict.SAT }, verdicts)
+    }
+
+    @Test
+    fun `an unrelated nonlinear real relation should keep a zero FlatZinc tolerance exact`() {
+        val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+
+        val verdicts = unrelatedNonlinear.associateWith { solveWithUnrelated(it, exact) }
+
+        assertEquals(unrelatedNonlinear.associateWith { FiniteSolveVerdict.UNSAT }, verdicts)
     }
 
     @Test
