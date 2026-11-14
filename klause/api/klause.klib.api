@@ -19108,6 +19108,13 @@ sealed class com.eignex.klause.theory/LinearEncodingFormula { // com.eignex.klau
     }
 }
 
+final object com.eignex.klause.arithmetic.json/ExactRealJson { // com.eignex.klause.arithmetic.json/ExactRealJson|null[0]
+    final fun decodeFromJsonElement(kotlinx.serialization.json/JsonElement): com.eignex.klause.arithmetic.real/ExactRealValue // com.eignex.klause.arithmetic.json/ExactRealJson.decodeFromJsonElement|decodeFromJsonElement(kotlinx.serialization.json.JsonElement){}[0]
+    final fun decodeFromString(kotlin/String): com.eignex.klause.arithmetic.real/ExactRealValue // com.eignex.klause.arithmetic.json/ExactRealJson.decodeFromString|decodeFromString(kotlin.String){}[0]
+    final fun encodeToJsonElement(com.eignex.klause.arithmetic.real/ExactRealValue): kotlinx.serialization.json/JsonElement // com.eignex.klause.arithmetic.json/ExactRealJson.encodeToJsonElement|encodeToJsonElement(com.eignex.klause.arithmetic.real.ExactRealValue){}[0]
+    final fun encodeToString(com.eignex.klause.arithmetic.real/ExactRealValue): kotlin/String // com.eignex.klause.arithmetic.json/ExactRealJson.encodeToString|encodeToString(com.eignex.klause.arithmetic.real.ExactRealValue){}[0]
+}
+
 final object com.eignex.klause.backtrack.selector/DomainMaxRegret : com.eignex.klause.backtrack.selector/VariableSelector { // com.eignex.klause.backtrack.selector/DomainMaxRegret|null[0]
     final fun fresh(): com.eignex.klause.backtrack.selector/DomainMaxRegret // com.eignex.klause.backtrack.selector/DomainMaxRegret.fresh|fresh(){}[0]
     final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.solver.search/VarRef? // com.eignex.klause.backtrack.selector/DomainMaxRegret.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
@@ -19202,13 +19209,6 @@ final object com.eignex.klause.formats.dimacs/Dimacs { // com.eignex.klause.form
     final fun parse(kotlin/String): com.eignex.klause.formats.dimacs/CnfDocument // com.eignex.klause.formats.dimacs/Dimacs.parse|parse(kotlin.String){}[0]
     final fun parseWcnf(com.eignex.util.io/CharSource): com.eignex.klause.formats.dimacs/WcnfDocument // com.eignex.klause.formats.dimacs/Dimacs.parseWcnf|parseWcnf(com.eignex.util.io.CharSource){}[0]
     final fun parseWcnf(kotlin/String): com.eignex.klause.formats.dimacs/WcnfDocument // com.eignex.klause.formats.dimacs/Dimacs.parseWcnf|parseWcnf(kotlin.String){}[0]
-}
-
-final object com.eignex.klause.formats.json/ExactRealJson { // com.eignex.klause.formats.json/ExactRealJson|null[0]
-    final fun decodeFromJsonElement(kotlinx.serialization.json/JsonElement): com.eignex.klause.arithmetic.real/ExactRealValue // com.eignex.klause.formats.json/ExactRealJson.decodeFromJsonElement|decodeFromJsonElement(kotlinx.serialization.json.JsonElement){}[0]
-    final fun decodeFromString(kotlin/String): com.eignex.klause.arithmetic.real/ExactRealValue // com.eignex.klause.formats.json/ExactRealJson.decodeFromString|decodeFromString(kotlin.String){}[0]
-    final fun encodeToJsonElement(com.eignex.klause.arithmetic.real/ExactRealValue): kotlinx.serialization.json/JsonElement // com.eignex.klause.formats.json/ExactRealJson.encodeToJsonElement|encodeToJsonElement(com.eignex.klause.arithmetic.real.ExactRealValue){}[0]
-    final fun encodeToString(com.eignex.klause.arithmetic.real/ExactRealValue): kotlin/String // com.eignex.klause.formats.json/ExactRealJson.encodeToString|encodeToString(com.eignex.klause.arithmetic.real.ExactRealValue){}[0]
 }
 
 final object com.eignex.klause.formats.json/JsonSchema { // com.eignex.klause.formats.json/JsonSchema|null[0]
@@ -19708,7 +19708,7 @@ final fun (com.eignex.klause.solver.pipeline/SourceSetup).com.eignex.klause.solv
 final fun (com.eignex.klause.solver.result/QuadraticOptimizationResult).com.eignex.klause.solver.evidence/verifySourceEvidence(com.eignex.klause.solver.evidence/SourceProofContext, com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.evidence/SourceEvidenceCheck // com.eignex.klause.solver.evidence/verifySourceEvidence|verifySourceEvidence@com.eignex.klause.solver.result.QuadraticOptimizationResult(com.eignex.klause.solver.evidence.SourceProofContext;com.eignex.klause.util.Cancellation){}[0]
 final fun (com.eignex.klause.solver.search/SearchContext).com.eignex.klause.solver.search/explainAtoms(com.eignex.klause.solver.search/SearchAtomPremise, com.eignex.klause.solver.search/SearchDecision? = ..., kotlin/Int = ...): com.eignex.klause.solver.search/SearchExplanation? // com.eignex.klause.solver.search/explainAtoms|explainAtoms@com.eignex.klause.solver.search.SearchContext(com.eignex.klause.solver.search.SearchAtomPremise;com.eignex.klause.solver.search.SearchDecision?;kotlin.Int){}[0]
 final fun (com.eignex.klause.solver.search/VariableBranching<com.eignex.klause.solver.search/BranchingState>).com.eignex.klause.backtrack.selector/asSelector(): com.eignex.klause.backtrack.selector/VariableSelector // com.eignex.klause.backtrack.selector/asSelector|asSelector@com.eignex.klause.solver.search.VariableBranching<com.eignex.klause.solver.search.BranchingState>(){}[0]
-final fun (com.eignex.klause.solver/Sample).com.eignex.klause.arithmetic.real/exactRealValue(kotlin/Int): com.eignex.klause.arithmetic.real/ExactRealValue // com.eignex.klause.arithmetic.real/exactRealValue|exactRealValue@com.eignex.klause.solver.Sample(kotlin.Int){}[0]
+final fun (com.eignex.klause.solver/Sample).com.eignex.klause.solver/exactRealValue(kotlin/Int): com.eignex.klause.arithmetic.real/ExactRealValue // com.eignex.klause.solver/exactRealValue|exactRealValue@com.eignex.klause.solver.Sample(kotlin.Int){}[0]
 final fun (com.eignex.klause.solver/SourceStrategy).com.eignex.klause.solver/solveSample(com.eignex.klause.backtrack/BacktrackParams = ...): com.eignex.klause.solver/SolveResult // com.eignex.klause.solver/solveSample|solveSample@com.eignex.klause.solver.SourceStrategy(com.eignex.klause.backtrack.BacktrackParams){}[0]
 final fun (com.eignex.skema/SchemaDef<com.eignex.klause.model/SchemaEntry>).com.eignex.klause.compile/compile(com.eignex.klause.config/KlauseConfig = ..., com.eignex.klause.ir/SemanticOverrides = ..., com.eignex.klause.factor.codec/FactorCodecs = ...): com.eignex.klause.compile/CompiledSchema // com.eignex.klause.compile/compile|compile@com.eignex.skema.SchemaDef<com.eignex.klause.model.SchemaEntry>(com.eignex.klause.config.KlauseConfig;com.eignex.klause.ir.SemanticOverrides;com.eignex.klause.factor.codec.FactorCodecs){}[0]
 final fun (com.eignex.skema/SchemaDef<com.eignex.klause.model/SchemaEntry>).com.eignex.klause.model/renameDeclarations(kotlin/Function1<kotlin/String, kotlin/String>): com.eignex.skema/SchemaDef<com.eignex.klause.model/SchemaEntry> // com.eignex.klause.model/renameDeclarations|renameDeclarations@com.eignex.skema.SchemaDef<com.eignex.klause.model.SchemaEntry>(kotlin.Function1<kotlin.String,kotlin.String>){}[0]

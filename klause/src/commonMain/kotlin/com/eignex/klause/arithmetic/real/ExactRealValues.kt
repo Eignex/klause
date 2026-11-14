@@ -9,7 +9,6 @@ import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
 import com.eignex.klause.arithmetic.transcendental.TranscendentalInterrupted
 import com.eignex.klause.arithmetic.transcendental.TranscendentalResourceLimit
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 
 /** Capture an algebraic scalar as an exact real coordinate. */
@@ -17,15 +16,6 @@ fun AlgebraicReal.toExactRealValue(): ExactRealValue = ExactRealValue(ExactRealE
 
 /** Capture a rational scalar without a floating conversion. */
 fun BigFraction.toExactRealValue(): ExactRealValue = AlgebraicArithmetic().rational(this).toExactRealValue()
-
-/** Authoritative real coordinate, widening a finite binary64 value only when no exact witness exists. */
-fun Sample.exactRealValue(id: Int): ExactRealValue = symbolicReals?.get(id)
-    ?: algebraicReals?.get(id)?.toExactRealValue()
-    ?: (
-        exactReals?.get(id) ?: requireNotNull(BigFraction.ofDouble(approximateRealValue(id))) {
-        "real coordinate $id has no exact value"
-    }
-    ).toExactRealValue()
 
 /** Numerical view for display or learning features; NaN means an enclosure was unavailable. */
 fun ExactRealValue.approximate(): Double {

@@ -1,7 +1,6 @@
-package com.eignex.klause.factor.codec
+package com.eignex.klause.arithmetic.json
 
 import com.eignex.klause.arithmetic.real.ExactRealValue
-import com.eignex.klause.formats.json.ExactRealJson
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder

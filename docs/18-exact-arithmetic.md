@@ -242,12 +242,15 @@ then strict separation of enclosures; overlapping enclosures give no verdict.
 
 ### Source and publication boundary
 
-`formats.json.ExactRealJson` reads and writes these closed values directly. Rational
+`arithmetic.json.ExactRealJson` reads and writes these closed values directly. Rational
 leaves are fraction strings; `root` selects a one-based distinct real root using
 rational polynomial coefficients in ascending order. Structured `pi`, `exp`, `log`,
 `sin`, `cos`, `add`, `multiply` and `power` nodes retain exact expression authority.
 Decoding checks root selection and function domains. Display approximations and
-isolating intervals are not part of the interchange identity.
+isolating intervals are not part of the interchange identity. The same package owns
+the integer, rational and exact-real serializers that factor codecs and problem
+documents share, and depends on neither. `solver.Sample.exactRealValue` reads a
+sample coordinate, widening binary64 only when no exact value was captured.
 
 `ExactRealEquality` pins a native real column to one of these values. Algebraic
 equalities have polynomial encodings with strict isolating bounds. Symbolic pins
