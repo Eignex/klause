@@ -499,8 +499,7 @@ These instrumented captures support attribution; use separate uninstrumented con
 for performance comparisons.
 
 Profile reflection reads the session's nullable retained propagation owner through
-`LivePropagationState`; live-only probes fail explicitly after release, and residual
-inspection declines a released session. Captures retain bounded diagnostic traces
+`LivePropagationState`; live-only probes fail explicitly after release. Captures retain bounded diagnostic traces
 and lifetime totals without retaining the propagation owner after retirement.
 
 For repeatable finite portfolio diagnostics, use one processor, a fixed solver seed,
