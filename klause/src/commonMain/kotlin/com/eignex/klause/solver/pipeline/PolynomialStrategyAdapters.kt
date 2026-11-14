@@ -66,12 +66,8 @@ internal class PolynomialStrategyAdapters(
     }
 
     private fun workerParams(slot: PortfolioWorkerSlot): PolynomialStrategyParams = params.copy(
-        backtrack = params.backtrack.copy(randomSeed = slot.seed,
-            maxDecisions = slot.nativeAllowance(params.backtrack.maxDecisions), nodeBudget = slot.nodeBudget),
-        localSearch = params.localSearch.copy(randomSeed = slot.seed,
-            maxFlips = slot.heuristicAllowance(params.localSearch.maxFlips),
-            maxInstructions = params.localSearch.maxInstructions?.let(slot::heuristicAllowance),
-            nodeBudget = slot.nodeBudget),
+        backtrack = slot.backtrack(params.backtrack),
+        localSearch = slot.localSearch(params.localSearch),
     )
 
     private fun portfolio(engine: FiniteEngine, objective: LinearObjective? = null): PortfolioInvocation {
