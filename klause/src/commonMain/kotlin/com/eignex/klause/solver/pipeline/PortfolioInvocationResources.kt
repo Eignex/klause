@@ -1,6 +1,8 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.util.Cancellation
 
 internal class PortfolioWorkerSlot(
@@ -18,6 +20,13 @@ internal class PortfolioWorkerSlot(
 
     fun nativeAllowance(limit: Long): Long = nativeWorkerAllowances(count, limit, complete)[index]
     fun heuristicAllowance(limit: Long): Long = heuristicWorkerAllowances(count, limit, complete)[index]
+
+    fun backtrack(params: BacktrackParams): BacktrackParams = params.copy(randomSeed = seed,
+        maxDecisions = nativeAllowance(params.maxDecisions), nodeBudget = nodeBudget)
+
+    fun localSearch(params: LocalSearchParams): LocalSearchParams = params.copy(randomSeed = seed,
+        maxFlips = heuristicAllowance(params.maxFlips),
+        maxInstructions = params.maxInstructions?.let(::heuristicAllowance), nodeBudget = nodeBudget)
 
     fun <T : AutoCloseable> own(resource: T): T {
         check(!closed) { "portfolio worker slot is closed" }

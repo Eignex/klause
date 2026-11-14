@@ -120,7 +120,7 @@ internal class FiniteNumericalCompanions private constructor(
         return listOf(
             factory(firstArm, ArmFamily.Backtrack) { slot ->
                 lateinit var worker: PortfolioWorker
-                worker = PortfolioWorker.ofMinimize("numerical/finite-companion", firstArm, resumable = {
+                worker = PortfolioWorker.ofMinimize(FiniteCompanionArms.NUMERICAL_TRAVERSAL, firstArm, resumable = {
                     val limits = local(slot)
                     val search = if (admission == null)
                         numericalSearch(limits, worker, requireNotNull(context), sharePoints)
@@ -143,7 +143,7 @@ internal class FiniteNumericalCompanions private constructor(
                 lateinit var companion: PortfolioWorker
                 val limits = local(slot)
                 val worker = context?.let { repairWorker(slot, firstArm + 1, limits, it, sharePoints) { companion } }
-                companion = PortfolioWorker.ofMinimize("ls/finite-joint-companion", firstArm + 1,
+                companion = PortfolioWorker.ofMinimize(FiniteCompanionArms.JOINT_REPAIR, firstArm + 1,
                     countsInstructions = true,
                     resumable = {
                         val search = if (worker != null) requireNotNull(worker.newResumableSearch(incumbents::bound))
@@ -198,7 +198,7 @@ internal class FiniteNumericalCompanions private constructor(
                     standing?.toString(), comparison.rawValue?.toString(), comparison.completedValue?.toString(),
                     comparison.cutoff?.toString(), candidate?.toString(), disposition))
             } }))
-        return exactNeighborhoodWorker("ls/finite-joint-companion", arm, objective,
+        return exactNeighborhoodWorker(FiniteCompanionArms.JOINT_REPAIR, arm, objective,
             limits.cancellation, limits.timeout, { repair.exhausted },
             pendingIncumbentTrial = { repair.incumbentTrialPending },
             open = { repair.search(adaptive = adaptiveRepair, seed = slot.seed) })
