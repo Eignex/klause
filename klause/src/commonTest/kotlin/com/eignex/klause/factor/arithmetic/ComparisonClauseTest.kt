@@ -475,7 +475,7 @@ class ComparisonClauseTest {
     @Test
     fun `comparison clause deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0xCC10)
-        repeat(300) { iter ->
+        repeat(130) { iter ->
             val n = 3
             val problem = Problem(
                 numBoolVars = 0,

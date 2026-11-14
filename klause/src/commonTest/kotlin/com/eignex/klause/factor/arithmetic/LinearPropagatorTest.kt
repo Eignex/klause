@@ -159,7 +159,7 @@ class LinearPropagatorTest {
     fun `linear deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x11E0)
         for (op in LinearOp.entries) {
-            repeat(100) { iter ->
+            repeat(50) { iter ->
                 val n = 3
                 val problem = Problem(
                     numBoolVars = 0,

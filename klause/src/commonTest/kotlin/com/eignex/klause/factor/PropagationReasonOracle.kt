@@ -32,7 +32,9 @@ object PropagationReasonOracle {
             ConflictReasonOracle.assertEntailed(problem, state, 0, label)
             return
         }
-        val solutions = BruteForceSolver(problem.bake()).enumerate(BruteForceParams(randomSeed = 0L)).toList()
+        val solutions by lazy {
+            BruteForceSolver(problem.bake()).enumerate(BruteForceParams(randomSeed = 0L)).toList()
+        }
         for (b in 0 until problem.numBoolVars) {
             val value = state.boolValues[b] ?: continue
             if (boolsBefore[b] != null) continue

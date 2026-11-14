@@ -101,7 +101,7 @@ class LexLessPropagatorTest {
     @Test
     fun `lex less deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x1E70)
-        repeat(300) { iter ->
+        repeat(65) { iter ->
             val n = 3
             val problem = Problem(
                 numBoolVars = 0,

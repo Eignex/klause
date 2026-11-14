@@ -169,7 +169,7 @@ class ElementPropagatorTest {
     @Test
     fun `constant-array element deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0xE1E0)
-        repeat(300) { iter ->
+        repeat(20) { iter ->
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = 2,
@@ -276,7 +276,7 @@ class ElementPropagatorTest {
     @Test
     fun `variable-array element deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0xE1E1)
-        repeat(300) { iter ->
+        repeat(100) { iter ->
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = 5,

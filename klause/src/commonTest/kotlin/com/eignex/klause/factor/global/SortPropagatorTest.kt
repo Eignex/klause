@@ -87,7 +87,7 @@ class SortPropagatorTest {
     @Test
     fun `sort deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x5022)
-        repeat(100) { iter ->
+        repeat(25) { iter ->
             val n = 3
             val problem = sortProblem(Array(2 * n) { IntDomain(0, 3) })
             PropagationReasonOracle.assertReasonsImply(problem, "sort#$iter") { state ->

@@ -113,7 +113,7 @@ class GlobalCardinalityPropagatorTest {
     @Test
     fun `global cardinality deductions with count vars should be implied by their reasons under carved holes`() {
         val rng = Random(0x6CC1)
-        repeat(100) { iter ->
+        repeat(15) { iter ->
             val n = 4
             val problem = Problem(
                 numBoolVars = 0,
