@@ -14,8 +14,9 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 import com.eignex.klause.solver.pipeline.FloatGridConsumerPurpose
-import com.eignex.klause.solver.pipeline.PreparedSourceInvocation
+import com.eignex.klause.solver.pipeline.SelectedFloatGridPreparation
 import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.SourceRouteSelection
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.prepareSelectedFloatGrid
 import com.eignex.klause.solver.pipeline.preservesOriginalCompleteArm
@@ -51,11 +52,11 @@ internal class CompiledSourceBinding(
 
     fun attachment(): SourceAttachment = SourceAttachment(originalProblem, emptyList(), null, variables)
 
-    fun selectView(invocation: PreparedSourceInvocation) {
-        require(invocation.source.originalSource === originalProblem)
-        if (SourceSetup.preservesOriginalCompleteArm(invocation)) return
-        val selected = selectedVariables(invocation.cancellation) ?: return
-        if (selected.isNotEmpty()) SourceSetup.prepareSelectedFloatGrid(invocation, selected,
+    fun selectView(selection: SourceRouteSelection): SelectedFloatGridPreparation? {
+        require(selection.source.originalSource === originalProblem)
+        if (SourceSetup.preservesOriginalCompleteArm(selection)) return null
+        val selected = selectedVariables(selection.cancellation) ?: return null
+        return if (selected.isEmpty()) null else SourceSetup.prepareSelectedFloatGrid(selection, selected,
             FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY, truncatedRows)
     }
 

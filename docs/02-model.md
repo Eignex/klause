@@ -245,7 +245,8 @@ larger encodings decline while native filtering and scoring remain.
 ### Private float projections
 
 `FloatSemantics.Grid` permits a private finite or heuristic projection without
-selecting one. A requesting consumer binds that view to its prepared invocation;
+selecting one. A requesting consumer selects that view during setup, after route
+selection and before the invocation is returned;
 [FlatZinc](04-finite-formats.md#flatzinc-floats) defines its automatic fallback.
 Original declarations, relations and objective remain on the attachment, and private
 helpers stay distinct. Unsupported factors or stops decline only the view.

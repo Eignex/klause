@@ -107,32 +107,44 @@ class SourceSetupRequest private constructor(
 /** Captures one source route and retains its operation binding for execution. */
 object SourceSetup {
     /** Prepare from neutral source data without allocating heuristic worker state. */
-    fun prepare(request: SourceSetupRequest): PreparedSourceInvocation = prepareObserved(request, null)
+    fun prepare(request: SourceSetupRequest): PreparedSourceInvocation = PreparedSourceInvocation(selectRoute(request))
 
     /** Prepare the same source binding while observing bound-probing LP work. */
     fun prepare(request: SourceSetupRequest, onLpStats: (LpStats) -> Unit): PreparedSourceInvocation =
-        prepareObserved(request, onLpStats)
+        PreparedSourceInvocation(selectRoute(request, onLpStats))
 
     internal fun prepare(request: SourceSetupRequest, polynomialCancellation: Cancellation): PreparedSourceInvocation =
-        prepareObserved(request, null, polynomialCancellation)
+        PreparedSourceInvocation(selectRoute(request, null, polynomialCancellation))
 
-    private fun prepareObserved(
+    // The grid consumer runs on the selected route before the invocation exists, so no execution view escapes first.
+    internal fun prepareWithGrid(
         request: SourceSetupRequest,
-        onLpStats: ((LpStats) -> Unit)?,
+        privateGrid: (SourceRouteSelection) -> SelectedFloatGridPreparation?,
         polynomialCancellation: Cancellation = request.cancellation,
+        onLpStats: ((LpStats) -> Unit)? = null,
     ): PreparedSourceInvocation {
+        val selection = selectRoute(request, onLpStats, polynomialCancellation)
+        return (privateGrid(selection) as? SelectedFloatGridPreparation.Prepared)?.invocation
+            ?: PreparedSourceInvocation(selection)
+    }
+
+    internal fun selectRoute(
+        request: SourceSetupRequest,
+        onLpStats: ((LpStats) -> Unit)? = null,
+        polynomialCancellation: Cancellation = request.cancellation,
+    ): SourceRouteSelection {
         val stop = request.cancellation.encodingPreparationScope()
         request.source.formula?.let { formula ->
             if (formula is AttachedSourceFormula.Linear) {
                 return prepareLinearSource(request, formula.problem, stop, onLpStats)
             }
             val route = prepareNativeSource(request, formula, stop)
-            return PreparedSourceInvocation(request, route, stop)
+            return SourceRouteSelection(request, route, stop)
         }
         val problem = request.source.problem
         if (problem.factors.any {
             it is com.eignex.klause.factor.arithmetic.ExactRealEquality && it.value.algebraic == null
-        }) return PreparedSourceInvocation(request, prepareExactRealSource(request, stop), stop)
+        }) return SourceRouteSelection(request, prepareExactRealSource(request, stop), stop)
         val projections = (problem as? BakedProblem)?.factorProjections
             ?.takeIf { it.providers === request.providers } ?: request.providers.prepare(problem)
         val exactNormalization = request.maximize && request.objective?.let { objective ->
@@ -140,7 +152,7 @@ object SourceSetup {
                 objective.boolWeightValues.any { it == Long.MIN_VALUE }
         } == true
         if (request.quadraticObjective != null || exactNormalization) {
-            return PreparedSourceInvocation(
+            return SourceRouteSelection(
                 request,
                 prepareFactorQuadratic(request, projections, polynomialCancellation or stop, stop),
                 stop,
@@ -155,6 +167,6 @@ object SourceSetup {
             polynomialCancellation = polynomialCancellation or stop,
             onLpStats = onLpStats,
         )
-        return PreparedSourceInvocation(request, route, stop)
+        return SourceRouteSelection(request, route, stop)
     }
 }

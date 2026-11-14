@@ -34,11 +34,12 @@ class FloatGridPublicationTest {
         val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+        val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source),
             ExecutionOperation.ENUMERATE, FiniteEngine.FIXED))
-        assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(invocation,
+        val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
+            SourceSetup.prepareSelectedFloatGrid(selection,
             listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY,
-            declaredGridSemantics = true))
+            declaredGridSemantics = true)).invocation
         val binding = assertNotNull(invocation.floatGrid)
         val publication = FloatGridPublication(binding, Cancellation.Never, null, FiniteSolveCallbacks({}, {}))
         publication.onSample(Sample(booleanArrayOf(), longArrayOf(1)))
@@ -56,12 +57,13 @@ class FloatGridPublicationTest {
         val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+        val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source),
             ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
             LinearObjective(realCoefficients = doubleArrayOf(1.0)), maximize = true))
-        assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(invocation,
+        val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
+            SourceSetup.prepareSelectedFloatGrid(selection,
             listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY,
-            declaredGridSemantics = true))
+            declaredGridSemantics = true)).invocation
         val binding = assertNotNull(invocation.floatGrid)
         val publication = FloatGridPublication(binding, Cancellation.Never, { it.approximateRealValue(0) <= 0.5 },
             FiniteSolveCallbacks({}, {}))
@@ -82,10 +84,11 @@ class FloatGridPublicationTest {
             numRealVars = 3, realLower = doubleArrayOf(-1.0, 0.0, -1.0),
             realUpper = doubleArrayOf(1.0, 2.0, 2.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+        val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source),
             ExecutionOperation.SATISFY, FiniteEngine.FIXED))
-        assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(invocation,
-            List(3) { FloatGridVariable(SourceRealId(it)) }, FloatGridConsumerPurpose.FINITE_COMPATIBILITY))
+        val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
+            SourceSetup.prepareSelectedFloatGrid(selection,
+            List(3) { FloatGridVariable(SourceRealId(it)) }, FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
         val binding = assertNotNull(invocation.floatGrid)
         val points = ArrayList<Sample>()
         val publication = FloatGridPublication(binding, Cancellation.Never, null, FiniteSolveCallbacks(points::add, {}))
@@ -103,11 +106,12 @@ class FloatGridPublicationTest {
         val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+        val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source),
             ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
             LinearObjective(realCoefficients = doubleArrayOf(1.0)), maximize = true))
-        assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(invocation,
-            listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY))
+        val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
+            SourceSetup.prepareSelectedFloatGrid(selection,
+            listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
         val binding = assertNotNull(invocation.floatGrid)
         val publications = FloatGridPublication(binding, Cancellation.Never, null, FiniteSolveCallbacks({}, {}))
         val preparation = FinitePipelinePreparation(binding.projection.problem, null, { it }, null)
@@ -132,10 +136,11 @@ class FloatGridPublicationTest {
         val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+        val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source),
             ExecutionOperation.SATISFY, FiniteEngine.FIXED))
-        assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(invocation,
-            listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY))
+        val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
+            SourceSetup.prepareSelectedFloatGrid(selection,
+            listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
         val binding = assertNotNull(invocation.floatGrid)
         var stopped = false
         val points = ArrayList<Sample>()
@@ -158,10 +163,11 @@ class FloatGridPublicationTest {
             intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.25)), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(2, 1000)).resolve())
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+        val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source),
             ExecutionOperation.SATISFY, FiniteEngine.FIXED))
-        assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(invocation,
-            listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY))
+        val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
+            SourceSetup.prepareSelectedFloatGrid(selection,
+            listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
         val publications = ArrayList<Sample>()
 
         val execution = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
@@ -186,11 +192,12 @@ class FloatGridPublicationTest {
         val source = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(ContinuousProduct(0, 0, 1)), numRealVars = 2,
             realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+        val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source),
             ExecutionOperation.SATISFY, FiniteEngine.FIXED))
-        assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(invocation,
+        val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
+            SourceSetup.prepareSelectedFloatGrid(selection,
             listOf(FloatGridVariable(SourceRealId(0)), FloatGridVariable(SourceRealId(1))),
-            FloatGridConsumerPurpose.FINITE_COMPATIBILITY))
+            FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
         val binding = assertNotNull(invocation.floatGrid)
         val native = FiniteSolveOutcome.Completed(FiniteSolveVerdict.SAT, SolveStats.EMPTY, 1,
             Sample(booleanArrayOf(), longArrayOf(1, 0)), 0)
@@ -212,10 +219,11 @@ class FloatGridPublicationTest {
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
         val objective = LinearObjective(realCoefficients = doubleArrayOf(3.0), constant = 7)
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+        val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source),
             ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED, objective, maximize = true))
-        assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(invocation,
-            listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY))
+        val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
+            SourceSetup.prepareSelectedFloatGrid(selection,
+            listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
         val points = ArrayList<Sample>()
 
         val execution = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
