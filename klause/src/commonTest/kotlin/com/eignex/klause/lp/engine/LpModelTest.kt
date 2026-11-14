@@ -110,12 +110,12 @@ class LpModelTest {
         assertFailsWith<IllegalArgumentException> { model.recentered(listOf(one)) }
         assertTrue(model.sameAuthority(model.recentered(listOf(zero))))
         assertEquals(2.0.toRawBits(), model.rhs(0).ieeeBits)
-        assertNull(model.toLegacy())
+        assertNull(model.toIntegerModel())
         assertNotNull(exactLpStateKey(model))
     }
 
     @Test
-    fun `nonintegral values in any numeric slot should decline the legacy bridge`() {
+    fun `nonintegral values in any numeric slot should decline the integer model conversion`() {
         val zero = ExactLpNumber.of(0L)
         val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))
         val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 80, BIG_ONE))
@@ -138,7 +138,7 @@ class LpModelTest {
                     ),
                 )
 
-                assertNull(model.toLegacy(), "slot $slot")
+                assertNull(model.toIntegerModel(), "slot $slot")
                 assertNotNull(exactLpStateKey(model))
                 assertTrue(model.sameAuthority(model.copy()))
             }
@@ -200,7 +200,7 @@ class LpModelTest {
             assertEquals(value, copy.rhs(0).value)
             assertEquals(value, copy.column(0).bounds.upper?.number?.value)
             assertEquals(value, copy.objective.cost(0).value)
-            assertNull(copy.toLegacy())
+            assertNull(copy.toIntegerModel())
         }
     }
 
@@ -284,17 +284,17 @@ class LpModelTest {
             ExactLpObjective(costs),
         )
         val copy = model.copy()
-        val legacy = assertNotNull(model.toLegacy())
+        val integer = assertNotNull(model.toIntegerModel())
 
         entries.clear()
         rhs[0] = zero
         costs[0] = zero
         premises.clear()
-        legacy.csc.colVal[0] = -100L
-        legacy.rowPremises[0]!!.thresholds[0] = -100L
+        integer.csc.colVal[0] = -100L
+        integer.rowPremises[0]!!.thresholds[0] = -100L
 
         assertTrue(model.sameAuthority(copy))
-        val fresh = assertNotNull(model.toLegacy())
+        val fresh = assertNotNull(model.toIntegerModel())
         assertEquals(2L, fresh.csc.colVal[0])
         assertEquals(8L, fresh.rhs[0])
         assertEquals(3L, fresh.cost[0])

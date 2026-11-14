@@ -142,15 +142,15 @@ internal class IntegerCertificate(
 ) : LpDeductionCertificate {
     // Row weights and endpoint support cannot be reinterpreted after a pop or an objective edit.
     private val authority = model.exactState
-    private val legacyModel = model.takeIf { authority == null }
-    private val legacySnapshot = legacyModel?.let(LpCapturedModel::snapshotIntegerAuthority)
-    val authorityStorageUnits: Long = legacySnapshot?.integerAuthorityUnits ?: 0L
+    private val integerModel = model.takeIf { authority == null }
+    private val integerSnapshot = integerModel?.let(LpCapturedModel::snapshotIntegerAuthority)
+    val authorityStorageUnits: Long = integerSnapshot?.integerAuthorityUnits ?: 0L
 
     override fun belongsTo(model: LpModel, observer: LpCertificationObserver?): Boolean {
         if (model.m != mult.size || model.numVars != reduced.size) return false
         if (authority != null) return model.exactState === authority
-        if (model !== legacyModel) return false
-        val matches = requireNotNull(legacySnapshot).matchesIntegerAuthority(model)
+        if (model !== integerModel) return false
+        val matches = requireNotNull(integerSnapshot).matchesIntegerAuthority(model)
         observer?.observe(LpCertifier.INTEGER, matches, LpCertifierCost.Metered(authorityStorageUnits))
         return matches
     }
@@ -559,7 +559,7 @@ private fun chooseScale(maxY: Double, scaleBits: Int): Int {
 internal class RationalizedLp(val model: LpModel, val scale: Long, val objConstantExact: Boolean)
 
 /**
- * A dyadically scaled copy of the exact finite binary data in a legacy Double view, or null outside
+ * A dyadically scaled copy of the exact finite binary data in an [LpDoubleView], or null outside
  * the bounded Long scaling budget. Parsed rational authority belongs to [ExactLpModel] and cannot be
  * recovered from this projection. Structural coordinates stay unchanged; logical coordinates scale
  * with the rows, so their costs stay unchanged and their finite sides scale with the RHS.

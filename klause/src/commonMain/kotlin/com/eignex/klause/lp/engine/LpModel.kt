@@ -42,7 +42,12 @@ internal class LpRowPremises(
     /** Boolean literals that must hold for the row to be valid (a reified real atom's activation);
      *  a learned clause leaning on the row cites their negations. */
     val boolLits: IntArray = emptyIntArray(),
-)
+) {
+    fun toExact(): ExactLpPremises = ExactLpPremises(
+        vars.indices.map { ExactLpPremise(vars[it], isUpper[it], ExactLpNumber.of(thresholds[it])) },
+        boolLits.toList(),
+    )
+}
 
 /** Optimization sense. Branch-and-bound minimizes; [MAXIMIZE] is negated at build time. */
 internal enum class Sense { MINIMIZE, MAXIMIZE }
@@ -126,7 +131,7 @@ internal class LpModel(
     /**
      * Right-hand side per row after the `>=`-to-`<=` flip but **before** the lower-bound shift — i.e.
      * `rhs[i] = flippedRhs[i] − Σ_j csc(i,j)·loShift[j]`. Retained so [rebind] can copy column bounds
-     * over the fixed [csc] for legacy capture replay without re-running [LpBuilder]: the structure
+     * over the fixed [csc] for capture replay without re-running [LpBuilder]: the structure
      * (matrix, costs, tags, row relations) stays fixed while the bound-derived vectors change.
      * Defaults to the post-shift [rhs] for models that never rebind.
      */
@@ -217,7 +222,7 @@ internal class LpModel(
      * A model identical in structure ([csc], [cost], [tag], [rowGlobal], [rowPremises], slack
      * relations) but with fresh structural-column bounds `[lo[j], hi[j]]`. Recomputes only the
      * bound-derived vectors — [rhs] (via the lower-bound shift over the fixed matrix), [upper],
-     * [loShift] and [objConstant] — in `O(nnz)`. Legacy capture replay uses this copy to import
+     * [loShift] and [objConstant] — in `O(nnz)`. Capture replay uses this copy to import
      * updated source authority; it does not mutate a persistent solver.
      */
     fun rebind(lo: LongArray, hi: LongArray): LpModel {
@@ -234,7 +239,7 @@ internal class LpModel(
             newObjConstant = addExact(newObjConstant, mulExact(cost[j], lo[j]))
         }
         val dv = doubleView?.let { view ->
-            // The legacy view has no exact pre-shift RHS; a rounded recenter cannot preserve authority.
+            // The double view has no exact pre-shift RHS; a rounded recenter cannot preserve authority.
             require((0 until n).all { BigFraction.ofDouble(view.loShift[it]) == BigFraction.ofLong(lo[it]) }) {
                 "real rebind requires unchanged exact origins"
             }
@@ -958,7 +963,8 @@ internal class ExactLpNumber private constructor(
         ieeeBits?.let { Double.fromBits(it) } ?: value.toDouble()
     }
 
-    fun legacyLong(): Long? = if (ieeeBits == null) exactLong() else null
+    // An integer LpModel has no binary64 provenance, so a value carrying IEEE input bits has no form there.
+    fun integerModelLong(): Long? = if (ieeeBits == null) exactLong() else null
 
     fun exactLong(): Long? = integer
 
@@ -1001,9 +1007,9 @@ internal class ExactLpPremises(bounds: List<ExactLpPremise>, literals: List<Int>
     fun boundEntries(): List<ExactLpPremise> = bounds.toList()
     fun literalEntries(): List<Int> = literals.toList()
 
-    fun toLegacy(): LpRowPremises? {
+    fun toRowPremises(): LpRowPremises? {
         val thresholds = LongArray(bounds.size)
-        for (i in bounds.indices) thresholds[i] = bounds[i].threshold.legacyLong() ?: return null
+        for (i in bounds.indices) thresholds[i] = bounds[i].threshold.integerModelLong() ?: return null
         return LpRowPremises(
             IntArray(bounds.size) { bounds[it].variable },
             BooleanArray(bounds.size) { bounds[it].upper },
@@ -1220,7 +1226,7 @@ internal class ExactLpModel private constructor(
     fun sameMatrix(other: ExactLpModel): Boolean = n == other.n && m == other.m &&
         matrix == other.matrix && rows == other.rows
 
-    fun toLegacy(): LpModel? {
+    fun toIntegerModel(): LpModel? {
         if (columns.any { !it.bounds.consistent || !it.integral } || rows.any { it.strict }) return null
         if (objective.scale != ExactLpNumber.of(1L) || objective.externalConstant != ExactLpNumber.of(0L)) return null
         val upper = LongArray(numVars)
@@ -1232,23 +1238,23 @@ internal class ExactLpModel private constructor(
             if (bounds.lower != ExactLpSide(ExactLpNumber.of(0L))) return null
             bounds.upper?.let { side ->
                 if (side.strict || side.premises != null) return null
-                upper[j] = side.number.legacyLong() ?: return null
+                upper[j] = side.number.integerModelLong() ?: return null
                 hasUpper[j] = true
             }
             if (j >= n && hasUpper[j] && upper[j] != 0L) return null
             if (j < n) {
-                origin[j] = columns[j].origin.legacyLong() ?: return null
+                origin[j] = columns[j].origin.integerModelLong() ?: return null
             } else if (columns[j].origin != ExactLpNumber.of(0L) || columns[j].tag != -1) {
                 return null
             }
-            cost[j] = objective.cost(j).legacyLong() ?: return null
+            cost[j] = objective.cost(j).integerModelLong() ?: return null
         }
-        val constant = objective.constant.legacyLong() ?: return null
+        val constant = objective.constant.integerModelLong() ?: return null
         val rhs = LongArray(m)
         val premises = arrayOfNulls<LpRowPremises>(m)
         for (i in rows.indices) {
-            rhs[i] = rightHandSide[i].legacyLong() ?: return null
-            premises[i] = rows[i].premises?.let { it.toLegacy() ?: return null }
+            rhs[i] = rightHandSide[i].integerModelLong() ?: return null
+            premises[i] = rows[i].premises?.let { it.toRowPremises() ?: return null }
         }
         val pointers = IntArray(n + 1)
         for (j in 0 until n) pointers[j + 1] = pointers[j] + matrix[j].size
@@ -1257,7 +1263,7 @@ internal class ExactLpModel private constructor(
         for (j in 0 until n) {
             for ((k, entry) in matrix[j].withIndex()) {
                 indices[pointers[j] + k] = entry.row
-                values[pointers[j] + k] = entry.number.legacyLong() ?: return null
+                values[pointers[j] + k] = entry.number.integerModelLong() ?: return null
             }
         }
         val flipped = rhs.copyOf()

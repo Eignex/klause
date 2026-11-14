@@ -1,11 +1,9 @@
 package com.eignex.klause.lp.engine
 
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -83,29 +81,7 @@ class LpBasisTest {
             assertFalse(bounds.consistent)
             assertFalse(bounds.fixed)
             assertFalse(ExactLpBasis(emptyList(), listOf(ExactLpStatus.FIXED)).validFor(model))
-            assertNull(model.toLegacy())
+            assertNull(model.toIntegerModel())
         }
-    }
-
-    @Test
-    fun `fixed conversion should retain exact source status and basis order`() {
-        val zero = ExactLpSide(ExactLpNumber.of(0L))
-        val model = ExactLpModel(
-            listOf(emptyList()),
-            listOf(ExactLpNumber.of(0L)),
-            listOf(ExactLpColumn(ExactLpBounds(zero, zero)), ExactLpColumn(ExactLpBounds(zero))),
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(ExactLpNumber.of(0L), ExactLpNumber.of(0L))),
-        )
-        val basis = ExactLpBasis(listOf(1), listOf(ExactLpStatus.FIXED, ExactLpStatus.BASIC))
-
-        val converted = assertNotNull(basis.toLegacy(model))
-
-        assertContentEquals(intArrayOf(1), converted.basis.basicVars)
-        assertEquals(VarStatus.AT_LOWER, converted.basis.status[0])
-        assertEquals(ExactLpStatus.FIXED, converted.exactBasis.status(0))
-        assertTrue(converted.source.column(0).bounds.fixed)
-        assertTrue(converted.model.hasUpper[0])
-        assertEquals(0L, converted.model.upper[0])
     }
 }

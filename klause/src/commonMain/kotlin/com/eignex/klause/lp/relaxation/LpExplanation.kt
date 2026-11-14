@@ -393,7 +393,7 @@ internal object LpExplanation {
                 ) {
                     return false
                 }
-                val value = ExactLpNumber.of(premise.value).legacyLong() ?: return false
+                val value = ExactLpNumber.of(premise.value).exactLong() ?: return false
                 if (session.intDomain(premise.source.id).contains(value)) return false
                 session.equalityLit(premise.source.id, value)
             }

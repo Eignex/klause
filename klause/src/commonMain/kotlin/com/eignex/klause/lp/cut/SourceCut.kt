@@ -11,9 +11,6 @@ import com.eignex.klause.lp.engine.CutRoundingRule
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.CutWeightedRow
-import com.eignex.klause.lp.engine.ExactLpNumber
-import com.eignex.klause.lp.engine.ExactLpPremise
-import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.exactRhs
@@ -496,22 +493,13 @@ private class SourceCutMapper(
                     facts.add(CutProofFact(rowFact, true))
                 } else {
                     val premises = row.exactPremises ?: run {
-                        val legacy = row.premises ?: decline(CutMappingDecline.MISSING_PROVENANCE)
-                        if (legacy.vars.size != legacy.isUpper.size || legacy.vars.size != legacy.thresholds.size ||
-                            legacy.vars.any { it < 0 }
+                        val integer = row.premises ?: decline(CutMappingDecline.MISSING_PROVENANCE)
+                        if (integer.vars.size != integer.isUpper.size || integer.vars.size != integer.thresholds.size ||
+                            integer.vars.any { it < 0 }
                         ) {
                             decline(CutMappingDecline.MISSING_PROVENANCE)
                         }
-                        ExactLpPremises(
-                            legacy.vars.indices.map {
-                                ExactLpPremise(
-                                    legacy.vars[it],
-                                    legacy.isUpper[it],
-                                    ExactLpNumber.of(legacy.thresholds[it]),
-                                )
-                            },
-                            legacy.boolLits.toList(),
-                        )
+                        integer.toExact()
                     }
                     if (premises.size == 0L) decline(CutMappingDecline.MISSING_PROVENANCE)
                     for (premise in premises.boundEntries()) {

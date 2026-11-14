@@ -304,9 +304,9 @@ class ComponentLpSolverTest {
             builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
         }
         builder.addRow(intArrayOf(), longArrayOf(), Relation.LE, 0L)
-        val legacy = builder.build(Sense.MINIMIZE)
-        legacy.rowStrict[2] = true
-        val state = LpExactState(assertNotNull(legacy.authoritativeModel()))
+        val integer = builder.build(Sense.MINIMIZE)
+        integer.rowStrict[2] = true
+        val state = LpExactState(assertNotNull(integer.authoritativeModel()))
         val owner = assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel())))
 
         owner.use {
@@ -402,9 +402,9 @@ class ComponentLpSolverTest {
             builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
         }
         builder.addRow(intArrayOf(), longArrayOf(), Relation.LE, 2L)
-        val legacy = builder.build(Sense.MINIMIZE)
-        legacy.cost[legacy.slackCol(2)] = 3L
-        val model = assertNotNull(LpExactState(assertNotNull(legacy.authoritativeModel())).ownerWorkingModel())
+        val integer = builder.build(Sense.MINIMIZE)
+        integer.cost[integer.slackCol(2)] = 3L
+        val model = assertNotNull(LpExactState(assertNotNull(integer.authoritativeModel())).ownerWorkingModel())
 
         val result = solveAndCertify(model)
 

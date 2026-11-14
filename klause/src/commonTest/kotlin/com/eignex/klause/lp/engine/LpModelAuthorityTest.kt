@@ -7,7 +7,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-class LegacyLpModelTest {
+class LpModelAuthorityTest {
     @Test
     fun `IEEE bounds origins and objective should retain their source bits`() {
         val model = LpBuilder().apply { addRealVar(-0.0, 0.1, cost = 0.3, tag = 7) }.build(Sense.MAXIMIZE)
@@ -36,7 +36,7 @@ class LegacyLpModelTest {
     }
 
     @Test
-    fun `cancellation should not publish a legacy strict witness`() {
+    fun `cancellation should not publish a strict witness`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, 1.0)
             addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 0.0, strict = true)

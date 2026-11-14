@@ -39,7 +39,7 @@ class ExactLpInputAdapterTest {
         assertTrue(exact.column(1).integral)
         assertEquals(wide.toString(), exact.entries(1).single().number.value.toString())
         assertEquals((wide + BIG_ONE).toString(), exact.rhs(0).value.toString())
-        assertNull(exact.toLegacy())
+        assertNull(exact.toIntegerModel())
     }
 
     @Test
@@ -68,7 +68,7 @@ class ExactLpInputAdapterTest {
         assertTrue(exact.row(0).strict)
         assertFalse(exact.row(0).global)
         assertNotNull(exact.row(0).premises)
-        assertNull(exact.toLegacy())
+        assertNull(exact.toIntegerModel())
     }
 
     @Test
@@ -92,7 +92,7 @@ class ExactLpInputAdapterTest {
         assertEquals(third, model.entries(0).single().number.value)
         assertEquals(third, model.rhs(0).value)
         assertEquals(4, model.column(0).tag)
-        assertNull(model.toLegacy())
+        assertNull(model.toIntegerModel())
     }
 
     @Test
@@ -103,10 +103,10 @@ class ExactLpInputAdapterTest {
             factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 4)),
         )
 
-        val legacy = assertNotNull(QfLraSystem(model).build { true }.toExactLpModel().toLegacy())
+        val integer = assertNotNull(QfLraSystem(model).build { true }.toExactLpModel().toIntegerModel())
 
-        assertFalse(legacy.rowGlobal.single())
-        assertEquals(listOf(Lit.make(0, true)), assertNotNull(legacy.rowPremises.single()).boolLits.toList())
+        assertFalse(integer.rowGlobal.single())
+        assertEquals(listOf(Lit.make(0, true)), assertNotNull(integer.rowPremises.single()).boolLits.toList())
     }
 
     private fun openBounds(size: Int): IntBounds {

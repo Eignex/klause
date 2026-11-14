@@ -24,7 +24,7 @@ internal object MpsLpCheckpoint {
         val stop = Cancellation.after(30.seconds)
         val prepared = MpsLpAdmission.rootRelaxation(problem, objective, false, stop)
         val sourceModel = requireNotNull(call(prepared, "getModel"))
-        val authority = Class.forName(ENGINE + "LegacyLpModelKt").methods.single {
+        val authority = Class.forName(ENGINE + "LpModelAuthorityKt").methods.single {
             it.name == "authoritativeModel" && it.parameterCount == 1
         }.invoke(null, sourceModel)
         val trail = Class.forName(ENGINE + "LpBoundTrail").constructors.single {
