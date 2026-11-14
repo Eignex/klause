@@ -355,8 +355,12 @@ accepted point, and relations over integers and Booleans alone never read the sl
 `capturedRealAcceptance` owns this check. A refused point continues into exact
 completion. Local-search and ALNS workers
 [complete candidates](11-neighborhoods.md#continuous-candidate-completion) through the
-same acceptance, so every engine accepts the same points. A source with a product,
-power, absolute value, extremum or selection over reals has no acceptance, so its completions stay exact, and sources routed to a
+same acceptance, so every engine accepts the same points. Real coordinates that share
+a relation form a component, and acceptance judges each component on its own. A
+component with a product, power, absolute value, extremum or selection over reals
+holds exactly, its declarations and linear rows included, while other components keep
+the slack. A source whose every component holds exactly has no acceptance, so its
+completions stay exact, and sources routed to a
 [linear theory](15-linear-arithmetic.md) are decided exactly. Completed search
 reports its optimum or refutation under this numerical policy.
 
