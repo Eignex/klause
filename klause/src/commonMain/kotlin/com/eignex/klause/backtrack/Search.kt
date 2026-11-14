@@ -1088,9 +1088,9 @@ private class ResidualRealComponent(
             it is RealAbs || it is RealFiniteDomain ||
                 (it is ContinuousProduct && it.finiteChoices != null && !it.finiteChoices.hasGuards)
         }) AbsRealCompletion(problem) else null
-    // A finite membership is the one exact-completion relation a float leaf point can satisfy within tolerance.
-    private val floatMembership = toleranceCheck.permitsToleranceOptimum() &&
-        problem.factors.none { it is RealAbs || it is ContinuousProduct }
+    // A source that accepts points within its slack judges each real component on its own, holding a component with
+    // an absolute value or product exactly, so a float leaf point may complete these models before the exact search.
+    private val floatCompletion = toleranceCheck.permitsToleranceOptimum()
     private val solveContext = solveContext
     private var absWork = 0L
     private val engine = LpEngine(
@@ -1113,7 +1113,7 @@ private class ResidualRealComponent(
         completed = null
         if (context.cancelled()) return ComponentCheck.Indeterminate
         absCompletion?.let { completion ->
-            if (toleranceCheck != null && floatMembership) {
+            if (toleranceCheck != null && floatCompletion) {
                 engine.leafFloatCompletion(cp.session, toleranceCheck)?.let { sample ->
                     completed = sample
                     return ComponentCheck.Feasible
