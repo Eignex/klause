@@ -226,7 +226,7 @@ internal class FlatZincCompiler(
             definitionHints = definitionHints,
         ).also { program ->
             program.retainSource(FlatZincSourceState(program.suppliedCopy(), declaredRealCount,
-                selectLegacy = { finiteRepresentations }, projectSearch = { compileSearchAnnotation(it) }))
+                selectRepresentations = { finiteRepresentations }, projectSearch = { compileSearchAnnotation(it) }))
         }
     }
 

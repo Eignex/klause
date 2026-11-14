@@ -786,7 +786,6 @@ final enum class com.eignex.klause.solver.pipeline/PreparedExecutionKind : kotli
 }
 
 final enum class com.eignex.klause.solver.pipeline/PreparedPlanDecline : kotlin/Enum<com.eignex.klause.solver.pipeline/PreparedPlanDecline> { // com.eignex.klause.solver.pipeline/PreparedPlanDecline|null[0]
-    enum entry CONTINUOUS_LINEAR_OBJECTIVE // com.eignex.klause.solver.pipeline/PreparedPlanDecline.CONTINUOUS_LINEAR_OBJECTIVE|null[0]
     enum entry OPEN_POLYNOMIAL_INTEGER // com.eignex.klause.solver.pipeline/PreparedPlanDecline.OPEN_POLYNOMIAL_INTEGER|null[0]
     enum entry POLYNOMIAL_ENCODING // com.eignex.klause.solver.pipeline/PreparedPlanDecline.POLYNOMIAL_ENCODING|null[0]
     enum entry RESOURCE // com.eignex.klause.solver.pipeline/PreparedPlanDecline.RESOURCE|null[0]

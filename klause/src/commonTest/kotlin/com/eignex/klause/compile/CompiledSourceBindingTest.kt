@@ -193,7 +193,7 @@ class CompiledSourceBindingTest {
         val compiled = schema.compile()
         val point = BacktrackSolver(compiled.problem.bake()).enumerate().single()
         val original = compiled.sourceBinding.originalProblem
-        val column = assertNotNull(compiled.sourceBinding.legacyColumn(schema.x.value.name))
+        val column = assertNotNull(compiled.sourceBinding.compatibilityColumn(schema.x.value.name))
 
         assertNull(compiled.decode(schema.x, point))
         assertEquals(0.0, compiled.decode(schema.x.value, point))
