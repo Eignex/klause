@@ -31,6 +31,7 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchModelKey
+import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
@@ -897,4 +898,35 @@ class QfLiraSolverTest {
         val open = Bits(size).also { bits -> repeat(size, bits::set) }
         return IntBounds.fromModelBounds(LongArray(size), LongArray(size), open, open)
     }
+
+    @Test
+    fun `linear adapter should enforce source predicates and retract their scope`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(1.0),
+            realUpper = doubleArrayOf(2.0),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val split = assertNotNull(
+                SourceBoundAtom.rationalSplit(
+                    session,
+                    listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)),
+                    BigFraction.ZERO,
+                ),
+            )
+
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Theory(split.positive)))
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.negative)))
+
+            assertIs<ComponentCheck.Feasible>(session.check())
+        }
+    }
+
 }

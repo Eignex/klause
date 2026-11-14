@@ -2,14 +2,18 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.TheoryCompletion
+import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
 class SmtLibRealTest {
@@ -238,5 +242,32 @@ class SmtLibRealTest {
         assertEquals("1", point.intValue(source.intVarNames.getValue("n")))
         assertEquals(false, point.boolValue(source.boolVarNames.getValue("b")))
         assertEquals(0, source.model.numRealVars)
+    }
+
+    @Test
+    fun `a full predicate table should retain names and still create uncached definitions`() {
+        val predicates = SmtRealPredicates(Cancellation.Never, maxEntries = 2)
+        val first = RealComb(emptyMap(), mapOf(0 to BigFraction.ONE), BigFraction.ZERO)
+        val second = RealComb(emptyMap(), mapOf(1 to BigFraction.ONE), BigFraction.ZERO)
+        var next = 0
+
+        val names = listOf(first, second, second, first).map { term ->
+            predicates.literal(term, LinearOp.LE, strict = false) { next++ }
+        }
+
+        assertEquals(listOf(0, 1, 2, 0), names)
+    }
+
+    @Test
+    fun `an interrupted predicate lookup should not create a definition`() {
+        val predicates = SmtRealPredicates(Cancellation { true })
+        val term = RealComb(emptyMap(), mapOf(0 to BigFraction.ONE), BigFraction.ZERO)
+        var definitions = 0
+
+        assertFailsWith<PolynomialSourceInterrupted> {
+            predicates.literal(term, LinearOp.LE, strict = false) { definitions++ }
+        }
+
+        assertEquals(0, definitions)
     }
 }
