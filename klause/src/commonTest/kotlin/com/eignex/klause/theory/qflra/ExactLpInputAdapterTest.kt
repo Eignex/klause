@@ -103,10 +103,10 @@ class ExactLpInputAdapterTest {
             factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 4)),
         )
 
-        val legacy = assertNotNull(QfLraSystem(model).build { true }.toExactLpModel().toIntegerModel())
+        val integer = assertNotNull(QfLraSystem(model).build { true }.toExactLpModel().toIntegerModel())
 
-        assertFalse(legacy.rowGlobal.single())
-        assertEquals(listOf(Lit.make(0, true)), assertNotNull(legacy.rowPremises.single()).boolLits.toList())
+        assertFalse(integer.rowGlobal.single())
+        assertEquals(listOf(Lit.make(0, true)), assertNotNull(integer.rowPremises.single()).boolLits.toList())
     }
 
     private fun openBounds(size: Int): IntBounds {
