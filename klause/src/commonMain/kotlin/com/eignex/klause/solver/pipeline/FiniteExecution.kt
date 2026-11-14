@@ -527,7 +527,6 @@ internal fun FinitePipeline.solve(
     require(request.engine == FiniteEngine.FIXED || lpSolveContext == request.lpSolveContext) {
         "custom LP dependencies require the fixed finite route"
     }
-    request.shape.sourceInvocation?.freezeExecution()
     val stop = request.shape.sourceInvocation?.let {
         (request.cancellation or it.cancellation).encodingPreparationScope()
     } ?: request.cancellation
