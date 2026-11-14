@@ -6,6 +6,7 @@ import com.eignex.klause.formats.flatzinc.FlatZincCompiler.IntegerFloatImage
 import com.eignex.klause.formats.flatzinc.FlatZincCompiler.IntegerFloatProduct
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.validation.capturedSourceSlack
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.fitsLong
@@ -113,13 +114,17 @@ internal fun FlatZincCompiler.needsRoundedFloatBounds(variable: Int, image: Inte
     val bounds = floatVars.values.first { it.varId == variable }
     val values = intDomains[image.variable].spanOrNull(limit.toLong()) ?: return false
     val scale = requireNotNull(BigFraction.ofDouble(image.scale))
+    // The original arm accepts an image within the declared slack of its bound, so only a wider crossing rounds.
+    val policy = sourceSemantics.effective.feasibilityTolerance
+    val lower = requireNotNull(BigFraction.ofDouble(bounds.lo))
+    val upper = requireNotNull(BigFraction.ofDouble(bounds.hi))
     for (i in 0 until values.size) {
         val value = values.valueAt(i)
         val rounded = image.scale * value.toDouble()
         if (rounded != bounds.lo && rounded != bounds.hi) continue
         val exact = scale * BigFraction.ofLong(value)
-        if ((rounded == bounds.lo && exact < requireNotNull(BigFraction.ofDouble(bounds.lo))) ||
-            (rounded == bounds.hi && exact > requireNotNull(BigFraction.ofDouble(bounds.hi)))
+        if ((rounded == bounds.lo && exact < lower - capturedSourceSlack(policy, lower)) ||
+            (rounded == bounds.hi && exact > upper + capturedSourceSlack(policy, upper))
         ) {
             return true
         }

@@ -657,8 +657,11 @@ internal fun FinitePipeline.solve(
             definitionalSweep = request.shape.definitionalSweep,
             searchHints = searchHints,
             cores = request.cores,
-            executionOptions = if (linearSource == null) request.executionOptions else
-                request.executionOptions.withNumericalCompletion(),
+            // A source that accepts points within its slack completes numerically in every worker; exact
+            // completion in the incomplete workers would refuse the points the complete ones publish.
+            executionOptions = if (linearSource == null &&
+                (invocation == null || gridPublication != null || !sourceCheck.permitsToleranceOptimum())
+            ) request.executionOptions else request.executionOptions.withNumericalCompletion(),
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
             lpConfig = request.lpConfig,

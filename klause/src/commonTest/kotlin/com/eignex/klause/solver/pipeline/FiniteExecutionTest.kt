@@ -38,11 +38,15 @@ class FiniteExecutionTest {
         solve satisfy;
     """.trimIndent()
 
-    private fun solveFlatZinc(overrides: SemanticOverrides, onSample: (Sample) -> Unit = {}): FiniteSolveVerdict {
+    private fun solveFlatZinc(
+        overrides: SemanticOverrides,
+        engine: FiniteEngine = FiniteEngine.FIXED,
+        onSample: (Sample) -> Unit = {},
+    ): FiniteSolveVerdict {
         val program = parseFlatZinc(roundedBound, semanticOverrides = overrides)
         val invocation = program.prepareSourceExecution(SourceSetupRequest(program.sourceAttachment(),
-            ExecutionOperation.SATISFY, FiniteEngine.FIXED))
-        val request = SourceExecutionPolicy().finiteRequest(invocation.finiteShape(), FiniteEngine.FIXED,
+            ExecutionOperation.SATISFY, engine))
+        val request = SourceExecutionPolicy().finiteRequest(invocation.finiteShape(), engine,
             presolveConfig = PresolveConfig.NONE, cancellation = Cancellation.after(1.seconds))
 
         val result = FinitePipeline.solve(request, FiniteSolveCallbacks(onSample, {}))
@@ -54,10 +58,22 @@ class FiniteExecutionTest {
     fun `a FlatZinc real completion should be accepted within the declared tolerance`() {
         val samples = ArrayList<Sample>()
 
-        val verdict = solveFlatZinc(SemanticOverrides(), samples::add)
+        val verdict = solveFlatZinc(SemanticOverrides(), onSample = samples::add)
 
         assertEquals(FiniteSolveVerdict.SAT, verdict)
         assertNull(samples.single().exactReals)
+    }
+
+    @Test
+    fun `incomplete engines should accept a FlatZinc real completion within the declared tolerance`() {
+        for (engine in listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
+            val samples = ArrayList<Sample>()
+
+            val verdict = solveFlatZinc(SemanticOverrides(), engine, samples::add)
+
+            assertEquals(FiniteSolveVerdict.SAT, verdict, "$engine")
+            assertNull(samples.last().exactReals, "$engine")
+        }
     }
 
     @Test

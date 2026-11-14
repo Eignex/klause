@@ -2,6 +2,8 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
@@ -10,21 +12,31 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class FlatZincIntegerFloatImagesTest {
+    // Binary64 `0.01 * 200` exceeds the declared bound `2.0` by `3/72057594037927936`.
+    private val roundedBound = """
+        var {50, 100, 200}: n;
+        var 50.0..200.0: raw;
+        var 0.5..2.0: scaled;
+        constraint int2float(n, raw);
+        constraint float_lin_eq([0.01, -1.0], [raw, scaled], 0.0);
+        solve satisfy;
+    """.trimIndent()
+
+    @Test
+    fun `a rounded bound within the declared slack should keep the original representation`() {
+        val program = parseFlatZinc(roundedBound, floatBuckets = 2)
+
+        assertTrue(program.floatVarsByName.getValue("scaled").lpOnly)
+        assertFalse(program.floatRepresentations.getValue("scaled").approximate)
+    }
+
     @Test
     fun `rounded derived bounds should preserve exact source intake and a private grid view`() {
-        val source = """
-            var {50, 100, 200}: n;
-            var 50.0..200.0: raw;
-            var 0.5..2.0: scaled;
-            constraint int2float(n, raw);
-            constraint float_lin_eq([0.01, -1.0], [raw, scaled], 0.0);
-            solve satisfy;
-        """.trimIndent()
-
-        val program = parseFlatZinc(source, floatBuckets = 2)
+        val program = parseFlatZinc(roundedBound, floatBuckets = 2,
+            semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()))
 
         assertFalse(program.floatVarsByName.getValue("scaled").lpOnly)
-        val exact = parseFlatZinc(source, exactFloats = true).sourceProgram
+        val exact = parseFlatZinc(roundedBound, exactFloats = true).sourceProgram
         assertTrue(exact.floatVarsByName.values.all { it.lpOnly })
         assertTrue(exact.problem.realLower.contentEquals(doubleArrayOf(50.0, 0.5)))
         assertTrue(exact.problem.realUpper.contentEquals(doubleArrayOf(200.0, 2.0)))
