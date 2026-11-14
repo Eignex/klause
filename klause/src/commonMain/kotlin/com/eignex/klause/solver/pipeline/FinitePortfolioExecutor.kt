@@ -124,8 +124,9 @@ internal fun FinitePipeline.portfolioExecutor(
     val identity = ModelIdentity.of(problem, objective)
     val binding = EngineInvocation(preparedPlan, identity, objective)
     val companionArms = FiniteCompanionArms.assemble(problem, scenario, objective,
-        FiniteCompanionControls(numericalCompanions, incumbentCompletionCheck, fundedCompanions,
-            waitForCompanionImprovement, adaptiveCompanionRepair, onJointRepair),
+        FiniteCompanionControls(params = numericalCompanions, incumbentCompletionCheck = incumbentCompletionCheck,
+            funded = fundedCompanions, waitForImprovement = waitForCompanionImprovement,
+            adaptiveRepair = adaptiveCompanionRepair, onJointRepair = onJointRepair),
         cancellation, onEvent)
     val finiteFactories = PortfolioBuilder.factories(
         problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
