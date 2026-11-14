@@ -11,6 +11,7 @@ import com.eignex.klause.solver.pipeline.FloatGridConsumerPurpose
 import com.eignex.klause.solver.pipeline.PreparedSourceInvocation
 import com.eignex.klause.solver.pipeline.SelectedFloatGridPreparation
 import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.SourceRouteSelection
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.prepareSelectedFloatGrid
@@ -52,20 +53,20 @@ internal class FlatZincSourceState(
         if (original.semantics.effective.floats !is FloatSemantics.Grid) {
             return FlatZincGridGeometry(null, original.floatRepresentations)
         }
-        val (representations, variables) = requireNotNull(selection(Cancellation.Never))
+        val (representations, variables) = requireNotNull(gridVariables(Cancellation.Never))
         if (variables.isEmpty()) return FlatZincGridGeometry(null, representations)
-        val invocation = SourceSetup.prepare(SourceSetupRequest(attachment(), ExecutionOperation.SATISFY,
+        val selection = SourceSetup.selectRoute(SourceSetupRequest(attachment(), ExecutionOperation.SATISFY,
             FiniteEngine.LOCAL_SEARCH))
-        val prepared = SourceSetup.prepareSelectedFloatGrid(invocation, variables,
+        val prepared = SourceSetup.prepareSelectedFloatGrid(selection, variables,
             FloatGridConsumerPurpose.FINITE_COMPATIBILITY, declaredGridSemantics = true)
         if (prepared !is SelectedFloatGridPreparation.Prepared) {
             return FlatZincGridGeometry(null, original.floatRepresentations)
         }
-        val definition = requireNotNull(invocation.floatGrid).projection.mapping.definition()
+        val definition = requireNotNull(prepared.invocation.floatGrid).projection.mapping.definition()
         return FlatZincGridGeometry(definition, representations)
     }
 
-    private fun selection(
+    private fun gridVariables(
         cancellation: Cancellation,
     ): Pair<Map<String, FloatRepresentation>, List<FloatGridVariable>>? {
         cancellation.charge(original.problem.numFactors.toLong() + original.problem.numRealVars)
@@ -96,20 +97,19 @@ internal class FlatZincSourceState(
         return if (cancellation()) null else representations to variables
     }
 
-    fun prepare(invocation: PreparedSourceInvocation, purpose: FloatGridConsumerPurpose) {
-        val stop = invocation.cancellation
+    fun selectGrid(selection: SourceRouteSelection, purpose: FloatGridConsumerPurpose): SelectedFloatGridPreparation? {
+        val stop = selection.cancellation
         if (stop() || original.problem.numRealVars == 0 ||
             original.semantics.effective.floats !is FloatSemantics.Grid
-        ) return
+        ) return null
         if (geometryOwner.isInitialized()) {
-            geometry.definition?.let {
-                SourceSetup.prepareSelectedFloatGrid(invocation, it, purpose, declaredGridSemantics = true)
+            return geometry.definition?.let {
+                SourceSetup.prepareSelectedFloatGrid(selection, it, purpose, declaredGridSemantics = true)
             }
-        } else {
-            val (_, variables) = selection(stop) ?: return
-            if (variables.isNotEmpty()) SourceSetup.prepareSelectedFloatGrid(invocation, variables, purpose,
-                declaredGridSemantics = true)
         }
+        val (_, variables) = gridVariables(stop) ?: return null
+        return if (variables.isEmpty()) null else SourceSetup.prepareSelectedFloatGrid(selection, variables, purpose,
+            declaredGridSemantics = true)
     }
 
     fun executionProgram(invocation: PreparedSourceInvocation): FlatZincProgram {
@@ -240,9 +240,9 @@ private fun FlatZincProgram.prepareInvocation(
     onLpStats: ((LpStats) -> Unit)? = null,
 ): PreparedSourceInvocation {
     require(request.source.originalSource === sourceProgram.problem) { "FlatZinc request belongs to another source" }
-    val invocation = if (onLpStats == null) SourceSetup.prepare(request) else SourceSetup.prepare(request, onLpStats)
-    retainedSource?.prepare(invocation, purpose)
-    return invocation
+    val state = retainedSource
+    return SourceSetup.prepareWithGrid(request, { selection -> state?.selectGrid(selection, purpose) },
+        onLpStats = onLpStats)
 }
 
 internal fun FlatZincProgram.forSample(sample: Sample): FlatZincProgram {

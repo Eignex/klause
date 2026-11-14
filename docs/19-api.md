@@ -81,11 +81,12 @@ models keep finite execution. Native snapshots (`PolynomialRealProblem`,
 with explicit `ProblemSettings` and keep their exact formula and objective. Hints are
 described under [source definition materialization](10-local-search.md#source-definition-materialization).
 
-`PreparedSourceInvocation` retains the selected route, source plan and operation
-admission. When preparation selects a private float grid, `FiniteSolveResult.outcome`
-reports source-qualified points and claims unless the consumer declares grid
-semantics. FlatZinc declares that scope, recorded by
-`SourceFloatProjection.declaredGridSemantics`, and reports grid witnesses, optima
+`PreparedSourceInvocation` retains the selected route, source plan, operation
+admission and any private grid. Setup finishes route and grid selection before
+returning it, so an invocation never changes its execution view. With a private
+float grid, `FiniteSolveResult.outcome` reports source-qualified points and claims
+unless the consumer declares grid semantics. FlatZinc declares that scope, recorded
+by `SourceFloatProjection.declaredGridSemantics`, and reports grid witnesses, optima
 and refutations. `nativeGridOutcome` keeps the grid's own outcome in either case.
 An interrupted preparation returns `Declined` with its stop reason.
 
