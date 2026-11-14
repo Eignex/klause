@@ -136,6 +136,9 @@ Read `klause-bench/README.md` before benchmarking. In short:
   bounds a triangular block implies. It is a leaf: `util` and nothing else.
 - `lp` and its remaining subpackages own the model-facing half: relaxation assembly from factors,
   separators, bounding policy, open-model reasoning. Dependencies point at `lp.engine`, never back.
+- `PreparedFactorProjections` is an immutable per-source selection. LP template retention, admission,
+  funding and namespace inheritance belong to `lp.relaxation.LpPreparationCache`, which a selection
+  only carries; views that keep the source's factors inherit it, and rewrites start a fresh one.
 - `bound` owns the combinatorial bounds a CP constraint admits on its own: Lagrangian duals over
   AllDifferent and multi-knapsack structure, energetic and flow feasibility over `Cumulative`. It
   reads factors, `ir`, `solver.objective`, and propagation state, and may read `lp.relaxation`
