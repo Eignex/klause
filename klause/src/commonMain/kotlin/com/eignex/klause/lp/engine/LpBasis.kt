@@ -120,27 +120,4 @@ internal class ExactLpBasis(headings: List<Int>, statuses: List<ExactLpStatus>) 
             }
         }
     }
-
-    fun toLegacy(model: ExactLpModel): LegacyLpBasis? {
-        if (!validFor(model)) return null
-        val legacy = model.toLegacy() ?: return null
-        val status = Array(statuses.size) { j ->
-            when (statuses[j]) {
-                ExactLpStatus.BASIC -> VarStatus.BASIC
-                ExactLpStatus.AT_LOWER, ExactLpStatus.FIXED -> VarStatus.AT_LOWER
-                ExactLpStatus.AT_UPPER -> VarStatus.AT_UPPER
-                ExactLpStatus.FREE -> return null
-            }
-        }
-        val basis = Basis(headings.toIntArray(), status, captureEligible = ExactLpStatus.FIXED !in statuses)
-        return LegacyLpBasis(model, this, legacy, basis)
-    }
 }
-
-// Retain fixedness and the exact immutable authority alongside the independently owned legacy data.
-internal class LegacyLpBasis(
-    val source: ExactLpModel,
-    val exactBasis: ExactLpBasis,
-    val model: LpModel,
-    val basis: Basis,
-)

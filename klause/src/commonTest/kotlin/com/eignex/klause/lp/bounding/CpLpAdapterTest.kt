@@ -646,7 +646,7 @@ class CpLpAdapterTest {
             } -
                 coefficients[boolColumn]
             assertEquals(1L, rhs)
-            val premises = assertNotNull(authority.row(row).premises?.toLegacy())
+            val premises = assertNotNull(authority.row(row).premises?.toRowPremises())
             val facts = premises.vars.indices.map { index ->
                 CutProofFact(
                     CutPremise.Bound(

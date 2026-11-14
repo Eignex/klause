@@ -246,7 +246,7 @@ class ExactBasisVerifyTest {
     }
 
     @Test
-    fun `a mutated legacy matrix or reordered headings should not reuse factors`() {
+    fun `a mutated integer matrix or reordered headings should not reuse factors`() {
         val model = LpBuilder().apply {
             repeat(2) { addVar(0L, 2L) }
             addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L)

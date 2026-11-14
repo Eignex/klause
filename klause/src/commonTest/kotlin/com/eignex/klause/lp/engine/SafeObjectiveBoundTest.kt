@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 
 class SafeObjectiveBoundTest {
     @Test
-    fun `supplied legacy certificates should not preserve a bound after its objective changes`() {
+    fun `supplied certificates on an integer model should not preserve a bound after its objective changes`() {
         val model = LpBuilder().apply {
             val x = addVar(0L, 9L, cost = 1L)
             val y = addVar(0L, 9L, cost = 1L)
