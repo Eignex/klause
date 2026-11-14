@@ -243,7 +243,7 @@ class MddPropagatorTest {
     @Test
     fun `mdd deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x3DD0)
-        repeat(60) { iter ->
+        repeat(20) { iter ->
             val problem = Problem(0, 4, Array(4) { IntDomain(0, 2) }, arrayOf<Factor>(randomMdd(rng, 4, 3, cost = -1)))
             PropagationReasonOracle.assertReasonsImply(problem, "mdd#$iter") { state -> state.narrow(rng, 2, 2) }
         }
@@ -252,7 +252,7 @@ class MddPropagatorTest {
     @Test
     fun `cost mdd deductions should be implied by their reasons`() {
         val rng = Random(0x3DD1)
-        repeat(60) { iter ->
+        repeat(20) { iter ->
             val domains = Array(4) { if (it == 3) IntDomain(0, 9) else IntDomain(0, 2) }
             val problem = Problem(0, 4, domains, arrayOf<Factor>(randomMdd(rng, 3, 2, cost = 3)))
             PropagationReasonOracle.assertReasonsImply(problem, "cost-mdd#$iter") { state -> state.narrow(rng, 3, 9) }

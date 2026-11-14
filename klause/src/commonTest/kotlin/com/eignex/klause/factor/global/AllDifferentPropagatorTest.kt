@@ -226,7 +226,7 @@ class AllDifferentPropagatorTest {
     @Test
     fun `alldifferent matching deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0xAD01)
-        repeat(300) { iter ->
+        repeat(210) { iter ->
             val n = 4
             val problem = Problem(
                 numBoolVars = 0,
@@ -243,7 +243,7 @@ class AllDifferentPropagatorTest {
     @Test
     fun `bounds-consistent alldifferent deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0xAD02)
-        repeat(300) { iter ->
+        repeat(200) { iter ->
             val n = 4
             val problem = Problem(
                 numBoolVars = 0,

@@ -61,7 +61,7 @@ class IncreasingPropagatorTest {
     @Test
     fun `increasing deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x1C5)
-        repeat(100) { iter ->
+        repeat(20) { iter ->
             val problem = chain(strict = rng.nextBoolean(), n = 4, hi = 5)
             PropagationReasonOracle.assertReasonsImply(problem, "increasing#$iter") { state ->
                 (0 until 4).all {

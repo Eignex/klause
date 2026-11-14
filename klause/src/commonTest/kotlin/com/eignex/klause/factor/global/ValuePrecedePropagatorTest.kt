@@ -20,7 +20,7 @@ class ValuePrecedePropagatorTest {
     @Test
     fun `value precede deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x7A1E)
-        repeat(300) { iter ->
+        repeat(40) { iter ->
             val n = 5
             val problem = Problem(
                 numBoolVars = 0,

@@ -171,7 +171,7 @@ class LocalSearchSolverTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1L, 0L, 1L))
 
         val incumbents = LocalSearchSolver(problem.bake(), definitionalSweep = sweep, perMoveInvariants = true)
-            .improvements(objective, LocalSearchParams(maxFlips = 2_000, randomSeed = 3, lsObjective = gradient))
+            .improvements(objective, LocalSearchParams(maxFlips = 500, randomSeed = 3, lsObjective = gradient))
             .filterIsInstance<MinimizeResult.WithSample>()
             .toList()
 

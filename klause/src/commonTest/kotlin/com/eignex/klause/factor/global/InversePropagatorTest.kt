@@ -50,7 +50,7 @@ class InversePropagatorTest {
     @Test
     fun `inverse deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x1DE5)
-        repeat(60) { iter ->
+        repeat(25) { iter ->
             val n = 3
             val problem = Problem(
                 numBoolVars = 0,

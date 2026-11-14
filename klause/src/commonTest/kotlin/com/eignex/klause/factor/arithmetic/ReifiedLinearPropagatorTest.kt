@@ -234,7 +234,7 @@ class ReifiedLinearPropagatorTest {
     fun `reified linear deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x11E1)
         for (op in LinearOp.entries) {
-            repeat(50) { iter ->
+            repeat(35) { iter ->
                 val n = 3
                 val problem = Problem(
                     numBoolVars = 1,

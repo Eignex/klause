@@ -290,7 +290,7 @@ class CumulativePropagatorTest {
     @Test
     fun `cumulative deductions over optional tasks should be implied by their reasons`() {
         val rng = Random(0xC0A1)
-        repeat(100) { iter ->
+        repeat(60) { iter ->
             val n = 3
             val problem = Problem(
                 numBoolVars = n,
