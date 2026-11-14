@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class GeneralWatchReclamationTest {
@@ -197,4 +198,33 @@ class GeneralWatchReclamationTest {
         assertEquals(generation, session.learnedRetirementGeneration)
     }
 
+    @Test
+    fun `growing retired stores should release general ownership under production grants`() {
+        for (retiredCount in listOf(4000, 20_000)) {
+            val session = PropagationSession(Problem(6, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = false)
+            val baseline = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+            repeat(retiredCount) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
+            repeat(retiredCount / 1000) { session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false } }
+            assertEquals(0, session.activeLearnedClauseCount)
+            val generation = session.learnedRetirementGeneration
+
+            repeat(retiredCount / 250) {
+                val work = session.work
+                session.compactLearnedClauses(65_536L, 1_048_576L, { false }) { _, _ -> true }
+                assertTrue(session.work - work <= 65_536L)
+            }
+            val released = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+            assertEquals(0L, released.getValue("learnedPayloadBytes"))
+            assertTrue(released.getValue("sessionWatchCapacityBytes") <=
+                baseline.getValue("sessionWatchCapacityBytes"))
+            assertTrue(released.getValue("learnedMetadataCapacityBytes") <=
+                baseline.getValue("learnedMetadataCapacityBytes"))
+            assertTrue(released.getValue("ownedPrimitiveBytes") <= baseline.getValue("ownedPrimitiveBytes"))
+            assertEquals(generation, session.learnedRetirementGeneration)
+            session.pinBool(4, false)
+            assertEquals(true, session.boolValue(5))
+        }
+    }
 }
