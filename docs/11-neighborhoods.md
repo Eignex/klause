@@ -194,8 +194,10 @@ unsuccessful-pose marker. Post-incumbent admission keeps its objective
 and probe rules.
 
 Numerical completion uses the source tolerance callback when one is supplied;
-otherwise it needs exact certification. Exact completion uses bounded point recovery
-and sparse row repair, theory-backed linear completion keeps a worker-private
+otherwise it needs exact certification. A source whose acceptance admits tolerance
+points selects numerical completion for every local-search and ALNS worker, including
+a model whose discrete coordinates are all fixed. Exact completion uses bounded point
+recovery and sparse row repair, theory-backed linear completion keeps a worker-private
 conditioned query, and polynomial completion must accept the unchanged finite point.
 A completed witness is heuristic incumbent evidence, never an optimum proof.
 
