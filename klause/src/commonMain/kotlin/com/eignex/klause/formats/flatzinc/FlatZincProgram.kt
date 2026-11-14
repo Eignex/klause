@@ -48,24 +48,25 @@ class FlatZincProgram(
         private set
 
     /** Historical finite compatibility model, materialized only when requested. */
-    val problem: Problem get() = retainedSource?.legacy?.problem ?: suppliedProblem
+    val problem: Problem get() = retainedSource?.compatibility?.problem ?: suppliedProblem
 
     /** Integer names in the historical finite compatibility frame. */
-    val intVarsByName: Map<String, Int> get() = retainedSource?.legacy?.intVarsByName ?: suppliedInts
+    val intVarsByName: Map<String, Int> get() = retainedSource?.compatibility?.intVarsByName ?: suppliedInts
 
     /** Float decoders paired with the historical finite compatibility model. */
-    val floatVarsByName: Map<String, FloatBucketing> get() = retainedSource?.legacy?.floatVarsByName ?: suppliedFloats
+    val floatVarsByName: Map<String, FloatBucketing>
+        get() = retainedSource?.compatibility?.floatVarsByName ?: suppliedFloats
 
     /** Arrays paired with the historical finite compatibility model. */
-    val arraysByName: Map<String, FlatZincArray> get() = retainedSource?.legacy?.arraysByName ?: suppliedArrays
+    val arraysByName: Map<String, FlatZincArray> get() = retainedSource?.compatibility?.arraysByName ?: suppliedArrays
 
     /** Component provenance paired with the historical finite compatibility model. */
     val floatRepresentations: Map<String, FloatRepresentation>
-        get() = retainedSource?.legacy?.floatRepresentations ?: suppliedRepresentations
+        get() = retainedSource?.compatibility?.floatRepresentations ?: suppliedRepresentations
 
     /** Search groups in the historical finite compatibility coordinates. */
     val searchHints: FlatZincSearchHints? get() {
-        retainedSource?.let { return it.legacy.searchHints }
+        retainedSource?.let { return it.compatibility.searchHints }
         return suppliedSearchHints
     }
 

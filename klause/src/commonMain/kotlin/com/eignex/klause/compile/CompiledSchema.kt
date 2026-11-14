@@ -67,9 +67,9 @@ class CompiledSchema internal constructor(
         representations = floatRepresentations)
 
     /** Explicit finite compatibility view; source strategies retain the original declarations. */
-    val problem: Problem get() = sourceBinding.legacyProblem
+    val problem: Problem get() = sourceBinding.compatibilityProblem
 
-    internal val realVarIdByName: Map<String, Int> get() = sourceBinding.legacyRealNames()
+    internal val realVarIdByName: Map<String, Int> get() = sourceBinding.compatibilityRealNames()
 
     private val booleanIds: Map<String, Int> = boolVarIdByName.toMap()
 
@@ -79,7 +79,7 @@ class CompiledSchema internal constructor(
     private val integerIds: Map<String, Int> = intVarIdByName.toMap()
 
     /** Integer variable id by schema name (a defensive copy). */
-    val intVarIdByName: Map<String, Int> get() = sourceBinding.legacyIntegerNames()
+    val intVarIdByName: Map<String, Int> get() = sourceBinding.compatibilityIntegerNames()
 
     private val nominalIds: Map<String, Map<String, Int>> = nominalIndicators.mapValues { it.value.toMap() }
 
@@ -207,7 +207,7 @@ class CompiledSchema internal constructor(
             val id = sourceBinding.realNames[handle.name] ?: error("No float variable named '${handle.name}'")
             return sample.approximateRealValue(id)
         }
-        sourceBinding.legacyColumn(handle.name)?.let { column ->
+        sourceBinding.compatibilityColumn(handle.name)?.let { column ->
             return checkNotNull(column.value(sample.intValue(column.coordinate.variable))) {
                 "Float '${handle.name}' has an invalid value-carrier index"
             }.toDouble()
@@ -252,7 +252,7 @@ class CompiledSchema internal constructor(
      * preserves their ordering; decoding recovers the real value.
      */
     fun minimize(handle: FloatHandle): LinearObjective {
-        sourceBinding.legacyColumn(handle.name)?.let {
+        sourceBinding.compatibilityColumn(handle.name)?.let {
             return sourceBinding.paired(problem.minimizeInt(it.coordinate.variable))
         }
         realVarIdByName[handle.name]?.let { return realObjective(it, maximize = false) }
@@ -264,7 +264,7 @@ class CompiledSchema internal constructor(
 
     /** A [LinearObjective] that maximises [handle] — minimise the negated bucket id (or real column). */
     fun maximize(handle: FloatHandle): LinearObjective {
-        sourceBinding.legacyColumn(handle.name)?.let {
+        sourceBinding.compatibilityColumn(handle.name)?.let {
             return sourceBinding.paired(problem.maximizeInt(it.coordinate.variable))
         }
         realVarIdByName[handle.name]?.let { return realObjective(it, maximize = true) }
