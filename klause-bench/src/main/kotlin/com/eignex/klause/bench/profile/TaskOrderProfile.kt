@@ -81,7 +81,7 @@ internal object TaskOrderProfile {
         for (equal in listOf(false, true)) {
             val factors = arrayListOf<Factor>(Cumulative.unary(intArrayOf(0, 1), longArrayOf(2, 2)))
             if (equal) factors += Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)
-            val source = Problem(0, 2, Array(2) { IntDomain(0, 31) }, factors.toTypedArray())
+            val source = Problem.of(0, 2, Array(2) { IntDomain(0, 31) }, factors.toTypedArray())
             val name = if (equal) "equal-starts" else "free-pair"
             for (arm in arms) capture(source, name, arm, out)
             prefixes(source, name, out)
@@ -185,7 +185,7 @@ internal object TaskOrderProfile {
             ReifiedLinear(bool + 1, longArrayOf(-1, 1), intArrayOf(a, b), LinearOp.LE, -pair.durations[1]),
             Clause(intArrayOf(Lit.make(bool, true), Lit.make(bool + 1, true))),
         )
-        return Problem(
+        return Problem.of(
             source.numBoolVars + 2, source.numIntVars, source.declaredIntDomains, factors,
             impliedFactorMask = source.impliedFactorMask?.copyOf(factors.size),
             hasSymmetryBreaking = source.hasSymmetryBreaking,

@@ -26,7 +26,7 @@ class SourceSolvableTest(private val direction: String) {
 
     @Test
     fun `finite source definitions should retain one invocation and publish original objective units`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(2, 3)),
+        val source = Problem.of(0, 2, arrayOf(IntDomain(0, 1), IntDomain(2, 3)),
             arrayOf(Element(0, 1, longArrayOf(2, 3), arrIsVars = false, indexOffset = 0)))
         val maximize = direction == "maximize"
         val objective = LinearObjective(intCoefficients = longArrayOf(0, if (maximize) -1L else 1L))

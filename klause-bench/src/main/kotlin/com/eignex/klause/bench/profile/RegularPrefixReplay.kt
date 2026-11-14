@@ -125,7 +125,7 @@ internal fun regularPrefixDefinitions(source: Problem): RegularPrefixDefinitions
         ) { it < original.size && original[it] }
     }
     return RegularPrefixDefinitions(
-        Problem(
+        Problem.of(
             source.numBoolVars + count,
             domains.size,
             domains.toTypedArray(),

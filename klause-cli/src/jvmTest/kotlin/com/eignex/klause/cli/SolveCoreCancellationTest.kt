@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
 class SolveCoreCancellationTest {
     @Test
     fun `source publication cancellation should preserve its original exception without terminal claims`() {
-        val model = Problem(
+        val model = Problem.of(
             2,
             0,
             emptyArray(),

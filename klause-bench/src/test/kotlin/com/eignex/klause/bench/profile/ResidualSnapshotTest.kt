@@ -25,7 +25,7 @@ class ResidualSnapshotTest {
         @BeforeAll
         @JvmStatic
         fun initializeCodec() {
-            ProblemJson().encodeToString(Problem(0, 0, emptyArray(), emptyArray()))
+            ProblemJson().encodeToString(Problem.of(0, 0, emptyArray(), emptyArray()))
         }
     }
 
@@ -35,7 +35,7 @@ class ResidualSnapshotTest {
             Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
             Clause(intArrayOf(Lit.make(4, true), Lit.make(0, false), Lit.make(2, false))),
         )
-        val problem = Problem(6, 0, emptyArray(), factors.toTypedArray())
+        val problem = Problem.of(6, 0, emptyArray(), factors.toTypedArray())
         return ResidualSnapshots.capture(
             problem, LinearObjective(longArrayOf(1, -2, 3, 4, 5, -6), constant = 10),
             listOf(null, null, null, null, true, null), LearnedResidualInspection(emptyList(), 0, null),
@@ -91,7 +91,7 @@ class ResidualSnapshotTest {
 
     @Test
     fun `a learned PB and a checked cutoff should remain in the enforcing scope`() {
-        val problem = Problem(4, 0, emptyArray(), arrayOf(
+        val problem = Problem.of(4, 0, emptyArray(), arrayOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
         ))
@@ -118,7 +118,7 @@ class ResidualSnapshotTest {
     fun `interrupted capture should publish no partial payload`(interruptAt: Int) {
         var polls = 0
         val capture = ResidualSnapshots.capture(
-            Problem(3, 0, emptyArray(), Array(3) { Clause(intArrayOf(Lit.make(it, true))) }),
+            Problem.of(3, 0, emptyArray(), Array(3) { Clause(intArrayOf(Lit.make(it, true))) }),
             LinearObjective(), List(3) { null },
             LearnedResidualInspection(emptyList(), 0, null), JsonObject(emptyMap()), JsonObject(emptyMap()),
             null, Cancellation { ++polls >= interruptAt }, ResidualSnapshots.MAX_BYTES,
@@ -157,7 +157,7 @@ class ResidualSnapshotTest {
         val factors = (0 until 2).flatMap { c -> (0 until 5).map { i ->
             Clause(intArrayOf(Lit.make(c * 5 + i, true), Lit.make(c * 5 + (i + 1) % 5, true)))
         } }
-        val problem = Problem(10, 0, emptyArray(), factors.toTypedArray())
+        val problem = Problem.of(10, 0, emptyArray(), factors.toTypedArray())
         val context = ResidualCaptureContext(LinearObjective(), JsonObject(emptyMap()), JsonObject(emptyMap()),
             ResidualSnapshotBudget(1, 0))
         val recorder = ConditionalComponentTrace.Recorder(problem, Long.MAX_VALUE, 1, context)
@@ -173,7 +173,7 @@ class ResidualSnapshotTest {
     @Test
     fun `fixed objective contributions should remain exact beyond a signed word`() {
         val captured = ResidualSnapshots.capture(
-            Problem(3, 0, emptyArray(), emptyArray()),
+            Problem.of(3, 0, emptyArray(), emptyArray()),
             LinearObjective(longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE, Long.MIN_VALUE), constant = Long.MAX_VALUE),
             listOf(true, true, null), LearnedResidualInspection(emptyList(), 0, null),
             JsonObject(emptyMap()), JsonObject(emptyMap()), null, Cancellation.Never, ResidualSnapshots.MAX_BYTES,

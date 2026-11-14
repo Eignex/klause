@@ -25,7 +25,7 @@ class ConditionalComponentTraceTest {
         val bridge = mutableListOf(Lit.make(0, true), Lit.make(5, true))
         bridge.add(separatorPosition, Lit.make(separator, true))
         factors += Clause(bridge.toIntArray())
-        return Problem(11, 0, emptyArray(), factors.toTypedArray())
+        return Problem.of(11, 0, emptyArray(), factors.toTypedArray())
     }
 
     @ParameterizedTest

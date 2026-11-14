@@ -48,8 +48,8 @@ internal object ConditionalSymmetryProfile {
         val source = Dimacs.parseWcnf(bytes.decodeToString()).toProblem()
         val objective = source.objective.toLinearObjective()
         for (openingPins in listOf(false, true)) {
-            val problem = if (openingPins) source.problem.withFactors(source.problem.factors +
-                arrayOf(Clause(intArrayOf(Lit.make(2, true))), Clause(intArrayOf(Lit.make(3, true)))))
+            val problem = if (openingPins) source.problem.withFactors(source.problem.factors.asList() +
+                listOf(Clause(intArrayOf(Lit.make(2, true))), Clause(intArrayOf(Lit.make(3, true)))))
             else source.problem
             for (mode in listOf("default", "default,+objective-symmetry")) {
                 val stop = Cancellation.after(8.seconds)

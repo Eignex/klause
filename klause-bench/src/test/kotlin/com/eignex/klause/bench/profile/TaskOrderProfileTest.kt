@@ -19,7 +19,7 @@ import org.junit.jupiter.params.provider.ValueSource
 class TaskOrderProfileTest {
     @Test
     fun `order overlay gives each native source solution one extension`() {
-        val source = Problem(0, 2, Array(2) { IntDomain(0, 3) },
+        val source = Problem.of(0, 2, Array(2) { IntDomain(0, 3) },
             arrayOf(Cumulative.unary(intArrayOf(0, 1), longArrayOf(2, 2))))
         val params = BruteForceParams(randomSeed = 1)
         val expected = BruteForceSolver(source.bake()).enumerate(params).map { it.ints.toList() }.toSet()
@@ -33,7 +33,7 @@ class TaskOrderProfileTest {
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `both order alternatives enforce later source bounds`(forward: Boolean) {
-        val source = Problem(0, 2, Array(2) { IntDomain(0, 6) },
+        val source = Problem.of(0, 2, Array(2) { IntDomain(0, 6) },
             arrayOf(Cumulative.unary(intArrayOf(0, 1), longArrayOf(2, 2))))
         val session = PropagationSession(TaskOrderProfile.withOrderPair(source))
         val first = if (forward) 0 else 1
@@ -48,7 +48,7 @@ class TaskOrderProfileTest {
 
     @Test
     fun `undo removes the chosen source order`() {
-        val source = Problem(0, 2, Array(2) { IntDomain(0, 6) },
+        val source = Problem.of(0, 2, Array(2) { IntDomain(0, 6) },
             arrayOf(Cumulative.unary(intArrayOf(0, 1), longArrayOf(2, 2))))
         val session = PropagationSession(TaskOrderProfile.withOrderPair(source))
         session.pinBool(0, true)
@@ -68,7 +68,7 @@ class TaskOrderProfileTest {
             presents = if (shape == "optional") intArrayOf(Lit.make(0, true), Lit.make(0, true)) else intArrayOf(),
             durationVars = if (shape == "variable") intArrayOf(2, 2) else intArrayOf(),
         )
-        val source = Problem(1, 3, Array(3) { IntDomain(0, 6) }, arrayOf(factor))
+        val source = Problem.of(1, 3, Array(3) { IntDomain(0, 6) }, arrayOf(factor))
 
         val ordered = TaskOrderProfile.withOrderPair(source)
 

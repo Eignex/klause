@@ -167,11 +167,11 @@ internal object GlobalScoringComparison {
     }
 
     private fun fixtures(out: File) {
-        val mandatory = Problem(0, 5, Array(5) { IntDomain(0, 4) },
+        val mandatory = Problem.of(0, 5, Array(5) { IntDomain(0, 4) },
             arrayOf(AllDifferent(intArrayOf(0, 1, 2, 3, 4))))
-        val optional = Problem(2, 3, Array(3) { IntDomain(0, 2) }, arrayOf(AllDifferent(intArrayOf(0, 0, 1, 2),
+        val optional = Problem.of(2, 3, Array(3) { IntDomain(0, 2) }, arrayOf(AllDifferent(intArrayOf(0, 0, 1, 2),
             intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(0, true), Lit.make(1, true)), longArrayOf(0))))
-        val weighted = Problem(0, 3, Array(3) { IntDomain(0, 7) }, arrayOf(Mdd(intArrayOf(0, 1),
+        val weighted = Problem.of(0, 3, Array(3) { IntDomain(0, 7) }, arrayOf(Mdd(intArrayOf(0, 1),
             intArrayOf(1, 2, 1), intArrayOf(0, 8, 16),
             longArrayOf(0, 0, 0, 2, 0, 1, 1, 3, 0, 1, 0, 3, 1, 0, 0, 4), 0, intArrayOf(0), 4, 2)))
         out.resolve("fixtures.jsonl").bufferedWriter().use { writer ->
@@ -364,9 +364,10 @@ internal object GlobalScoringComparison {
         }
     }
 
-    private fun copy(source: Problem, factors: Array<Factor>): Problem = Problem(source.numBoolVars, source.numIntVars,
-        source.declaredIntDomains, factors, source.impliedFactorMask, source.hasSymmetryBreaking, source.numRealVars,
-        source.realLower, source.realUpper, source.settings, source.semantics)
+    private fun copy(source: Problem, factors: Array<Factor>): Problem = Problem.of(
+        source.numBoolVars, source.numIntVars, source.declaredIntDomains, factors, source.impliedFactorMask,
+        source.hasSymmetryBreaking, source.numRealVars, source.realLower, source.realUpper,
+        source.settings, source.semantics)
 
     private fun allocatedBytes(): Long {
         val bean = ManagementFactory.getThreadMXBean() as? ThreadMXBean ?: return -1L

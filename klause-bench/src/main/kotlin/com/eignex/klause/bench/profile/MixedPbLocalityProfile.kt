@@ -51,7 +51,7 @@ internal object MixedPbLocalityProfile {
                         add(Clause(intArrayOf(Lit.make(1, true), Lit.make(3, false))))
                         if (mode == 2) add(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 5))
                     }
-                    val problem = Problem(booleans, if (mode == 0) 0 else 1,
+                    val problem = Problem.of(booleans, if (mode == 0) 0 else 1,
                         if (mode == 0) emptyArray() else arrayOf(IntDomain(0, 10)), factors.toTypedArray())
                     val native = PropagationSession(problem, pbLearning = pb)
                     val cp = CpSearchComponent(native)

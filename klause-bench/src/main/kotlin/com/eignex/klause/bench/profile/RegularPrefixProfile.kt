@@ -100,7 +100,7 @@ internal object RegularPrefixProfile {
 
     private fun control(k: Int, allowTwo: Boolean): Problem {
         val transitions = longArrayOf(1, 2, 2, 3, 3, 1)
-        return Problem(
+        return Problem.of(
             0,
             k + 2,
             Array(k + 2) { IntDomain(1, 2) },

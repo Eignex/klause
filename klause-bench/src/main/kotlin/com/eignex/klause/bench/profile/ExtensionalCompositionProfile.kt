@@ -139,7 +139,7 @@ internal object ExtensionalCompositionProfile {
                 }
                 val allocation = bean.getThreadAllocatedBytes(thread)
                 val start = System.nanoTime()
-                val delta = Presolve.composeExtensional(problem.withFactors(factors), token)
+                val delta = Presolve.composeExtensional(problem.withFactors(factors.asList()), token)
                 val elapsed = System.nanoTime() - start
                 val allocated = bean.getThreadAllocatedBytes(thread) - allocation
                 val row = buildJsonObject {

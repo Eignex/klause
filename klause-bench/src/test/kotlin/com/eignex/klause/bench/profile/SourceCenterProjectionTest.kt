@@ -23,7 +23,7 @@ import kotlin.test.assertNull
 class SourceCenterProjectionTest {
     @Test
     fun `prepared root Boolean pins are enforced before a warm start`() {
-        val problem = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true)))))
+        val problem = Problem.of(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true)))))
 
         val (projected, decline) = projectedSourceCenter(Sample(booleanArrayOf(false), longArrayOf()),
             problem.bake(), VarRemap(intArrayOf(0), intArrayOf()), null, { it })
@@ -34,7 +34,7 @@ class SourceCenterProjectionTest {
 
     @Test
     fun `fresh definition networks retain a complete mixed center`() {
-        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)),
+        val problem = Problem.of(1, 1, arrayOf(IntDomain(0, 1)),
             arrayOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)))
         val sweep = assertNotNull(DefinitionalSweep.fromSource(problem,
             listOf(DefinitionHint.BooleanValue(0, Lit.make(0, true)))))
@@ -49,7 +49,7 @@ class SourceCenterProjectionTest {
 
     @Test
     fun `complete centers follow reordered Boolean and integer maps`() {
-        val problem = Problem(2, 2, Array(2) { IntDomain(0, 9) }, emptyArray())
+        val problem = Problem.of(2, 2, Array(2) { IntDomain(0, 9) }, emptyArray())
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         val source = Sample(booleanArrayOf(true, false), longArrayOf(3, 7))
         val reconstruct = { point: Sample ->
@@ -67,7 +67,7 @@ class SourceCenterProjectionTest {
     @Test
     fun `conflicting aliases decline rather than selecting the last source value`() {
         val state = LocalSearchState(LocalSearchModel.open(
-            Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())), Random(0))
+            Problem.of(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())), Random(0))
 
         val decline = loadSourceCenter(Sample(booleanArrayOf(), longArrayOf(3, 7)), state,
             VarRemap(intArrayOf(), intArrayOf(0, 0)), { it }) { }
@@ -78,7 +78,7 @@ class SourceCenterProjectionTest {
     @Test
     fun `an unmapped searched coordinate declines instead of receiving a default value`() {
         val state = LocalSearchState(LocalSearchModel.open(
-            Problem(1, 1, arrayOf(IntDomain(0, 9)), emptyArray())), Random(0))
+            Problem.of(1, 1, arrayOf(IntDomain(0, 9)), emptyArray())), Random(0))
 
         val decline = loadSourceCenter(Sample(booleanArrayOf(), longArrayOf(3)), state,
             VarRemap(intArrayOf(), intArrayOf(0)), { it }) { }
@@ -89,7 +89,7 @@ class SourceCenterProjectionTest {
     @Test
     fun `a center conflicting with a pin declines before search`() {
         val state = LocalSearchState(LocalSearchModel.open(
-            Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())), Random(0),
+            Problem.of(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())), Random(0),
             Assumptions(ints = mapOf(0 to 4L)))
 
         val decline = loadSourceCenter(Sample(booleanArrayOf(), longArrayOf(3)), state,

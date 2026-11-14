@@ -168,7 +168,7 @@ internal object AssignmentCostProfile {
         } else longArrayOf(1, 3, 4))
         val coefficients = objective.intCoefficients
         val cutoff = Linear(coefficients, IntArray(coefficients.size) { it }, LinearOp.LE, 10L)
-        val query = source.problem.withFactors(source.problem.factors + cutoff).bake(stop)
+        val query = source.problem.withFactors(source.problem.factors.asList() + cutoff).bake(stop)
         val root = PropagationSession(query, stop)
         val before = root.intDomain(0).toString()
         val pinned = root.pinInt(0, 1)

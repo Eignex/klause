@@ -15,12 +15,19 @@ import com.eignex.util.collections.Bits
  * root-propagated domains a finite engine branches on live on [com.eignex.klause.propagation.BakedProblem].
  * Factors mention Boolean, integer, and real variables in any mix.
  *
- * Structural arrays and factor payloads are borrowed read-only. Callers must keep them unchanged
- * for this model's lifetime, including lazy or resumable searches and plans derived from it.
- * Rewrites construct a fresh model and invalidate source-scoped plans and evidence. Assignment
- * publications and objective coefficients instead own their captured buffers.
+ * The model owns its structural arrays. [Problem.of] and the list overload of [withFactors] capture
+ * every array they receive, once; internal builders transfer ownership of freshly built arrays
+ * without a copy and never write them afterwards. The arrays read back through [factors],
+ * [impliedFactorMask], [realLower] and [realUpper] are that storage, so reads allocate nothing and
+ * readers must never write them.
+ *
+ * Factor payloads are borrowed read-only. A factor, built-in or custom, must keep its payload,
+ * membership and structural key unchanged for as long as any model, lazy or resumable search, plan
+ * or evidence derived from it is alive. Rewrites construct a fresh model and invalidate
+ * source-scoped plans and evidence. Assignment publications and objective coefficients own their
+ * captured buffers.
  */
-open class Problem(
+open class Problem internal constructor(
     /** Number of Boolean variables; ids occupy `[0, numBoolVars)`. */
     val numBoolVars: Int,
     /** Number of integer variables; ids occupy `[0, numIntVars)`. */
@@ -130,9 +137,10 @@ open class Problem(
      * Build a canonical source model from its declared integer bounds.
      *
      * The columns admit their whole range: a model that also excludes interior values states them, and
-     * reaches this class through [declaredIntDomains] or the value-set constructors instead.
+     * reaches this class through [declaredIntDomains] or the value-set constructors instead. The model
+     * adopts every array passed here: the internal builder transfers ownership.
      */
-    constructor(
+    internal constructor(
         numBoolVars: Int,
         intBounds: IntBounds,
         factors: Array<Factor>,
@@ -162,9 +170,10 @@ open class Problem(
      *
      * [openIntLo] / [openIntHi] (or their packed forms) mark the sides of [intDomains] whose endpoint was
      * invented to close a genuinely open declaration, so model-level consumers keep reasoning over the
-     * true open range. [modelBounds] supplies those bounds directly when a rebuild retains them.
+     * true open range. [modelBounds] supplies those bounds directly when a rebuild retains them. The
+     * model adopts [factors], the mask, the real bounds and packed marks: the builder transfers ownership.
      */
-    constructor(
+    internal constructor(
         numBoolVars: Int,
         numIntVars: Int,
         intDomains: Array<IntDomain>,
@@ -202,8 +211,8 @@ open class Problem(
         semantics = semantics,
     )
 
-    /** Overload taking factors as a [List]; they are stored as an [Array]. */
-    constructor(
+    /** Overload taking factors as a [List]; they are stored as an [Array] and the other arrays are adopted. */
+    internal constructor(
         numBoolVars: Int,
         numIntVars: Int,
         intDomains: Array<IntDomain>,
@@ -300,9 +309,13 @@ open class Problem(
      * model; a rewrite states which rows it keeps, not which values.
      *
      * [newImpliedFactorMask] is indexed by [newFactors], so a rewrite that reorders or drops rows states
-     * the mask it kept; `null` marks no row implied.
+     * the mask it kept; `null` marks no row implied. Both are captured, so the caller keeps its own copies.
      */
-    fun withFactors(newFactors: Array<Factor>, newImpliedFactorMask: BooleanArray? = null): Problem = Problem(
+    fun withFactors(newFactors: List<Factor>, newImpliedFactorMask: BooleanArray? = null): Problem =
+        withFactors(newFactors.toTypedArray(), newImpliedFactorMask?.copyOf())
+
+    /** [withFactors] for an internal builder that transfers ownership of [newFactors] and its mask. */
+    internal fun withFactors(newFactors: Array<Factor>, newImpliedFactorMask: BooleanArray? = null): Problem = Problem(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
         declaredIntDomains = declaredIntDomains,
@@ -340,4 +353,122 @@ open class Problem(
 
     /** Total number of factors. */
     val numFactors: Int get() = factors.size
+
+    /** Owned construction: every array a caller passes is captured once, so later writes cannot reach the model. */
+    companion object {
+        /**
+         * A source model over the declarations [declaredIntDomains], such as another model's. [factors],
+         * [impliedFactorMask], [realLower] and [realUpper] are copied; factor payloads stay borrowed under
+         * the stability contract on [Problem].
+         */
+        fun of(
+            numBoolVars: Int,
+            numIntVars: Int,
+            declaredIntDomains: SourceIntDomains,
+            factors: Array<Factor>,
+            impliedFactorMask: BooleanArray? = null,
+            hasSymmetryBreaking: Boolean = false,
+            numRealVars: Int = 0,
+            realLower: DoubleArray = emptyDoubleArray(),
+            realUpper: DoubleArray = emptyDoubleArray(),
+            settings: ProblemSettings = ProblemSettings(),
+            semantics: EffectiveSourceSemantics = defaultIrSemantics,
+        ): Problem = Problem(
+            numBoolVars = numBoolVars,
+            numIntVars = numIntVars,
+            declaredIntDomains = declaredIntDomains,
+            factors = factors.copyOf(),
+            impliedFactorMask = impliedFactorMask?.copyOf(),
+            hasSymmetryBreaking = hasSymmetryBreaking,
+            numRealVars = numRealVars,
+            realLower = realLower.copyOf(),
+            realUpper = realUpper.copyOf(),
+            settings = settings,
+            semantics = semantics,
+        )
+
+        /**
+         * A source model whose integer columns admit their whole [intBounds] range. [factors],
+         * [impliedFactorMask], [realLower] and [realUpper] are copied; factor payloads stay borrowed under
+         * the stability contract on [Problem].
+         */
+        fun of(
+            numBoolVars: Int,
+            intBounds: IntBounds,
+            factors: Array<Factor>,
+            impliedFactorMask: BooleanArray? = null,
+            hasSymmetryBreaking: Boolean = false,
+            numRealVars: Int = 0,
+            realLower: DoubleArray = emptyDoubleArray(),
+            realUpper: DoubleArray = emptyDoubleArray(),
+            settings: ProblemSettings = ProblemSettings(),
+            semantics: EffectiveSourceSemantics = defaultIrSemantics,
+        ): Problem = Problem(
+            numBoolVars = numBoolVars,
+            intBounds = intBounds,
+            factors = factors.copyOf(),
+            impliedFactorMask = impliedFactorMask?.copyOf(),
+            hasSymmetryBreaking = hasSymmetryBreaking,
+            numRealVars = numRealVars,
+            realLower = realLower.copyOf(),
+            realUpper = realUpper.copyOf(),
+            settings = settings,
+            semantics = semantics,
+        )
+
+        /**
+         * A source model whose integer columns declare the value sets [intDomains]. [openIntLo] /
+         * [openIntHi] mark sides whose endpoint was invented to close an open declaration. Every array is
+         * copied; factor payloads stay borrowed under the stability contract on [Problem].
+         */
+        fun of(
+            numBoolVars: Int,
+            numIntVars: Int,
+            intDomains: Array<IntDomain>,
+            factors: List<Factor>,
+            impliedFactorMask: BooleanArray? = null,
+            hasSymmetryBreaking: Boolean = false,
+            numRealVars: Int = 0,
+            realLower: DoubleArray = emptyDoubleArray(),
+            realUpper: DoubleArray = emptyDoubleArray(),
+            openIntLo: BooleanArray? = null,
+            openIntHi: BooleanArray? = null,
+            settings: ProblemSettings = ProblemSettings(),
+            semantics: EffectiveSourceSemantics = defaultIrSemantics,
+        ): Problem = Problem(
+            numBoolVars = numBoolVars,
+            numIntVars = numIntVars,
+            intDomains = intDomains,
+            factors = factors.toTypedArray(),
+            impliedFactorMask = impliedFactorMask?.copyOf(),
+            hasSymmetryBreaking = hasSymmetryBreaking,
+            numRealVars = numRealVars,
+            realLower = realLower.copyOf(),
+            realUpper = realUpper.copyOf(),
+            openIntLo = openIntLo,
+            openIntHi = openIntHi,
+            settings = settings,
+            semantics = semantics,
+        )
+
+        /** The value-set [of] over a factor array, copied like every other argument. */
+        fun of(
+            numBoolVars: Int,
+            numIntVars: Int,
+            intDomains: Array<IntDomain>,
+            factors: Array<Factor>,
+            impliedFactorMask: BooleanArray? = null,
+            hasSymmetryBreaking: Boolean = false,
+            numRealVars: Int = 0,
+            realLower: DoubleArray = emptyDoubleArray(),
+            realUpper: DoubleArray = emptyDoubleArray(),
+            openIntLo: BooleanArray? = null,
+            openIntHi: BooleanArray? = null,
+            settings: ProblemSettings = ProblemSettings(),
+            semantics: EffectiveSourceSemantics = defaultIrSemantics,
+        ): Problem = of(
+            numBoolVars, numIntVars, intDomains, factors.asList(), impliedFactorMask, hasSymmetryBreaking,
+            numRealVars, realLower, realUpper, openIntLo, openIntHi, settings, semantics,
+        )
+    }
 }

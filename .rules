@@ -120,6 +120,10 @@ Read `klause-bench/README.md` before benchmarking. In short:
 
 - `ir` owns engine-neutral literals, variable descriptions, remapping, and structural keys. It does not
   depend on engines, compilation, or input formats.
+- A `Problem` owns its structural arrays: `Problem.of` captures them, internal builders hand over fresh
+  arrays through the internal constructors and never write them again, and nobody writes the arrays a
+  model returns. Factor payloads stay borrowed and unchanged for the source's lifetime; a rewrite is a
+  fresh source and invalidates source-scoped plans, caches and evidence.
 - `lowering` owns generic Boolean and constraint encodings shared by schema compilation and input formats.
   It does not depend on either caller. Input formats parse and lower source syntax; they are not compiler
   dependencies.
