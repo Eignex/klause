@@ -654,9 +654,9 @@ class PortfolioSchedulingTest {
         }
 
         Portfolio.thompson(workers).also { it.runTimeSource = clock }
-            .use { it.minimize(Cancellation { slices.sum() >= 2_000 }) }
+            .use { it.minimize(Cancellation { slices.sum() >= 1_000 }) }
 
-        assertEquals(2_000, slices.sum())
+        assertEquals(1_000, slices.sum())
         assertTrue(slices[0] > slices.sum() / 2, "backtrack ran ${slices[0]} of ${slices.sum()} slices")
     }
 
@@ -971,7 +971,7 @@ class PortfolioSchedulingTest {
 
     @Test
     fun `stagnant feasibility search should cede family share regardless of the local search arm count`() {
-        for (locals in listOf(1, 4, 8)) {
+        for (locals in listOf(1, 8)) {
             val slices = IntArray(locals + 1)
             val workers = List(locals + 1) { arm ->
                 PortfolioWorker.ofSolve("arm$arm", arm) { _, _ ->

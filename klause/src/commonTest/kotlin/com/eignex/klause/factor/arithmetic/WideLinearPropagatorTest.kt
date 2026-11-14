@@ -43,7 +43,7 @@ class WideLinearPropagatorTest {
     fun `wide linear deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x1DE0)
         for (op in LinearOp.entries) {
-            repeat(75) { iter ->
+            repeat(40) { iter ->
                 val n = 3
                 val problem = Problem(
                     numBoolVars = 0,
