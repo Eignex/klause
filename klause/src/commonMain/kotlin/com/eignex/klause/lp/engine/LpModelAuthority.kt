@@ -38,7 +38,7 @@ internal fun LpModel.authoritativeModel(
         List(numVars) { column ->
             // The adapter validates prepared columns against this normalized layout before import.
             (if (column < n && dv == null) structuralColumn?.invoke(column) else null) ?: ExactLpColumn(
-                legacyBounds(column),
+                authoritativeBounds(column),
                 origin = if (column >= n) {
                     ExactLpNumber.of(0L)
                 } else {
@@ -52,18 +52,7 @@ internal fun LpModel.authoritativeModel(
             ExactLpRow(
                 rowGlobal[row],
                 rowStrict[row],
-                rowPremises[row]?.let { premise ->
-                    ExactLpPremises(
-                        premise.vars.indices.map {
-                            ExactLpPremise(
-                                premise.vars[it],
-                                premise.isUpper[it],
-                                ExactLpNumber.of(premise.thresholds[it]),
-                            )
-                        },
-                        premise.boolLits.toList(),
-                    )
-                },
+                rowPremises[row]?.toExact(),
             )
         },
         ExactLpObjective(
@@ -81,7 +70,7 @@ internal fun LpModel.authoritativeModel(
     )
 }
 
-private fun LpModel.legacyBounds(column: Int): ExactLpBounds = ExactLpBounds(
+private fun LpModel.authoritativeBounds(column: Int): ExactLpBounds = ExactLpBounds(
     if (column < n && probeClampedLo[column]) {
         null
     } else {

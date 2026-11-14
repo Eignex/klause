@@ -187,7 +187,7 @@ internal fun LpEngine.lbTreeSearch(
                             if (variable < 0 || relaxation.colIsBool[column]) {
                                 null
                             } else {
-                                ExactLpNumber.of(point[column]).legacyLong()?.let { variable to it }
+                                ExactLpNumber.of(point[column]).exactLong()?.let { variable to it }
                             }
                         }.toMap()
                         for (column in relaxation.colVarId.indices) {

@@ -188,7 +188,7 @@ internal object NumericalResidualProfile {
     }
 
     private fun captureModel(model: Any, source: JsonElement, out: File, entry: String) {
-        val authority = Class.forName(ENGINE + "LegacyLpModelKt").methods.single {
+        val authority = Class.forName(ENGINE + "LpModelAuthorityKt").methods.single {
             it.name == "authoritativeModel" && it.parameterCount == 1
         }
         val exact = requireNotNull(authority.invoke(null, model))

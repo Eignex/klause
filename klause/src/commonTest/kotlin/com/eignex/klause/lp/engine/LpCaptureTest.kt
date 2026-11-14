@@ -248,7 +248,7 @@ class LpCaptureTest {
     }
 
     @Test
-    fun `legacy capture should reject exact projection and native status`() {
+    fun `integer model capture should reject exact projection and native status`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
             listOf(emptyList()),

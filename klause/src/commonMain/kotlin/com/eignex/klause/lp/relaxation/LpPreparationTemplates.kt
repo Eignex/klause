@@ -193,17 +193,17 @@ internal data class LpIntegerBoundTemplate(
     }
 
     private fun matchesColumn(current: ExactLpColumn, cancellation: Cancellation): Boolean =
-        current.integral && current.tag == variable && current.origin.legacyLong() == lower &&
+        current.integral && current.tag == variable && current.origin.integerModelLong() == lower &&
             matchesLower(current.bounds.lower) && matchesUpper(current.bounds.upper, cancellation)
 
     private fun matchesLower(side: ExactLpSide?): Boolean = side != null &&
-        !side.strict && side.premises == null && side.number.legacyLong() == 0L
+        !side.strict && side.premises == null && side.number.integerModelLong() == 0L
 
     private fun matchesUpper(side: ExactLpSide?, cancellation: Cancellation): Boolean {
         if (side == null) return true
         if (side.strict || side.premises != null || side.number.ieeeBits != null) return false
         val width = upper - lower
-        if (width >= 0L) return side.number.legacyLong() == width
+        if (width >= 0L) return side.number.integerModelLong() == width
         cancellation.charge(COLUMN_WORK)
         if (cancellation()) return false
         return side.number.value == BigFraction.ofLong(upper) - BigFraction.ofLong(lower)

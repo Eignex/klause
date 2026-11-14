@@ -362,7 +362,7 @@ internal fun cutProofApplies(
             }
 
             is CutPremise.Excluded -> {
-                val value = ExactLpNumber.of(premise.value).legacyLong()
+                val value = ExactLpNumber.of(premise.value).exactLong()
                 premise.source.kind == CutSourceKind.INTEGER && premise.source.id in 0 until problem.numIntVars &&
                     value != null && !domains.intDomain(premise.source.id).contains(value)
             }

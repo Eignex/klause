@@ -51,7 +51,7 @@ class IntegerDualBoundTest {
     }
 
     @Test
-    fun `legacy certificates should reject mutations to numeric authority and source premises`() {
+    fun `integer model certificates should reject mutations to numeric authority and source premises`() {
         val edits = listOf<Pair<String, (LpModel) -> Unit>>(
             "cost" to { it.cost[0] = 0L },
             "rhs" to { it.rhs[0] = 0L },
