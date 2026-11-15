@@ -584,12 +584,9 @@ class SearchLearningTest {
         val excess = 500
         val params = SearchLearnedDbParams(maxClauses = cap, glueLbd = 0)
         val learning = SearchLearning(params)
-        val reference = SearchLearning(params)
         val host = SearchSession(emptyList())
         repeat(cap + excess) { learning.learn(intArrayOf(it * 4, it * 4 + 2), host) }
-        repeat(cap) { reference.learn(intArrayOf(it * 4, it * 4 + 2), host) }
         assertIs<ComponentResult.Consistent>(learning.propagate(host, IntArrayList()))
-        assertIs<ComponentResult.Consistent>(reference.propagate(host, IntArrayList()))
 
         repeat(excess / 10) {
             var charged = 0L
@@ -597,13 +594,11 @@ class SearchLearningTest {
             assertTrue(charged <= params.reclamationWork)
         }
         val released = observedMemory(learning)
-        val retained = observedMemory(reference)
 
         assertEquals(cap, learning.size)
         assertEquals(excess.toLong(), learning.snapshot().dropped)
         assertEquals(0L, released.getValue("sharedLearnedRetiredObjects"))
-        assertEquals(retained.getValue("ownedPrimitiveBytes"), released.getValue("ownedPrimitiveBytes"))
-        assertEquals(retained.getValue("ownedReferenceSlots"), released.getValue("ownedReferenceSlots"))
+        assertEquals(cap * 2L * Int.SIZE_BYTES, released.getValue("sharedLearnedPayloadBytes"))
     }
 
     @Test
