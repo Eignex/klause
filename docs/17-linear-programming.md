@@ -232,9 +232,12 @@ form.
 
 Consumers decide when to request certified bounds, fixings, conflicts or witnesses
 and how to apply and retract them. Their policy stays outside the engine. Floating
-points, coordinates, scores, orderings and observations are guidance throughout this
-section: they never supply bound, witness, refutation or certificate authority, and
-ordinary search keeps every alternative they reorder.
+values used as guidance in this chapter (rounding targets, value preferences, source
+coordinates, scores, orderings, estimates and observations) supply no bound,
+witness, refutation or certificate authority, train no history unless stated, and
+leave ordinary search every alternative they reorder. The only floating authority
+is the numerical deduction mode and the source-tolerance acceptance of a leaf
+optimum ([numerical and exact deductions](#numerical-and-exact-deductions)).
 
 The trivial objective bound caches Boolean contributions only with no retained
 decisions. Its baseline contains permanent root facts; later pins and backtracks
@@ -293,8 +296,9 @@ exhaustion, cancellation or refusal withholds the root bound.
 
 Sparse-trial preparation is capped at eight million modeled work units; root and
 node LP work stop at 150 million units or the containing invocation's smaller
-allowance, and tighter caller deadlines and work shares remain in force. Bounded atomic numerical
-operations can finish past a work boundary; the ledger keeps their actual cost.
+allowance, and tighter caller deadlines and work shares remain in force. Bounded
+atomic numerical operations can finish past a work boundary; the ledger keeps their
+actual cost.
 The two-GiB modeled storage envelope covers source authority, sparse owners,
 scratch and factor construction. Each sparse factor attempt reserves entries
 before writing and stops at two million entries or eight million work units;
@@ -306,13 +310,16 @@ one-MiB guidance cap. Rounding pins through propagation with nearest targets, an
 retained-root plans also try upward and downward targets; an interrupted pin restores
 the last complete fixpoint. A completed point can instead transfer to ordinary integer
 value ordering when its source coordinates and objective still match; source real
-variables, masked or unfinished proposals and disabled LP branching withhold it.
+variables, an unfinished or masked auxiliary proposal and disabled LP branching
+withhold it. A masked guide carries an availability mask over its known columns;
+unknown columns keep their ordinary domain choices.
 Before the first incumbent, an integer-only traversal can visit the declared factor
 components of undetermined columns contiguously, known fractional coordinates first.
 A ready component guide defers simplex node queries until the first incumbent while
 inherited checked bounds, combinatorial bounds and CP checks stay active. Completed
-component assignments can survive restarts as private value preferences. Guide
-replacement, reset, reseed and engine close release these structures.
+component assignments survive restarts and guide replacement as private value
+preferences; guide replacement, restart and reseed discard the component ordering,
+and target reset, reseed and engine close release the preferences.
 
 ### Immutable component ownership
 
@@ -361,9 +368,10 @@ alternatives of one unresolved source Boolean, combining at most two rows per
 alternative with exact positive weights. Equal coefficient vectors keep the weaker
 right side, and strictness survives only when both alternatives establish it. Each
 consequence imports a `BooleanSplit` proof, so mutually exclusive guards are
-discharged by exhaustive coverage rather than activated together. The final
-refutation rechecks dormant premises with their original guards and pins, and no
-consequence becomes an original premise or witness authority.
+discharged by exhaustive coverage rather than activated together. The partial LP
+consumes only source-checked consequences, and its final refutation rechecks
+dormant premises with their original guards and pins. No consequence becomes an
+original premise or witness authority.
 
 Cuts aggregate exact source rows and apply their rounding rule's bound and
 integrality checks. Local cuts keep their substitutions and premises and are
@@ -397,21 +405,27 @@ shifted right sides decline. Cut definitions and source-row ownership stay in th
 retained template. Every query rechecks active cuts against the exact numeric source
 context under one shared proof allowance; inactive Boolean guards or integer pins
 disable their rows and dependent cuts, and a cut with several source owners needs
-every owner active. Certificates cite the nested rounding derivation, and final
-source checking repeats Boolean substitution independently.
+every owner active. Unverified cuts remain inactive, and a query with inactive rows
+keeps the identity row layout unless it retains masked cuts. Certificates cite the
+nested rounding derivation, and final source checking repeats Boolean substitution
+independently.
 
 Point selection admits at most one additional checked cut per usable point and
-waits for its completed query before scanning again; only a strictly stronger
-checked bound, a checked incumbent or terminal evidence skips the discovery
-cooldown. Unselected candidates retire after four completed scans without an
-addition, and installed rows expire after four slack scoring scans. Retirement only
-weakens the relaxation. Managed masks keep unselected and retired rows as inactive
-numerical rows with free logical columns and zero multipliers, so a compatible owner
-survives additions and retirement. Equality packing requires matching activity on
-both packed sides. A new template first runs the ordinary checked recipe; a completed point can add one
-selection round, and a successful round retains its checked mask. Scores combine
-normalized violation, inverse square-root support and objective parallelism and
-guide selection only. `source-point-cuts=true` opts the retained frontier into
+waits for its completed query before scanning again. Only a strictly stronger
+checked bound, a checked incumbent or terminal evidence enables the next scan
+immediately; an unchanged or unavailable bound, an unfinished round or a scan
+without an addition starts a seven-query discovery cooldown. Unselected candidates
+retire after four completed scans without an addition, and installed rows expire
+after four consecutive slack scoring scans; a tight scan resets the count.
+Retirement only weakens the relaxation. A query's cut mask names the cut rows it
+activates; managed current masks and fully checked selected families keep
+unselected and retired rows as inactive numerical rows with free logical columns
+and zero multipliers, so a compatible owner survives additions and retirement.
+Completed base bounds survive a paused or declined separation round. A new template
+first runs the ordinary checked recipe; a completed point can add one selection
+round, and a successful round retains its checked mask. Scores combine normalized
+violation, inverse square-root support and objective parallelism and guide
+selection only. `source-point-cuts=true` opts the retained frontier into
 this point-based separation; the ordinary default activates all accepted source cuts.
 The containing source request owns these separation, selection and advisory
 branching settings, binds them to its admitted numerical companions and removes them
@@ -423,13 +437,15 @@ permits integer rounding, otherwise mixed rounding cites an active bound for eac
 remaining continuous coordinate. `source-aggregate-cuts=true`, disabled by default,
 adds a template policy that pairs rows of opposite sign on a shared continuous
 coordinate, with at least one integer-activity row, and retains at most 64
-proposals. Pure-integer points also try half rounding and two-row combinations,
-greedy continuation along at most four original rows, and half scaling whose odd
-coefficients cite established endpoint premises. An established invocation bound can
-stand in for a missing stated endpoint only as a typed assumption that every cut
-verification resolves in the current scope; retracting it withholds the cut. Slack
-and scope ordering choose premises only. Every candidate keeps its owners and nested
-derivation and needs source verification before admission.
+proposals. A nonseparating mixed-row seed can continue greedily along one
+opposite-sign continuous incidence path through at most four original rows.
+Pure-integer points also try half rounding, two-row combinations and half scaling
+whose odd coefficients cite established endpoint premises. An established
+invocation bound can stand in for a missing stated endpoint only as a typed
+assumption that every cut verification resolves in the current scope; retracting it
+withholds the cut. Slack and scope ordering choose premises only. Every candidate
+keeps its owners and nested derivation and needs source verification before
+admission.
 
 ### Root preparation
 
@@ -459,7 +475,9 @@ consultation. A paused builder keeps only its source-root assembly buffers; no p
 layout, point or certificate is visible. Completion prepares the layout, private
 exact state and numerical owner before the consultation's numerical clock starts,
 and the consultation adopts that owner only while its source-root model, exact state
-and root scope remain current.
+and root scope remain current. Containing cancellation or spent cumulative funding
+retires the builder. Incumbent validation can retire pending construction, and engine
+closure releases its private buffers.
 
 The internal root-only policy gives source projection and owner construction the
 remaining cumulative LP allowance while each floating query keeps its adaptive
@@ -474,11 +492,13 @@ certificate allowances, and retained MIP callers fund consultations through
 incomplete result.
 
 Identity row layouts are the default. An explicit unconditional-equality policy
-combines adjacent closed, exactly opposing inequalities into one row with a fixed
-logical column. The emitted multiplier's sign selects the original inequality when
-lifting row weights. Conditional templates retain their identity layout even when
-their guards currently hold: a later sibling can retract either side. Source
-lifting and ordinary evidence checking still decide whether the bound is usable.
+(equality packing) combines adjacent closed, exactly opposing inequalities into one
+row with a fixed logical column; a cut mask that suspends rows through packing needs
+matching activity on both packed sides. The emitted multiplier's sign selects the
+original inequality when lifting row weights. Conditional templates retain their
+identity layout even when their guards currently hold: a later sibling can retract
+either side. Source lifting and ordinary evidence checking still decide whether the
+bound is usable.
 
 An admitted sparse root query can copy nonzero row multipliers from its suspended
 owner as a dual proposal without a basis solve; only the exact check against the
@@ -486,11 +506,11 @@ unchanged root model establishes a bound. Dual-only certification runs under its
 input, arithmetic and allocation limits. A refused candidate enters bounded rational
 reconstruction: a retained basis proposes duals by peeling singleton equations and
 variables and solving residual components with rational factors, and a
-dimension-limited component proposes a subset for its open basic directions that
-need absent sides. Continued fractions are the last proposal. Every proposal must
-pass the complete exact reduced-cost and bound-side check; basis-derived bounds need
-both rational and exact-basis policy acceptance. Accepted bounds keep their row
-multipliers for source lifting. A completed infeasibility candidate enters bounded
+dimension-limited component proposes a subset of dual coordinates for the open basic
+directions whose residuals need absent sides. Continued fractions are the last
+proposal. Every proposal must pass the complete exact reduced-cost and bound-side
+check; basis-derived bounds need both rational and exact-basis policy acceptance.
+Accepted bounds keep their row multipliers for source lifting. A completed infeasibility candidate enters bounded
 Farkas reconstruction the same way; the exact ray check yields row multipliers and
 bound-side support, and source lifting restores extracted sides before checking.
 Only that checked derivation closes a traversal leaf or repair query.
@@ -590,7 +610,8 @@ checked cut rows when every existing column, row and objective value and its met
 are unchanged; equality-packing changes fall back to replacement. Each query lifts
 multipliers through its own source-side mapping and checks the derivation in its
 source scope. Neighborhood invocations can borrow a retained authority, leaving its
-cleanup and cumulative funding with the owner.
+cleanup and cumulative funding with the owner. Floating source coordinates are
+guidance and supply no witness or proof authority.
 
 `LinearAuthority.advance` runs the shared sparse preparation, floating and
 bound-certificate policy through that scoped owner. One admitted operation survives
@@ -608,13 +629,16 @@ accepting only an exact strict improvement that passes a fresh check; a fixed-pi
 solve supplies no global bound or refutation. Residuals too large for exact input
 admission use a sparse feasibility query whose completed coordinates go through
 rational reconstruction and primal-only exact basis verification, publishing no dual
-bound or conflict.
+bound or conflict; recovery declines supply neither a conflict nor exhaustion
+authority.
 
 `solver.pipeline.SourceNumericalFeedback` delivers completed queries to decision
 consumers. Latest-query consumers own one bounded slot; prefix consumers and
 inspection observers share a bounded archive of the first queries. A record exposes
 exact-valued relaxation coordinates, generating cut masks, active source rows and
-scoped checked bounds or refutations, and a consumer names the projection it reads,
+scoped checked bounds or refutations. Such coordinates can contain numerical
+residuals and require full source checking before publication. A consumer names the
+projection it reads,
 so a withheld field is explicit rather than unavailable. Compatibility requires the
 same source premises, semantics, objective and query restrictions; a cutoff
 attribution requires its actual strict objective premise. Cancellation, pauses,
@@ -649,7 +673,8 @@ bound-state fork of the parent; one private owner adopts the siblings in turn,
 starting from the parent basis and sharing its immutable CSC and row views, and
 declines unsafe refreshes instead of rebuilding the shared matrix. The parent state,
 optimum and factors stay untouched. Every direction needs a complete optimal solve
-and a finite nonnegative gain, or the whole comparison is withheld. Projection,
+and a finite nonnegative gain, or the whole comparison is withheld. These estimates
+train no history and supply no pruning or certificate authority. Projection,
 construction, scaling and the floating solves share one positive caller allowance;
 an exhausted grant is never passed on as the floating API's unbounded zero.
 Child-value consultations instead accept a completed current iterate and report
@@ -788,8 +813,8 @@ same exact witness–bound equality as the result contract. Tolerance acceptance
 its separate source-defined verdict and supplies no exact attainment claim.
 
 Retained certification owners keep checked results in a single-package store. A
-checked bound can answer a bound request but not a completion or attainment request. Reuse requires the
-production acceptance policy and the same authority: bounds, scope, active rows,
+checked bound can answer a bound request but not a completion or attainment request.
+Reuse requires the production acceptance policy and the same authority: bounds, scope, active rows,
 matrix, objective, origins, strictness and integrality. Packages keep no floating
 vectors or ordered basis, and edits and owner retirement invalidate them.
 
@@ -967,9 +992,9 @@ composed bound. Fractional branching keeps every eligible exact integer coordina
 in source order. An internal opt-in history of checked immediate-child bound gains
 can choose the coordinate instead, and an internal aggregate branch policy, disabled
 by default, can split on a primitive integer direction from paired active rows whose
-feasible activity lies strictly between adjacent integers. Both restrictions stay in
-the coverage tree and the original-source checker, and neither supplies pruning or
-proof authority.
+feasible activity lies strictly between adjacent integers. The two aggregate split
+restrictions stay in the coverage tree and the original-source checker; neither
+policy supplies pruning or proof authority.
 
 Joint repair binds separation, point selection and aggregation to its shared
 numerical owner for root preparation and retained neighborhood queries. Before its
@@ -1005,12 +1030,14 @@ attempts and cleanup are charged. Cheap exact arithmetic charges operand
 word-length squared.
 
 Every preparation, construction, copy, check and retention step in this chapter
-debits its containing allowance before it publishes, and storage is reserved before
-allocation. Declined, failed and interrupted attempts keep their charges; nothing is
-refunded, and a funded step grants no further work. An interrupted step publishes no
-partial layout, point, bound or certificate, and a later slice charges only its new
-work. Per-family, per-phase and per-claim observations are inclusive and overlap the
-ordinary LP totals.
+debits its containing allowance before it publishes. Capped stores (sparse owners,
+factor attempts, guidance, checking, probe and basis copies) reserve storage before
+allocation; root layout assembly charges its materialized extent on completion.
+Declined, failed and interrupted attempts keep their charges; nothing is refunded,
+and a funded step grants no further work. An interrupted step publishes nothing of
+its own; a bound taken from its completed parts is published only after its own
+complete check, and a later slice charges only its new work. Per-family, per-phase
+and per-claim observations are inclusive and overlap the ordinary LP totals.
 
 Reconstruction and refinement poll ordinary tokens every 64 calls or 4096 work,
 while resource caps are checked on every charge. Cancelled evidence is discarded.
