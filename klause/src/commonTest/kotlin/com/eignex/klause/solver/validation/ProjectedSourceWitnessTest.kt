@@ -50,18 +50,32 @@ class ProjectedSourceWitnessTest {
         }
     }
 
+    private fun tolerantProduct() = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(ContinuousProduct(0, 0, 1)),
+        numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0),
+        semantics = SourceSemantics(SourceFormat.IR,
+            feasibilityTolerance = SourceTolerance(SemanticRational.of(bigIntOf(3), bigIntOf(10)))).resolve())
+
     @Test
-    fun `an uncovered tolerant nonlinear relation should remain indeterminate despite an extra callback`() {
-        val source = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(ContinuousProduct(0, 0, 1)), numRealVars = 2,
-            realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0),
-            semantics = SourceSemantics(SourceFormat.IR,
-                feasibilityTolerance = SourceTolerance(SemanticRational.of(bigIntOf(3), bigIntOf(10)))).resolve())
-        val checker = source.withFactors(emptyArray()).bake()
+    fun `captured tolerance should admit a product residual within the slack`() {
+        val source = tolerantProduct()
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.5, 0.0),
             exactReals = listOf(BigFraction.of(bigIntOf(1), bigIntOf(2)), BigFraction.ZERO))
 
-        val result = verifyProjectedSourceWitness(source, checker, point, Cancellation.Never) { true }
+        val result = verifyProjectedSourceWitness(source, source.withFactors(emptyArray()).bake(), point,
+            Cancellation.Never) { true }
 
-        assertIs<Verification.Indeterminate>(result)
+        assertIs<Verification.Accepted<*, *>>(result)
+    }
+
+    @Test
+    fun `captured tolerance should reject a product residual beyond the slack despite an extra callback`() {
+        val source = tolerantProduct()
+        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.75, 0.0),
+            exactReals = listOf(BigFraction.of(bigIntOf(3), bigIntOf(4)), BigFraction.ZERO))
+
+        val result = verifyProjectedSourceWitness(source, source.withFactors(emptyArray()).bake(), point,
+            Cancellation.Never) { true }
+
+        assertIs<Verification.Rejected>(result)
     }
 }

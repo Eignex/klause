@@ -1,5 +1,8 @@
 package com.eignex.klause.theory
 
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.RealAbs
+import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
@@ -7,6 +10,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.simplex.exact.BigFraction
@@ -21,16 +25,23 @@ import com.eignex.klause.solver.search.SearchExecutionControlAdapter
 import com.eignex.klause.solver.search.SearchExecutionControls
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.selectedFactorProjections
+import com.eignex.klause.solver.validation.permitsToleranceOptimum
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 
-internal class AbsRealCompletion(private val source: Problem) {
+// Completes the real coordinates of a fixed discrete point by an exact search over the linear encodings of the
+// source's real relations. With a positive tolerance whose relations `toleranceLinearModel` states, a point the
+// exact search refutes is searched again with every relation within that tolerance, so a witness of that search is
+// a point within tolerance and its refutation shows that no such point exists.
+internal class AbsRealCompletion(private val source: Problem, tolerance: SourceTolerance? = null) {
     private val encoders = source.selectedFactorProjections()
+    private val tolerance = tolerance?.takeUnless { it.isExact || !toleranceLinearModelSupported(source) }
 
     sealed interface Result {
-        class Witness(val reals: List<BigFraction>) : Result
+        // A completion; [withinTolerance] when it holds the relations only within the source tolerance.
+        class Witness(val reals: List<BigFraction>, val withinTolerance: Boolean = false) : Result
         data object Refuted : Result
         data object Undecided : Result
     }
@@ -56,7 +67,17 @@ internal class AbsRealCompletion(private val source: Problem) {
         val metered = object : SearchExecutionControls by containing {
             override val cancellation: Cancellation = counted
         }
-        val result = completeWith(sample, counted, metered, solveContext)
+        // An exact completion is preferred: it strains no relation, and the tolerance search runs only where the
+        // slack decides feasibility.
+        val exact = completeWith(sample, counted, metered, solveContext,
+            encoders.finiteLinearModel(sample, counted))
+        val result = tolerance?.takeIf { exact == Result.Refuted && !counted() }?.let { policy ->
+            when (val relaxed = completeWith(sample, counted, metered, solveContext,
+                encoders.toleranceLinearModel(sample, policy, counted))) {
+                is Result.Witness -> Result.Witness(relaxed.reals, withinTolerance = true)
+                else -> relaxed
+            }
+        } ?: exact
         return Completed(if (counted()) Result.Undecided else result, work)
     }
 
@@ -65,8 +86,9 @@ internal class AbsRealCompletion(private val source: Problem) {
         cancellation: Cancellation,
         controls: SearchExecutionControls,
         solveContext: LpSolveContext,
+        encoding: Problem?,
     ): Result {
-        val encoded = encoders.finiteLinearModel(sample, cancellation) ?: return Result.Undecided
+        val encoded = encoding ?: return Result.Undecided
         val factors = ArrayList<Factor>()
         factors.addAll(encoded.factors)
         for (id in 0 until source.numBoolVars) {
@@ -110,3 +132,14 @@ internal class AbsRealCompletion(private val source: Problem) {
         }
     }
 }
+
+// Whether a fixed discrete point needs a search to complete the reals: an absolute value, a finite membership or a
+// product with unguarded finite choices states a disjunction that no single linear relaxation decides.
+internal fun Problem.requiresRealCompletionSearch(): Boolean = factors.any {
+    it is RealAbs || it is RealFiniteDomain ||
+        (it is ContinuousProduct && it.finiteChoices != null && !it.finiteChoices.hasGuards)
+}
+
+// The tolerance a leaf completion reads: the source's positive tolerance, when [check] accepts tolerance points.
+internal fun Problem.completionTolerance(check: ((Sample) -> Boolean)?): SourceTolerance? =
+    semantics.effective.feasibilityTolerance?.takeIf { !it.isExact && check.permitsToleranceOptimum() }

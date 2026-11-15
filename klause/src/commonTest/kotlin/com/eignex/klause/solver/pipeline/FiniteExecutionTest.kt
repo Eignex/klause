@@ -104,12 +104,36 @@ class FiniteExecutionTest {
         assertEquals(unrelatedNonlinear.associateWith { FiniteSolveVerdict.UNSAT }, verdicts)
     }
 
+    private val slackRelations = listOf(
+        "var 0.0..2.0: b;" to "constraint float_abs(y, b);",
+        "var 1..2: i;" to "constraint array_float_element(i, [2.0, 1.0], y);",
+        "var 1..3: k; var 1.0..3.0: kf; var 0.0..6.0: b;" to
+            "constraint int2float(k, kf); constraint float_times(kf, y, b);",
+    )
+
+    private fun solveSlackRelations(overrides: SemanticOverrides) =
+        slackRelations.associate { (declarations, relation) ->
+            relation to solveFlatZinc(overrides, declarations = declarations, constraints = relation)
+        }
+
     @Test
-    fun `a nonlinear real relation over a row that needs the slack should keep its component exact`() {
-        val verdict = solveFlatZinc(SemanticOverrides(),
-            declarations = "var 1..2: i; var 0.0..1.0: u; var 0.0..1.0: v;",
-            constraints = "constraint array_float_element(i, [2.0, 1.0], y); " +
-                "constraint float_lin_eq([1.0, 1.0], [u, v], 1.0);")
+    fun `a real relation over a row that needs the slack should be judged within the declared tolerance`() {
+        val verdicts = solveSlackRelations(SemanticOverrides())
+
+        assertEquals(slackRelations.associate { it.second to FiniteSolveVerdict.SAT }, verdicts)
+    }
+
+    @Test
+    fun `a real relation over a row that needs the slack should be refuted at zero tolerance`() {
+        val verdicts = solveSlackRelations(SemanticOverrides(feasibilityTolerance = SourceTolerance()))
+
+        assertEquals(slackRelations.associate { it.second to FiniteSolveVerdict.UNSAT }, verdicts)
+    }
+
+    @Test
+    fun `a real relation violated beyond the declared tolerance should be refuted`() {
+        val verdict = solveFlatZinc(SemanticOverrides(), declarations = "var -1.0..1.0: a; var 0.0..0.4: b;",
+            constraints = "constraint float_abs(a, b); constraint float_eq(a, -0.5);")
 
         assertEquals(FiniteSolveVerdict.UNSAT, verdict)
     }

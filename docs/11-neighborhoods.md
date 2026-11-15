@@ -202,7 +202,11 @@ and probe rules.
 Numerical completion uses the source tolerance callback when one is supplied;
 otherwise it needs exact certification. A source whose acceptance admits tolerance
 points selects numerical completion for every local-search and ALNS worker, including
-a model whose discrete coordinates are all fixed. Exact completion uses bounded point
+a model whose discrete coordinates are all fixed. On a model with an absolute value,
+finite membership or choice product, numerical completion offers the float point
+first and then searches the leaf as a backtrack leaf does, within the tolerance where
+the exact search refutes; see [FlatZinc floats](04-finite-formats.md#flatzinc-floats).
+Exact completion uses bounded point
 recovery and sparse row repair, theory-backed linear completion keeps a worker-private
 conditioned query, and polynomial completion must accept the unchanged finite point.
 A completed witness is heuristic incumbent evidence, never an optimum proof.

@@ -20,6 +20,8 @@ import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.solver.validation.permitsToleranceOptimum
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.AbsRealCompletion
+import com.eignex.klause.theory.completionTolerance
+import com.eignex.klause.theory.requiresRealCompletionSearch
 import com.eignex.klause.util.Cancellation
 import kotlin.math.ceil
 
@@ -43,33 +45,41 @@ internal class LeafRealCompletion(
 
     private val encoders = problem.selectedFactorProjections()
     private val encoding = LinearCompletionEncoding(encoders)
-    private val absCompletion = if (problem.factors.any { it is RealAbs }) AbsRealCompletion(problem) else null
+    private val tolerance = problem.completionTolerance(toleranceCheck)
+    private val absCompletion = if (problem.factors.any { it is RealAbs } ||
+        (tolerance != null && problem.requiresRealCompletionSearch())
+    ) AbsRealCompletion(problem, tolerance) else null
     var observeLp: ((LpVerdict, LpStats) -> Unit)? = null
     var observeFloat: ((Sample) -> Unit)? = null
 
     override fun complete(candidate: Sample, cancellation: Cancellation): Completion {
-        if (objective == null || objective.realCoefficientValues.all { it == 0.0 }) {
-            absCompletion?.let { completion ->
-                val checked = completion.complete(candidate, cancellation)
-                val work = movesFor(checked.work.toDouble())
-                return when (val result = checked.result) {
-                    is AbsRealCompletion.Result.Witness -> {
-                        val coordinates = DoubleArray(result.reals.size) { result.reals[it].toDouble() }
-                        val sample = candidate.copy(reals = coordinates, exactReals = result.reals)
-                        if (verifyRealCoordinates(problem, sample) is Verification.Accepted) {
-                            Completion.Witness(sample, work)
-                        } else Completion.Undecided(work)
-                    }
-                    AbsRealCompletion.Result.Refuted -> Completion.Refuted(
-                        problem.factors.indices.filter { factor ->
-                            problem.factors[factor].variables.reals.isNotEmpty()
-                        }.toIntArray(),
-                        work,
-                    )
-                    AbsRealCompletion.Result.Undecided -> Completion.Undecided(work)
-                }
+        val search = absCompletion?.takeIf { objective == null || objective.realCoefficientValues.all { it == 0.0 } }
+            ?: return linearCompletion(candidate, cancellation)
+        // A source that accepts points within its tolerance offers the floating completion first, as a backtrack
+        // leaf does; a refused point leaves the decision to the completion search.
+        val floating = if (tolerance != null) linearCompletion(candidate, cancellation) else null
+        if (floating is Completion.Witness || cancellation()) return floating ?: Completion.Undecided(movesFor(0.0))
+        val checked = search.complete(candidate, cancellation)
+        val work = movesFor(checked.work.toDouble()) + (floating?.work ?: 0L)
+        return when (val result = checked.result) {
+            is AbsRealCompletion.Result.Witness -> {
+                val coordinates = DoubleArray(result.reals.size) { result.reals[it].toDouble() }
+                val sample = candidate.copy(reals = coordinates, exactReals = result.reals)
+                val accepted = if (result.withinTolerance) toleranceCheck?.invoke(sample) == true
+                    else verifyRealCoordinates(problem, sample) is Verification.Accepted
+                if (accepted) Completion.Witness(sample, work) else Completion.Undecided(work)
             }
+            AbsRealCompletion.Result.Refuted -> Completion.Refuted(
+                problem.factors.indices.filter { factor ->
+                    problem.factors[factor].variables.reals.isNotEmpty()
+                }.toIntArray(),
+                work,
+            )
+            AbsRealCompletion.Result.Undecided -> Completion.Undecided(work)
         }
+    }
+
+    private fun linearCompletion(candidate: Sample, cancellation: Cancellation): Completion {
         val encoded = encoding.modelFor(candidate, cancellation) ?: return Completion.Undecided(movesFor(0.0))
         val sink = LpStatsSink(LpRoute.STANDALONE)
         val check = if (observeFloat == null) toleranceCheck else FiniteSourceAcceptance(
