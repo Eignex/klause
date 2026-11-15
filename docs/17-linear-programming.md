@@ -515,9 +515,10 @@ dimension-limited component proposes a subset of dual coordinates for the open b
 directions whose residuals need absent sides. Continued fractions are the last
 proposal. Every proposal must pass the complete exact reduced-cost and bound-side
 check; basis-derived bounds need both rational and exact-basis policy acceptance.
-Accepted bounds keep their row multipliers for source lifting. A completed infeasibility candidate enters bounded
-Farkas reconstruction the same way; the exact ray check yields row multipliers and
-bound-side support, and source lifting restores extracted sides before checking.
+Accepted bounds keep their row multipliers for source lifting. A completed
+infeasibility candidate enters bounded Farkas reconstruction the same way; the exact
+ray check yields row multipliers and bound-side support, and source lifting restores
+extracted sides before checking.
 Only that checked derivation closes a traversal leaf or repair query.
 
 `source-refutation-reuse=true` enables a traversal-owned index of checked source
@@ -819,9 +820,10 @@ its separate source-defined verdict and supplies no exact attainment claim.
 
 Retained certification owners keep checked results in a single-package store. A
 checked bound can answer a bound request but not a completion or attainment request.
-Reuse requires the production acceptance policy and the same authority: bounds, scope, active rows,
-matrix, objective, origins, strictness and integrality. Packages keep no floating
-vectors or ordered basis, and edits and owner retirement invalidate them.
+Reuse requires the production acceptance policy and the same authority: bounds,
+scope, active rows, matrix, objective, origins, strictness and integrality. Packages
+keep no floating vectors or ordered basis, and edits and owner retirement invalidate
+them.
 
 Exact dual checks validate the complete input before skipping products with exactly
 zero multipliers, right-hand sides or selected endpoints; reduced-cost signs,
