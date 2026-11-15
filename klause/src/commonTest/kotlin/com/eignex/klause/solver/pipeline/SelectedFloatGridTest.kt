@@ -54,15 +54,19 @@ class SelectedFloatGridTest {
                 val objective = if (operation == ExecutionOperation.OPTIMIZE) {
                     LinearObjective(realCoefficients = doubleArrayOf(1.0))
                 } else null
-                val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source), operation,
-                    engine, objective, maximize = objective != null))
-                assertTrue(ExecutionStrategy.COMPLETE in assertNotNull(selection.admission).arms)
+                var result: SelectedFloatGridPreparation? = null
+                val invocation = SourceSetup.prepareWithGrid(SourceSetupRequest(SourceAttachment(source), operation,
+                    engine, objective, maximize = objective != null), privateGrid = { selection ->
+                    SourceSetup.prepareSelectedFloatGrid(selection, listOf(FloatGridVariable(SourceRealId(0))),
+                        FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY).also { result = it }
+                })
 
-                val result = assertIs<SelectedFloatGridPreparation.Declined>(SourceSetup.prepareSelectedFloatGrid(
-                    selection, listOf(FloatGridVariable(SourceRealId(0))),
-                    FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY))
-
-                assertEquals(SelectedGridDecline.CONSUMER, result.cause)
+                assertTrue(ExecutionStrategy.COMPLETE in assertNotNull(invocation.admission).arms)
+                val declined = assertIs<SelectedFloatGridPreparation.Declined>(result)
+                assertEquals(SelectedGridDecline.CONSUMER, declined.cause)
+                assertNull(invocation.floatProjection)
+                assertSame(invocation.preparedPlan, invocation.enginePlan)
+                assertSame(invocation.route, invocation.engineRoute)
             }
         }
     }
@@ -110,7 +114,7 @@ class SelectedFloatGridTest {
     }
 
     @Test
-    fun `automatic private selection should preserve an original source refutation`() {
+    fun `automatic private selection should decline over an original source refutation`() {
         val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
@@ -176,7 +180,7 @@ class SelectedFloatGridTest {
     }
 
     @Test
-    fun `a continuous policy should decline only the requested private view`() {
+    fun `a continuous policy should decline the requested private view with its policy cause`() {
         val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Continuous).resolve())

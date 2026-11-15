@@ -4,10 +4,8 @@ import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 
-/**
- * Route and operation binding selected by setup. A private grid consumer reads it before setup
- * returns the immutable [PreparedSourceInvocation].
- */
+// Route and operation binding selected by setup. A private grid consumer reads it before setup
+// returns the immutable PreparedSourceInvocation.
 internal class SourceRouteSelection(
     val request: SourceSetupRequest,
     val route: SourceProblemRoute,
