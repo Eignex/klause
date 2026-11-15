@@ -55,7 +55,8 @@ internal fun captureObjectiveProposals(
         val sourceAgreement = canonicalValue == sourceValue
         visited++
         if (agreement != true || !sourceAgreement) disagreements++
-        if (probes.size < 32) probes += buildJsonObject {
+        if (probes.size < 32) {
+            probes += buildJsonObject {
             put("move", move.toString())
             put("source", trajectorySource(point))
             put("canonicalValue", canonicalValue.toString())
@@ -66,10 +67,12 @@ internal fun captureObjectiveProposals(
             put("nativeSourceAccepted", FiniteConflictSelection.checkSource(sourceModel, point, stop))
             put("independentWitnessCheck", false)
         }
+        }
     }
     val complete = visited == candidates.size && disagreements == 0 && functional != null
     check(boundary == trajectoryRandomBoundary(state))
-    out.writeText(buildJsonObject {
+    out.writeText(
+        buildJsonObject {
         put("source", trajectorySource(source))
         put("unfilteredTemplates", raw.list.size)
         put("ordinarySinkMoves", sink.list.size)
@@ -77,11 +80,16 @@ internal fun captureObjectiveProposals(
         put("completeCandidateValuesChecked", visited)
         put("candidateValueDisagreements", disagreements)
         put("candidateValueQualification", complete)
-        if (!complete) put("decline", when {
-            functional == null -> "no-functional-objective"
-            disagreements > 0 -> "candidate-value-disagreement"
-            else -> "incomplete-candidate-value-scan"
-        })
+        if (!complete) {
+            put(
+            "decline",
+            when {
+                functional == null -> "no-functional-objective"
+                disagreements > 0 -> "candidate-value-disagreement"
+                else -> "incomplete-candidate-value-scan"
+            },
+        )
+        }
         put("filterAccounting", "templates precede pins, definitions and owners; channel expansion can add moves")
         put("candidates", JsonArray(probes))
         put("candidateLimit", 32)
@@ -90,6 +98,7 @@ internal fun captureObjectiveProposals(
         put("diagnosticAllocatedBytes", trajectoryThreadBytes() - bytes)
         put("proposalEquivalenceClaim", false)
         put("globalEquivalenceFromSamples", false)
-    }.toString())
+    }.toString()
+    )
     return complete
 }

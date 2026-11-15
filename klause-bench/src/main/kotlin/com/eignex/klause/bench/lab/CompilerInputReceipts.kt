@@ -43,7 +43,10 @@ internal class CompilerInputReceipts(
     private fun read(path: Path): Receipt? {
         return try {
             val bytes = Files.newInputStream(path).use { it.readNBytes(MAX_BYTES + 1) }
-            if (bytes.size > MAX_BYTES) null else DataInputStream(ByteArrayInputStream(bytes)).use { input ->
+            if (bytes.size > MAX_BYTES) {
+                null
+            } else {
+                DataInputStream(ByteArrayInputStream(bytes)).use { input ->
                 if (input.readInt() != FORMAT) return null
                 val root = input.readUTF()
                 val digest = input.readUTF()
@@ -53,6 +56,7 @@ internal class CompilerInputReceipts(
                     Stamp(input.readUTF(), input.readLong(), input.readUTF(), input.readUTF(), input.readUTF())
                 }
                 if (input.read() != -1) null else Receipt(root, digest, files)
+            }
             }
         } catch (_: IOException) {
             null
@@ -92,17 +96,26 @@ internal class CompilerInputReceipts(
     private fun metadata(root: Path): List<Stamp>? {
         return try {
             val paths = Files.walk(root).use { it.sorted().limit(MAX_FILES + 1L).toList() }
-            if (paths.size > MAX_FILES) null else paths.map { path ->
+            if (paths.size > MAX_FILES) {
+                null
+            } else {
+                paths.map { path ->
                 val attrs = Files.readAttributes(
-                    path, "unix:size,lastModifiedTime,ctime,fileKey,isRegularFile,isDirectory", NOFOLLOW_LINKS,
+                    path,
+                    "unix:size,lastModifiedTime,ctime,fileKey,isRegularFile,isDirectory",
+                    NOFOLLOW_LINKS,
                 )
                 if (attrs["isRegularFile"] != true && attrs["isDirectory"] != true) return null
                 val changed = attrs["ctime"]?.toString() ?: return null
                 val key = attrs["fileKey"]?.toString() ?: return null
                 Stamp(
-                    root.relativize(path).toString(), attrs["size"] as Long,
-                    attrs["lastModifiedTime"].toString(), changed, key,
+                    root.relativize(path).toString(),
+                    attrs["size"] as Long,
+                    attrs["lastModifiedTime"].toString(),
+                    changed,
+                    key,
                 )
+            }
             }
         } catch (_: UnsupportedOperationException) {
             null

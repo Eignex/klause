@@ -44,7 +44,8 @@ class MiniZincModeTest(private val direction: String) {
     @Test
     fun `complete assignment capture should retain reconstructed hidden coordinates without changing model output`() {
         val source = File.createTempFile("complete-assignment", ".fzn").apply {
-            writeText("""
+            writeText(
+                """
                 var 7..7: x :: output_var;
                 var 0..28: hidden;
                 constraint int_lin_eq([2,-1], [x,hidden], 0);
@@ -115,7 +116,8 @@ class MiniZincModeTest(private val direction: String) {
     @Test
     fun `output reconstruction should retain independent scaled costs and original objective units`() {
         val source = File.createTempFile("scaled-costs", ".fzn").apply {
-            writeText("""
+            writeText(
+                """
                 var 12811..12811: length_a;
                 var 12811..12811: length_b;
                 var 0..100: scaled_a;
@@ -133,7 +135,8 @@ class MiniZincModeTest(private val direction: String) {
             )
         }
         val outputModel = File.createTempFile("scaled-costs", ".ozn").apply {
-            writeText("""
+            writeText(
+                """
                 int: cost_a;
                 int: cost_b;
                 int: total;
@@ -210,16 +213,30 @@ class MiniZincModeTest(private val direction: String) {
 
     @Test
     fun `declared nonlinear grid optimization should report its optimum in original units`() {
-        val program = parseFlatZinc("var 0.0..1.0: x :: output_var; var 0.0..1.0: y :: output_var; " +
-            "constraint float_le(x,0.75); constraint float_times(x,x,y); solve $direction y;", floatBuckets = 5)
+        val program = parseFlatZinc(
+            "var 0.0..1.0: x :: output_var; var 0.0..1.0: y :: output_var; " +
+                "constraint float_le(x,0.75); constraint float_times(x,x,y); solve $direction y;",
+            floatBuckets = 5,
+        )
         val maximize = direction == "maximize"
         val objective = assertNotNull(program.sourceProgram.linearObjective())
         val normalized = if (maximize) objective.negated() else objective
-        val invocation = program.prepareFiniteCompatibility(SourceSetupRequest(program.sourceAttachment(),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED, normalized, maximize = maximize))
+        val invocation = program.prepareFiniteCompatibility(
+            SourceSetupRequest(
+            program.sourceAttachment(),
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.FIXED,
+            normalized,
+            maximize = maximize,
+        )
+        )
         assertTrue(assertNotNull(invocation.floatProjection).declaredGridSemantics)
-        val solvable = Solvable(invocation.finiteShape(), { writeFlatZincSolution(program.sourceProgram, it, true) },
-            null, continuousObjectiveValue = { normalized.evaluateExact(it).toDouble() })
+        val solvable = Solvable(
+            invocation.finiteShape(),
+            { writeFlatZincSolution(program.sourceProgram, it, true) },
+            null,
+            continuousObjectiveValue = { normalized.evaluateExact(it).toDouble() },
+        )
         val common = CommonOptions().apply {
             engine = "fixed"
             parallel = 1
@@ -249,8 +266,10 @@ class MiniZincModeTest(private val direction: String) {
     @Test
     fun `exact nonlinear float optimization should retain continuous semantics without a grid`() {
         val source = File.createTempFile("exact-nonlinear-flatzinc", ".fzn").apply {
-            writeText("var 0.0..1.0: x :: output_var; var 0.0..1.0: y :: output_var; " +
-                "constraint float_eq(x,0.25); constraint float_times(x,x,y); solve $direction y;")
+            writeText(
+                "var 0.0..1.0: x :: output_var; var 0.0..1.0: y :: output_var; " +
+                    "constraint float_eq(x,0.25); constraint float_times(x,x,y); solve $direction y;",
+            )
         }
         val common = CommonOptions().apply {
             engine = "cp"
@@ -287,8 +306,15 @@ class MiniZincModeTest(private val direction: String) {
     fun `prepared finite dispatch should retain its source invocation objective units and routing costs`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(3), constant = 7)
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK, objective, maximize = direction == "maximize"))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source),
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.BACKTRACK,
+            objective,
+            maximize = direction == "maximize",
+        )
+        )
         val stats = LpStats()
 
         val solvable = preparedSourceSolvable(invocation, { "" }, { "" }, stats, 17)
@@ -331,9 +357,11 @@ class MiniZincModeTest(private val direction: String) {
     @Test
     fun `finite loading should capture source definitions without materializing heuristic state`() {
         val source = File.createTempFile("source-setup-flatzinc", ".fzn").apply {
-            writeText("var -2..2: x; var 0..2: a; var 4..8: score; " +
-                "constraint int_abs(x,a) :: defines_var(a); " +
-                "constraint int_lin_eq([2,-1],[a,score],-4) :: defines_var(score); solve $direction score;")
+            writeText(
+                "var -2..2: x; var 0..2: a; var 4..8: score; " +
+                    "constraint int_abs(x,a) :: defines_var(a); " +
+                    "constraint int_lin_eq([2,-1],[a,score],-4) :: defines_var(score); solve $direction score;",
+            )
         }
         try {
             for (engine in listOf("cp", "ls")) {

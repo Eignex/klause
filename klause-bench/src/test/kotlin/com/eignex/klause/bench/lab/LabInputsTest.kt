@@ -38,9 +38,13 @@ class LabInputsTest {
         "zero_one_knapsack,d763322febf3d75574c902318c58b6436f24403c900bca90c0d4888145ec42d3",
     )
     fun `smoke selection retains original bytes under isolated filenames`(name: String, sha256: String) {
-        val request = BenchRequest(parameters = mapOf(
-            "suite" to "mzn-smoke", "name" to name, "input-only" to "true",
-        ))
+        val request = BenchRequest(
+            parameters = mapOf(
+            "suite" to "mzn-smoke",
+            "name" to name,
+            "input-only" to "true",
+        )
+        )
 
         val case = KlauseLabSuite.plan(request).single()
         val model = case.inputs.single { it.role == "model" }
@@ -54,9 +58,13 @@ class LabInputsTest {
 
     @Test
     fun `smoke include directories contain only namespaced diagnostic models`() {
-        val request = BenchRequest(parameters = mapOf(
-            "suite" to "mzn-smoke", "name" to "argmax", "input-only" to "true",
-        ))
+        val request = BenchRequest(
+            parameters = mapOf(
+            "suite" to "mzn-smoke",
+            "name" to "argmax",
+            "input-only" to "true",
+        )
+        )
 
         val case = KlauseLabSuite.plan(request).single()
         val include = case.inputs.single { it.role == "include" }
@@ -65,9 +73,12 @@ class LabInputsTest {
 
         assertTrue(models.isNotEmpty())
         assertTrue(models.all { it.name.startsWith("klause-test-") })
-        assertEquals(listOf("globals.mzn"), LabInputs.includeNames(
+        assertEquals(
+            listOf("globals.mzn"),
+            LabInputs.includeNames(
             CorpusFetcher.workspaceRoot().resolve(case.inputs.single { it.role == "model" }.path).readText(),
-        ))
+        )
+        )
     }
 
     @ParameterizedTest
@@ -90,9 +101,11 @@ class LabInputsTest {
             System.setProperty("klause.workspace.root", source.toString())
             System.setProperty("klause.bench.corpusCache", linked.toString())
             val ref = ProblemRef(
-                "model", Format.DIMACS,
+                "model",
+                Format.DIMACS,
                 ProblemSource.Prepared(linked.resolve(name).toFile()),
-                Category.SAT, Expected.Unknown,
+                Category.SAT,
+                Expected.Unknown,
             )
 
             val inputs = LabInputs.resolve(ref)
@@ -123,6 +136,7 @@ class LabInputsTest {
             root.toFile().deleteRecursively()
         }
     }
+
     @ParameterizedTest
     @CsvSource("compiler,true", "include,false")
     fun `only compiler identities are shared within a plan and execution checks changed trees`(
@@ -180,5 +194,4 @@ class LabInputsTest {
             root.toFile().deleteRecursively()
         }
     }
-
 }

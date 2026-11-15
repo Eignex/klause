@@ -4,8 +4,12 @@ internal object ContinuousArithmeticSuite {
     val suite = suite("continuous-arithmetic", "Continuous product source and grid execution controls") {
         license = "internal"
         for ((name, optimum) in listOf("square" to 1L, "product" to 0L, "chain" to 0L, "power" to 4L)) {
-            vendoredMzn(name, Category.OPTIMIZATION, Expected.Opt(optimum),
-                model = "continuous-arithmetic/$name.mzn")
+            vendoredMzn(
+                name,
+                Category.OPTIMIZATION,
+                Expected.Opt(optimum),
+                model = "continuous-arithmetic/$name.mzn",
+            )
         }
         vendoredMzn("power-sat", Category.CSP, Expected.Sat, model = "continuous-arithmetic/power-sat.mzn")
     }

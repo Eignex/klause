@@ -39,8 +39,11 @@ object ScopedResidualConsumer {
             val catalog = context.snapshot.sourceIdentity["kind"]?.jsonPrimitive?.content == "catalog"
             when {
                 context.snapshot.activeCutoff == null -> decline("no-live-incumbent")
+
                 catalog && consumedCatalog -> decline("one-retained-source-context-limit")
+
                 !catalog && consumedControl -> decline("one-retained-control-context-limit")
+
                 else -> {
                     val retained = compare(context, 2_000L, 3L, fromRoot = false)
                     val root = compare(context, 2_000L, 3L, fromRoot = true)
@@ -66,12 +69,7 @@ object ScopedResidualConsumer {
         val biased: Int? = null,
     )
 
-    private class Study(
-        val context: ResidualProbeContext,
-        val millis: Long,
-        val seed: Long,
-        val fromRoot: Boolean,
-    ) {
+    private class Study(val context: ResidualProbeContext, val millis: Long, val seed: Long, val fromRoot: Boolean) {
         val receipts = ArrayList<JsonObject>()
     }
 
@@ -106,6 +104,7 @@ object ScopedResidualConsumer {
             val factor = codec.decodeFromJsonElement(entry.problem).factors.single()
             when (factor) {
                 is Clause -> clauses += factor.literals.toList()
+
                 is PseudoBoolean -> {
                     if (!ResidualBudgetGate.impliedByCutoff(
                             factor,
@@ -115,9 +114,12 @@ object ScopedResidualConsumer {
                             fixed,
                             allowance,
                         )
-                    ) return Admission(null, "non-budget-pb-remains-enforcing", budgetRows)
+                    ) {
+                        return Admission(null, "non-budget-pb-remains-enforcing", budgetRows)
+                    }
                     budgetRows++
                 }
+
                 else -> return Admission(null, "unsupported-enforcing-reader", budgetRows)
             }
         }
@@ -138,13 +140,17 @@ object ScopedResidualConsumer {
             ?: return decline("no-live-incumbent")
         val source = context.originalProblem
         if (source.numIntVars != 0 || source.numRealVars != 0 ||
-            source.factors.any { f -> f !is Clause || f.literals.any {
-                Lit.variable(it) !in 0 until source.numBoolVars
-            } } ||
+            source.factors.any { f ->
+                f !is Clause || f.literals.any {
+                    Lit.variable(it) !in 0 until source.numBoolVars
+                }
+            } ||
             context.originalObjective.boolWeights.size > source.numBoolVars ||
             context.originalObjective.intCoefficients.any { it != 0L } ||
             context.originalObjective.realCoefficients.any { it != 0.0 }
-        ) return decline("original-source-check-unavailable")
+        ) {
+            return decline("original-source-check-unavailable")
+        }
         val study = Study(context, millis, seed, fromRoot)
         val admission = funded(study) { invocation ->
             val admitted = admit(invocation)
@@ -162,15 +168,18 @@ object ScopedResidualConsumer {
                 if (floor >= cutoff) put("decline", "ordinary-additive-bound-already-closes")
             }
         }
-        if (admission["decline"] != null) return buildJsonObject {
+        if (admission["decline"] != null) {
+            return buildJsonObject {
             put("opening", if (fromRoot) "prepared-root" else "retained-node")
             put("admission", admission)
             put("sourceVerdictClaim", false)
             put("witnessChecks", JsonArray(study.receipts))
         }
+        }
         val natural = if (admission["components"] == JsonPrimitive(1)) {
             decline("one-component-falls-back-to-ordinary")
-        } else funded(study) { invocation ->
+        } else {
+            funded(study) { invocation ->
             val admitted = admit(invocation)
             val residual = admitted.residual ?: return@funded decline(checkNotNull(admitted.reason))
             ScopedComponentProfile.composition(
@@ -181,6 +190,7 @@ object ScopedResidualConsumer {
                 invocation.allowance,
                 sourceCheck = invocation.check,
             )
+        }
         }
         val separator = funded(study) { invocation ->
             val admitted = admit(invocation)
@@ -200,8 +210,13 @@ object ScopedResidualConsumer {
             put("admission", admission)
             put("ordinary", ordinary(study, OrdinaryControl()))
             put("ordinaryLp", ordinary(study, OrdinaryControl(lp = LpEmphasis.DEFAULT)))
-            put("ordinaryStrong", ordinary(study,
-                OrdinaryControl(lp = LpEmphasis.AGGRESSIVE, pbCutoff = true, objectiveOrder = true)))
+            put(
+                "ordinaryStrong",
+                ordinary(
+                study,
+                OrdinaryControl(lp = LpEmphasis.AGGRESSIVE, pbCutoff = true, objectiveOrder = true),
+            )
+            )
             put("naturalDecomposition", natural)
             put("separatorDecomposition", separator)
             if (variable != null) put("ordinarySeparatorOrder", ordinary(study, OrdinaryControl(biased = variable)))
@@ -226,7 +241,9 @@ object ScopedResidualConsumer {
             val sourceValues = List(source.numBoolVars) { original.boolValue(it) }
             val sourceWeights = objective.boolWeights
             val sourceCost = ResidualSnapshots.objective(
-                List(source.numBoolVars) { sourceWeights.getOrElse(it) { 0L } }, objective.constant, sourceValues,
+                List(source.numBoolVars) { sourceWeights.getOrElse(it) { 0L } },
+                objective.constant,
+                sourceValues,
             )
             val preparedCost = ResidualSnapshots.objective(weights, constant, values)
             val checked = sourceCost == preparedCost && source.factors.all { factor ->
@@ -258,7 +275,11 @@ object ScopedResidualConsumer {
         }
         val decisions = ArrayList<JsonObject>()
         val run = ResidualReplayControls.solve(
-            mapping.toIntArray(), factors, snapshot.boolWeights.toLongArray(), allowance.stop, study.seed,
+            mapping.toIntArray(),
+            factors,
+            snapshot.boolWeights.toLongArray(),
+            allowance.stop,
+            study.seed,
         ) { base: BacktrackParams ->
             base.copy(
                 nodeBudget = allowance.nodes,
@@ -266,7 +287,9 @@ object ScopedResidualConsumer {
                 objectiveGuidedValues = control.objectiveOrder,
                 lpConfig = control.lp?.let { LpConfig(it) },
                 variableSelector = ScopedComponentProfile.DecisionTrace(
-                    base.variableSelector, control.biased?.let { mapping.indexOf(it) }?.takeIf { it >= 0 }, decisions,
+                    base.variableSelector,
+                    control.biased?.let { mapping.indexOf(it) }?.takeIf { it >= 0 },
+                    decisions,
                 ),
             )
         }
@@ -305,7 +328,9 @@ object ScopedResidualConsumer {
         if (root.numIntVars != 0 || root.numRealVars != 0 || root.factors.any { it !is Clause } ||
             coefficients.size > root.numBoolVars || cutoff.witness.size != root.numBoolVars ||
             objective.intCoefficients.any { it != 0L } || objective.realCoefficients.any { it != 0.0 }
-        ) return Opening(null, "unsupported-prepared-root")
+        ) {
+            return Opening(null, "unsupported-prepared-root")
+        }
         val cells = root.factors.sumOf { (it as Clause).literals.size.toLong() } + root.numBoolVars * 8L
         if (!allowance.visit(cells) || !allowance.retain(cells * 32L)) return Opening(null, "root-allowance")
         val implied = root.baked as? PropagationResult.Implied ?: return Opening(null, "unavailable-root-fixpoint")
@@ -319,19 +344,34 @@ object ScopedResidualConsumer {
         val checker = originalChecker(parent, study.receipts, weights, objective.constant)
         if (ResidualSnapshots.objective(weights, objective.constant, point) != BigInteger(cutoff.strictUpper) ||
             !checker(point, allowance)
-        ) return Opening(null, "prepared-root-incumbent-unavailable")
+        ) {
+            return Opening(null, "prepared-root-incumbent-unavailable")
+        }
         val factors = root.factors.toMutableList()
         implied.forEachBool { v, value -> factors += Clause(intArrayOf(Lit.make(v, value))) }
-        val source = Problem(root.numBoolVars, 0, emptyArray(), factors.toTypedArray(),
-            settings = root.settings, semantics = root.semantics)
+        val source = Problem(
+            root.numBoolVars,
+            0,
+            emptyArray(),
+            factors.toTypedArray(),
+            settings = root.settings,
+            semantics = root.semantics,
+        )
         val rhs = BigInteger(cutoff.strictUpper) - BigInteger.ONE - BigInteger.valueOf(objective.constant)
         val budget = PseudoBoolean(
             weights.map { parseBigInt(it.toString()) }.toTypedArray(),
-            IntArray(weights.size) { Lit.make(it, true) }, PbOp.LE,
+            IntArray(weights.size) { Lit.make(it, true) },
+            PbOp.LE,
             parseBigInt(rhs.toString()),
         )
-        val constrained = Problem(root.numBoolVars, 0, emptyArray(), (factors + budget).toTypedArray(),
-            settings = root.settings, semantics = root.semantics)
+        val constrained = Problem(
+            root.numBoolVars,
+            0,
+            emptyArray(),
+            (factors + budget).toTypedArray(),
+            settings = root.settings,
+            semantics = root.semantics,
+        )
             .bake(allowance.stop)
         if (allowance.stop()) return Opening(null, "root-propagation-allowance")
         val propagated = constrained.baked
@@ -340,11 +380,15 @@ object ScopedResidualConsumer {
             List(root.numBoolVars) { propagated.boolValueOrNull(it) }
         } else if (closed) {
             List(root.numBoolVars) { implied.boolValueOrNull(it) }
-        } else return Opening(null, "incomplete-root-propagation")
-        val metadata = JsonObject(parent.snapshot.preparationIdentity + buildJsonObject {
+        } else {
+            return Opening(null, "incomplete-root-propagation")
+        }
+        val metadata = JsonObject(
+            parent.snapshot.preparationIdentity + buildJsonObject {
             put("opening", "prepared-root-after-cutoff-propagation")
             put("incumbentParentCondition", parent.snapshot.conditionIdentity)
-        })
+        }
+        )
         val capture = ResidualSnapshots.capture(
             source, objective, values, LearnedResidualInspection(emptyList(), 0, null),
             parent.snapshot.sourceIdentity, metadata, rootCutoff, allowance.stop, ResidualSnapshots.MAX_BYTES,
@@ -358,8 +402,15 @@ object ScopedResidualConsumer {
         File(System.getenv("OUT") ?: "build/profile-out").resolve(file).writeBytes(bytes)
         if (closed) return Opening(null, "ordinary-root-propagation-closes-cutoff", true, file)
         return Opening(
-            ResidualProbeContext(snapshot, parent.reconstruct, parent.originalProblem, parent.originalObjective,
-                root, objective), file = file,
+            ResidualProbeContext(
+                snapshot,
+                parent.reconstruct,
+                parent.originalProblem,
+                parent.originalObjective,
+                root,
+                objective,
+            ),
+            file = file,
         )
     }
 
@@ -369,7 +420,9 @@ object ScopedResidualConsumer {
         if (!allowance.visit()) return decline("containing-allowance")
         val opening = if (study.fromRoot) preparedRoot(study, allowance) else Opening(study.context)
         val context = opening.context
-        if (context == null) return JsonObject(decline(checkNotNull(opening.reason)) + buildJsonObject {
+        if (context == null) {
+            return JsonObject(
+                decline(checkNotNull(opening.reason)) + buildJsonObject {
             put("cutoffClosed", opening.closed && !allowance.stop())
             put("snapshotFile", opening.file)
             put("totalIncludingInputMs", (System.nanoTime() - start) / 1_000_000.0)
@@ -378,7 +431,9 @@ object ScopedResidualConsumer {
             put("cumulativeModeledBytes", allowance.bytes)
             put("originalSourceIncumbentChecked", opening.closed)
             put("stopped", allowance.stop())
-        })
+        }
+            )
+        }
         val snapshot = context.snapshot
         val identity = ResidualSnapshots.encode(snapshot)
         if (!allowance.retain(identity.length * 12L) || !allowance.visit(identity.length.toLong())) {
@@ -389,10 +444,13 @@ object ScopedResidualConsumer {
         val checked = checker(checkNotNull(snapshot.activeCutoff).witness, allowance)
         check(checked || allowance.stop())
         val verified = System.nanoTime()
-        val result = if (allowance.stop()) decline("verification-allowance") else {
+        val result = if (allowance.stop()) {
+            decline("verification-allowance")
+        } else {
             run(Invocation(context, allowance, identity, checker))
         }
-        return JsonObject(result + buildJsonObject {
+        return JsonObject(
+            result + buildJsonObject {
             put("conditionIdentity", snapshot.conditionIdentity)
             put("snapshotFile", opening.file)
             put("loadVerifyMs", (verified - start) / 1_000_000.0)
@@ -405,7 +463,8 @@ object ScopedResidualConsumer {
             put("visits", allowance.visits)
             put("cumulativeModeledBytes", allowance.bytes)
             put("stopped", allowance.stop())
-        })
+        }
+        )
     }
 
     private fun decline(reason: String): JsonObject = buildJsonObject { put("decline", reason) }

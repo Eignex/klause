@@ -37,22 +37,31 @@ internal object NumericalActiveRowsControls {
     }
 
     fun compare(
-        out: File, name: String, source: SourceProofContext,
-        params: TheoryParams = TheoryParams(randomSeed = 3L), frontier: Boolean = false,
-        sourceKind: String = "self-authored-native-exact-affine", append: Boolean = false,
+        out: File,
+        name: String,
+        source: SourceProofContext,
+        params: TheoryParams = TheoryParams(randomSeed = 3L),
+        frontier: Boolean = false,
+        sourceKind: String = "self-authored-native-exact-affine",
+        append: Boolean = false,
     ) {
         val output = out.resolve("active-controls.jsonl")
         if (!append) output.writeText("")
         val system = buildJsonObject {
             put("scope", NumericalFrontierSnapshot.scope(source.scope))
-            put("coordinates", buildJsonArray {
+            put(
+                "coordinates",
+                buildJsonArray {
                 source.coordinates.sortedWith(compareBy({ it.kind.ordinal }, { it.id })).forEach { coordinate ->
-                    add(buildJsonObject {
+                    add(
+                        buildJsonObject {
                         put("kind", coordinate.kind.name)
                         put("id", coordinate.id)
-                    })
+                    }
+                    )
                 }
-            })
+            }
+            )
             put("system", NumericalFrontierSnapshot.system(source))
         }
         val bytes = system.toString().toByteArray()
@@ -61,8 +70,12 @@ internal object NumericalActiveRowsControls {
             for (active in if (round % 2 == 0) listOf(false, true) else listOf(true, false)) {
                 val stop = ExecutionControl.after(10.seconds)
                 val started = System.nanoTime()
-                val invocation = NumericalFrontierSnapshot.open(source,
-                    params.copy(timeout = stop, cancellation = stop), frontier = frontier, activeRows = active)
+                val invocation = NumericalFrontierSnapshot.open(
+                    source,
+                    params.copy(timeout = stop, cancellation = stop),
+                    frontier = frontier,
+                    activeRows = active,
+                )
                 val selection = if (round == 0) NumericalSelectionSnapshot(ExecutionControl.after(30.seconds)) else null
                 val journal = selection?.attach(invocation)
                 val result = try {
@@ -108,16 +121,24 @@ internal object NumericalActiveRowsControls {
                     put("nativeTerminal", terminal?.claim?.let { it::class.simpleName })
                     put("value", field(result, "value")?.toString())
                     put("reason", field(result, "reason").toString())
-                    put("nativeTerminalCheck", terminal?.let {
+                    put(
+                        "nativeTerminalCheck",
+                        terminal?.let {
                         SourceEvidenceVerifier(source.withLinearAuthority()).verify(it, checkStop).toString()
-                    })
-                    put("nativeBoundCheck", bound?.let {
+                    }
+                    )
+                    put(
+                        "nativeBoundCheck",
+                        bound?.let {
                         SourceEvidenceVerifier(source.withLinearAuthority()).verify(it, checkStop).toString()
-                    })
+                    }
+                    )
                     put("independentProofCheck", false)
                     put("booleanDecisions", progress.openTheory.openBoolDecisions)
                     put("theoryChecks", progress.openTheory.openTheoryChecks)
-                    put("sourceLp", buildJsonObject {
+                    put(
+                        "sourceLp",
+                        buildJsonObject {
                         val work = progress.smt.sourceLp
                         put("operations", work.operations)
                         put("preparationWork", work.preparationWork)
@@ -127,10 +148,14 @@ internal object NumericalActiveRowsControls {
                         put("boundCertificationWork", work.boundCertificationWork)
                         put("conflictCertificationWork", work.conflictCertificationWork)
                         put("modeledAllocation", work.modeledAllocation)
-                    })
-                    put("stages", buildJsonObject {
+                    }
+                    )
+                    put(
+                        "stages",
+                        buildJsonObject {
                         progress.smt.completeSearchStages.orEmpty().forEach { (key, value) -> put(key, value) }
-                    })
+                    }
+                    )
                 }
                 output.appendText(entry.toString() + "\n")
             }
@@ -148,25 +173,48 @@ internal object NumericalActiveRowsControls {
             "inactive" -> SourceCondition(bools = mapOf(0 to false))
             else -> SourceCondition()
         }
-        val scope = SourceScope(SourceRevision("active-$name-v1", "native-exact-affine-v1"), condition,
-            SourceObjective("boolean-cost", ObjectiveSense.MINIMIZE))
+        val scope = SourceScope(
+            SourceRevision("active-$name-v1", "native-exact-affine-v1"),
+            condition,
+            SourceObjective("boolean-cost", ObjectiveSense.MINIMIZE),
+        )
         val rows = linkedMapOf("lower" to SourcePremise(SourceInequality(mapOf(x to one.negated()), zero)))
         when (name) {
-            "closed", "strict" -> rows["upper"] = SourcePremise(SourceInequality(mapOf(x to one),
-                if (name == "strict") zero else one.negated(), strict = name == "strict"))
+            "closed", "strict" -> rows["upper"] = SourcePremise(
+                SourceInequality(
+                mapOf(x to one),
+                if (name == "strict") zero else one.negated(),
+                strict = name == "strict",
+            )
+            )
+
             "guarded", "inactive", "unresolved" -> rows["upper"] = SourcePremise(
-                SourceInequality(mapOf(x to one), one.negated()), mapOf(0 to true))
+                SourceInequality(mapOf(x to one), one.negated()),
+                mapOf(0 to true),
+            )
+
             "boolean-term" -> rows["upper"] = SourcePremise(
-                SourceInequality(mapOf(x to one, booleans[0] to one.negated()), one.negated()))
+                SourceInequality(mapOf(x to one, booleans[0] to one.negated()), one.negated()),
+            )
+
             "integer-pin" -> {
                 rows["integer-lower"] = SourcePremise(SourceInequality(mapOf(integer to one.negated()), one.negated()))
                 rows["integer-upper"] = SourcePremise(SourceInequality(mapOf(integer to one), one))
-                rows["indicator"] = SourcePremise(SourceInequality(emptyMap(), one.negated()),
-                    emptyMap(), mapOf(integer to one))
+                rows["indicator"] = SourcePremise(
+                    SourceInequality(emptyMap(), one.negated()),
+                    emptyMap(),
+                    mapOf(integer to one),
+                )
             }
+
             else -> error("unknown active row control")
         }
-        return SourceProofContext(scope, (booleans + listOf(x, integer)).toSet(), rows,
-            mapOf(booleans[2] to BigFraction.ofLong(7)), BigFraction.ofLong(3))
+        return SourceProofContext(
+            scope,
+            (booleans + listOf(x, integer)).toSet(),
+            rows,
+            mapOf(booleans[2] to BigFraction.ofLong(7)),
+            BigFraction.ofLong(3),
+        )
     }
 }

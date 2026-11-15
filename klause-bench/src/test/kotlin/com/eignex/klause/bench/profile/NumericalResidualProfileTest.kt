@@ -13,8 +13,11 @@ class NumericalResidualProfileTest {
     @ValueSource(strings = ["NaN", "Infinity", "-Infinity"])
     fun `nonfinite statistics should serialize as strings`(value: String) {
         val number = value.toDouble()
-        val statistics = mapOf("double" to number, "float" to number.toFloat(),
-            "array" to doubleArrayOf(number))
+        val statistics = mapOf(
+            "double" to number,
+            "float" to number.toFloat(),
+            "array" to doubleArrayOf(number),
+        )
 
         val encoded = NumericalResidualProfile.json(statistics).toString()
 

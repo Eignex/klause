@@ -14,9 +14,13 @@ internal object QuadraticProposalSuite {
             "coupled-32-rows-256",
             "diagonal-64-rows-512",
         )) {
-            vendored(name, Category.OPTIMIZATION, Expected.Opt(0),
+            vendored(
+                name,
+                Category.OPTIMIZATION,
+                Expected.Opt(0),
                 relPath = "quadratic-proposals-v1/$name.smt2",
-                tags = setOf("quadratic-objective", "quadratic-proposals-v1"))
+                tags = setOf("quadratic-objective", "quadratic-proposals-v1"),
+            )
         }
     }
 }

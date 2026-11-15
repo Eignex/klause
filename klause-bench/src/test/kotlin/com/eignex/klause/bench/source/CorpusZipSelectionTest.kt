@@ -26,18 +26,24 @@ class CorpusZipSelectionTest {
     fun `a selected member preserves original bytes without fetching unrelated member bodies`(xz: Boolean) {
         val bytes = "7 1 2 0\n11 -1 2 0\n".encodeToByteArray()
         val name = "source.wcnf" + if (xz) ".xz" else ""
-        val packed = if (xz) ByteArrayOutputStream().also { out ->
+        val packed = if (xz) {
+            ByteArrayOutputStream().also { out ->
             XZOutputStream(out, LZMA2Options(0)).use { it.write(bytes) }
-        }.toByteArray() else bytes
+        }.toByteArray()
+        } else {
+            bytes
+        }
         val archive = ByteArrayOutputStream().also { out ->
             ZipOutputStream(out).use { zip ->
                 val unrelated = ByteArray(262144)
-                zip.putNextEntry(ZipEntry("unrelated").apply {
+                zip.putNextEntry(
+                    ZipEntry("unrelated").apply {
                     method = ZipEntry.STORED
                     size = unrelated.size.toLong()
                     compressedSize = size
                     crc = CRC32().also { it.update(unrelated) }.value
-                })
+                }
+                )
                 zip.write(unrelated)
                 zip.closeEntry()
                 zip.putNextEntry(ZipEntry("nested/$name"))
@@ -60,12 +66,14 @@ class CorpusZipSelectionTest {
                 }
                 override fun getContentLengthLong() = -1L
                 override fun getInputStream() = archive.copyOfRange(
-                    interval[0].toInt(), interval[1].toInt() + 1,
+                    interval[0].toInt(),
+                    interval[1].toInt() + 1,
                 ).also { transferred += it.size }.inputStream()
             }
         })
         val member = FetchMethod.ZipMember(
-            name, HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)),
+            name,
+            HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)),
         )
         val root = Files.createTempDirectory("corpuszipselection").toFile()
         try {
@@ -102,7 +110,8 @@ class CorpusZipSelectionTest {
                 }
                 override fun getContentLengthLong() = -1L
                 override fun getInputStream() = archive.copyOfRange(
-                    interval[0].toInt(), interval[1].toInt() + 1,
+                    interval[0].toInt(),
+                    interval[1].toInt() + 1,
                 ).inputStream()
             }
         })
@@ -111,7 +120,9 @@ class CorpusZipSelectionTest {
         try {
             assertFailsWith<IllegalArgumentException> {
                 CorpusZipSelection(downloader).fetch(
-                    URI("https://corpus.invalid/archive"), FetchMethod.ZipMember("source.wcnf", "0".repeat(64)), root,
+                    URI("https://corpus.invalid/archive"),
+                    FetchMethod.ZipMember("source.wcnf", "0".repeat(64)),
+                    root,
                 )
             }
 
@@ -148,7 +159,8 @@ class CorpusZipSelectionTest {
                 }
                 override fun getContentLengthLong() = -1L
                 override fun getInputStream() = archive.copyOfRange(
-                    interval[0].toInt(), interval[1].toInt() + 1,
+                    interval[0].toInt(),
+                    interval[1].toInt() + 1,
                 ).inputStream()
             }
         })
@@ -158,7 +170,9 @@ class CorpusZipSelectionTest {
 
             assertFailsWith<IllegalArgumentException> {
                 CorpusZipSelection(downloader).fetch(
-                    URI("https://corpus.invalid/archive"), FetchMethod.ZipMember(name, "0".repeat(64)), root,
+                    URI("https://corpus.invalid/archive"),
+                    FetchMethod.ZipMember(name, "0".repeat(64)),
+                    root,
                 )
             }
 

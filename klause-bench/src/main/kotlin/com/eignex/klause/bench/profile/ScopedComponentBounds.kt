@@ -59,7 +59,9 @@ internal class ComponentCostBounds private constructor(
         require(cost >= lower)
         return if (upper == null || cost < checkNotNull(upper)) {
             ComponentCostBounds(scope, lower, values.toList(), false)
-        } else this
+        } else {
+            this
+        }
     }
 
     // A complete check of source AND cost < threshold proves a floor, never source infeasibility.

@@ -47,10 +47,17 @@ internal object ElementHullProfile {
             if (parsed.sense == ObjectiveSense.MAXIMIZE) it.negated() else it
         }
         val budget = PresolveBudget(1_650_000_000L)
-        val prepared = FinitePipeline.prepare(FinitePipelineRequest(
-            parsed.problem, FiniteEngine.MIXED, objective, cancellation = stop, solveCancellation = stop,
-            presolveBudget = budget, randomSeed = 3L,
-        ))
+        val prepared = FinitePipeline.prepare(
+            FinitePipelineRequest(
+            parsed.problem,
+            FiniteEngine.MIXED,
+            objective,
+            cancellation = stop,
+            solveCancellation = stop,
+            presolveBudget = budget,
+            randomSeed = 3L,
+        )
+        )
         check(prepared.presolve?.infeasible != true && !stop())
         val problem = prepared.problem
         val elements = problem.factors.filterIsInstance<Element>()
@@ -85,10 +92,20 @@ internal object ElementHullProfile {
             put("rows", get(model, "M") as Int)
             put("columns", get(model, "N") as Int)
             put("selectorColumns", requirements.count { it != null })
-            put("selectorMemberships", buildJsonArray {
+            put(
+                "selectorMemberships",
+                buildJsonArray {
                 requirements.filterNotNull().groupingBy { (it as LongArray)[0] }.eachCount().toSortedMap()
-                    .forEach { (index, count) -> add(buildJsonObject { put("index", index); put("choices", count) }) }
-            })
+                    .forEach { (index, count) ->
+                        add(
+                            buildJsonObject {
+                        put("index", index);
+                        put("choices", count)
+                    }
+                        )
+                    }
+            }
+            )
             put("assemblyNs", assemblyNs)
             put("assemblyThreadAllocatedBytes", allocated)
             put("javaVersion", System.getProperty("java.version"))
@@ -99,38 +116,35 @@ internal object ElementHullProfile {
         println(report)
     }
 
-    private fun selection(
-        problem: Problem,
-        objective: LinearObjective?,
-        config: LpConfig,
-        stop: ExecutionControl,
-    ) = buildJsonObject {
-        val method = LpAutoConfig.javaClass.methods.single { it.name.startsWith("admission$") }
-        val admission = method.invoke(LpAutoConfig, problem, config, LpPlan())
-        @Suppress("UNCHECKED_CAST")
-        val indexes = get(admission, "ElementIndexes") as Set<Int>
-        val plan = get(admission, "Plan") as LpPlan
-        put("indexes", buildJsonArray { indexes.sorted().forEach { add(JsonPrimitive(it)) } })
-        for (name in listOf("EstimatedRows", "EstimatedColumns", "EstimatedCells")) {
-            put(name.replaceFirstChar { it.lowercase() }, get(admission, name) as Long)
+    private fun selection(problem: Problem, objective: LinearObjective?, config: LpConfig, stop: ExecutionControl) =
+        buildJsonObject {
+            val method = LpAutoConfig.javaClass.methods.single { it.name.startsWith("admission$") }
+            val admission = method.invoke(LpAutoConfig, problem, config, LpPlan())
+
+            @Suppress("UNCHECKED_CAST")
+            val indexes = get(admission, "ElementIndexes") as Set<Int>
+            val plan = get(admission, "Plan") as LpPlan
+            put("indexes", buildJsonArray { indexes.sorted().forEach { add(JsonPrimitive(it)) } })
+            for (name in listOf("EstimatedRows", "EstimatedColumns", "EstimatedCells")) {
+                put(name.replaceFirstChar { it.lowercase() }, get(admission, name) as Long)
+            }
+            put("elementEnabled", plan.element)
+            put("elementOnlyProjection", true)
+            val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
+            val thread = Thread.currentThread().threadId()
+            val before = bean.getThreadAllocatedBytes(thread)
+            val started = System.nanoTime()
+            val relaxation = MpsLpAdmission.rootRelaxation(problem, objective, false, stop, plan.element, indexes)
+            put("assemblyNs", System.nanoTime() - started)
+            put("assemblyThreadAllocatedBytes", bean.getThreadAllocatedBytes(thread) - before)
+            val model = get(relaxation, "Model")
+            val rows = get(model, "M") as Int
+            val columns = get(model, "N") as Int
+            put("rows", rows)
+            put("columns", columns)
+            put("emittedCells", rows.toLong() * (columns.toLong() + rows + 1))
+            put("selectorColumns", (get(relaxation, "ColReq") as Array<*>).count { it != null })
         }
-        put("elementEnabled", plan.element)
-        put("elementOnlyProjection", true)
-        val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
-        val thread = Thread.currentThread().threadId()
-        val before = bean.getThreadAllocatedBytes(thread)
-        val started = System.nanoTime()
-        val relaxation = MpsLpAdmission.rootRelaxation(problem, objective, false, stop, plan.element, indexes)
-        put("assemblyNs", System.nanoTime() - started)
-        put("assemblyThreadAllocatedBytes", bean.getThreadAllocatedBytes(thread) - before)
-        val model = get(relaxation, "Model")
-        val rows = get(model, "M") as Int
-        val columns = get(model, "N") as Int
-        put("rows", rows)
-        put("columns", columns)
-        put("emittedCells", rows.toLong() * (columns.toLong() + rows + 1))
-        put("selectorColumns", (get(relaxation, "ColReq") as Array<*>).count { it != null })
-    }
 
     private fun get(receiver: Any, name: String): Any =
         requireNotNull(receiver.javaClass.getMethod("get$name").invoke(receiver))

@@ -31,9 +31,12 @@ internal object CoefficientLiftingProfile {
             put("revision", Reports.readGitSha())
             put("scope", "coefficient-strengthening-java-thread-allocations")
             put("javaVersion", System.getProperty("java.version"))
-            put("jvmOptions", buildJsonArray {
+            put(
+                "jvmOptions",
+                buildJsonArray {
                 ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
-            })
+            }
+            )
         }
         out.resolve("identity.json").writeText("$identity\n")
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
@@ -90,8 +93,11 @@ internal object CoefficientLiftingProfile {
     private fun retain(problem: BakedProblem, productive: Boolean) {
         val delta = Presolve.strengthenCoefficients(problem)
         check(!delta.infeasible)
-        if (productive) check(delta.droppedIndices.size == 1 && delta.addedFactors.size == 1)
-        else check(delta.isEmpty)
+        if (productive) {
+            check(delta.droppedIndices.size == 1 && delta.addedFactors.size == 1)
+        } else {
+            check(delta.isEmpty)
+        }
         retained = delta
     }
 }

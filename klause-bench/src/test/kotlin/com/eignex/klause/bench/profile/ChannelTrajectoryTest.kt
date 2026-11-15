@@ -44,10 +44,18 @@ class ChannelTrajectoryTest {
 
     @Test
     fun `searched channel moves report a changed source destination`() {
-        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)),
-            arrayOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)))
-        val sweep = assertNotNull(DefinitionalSweep.fromSource(problem,
-            listOf(DefinitionHint.BooleanValue(0, Lit.make(0, true)))))
+        val problem = Problem(
+            1,
+            1,
+            arrayOf(IntDomain(0, 1)),
+            arrayOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)),
+        )
+        val sweep = assertNotNull(
+            DefinitionalSweep.fromSource(
+            problem,
+            listOf(DefinitionHint.BooleanValue(0, Lit.make(0, true))),
+        )
+        )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         state.invariants = ChannelView.SearchedValues.sweep(sweep, ExecutionControl.Never)
             ?.network(problem.numIntVars, problem.numBoolVars)
@@ -58,10 +66,16 @@ class ChannelTrajectoryTest {
         val candidate = searched.probe(Move.BoolFlip(0))
 
         assertNull(candidate["decline"])
-        assertEquals("true", candidate.getValue("source").jsonObject.getValue("bools")
-            .jsonArray.single().jsonPrimitive.content)
-        assertEquals("0", candidate.getValue("source").jsonObject.getValue("ints")
-            .jsonArray.single().jsonPrimitive.content)
+        assertEquals(
+            "true",
+            candidate.getValue("source").jsonObject.getValue("bools")
+            .jsonArray.single().jsonPrimitive.content
+        )
+        assertEquals(
+            "0",
+            candidate.getValue("source").jsonObject.getValue("ints")
+            .jsonArray.single().jsonPrimitive.content
+        )
     }
 
     @ParameterizedTest
@@ -71,8 +85,12 @@ class ChannelTrajectoryTest {
         val model = LocalSearchModel.open(problem)
         val state = LocalSearchState(model, Random(0))
         val coordinates = VarRemap(intArrayOf(0), intArrayOf(0))
-        val view = TrajectoryView(if (maintained) "maintained" else "searched", state, coordinates,
-            synchronize = { if (maintained) state.assignment.setBool(0, state.assignment.intValue(0) <= 0L) })
+        val view = TrajectoryView(
+            if (maintained) "maintained" else "searched",
+            state,
+            coordinates,
+            synchronize = { if (maintained) state.assignment.setBool(0, state.assignment.intValue(0) <= 0L) },
+        )
 
         val source = Sample(booleanArrayOf(false), longArrayOf(-1))
 

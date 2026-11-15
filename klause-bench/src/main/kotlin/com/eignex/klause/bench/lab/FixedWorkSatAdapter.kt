@@ -78,8 +78,10 @@ internal object FixedWorkSatSuite : BenchSuite {
                 }
                 val sources = if (planned) {
                     listOf(Source(parameters.getValue("source-path"), parameters.getValue("sha256")))
-                } else parameters.getValue("sources").split(',').map { entry ->
+                } else {
+                    parameters.getValue("sources").split(',').map { entry ->
                     Source(entry.substringAfter(':'), entry.substringBefore(':'))
+                }
                 }
                 require(sources.size in 1..MAX_SOURCES && sources.map { it.path }.distinct().size == sources.size) {
                     "1 to $MAX_SOURCES distinct sources"
@@ -102,26 +104,40 @@ internal object FixedWorkSatSuite : BenchSuite {
                 require(rows in 0..MAX_TRACE_ROWS) { "trace-rows must be in 0..$MAX_TRACE_ROWS" }
                 val heap = parameters["heap-mib"]?.toInt() ?: DEFAULT_HEAP_MIB
                 require(heap in MIN_HEAP_MIB..MAX_HEAP_MIB) { "heap-mib must be in $MIN_HEAP_MIB..$MAX_HEAP_MIB" }
-                return Options(sources, seeds, FixedWorkUnit.of(parameters.getValue("unit")), limit, deadline,
-                    measurement, warmups, recipe, rows, heap)
+                return Options(
+                    sources, seeds, FixedWorkUnit.of(parameters.getValue("unit")), limit, deadline,
+                    measurement, warmups, recipe, rows, heap,
+                )
             }
         }
     }
 
     override fun plan(request: BenchRequest): List<BenchCase> {
         val options = Options.parse(request.parameters, planned = false)
-        return options.sources.flatMap { source -> options.seeds.map { seed ->
-            val key = "${options.measurement}/${options.unit.label}-${options.limit}/${source.path}/seed-$seed"
-            BenchCase("fixed-work-sat/$key",
-                request.parameters - "sources" - "seeds" +
-                    mapOf("source-path" to source.path, "sha256" to source.sha256, "seed" to "$seed"),
-                BenchResources(cpus = 1, memoryMiB = options.heapMiB + NATIVE_HEADROOM_MIB,
-                    timeoutSeconds = options.processSeconds + CASE_MARGIN_SECONDS),
-                inputs = listOf(BenchInput(source.path, BenchInputRoot.CORPUS, "model", source.sha256)),
-                attributes = mapOf("suite" to "fixed-work-sat", "problem" to source.path,
-                    "comparisonKey" to key, "pairKey" to key, "seed" to "$seed",
-                    "recordSchema" to FixedWorkSatMeasurement.SCHEMA))
-        } }
+        return options.sources.flatMap { source ->
+            options.seeds.map { seed ->
+                val key = "${options.measurement}/${options.unit.label}-${options.limit}/${source.path}/seed-$seed"
+                BenchCase(
+                    "fixed-work-sat/$key",
+                    request.parameters - "sources" - "seeds" +
+                        mapOf("source-path" to source.path, "sha256" to source.sha256, "seed" to "$seed"),
+                    BenchResources(
+                        cpus = 1,
+                        memoryMiB = options.heapMiB + NATIVE_HEADROOM_MIB,
+                        timeoutSeconds = options.processSeconds + CASE_MARGIN_SECONDS,
+                    ),
+                    inputs = listOf(BenchInput(source.path, BenchInputRoot.CORPUS, "model", source.sha256)),
+                    attributes = mapOf(
+                        "suite" to "fixed-work-sat",
+                        "problem" to source.path,
+                        "comparisonKey" to key,
+                        "pairKey" to key,
+                        "seed" to "$seed",
+                        "recordSchema" to FixedWorkSatMeasurement.SCHEMA,
+                    ),
+                )
+            }
+        }
     }
 
     override fun run(case: BenchCase, context: BenchContext): BenchResult {
@@ -131,8 +147,10 @@ internal object FixedWorkSatSuite : BenchSuite {
         val out = context.outputDirectory
         Files.createDirectories(out)
         val input = case.inputs.single()
-        require(input.root == BenchInputRoot.CORPUS && input.sha256 == declared.sha256 &&
-            input.path == declared.path) { "Case input differs from its parameters" }
+        require(
+            input.root == BenchInputRoot.CORPUS && input.sha256 == declared.sha256 &&
+                input.path == declared.path,
+        ) { "Case input differs from its parameters" }
         LabInputs.verify(case, context)
         val bytes = CorpusFiles.open(LabInputs.path(input, context).toFile()).use {
             it.readNBytes(MAX_SOURCE_BYTES + 1)
@@ -140,8 +158,10 @@ internal object FixedWorkSatSuite : BenchSuite {
         require(bytes.size <= MAX_SOURCE_BYTES) { "Source exceeds $MAX_SOURCE_BYTES bytes" }
         val source = out.resolve("source.cnf")
         Files.write(source, bytes)
-        val request = FixedWorkRequest(source.toString(), sha256(bytes), seed, options.recipe, options.unit,
-            options.limit, options.deadlineSeconds * MILLIS, options.warmups, options.traceRows)
+        val request = FixedWorkRequest(
+            source.toString(), sha256(bytes), seed, options.recipe, options.unit,
+            options.limit, options.deadlineSeconds * MILLIS, options.warmups, options.traceRows,
+        )
         val requestFile = out.resolve("request.json")
         Files.writeString(requestFile, Reports.json.encodeToString(FixedWorkRequest.serializer(), request) + "\n")
         val identity = identity(context, input, bytes)
@@ -151,11 +171,19 @@ internal object FixedWorkSatSuite : BenchSuite {
         val invocations = out.resolve(FixedWorkSatMeasurement.INVOCATIONS).toFile()
         val records = if (invocations.isFile) {
             invocations.readLines().filter(String::isNotBlank).map { Reports.json.parseToJsonElement(it).jsonObject }
-        } else emptyList()
+        } else {
+            emptyList()
+        }
         val runtime = out.resolve(FixedWorkSatMeasurement.RUNTIME).toFile()
             .takeIf(File::isFile)?.let { Reports.json.parseToJsonElement(it.readText()).jsonObject }
-        val artifacts = listOf("request.json", IDENTITY, FixedWorkSatMeasurement.RUNTIME,
-            FixedWorkSatMeasurement.INVOCATIONS, FixedWorkSatMeasurement.TRACE, LOG)
+        val artifacts = listOf(
+            "request.json",
+            IDENTITY,
+            FixedWorkSatMeasurement.RUNTIME,
+            FixedWorkSatMeasurement.INVOCATIONS,
+            FixedWorkSatMeasurement.TRACE,
+            LOG,
+        )
             .filter { Files.isRegularFile(out.resolve(it)) }.map { context.artifact(it) }
         return outcome(case.id, options, identity, runtime, records, exit, killed).let {
             BenchResult(it.caseId, it.status, it.metrics, artifacts, it.details, it.message)
@@ -186,25 +214,43 @@ internal object FixedWorkSatSuite : BenchSuite {
             put("recipe", options.recipe)
             put("identity", identity)
             put("runtime", runtime ?: JsonNull)
-            put("process", buildJsonObject {
+            put(
+                "process",
+                buildJsonObject {
                 put("exit", exit)
                 put("emergencyKilled", killed)
                 put("ceilingSeconds", options.processSeconds)
-            })
+            }
+            )
             put("comparable", comparable)
             put("interrupted", interrupted)
             put("traceRowsTruncated", truncated)
-            put("warmupDigestsMatch", if (measured == null || warmups.isEmpty()) JsonNull else JsonPrimitive(
-                warmups.all { it.digest() == measured.digest() }))
+            put(
+                "warmupDigestsMatch",
+                if (measured == null || warmups.isEmpty()) {
+                JsonNull
+            } else {
+                JsonPrimitive(
+                warmups.all { it.digest() == measured.digest() },
+            )
+            }
+            )
             put("warmups", JsonArray(warmups))
             put("measured", measured ?: JsonNull)
             put("performanceQualified", false)
         }
         if (measured == null) {
-            val reason = if (killed) "killed at the ${options.processSeconds}s emergency process ceiling"
-            else "exited with ${exit ?: "no status"}"
-            return BenchResult(caseId, BenchStatus.FAILED, details = details,
-                message = "Measured invocation incomplete: child $reason; ${warmups.size} warmups retained")
+            val reason = if (killed) {
+                "killed at the ${options.processSeconds}s emergency process ceiling"
+            } else {
+                "exited with ${exit ?: "no status"}"
+            }
+            return BenchResult(
+                caseId,
+                BenchStatus.FAILED,
+                details = details,
+                message = "Measured invocation incomplete: child $reason; ${warmups.size} warmups retained",
+            )
         }
         val counters = measured.getValue("counters").jsonObject
         val metrics = buildList {
@@ -223,9 +269,12 @@ internal object FixedWorkSatSuite : BenchSuite {
             }
         }
         val message = when {
-            !comparable -> "Interrupted by the ${options.deadlineSeconds}s emergency deadline before the fixed-work " +
+            !comparable ->
+                "Interrupted by the ${options.deadlineSeconds}s emergency deadline before the fixed-work " +
                 "limit; partial work is not comparable"
+
             truncated -> "Retained trace rows are truncated; the digest still covers every event"
+
             else -> null
         }
         return BenchResult(caseId, BenchStatus.SUCCESS, metrics, details = details, message = message)
@@ -254,8 +303,14 @@ internal object FixedWorkSatSuite : BenchSuite {
     private fun launch(argv: List<String>, context: BenchContext, ceilingSeconds: Long): Pair<Int?, Boolean> {
         val process = ProcessBuilder(argv).directory(context.outputDirectory.toFile()).redirectErrorStream(true)
             .redirectOutput(context.outputDirectory.resolve(LOG).toFile()).apply {
-                environment().keys.removeAll { it in setOf("JAVA_OPTS", "JAVA_TOOL_OPTIONS", "_JAVA_OPTIONS",
-                    "JDK_JAVA_OPTIONS") }
+                environment().keys.removeAll {
+                    it in setOf(
+                        "JAVA_OPTS",
+                        "JAVA_TOOL_OPTIONS",
+                        "_JAVA_OPTIONS",
+                        "JDK_JAVA_OPTIONS",
+                    )
+                }
             }.start()
         fun kill() {
             process.descendants().forEach { it.destroyForcibly() }
@@ -263,8 +318,9 @@ internal object FixedWorkSatSuite : BenchSuite {
             process.waitFor(KILL_GRACE_SECONDS, TimeUnit.SECONDS)
         }
         return try {
-            if (process.waitFor(ceilingSeconds, TimeUnit.SECONDS)) process.exitValue() to false
-            else {
+            if (process.waitFor(ceilingSeconds, TimeUnit.SECONDS)) {
+                process.exitValue() to false
+            } else {
                 kill()
                 null to true
             }

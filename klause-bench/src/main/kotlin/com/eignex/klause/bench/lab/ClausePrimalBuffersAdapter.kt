@@ -37,13 +37,25 @@ internal object ClausePrimalBuffersSuite : BenchSuite {
         val seeds = (request.parameters["seeds"] ?: "1,3,7").split(',').map(String::toLong)
         require(groups.all { it in 2..22_000 } && costs.all { it in setOf(2, 64) })
         require(groups.size * costs.size * seeds.size in 1..32)
-        return groups.flatMap { size -> costs.flatMap { count -> seeds.map { seed ->
-            val id = "groups-$size/costs-$count/seed-$seed"
-            BenchCase(id, parameters = mapOf("groups" to "$size", "costs" to "$count", "seed" to "$seed"),
-                resources = BenchResources(1, 2048, 120),
-                attributes = mapOf("suite" to "clause-primal-buffers", "problem" to id,
-                    "comparisonKey" to id, "pairKey" to id, "recordSchema" to "clause-primal-buffers-v1"))
-        } } }
+        return groups.flatMap { size ->
+            costs.flatMap { count ->
+                seeds.map { seed ->
+                    val id = "groups-$size/costs-$count/seed-$seed"
+                    BenchCase(
+                        id,
+                        parameters = mapOf("groups" to "$size", "costs" to "$count", "seed" to "$seed"),
+                        resources = BenchResources(1, 2048, 120),
+                        attributes = mapOf(
+                            "suite" to "clause-primal-buffers",
+                            "problem" to id,
+                            "comparisonKey" to id,
+                            "pairKey" to id,
+                            "recordSchema" to "clause-primal-buffers-v1",
+                        ),
+                    )
+                }
+            }
+        }
     }
 
     override fun run(case: BenchCase, context: BenchContext): BenchResult {
@@ -55,10 +67,12 @@ internal object ClausePrimalBuffersSuite : BenchSuite {
         Files.createDirectories(out)
         val report = out.resolve("buffers.json")
         val java = File(System.getProperty("java.home"), "bin/java").absolutePath
-        val argv = listOf(java, "-Xms512m", "-Xmx512m", "-XX:ActiveProcessorCount=1",
+        val argv = listOf(
+            java, "-Xms512m", "-Xmx512m", "-XX:ActiveProcessorCount=1",
             "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector", "-cp", classpath,
             "com.eignex.klause.bench.profile.ClausePrimalBuffersProfile", case.parameters.getValue("groups"),
-            case.parameters.getValue("costs"), case.parameters.getValue("seed"), report.toAbsolutePath().toString())
+            case.parameters.getValue("costs"), case.parameters.getValue("seed"), report.toAbsolutePath().toString(),
+        )
         val process = ProcessBuilder(argv).redirectErrorStream(true).redirectOutput(out.resolve("profile.log").toFile())
             .start()
         try {
@@ -68,8 +82,12 @@ internal object ClausePrimalBuffersSuite : BenchSuite {
             if (process.isAlive) process.destroyForcibly()
         }
         val details = BenchProtocol.json.parseToJsonElement(Files.readString(report)).jsonObject
-        val metrics = listOf("constructionBytes" to "bytes/walk", "trialBytes" to "bytes/trial",
-            "constructionNs" to "ns/walk", "trialNs" to "ns/trial").map { (name, unit) ->
+        val metrics = listOf(
+            "constructionBytes" to "bytes/walk",
+            "trialBytes" to "bytes/trial",
+            "constructionNs" to "ns/walk",
+            "trialNs" to "ns/trial",
+        ).map { (name, unit) ->
             BenchMetric(name, details.getValue(name).jsonPrimitive.double, unit, MetricDirection.LOWER)
         }
         return BenchResult(case.id, metrics = metrics, artifacts = context.artifacts(), details = details)

@@ -28,9 +28,11 @@ internal object ExtensionalCompositionProfile {
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.containsAll(setOf("suite", "problem", "sha256")))
-        require(options.keys.all {
+        require(
+            options.keys.all {
             it in setOf("suite", "problem", "sha256", "prepared", "preparationWork", "sensitive", "cycles")
-        })
+        }
+        )
         val preparationWorkLimit = options["preparationWork"]?.toLong() ?: 2_000_000_000L
         require(preparationWorkLimit > 0)
         val sensitive = options["sensitive"] != "false"
@@ -55,9 +57,12 @@ internal object ExtensionalCompositionProfile {
         }
         val preparation = if (options["prepared"] == "true") {
             PresolvePipeline.run(source, null, PresolveConfig.DEFAULT, sensitive, preparationToken)
-        } else null
+        } else {
+            null
+        }
         val problem = preparation?.problem ?: source
-        out.resolve("preparation.json").writeText(buildJsonObject {
+        out.resolve("preparation.json").writeText(
+            buildJsonObject {
             put("requested", preparation != null)
             put("solutionSetSensitive", sensitive)
             put("cancelled", preparationToken())
@@ -70,52 +75,103 @@ internal object ExtensionalCompositionProfile {
             put("sourceFactors", source.factors.size)
             put("preparedFactors", problem.factors.size)
             put("allDifferent", problem.factors.count { it is AllDifferent })
-        }.toString())
+        }.toString()
+        )
         if (preparationToken() || preparation?.stats?.infeasible == true) return
         val tables = problem.factors.filterIsInstance<Table>()
         val diagrams = problem.factors.filterIsInstance<Mdd>()
         val shapes = buildJsonObject {
-            put("tables", buildJsonArray {
+            put(
+                "tables",
+                buildJsonArray {
                 tables.groupingBy { "${it.arity}/${it.numTuples}/${it.hi != null}" }.eachCount()
                     .forEach { (shape, count) ->
-                        add(buildJsonObject { put("arity/rows/intervals", shape); put("count", count) })
+                        add(
+                            buildJsonObject {
+                            put("arity/rows/intervals", shape);
+                            put("count", count)
+                        }
+                        )
                     }
-            })
-            put("tableScopes", buildJsonArray {
-                for ((id, table) in tables.withIndex()) add(buildJsonObject {
+            }
+            )
+            put(
+                "tableScopes",
+                buildJsonArray {
+                for ((id, table) in tables.withIndex()) {
+                    add(
+                        buildJsonObject {
                     put("table", id)
                     put("scope", table.xs.joinToString(","))
-                    put("sourcePayloads", source.factors.indices.filter {
+                    put(
+                        "sourcePayloads",
+                        source.factors.indices.filter {
                         val original = source.factors[it] as? Table
                         original != null && original.tuples.contentEquals(table.tuples)
-                    }.joinToString(","))
-                })
-            })
-            put("tablePairs", buildJsonArray {
-                for (a in tables.indices) for (b in a + 1 until tables.size) {
+                    }.joinToString(",")
+                    )
+                }
+                    )
+                }
+            }
+            )
+            put(
+                "tablePairs",
+                buildJsonArray {
+                for (a in tables.indices) {
+                    for (b in a + 1 until tables.size) {
                     val shared = tables[a].xs.count { it in tables[b].xs }
                     if (shared == 0) continue
-                    add(buildJsonObject { put("left", a); put("right", b); put("shared", shared) })
+                    add(
+                        buildJsonObject {
+                        put("left", a);
+                        put("right", b);
+                        put("shared", shared)
+                    }
+                    )
                 }
-            })
-            put("allDifferentScopes", buildJsonArray {
+                }
+            }
+            )
+            put(
+                "allDifferentScopes",
+                buildJsonArray {
                 for (factor in problem.factors.filterIsInstance<AllDifferent>()) {
                     add(buildJsonObject { put("scope", factor.vars.joinToString(",")) })
                 }
-            })
-            put("diagrams", buildJsonArray {
+            }
+            )
+            put(
+                "diagrams",
+                buildJsonArray {
                 diagrams.groupingBy { diagramShape(it) }
                     .eachCount().forEach { (shape, count) ->
-                        add(buildJsonObject { put("arity/states/records", shape); put("count", count) })
+                        add(
+                            buildJsonObject {
+                            put("arity/states/records", shape);
+                            put("count", count)
+                        }
+                        )
                     }
-            })
-            put("overlaps", buildJsonArray {
-                for (diagram in diagrams.take(1)) for (table in tables) {
+            }
+            )
+            put(
+                "overlaps",
+                buildJsonArray {
+                for (diagram in diagrams.take(1)) {
+                    for (table in tables) {
                     val positions = diagram.seq.indices.filter { diagram.seq[it] in table.xs }
                     if (positions.size < 2) continue
-                    add(buildJsonObject { put("positions", positions.joinToString(",")); put("rows", table.numTuples) })
+                    add(
+                        buildJsonObject {
+                        put("positions", positions.joinToString(","));
+                        put("rows", table.numTuples)
+                    }
+                    )
                 }
-            })
+                }
+            }
+            )
         }
         out.resolve("shapes.json").writeText(shapes.toString())
         if (options["cycles"] == "true") ExtensionalCycleProjection.capture(problem, sha256(bytes), out)
@@ -130,7 +186,8 @@ internal object ExtensionalCompositionProfile {
             samples["one-diagram"] = (listOf<Factor>(diagram) + overlaps).toTypedArray()
         }
         out.resolve("composition.jsonl").bufferedWriter().use { writer ->
-            for ((name, factors) in samples) repeat(3) { iteration ->
+            for ((name, factors) in samples) {
+                repeat(3) { iteration ->
                 var work = 0L
                 val meter = WorkMeter { work += it }
                 val token = object : ExecutionControl() {
@@ -154,33 +211,48 @@ internal object ExtensionalCompositionProfile {
                     put("elapsedNs", elapsed)
                     put("allocatedBytes", allocated)
                     put("replaced", delta.droppedIndices.size)
-                    put("removedTableRows", delta.droppedIndices.sumOf { (factors[it] as? Table)?.numTuples ?: 0 } -
-                        delta.addedFactors.filterIsInstance<Table>().sumOf { it.numTuples })
-                    put("restrictions", buildJsonArray {
+                    put(
+                        "removedTableRows",
+                        delta.droppedIndices.sumOf { (factors[it] as? Table)?.numTuples ?: 0 } -
+                            delta.addedFactors.filterIsInstance<Table>().sumOf { it.numTuples },
+                    )
+                    put(
+                        "restrictions",
+                        buildJsonArray {
                         for (id in delta.droppedIndices) {
                             val before = factors[id] as? Table ?: continue
                             val after = delta.addedFactors.filterIsInstance<Table>()
                                 .singleOrNull { it.xs.contentEquals(before.xs) } ?: continue
-                            add(buildJsonObject {
+                            add(
+                                buildJsonObject {
                                 put("factor", id)
                                 put("scope", before.xs.joinToString(","))
                                 put("beforeRows", before.numTuples)
                                 put("afterRows", after.numTuples)
-                                put("sourcePayloads", source.factors.indices.filter {
+                                put(
+                                    "sourcePayloads",
+                                    source.factors.indices.filter {
                                     val original = source.factors[it] as? Table
                                     original != null && original.tuples.contentEquals(before.tuples)
-                                }.joinToString(","))
-                            })
+                                }.joinToString(",")
+                                )
+                            }
+                            )
                         }
-                    })
+                    }
+                    )
                     put("infeasible", delta.infeasible)
-                    put("mddRecords", delta.addedFactors.filterIsInstance<Mdd>()
-                        .sumOf { it.transitions.size / it.recordStride })
+                    put(
+                        "mddRecords",
+                        delta.addedFactors.filterIsInstance<Mdd>()
+                            .sumOf { it.transitions.size / it.recordStride },
+                    )
                     put("sourceVerdictClaim", false)
                 }
                 writer.appendLine(row.toString())
                 writer.flush()
                 println(row)
+            }
             }
         }
     }

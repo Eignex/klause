@@ -40,8 +40,8 @@ internal data class LabSettings(val parameters: Map<String, String>) {
         if (propagationControls) {
             require(
                 !inputOnly && engines.all {
-                it in setOf("cp", "bt", "backtrack", "fixed", "mixed", "portfolio", "pf")
-            }
+                    it in setOf("cp", "bt", "backtrack", "fixed", "mixed", "portfolio", "pf")
+                },
             )
             require("param.propagation-attribution" !in parameters && "param.historical-table-reasons" !in parameters) {
                 "propagation-controls owns attribution and historical Table switches"
@@ -100,9 +100,9 @@ internal data class LabSettings(val parameters: Map<String, String>) {
             emptyMap()
         } else {
             mapOf(
-            "param.propagation-attribution" to (control != "ordinary").toString(),
-            "param.historical-table-reasons" to (control == "historical-table").toString(),
-        )
+                "param.propagation-attribution" to (control != "ordinary").toString(),
+                "param.historical-table-reasons" to (control == "historical-table").toString(),
+            )
         }
 
     companion object {

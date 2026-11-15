@@ -15,14 +15,21 @@ class LocalSearchTrajectorySourceTest {
     @ValueSource(booleans = [false, true])
     fun `embedded sources retain their original hash pinned bytes`(compressed: Boolean) {
         val source = "<instance format=\"XCSP3\" type=\"CSP\"/>".encodeToByteArray()
-        val payload = if (compressed) ByteArrayOutputStream().apply {
+        val payload = if (compressed) {
+            ByteArrayOutputStream().apply {
             GZIPOutputStream(this).use { it.write(source) }
-        }.toByteArray() else source
+        }.toByteArray()
+        } else {
+            source
+        }
         val encoded = Base64.getEncoder().encodeToString(payload)
 
         val bytes = trajectorySourceBytes(
-            "xcsp3-csp", "control", sha256(source),
-            encoded.takeUnless { compressed }, encoded.takeIf { compressed },
+            "xcsp3-csp",
+            "control",
+            sha256(source),
+            encoded.takeUnless { compressed },
+            encoded.takeIf { compressed },
         )
 
         assertContentEquals(source, bytes)
@@ -32,15 +39,22 @@ class LocalSearchTrajectorySourceTest {
     @ValueSource(booleans = [false, true])
     fun `embedded sources with a different original hash decline`(compressed: Boolean) {
         val source = "<instance/>".encodeToByteArray()
-        val payload = if (compressed) ByteArrayOutputStream().apply {
+        val payload = if (compressed) {
+            ByteArrayOutputStream().apply {
             GZIPOutputStream(this).use { it.write(source) }
-        }.toByteArray() else source
+        }.toByteArray()
+        } else {
+            source
+        }
         val encoded = Base64.getEncoder().encodeToString(payload)
 
         assertFailsWith<IllegalArgumentException> {
             trajectorySourceBytes(
-                "xcsp3-csp", "control", "0".repeat(64),
-                encoded.takeUnless { compressed }, encoded.takeIf { compressed },
+                "xcsp3-csp",
+                "control",
+                "0".repeat(64),
+                encoded.takeUnless { compressed },
+                encoded.takeIf { compressed },
             )
         }
     }

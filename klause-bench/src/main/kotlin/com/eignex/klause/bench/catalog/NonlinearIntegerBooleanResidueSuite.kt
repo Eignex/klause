@@ -8,8 +8,12 @@ internal object NonlinearIntegerBooleanResidueSuite {
             "covered-unsat" to Expected.Unsat,
             "negated-support-sat" to Expected.Sat,
         )) {
-            vendored(name, expected = expected, relPath = "nonlinear-integer-boolean-residues-v1/$name.smt2",
-                tags = setOf("nonlinear-integer", "nonlinear-integer-boolean-residues-v1"))
+            vendored(
+                name,
+                expected = expected,
+                relPath = "nonlinear-integer-boolean-residues-v1/$name.smt2",
+                tags = setOf("nonlinear-integer", "nonlinear-integer-boolean-residues-v1"),
+            )
         }
     }
 }

@@ -46,10 +46,14 @@ internal object OrdinaryArithmeticLearningProfile {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys.all {
-            it in setOf("suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace", "source64", "format",
-                "attribution")
-        })
+        require(
+            options.keys.all {
+            it in setOf(
+                "suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace", "source64", "format",
+                "attribution",
+            )
+        }
+        )
         val suite = requireNotNull(options["suite"])
         val name = requireNotNull(options["problem"])
         val hash = requireNotNull(options["sha256"])
@@ -75,33 +79,44 @@ internal object OrdinaryArithmeticLearningProfile {
         val provenance = InstalledBuild.reference
         val fingerprint = provenance.fingerprint
         Reports.writeJson(out.resolve("provenance.json").path, provenance)
-        publish(buildJsonObject {
+        publish(
+            buildJsonObject {
             put("event", "provenance")
             put("fingerprint", fingerprint)
             put("build", Reports.json.encodeToString(provenance))
             put("javaRuntimeVersion", System.getProperty("java.runtime.version"))
             put("javaVmName", System.getProperty("java.vm.name"))
-        }.toString())
+        }.toString()
+        )
         val source64 = options["source64"]
         val catalogRef = if (source64 == null) Catalog.uncapped(suite).problems.single { it.name == name } else null
         val format = catalogRef?.format ?: Format.valueOf(requireNotNull(options["format"]).uppercase())
         val bytes = if (source64 == null) {
             CorpusFiles.open(CorpusFetcher.resolve(requireNotNull(catalogRef).source)).use { it.readNBytes(1_048_577) }
-        } else trajectorySourceBytes(suite, name, hash, source64)
+        } else {
+            trajectorySourceBytes(suite, name, hash, source64)
+        }
         require(bytes.size <= 1_048_576)
         val sourceFile = out.resolve("source.${format.name.lowercase()}").apply { writeBytes(bytes) }
         val observedHash = sha256(bytes)
-        publish(buildJsonObject {
+        publish(
+            buildJsonObject {
             put("event", "source")
             put("suite", suite)
             put("problem", name)
             put("expectedSha256", hash)
             put("observedSha256", observedHash)
             put("sourceMode", if (source64 == null) "catalog" else "frozen")
-        }.toString())
+        }.toString()
+        )
         check(observedHash == hash) { "source hash mismatch: expected $hash, observed $observedHash" }
-        val ref = catalogRef ?: ProblemRef(name, format, ProblemSource.Prepared(sourceFile),
-            Category.CSP, Expected.Unknown)
+        val ref = catalogRef ?: ProblemRef(
+            name,
+            format,
+            ProblemSource.Prepared(sourceFile),
+            Category.CSP,
+            Expected.Unknown,
+        )
         val codec = ProblemJson()
         out.resolve("ordinary-learning.jsonl").bufferedWriter().use { output ->
             for (learning in listOf(false, true)) {
@@ -112,15 +127,23 @@ internal object OrdinaryArithmeticLearningProfile {
                 val entry = Runners.resolve(ref)
                 val original = entry.problem
                 require(original.numIntVars <= 4096 && original.numBoolVars <= 4096)
-                val prepared = FinitePipeline.prepare(FinitePipelineRequest(
-                    original, FiniteEngine.BACKTRACK, entry.objective,
-                    cancellation = stop, solveCancellation = stop, randomSeed = 3L,
-                ))
+                val prepared = FinitePipeline.prepare(
+                    FinitePipelineRequest(
+                    original,
+                    FiniteEngine.BACKTRACK,
+                    entry.objective,
+                    cancellation = stop,
+                    solveCancellation = stop,
+                    randomSeed = 3L,
+                )
+                )
                 val label = if (learning) "integer" else "clause"
                 val originalJson = codec.encodeToString(original)
                 val preparedJson = codec.encodeToString(prepared.problem)
-                require(originalJson.encodeToByteArray().size <= 131_072 &&
-                    preparedJson.encodeToByteArray().size <= 131_072)
+                require(
+                    originalJson.encodeToByteArray().size <= 131_072 &&
+                        preparedJson.encodeToByteArray().size <= 131_072,
+                )
                 out.resolve("$label-original.json").writeText(originalJson)
                 out.resolve("$label-prepared.json").writeText(preparedJson)
                 var native: PropagationSession? = null
@@ -136,7 +159,10 @@ internal object OrdinaryArithmeticLearningProfile {
                         native = session
                         attachment = origin
                         val recorder = PreparedArithmeticLearningProfile.Capture(
-                            session, 1024, 65536, captureFirstInteger = learning && traceMode == "first-integer",
+                            session,
+                            1024,
+                            65536,
+                            captureFirstInteger = learning && traceMode == "first-integer",
                         )
                         capture = recorder
                         integerRowsAtCapture = recorder.lifecycle()["learningIntegerAdmitted"]
@@ -157,10 +183,15 @@ internal object OrdinaryArithmeticLearningProfile {
                         val picked = delegate.pick(session, rng)
                         if (recorder.accepting) {
                             val domain = (picked as? VarRef.IntVar)?.let { session.intDomain(it.varId) }
-                            recorder.record("traversal.pick", session.decisionLevel.toLong(),
+                            recorder.record(
+                                "traversal.pick",
+                                session.decisionLevel.toLong(),
                                 if (picked is VarRef.IntVar) picked.varId.toLong() else -1L,
                                 if (picked is VarRef.Bool) picked.varId.toLong() else -1L,
-                                domain?.min ?: 0L, domain?.max ?: 0L, picks.toLong())
+                                domain?.min ?: 0L,
+                                domain?.max ?: 0L,
+                                picks.toLong(),
+                            )
                         }
                         return picked
                     }
@@ -173,8 +204,12 @@ internal object OrdinaryArithmeticLearningProfile {
                         override fun onAttempt(decision: SearchDecision, context: SearchContext) {
                             base.branchObserver?.onAttempt(decision, context)
                             attempts++
-                            capture?.record("traversal.attempt", context.decisionLevel.toLong(),
-                                context.atomLiteral(decision)?.toLong() ?: -1L, attempts.toLong())
+                            capture?.record(
+                                "traversal.attempt",
+                                context.decisionLevel.toLong(),
+                                context.atomLiteral(decision)?.toLong() ?: -1L,
+                                attempts.toLong(),
+                            )
                         }
                     },
                     lpConfig = if (lp == "auto") LpConfig.AUTO else null,
@@ -247,16 +282,25 @@ internal object OrdinaryArithmeticLearningProfile {
                     put("lifecycleAfterRetirement", capture?.lifecycle() ?: JsonNull)
                     put("storedBeforeRetirement", beforeRetirement)
                     put("storedAfterRetirement", if (liveAtInspection) native.learnedClauseCount else null)
-                    put("retirementInspection", when {
-                        liveAtInspection -> "manual-retraction"
-                        native != null -> "solver-released"
-                        else -> "unobserved"
-                    })
+                    put(
+                        "retirementInspection",
+                        when {
+                            liveAtInspection -> "manual-retraction"
+                            native != null -> "solver-released"
+                            else -> "unobserved"
+                        },
+                    )
                     put("finiteWorkIncludingRetirement", capture?.work())
                     put("armElapsedBeforeSerializationNs", elapsed)
                     put("armProcessCpuNs", if (cpuBefore >= 0L && cpuAfter >= cpuBefore) cpuAfter - cpuBefore else null)
-                    put("armThreadAllocatedBytes", if (allocatedBefore >= 0L && allocatedAfter >= allocatedBefore)
-                        allocatedAfter - allocatedBefore else null)
+                    put(
+                        "armThreadAllocatedBytes",
+                        if (allocatedBefore >= 0L && allocatedAfter >= allocatedBefore) {
+                            allocatedAfter - allocatedBefore
+                        } else {
+                            null
+                        },
+                    )
                     put("cancelled", stop())
                     put("trace", capture?.export() ?: JsonNull)
                 }.toString()

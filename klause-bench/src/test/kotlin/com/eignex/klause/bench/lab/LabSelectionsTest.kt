@@ -64,7 +64,11 @@ class LabSelectionsTest {
                     assertEquals("[\"local\"]", recipe.getValue("tags").toString())
                 }
                 val reference = recipe["base"]?.jsonObject?.get("backend")?.jsonPrimitive?.content == "reference"
-                val manifest = if (reference) "reference" else if (sweep) "bench-linux" else "bench"
+                val manifest = if (reference) "reference" else if (sweep) {
+                    "bench-linux"
+                } else {
+                    "bench"
+                }
                 assertEquals("klause-bench/lab/$manifest.json", bench.getValue("manifest").jsonPrimitive.content)
                 LabSettings(parameters)
             }

@@ -18,8 +18,16 @@ internal object LabRuntime {
             add("-Dklause.bench.source-events=true")
             add("-XX:StartFlightRecording=filename=$report/harness.jfr,settings=profile,maxsize=128m,dumponexit=true")
         }
-        addAll(listOf("-cp", System.getProperty("java.class.path"),
-            "com.eignex.klause.bench.lab.LabAdapterKt", "solve-record", input.toString(), report.toString()))
+        addAll(
+            listOf(
+            "-cp",
+            System.getProperty("java.class.path"),
+            "com.eignex.klause.bench.lab.LabAdapterKt",
+            "solve-record",
+            input.toString(),
+            report.toString(),
+        )
+        )
     }
 
     fun environment(case: BenchCase, context: BenchContext): Map<String, String> {

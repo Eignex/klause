@@ -19,8 +19,12 @@ import kotlin.test.assertSame
 class TaskOrderProfileTest {
     @Test
     fun `order overlay gives each native source solution one extension`() {
-        val source = Problem(0, 2, Array(2) { IntDomain(0, 3) },
-            arrayOf(Cumulative.unary(intArrayOf(0, 1), longArrayOf(2, 2))))
+        val source = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 3) },
+            arrayOf(Cumulative.unary(intArrayOf(0, 1), longArrayOf(2, 2))),
+        )
         val params = BruteForceParams(randomSeed = 1)
         val expected = BruteForceSolver(source.bake()).enumerate(params).map { it.ints.toList() }.toSet()
 
@@ -33,8 +37,12 @@ class TaskOrderProfileTest {
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `both order alternatives enforce later source bounds`(forward: Boolean) {
-        val source = Problem(0, 2, Array(2) { IntDomain(0, 6) },
-            arrayOf(Cumulative.unary(intArrayOf(0, 1), longArrayOf(2, 2))))
+        val source = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 6) },
+            arrayOf(Cumulative.unary(intArrayOf(0, 1), longArrayOf(2, 2))),
+        )
         val session = PropagationSession(TaskOrderProfile.withOrderPair(source))
         val first = if (forward) 0 else 1
         val second = 1 - first
@@ -48,8 +56,12 @@ class TaskOrderProfileTest {
 
     @Test
     fun `undo removes the chosen source order`() {
-        val source = Problem(0, 2, Array(2) { IntDomain(0, 6) },
-            arrayOf(Cumulative.unary(intArrayOf(0, 1), longArrayOf(2, 2))))
+        val source = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 6) },
+            arrayOf(Cumulative.unary(intArrayOf(0, 1), longArrayOf(2, 2))),
+        )
         val session = PropagationSession(TaskOrderProfile.withOrderPair(source))
         session.pinBool(0, true)
 

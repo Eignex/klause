@@ -28,11 +28,13 @@ class CorpusIndexTest {
             val model = File(tree, "model.cnf").apply { writeText("selected original") }
             File(tree, "other.cnf").writeText("unselected original")
             val selection = File(root, "selection.jsonl").apply {
-                writeText(buildJsonObject {
+                writeText(
+                    buildJsonObject {
                     put("collection", "fixture")
                     put("problem", "model")
                     put("model", model.absolutePath)
-                }.toString() + "\n")
+                }.toString() + "\n"
+                )
             }
             val output = File(root, "output")
 
@@ -43,8 +45,10 @@ class CorpusIndexTest {
             val index = requireNotNull(CommittedCorpusIndexes.load("fixture", output))
             assertEquals(listOf("model.cnf", "other.cnf"), index.files.map { it.path })
             val entry = requireNotNull(index.entry("model.cnf"))
-            assertEquals("fixture\tmodel\t${entry.sha256}\t${entry.bytes}\tinputs/fixture/model.cnf\n",
-                File(output, "selected-source-hashes.tsv").readText())
+            assertEquals(
+                "fixture\tmodel\t${entry.sha256}\t${entry.bytes}\tinputs/fixture/model.cnf\n",
+                File(output, "selected-source-hashes.tsv").readText(),
+            )
         } finally {
             root.deleteRecursively()
         }
@@ -59,11 +63,13 @@ class CorpusIndexTest {
             File(tree, "model.cnf").writeText("original")
             val outside = File(root, "outside.cnf").apply { writeText("outside") }
             val selection = File(root, "selection.jsonl").apply {
-                writeText(buildJsonObject {
+                writeText(
+                    buildJsonObject {
                     put("collection", "fixture")
                     put("problem", "model")
                     put("model", outside.absolutePath)
-                }.toString() + "\n")
+                }.toString() + "\n"
+                )
             }
 
             assertFailsWith<IllegalArgumentException> {
@@ -88,10 +94,13 @@ class CorpusIndexTest {
             val index = CommittedCorpusIndexes.fromSources("fixture", root)
 
             assertEquals(
-                listOf(CorpusIndex.Entry(
-                    "model.cnf", HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)),
+                listOf(
+                    CorpusIndex.Entry(
+                    "model.cnf",
+                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)),
                     bytes.size.toLong(),
-                )),
+                )
+                ),
                 index.files,
             )
         } finally {

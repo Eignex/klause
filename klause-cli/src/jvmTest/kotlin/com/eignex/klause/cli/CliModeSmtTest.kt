@@ -16,8 +16,10 @@ class CliModeSmtTest {
     @Test
     fun `SMT integer residue exclusions should report a checked surviving branch`() {
         val source = File.createTempFile("nia-residue-guards", ".smt2").apply {
-            writeText("(declare-const x Int) (declare-const y Int) " +
-                "(assert (or (= (+ (* x x) (* y y)) 3) (and (= x 1) (= y 1)))) (check-sat)")
+            writeText(
+                "(declare-const x Int) (declare-const y Int) " +
+                    "(assert (or (= (+ (* x x) (* y y)) 3) (and (= x 1) (= y 1)))) (check-sat)",
+            )
             deleteOnExit()
         }
 
@@ -33,8 +35,10 @@ class CliModeSmtTest {
     @Test
     fun `SMT residue refutation should report consumed source authority`() {
         val source = File.createTempFile("nia-residues", ".smt2").apply {
-            writeText("(declare-const x Int) (declare-const y Int) " +
-                "(assert (= (+ (* x x) (* y y)) 3)) (check-sat)")
+            writeText(
+                "(declare-const x Int) (declare-const y Int) " +
+                    "(assert (= (+ (* x x) (* y y)) 3)) (check-sat)",
+            )
             deleteOnExit()
         }
 
@@ -56,9 +60,16 @@ class CliModeSmtTest {
 
         for (steering in listOf(false, true)) {
             val output = capture {
-                assertEquals(0, runCli(arrayOf("-e", "cp", "-s", "--param", "nia-candidates=12",
+                assertEquals(
+                    0,
+                    runCli(
+                        arrayOf(
+                            "-e", "cp", "-s", "--param", "nia-candidates=12",
                     "--param", "nia-cell-refinement=true", "--param", "nia-cell-reuse=true",
-                    "--param", "nia-cell-steering=$steering", source.absolutePath)))
+                    "--param", "nia-cell-steering=$steering", source.absolutePath,
+                        )
+                    )
+                )
             }
 
             assertTrue("unknown" in output.lines(), output)

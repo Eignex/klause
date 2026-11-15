@@ -43,7 +43,9 @@ internal object LinearRootOpeningProfile {
             val requests = Json.decodeFromString<List<List<String>>>(requestBytes.decodeToString())
             require(requests.size in 1..4)
             requests.forEachIndexed { index, request -> inspect(request.toTypedArray(), out.resolve("$index")) }
-        } else inspect(args, out)
+        } else {
+            inspect(args, out)
+        }
     }
 
     private fun inspect(args: Array<String>, out: File) {
@@ -53,18 +55,27 @@ internal object LinearRootOpeningProfile {
             argument.substringBefore('=') to argument.substringAfter('=')
         }
         val required = setOf("suite", "problem", "sha256")
-        require(options.keys.containsAll(required) &&
-            options.keys.all { it in required + setOf("inspect", "source64", "sourceGzip64") })
+        require(
+            options.keys.containsAll(required) &&
+                options.keys.all { it in required + setOf("inspect", "source64", "sourceGzip64") },
+        )
         val inspection = options["inspect"]
-        val inspections = setOf("disjunction-names", "partial-arithmetic", "partial-implication",
+        val inspections = setOf(
+            "disjunction-names", "partial-arithmetic", "partial-implication",
             "partial-propagation", "partial-propagation-cache", "partial-propagation-cached",
             "partial-source-batching", "partial-source-batching-plain", "partial-row-activation",
-            "partial-row-activation-control")
+            "partial-row-activation-control",
+        )
         require(inspection == null || inspection in inspections)
         val expected = options.getValue("sha256")
         require(expected.matches(Regex("[0-9a-f]{64}")))
-        val bytes = trajectorySourceBytes(options.getValue("suite"), options.getValue("problem"), expected,
-            options["source64"], options["sourceGzip64"])
+        val bytes = trajectorySourceBytes(
+            options.getValue("suite"),
+            options.getValue("problem"),
+            expected,
+            options["source64"],
+            options["sourceGzip64"],
+        )
         require(bytes.size <= MAX_SOURCE_BYTES)
         val actual = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))
         require(actual == expected) { "original source identity differs" }
@@ -75,7 +86,8 @@ internal object LinearRootOpeningProfile {
         val admitted = SmtLib.parse(bytes.decodeToString(), cancellation = parsingStop)
         val compiled = admitted
         val parsingNs = System.nanoTime() - parsingStarted
-        out.resolve("source-preparation.json").writeText(buildJsonObject {
+        out.resolve("source-preparation.json").writeText(
+            buildJsonObject {
             put("suite", options.getValue("suite"))
             put("problem", options.getValue("problem"))
             put("sourceSha256", actual)
@@ -84,16 +96,19 @@ internal object LinearRootOpeningProfile {
             put("parsingNs", parsingNs)
             put("parsingBudgetMs", OPENING_BUDGET_MS)
             put("stopped", parsingStop())
-        }.toString() + "\n")
+        }.toString() + "\n"
+        )
         require(compiled.objective == null) { "only satisfaction openings are supported" }
         if (inspection != null && inspection.startsWith("partial-")) {
-            LinearPrefixInspection.inspect(compiled, out, actual, probe = inspection == "partial-implication",
+            LinearPrefixInspection.inspect(
+                compiled, out, actual, probe = inspection == "partial-implication",
                 integrated = inspection.startsWith("partial-propagation") || inspection == "partial-source-batching" ||
                     inspection.startsWith("partial-row-activation"),
                 cached = inspection == "partial-propagation-cache", reuse = inspection == "partial-propagation-cached",
                 batching = inspection.startsWith("partial-source-batching"),
                 incremental = inspection.startsWith("partial-row-activation"),
-                incrementalControl = inspection == "partial-row-activation-control")
+                incrementalControl = inspection == "partial-row-activation-control",
+            )
             return
         }
         val deadlineStarted = System.nanoTime()
@@ -103,9 +118,14 @@ internal object LinearRootOpeningProfile {
         val factory = OpenTheoryPipeline.javaClass.declaredMethods.single {
             it.name.startsWith("engineFor") && it.parameterCount == 1
         }
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            compiled.source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK, cancellation = stop,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            compiled.source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+            cancellation = stop,
+        )
+        )
         val model = requireNotNull(invocation.preparedPlan?.model) { "source has no factor inspection view" }
         val request = (invocation.route as? SourceProblemRoute.OpenTheory)?.request
             ?: error("source setup did not select a linear opening")
@@ -166,9 +186,12 @@ internal object LinearRootOpeningProfile {
                 put("sourceIntegerNames", compiled.intVarNames.size)
                 put("sourceRealNames", compiled.realVarNames.size)
                 put("javaVersion", System.getProperty("java.version"))
-                put("runtimeOptions", buildJsonArray {
+                put(
+                    "runtimeOptions",
+                    buildJsonArray {
                     ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
-                })
+                }
+                )
             }
             out.resolve("root-opening.json").writeText(result.toString() + "\n")
             decided?.let { out.resolve("decided-stats.txt").writeText(it.stats.toString() + "\n") }
@@ -182,8 +205,11 @@ internal object LinearRootOpeningProfile {
     private fun launch(args: Array<String>, out: File) {
         val command = arrayListOf(
             File(System.getProperty("java.home"), "bin/java").path,
-            "-Xmx3g", "-XX:+UseSerialGC", "-XX:ActiveProcessorCount=1",
-            "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector",
+            "-Xmx3g",
+            "-XX:+UseSerialGC",
+            "-XX:ActiveProcessorCount=1",
+            "--enable-native-access=ALL-UNNAMED",
+            "--add-modules=jdk.incubator.vector",
             "-XX:StartFlightRecording=filename=${out.resolve("measured-profile.jfr")}," +
                 "settings=profile,dumponexit=true",
         )
@@ -192,9 +218,11 @@ internal object LinearRootOpeningProfile {
         }
         command += listOf("-cp", System.getProperty("java.class.path"), javaClass.name)
         command += args
-        out.resolve("launcher.json").writeText(buildJsonObject {
+        out.resolve("launcher.json").writeText(
+            buildJsonObject {
             put("command", buildJsonArray { command.forEach { add(JsonPrimitive(it)) } })
-        }.toString() + "\n")
+        }.toString() + "\n"
+        )
         val builder = ProcessBuilder(command)
             .redirectOutput(out.resolve("measured.stdout"))
             .redirectError(out.resolve("measured.stderr"))
@@ -210,11 +238,13 @@ internal object LinearRootOpeningProfile {
                 process.waitFor()
             }
             out.resolve("measured.exit").writeText("${process.exitValue()}\n")
-            out.resolve("transport-status.json").writeText(buildJsonObject {
+            out.resolve("transport-status.json").writeText(
+                buildJsonObject {
                 put("timeout", transportTimeout)
                 put("forcedTermination", forced)
                 put("exit", process.exitValue())
-            }.toString() + "\n")
+            }.toString() + "\n"
+            )
         }
         if (process.exitValue() != 0) {
             System.err.write(out.resolve("measured.stderr").inputStream().use { it.readNBytes(16 * 1024) })

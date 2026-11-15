@@ -45,14 +45,27 @@ internal object MixedPbLocalityProfile {
                     val before = bean.getThreadAllocatedBytes(thread)
                     val booleans = 5
                     val factors = buildList<Factor> {
-                        add(Cardinality(intArrayOf(Lit.make(0, false), Lit.make(2, true),
-                            Lit.make(3, true), Lit.make(4, true)), min = 2, max = 4))
+                        add(
+                            Cardinality(
+                                intArrayOf(
+                            Lit.make(0, false),
+                            Lit.make(2, true),
+                            Lit.make(3, true),
+                            Lit.make(4, true),
+                        ),
+                            min = 2, max = 4
+                            )
+                        )
                         add(Clause(intArrayOf(Lit.make(1, true), Lit.make(2, false))))
                         add(Clause(intArrayOf(Lit.make(1, true), Lit.make(3, false))))
                         if (mode == 2) add(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 5))
                     }
-                    val problem = Problem(booleans, if (mode == 0) 0 else 1,
-                        if (mode == 0) emptyArray() else arrayOf(IntDomain(0, 10)), factors.toTypedArray())
+                    val problem = Problem(
+                        booleans,
+                        if (mode == 0) 0 else 1,
+                        if (mode == 0) emptyArray() else arrayOf(IntDomain(0, 10)),
+                        factors.toTypedArray(),
+                    )
                     val native = PropagationSession(problem, pbLearning = pb)
                     val cp = CpSearchComponent(native)
                     val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(booleans))
@@ -81,8 +94,10 @@ internal object MixedPbLocalityProfile {
                     val brancher = BooleanBranching { context ->
                         (0 until booleans).firstOrNull { context.boolValue(it) == null }?.let { variable ->
                             val first = variable == 0 && triggerConflict
-                            listOf(SearchDecision.Bool(Lit.make(variable, first)),
-                                SearchDecision.Bool(Lit.make(variable, !first)))
+                            listOf(
+                                SearchDecision.Bool(Lit.make(variable, first)),
+                                SearchDecision.Bool(Lit.make(variable, !first)),
+                            )
                         }
                     }
                     val result = shared.solve(booleans, booleanBranching = brancher, observer = observer)
@@ -92,10 +107,14 @@ internal object MixedPbLocalityProfile {
                     check(result is SearchResult.Satisfied)
                     if (pb && triggerConflict) check(storedPb > 0 && consumedPins > 0)
                     run {
-                        val checker = PropagationSession(problem.withIntDomains(Array(problem.numIntVars) {
+                        val checker = PropagationSession(
+                            problem.withIntDomains(
+                                Array(problem.numIntVars) {
                             val value = native.intDomain(it).min
                             IntDomain(value, value)
-                        }))
+                        }
+                            )
+                        )
                         check(!checker.isUnsatAtRoot)
                         for (variable in 0 until booleans) {
                             val checked = checker.pinBool(variable, checkNotNull(native.boolValue(variable)))
@@ -120,9 +139,12 @@ internal object MixedPbLocalityProfile {
                         put("decisions", decisions)
                         put("backjumps", backjumps)
                         put("storedConstraints", native.learnedClauseCount)
-                        put("work", state.javaClass.declaredMethods.single {
+                        put(
+                            "work",
+                            state.javaClass.declaredMethods.single {
                             it.name.startsWith("getWork") && it.parameterCount == 0
-                        }.invoke(state) as Long)
+                        }.invoke(state) as Long
+                        )
                         put("elapsedNs", System.nanoTime() - started)
                         put("threadAllocatedBytes", bean.getThreadAllocatedBytes(thread) - before)
                         put("osName", System.getProperty("os.name"))

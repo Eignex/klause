@@ -28,17 +28,22 @@ internal object ProjectedCountProfile {
         val checks = (options["maxChecks"] ?: "10000").toLong().also { require(it in 1..1_000_000) }
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
-        out.resolve("identity.json").writeText(buildJsonObject {
+        out.resolve("identity.json").writeText(
+            buildJsonObject {
             put("revision", Reports.readGitSha())
             put("javaVersion", System.getProperty("java.version"))
             put("os", System.getProperty("os.name"))
             put("arch", System.getProperty("os.arch"))
             put("processors", Runtime.getRuntime().availableProcessors())
             put("maxHeapBytes", Runtime.getRuntime().maxMemory())
-            put("jvmOptions", buildJsonArray {
+            put(
+                "jvmOptions",
+                buildJsonArray {
                 ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
-            })
-        }.toString())
+            }
+            )
+        }.toString()
+        )
         val counter = Class.forName("com.eignex.klause.count.AnytimeCounter")
         val instance = counter.getField("INSTANCE").get(null)
         val ordinary = counter.methods.single { it.name.startsWith("monolithic") && it.parameterCount == 2 }

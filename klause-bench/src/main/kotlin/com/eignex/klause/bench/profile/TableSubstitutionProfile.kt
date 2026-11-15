@@ -42,8 +42,12 @@ internal object TableSubstitutionProfile {
         sources.forEachIndexed { index, input ->
             val source = input.jsonObject
             require(source.keys == setOf("suite", "problem", "sha256"))
-            val bytes = trajectorySourceBytes(source.getValue("suite").jsonPrimitive.content,
-                source.getValue("problem").jsonPrimitive.content, source.getValue("sha256").jsonPrimitive.content, null)
+            val bytes = trajectorySourceBytes(
+                source.getValue("suite").jsonPrimitive.content,
+                source.getValue("problem").jsonPrimitive.content,
+                source.getValue("sha256").jsonPrimitive.content,
+                null,
+            )
             val directory = out.resolve("$index").apply { mkdirs() }
             directory.resolve("source.xml").writeBytes(bytes)
             for (mode in listOf("default", "default,+table-substitution")) {
@@ -53,18 +57,21 @@ internal object TableSubstitutionProfile {
                 val budget = PresolveBudget(550_000_000L)
                 val allocated = allocation.getThreadAllocatedBytes(Thread.currentThread().threadId())
                 val started = System.nanoTime()
-                val prepared = FinitePipeline.prepare(FinitePipelineRequest(
+                val prepared = FinitePipeline.prepare(
+                    FinitePipelineRequest(
                     parsed.problem, FiniteEngine.BACKTRACK, objective, PresolveConfig.parse(mode),
                     explicitPresolveConfig = true, cancellation = stop, solveCancellation = stop,
                     presolveBudget = budget, randomSeed = 3,
-                ))
+                )
+                )
                 val elapsed = System.nanoTime() - started
                 val allocatedBytes = allocation.getThreadAllocatedBytes(Thread.currentThread().threadId()) - allocated
                 val model = prepared.problem
                 val baked = model as? BakedProblem
                 val costs = prepared.objective?.intCoefficients ?: longArrayOf()
                 directory.resolve(if (mode == "default") "control.json" else "substitution.json")
-                    .writeText(buildJsonObject {
+                    .writeText(
+                        buildJsonObject {
                         put("input", input)
                         put("revision", Reports.readGitSha())
                         put("mode", mode)
@@ -80,29 +87,49 @@ internal object TableSubstitutionProfile {
                         put("stopped", stop())
                         put("infeasible", prepared.presolve?.infeasible)
                         put("tables", model.factors.count { it is Table })
-                        put("objectiveCoordinates", buildJsonArray {
-                            for (v in costs.indices) if (costs[v] != 0L) add(buildJsonObject {
+                        put(
+                            "objectiveCoordinates",
+                            buildJsonArray {
+                            for (v in costs.indices) {
+                                if (costs[v] != 0L) {
+                                add(
+                                    buildJsonObject {
                                 put("variable", v)
                                 put("coefficient", costs[v])
                                 put("domain", baked?.rootIntDomain(v).toString())
-                                put("readerKinds", model.factors.filter { v in it.intVars }
-                                    .groupingBy { it::class.simpleName }.eachCount().toString())
-                            })
-                        })
+                                put(
+                                    "readerKinds",
+                                    model.factors.filter { v in it.intVars }
+                                    .groupingBy { it::class.simpleName }.eachCount().toString()
+                                )
+                            }
+                                )
+                            }
+                            }
+                        }
+                        )
                         put("passes", JsonArray(prepared.presolve?.passes.orEmpty().map(::JsonPrimitive)))
-                        put("invocations", buildJsonArray {
-                            for (call in budget.invocations) add(buildJsonObject {
+                        put(
+                            "invocations",
+                            buildJsonArray {
+                            for (call in budget.invocations) {
+                                add(
+                                    buildJsonObject {
                                 put("lane", call.lane.name)
                                 put("pass", call.pass)
                                 put("outcome", call.outcome.name)
                                 put("work", call.work)
                                 put("ns", call.elapsed.inWholeNanoseconds)
                                 put("narrowedColumns", call.narrowedColumns)
-                            })
-                        })
+                            }
+                                )
+                            }
+                        }
+                        )
                         put("searchExecuted", false)
                         put("independentSourceValidation", false)
-                    }.toString())
+                    }.toString()
+                    )
                 println("${source.getValue("problem")}: $mode, ${model.factors.size} factors, stopped=${stop()}")
             }
         }

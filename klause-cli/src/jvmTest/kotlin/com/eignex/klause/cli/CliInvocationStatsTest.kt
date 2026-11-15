@@ -70,9 +70,15 @@ class CliInvocationStatsTest {
 
     @Test
     fun `heuristic execution should retain the source theory separately from its backend`() {
-        val model = Problem(0, 0, emptyArray(), emptyList(), numRealVars = 1,
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyList(),
+            numRealVars = 1,
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
         val common = CommonOptions().apply { engine = "ls" }
         val pipeline = sourceSolvable(model, null, false, common, { "" }, { "" }).rendering
 

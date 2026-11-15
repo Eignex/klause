@@ -19,9 +19,13 @@ class PolynomialPhaseProfileTest {
     fun `request encodings retain identical JSON bytes`(compressed: Boolean) {
         val json = "[{\"suite\":\"control\",\"problem\":\"constant\"}]".encodeToByteArray()
         val prefix = if (compressed) "requestz64=" else "request64="
-        val bytes = if (compressed) ByteArrayOutputStream().also { out ->
+        val bytes = if (compressed) {
+            ByteArrayOutputStream().also { out ->
             GZIPOutputStream(out).use { it.write(json) }
-        }.toByteArray() else json
+        }.toByteArray()
+        } else {
+            json
+        }
 
         val decoded = PolynomialPhaseProfile.requestBytes(prefix + Base64.getEncoder().encodeToString(bytes))
 
@@ -110,8 +114,11 @@ class PolynomialPhaseProfileTest {
     fun `fixed integer completion retains its original coordinate map`() {
         val source = "(declare-const i Int) (declare-const x Real) (assert (= (* x x) i))"
 
-        val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, capture = true,
-            fixedIntegers = mapOf("i" to "2"))
+        val trace = PolynomialPhaseProfile.PhaseAccess().measure(
+            source,
+            capture = true,
+            fixedIntegers = mapOf("i" to "2"),
+        )
 
         assertEquals("Satisfiable", trace.result)
         assertEquals("0", requireNotNull(trace.sourceCoordinates)["integer.i"])

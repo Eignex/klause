@@ -25,8 +25,14 @@ class ExtensionalCycleProjectionTest {
     @Test
     fun `interrupted source consumption should decline its count`() {
         val source = Table(intArrayOf(0, 1), longArrayOf(0, 0, 0, 1))
-        val projection = assertNotNull(ExtensionalCycleProjection.project(source, listOf(0, 1), arrayOf(null, null),
-            { true }))
+        val projection = assertNotNull(
+            ExtensionalCycleProjection.project(
+            source,
+            listOf(0, 1),
+            arrayOf(null, null),
+            { true },
+        )
+        )
         var remaining = 2
 
         val removed = ExtensionalCycleProjection.countUnsupported(projection, projection.table, { remaining-- > 0 })

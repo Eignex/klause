@@ -30,20 +30,29 @@ internal object GlobalScoringViews {
         require(canonical.problem === problem)
         val admissions = problem.factors.mapIndexedNotNull { id, factor ->
             (factor as? AllDifferent)?.let {
-                Admission(id, "pairwise-distinct", when {
-                    it.vars.size > MAX_ARITY -> "arity-limit"
-                    it.exceptSet.size > MAX_ARITY -> "except-limit"
-                    it.presents.any { literal -> literal < 0 } -> "invalid-presence"
-                    else -> null
-                })
+                Admission(
+                    id,
+                    "pairwise-distinct",
+                    when {
+                        it.vars.size > MAX_ARITY -> "arity-limit"
+                        it.exceptSet.size > MAX_ARITY -> "except-limit"
+                        it.presents.any { literal -> literal < 0 } -> "invalid-presence"
+                        else -> null
+                    },
+                )
             }
         }
         val accepted = admissions.filter { it.reason == null }.associateBy { problem.factors[it.factor] }
         val provider = ScoringProjectionProvider { factor ->
             val admission = accepted[factor]
-            if (admission == null) BuiltInScoringProjectionProvider.select(factor) else ScoringProjection(
-                ScoringCapability.GRADED, AssignmentCheckCapability.EXACT,
+            if (admission == null) {
+                BuiltInScoringProjectionProvider.select(factor)
+            } else {
+                ScoringProjection(
+                ScoringCapability.GRADED,
+                AssignmentCheckCapability.EXACT,
             ) { _, _ -> PairwiseDistinct(factor as AllDifferent, canonical.invariants[admission.factor]) }
+            }
         }
         return Selection(provider, admissions)
     }
@@ -84,8 +93,18 @@ internal object GlobalScoringViews {
             }
         }
         starts[table.arity] = records.size
-        return Relation(Mdd(table.xs, counts, starts, records.toLongArray(), 0,
-            IntArray(counts.last()) { it }, 3), null, work)
+        return Relation(
+            Mdd(
+            table.xs,
+            counts,
+            starts,
+            records.toLongArray(),
+            0,
+            IntArray(counts.last()) { it },
+            3,
+        ),
+            null, work
+        )
     }
 
     private fun diagramTable(mdd: Mdd, stop: ExecutionControl): Relation {
@@ -97,7 +116,9 @@ internal object GlobalScoringViews {
         if (mdd.layerStarts.first() != 0 || mdd.layerStarts.last() != mdd.transitions.size ||
             mdd.numStatesPerLayer.any { it <= 0 } || mdd.initial !in 0 until mdd.numStatesPerLayer[0] ||
             mdd.accepting.any { it !in 0 until mdd.numStatesPerLayer.last() }
-        ) return Relation(null, "invalid-diagram", 0)
+        ) {
+            return Relation(null, "invalid-diagram", 0)
+        }
         val outgoing = Array(mdd.seq.size) { linkedMapOf<Int, MutableList<Int>>() }
         var work = 0
         for (layer in mdd.seq.indices) {
@@ -116,7 +137,9 @@ internal object GlobalScoringViews {
                 val to = mdd.transitions[record + 2]
                 if (from !in 0L until mdd.numStatesPerLayer[layer].toLong() ||
                     to !in 0L until mdd.numStatesPerLayer[layer + 1].toLong()
-                ) return Relation(null, "invalid-diagram", work)
+                ) {
+                    return Relation(null, "invalid-diagram", work)
+                }
                 if (mdd.cost >= 0 && !deterministic.add(from.toInt() to mdd.transitions[record + 1])) {
                     return Relation(null, "nondeterministic-weighted-diagram", work)
                 }
@@ -183,7 +206,9 @@ private class PairwiseDistinct(private val relation: AllDifferent, native: Invar
             for (right in relation.vars.indices) {
                 if (right == left || (relation.vars[right] == intVar && right < left) ||
                     !present(state, right)
-                ) continue
+                ) {
+                    continue
+                }
                 val before = state.assignment.intValue(relation.vars[right])
                 val after = if (relation.vars[right] == intVar) newValue else before
                 if (oldCounted && before == oldValue) delta--

@@ -148,7 +148,9 @@ internal fun linearSourceSolvable(
     var lpStats = LpStats()
     val invocation = common.routingPreparationCancellation().use { stop ->
         val request = SourceSetupRequest(
-            source, operation, common.resolvedEngine(),
+            source,
+            operation,
+            common.resolvedEngine(),
             maximize = source.embeddedObjectiveSense == ObjectiveSense.MAXIMIZE,
             cancellation = stop,
             boundCancellation = common.routingCancellation(),

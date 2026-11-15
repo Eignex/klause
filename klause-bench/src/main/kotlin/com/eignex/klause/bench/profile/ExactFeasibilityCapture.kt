@@ -57,9 +57,14 @@ internal object ExactFeasibilityCapture {
         val stop = ExecutionControl.after(10_000.milliseconds)
         val compiled = SmtLib.parse(bytes.decodeToString(), cancellation = stop)
         require(compiled.objective == null)
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            compiled.source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK, cancellation = stop,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            compiled.source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+            cancellation = stop,
+        )
+        )
         val request = (invocation.route as? SourceProblemRoute.OpenTheory)?.request
             ?: error("source did not select exact linear execution")
         val factory = OpenTheoryPipeline.javaClass.declaredMethods.single {
@@ -109,7 +114,8 @@ internal object ExactFeasibilityCapture {
         val encoded = encode(captured)
         out.resolve("complete.klexact").writeBytes(encoded)
         out.resolve("premises.json").writeText(capturedPremises.toString())
-        out.resolve("capture.json").writeText(buildJsonObject {
+        out.resolve("capture.json").writeText(
+            buildJsonObject {
             put("revision", Reports.readGitSha())
             put("sourceSha256", sha256(bytes))
             put("captureSha256", sha256(encoded))
@@ -123,7 +129,8 @@ internal object ExactFeasibilityCapture {
             put("rawResult", result?.javaClass?.simpleName)
             put("booleans", buildJsonArray { requireNotNull(booleans).forEach { add(JsonPrimitive(it)) } })
             put("shape", shape(captured))
-        }.toString())
+        }.toString()
+        )
     }
 
     private fun premises(lp: Any, state: Any, context: SearchContext): JsonElement {
@@ -144,23 +151,29 @@ internal object ExactFeasibilityCapture {
                     put("literal", literal?.let(::JsonPrimitive) ?: JsonNull)
                     put("currentValue", literal?.let { context.boolValue(it ushr 1) }?.let(::JsonPrimitive) ?: JsonNull)
                 }
+
                 is SearchAtomPremise.All -> buildJsonObject {
                     @Suppress("UNCHECKED_CAST")
                     val children = field(premise, "premises") as List<SearchAtomPremise>
                     put("all", JsonArray(children.map { JsonPrimitive(visit(it)) }))
                 }
+
                 SearchAtomPremise.Unavailable -> buildJsonObject { put("unavailable", true) }
             }
             return id
         }
         val sides = buildJsonArray {
-            for (column in 0 until count) for (upper in listOf(false, true)) {
+            for (column in 0 until count) {
+                for (upper in listOf(false, true)) {
                 val premise = call(lp, "activeBoundPremise", column, upper) as? SearchAtomPremise ?: continue
-                add(buildJsonObject {
+                add(
+                    buildJsonObject {
                     put("column", column)
                     put("upper", upper)
                     put("premise", visit(premise))
-                })
+                }
+                )
+            }
             }
         }
         return buildJsonObject {
@@ -200,13 +213,15 @@ internal object ExactFeasibilityCapture {
         val capture = requireNotNull(call(companion, "decode", bytes))
         val state = requireNotNull(call(capture, "getInitialState"))
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
-        out.resolve("shape.json").writeText(buildJsonObject {
+        out.resolve("shape.json").writeText(
+            buildJsonObject {
             put("inspectionRevision", Reports.readGitSha())
             put("sourceJob", sourceJob)
             put("captureSha256", sha256(bytes))
             put("shape", shape(state))
             put("fixedAndComponents", components(state))
-        }.toString())
+        }.toString()
+        )
         out.resolve("continuation.json").writeText(continuation(state).toString())
         val contextCompanion = Class.forName(prefix + "LpSolveContext").getField("Companion").get(null)
         val context = requireNotNull(call(contextCompanion, "getProduction"))
@@ -215,26 +230,33 @@ internal object ExactFeasibilityCapture {
         val report = requireNotNull(call(replay, "replay", capture, context))
         val elapsed = System.nanoTime() - started
         val steps = call(report, "getSteps") as List<*>
-        out.resolve("replay.json").writeText(buildJsonObject {
+        out.resolve("replay.json").writeText(
+            buildJsonObject {
             put("inspectionRevision", Reports.readGitSha())
             put("captureSha256", sha256(bytes))
             put("coldReplayElapsedNs", elapsed)
             put("declinedEvent", call(report, "getDeclinedEventIndex")?.toString())
             put("originalWarmFactorsCaptured", false)
             put("sourceVerdictClaim", false)
-            put("steps", buildJsonArray {
+            put(
+                "steps",
+                buildJsonArray {
                 for (step in steps) {
                     val current = requireNotNull(step)
                     val result = call(current, "getResult")
-                    add(buildJsonObject {
+                    add(
+                        buildJsonObject {
                         put("accepted", call(current, "getAccepted") as Boolean)
                         put("verdict", result?.let { call(it, "getVerdict") }?.toString())
                         put("hasExactPoint", result?.let { call(it, "getExactPrimal") } != null)
                         put("continuation", result?.let { call(it, "getContinuation") }?.toString())
-                    })
+                    }
+                    )
                 }
-            })
-        }.toString())
+            }
+            )
+        }.toString()
+        )
     }
 
     private fun continuation(state: Any): JsonElement {
@@ -315,16 +337,21 @@ internal object ExactFeasibilityCapture {
             put("constantRowsAfterSubstitution", JsonArray(constantRows.map(::JsonPrimitive)))
             put("constantRowsVerified", false)
             put("rowUnfixedDegrees", JsonArray(degrees.map(::JsonPrimitive)))
-            put("components", buildJsonArray {
+            put(
+                "components",
+                buildJsonArray {
                 for ((key, rows) in grouped) {
                     val columns = (0 until n).filter { !fixed[it] && root(it) == key }
-                    add(buildJsonObject {
+                    add(
+                        buildJsonObject {
                         put("rows", JsonArray(rows.map(::JsonPrimitive)))
                         put("columns", JsonArray(columns.map(::JsonPrimitive)))
                         put("denseCells", rows.size.toLong() * (columns.size.toLong() + 2L * rows.size + 1))
-                    })
+                    }
+                    )
                 }
-            })
+            }
+            )
         }
     }
 
@@ -385,10 +412,12 @@ internal object ExactFeasibilityCapture {
             "-Dklause.bench.corpusCache=${CorpusFetcher.cacheRoot}",
             "-cp", System.getProperty("java.class.path"), javaClass.name,
         ) + args
-        out.resolve("runtime.json").writeText(buildJsonObject {
+        out.resolve("runtime.json").writeText(
+            buildJsonObject {
             put("command", JsonArray(command.map(::JsonPrimitive)))
             put("parentOptions", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
-        }.toString())
+        }.toString()
+        )
         val process = ProcessBuilder(command)
             .redirectOutput(out.resolve("child.stdout"))
             .redirectError(out.resolve("child.stderr"))

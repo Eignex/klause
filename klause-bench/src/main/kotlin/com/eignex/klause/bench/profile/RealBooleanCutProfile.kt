@@ -80,15 +80,25 @@ internal object RealBooleanCutProfile {
                         .let { if (round % 2 == 0) it else it.reversed() }
                     for (arm in arms) {
                         val context = if (arm == "separate-hulls") hulls(source) else source
-                        val conditions = if (arm == "exhaustive") listOf(false, true).map {
+                        val conditions = if (arm == "exhaustive") {
+                            listOf(false, true).map {
                             SourceCondition(bools = mapOf(0 to it))
-                        } else listOf(SourceCondition())
+                        }
+                        } else {
+                            listOf(SourceCondition())
+                        }
                         val allocated = bean.getThreadAllocatedBytes(thread)
                         val start = System.nanoTime()
                         val replays = conditions.map { condition ->
-                            val scoped = SourceProofContext(context.scope.copy(condition = condition),
-                                context.coordinates, context.premises, context.objective, context.objectiveConstant,
-                                LinearAuthoritySemantics(context), context.semantics)
+                            val scoped = SourceProofContext(
+                                context.scope.copy(condition = condition),
+                                context.coordinates,
+                                context.premises,
+                                context.objective,
+                                context.objectiveConstant,
+                                LinearAuthoritySemantics(context),
+                                context.semantics,
+                            )
                             replay(scoped, arm == "composed", conditions.size)
                         }
                         val elapsed = System.nanoTime() - start
@@ -96,10 +106,23 @@ internal object RealBooleanCutProfile {
                         val proofs = replays.map { replay ->
                             field(replay, "query")?.let { field(it, "refutation") as SourceEvidence? }
                         }
-                        val evidence = if (arm != "exhaustive") proofs.single() else
-                            if (proofs.any { it == null }) null else SourceEvidence(source.scope,
-                                SourceClaim.Refutation, SourceDerivation.BooleanSplit(0,
-                                    checkNotNull(proofs[0]).derivation, checkNotNull(proofs[1]).derivation))
+                        val evidence = if (arm != "exhaustive") {
+                            proofs.single()
+                        } else {
+                            if (proofs.any { it == null }) {
+                                null
+                            } else {
+                                SourceEvidence(
+                                source.scope,
+                                SourceClaim.Refutation,
+                                SourceDerivation.BooleanSplit(
+                                    0,
+                                    checkNotNull(proofs[0]).derivation,
+                                    checkNotNull(proofs[1]).derivation,
+                                ),
+                            )
+                            }
+                        }
                         val verdict = evidence?.let { SourceEvidenceVerifier(context.withLinearAuthority()).verify(it) }
                         check(evidence == null || verdict == SourceEvidenceCheck.Checked)
                         val record = buildJsonObject {
@@ -133,24 +156,73 @@ internal object RealBooleanCutProfile {
     }
 
     private fun source(refutation: Boolean, out: File): SourceProofContext {
-        val model = Problem(1, 0, emptyArray(), buildList {
-            for (id in 0..1) add(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(id),
-                doubleArrayOf(1.0), LinearOp.LE, 0.0))
-            for (sign in listOf(-1.0, 1.0)) add(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
-                doubleArrayOf(sign, sign), LinearOp.LE, 0.25))
-            if (refutation) add(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
-                doubleArrayOf(-1.0, 1.0), LinearOp.LE, -0.5))
-        }, numRealVars = 2, realLower = doubleArrayOf(-1.0, -1.0), realUpper = doubleArrayOf(1.0, 1.0))
+        val model = Problem(
+            1, 0, emptyArray(),
+            buildList {
+            for (id in 0..1) {
+                add(
+                    ReifiedRealLinear(
+                0,
+                intArrayOf(),
+                doubleArrayOf(),
+                intArrayOf(id),
+                doubleArrayOf(1.0),
+                LinearOp.LE,
+                0.0,
+            )
+                )
+            }
+            for (sign in listOf(-1.0, 1.0)) {
+                add(
+                    Linear(
+                intArrayOf(),
+                doubleArrayOf(),
+                intArrayOf(0, 1),
+                doubleArrayOf(sign, sign),
+                LinearOp.LE,
+                0.25,
+            )
+                )
+            }
+            if (refutation) {
+                add(
+                    Linear(
+                intArrayOf(),
+                doubleArrayOf(),
+                intArrayOf(0, 1),
+                doubleArrayOf(-1.0, 1.0),
+                LinearOp.LE,
+                -0.5,
+            )
+                )
+            }
+        },
+            numRealVars = 2, realLower = doubleArrayOf(-1.0, -1.0), realUpper = doubleArrayOf(1.0, 1.0)
+        )
         val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0, 1.0))
-        val scope = SourceScope(SourceRevision("coupled-real-$refutation", "klause-ir-exact-v1"),
-            objective = SourceObjective("difference", ObjectiveSense.MINIMIZE))
+        val scope = SourceScope(
+            SourceRevision("coupled-real-$refutation", "klause-ir-exact-v1"),
+            objective = SourceObjective("difference", ObjectiveSense.MINIMIZE),
+        )
         val stop = ExecutionControl.after(3.seconds)
         val started = System.nanoTime()
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(model), ExecutionOperation.OPTIMIZE,
-            FiniteEngine.BACKTRACK, objective, cancellation = stop))
-        val ordinary = SourceSetup.execute(SourceExecutionRequest(invocation,
-            ExecutionOptions(ExecutionOption.dryRunPresolve(true)), timeout = stop,
-            presolveBudget = PresolveBudget(100_000L)))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(model),
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.BACKTRACK,
+            objective,
+            cancellation = stop,
+        )
+        )
+        val ordinary = SourceSetup.execute(
+            SourceExecutionRequest(
+            invocation,
+            ExecutionOptions(ExecutionOption.dryRunPresolve(true)),
+            timeout = stop,
+            presolveBudget = PresolveBudget(100_000L),
+        )
+        )
         val preparation = (ordinary as? SourceExecutionResult.Prepared)?.result
         val numeric = preparation?.takeUnless { it.infeasible }?.model?.sourceProofContext(scope, objective)
         val candidate = numeric?.let { prepare(it) { _, _ -> } }
@@ -188,27 +260,50 @@ internal object RealBooleanCutProfile {
         val query = (field(capture, "retained") as List<*>).single()
         val type = Class.forName(PREFIX + "LinearAuthorityReplay")
         return type.declaredMethods.single { it.name == "activeRows" }
-            .invoke(type.getField("INSTANCE").get(null), query, 20_000_000L / alternatives,
-                67_108_864L / alternatives, stop, composed)
+            .invoke(
+                type.getField("INSTANCE").get(null),
+                query,
+                20_000_000L / alternatives,
+                67_108_864L / alternatives,
+                stop,
+                composed,
+            )
     }
 
     private fun inspect(source: SourceProofContext, file: File) {
         var work = 0L
         var allocation = 0L
-        val result = prepare(source) { steps, bytes -> work += steps; allocation += bytes }
+        val result = prepare(source) { steps, bytes ->
+            work += steps;
+            allocation += bytes
+        }
+
         @Suppress("UNCHECKED_CAST")
         val consequences = field(result, "consequences") as List<SourceEvidence>
         val rounding = Class.forName(PREFIX + "LinearAuthorityCuts").getField("Companion").get(null)
         val installed = rounding.javaClass.declaredMethods.single { it.name == "prepare" }
             .invoke(rounding, source, ExecutionControl.after(3.seconds), false, { _: Long -> })
         val quarter = BigFraction.ofLong(4).reciprocal()
-        val common = consequences.single { it.claim == SourceClaim.Consequence(
-            SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.MINUS_ONE), quarter)) }
-        val bound = SourceEvidence(source.scope, SourceClaim.Bound(quarter.negated()),
-            SourceDerivation.Combination(listOf(SourceDerivation.Combination.Term(BigFraction.ONE,
-                SourceDerivation.Import(common)))))
+        val common = consequences.single {
+            it.claim == SourceClaim.Consequence(
+                SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.MINUS_ONE), quarter),
+            )
+        }
+        val bound = SourceEvidence(
+            source.scope,
+            SourceClaim.Bound(quarter.negated()),
+            SourceDerivation.Combination(
+                listOf(
+                    SourceDerivation.Combination.Term(
+                BigFraction.ONE,
+                SourceDerivation.Import(common),
+            )
+                )
+            ),
+        )
         check(SourceEvidenceVerifier(source).verify(bound) == SourceEvidenceCheck.Checked)
-        file.writeText(buildJsonObject {
+        file.writeText(
+            buildJsonObject {
             put("complete", field(result, "complete") as Boolean)
             put("reason", field(result, "reason") as String)
             put("preparationWork", work)
@@ -216,19 +311,32 @@ internal object RealBooleanCutProfile {
             put("installedRoundingCuts", (field(requireNotNull(installed), "rows") as List<*>).size)
             put("checkedLowerBound", quarter.negated().toString())
             put("independentProofCheck", false)
-            put("rows", buildJsonArray { consequences.forEach { evidence ->
-                val row = (evidence.claim as SourceClaim.Consequence).inequality
-                add(buildJsonObject {
-                    put("rhs", row.rhs.toString())
-                    put("strict", row.strict)
-                    put("coefficients", buildJsonObject { row.coefficients.forEach { (id, value) ->
-                        put("${id.kind}/${id.id}", value.toString())
-                    } })
-                    put("sourceCheck", SourceEvidenceVerifier(source).verify(evidence).toString())
-                    put("proof", proof(evidence.derivation))
-                })
-            } })
-        }.toString())
+            put(
+                "rows",
+                buildJsonArray {
+                consequences.forEach { evidence ->
+                    val row = (evidence.claim as SourceClaim.Consequence).inequality
+                    add(
+                        buildJsonObject {
+                        put("rhs", row.rhs.toString())
+                        put("strict", row.strict)
+                        put(
+                            "coefficients",
+                            buildJsonObject {
+                            row.coefficients.forEach { (id, value) ->
+                                put("${id.kind}/${id.id}", value.toString())
+                            }
+                        }
+                        )
+                        put("sourceCheck", SourceEvidenceVerifier(source).verify(evidence).toString())
+                        put("proof", proof(evidence.derivation))
+                    }
+                    )
+                }
+            }
+            )
+        }.toString()
+        )
     }
 
     private fun prepare(source: SourceProofContext, cost: (Long, Long) -> Unit): Any {
@@ -246,10 +354,23 @@ internal object RealBooleanCutProfile {
                 put("whenFalse", proof(value.whenFalse))
                 put("whenTrue", proof(value.whenTrue))
             }
-            is SourceDerivation.Combination -> put("terms", buildJsonArray { value.terms.forEach {
-                add(buildJsonObject { put("weight", it.weight.toString()); put("row", proof(it.derivation)) })
-            } })
+
+            is SourceDerivation.Combination -> put(
+                "terms",
+                buildJsonArray {
+                value.terms.forEach {
+                    add(
+                        buildJsonObject {
+                        put("weight", it.weight.toString());
+                        put("row", proof(it.derivation))
+                    }
+                    )
+                }
+            }
+            )
+
             is SourceDerivation.Premise -> put("id", value.id)
+
             else -> error("unexpected common-row proof")
         }
     }
@@ -260,19 +381,47 @@ internal object RealBooleanCutProfile {
         rows["hull/b/lower"] = SourcePremise(SourceInequality(mapOf(b to BigFraction.MINUS_ONE), BigFraction.ZERO))
         rows["hull/b/upper"] = SourcePremise(SourceInequality(mapOf(b to BigFraction.ONE), BigFraction.ONE))
         for (id in listOf(x, y)) {
-            rows["hull/$id/upper"] = SourcePremise(SourceInequality(
-                mapOf(id to BigFraction.ONE, b to BigFraction.ONE), BigFraction.ONE))
-            rows["hull/$id/lower"] = SourcePremise(SourceInequality(
-                mapOf(id to BigFraction.MINUS_ONE, b to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            rows["hull/$id/upper"] = SourcePremise(
+                SourceInequality(
+                mapOf(id to BigFraction.ONE, b to BigFraction.ONE),
+                BigFraction.ONE,
+            )
+            )
+            rows["hull/$id/lower"] = SourcePremise(
+                SourceInequality(
+                mapOf(id to BigFraction.MINUS_ONE, b to BigFraction.MINUS_ONE),
+                BigFraction.ZERO,
+            )
+            )
         }
-        val context = SourceProofContext(source.scope.copy(revision = source.scope.revision.copy(
-            identity = source.scope.revision.identity + "-hulls")), source.coordinates + b, rows, source.objective)
-        val values = listOf(BigFraction.ofLong(2) * BigFraction.ofLong(5).reciprocal(),
-            BigFraction.ofLong(-2) * BigFraction.ofLong(5).reciprocal(), BigFraction.ofLong(2).reciprocal())
-        val point = Sample(booleanArrayOf(false), longArrayOf(), values.map { it.toDouble() }.toDoubleArray(),
-            exactReals = values)
-        check(SourceEvidenceVerifier(context.withLinearAuthority()).verify(SourceEvidence(context.scope,
-            SourceClaim.Witness(point), SourceDerivation.SourceWitness)) == SourceEvidenceCheck.Checked)
+        val context = SourceProofContext(
+            source.scope.copy(
+                revision = source.scope.revision.copy(
+            identity = source.scope.revision.identity + "-hulls",
+        )
+            ),
+            source.coordinates + b, rows, source.objective
+        )
+        val values = listOf(
+            BigFraction.ofLong(2) * BigFraction.ofLong(5).reciprocal(),
+            BigFraction.ofLong(-2) * BigFraction.ofLong(5).reciprocal(),
+            BigFraction.ofLong(2).reciprocal(),
+        )
+        val point = Sample(
+            booleanArrayOf(false),
+            longArrayOf(),
+            values.map { it.toDouble() }.toDoubleArray(),
+            exactReals = values,
+        )
+        check(
+            SourceEvidenceVerifier(context.withLinearAuthority()).verify(
+                SourceEvidence(
+            context.scope,
+            SourceClaim.Witness(point),
+            SourceDerivation.SourceWitness,
+        )
+            ) == SourceEvidenceCheck.Checked
+        )
         return context
     }
 }

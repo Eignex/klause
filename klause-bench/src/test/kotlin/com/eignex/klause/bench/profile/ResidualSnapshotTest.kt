@@ -91,10 +91,13 @@ class ResidualSnapshotTest {
 
     @Test
     fun `a learned PB and a checked cutoff should remain in the enforcing scope`() {
-        val problem = Problem(4, 0, emptyArray(), arrayOf(
+        val problem = Problem(
+            4, 0, emptyArray(),
+            arrayOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-        ))
+        )
+        )
         val session = PropagationSession(problem, nativeSat = false)
         session.addLearnedPb(LongArray(4) { 1 }, IntArray(4) { Lit.make(it, false) }, 1, 1, permanent = true)
         val capture = ResidualSnapshots.capture(
@@ -108,9 +111,13 @@ class ResidualSnapshotTest {
         assertEquals(listOf(listOf(0, 1), listOf(2, 3)), snapshot.sourceComponents)
         assertEquals(listOf(listOf(0, 1, 2, 3)), snapshot.enforcingComponents)
         assertEquals("unavailable", snapshot.learned.single().logicalScope)
-        assertFailsWith<IllegalArgumentException> { ResidualSnapshots.verify(snapshot.copy(
-            learned = snapshot.learned.map { it.copy(logicalScope = "source-valid") },
-        )) }
+        assertFailsWith<IllegalArgumentException> {
+            ResidualSnapshots.verify(
+                snapshot.copy(
+                learned = snapshot.learned.map { it.copy(logicalScope = "source-valid") },
+            )
+            )
+        }
     }
 
     @ParameterizedTest
@@ -154,12 +161,18 @@ class ResidualSnapshotTest {
 
     @Test
     fun `a declined snapshot should retain no unbounded in memory probe payload`() {
-        val factors = (0 until 2).flatMap { c -> (0 until 5).map { i ->
-            Clause(intArrayOf(Lit.make(c * 5 + i, true), Lit.make(c * 5 + (i + 1) % 5, true)))
-        } }
+        val factors = (0 until 2).flatMap { c ->
+            (0 until 5).map { i ->
+                Clause(intArrayOf(Lit.make(c * 5 + i, true), Lit.make(c * 5 + (i + 1) % 5, true)))
+            }
+        }
         val problem = Problem(10, 0, emptyArray(), factors.toTypedArray())
-        val context = ResidualCaptureContext(LinearObjective(), JsonObject(emptyMap()), JsonObject(emptyMap()),
-            ResidualSnapshotBudget(1, 0))
+        val context = ResidualCaptureContext(
+            LinearObjective(),
+            JsonObject(emptyMap()),
+            JsonObject(emptyMap()),
+            ResidualSnapshotBudget(1, 0),
+        )
         val recorder = ConditionalComponentTrace.Recorder(problem, Long.MAX_VALUE, 1, context)
 
         recorder.observe(PropagationSession(problem))

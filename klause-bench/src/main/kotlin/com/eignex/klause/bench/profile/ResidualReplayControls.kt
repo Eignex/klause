@@ -25,12 +25,7 @@ import java.math.BigInteger
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 
-internal class ResidualRun(
-    val vars: IntArray,
-    val result: MinimizeResult?,
-    val buildNanos: Long,
-    val solveNanos: Long,
-)
+internal class ResidualRun(val vars: IntArray, val result: MinimizeResult?, val buildNanos: Long, val solveNanos: Long)
 
 internal object ResidualReplayControls {
     @Suppress("LongParameterList")
@@ -72,7 +67,9 @@ internal object ResidualReplayControls {
             ResidualSnapshots.enforcingProblem(snapshot).factors.map {
                 it.remap(VarRemap(snapshot.residualToPrepared.toIntArray(), IntArray(0)))
             }
-        } else snapshot.residualClauses.map { Clause(it.toIntArray()) }
+        } else {
+            snapshot.residualClauses.map { Clause(it.toIntArray()) }
+        }
         val weights = snapshot.boolWeights.toLongArray()
         val components = (if (enforcing) snapshot.enforcingComponents else snapshot.sourceComponents).toMutableList()
         if (factors.any { it.boolVars.isEmpty() }) components += emptyList<Int>()
@@ -106,7 +103,9 @@ internal object ResidualReplayControls {
         val optima = children.map { exactOptimum(it, weights) }
         val sum = if (optima.all { it != null }) {
             optima.fold(BigInteger.ZERO) { a, b -> a + requireNotNull(b) }
-        } else null
+        } else {
+            null
+        }
         if (sum != null) {
             for (child in children) {
                 val sample = requireNotNull(child.result?.assignment)
@@ -131,8 +130,11 @@ internal object ResidualReplayControls {
             put("fixedAndIsolated", fixed.toString())
             put("composedOptimum", sum?.let { (it + fixed).toString() })
             put("jointOptimum", jointOptimum?.let { (it + fixed).toString() })
-            put("compositionComplete", children.all { it.result is MinimizeResult.Optimal } ||
-                children.any { it.result is MinimizeResult.Infeasible })
+            put(
+                "compositionComplete",
+                children.all { it.result is MinimizeResult.Optimal } ||
+                    children.any { it.result is MinimizeResult.Infeasible },
+            )
             put("childRefuted", children.any { it.result is MinimizeResult.Infeasible })
             put("jointRefuted", joint.result is MinimizeResult.Infeasible)
             put("nativeResidualWitnessChecked", checked)
@@ -143,14 +145,19 @@ internal object ResidualReplayControls {
 
     fun satisfied(factor: Factor, values: List<Boolean>): Boolean = when (factor) {
         is Clause -> factor.literals.any { values[Lit.variable(it)] == Lit.isPositive(it) }
+
         is PseudoBoolean -> {
             require(factor.op == PbOp.GE)
             val sum = factor.literals.indices.fold(BigInteger.ZERO) { total, i ->
-                if (values[Lit.variable(factor.literals[i])] == Lit.isPositive(factor.literals[i]))
-                    total + BigInteger(factor.constants.exactCoeff(i).toString()) else total
+                if (values[Lit.variable(factor.literals[i])] == Lit.isPositive(factor.literals[i])) {
+                    total + BigInteger(factor.constants.exactCoeff(i).toString())
+                } else {
+                    total
+                }
             }
             sum >= BigInteger(factor.constants.exactBound.toString())
         }
+
         else -> error("unsupported residual witness factor")
     }
 

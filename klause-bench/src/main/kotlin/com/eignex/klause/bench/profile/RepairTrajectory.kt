@@ -29,8 +29,11 @@ internal object RepairTrajectory {
     fun attach(solver: LocalSearchSolver, rule: String, maxCoordinates: Int = 4096): Any {
         require(maxCoordinates in 1..TRAJECTORY_COORDINATE_LIMIT)
         val type = Class.forName("com.eignex.klause.localsearch.RepairTrace")
-        val trace = type.getDeclaredConstructor(String::class.java, Int::class.javaPrimitiveType,
-            Int::class.javaPrimitiveType).newInstance(rule, 32, maxCoordinates)
+        val trace = type.getDeclaredConstructor(
+            String::class.java,
+            Int::class.javaPrimitiveType,
+            Int::class.javaPrimitiveType,
+        ).newInstance(rule, 32, maxCoordinates)
         val engine = checkNotNull(get(solver, "Engine"))
         engine.javaClass.methods.single { it.name.substringBefore('$') == "setRepairTrace" }.invoke(engine, trace)
         return trace
@@ -44,7 +47,8 @@ internal object RepairTrajectory {
                 val before = get(checkNotNull(frames.first()), "Sample") as Sample
                 val sourceBefore = prepared.reconstruct(before)
                 val center = (get(entry, "Center") as Sample?)?.let(prepared.reconstruct)
-                writer.appendLine(buildJsonObject {
+                writer.appendLine(
+                    buildJsonObject {
                     put("id", get(entry, "Id") as Int)
                     put("owner", get(entry, "Owner").toString())
                     put("freedScopeAvailable", get(entry, "ScopeComplete") as Boolean)
@@ -60,11 +64,16 @@ internal object RepairTrajectory {
                     }
                     put("basinClassified", false)
                     for (scope in listOf("RequestedBools", "RequestedInts", "EffectiveBools", "EffectiveInts")) {
-                        put(scope.replaceFirstChar { it.lowercase() },
-                            JsonArray((get(entry, scope) as IntArray).map(::JsonPrimitive)))
+                        put(
+                            scope.replaceFirstChar { it.lowercase() },
+                            JsonArray((get(entry, scope) as IntArray).map(::JsonPrimitive)),
+                        )
                     }
                     if (center != null) put("sourceCenter", sample(center))
-                    put("frames", JsonArray(frames.map { frame ->
+                    put(
+                        "frames",
+                        JsonArray(
+                            frames.map { frame ->
                         val captured = checkNotNull(frame)
                         val working = get(captured, "Sample") as Sample
                         val source = prepared.reconstruct(working)
@@ -77,22 +86,33 @@ internal object RepairTrajectory {
                             if (center != null) put("fromCenter", distance(center, source, inputs))
                             put("workingDiscreteChanges", before.hammingDistanceTo(working))
                         }
-                    }))
-                }.toString())
+                    }
+                        )
+                    )
+                }.toString()
+                )
                 writer.flush()
             }
         }
-        file.resolveSibling("${file.nameWithoutExtension}-cost.json").writeText(buildJsonObject {
+        file.resolveSibling("${file.nameWithoutExtension}-cost.json").writeText(
+            buildJsonObject {
             put("coordinateReads", get(trace, "CoordinateReads") as Long)
             put("declinedAttempts", get(trace, "Declined") as Long)
             put("maxAttempts", get(trace, "MaxAttempts") as Int)
             put("maxCoordinates", get(trace, "MaxCoordinates") as Int)
             put("sourceVerdictClaim", false)
-        }.toString())
+        }.toString()
+        )
     }
 
-    fun controls(trace: Any, problem: BakedProblem, objective: LinearObjective, file: File, seed: Long,
-        prepared: FinitePipelinePreparation, source: BakedProblem,
+    fun controls(
+        trace: Any,
+        problem: BakedProblem,
+        objective: LinearObjective,
+        file: File,
+        seed: Long,
+        prepared: FinitePipelinePreparation,
+        source: BakedProblem,
     ) {
         val scope = Class.forName("com.eignex.klause.meta.alns.RepairScope").getField("INSTANCE").get(null)
         val freedType = Class.forName("com.eignex.klause.meta.alns.FreedVars")
@@ -115,10 +135,16 @@ internal object RepairTrajectory {
                 checkSource(source, prepared.reconstruct(center))
                 val blocks = problem.factors.asSequence().mapNotNull { factor ->
                     val label = when (factor) {
-                        is AllDifferent -> if (factor.presents.isEmpty() && factor.exceptSet.isEmpty())
-                            "assignment-block" else return@mapNotNull null
+                        is AllDifferent -> if (factor.presents.isEmpty() && factor.exceptSet.isEmpty()) {
+                            "assignment-block"
+                        } else {
+                            return@mapNotNull null
+                        }
+
                         is Cumulative -> if (factor.presents.isEmpty()) "resource-block" else return@mapNotNull null
+
                         is Diffn -> "placement-block"
+
                         else -> return@mapNotNull null
                     }
                     val variables = factor.intVars.distinct()
@@ -133,8 +159,12 @@ internal object RepairTrajectory {
                     candidates.add(label to variables)
                     val eligible = (0 until problem.numIntVars).filter { !problem.rootIntDomain(it).isFixed }
                     repeat(4) {
-                        if (eligible.size >= variables.size) candidates.add("size-matched-sample" to
-                            eligible.shuffled(random).take(variables.size).toIntArray())
+                        if (eligible.size >= variables.size) {
+                            candidates.add(
+                            "size-matched-sample" to
+                                eligible.shuffled(random).take(variables.size).toIntArray(),
+                        )
+                        }
                     }
                 }
                 planned += candidates.size
@@ -146,12 +176,20 @@ internal object RepairTrajectory {
                         .newInstance(intArrayOf(), variables)
                     val assumptions = pins.invoke(scope, problem, center, freed) as Assumptions
                     val started = System.nanoTime()
-                    val result = BacktrackSolver(problem).minimize(objective, BacktrackParams(
-                        assumptions = assumptions, maxDecisions = 10_000, cancellation = stop, randomSeed = seed))
+                    val result = BacktrackSolver(problem).minimize(
+                        objective,
+                        BacktrackParams(
+                        assumptions = assumptions,
+                        maxDecisions = 10_000,
+                        cancellation = stop,
+                        randomSeed = seed,
+                    )
+                    )
                     val elapsed = System.nanoTime() - started
                     val completed = result is MinimizeResult.Optimal || result is MinimizeResult.Infeasible
                     if (completed) completedControls++
-                    writer.appendLine(buildJsonObject {
+                    writer.appendLine(
+                        buildJsonObject {
                         put("centerId", get(entry, "Id") as Int)
                         put("candidateIndex", candidateIndex)
                         put("candidateCount", candidates.size)
@@ -161,15 +199,21 @@ internal object RepairTrajectory {
                         put("center", sample(center))
                         put("centerObjective", objective.evaluate(center))
                         put("result", result::class.simpleName)
-                        put("reason", when (result) {
-                            is MinimizeResult.Unknown -> result.reason.toString()
-                            is MinimizeResult.BestFound -> result.reason.toString()
-                            else -> null
-                        })
+                        put(
+                            "reason",
+                            when (result) {
+                                is MinimizeResult.Unknown -> result.reason.toString()
+                                is MinimizeResult.BestFound -> result.reason.toString()
+                                else -> null
+                            },
+                        )
                         put("completedLocalExhaustion", completed)
-                        put("strictImprovement", result.assignment?.let {
+                        put(
+                            "strictImprovement",
+                            result.assignment?.let {
                             objective.evaluateExact(it) < objective.evaluateExact(center)
-                        } ?: false)
+                        } ?: false
+                        )
                         put("nodes", result.stats.search.nodes.sum)
                         put("elapsedNanos", elapsed)
                         result.assignment?.let {
@@ -177,12 +221,14 @@ internal object RepairTrajectory {
                             put("nativeSourceAccepted", checkSource(source, prepared.reconstruct(it)))
                         }
                         put("globalProofClaim", false)
-                    }.toString())
+                    }.toString()
+                    )
                     writer.flush()
                 }
             }
         }
-        file.resolveSibling("${file.nameWithoutExtension}-limits.json").writeText(buildJsonObject {
+        file.resolveSibling("${file.nameWithoutExtension}-limits.json").writeText(
+            buildJsonObject {
             put("maxCenters", 4)
             put("maxBlocksPerCenter", 4)
             put("maxRelationBlockCoordinates", 6)
@@ -195,7 +241,8 @@ internal object RepairTrajectory {
             put("completedControls", completedControls)
             put("boundedScanCompleted", !stop() && attempted == planned)
             put("wholeSourceExhaustionClaim", false)
-        }.toString())
+        }.toString()
+        )
     }
 
     internal fun properSubsets(variables: IntArray): List<IntArray> {
@@ -205,10 +252,17 @@ internal object RepairTrajectory {
         }
     }
 
-    fun writeResult(file: File, result: MinimizeResult, prepared: FinitePipelinePreparation,
-        source: BakedProblem, picks: Long, runNanos: Long, allocatedBytes: Long,
+    fun writeResult(
+        file: File,
+        result: MinimizeResult,
+        prepared: FinitePipelinePreparation,
+        source: BakedProblem,
+        picks: Long,
+        runNanos: Long,
+        allocatedBytes: Long,
     ) {
-        file.writeText(buildJsonObject {
+        file.writeText(
+            buildJsonObject {
             put("objective", result.objectiveValue)
             put("picks", picks)
             put("moves", result.stats.ls.moves.sum)
@@ -224,7 +278,8 @@ internal object RepairTrajectory {
                 put("source", sample(reconstructed))
                 put("nativeSourceAccepted", checkSource(source, reconstructed))
             }
-        }.toString())
+        }.toString()
+        )
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -248,9 +303,12 @@ internal object RepairTrajectory {
         val changed = inputs.count { before.exactIntValue(it) != after.exactIntValue(it) }
         put("sourceInputChanges", changed)
         put("sourceAuxiliaryChanges", before.hammingDistanceTo(after) - changed)
-        put("approximateRealL1Displacement", (0 until before.numRealVars).sumOf {
+        put(
+            "approximateRealL1Displacement",
+            (0 until before.numRealVars).sumOf {
             abs(before.approximateRealValue(it) - after.approximateRealValue(it))
-        })
+        }
+        )
     }
 
     private fun get(owner: Any, property: String): Any? = owner.javaClass.methods.single {

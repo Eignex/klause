@@ -124,11 +124,19 @@ internal object SmtLibFormat : ProblemFormat {
                 }
                 val operation = if (objective != null || parsed.source.embeddedObjectiveSense != null) {
                     ExecutionOperation.OPTIMIZE
-                } else ExecutionOperation.SATISFY
-                val invocation = SourceSetup.prepare(SourceSetupRequest(
-                    parsed.source, operation, FiniteEngine.BACKTRACK, objective, maximize,
+                } else {
+                    ExecutionOperation.SATISFY
+                }
+                val invocation = SourceSetup.prepare(
+                    SourceSetupRequest(
+                    parsed.source,
+                    operation,
+                    FiniteEngine.BACKTRACK,
+                    objective,
+                    maximize,
                     boundCancellation = ExecutionControl { true },
-                ))
+                )
+                )
                 check(invocation.route is SourceProblemRoute.Finite) {
                     "${file.name}: in-process benchmarks require finite source bounds; use the CLI for open models"
                 }

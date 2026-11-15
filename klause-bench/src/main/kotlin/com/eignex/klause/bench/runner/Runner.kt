@@ -84,8 +84,12 @@ internal object InProcessRunner : Runner {
         val file = CorpusFetcher.resolve(src)
         if (ref.format == Format.WCNF) {
             val ingested by lazy { format.ingest(file) }
-            return ResolvedProblem(ref, lazy { ingested.problem },
-                deferredObjective = lazy { ingested.objective }, optimizes = true)
+            return ResolvedProblem(
+                ref,
+                lazy { ingested.problem },
+                deferredObjective = lazy { ingested.objective },
+                optimizes = true,
+            )
         }
         return runCatching { format.ingest(file) }
             .map { ResolvedProblem(ref, lazy { it.problem }, it.objective, maximize = it.maximize) }

@@ -42,7 +42,9 @@ internal object MpsFeasibility {
             if (!line.first().isWhitespace()) {
                 section = fields.first()
             } else if (section == "ROWS") {
-                if (fields.first() == "N") freeRows.add(fields[1]) else if (zeroRow == null) zeroRow = fields[1]
+                if (fields.first() == "N") freeRows.add(fields[1]) else if (zeroRow == null) {
+                    zeroRow = fields[1]
+                }
             }
         }
         // An objective-only column must retain its bounds and integrality after its coefficients are removed.
@@ -65,7 +67,9 @@ internal object MpsFeasibility {
             }
             when (section) {
                 "OBJSENSE", "OBJNAME" -> Unit
+
                 "ROWS" -> if (fields.first() != "N") output.add(line)
+
                 "COLUMNS" -> {
                     if (fields.any { it.trim('\'') == "MARKER" }) {
                         output.add(line)
@@ -75,6 +79,7 @@ internal object MpsFeasibility {
                         output.add(" ${fields.first()} $coefficients")
                     }
                 }
+
                 "RHS", "RANGES" -> {
                     val namedSet = fields.size % 2 == 1
                     val pairs = fields.drop(if (namedSet) 1 else 0).chunked(2).filter { it.first() !in freeRows }
@@ -83,6 +88,7 @@ internal object MpsFeasibility {
                         output.add(" " + (prefix + pairs.flatten()).joinToString(" "))
                     }
                 }
+
                 else -> output.add(line)
             }
         }

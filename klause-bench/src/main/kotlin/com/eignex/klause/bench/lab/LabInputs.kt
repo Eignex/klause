@@ -104,7 +104,9 @@ internal object LabInputs {
         val relative = file.relativeTo(File(CorpusFetcher.cacheRoot, collection.id)).invariantSeparatorsPath
         val entry = index.entry(relative) ?: index.entry(CorpusFiles.plainPath(relative)) ?: return file.toPath()
         if (entry.path.endsWith(CorpusFiles.SUFFIX)) return file.toPath()
-        val materialized = if (entry.path == relative) file else {
+        val materialized = if (entry.path == relative) {
+            file
+        } else {
             val plainPresent = File(CorpusFiles.plainPath(file.path)).isFile
             CorpusFiles.unpack(file, keepPacked = true).also {
                 if (!plainPresent) CorpusFetcher.cache().recordSizesUnder(it)

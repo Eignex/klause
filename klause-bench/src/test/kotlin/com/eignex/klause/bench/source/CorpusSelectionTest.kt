@@ -17,7 +17,10 @@ class CorpusSelectionTest {
         val root = Files.createTempDirectory("archive-corpus").toFile()
         try {
             val paths = listOf("set/alpha-2.mps.zst", "set/beta-1.mps.zst", "set/alpha-1.mps.zst", "README")
-            for (path in paths) File(root, path).apply { parentFile.mkdirs(); writeText("fixture") }
+            for (path in paths) File(root, path).apply {
+                parentFile.mkdirs();
+                writeText("fixture")
+            }
             val layout = Layout.Flat("set", "mps") { it.substringBefore('-') }
             val selection = Selection(perFamily = 1, maxInstances = 2, sampleSeed = 7)
 
@@ -307,7 +310,10 @@ class CorpusSelectionTest {
         val root = Files.createTempDirectory("zstpair").toFile()
         try {
             val paths = listOf("COP/Mkp-1.xml", "COP/Mkp-1.xml.zst", "COP/Other-2.xml.zst")
-            for (path in paths) File(root, path).apply { parentFile.mkdirs(); writeText("fixture") }
+            for (path in paths) File(root, path).apply {
+                parentFile.mkdirs();
+                writeText("fixture")
+            }
             val layout = Layout.Flat("COP", "xml")
             val stored = listOf("COP/Mkp-1.xml.zst", "COP/Other-2.xml.zst")
 

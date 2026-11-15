@@ -30,18 +30,29 @@ class SourceIdentityAdapterTest {
             val packed = if (compressed) Zstd.compress(plain) else plain
             val name = if (compressed) "tiny.opb.zst" else "tiny.opb"
             Files.write(corpus.resolve(name), packed)
-            val template = BenchCase("original", inputs = listOf(
-                BenchInput(name, BenchInputRoot.CORPUS, "model", sha256(packed))),
-                attributes = mapOf("suite" to "offline", "problem" to "tiny"))
-            val case = SourceIdentitySuite.plan(BenchRequest(mapOf(
-                "cases" to BenchProtocol.json.encodeToString(listOf(template))))).single()
+            val template = BenchCase(
+                "original",
+                inputs = listOf(
+                    BenchInput(name, BenchInputRoot.CORPUS, "model", sha256(packed)),
+                ),
+                attributes = mapOf("suite" to "offline", "problem" to "tiny"),
+            )
+            val case = SourceIdentitySuite.plan(
+                BenchRequest(
+                    mapOf(
+                "cases" to BenchProtocol.json.encodeToString(listOf(template)),
+            )
+                )
+            ).single()
 
             val result = SourceIdentitySuite.run(case, BenchContext(out, corpusDirectory = corpus))
 
             assertEquals(BenchStatus.SUCCESS, result.status)
             val details = requireNotNull(result.details)
-            assertEquals("5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03",
-                details.getValue("plainSha256").jsonPrimitive.content)
+            assertEquals(
+                "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03",
+                details.getValue("plainSha256").jsonPrimitive.content,
+            )
             assertEquals("6", details.getValue("plainBytes").jsonPrimitive.content)
             assertEquals(sha256(packed), details.getValue("packedSha256").jsonPrimitive.content)
             assertEquals("false", details.getValue("solverExecuted").jsonPrimitive.content)
@@ -62,9 +73,13 @@ class SourceIdentityAdapterTest {
             val name = if (compressed) "tiny.opb.zst" else "tiny.opb"
             Files.write(corpus.resolve(name), if (compressed) Zstd.compress(plain) else plain)
             Files.writeString(out.resolve("source-identity.json"), "stale receipt")
-            val case = BenchCase("original", inputs = listOf(
-                BenchInput(name, BenchInputRoot.CORPUS, "model", "0".repeat(64))),
-                attributes = mapOf("suite" to "offline", "problem" to "tiny"))
+            val case = BenchCase(
+                "original",
+                inputs = listOf(
+                    BenchInput(name, BenchInputRoot.CORPUS, "model", "0".repeat(64)),
+                ),
+                attributes = mapOf("suite" to "offline", "problem" to "tiny"),
+            )
 
             assertFailsWith<IllegalArgumentException> {
                 SourceIdentitySuite.run(case, BenchContext(out, corpusDirectory = corpus))

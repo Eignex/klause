@@ -82,16 +82,16 @@ class EqualityKernelMoveTest {
         )
         val sweep = assertNotNull(
             DefinitionalSweep.fromSource(
-            problem,
-            listOf(
-                DefinitionHint.Linear(
-                1,
-                longArrayOf(1, -1),
-                arrayOf(DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1)),
-                0,
-            )
+                problem,
+                listOf(
+                    DefinitionHint.Linear(
+                        1,
+                        longArrayOf(1, -1),
+                        arrayOf(DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1)),
+                        0,
+                    ),
+                ),
             ),
-        )
         )
         val step = EqualityKernelMove.Step(
             BigInteger.ONE,
@@ -196,8 +196,8 @@ class EqualityKernelMoveTest {
 
         val probe = assertNotNull(
             EqualityKernelMove.probe(view, move, ExecutionControl.Never) { point, _ ->
-            point.intValue(0) != point.intValue(1)
-        }
+                point.intValue(0) != point.intValue(1)
+            },
         )
 
         assertTrue(probe.inspection.netDelta > 0)
@@ -222,12 +222,12 @@ class EqualityKernelMoveTest {
 
         val applied = assertNotNull(
             EqualityKernelMove.consume(
-            view,
-            move,
-            center,
-            objective::evaluateExact,
-            ExecutionControl.Never,
-        ) { _, _ -> true }
+                view,
+                move,
+                center,
+                objective::evaluateExact,
+                ExecutionControl.Never,
+            ) { _, _ -> true },
         )
 
         assertEquals(Sample(booleanArrayOf(), longArrayOf(2, 2)), applied.source)
@@ -262,13 +262,13 @@ class EqualityKernelMoveTest {
         } else {
             assertNull(
                 EqualityKernelMove.consume(
-                view,
-                move,
-                center,
-                objective::evaluateExact,
-                ExecutionControl.Never,
-                verify,
-            )
+                    view,
+                    move,
+                    center,
+                    objective::evaluateExact,
+                    ExecutionControl.Never,
+                    verify,
+                ),
             )
         }
 

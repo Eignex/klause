@@ -25,8 +25,11 @@ class ReportsTest {
             val artifacts = BenchContext(root).artifacts()
 
             assertEquals(2, artifacts.size)
-            assertEquals(problem, Reports.json.parseToJsonElement(Files.readString(record))
-                .jsonObject.getValue("problem").jsonPrimitive.content)
+            assertEquals(
+                problem,
+                Reports.json.parseToJsonElement(Files.readString(record))
+                .jsonObject.getValue("problem").jsonPrimitive.content
+            )
         } finally {
             root.toFile().deleteRecursively()
         }

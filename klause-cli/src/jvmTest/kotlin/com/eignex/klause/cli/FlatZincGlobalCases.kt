@@ -12,8 +12,11 @@ internal val flatZincGlobalCases: List<Triple<String, String, String?>> = listOf
     Triple("global_cardinality-variable", "global_cardinality([1],[1],[x])", "GlobalCardinality"),
     Triple("global_cardinality_closed-variable", "global_cardinality_closed([1],[1],[x])", "GlobalCardinality"),
     Triple("global_cardinality_low_up", "global_cardinality_low_up([x],[1],[1],[1])", "GlobalCardinality"),
-    Triple("global_cardinality_low_up_closed", "global_cardinality_low_up_closed([x],[1],[1],[1])",
-        "GlobalCardinality"),
+    Triple(
+        "global_cardinality_low_up_closed",
+        "global_cardinality_low_up_closed([x],[1],[1],[1])",
+        "GlobalCardinality",
+    ),
     Triple("nvalue", "nvalue(x,[1])", "NValue"),
     Triple("atleast_nvalues", "atleast_nvalues(2,[x,0])", "NValue"),
     Triple("atmost_nvalues", "atmost_nvalues(x,[1])", "NValue"),
@@ -36,8 +39,12 @@ internal val flatZincGlobalCases: List<Triple<String, String, String?>> = listOf
     Triple("diffn-variable", "fzn_diffn([0,x],[0,0],[d,d],[d,d])", "Diffn"),
     Triple("diffn_nonstrict-variable", "fzn_diffn_nonstrict([0,x],[0,0],[d,d],[d,d])", "Diffn"),
     Triple("diffn-zero", "fzn_diffn([0,v],[0,0],[2,0],[1,1])", "Diffn"),
-    Triple("diffn-variable-zero", "fzn_diffn([0,v],[0,0],[two,z],[1,1]); " +
-        "constraint int_eq(two,2); constraint int_eq(z,0)", "Diffn"),
+    Triple(
+        "diffn-variable-zero",
+        "fzn_diffn([0,v],[0,0],[two,z],[1,1]); " +
+            "constraint int_eq(two,2); constraint int_eq(z,0)",
+        "Diffn",
+    ),
     Triple("table_int", "klause_table_int([x],[1,2])", "Table"),
     Triple("regular", "klause_regular([x],1,2,[1,0],1,{1})", "Regular"),
     Triple("mdd", "klause_mdd([x],1,[1],1,[1],[{1}],[0])", "Mdd"),
@@ -50,8 +57,12 @@ internal val flatZincGlobalCases: List<Triple<String, String, String?>> = listOf
     Triple("disjunctive_strict", "fzn_disjunctive_strict([0,x],[1,1])", "Cumulative"),
     Triple("disjunctive_strict-variable", "fzn_disjunctive_strict([0,x],[d,d])", "Cumulative"),
     Triple("disjunctive_strict-zero", "fzn_disjunctive_strict([0,v],[2,0])", "Cumulative"),
-    Triple("disjunctive_strict-variable-zero", "fzn_disjunctive_strict([0,v],[two,z]); " +
-        "constraint int_eq(two,2); constraint int_eq(z,0)", "Cumulative"),
+    Triple(
+        "disjunctive_strict-variable-zero",
+        "fzn_disjunctive_strict([0,v],[two,z]); " +
+            "constraint int_eq(two,2); constraint int_eq(z,0)",
+        "Cumulative",
+    ),
     Triple("sliding_sum", "fzn_sliding_sum(1,2,1,[x])", "Linear"),
     Triple("count_eq", "klause_count_eq([x],1,1)", "GlobalCardinality"),
     Triple("among", "fzn_among(1,[x],{1})", "GlobalCardinality"),

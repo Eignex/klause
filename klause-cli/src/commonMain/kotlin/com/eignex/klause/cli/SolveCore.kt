@@ -103,7 +103,12 @@ internal object SolveCore {
 
             is SourceRendering.ExactSource -> {
                 solveCapturedSource(
-                    rawSolvable, pipeline, common, output, publication, requireNotNull(sourceControls),
+                    rawSolvable,
+                    pipeline,
+                    common,
+                    output,
+                    publication,
+                    requireNotNull(sourceControls),
                 ) { budgetSpent(common, it) }
                 return
             }
@@ -120,7 +125,9 @@ internal object SolveCore {
                 if (sourceControls != null) {
                     executeFinite(
                         requireNotNull(sourceControls.finiteRequest).invoke(rawSolvable.finiteShape),
-                        rawSolvable, common, output,
+                        rawSolvable,
+                        common,
+                        output,
                     )
                     return
                 }
@@ -429,8 +436,11 @@ internal object SolveCore {
                 ?: usageError("portfolio arm default expects a positive integer")
         }
         return SourceExecutionPolicy(
-            ceiling(common.lp), ceiling(defaultLp()), arms,
-            common.lpPricing.takeIf { common.lpPricingExplicit }, explicitPresolve,
+            ceiling(common.lp),
+            ceiling(defaultLp()),
+            arms,
+            common.lpPricing.takeIf { common.lpPricingExplicit },
+            explicitPresolve,
         )
     }
 
@@ -617,17 +627,25 @@ internal fun describeEvent(e: SearchEvent, t: Long, worker: String? = null): Str
     return when (e) {
         is SearchEvent.BacktrackIncomplete ->
             "[$t ms]$who incomplete optimization: path=${e.path} stop=${e.stopCause}"
+
         is SearchEvent.BacktrackComponentStop -> e.stop.let {
             "[$t ms]$who component terminal: origin=${it.site} firstStop=${it.stopCause} cancelled=${it.cancelled}" +
                 " unresolved=${it.unresolvedCoverage} level=${it.decisionLevel} replayed=${e.replayed}"
         }
+
         is SearchEvent.Restart -> "[$t ms]$who restart #${e.index} after ${e.steps} decisions"
+
         is SearchEvent.LearnedDbSweep -> "[$t ms]$who learned-DB sweep: kept ${e.kept}, dropped ${e.dropped}"
+
         is SearchEvent.Incumbent -> "[$t ms]$who incumbent objective ${e.objective}"
-        is SearchEvent.WorkerAdmission -> "admission ${e.recipe} admitted=${e.admitted} " +
+
+        is SearchEvent.WorkerAdmission ->
+            "admission ${e.recipe} admitted=${e.admitted} " +
             "selected=${e.selected}${e.role?.let { role -> " role=$role" }.orEmpty()} " +
             "${e.requirements} declines=${e.declines}"
+
         is SearchEvent.PortfolioDiagnostic -> "portfolio ${e.event}"
+
         is SearchEvent.CompanionComparison -> "companion $e"
     }
 }

@@ -46,8 +46,11 @@ class GlobalScoringViewsTest {
 
     @Test
     fun `pairwise deltas preserve repeated coordinates optional polarity and excepted values`() {
-        val factor = AllDifferent(intArrayOf(0, 0, 1, 2),
-            intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(0, true), Lit.make(1, true)), longArrayOf(0))
+        val factor = AllDifferent(
+            intArrayOf(0, 0, 1, 2),
+            intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(0, true), Lit.make(1, true)),
+            longArrayOf(0),
+        )
         val problem = Problem(2, 3, Array(3) { IntDomain(0, 2) }, arrayOf(factor))
         val state = pairwise(problem)
         state.assignment.setBool(0, true)
@@ -55,8 +58,12 @@ class GlobalScoringViewsTest {
         for (i in 0..2) state.assignment.setInt(i, 1)
         state.recompute()
         assertEquals(3L, state.cost)
-        val moves = listOf(Move.IntSet(0, 0), Move.BoolFlip(1), Move.BoolFlip(0),
-            Move.Compound(listOf(Move.IntSet(0, 1), Move.IntSet(1, 1), Move.IntSet(0, 2))))
+        val moves = listOf(
+            Move.IntSet(0, 0),
+            Move.BoolFlip(1),
+            Move.BoolFlip(0),
+            Move.Compound(listOf(Move.IntSet(0, 1), Move.IntSet(1, 1), Move.IntSet(0, 2))),
+        )
         for (move in moves) {
             val before = state.cost
             val delta = state.netDelta(move)
@@ -73,17 +80,23 @@ class GlobalScoringViewsTest {
     @ParameterizedTest
     @ValueSource(ints = [0, 1, 2, 3])
     fun `integer probes reconcile every aliased value under each presence assignment`(presence: Int) {
-        val factor = AllDifferent(intArrayOf(0, 0, 1, 2),
-            intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(0, true), Lit.make(1, true)), longArrayOf(0))
+        val factor = AllDifferent(
+            intArrayOf(0, 0, 1, 2),
+            intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(0, true), Lit.make(1, true)),
+            longArrayOf(0),
+        )
         val state = pairwise(Problem(2, 3, Array(3) { IntDomain(0, 2) }, arrayOf(factor)))
         state.assignment.setBool(0, presence and 1 != 0)
         state.assignment.setBool(1, presence and 2 != 0)
-        for (a in 0L..2L) for (b in 0L..2L) for (c in 0L..2L) {
+        for (a in 0L..2L) {
+            for (b in 0L..2L) {
+                for (c in 0L..2L) {
             state.assignment.setInt(0, a)
             state.assignment.setInt(1, b)
             state.assignment.setInt(2, c)
             state.recompute()
-            for (id in 0..2) for (value in 0L..2L) {
+            for (id in 0..2) {
+                for (value in 0L..2L) {
                 val old = state.assignment.intValue(id)
                 val before = state.cost
                 val move = Move.IntSet(id, value)
@@ -95,6 +108,9 @@ class GlobalScoringViewsTest {
                 state.apply(Move.IntSet(id, old))
                 assertEquals(before, state.cost)
             }
+            }
+        }
+            }
         }
     }
 
@@ -102,7 +118,9 @@ class GlobalScoringViewsTest {
     @ValueSource(booleans = [false, true])
     fun `ground table and diagram grades agree for every small assignment and primitive probe`(repeated: Boolean) {
         val states = groundControls.getValue(repeated)
-        for (a in 0L..2L) for (b in 0L..2L) for (c in 0L..2L) {
+        for (a in 0L..2L) {
+            for (b in 0L..2L) {
+                for (c in 0L..2L) {
             for (state in states) {
                 state.assignment.setInt(0, a)
                 state.assignment.setInt(1, b)
@@ -110,17 +128,29 @@ class GlobalScoringViewsTest {
                 state.recompute()
             }
             assertEquals(1, states.map { it.cost }.distinct().size)
-            for (id in 0..2) for (value in 0L..2L) {
+            for (id in 0..2) {
+                for (value in 0L..2L) {
                 val move = Move.IntSet(id, value)
                 assertEquals(1, states.map { it.netDelta(move) }.distinct().size)
+            }
+            }
+        }
             }
         }
     }
 
     @Test
     fun `weighted paths retain exact cost tuples while changing infeasible grades`() {
-        val diagram = Mdd(intArrayOf(0, 1), intArrayOf(1, 2, 1), intArrayOf(0, 8, 16),
-            longArrayOf(0, 0, 0, 2, 0, 1, 1, 3, 0, 1, 0, 3, 1, 0, 0, 4), 0, intArrayOf(0), 4, 2)
+        val diagram = Mdd(
+            intArrayOf(0, 1),
+            intArrayOf(1, 2, 1),
+            intArrayOf(0, 8, 16),
+            longArrayOf(0, 0, 0, 2, 0, 1, 1, 3, 0, 1, 0, 3, 1, 0, 0, 4),
+            0,
+            intArrayOf(0),
+            4,
+            2,
+        )
         val table = assertIs<Table>(GlobalScoringViews.alternate(diagram).factor)
 
         assertEquals(listOf(0L, 1L, 5L, 1L, 0L, 7L), table.tuples.toList())
@@ -143,8 +173,16 @@ class GlobalScoringViewsTest {
 
     @Test
     fun `cost aliases remain repeated columns instead of independent coordinates`() {
-        val diagram = Mdd(intArrayOf(0), intArrayOf(1, 1), intArrayOf(0, 8),
-            longArrayOf(0, 1, 0, 2, 0, 2, 0, 2), 0, intArrayOf(0), 4, 0)
+        val diagram = Mdd(
+            intArrayOf(0),
+            intArrayOf(1, 1),
+            intArrayOf(0, 8),
+            longArrayOf(0, 1, 0, 2, 0, 2, 0, 2),
+            0,
+            intArrayOf(0),
+            4,
+            0,
+        )
         val table = assertIs<Table>(GlobalScoringViews.alternate(diagram).factor)
 
         assertEquals(listOf(0, 0), table.xs.toList())
@@ -153,16 +191,31 @@ class GlobalScoringViewsTest {
 
     @Test
     fun `weighted nondeterminism declines instead of selecting one cost path`() {
-        val diagram = Mdd(intArrayOf(0), intArrayOf(1, 1), intArrayOf(0, 8),
-            longArrayOf(0, 1, 0, 2, 0, 1, 0, 3), 0, intArrayOf(0), 4, 1)
+        val diagram = Mdd(
+            intArrayOf(0),
+            intArrayOf(1, 1),
+            intArrayOf(0, 8),
+            longArrayOf(0, 1, 0, 2, 0, 1, 0, 3),
+            0,
+            intArrayOf(0),
+            4,
+            1,
+        )
 
         assertEquals("nondeterministic-weighted-diagram", GlobalScoringViews.alternate(diagram).reason)
     }
 
     @Test
     fun `oversized accepting data declines before indexing a small diagram`() {
-        val diagram = Mdd(intArrayOf(0), intArrayOf(1, 1), intArrayOf(0, 3), longArrayOf(0, 0, 0),
-            0, IntArray(GlobalScoringViews.MAX_CELLS + 1), 3)
+        val diagram = Mdd(
+            intArrayOf(0),
+            intArrayOf(1, 1),
+            intArrayOf(0, 3),
+            longArrayOf(0, 0, 0),
+            0,
+            IntArray(GlobalScoringViews.MAX_CELLS + 1),
+            3,
+        )
 
         val result = GlobalScoringViews.alternate(diagram)
 
@@ -173,8 +226,15 @@ class GlobalScoringViewsTest {
     @Test
     fun `path expansion stops before publishing a partial relation`() {
         val layers = 11
-        val diagram = Mdd(IntArray(layers) { it }, IntArray(layers + 1) { 1 }, IntArray(layers + 1) { it * 6 },
-            LongArray(layers * 6) { if (it % 6 == 4) 1 else 0 }, 0, intArrayOf(0), 3)
+        val diagram = Mdd(
+            IntArray(layers) { it },
+            IntArray(layers + 1) { 1 },
+            IntArray(layers + 1) { it * 6 },
+            LongArray(layers * 6) { if (it % 6 == 4) 1 else 0 },
+            0,
+            intArrayOf(0),
+            3,
+        )
         val result = GlobalScoringViews.alternate(diagram)
 
         assertEquals("path-limit", result.reason)
@@ -211,8 +271,16 @@ class GlobalScoringViewsTest {
 
     @Test
     fun `overflowing weighted paths decline without wrapping their cost`() {
-        val diagram = Mdd(intArrayOf(0, 1), intArrayOf(1, 1, 1), intArrayOf(0, 4, 8),
-            longArrayOf(0, 0, 0, Long.MAX_VALUE, 0, 1, 0, 1), 0, intArrayOf(0), 4, 2)
+        val diagram = Mdd(
+            intArrayOf(0, 1),
+            intArrayOf(1, 1, 1),
+            intArrayOf(0, 4, 8),
+            longArrayOf(0, 0, 0, Long.MAX_VALUE, 0, 1, 0, 1),
+            0,
+            intArrayOf(0),
+            4,
+            2,
+        )
 
         assertEquals("weight-overflow", GlobalScoringViews.alternate(diagram).reason)
     }
@@ -220,8 +288,12 @@ class GlobalScoringViewsTest {
     @Test
     fun `oversized distinctness keeps native scoring and an explicit decline`() {
         val count = GlobalScoringViews.MAX_ARITY + 1
-        val problem = Problem(0, count, Array(count) { IntDomain(0, count.toLong()) },
-            arrayOf(AllDifferent(IntArray(count) { it })))
+        val problem = Problem(
+            0,
+            count,
+            Array(count) { IntDomain(0, count.toLong()) },
+            arrayOf(AllDifferent(IntArray(count) { it })),
+        )
         val selection = GlobalScoringViews.pairwise(problem, LocalSearchProblem(problem))
 
         assertEquals("arity-limit", selection.admissions.single().reason)
@@ -234,8 +306,12 @@ class GlobalScoringViewsTest {
         return LocalSearchState(LocalSearchModel.open(problem, projections), Random(7))
     }
 
-    private fun state(factor: Factor): LocalSearchState = LocalSearchState(LocalSearchModel.open(
-        Problem(0, 3, Array(3) { IntDomain(0, 7) }, arrayOf(factor))), Random(7))
+    private fun state(factor: Factor): LocalSearchState = LocalSearchState(
+        LocalSearchModel.open(
+        Problem(0, 3, Array(3) { IntDomain(0, 7) }, arrayOf(factor)),
+    ),
+        Random(7)
+    )
 
     companion object {
         private lateinit var groundControls: Map<Boolean, List<LocalSearchState>>
@@ -249,9 +325,12 @@ class GlobalScoringViewsTest {
                 val diagram = assertIs<Mdd>(GlobalScoringViews.alternate(table).factor)
                 val roundTrip = assertIs<Table>(GlobalScoringViews.alternate(diagram).factor)
                 listOf(table, diagram, roundTrip).map { factor ->
-                    LocalSearchState(LocalSearchModel.open(
-                        Problem(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf(factor))),
-                        Random(7))
+                    LocalSearchState(
+                        LocalSearchModel.open(
+                            Problem(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf(factor)),
+                        ),
+                        Random(7),
+                    )
                 }
             }
         }

@@ -13,9 +13,11 @@ import java.util.Locale
 internal object CliProfile {
     private const val CLI_CALLER_DEPTH = 3
     private const val MODEL_CALLER_DEPTH = 4
-    private val timedEvents = setOf("jdk.GarbageCollection", "jdk.GCPhasePause", "jdk.ThreadPark",
+    private val timedEvents = setOf(
+        "jdk.GarbageCollection", "jdk.GCPhasePause", "jdk.ThreadPark",
         "jdk.ThreadSleep", "jdk.JavaMonitorEnter", "jdk.JavaMonitorWait", "jdk.Compilation",
-        "jdk.SafepointBegin", "jdk.ExecuteVMOperation")
+        "jdk.SafepointBegin", "jdk.ExecuteVMOperation",
+    )
     private val mechanismPackages = listOf(
         "com.eignex.klause.util.",
         "com.eignex.klause.bench.",
@@ -76,6 +78,7 @@ internal object CliProfile {
                 }
                 when (event.eventType.name) {
                     "jdk.NativeMethodSample" -> nativeCallers.merge(cliOperationCallers(event), 1L, Long::plus)
+
                     "jdk.ExecutionSample" -> {
                         topMethod(event)?.let { cpu.merge(it, 1L, Long::plus) }
                         phases.merge(cliPhase(event), 1L, Long::plus)
@@ -86,6 +89,7 @@ internal object CliProfile {
                             .map { "${it.method.type.name}.${it.method.name}" }
                         cpuPolynomialCheckpoints.merge(cliPolynomialCheckpointCallers(stack), 1L, Long::plus)
                     }
+
                     "jdk.ObjectAllocationSample" -> {
                         val weight = event.getLong("weight")
                         allocation.merge(cliPhase(event), weight, Long::plus)
@@ -103,20 +107,38 @@ internal object CliProfile {
         printTable("$label: CPU samples by phase (stack attribution)", phases, 40, output)
         printTable("$label: CPU self-samples", cpu, 60, output)
         printTable("$label: CPU samples by captured callers", cpuCallers, 60, output)
-        printTable("$label: CPU samples by captured polynomial checkpoint callers",
-            cpuPolynomialCheckpoints, Int.MAX_VALUE, output)
+        printTable(
+            "$label: CPU samples by captured polynomial checkpoint callers",
+            cpuPolynomialCheckpoints,
+            Int.MAX_VALUE,
+            output,
+        )
         printTable("$label: sampled allocation weight by phase (estimated bytes)", allocation, 40, output)
-        printTable("$label: sampled allocation weight by captured callers (estimated bytes)",
-            allocationCallers, 60, output)
+        printTable(
+            "$label: sampled allocation weight by captured callers (estimated bytes)",
+            allocationCallers,
+            60,
+            output,
+        )
         printTable("$label: CPU samples by captured model-facing callers", cpuModelCallers, 60, output)
-        printTable("$label: sampled allocation weight by captured model-facing callers (estimated bytes)",
-            allocationModelCallers, 60, output)
-        printTable("$label: CPU samples by captured context markers and model-facing callers",
-            cpuContexts, Int.MAX_VALUE, output)
+        printTable(
+            "$label: sampled allocation weight by captured model-facing callers (estimated bytes)",
+            allocationModelCallers,
+            60,
+            output,
+        )
+        printTable(
+            "$label: CPU samples by captured context markers and model-facing callers",
+            cpuContexts,
+            Int.MAX_VALUE,
+            output,
+        )
         printTable(
             "$label: sampled allocation weight by captured context markers and " +
                 "model-facing callers (estimated bytes)",
-            allocationContexts, Int.MAX_VALUE, output,
+            allocationContexts,
+            Int.MAX_VALUE,
+            output,
         )
     }
 
@@ -188,18 +210,29 @@ internal object CliProfile {
                 it.contains("LocalSearchProblem.<init>") || it.contains("LocalSearchPreparation.get") ||
                     (it.contains("LocalSearchProblem") && it.contains("preparation"))
             } -> "local-search projection preparation"
+
             localState -> "local-search state allocation"
+
             methods.any { it.contains("LocalSearchEngine.installInvariants") } -> "local-search invariant setup"
+
             initializing -> "local-search seeding"
+
             methods.any { it.contains("LocalSearchEngine.restartAndRepair") } -> "local-search restart seeding"
+
             methods.any {
                 it.contains(".GreedyInit.") || it.contains("LocalSearchEngine.greedyRepairPass")
             } -> "local-search seeding"
+
             methods.any { it.contains("SourceDrivenStrategy.pickMove") } -> "local-search move selection"
+
             methods.any { it.contains("LocalSearchState.apply") } -> "local-search move application"
+
             methods.any { it.contains("LocalSearchEngine") } -> "local-search loop"
+
             methods.any { it.contains(".presolve.") } -> "presolve"
+
             methods.any { it.contains("BacktrackSolver") || it.contains(".backtrack.") } -> backtrackPhase(methods)
+
             methods.any {
                 it.contains("PreparedSearchComponents.<init>") ||
                     it.contains("PreparedSearchComponents.prepareSource") ||
@@ -207,22 +240,29 @@ internal object CliProfile {
                     it.contains("ComponentPlanKt.componentPlan") ||
                     it.contains("PreparedSourcePlanKt.prepareExecutionPlan")
             } -> "shared source preparation"
+
             methods.any {
                 it.contains("ExactLiraSearchComponent.installSource") ||
                     it.contains("ExactLiraSearchComponent.assertSource")
             } -> "shared theory source installation"
+
             methods.any {
                 it.contains("SearchSession.initialize") || it.contains("SearchSession.prepareInitialization") ||
                     it.contains("ClauseSearchComponent.initialize") ||
                     it.contains("ExactLiraSearchComponent.initialize")
             } -> "shared root initialization"
+
             methods.any { it.endsWith("SearchSession.check") } -> "shared model check"
+
             methods.any { it.contains("SearchSession.propagate") } -> "shared propagation"
+
             methods.any { it.contains("PreparedSearchRegistrations.open") } -> "shared session opening"
+
             methods.any {
                 it.contains("SearchRun.next") || it.contains("SearchRun.advanceFrame") ||
                     it.contains("SearchRun.backtrack")
             } -> "shared search"
+
             else -> "other or unclassified"
         }
         val context = when {
@@ -235,17 +275,22 @@ internal object CliProfile {
 
     private fun backtrackPhase(methods: List<String>): String = when {
         methods.any { it.contains("PropagationProblem") } -> "backtrack projection preparation"
+
         methods.any { it.contains("PropagationState.<init>") || it.contains("NativeSatState.<init>") } ->
             "backtrack state allocation"
+
         methods.any { it.contains("LpEngine.<init>") } -> "backtrack LP preparation"
+
         methods.any {
             it.contains("PropagationSession.<init>") || it.contains("PropagationState.advanceRootFixpoint") ||
                 it.contains("PropagationState.beginRootFixpoint")
         } -> "backtrack root propagation"
+
         methods.any {
             it.contains("ResumableMinimize.<init>") || it.contains("ResumableSatisfaction.<init>") ||
                 it.contains("CpSatisfactionTraversal.<init>") || it.contains("PropagationPreparation.advance")
         } -> "backtrack initialization"
+
         else -> "backtrack search"
     }
 

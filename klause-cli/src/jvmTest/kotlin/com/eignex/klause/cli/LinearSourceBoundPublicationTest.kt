@@ -30,13 +30,24 @@ class LinearSourceBoundPublicationTest(private val sense: ObjectiveSense) {
     fun `finite output should publish a nominal bound in original objective units`() {
         val third = SemanticRational.of(BIG_ONE, bigIntOf(3))
         val source = LinearSourceProblem(
-            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
-                LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE)),
-            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE),
-                LinearSourceTerm(1, SemanticRational.ONE)),
-                lower = SemanticRational.of(BIG_ONE, bigIntOf(2)))),
-            LinearSourceObjective(listOf(LinearSourceTerm(0, third), LinearSourceTerm(1, third)),
-                SemanticRational.of(BIG_ONE, bigIntOf(10)), sense),
+            listOf(
+                LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
+                LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
+            ),
+            listOf(
+                LinearSourceRow(
+                listOf(
+                    LinearSourceTerm(0, SemanticRational.ONE),
+                    LinearSourceTerm(1, SemanticRational.ONE),
+                ),
+                lower = SemanticRational.of(BIG_ONE, bigIntOf(2)),
+            )
+            ),
+            LinearSourceObjective(
+                listOf(LinearSourceTerm(0, third), LinearSourceTerm(1, third)),
+                SemanticRational.of(BIG_ONE, bigIntOf(10)),
+                sense,
+            ),
         )
         val common = CommonOptions().apply {
             engine = "mixed"
@@ -48,17 +59,25 @@ class LinearSourceBoundPublicationTest(private val sense: ObjectiveSense) {
         val pairs = mutableMapOf<String, String>()
         var result: SourceExecutionResult? = null
         val output = object : OutputProtocol by SmtLibOutput() {
-            override fun onLinearSourceResult(value: SourceExecutionResult) { result = value }
-            override fun onAllowanceStatistics(values: List<Pair<String, String>>) { pairs.putAll(values) }
+            override fun onLinearSourceResult(value: SourceExecutionResult) {
+                result = value
+            }
+            override fun onAllowanceStatistics(values: List<Pair<String, String>>) {
+                pairs.putAll(values)
+            }
         }
 
         SolveCore.solve(solvable, common, output)
 
         assertIs<SourceExecutionResult.Finite>(result)
-        assertEquals(if (sense == ObjectiveSense.MINIMIZE) "4/15" else "23/30",
-            pairs["nativeNominalObjectiveBound"])
-        assertEquals(if (sense == ObjectiveSense.MINIMIZE) "lower" else "upper",
-            pairs["nativeNominalObjectiveBoundDirection"])
+        assertEquals(
+            if (sense == ObjectiveSense.MINIMIZE) "4/15" else "23/30",
+            pairs["nativeNominalObjectiveBound"],
+        )
+        assertEquals(
+            if (sense == ObjectiveSense.MINIMIZE) "lower" else "upper",
+            pairs["nativeNominalObjectiveBoundDirection"],
+        )
         assertEquals("false", pairs["nativeNominalObjectiveBoundStrict"])
         assertEquals("nominal-source", pairs["nativeNominalObjectiveBoundScope"])
         assertEquals("true", pairs["nativeNominalObjectiveBoundCoversTolerance"])

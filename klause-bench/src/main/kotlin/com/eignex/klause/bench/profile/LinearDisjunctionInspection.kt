@@ -80,12 +80,18 @@ internal object LinearDisjunctionInspection {
     }
 
     private fun replay(
-        component: Any, register: Method, fragment: Problem, sourceBooleans: Int, stop: ExecutionControl,
+        component: Any,
+        register: Method,
+        fragment: Problem,
+        sourceBooleans: Int,
+        stop: ExecutionControl,
     ): JsonObject {
         val registry = SearchAtomRegistry(sourceBooleans)
         val context = SearchSession(emptyList(), cancellation = stop, atoms = registry)
-        val address = register.parameterTypes[2].getDeclaredConstructor(Int::class.javaPrimitiveType,
-            Int::class.javaPrimitiveType).apply { isAccessible = true }
+        val address = register.parameterTypes[2].getDeclaredConstructor(
+            Int::class.javaPrimitiveType,
+            Int::class.javaPrimitiveType,
+        ).apply { isAccessible = true }
         var visited = 0
         for ((factorIndex, factor) in fragment.factors.withIndex()) {
             if (stop()) break
@@ -130,19 +136,24 @@ internal object LinearDisjunctionInspection {
         val previous = assertions(existing)
         val proposed = assertions(scratch)
         return buildJsonObject {
-            put("proposed", buildJsonArray {
+            put(
+                "proposed",
+                buildJsonArray {
                 for (entry in proposed) {
                     val matched = named[entry.payload] as? RegisteredTheoryDecision
-                    add(buildJsonObject {
+                    add(
+                        buildJsonObject {
                         put("payload", payloadRecord(entry.payload))
                         put("existingLiteral", matched?.literal)
                         matched?.let {
                             val index = (it.literal xor 1) - existing.sourceBooleanCount * 2
                             put("existingComplement", payloadRecord(previous[index].payload))
                         }
-                    })
+                    }
+                    )
                 }
-            })
+            }
+            )
         }
     }
 
@@ -155,22 +166,32 @@ internal object LinearDisjunctionInspection {
         when (val constants = row.constants) {
             is IntegralConstants -> {
                 put("bound", constants.exactBound.toString())
-                put("coefficients", buildJsonArray {
+                put(
+                    "coefficients",
+                    buildJsonArray {
                     for (i in 0 until row.size) add(JsonPrimitive(constants.exactCoeff(i).toString()))
-                })
+                }
+                )
             }
+
             is RealConstants -> {
                 put("boundBits", constants.bound.toRawBits())
-                put("discreteCoefficientBits", buildJsonArray {
+                put(
+                    "discreteCoefficientBits",
+                    buildJsonArray {
                     for (i in 0 until constants.intCoefficients.size) {
                         add(JsonPrimitive(constants.intCoefficients.at(i).toRawBits()))
                     }
-                })
-                put("realCoefficientBits", buildJsonArray {
+                }
+                )
+                put(
+                    "realCoefficientBits",
+                    buildJsonArray {
                     for (i in 0 until constants.realCoefficients.size) {
                         add(JsonPrimitive(constants.realCoefficients.at(i).toRawBits()))
                     }
-                })
+                }
+                )
             }
         }
     }
@@ -181,9 +202,12 @@ internal object LinearDisjunctionInspection {
             put("threshold", payload.threshold.toString())
             put("upper", payload.upper)
             put("strict", payload.strict)
-            put("terms", buildJsonArray {
+            put(
+                "terms",
+                buildJsonArray {
                 for (term in payload.terms) add(JsonPrimitive("${term.source}:${term.coefficient}"))
-            })
+            }
+            )
         } else {
             put("description", payload.toString())
         }

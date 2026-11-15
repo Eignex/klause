@@ -28,7 +28,9 @@ class RegularPrefixReplayTest {
     fun `a retained state exclusion prunes a different source prefix after undo`() {
         val transitions = longArrayOf(1, 2, 2, 3, 3, 1)
         val source = Problem(
-            0, 5, Array(5) { IntDomain(1, 2) },
+            0,
+            5,
+            Array(5) { IntDomain(1, 2) },
             arrayOf(
                 Regular(intArrayOf(0, 1, 2), 3, 2, transitions, 1, intArrayOf(1, 2, 3)),
                 Regular(intArrayOf(0, 1, 2, 3, 4), 3, 2, transitions, 1, intArrayOf(1)),

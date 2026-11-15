@@ -252,7 +252,9 @@ internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
     val moves = stats.ls.moves.sum
     if (stats.run.backend != "ls" && moves == 0.0 && stats.ls.bestResidual == null &&
         stats.ls.phaseNanos.isEmpty() && stats.ls.objectiveScoring.isEmpty()
-    ) return emptyList()
+    ) {
+        return emptyList()
+    }
 
     val out = ArrayList<Pair<String, String>>()
     out += "lsMoves" to "${moves.toLong()}"
@@ -362,7 +364,6 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
         out += "clausalPrimalRejected" to "${stats.search.clausalPrimalRejected.sum.toLong()}"
         out += "clausalPrimalInfeasible" to "${stats.search.clausalPrimalInfeasible.sum.toLong()}"
         out += "clausalPrimalIncomplete" to "${stats.search.clausalPrimalIncomplete.sum.toLong()}"
-
     }
     return out
 }
@@ -383,15 +384,17 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
         stats.portfolio.maxSliceWork?.let { "portfolioMaxSliceWork" to "$it" },
         stats.portfolio.sliceGrowth?.let { "portfolioSliceGrowth" to "$it" },
     )
-    val proofs = stats.portfolio.booleanProof.flatMapIndexed { index, proof -> listOfNotNull(
-        "booleanProof.$index.tasks" to "${proof.tasks}",
-        "booleanProof.$index.nativeRefutations" to "${proof.nativeRefutations}",
-        "booleanProof.$index.probeSegments" to "${proof.probeSegments}",
-        "booleanProof.$index.retainedProbes" to "${proof.retainedProbes}",
-        "booleanProof.$index.probeWork" to "${proof.probeWork}",
-        "booleanProof.$index.workerWork" to "${proof.workerWork}",
-        proof.decline?.let { "booleanProof.$index.decline" to it },
-    ) }
+    val proofs = stats.portfolio.booleanProof.flatMapIndexed { index, proof ->
+        listOfNotNull(
+            "booleanProof.$index.tasks" to "${proof.tasks}",
+            "booleanProof.$index.nativeRefutations" to "${proof.nativeRefutations}",
+            "booleanProof.$index.probeSegments" to "${proof.probeSegments}",
+            "booleanProof.$index.retainedProbes" to "${proof.retainedProbes}",
+            "booleanProof.$index.probeWork" to "${proof.probeWork}",
+            "booleanProof.$index.workerWork" to "${proof.workerWork}",
+            proof.decline?.let { "booleanProof.$index.decline" to it },
+        )
+    }
     val starts = stats.portfolio.heuristicStarts.flatMapIndexed { index, start ->
         listOf(
             "heuristicStart.$index.requiredWork" to "${start.requiredWork}",
@@ -424,15 +427,17 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
                 "\"message\":${it.message?.let(::diagnosticString) ?: "null"},\"trace\":${diagnosticString(it.trace)}}"
         }
     }
-    val phases = stats.portfolio.arms.flatMap { arm -> arm.phases.map { phase ->
-        "armPhase.${arm.label}.${phase.phase}" to
-            "segments=${phase.segments} work=${phase.work} ns=${phase.nanos} " +
-            "checks=${phase.checks} checkNs=${phase.checkingNanos} incumbents=${phase.incumbents} " +
-            "closures=${phase.closures} initNs=${phase.initializationNanos} initWork=${phase.initializationWork} " +
-            "preparationNs=${phase.preparationNanos}" + phase.credit.entries.joinToString("") {
-                " ${it.key}=${round4(it.value)}"
-            }
-    } }
+    val phases = stats.portfolio.arms.flatMap { arm ->
+        arm.phases.map { phase ->
+            "armPhase.${arm.label}.${phase.phase}" to
+                "segments=${phase.segments} work=${phase.work} ns=${phase.nanos} " +
+                "checks=${phase.checks} checkNs=${phase.checkingNanos} incumbents=${phase.incumbents} " +
+                "closures=${phase.closures} initNs=${phase.initializationNanos} initWork=${phase.initializationWork} " +
+                "preparationNs=${phase.preparationNanos}" + phase.credit.entries.joinToString("") {
+                    " ${it.key}=${round4(it.value)}"
+                }
+        }
+    }
     val lifecycle = stats.portfolio.arms.map { arm ->
         val life = arm.lifecycle
         "armLifecycle.${arm.label}" to
@@ -444,7 +449,10 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
             "imports=${life.incumbentImports} uses=${life.incumbentUses}"
     }
     val alns = stats.alns
-    val inner = if (alns == AlnsStats()) emptyList() else listOf(
+    val inner = if (alns == AlnsStats()) {
+        emptyList()
+    } else {
+        listOf(
         "alnsBootstrapCpNodes" to "${alns.bootstrapCpNodes}",
         "alnsBootstrapLsMoves" to "${alns.bootstrapLsMoves}",
         "alnsRepairCpNodes" to "${alns.repairCpNodes}",
@@ -454,6 +462,7 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
         "alnsBootstrapLsMillis" to "${alns.bootstrapLsMillis}",
         "alnsRepairMillis" to "${alns.repairMillis}",
     )
+    }
     return listOfNotNull(profile, reseeding) + slices + proofs + starts + schedule + phases + lifecycle +
         failures + inner
 }

@@ -23,12 +23,18 @@ internal fun trajectoryModel(bytes: ByteArray, format: String): TrajectoryModel 
     "xcsp3" -> Xcsp3.parse(bytes.decodeToString()).let {
         TrajectoryModel(it.problem, it.objective, it.intVarNames, it.sense, it.definedVars, it.definitionHints)
     }
+
     "mps" -> Mps.parse(bytes.decodeToString()).toProblem().let {
         require(it.sourceExact && it.floatColumns == 0 && it.model.numRealVars == 0 && !it.maximize) {
             "MPS trajectories require an exactly retained pure integer minimization model"
         }
-        TrajectoryModel(it.model, it.objective, it.columns.associate { column -> column.name to column.id },
-            ObjectiveSense.MINIMIZE)
+        TrajectoryModel(
+            it.model,
+            it.objective,
+            it.columns.associate { column -> column.name to column.id },
+            ObjectiveSense.MINIMIZE,
+        )
     }
+
     else -> error("unsupported trajectory format: $format")
 }

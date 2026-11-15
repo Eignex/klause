@@ -30,8 +30,10 @@ class MpsModeNumericalStatusTest(
     fun `completed MPS optimization should report the configured certification scope`() {
         val source = File.createTempFile("mps-numerical-status", ".mps").apply {
             val integer = if (mixed) " M0 'MARKER' 'INTORG'\n I COST 0\n M1 'MARKER' 'INTEND'\n" else ""
-            writeText("OBJSENSE\n ${if (maximize) "MAX" else "MIN"}\nROWS\n N COST\nCOLUMNS\n" +
-                integer + " X COST 1\nBOUNDS\n LO B X 1\n UP B X 2\nENDATA\n")
+            writeText(
+                "OBJSENSE\n ${if (maximize) "MAX" else "MIN"}\nROWS\n N COST\nCOLUMNS\n" +
+                integer + " X COST 1\nBOUNDS\n LO B X 1\n UP B X 2\nENDATA\n"
+            )
         }
         val bytes = ByteArrayOutputStream()
         val previous = System.out

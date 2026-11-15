@@ -51,7 +51,8 @@ internal object SourceEncoderReuseProfile {
         require(repeats > 0 && warmups >= 0)
         out.resolve("runs.jsonl").bufferedWriter().use { writer ->
             repeat(warmups + repeats) { repeat ->
-                for (custom in listOf(false, true)) for (deletion in listOf(false, true)) {
+                for (custom in listOf(false, true)) {
+                    for (deletion in listOf(false, true)) {
                     val report = measure(parsed.source, custom, deletion)
                     val record = buildJsonObject {
                         put("suite", suite)
@@ -67,6 +68,7 @@ internal object SourceEncoderReuseProfile {
                     writer.flush()
                     println(record)
                 }
+                }
             }
         }
     }
@@ -74,7 +76,10 @@ internal object SourceEncoderReuseProfile {
     private fun measure(source: SourceAttachment, custom: Boolean, deletion: Boolean): JsonObject {
         var selections = 0L
         var installations = 0L
-        val providers = if (!custom) FactorProjectionProviders.Default else FactorProjectionProviders(
+        val providers = if (!custom) {
+            FactorProjectionProviders.Default
+        } else {
+            FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
                 selections++
                 val selected = BuiltInEncoderProvider.select(factor, target)
@@ -84,17 +89,32 @@ internal object SourceEncoderReuseProfile {
                 }
             },
         )
+        }
         val stop = ExecutionControl.after(3.seconds)
         val started = System.nanoTime()
-        val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK, providers = providers, cancellation = stop))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+            providers = providers,
+            cancellation = stop,
+        )
+        )
         val setupNs = System.nanoTime() - started
         val setupSelections = selections
         val setupInstallations = installations
         val budget = PresolveBudget(1_000_000L)
-        val result = SourceSetup.execute(SourceExecutionRequest(invocation, ExecutionOptions.parse(emptyList()),
-            randomSeed = 3L, timeout = stop, presolveBudget = budget,
-            presolveConfig = if (deletion) PresolveConfig.parse("off,+dependent-rows") else PresolveConfig.NONE))
+        val result = SourceSetup.execute(
+            SourceExecutionRequest(
+            invocation,
+            ExecutionOptions.parse(emptyList()),
+            randomSeed = 3L,
+            timeout = stop,
+            presolveBudget = budget,
+            presolveConfig = if (deletion) PresolveConfig.parse("off,+dependent-rows") else PresolveConfig.NONE,
+        )
+        )
         val totalNs = System.nanoTime() - started
         val native = ((result as SourceExecutionResult.Linear).result as OpenTheoryExecution.Satisfy).result
         return buildJsonObject {
@@ -112,11 +132,14 @@ internal object SourceEncoderReuseProfile {
                 put("executeEncoderSelections", selections - setupSelections)
                 put("executeEncoderInstallations", installations - setupInstallations)
             }
-            put("stages", buildJsonObject {
+            put(
+                "stages",
+                buildJsonObject {
                 for ((stage, entries) in budget.preparationStages.groupBy { it.stage }) {
                     put(stage.name, entries.sumOf { it.elapsed.inWholeNanoseconds })
                 }
-            })
+            }
+            )
         }
     }
 }

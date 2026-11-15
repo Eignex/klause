@@ -103,14 +103,14 @@ internal object EqualityKernelReplay {
                             put(
                                 "consumed",
                                 consumed?.let {
-                                buildJsonObject {
-                                    put("preparedInputs", JsonArray(it.inputs.map(::JsonPrimitive)))
-                                    put("source", trajectorySource(it.source))
-                                    put("sourceObjective", it.value.toString())
-                                    put("sourceChanges", it.changes)
-                                    put("nativeSourceCheck", true)
-                                }
-                            } ?: JsonNull
+                                    buildJsonObject {
+                                        put("preparedInputs", JsonArray(it.inputs.map(::JsonPrimitive)))
+                                        put("source", trajectorySource(it.source))
+                                        put("sourceObjective", it.value.toString())
+                                        put("sourceChanges", it.changes)
+                                        put("nativeSourceCheck", true)
+                                    }
+                                } ?: JsonNull,
                             )
                         },
                     )

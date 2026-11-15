@@ -60,7 +60,9 @@ internal object MiniZincMode : CliMode {
             // when the objective var is not in the model's `output` section. Off by default — the
             // standard MiniZinc flow renders objectives through solns2out, not this binary.
             FlagSpec(listOf("--output-objective"), false) { outputObjective = true },
-            FlagSpec(listOf("--output-complete-assignment"), false,
+            FlagSpec(
+                listOf("--output-complete-assignment"),
+                false,
                 help = "Include bounded original integer and Boolean coordinates as diagnostic comments",
             ) { completeAssignment = true },
         )
@@ -87,9 +89,13 @@ internal object MiniZincMode : CliMode {
             val applier = oznPath?.let { OznApplier(readTextFile(it)) }
             val render: (Sample) -> String = { sample ->
                 val text = applier?.render(original, sample) ?: writeFlatZincSolution(original, sample, outputObjective)
-                if (completeAssignment) withCompleteAssignment(original, text) {
+                if (completeAssignment) {
+                    withCompleteAssignment(original, text) {
                     writeFlatZincSolution(original.copy(outputItems = null), sample, true)
-                } else text
+                }
+                } else {
+                    text
+                }
             }
 
             val objective = original.linearObjective()
@@ -138,9 +144,13 @@ internal object MiniZincMode : CliMode {
             return preparedSourceSolvable(invocation, render, { assignment ->
                 val text = applier?.render(original, assignment)
                     ?: writeFlatZincSolution(original, assignment, outputObjective)
-                if (completeAssignment) withCompleteAssignment(original, text) {
+                if (completeAssignment) {
+                    withCompleteAssignment(original, text) {
                     writeFlatZincSolution(original.copy(outputItems = null), assignment, true)
-                } else text
+                }
+                } else {
+                    text
+                }
             }, lpStats, elapsed)
         }
 
@@ -153,9 +163,12 @@ internal object MiniZincMode : CliMode {
             val decline = when {
                 program.floatVarsByName.isNotEmpty() || program.setVarsByName.isNotEmpty() ->
                     "integer and Boolean coordinates required"
+
                 count > 65_536 -> "coordinate limit"
+
                 (program.boolVarsByName.keys.asSequence() + program.intVarsByName.keys.asSequence())
                     .sumOf { it.length.toLong() } > 4 * 1024 * 1024 -> "name limit"
+
                 else -> null
             }
             val point = if (decline == null) renderPoint().removeSuffix("----------\n") else null
@@ -267,8 +280,11 @@ internal class MiniZincOutput(
         if (realScopeChanged) {
             println("% klause-source-claim: caller real bounds; no default-source proof")
         }
-        val qualified = flatZincSourceVerdict(verdict, declarationScopeChanged ||
-            (floatApproximation && verdict == Verdict.UNBOUNDED))
+        val qualified = flatZincSourceVerdict(
+            verdict,
+            declarationScopeChanged ||
+                (floatApproximation && verdict == Verdict.UNBOUNDED),
+        )
         when (qualified) {
             Verdict.SATISFIABLE, Verdict.OPTIMAL -> println("==========")
 

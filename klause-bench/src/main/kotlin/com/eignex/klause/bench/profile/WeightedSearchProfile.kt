@@ -44,8 +44,14 @@ internal object WeightedSearchProfile {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys.all { it in setOf("suite", "problem", "sha256", "format", "policy", "timeout-ms",
-            "work", "slice-work", "seed") })
+        require(
+            options.keys.all {
+            it in setOf(
+                "suite", "problem", "sha256", "format", "policy", "timeout-ms",
+                "work", "slice-work", "seed",
+            )
+        }
+        )
         val suite = requireNotNull(options["suite"])
         val problem = requireNotNull(options["problem"])
         val hash = requireNotNull(options["sha256"])
@@ -78,10 +84,17 @@ internal object WeightedSearchProfile {
         }
         require(source.numIntVars == 0 && source.numRealVars == 0)
         val budget = PresolveBudget(100_000_000L)
-        val prepared = FinitePipeline.prepare(FinitePipelineRequest(
-            source, FiniteEngine.BACKTRACK, objective, cancellation = stop, solveCancellation = stop,
-            presolveBudget = budget, randomSeed = seed,
-        ))
+        val prepared = FinitePipeline.prepare(
+            FinitePipelineRequest(
+            source,
+            FiniteEngine.BACKTRACK,
+            objective,
+            cancellation = stop,
+            solveCancellation = stop,
+            presolveBudget = budget,
+            randomSeed = seed,
+        )
+        )
         val model = prepared.problem as? BakedProblem
         val preparationNanos = System.nanoTime() - opened
         val original = source.bake(stop)
@@ -100,7 +113,8 @@ internal object WeightedSearchProfile {
                 val floor = stats.lowerBound.toString()
                 previousCores = stats.cores
                 previousQueries = queries
-                output.appendLine(buildJsonObject {
+                output.appendLine(
+                    buildJsonObject {
                     put("event", event)
                     put("elapsedNs", System.nanoTime() - opened)
                     put("floor", floor)
@@ -116,23 +130,40 @@ internal object WeightedSearchProfile {
                     put("nodes", live.stats.search.nodes.sum)
                     put("propagationVisits", live.stats.search.propagationWork.sum)
                     for ((name, field) in fields) put(name, field.getLong(live))
-                }.toString())
+                }.toString()
+                )
                 output.flush()
             }
-            val observing = stop or ExecutionControl { observe("bound"); false }
-            val params = BacktrackParams(randomSeed = seed, cancellation = observing,
-                objectiveLowerBoundSink = { observe("bound") })
+            val observing = stop or ExecutionControl {
+                observe("bound");
+                false
+            }
+            val params = BacktrackParams(
+                randomSeed = seed,
+                cancellation = observing,
+                objectiveLowerBoundSink = { observe("bound") },
+            )
             var result: MinimizeResult? = null
             var checked = 0
             var slices = 0L
             var witnessValues = 0L
             if (model != null && !stop()) {
-                val live = constructor.newInstance(model, prepared.objective, params, policy == "stratified",
-                    maximumWork, timeout, TimeSource.Monotonic, CoreQueryProfile.refinementMode(when (policy) {
-                        "reasons" -> "REASONS"
-                        "deletion" -> "DELETION"
-                        else -> "NONE"
-                    })) as ResumableSearch
+                val live = constructor.newInstance(
+                    model,
+                    prepared.objective,
+                    params,
+                    policy == "stratified",
+                    maximumWork,
+                    timeout,
+                    TimeSource.Monotonic,
+                    CoreQueryProfile.refinementMode(
+                        when (policy) {
+                            "reasons" -> "REASONS"
+                            "deletion" -> "DELETION"
+                            else -> "NONE"
+                        },
+                    ),
+                ) as ResumableSearch
                 handle = live
                 live.use {
                     while (result == null && !stop()) {
@@ -147,18 +178,31 @@ internal object WeightedSearchProfile {
                             }
                             witnessValues += values
                             witness = "incumbent-${checked + 1}.json"
-                            Reports.writeJson(out.resolve(requireNotNull(witness)).path, buildJsonObject {
+                            Reports.writeJson(
+                                out.resolve(requireNotNull(witness)).path,
+                                buildJsonObject {
                                 put("sourceSha256", hash)
                                 put("objectiveExact", incumbent)
-                                put("originalBooleanValues", JsonArray((0 until sourceBooleans).map {
+                                put(
+                                    "originalBooleanValues",
+                                    JsonArray(
+                                        (0 until sourceBooleans).map {
                                     JsonPrimitive(point.boolValue(it))
-                                }))
-                                put("loweredBooleanValues", JsonArray((0 until source.numBoolVars).map {
+                                }
+                                    )
+                                )
+                                put(
+                                    "loweredBooleanValues",
+                                    JsonArray(
+                                        (0 until source.numBoolVars).map {
                                     JsonPrimitive(point.boolValue(it))
-                                }))
+                                }
+                                    )
+                                )
                                 put("coordinateOrder", "source variable i+1 at index i")
                                 put("validation", "native-original-source")
-                            })
+                            }
+                            )
                             checked++
                             observe("accepted-incumbent", true)
                         }
@@ -167,7 +211,9 @@ internal object WeightedSearchProfile {
                 }
                 observe("closed", true)
             }
-            Reports.writeJson(out.resolve("summary.json").path, buildJsonObject {
+            Reports.writeJson(
+                out.resolve("summary.json").path,
+                buildJsonObject {
                 put("suite", suite)
                 put("problem", problem)
                 put("sourceSha256", sha256(bytes))
@@ -190,7 +236,8 @@ internal object WeightedSearchProfile {
                 put("elapsedNsIncludingClose", System.nanoTime() - opened)
                 put("sourceCheck", "native-Boolean-point-propagation")
                 put("independentProofCheck", false)
-            })
+            }
+            )
         }
     }
 }

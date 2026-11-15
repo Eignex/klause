@@ -5,10 +5,7 @@ import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.util.numbers.BIG_ONE
 
-internal fun OutputProtocol.sourceQualified(
-    semantics: EffectiveSourceSemantics?,
-    comment: String,
-): OutputProtocol {
+internal fun OutputProtocol.sourceQualified(semantics: EffectiveSourceSemantics?, comment: String): OutputProtocol {
     if (semantics == null || !semantics.hasOverrides) return this
     val delegate = this
     return object : OutputProtocol by delegate {
@@ -26,7 +23,9 @@ private fun sourcePolicyText(semantics: EffectiveSourceSemantics): String = buil
     add("overrides=true")
     when (val floats = source.floats) {
         null -> Unit
+
         FloatSemantics.Continuous -> add("floats=continuous")
+
         is FloatSemantics.Grid -> {
             add("floats=grid")
             add("buckets=${floats.buckets}")

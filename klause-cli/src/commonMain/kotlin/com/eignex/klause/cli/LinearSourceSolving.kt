@@ -90,10 +90,10 @@ internal fun solveLinearSource(
     val stats = nativeStats.copy(presolve = result.preparationStats ?: nativeStats.presolve)
     output.onVerdictContext(
         VerdictContext(
-        budgetExhausted = stats.run.timedOut,
-        terminationReason = result.linearSourceReason(),
-        completePool = result.completeSearchAdmitted,
-    )
+            budgetExhausted = stats.run.timedOut,
+            terminationReason = result.linearSourceReason(),
+            completePool = result.completeSearchAdmitted,
+        ),
     )
     val solutions = if (solvable.optimize) publication.solutions else points
     val hasPoint = solutions > 0L
@@ -120,22 +120,27 @@ internal fun solveLinearSource(
     )
     if (!common.statistics) return
     qualified.nativeObjectiveBound?.let { bound ->
-        output.onAllowanceStatistics(listOf(
+        output.onAllowanceStatistics(
+            listOf(
             "nativeNominalObjectiveBound" to bound.value.toString(),
-            "nativeNominalObjectiveBoundDirection" to if (bound.sense == ObjectiveSense.MINIMIZE)
-                "lower" else "upper",
+            "nativeNominalObjectiveBoundDirection" to if (bound.sense == ObjectiveSense.MINIMIZE) {
+                "lower"
+            } else {
+                "upper"
+            },
             "nativeNominalObjectiveBoundStrict" to bound.strict.toString(),
             "nativeNominalObjectiveBoundScope" to "nominal-source",
             "nativeNominalObjectiveBoundCoversTolerance" to qualified.claimsCoverTolerance.toString(),
-        ))
+        )
+        )
     }
     output.onAllowanceStatistics(
         listOf(
-        "sourceConclusion" to qualified.conclusion.name.lowercase(),
-        "nativeConclusion" to qualified.nativeConclusion.name.lowercase(),
-        "nativeClaimsUnrestricted" to qualified.nativeClaimsUnrestricted.toString(),
-        "sourceObjectiveScale" to qualified.objectiveScale.toString(),
-    )
+            "sourceConclusion" to qualified.conclusion.name.lowercase(),
+            "nativeConclusion" to qualified.nativeConclusion.name.lowercase(),
+            "nativeClaimsUnrestricted" to qualified.nativeClaimsUnrestricted.toString(),
+            "sourceObjectiveScale" to qualified.objectiveScale.toString(),
+        ),
     )
     val sourceStats = stats.copy(
         ls = stats.ls.copy(incumbentObjective = qualified.incumbent?.objective?.toDouble() ?: Double.NaN),

@@ -27,15 +27,23 @@ class CorpusFilesTest {
             var cleanupNanos: Long? = null
 
             assertFailsWith<InterruptedIOException> {
-                CorpusFiles.withPlainFile(packed, checkActive = {
-                    val output = staging.walkTopDown().firstOrNull { it.isFile && it.length() > 0L }
-                    if (output != null) {
-                        partial = output
-                        if (interrupt) Thread.currentThread().interrupt()
-                        else throw InterruptedIOException("cancelled")
-                    }
-                }, onCleanup = { cleanupNanos = it }, stagingDirectory = staging,
-                    bufferBytes = bufferBytes) { error("cancelled source") }
+                CorpusFiles.withPlainFile(
+                    packed,
+                    checkActive = {
+                        val output = staging.walkTopDown().firstOrNull { it.isFile && it.length() > 0L }
+                        if (output != null) {
+                            partial = output
+                            if (interrupt) {
+                                Thread.currentThread().interrupt()
+                            } else {
+                                throw InterruptedIOException("cancelled")
+                            }
+                        }
+                    },
+                    onCleanup = { cleanupNanos = it },
+                    stagingDirectory = staging,
+                    bufferBytes = bufferBytes,
+                ) { error("cancelled source") }
             }
 
             assertTrue(partial != null)
@@ -58,8 +66,11 @@ class CorpusFilesTest {
             val body = ByteArray(130_003) { (it % 251).toByte() }
             val packed = CorpusFiles.compress(File(root, "inst.cnf").apply { writeBytes(body) })
 
-            val observed = CorpusFiles.withPlainFile(packed, stagingDirectory = File(root, "staging"),
-                bufferBytes = bufferBytes) { it.readBytes() }
+            val observed = CorpusFiles.withPlainFile(
+                packed,
+                stagingDirectory = File(root, "staging"),
+                bufferBytes = bufferBytes,
+            ) { it.readBytes() }
 
             assertContentEquals(body, observed)
         } finally {
@@ -74,8 +85,11 @@ class CorpusFilesTest {
             val packed = CorpusFiles.compress(File(root, "inst.cnf").apply { writeText("p cnf 0 0\n") })
             val staging = File(root, "staging")
 
-            CorpusFiles.withPlainFile(packed, stagingDirectory = staging,
-                onCleanupStart = { error("observation unavailable") }) { assertTrue(it.isFile) }
+            CorpusFiles.withPlainFile(
+                packed,
+                stagingDirectory = staging,
+                onCleanupStart = { error("observation unavailable") },
+            ) { assertTrue(it.isFile) }
 
             assertTrue(staging.listFiles().orEmpty().isEmpty())
         } finally {
@@ -146,7 +160,6 @@ class CorpusFilesTest {
             root.deleteRecursively()
         }
     }
-
 
     @Test
     fun `readText should return the plain text of a compressed instance`() {

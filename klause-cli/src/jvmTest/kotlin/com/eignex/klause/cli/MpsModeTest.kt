@@ -36,10 +36,17 @@ class MpsModeTest {
         val source = listOf(File(relative), File("../$relative")).first { it.isFile }
 
         val text = capture {
-            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "-s", "--exact",
+            assertEquals(
+                0,
+                runCli(
+                    arrayOf(
+                        "-e", "cp", "-p", "1", "-s", "--exact",
                 "--presolve", "off,+lp-harvest", "--lp", "aggressive,-cuts,preparation=disabled",
                 "--param", "lp-component-ownership=true", "--param", "bt-arm=lp-aggressive",
-                "--param", "arms=1", "-r", "3", "--param", "max-decisions=1000", source.absolutePath)))
+                "--param", "arms=1", "-r", "3", "--param", "max-decisions=1000", source.absolutePath,
+                    )
+                )
+            )
         }
 
         assertTrue("s OPTIMUM FOUND" in text.lines(), text)
@@ -56,10 +63,17 @@ class MpsModeTest {
         val source = listOf(File(relative), File("../$relative")).first { it.isFile }
 
         val text = capture {
-            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "-s", "--exact",
+            assertEquals(
+                0,
+                runCli(
+                    arrayOf(
+                        "-e", "cp", "-p", "1", "-s", "--exact",
                 "--presolve", "off,+lp-harvest", "--lp", "aggressive,-cuts",
                 "--param", "lp-component-ownership=true", "--param", "bt-arm=lp-aggressive",
-                "--param", "arms=1", "-r", "3", "--param", "max-decisions=1000", source.absolutePath)))
+                "--param", "arms=1", "-r", "3", "--param", "max-decisions=1000", source.absolutePath,
+                    )
+                )
+            )
         }
 
         assertTrue("s OPTIMUM FOUND" in text.lines(), text)
@@ -86,10 +100,17 @@ class MpsModeTest {
         val source = listOf(File(relative), File("../$relative")).first { it.isFile }
 
         val text = capture {
-            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "-s", "--exact", "--presolve", "off",
+            assertEquals(
+                0,
+                runCli(
+                    arrayOf(
+                        "-e", "cp", "-p", "1", "-s", "--exact", "--presolve", "off",
                 "--lp", "aggressive,-cuts", "--param", "lp-component-ownership=true",
                 "--param", "bt-arm=lp-aggressive", "--param", "arms=1", "-r", "3",
-                "--param", "max-decisions=1000", source.absolutePath)))
+                "--param", "max-decisions=1000", source.absolutePath,
+                    )
+                )
+            )
         }
 
         assertTrue("s OPTIMUM FOUND" in text.lines(), text)
@@ -136,8 +157,15 @@ class MpsModeTest {
             deleteOnExit()
         }
         val text = capture {
-            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "--source-absolute-tolerance", "1",
-                "--source-relative-tolerance", "0", source.absolutePath)))
+            assertEquals(
+                0,
+                runCli(
+                    arrayOf(
+                        "-e", "cp", "-p", "1", "--source-absolute-tolerance", "1",
+                "--source-relative-tolerance", "0", source.absolutePath,
+                    )
+                )
+            )
         }
 
         assertTrue("s OPTIMUM FOUND" in text.lines(), text)
@@ -172,8 +200,10 @@ class MpsModeTest {
             deleteOnExit()
         }
         val common = CommonOptions()
-        parseArgs(arrayOf("--exact", "--unbounded-int-lo", "2", "--unbounded-int-hi", "3"),
-            commonFlagSpecs(common)) {}
+        parseArgs(
+            arrayOf("--exact", "--unbounded-int-lo", "2", "--unbounded-int-hi", "3"),
+            commonFlagSpecs(common),
+        ) {}
         val session = MpsMode.newSession()
         val loaded = session.load(input.absolutePath, common)
         val output = session.output(common)
@@ -184,7 +214,8 @@ class MpsModeTest {
 
         val text = capture {
             ArithmeticPublication(output).publish(
-                pipeline.render(point), SourceValue.Rational(checkNotNull(point.objective)),
+                pipeline.render(point),
+                SourceValue.Rational(checkNotNull(point.objective)),
             )
             output.onComplete(Verdict.OPTIMAL)
         }
@@ -199,13 +230,17 @@ class MpsModeTest {
     @Test
     fun `MPS caller declaration defaults should qualify source refutations`() {
         val input = File.createTempFile("mps-effective-refutation", ".mps").apply {
-            writeText("ROWS\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R 1\n" +
-                " M1 'MARKER' 'INTEND'\nRHS\n RHS R 1\nENDATA")
+            writeText(
+                "ROWS\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R 1\n" +
+                    " M1 'MARKER' 'INTEND'\nRHS\n RHS R 1\nENDATA",
+            )
             deleteOnExit()
         }
         val common = CommonOptions()
-        parseArgs(arrayOf("--exact", "--unbounded-int-lo", "2", "--unbounded-int-hi", "open"),
-            commonFlagSpecs(common)) {}
+        parseArgs(
+            arrayOf("--exact", "--unbounded-int-lo", "2", "--unbounded-int-hi", "open"),
+            commonFlagSpecs(common),
+        ) {}
         val session = MpsMode.newSession()
         val loaded = session.load(input.absolutePath, common)
 
@@ -224,8 +259,10 @@ class MpsModeTest {
             deleteOnExit()
         }
         val common = CommonOptions()
-        parseArgs(arrayOf("--exact", "--unbounded-real-lo", "1/3", "--unbounded-real-hi", "1/3"),
-            commonFlagSpecs(common)) {}
+        parseArgs(
+            arrayOf("--exact", "--unbounded-real-lo", "1/3", "--unbounded-real-hi", "1/3"),
+            commonFlagSpecs(common),
+        ) {}
         val session = MpsMode.newSession()
         val loaded = session.load(input.absolutePath, common)
         val value = BigFraction.ofLong(3).reciprocal()
@@ -237,7 +274,8 @@ class MpsModeTest {
 
         val text = capture {
             ArithmeticPublication(output).publish(
-                pipeline.render(point), SourceValue.Rational(checkNotNull(point.objective)),
+                pipeline.render(point),
+                SourceValue.Rational(checkNotNull(point.objective)),
             )
             output.onComplete(Verdict.SATISFIABLE)
         }
@@ -296,7 +334,8 @@ class MpsModeTest {
 
         val text = capture {
             ArithmeticPublication(output).publish(
-                pipeline.render(point), SourceValue.Rational(checkNotNull(point.objective)),
+                pipeline.render(point),
+                SourceValue.Rational(checkNotNull(point.objective)),
             )
             output.onComplete(Verdict.BEST_FOUND)
         }
@@ -384,7 +423,8 @@ class MpsModeTest {
             val text = capture {
                 point?.let {
                     ArithmeticPublication(output).publish(
-                        pipeline.render(it), SourceValue.Rational(checkNotNull(it.objective)),
+                        pipeline.render(it),
+                        SourceValue.Rational(checkNotNull(it.objective)),
                     )
                 }
                 output.onComplete(Verdict.BEST_FOUND)
@@ -490,16 +530,21 @@ class MpsModeTest {
             val pipeline = assertIs<SourceRendering.LinearSource>(loaded.rendering)
             val original = assertIs<LinearSourceProblem>(pipeline.invocation.source.originalSource)
             val backing = pipeline.invocation.finiteShape().problem
-            val point = assertNotNull(original.checkMpsWitness(
+            val point = assertNotNull(
+                original.checkMpsWitness(
                 original.variables.map { if (it.integer) BigFraction.ONE else BigFraction.ofLong(5) },
-            ))
+            )
+            )
 
             assertEquals(listOf(realFirst, !realFirst), original.variables.map { !it.integer })
             assertEquals(2, backing.numIntVars)
             assertEquals(0, backing.numRealVars)
-            assertEquals(setOf(0L to 1L, 2L to 5L), (0 until backing.numIntVars).map {
+            assertEquals(
+                setOf(0L to 1L, 2L to 5L),
+                (0 until backing.numIntVars).map {
                 backing.intBounds.lower(it) to backing.intBounds.upper(it)
-            }.toSet())
+            }.toSet()
+            )
             assertEquals(BigFraction.ofLong(5), point.objective)
             assertEquals(if (realFirst) "v Z=5 X=1" else "v X=1 Z=5", pipeline.render(point))
         }
@@ -805,14 +850,18 @@ class MpsModeTest {
 
     @Test
     fun `float rendering should check zero reconstruction against source rows`() {
-        val source = assertNotNull(Mps.parse(
+        val source = assertNotNull(
+            Mps.parse(
             "ROWS\n N COST\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1 R -1\n" +
                 " M1 'MARKER' 'INTEND'\n X R 1\nRHS\n RHS R 0\nBOUNDS\n BV B I\n LO B X 0\nENDATA",
-        ).toLinearSourceProblem())
+        ).toLinearSourceProblem()
+        )
         for (residual in listOf(-5e-14, 5e-14)) {
-            val point = assertNotNull(source.checkMpsWitness(
+            val point = assertNotNull(
+                source.checkMpsWitness(
                 listOf(BigFraction.ZERO, assertNotNull(BigFraction.ofDouble(residual))),
-            ))
+            )
+            )
 
             val rendered = renderMpsSourceWitness(point, reconstruct = true)
 
@@ -822,10 +871,12 @@ class MpsModeTest {
 
     @Test
     fun `zero reconstruction should preserve a nonzero source equality`() {
-        val source = assertNotNull(Mps.parse(
+        val source = assertNotNull(
+            Mps.parse(
             "ROWS\n N COST\n E R\nCOLUMNS\n X COST 0 R 1\nRHS\n RHS R 0.00000000000001\n" +
                 "BOUNDS\n LO B X 0\nENDATA",
-        ).toLinearSourceProblem())
+        ).toLinearSourceProblem()
+        )
         val value = assertNotNull(BigFraction.ofDouble(1e-14))
         val point = assertNotNull(source.checkMpsWitness(listOf(value)))
 
@@ -836,8 +887,10 @@ class MpsModeTest {
 
     @Test
     fun `zero reconstruction should preserve the source objective at the float point`() {
-        val source = assertNotNull(Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1\nBOUNDS\n LO B X 0\nENDATA")
-            .toLinearSourceProblem())
+        val source = assertNotNull(
+            Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1\nBOUNDS\n LO B X 0\nENDATA")
+                .toLinearSourceProblem(),
+        )
         val value = assertNotNull(BigFraction.ofDouble(-5e-14))
         val point = assertNotNull(source.checkMpsWitness(listOf(value)))
 
@@ -848,15 +901,19 @@ class MpsModeTest {
 
     @Test
     fun `source-invalid display points should be rejected before rendering`() {
-        val source = assertNotNull(Mps.parse(
+        val source = assertNotNull(
+            Mps.parse(
             "ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 3.0000000000000001\nRHS\n RHS R 1\nENDATA",
-        ).toLinearSourceProblem())
+        ).toLinearSourceProblem()
+        )
         val value = assertNotNull(BigFraction.ofDouble(-5e-14))
 
         val point = source.checkMpsWitness(listOf(value))
 
-        assertEquals(SemanticRational.of(bigIntOf(30000000000000001L), bigIntOf(10000000000000000L)),
-            source.rows.single().terms.single().coefficient)
+        assertEquals(
+            SemanticRational.of(bigIntOf(30000000000000001L), bigIntOf(10000000000000000L)),
+            source.rows.single().terms.single().coefficient,
+        )
         assertNull(point)
     }
 
@@ -1053,7 +1110,8 @@ class MpsModeTest {
         val text = capture {
             point?.let {
                 ArithmeticPublication(output).publish(
-                    pipeline.render(it), SourceValue.Rational(checkNotNull(it.objective)),
+                    pipeline.render(it),
+                    SourceValue.Rational(checkNotNull(it.objective)),
                 )
             }
             output.onComplete(Verdict.BEST_FOUND)

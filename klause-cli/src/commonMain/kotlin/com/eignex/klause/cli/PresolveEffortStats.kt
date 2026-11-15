@@ -10,5 +10,4 @@ internal fun presolveEffortStats(
     config: PresolveConfig,
     budget: PresolveBudget?,
     elapsed: Duration,
-): PresolveEffortStats =
-    config.effortStats(budget, elapsed)
+): PresolveEffortStats = config.effortStats(budget, elapsed)

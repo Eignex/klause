@@ -63,10 +63,14 @@ internal object TaskOrderProfile {
     fun main(args: Array<String>) {
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
-        out.resolve("runtime.txt").writeText(listOf(
-            System.getProperty("os.name"), System.getProperty("os.arch"), System.getProperty("java.version"),
+        out.resolve("runtime.txt").writeText(
+            listOf(
+            System.getProperty("os.name"),
+            System.getProperty("os.arch"),
+            System.getProperty("java.version"),
             ManagementFactory.getRuntimeMXBean().inputArguments.toString(),
-        ).joinToString("\n"))
+        ).joinToString("\n")
+        )
         if (args.firstOrNull() == "mode=source") {
             inspectSource(args.drop(1).toTypedArray(), out)
             return
@@ -89,13 +93,7 @@ internal object TaskOrderProfile {
         if (args.isNotEmpty()) inspectSource(args, out)
     }
 
-    private fun capture(
-        source: Problem,
-        name: String,
-        arm: Arm,
-        out: File,
-        annotated: BacktrackParams? = null,
-    ) {
+    private fun capture(source: Problem, name: String, arm: Arm, out: File, annotated: BacktrackParams? = null) {
         val directory = out.resolve("$name/${arm.name}").apply { mkdirs() }
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
         bean.isThreadAllocatedMemoryEnabled = true
@@ -104,24 +102,36 @@ internal object TaskOrderProfile {
         val started = System.nanoTime()
         val stop = ExecutionControl.after(5.seconds)
         val model = if (arm.orders) withOrderPair(source) else source
-        val prepared = PresolvePipeline.run(model, null, PresolveConfig.parse(arm.prepare),
-            solutionSetSensitive = false, cancellation = stop, randomSeed = 1)
+        val prepared = PresolvePipeline.run(
+            model,
+            null,
+            PresolveConfig.parse(arm.prepare),
+            solutionSetSensitive = false,
+            cancellation = stop,
+            randomSeed = 1,
+        )
         val baked = prepared.problem.bake(cancellation = stop)
         val preparationNs = System.nanoTime() - started
         val trace = ArrayList<String>()
         val base = annotated ?: BacktrackParams(variableSelector = arm.variables, valueSelector = arm.values)
         val values = TracedValues(base.valueSelector, trace)
         val variables = if (arm.orders && model !== source) PairFirst(source.numBoolVars) else base.variableSelector
-        val result = BacktrackSolver(baked).solve(base.copy(
-            maxDecisions = DECISIONS, randomSeed = 1, cancellation = stop, valueSelector = values,
+        val result = BacktrackSolver(baked).solve(
+            base.copy(
+            maxDecisions = DECISIONS,
+            randomSeed = 1,
+            cancellation = stop,
+            valueSelector = values,
             variableSelector = variables,
             lpConfig = if (arm.lp) LpConfig.AGGRESSIVE else null,
-        ))
+        )
+        )
         val solveNs = System.nanoTime() - started - preparationNs
         val sample = (result as? SolveResult.Sat)?.assignment?.let(prepared.reconstruct)
         val checked = sample?.let { FiniteConflictSelection.checkSource(model.bake(cancellation = stop), it, stop) }
         directory.resolve("trace.json").writeText(JsonArray(trace.map(::JsonPrimitive)).toString())
-        directory.resolve("summary.json").writeText(buildJsonObject {
+        directory.resolve("summary.json").writeText(
+            buildJsonObject {
             put("revision", Reports.readGitSha())
             put("source", name)
             put("arm", arm.name)
@@ -132,8 +142,13 @@ internal object TaskOrderProfile {
             put("addedOrderBooleans", model.numBoolVars - source.numBoolVars)
             put("addedOrderFactors", model.factors.size - source.factors.size)
             put("preparedUnaryFactors", baked.factors.filterIsInstance<Cumulative>().count { it.unary })
-            put("preparedUnaryShapes", JsonArray(baked.factors.filterIsInstance<Cumulative>()
-                .filter { it.unary }.map { JsonPrimitive(unaryShape(it)) }))
+            put(
+                "preparedUnaryShapes",
+                JsonArray(
+                    baked.factors.filterIsInstance<Cumulative>()
+                .filter { it.unary }.map { JsonPrimitive(unaryShape(it)) }
+                )
+            )
             put("preparedDifferenceSystems", baked.factors.count { it.javaClass.simpleName == "DifferenceSystem" })
             put("preparedFactors", baked.factors.size)
             put("preparationNs", preparationNs)
@@ -149,7 +164,8 @@ internal object TaskOrderProfile {
             put("propagationWork", result.stats.search.propagationWork.sum)
             put("traceCapped", trace.size >= TRACE_LIMIT)
             put("deadlineReached", stop())
-        }.toString())
+        }.toString()
+        )
     }
 
     private fun prefixes(source: Problem, name: String, out: File) {
@@ -210,7 +226,8 @@ internal object TaskOrderProfile {
         compiler.compileOutput(reference).copyTo(out.resolve("source.ozn"))
         Reports.writeJson(out.resolve("compiler.json").path, MiniZincCompatibility.compiler)
         val source = resolved.problem
-        out.resolve("source-shape.json").writeText(buildJsonObject {
+        out.resolve("source-shape.json").writeText(
+            buildJsonObject {
             put("suite", options.getValue("suite"))
             put("problem", reference.name)
             put("modelSha256", options.getValue("modelSha256"))
@@ -220,11 +237,14 @@ internal object TaskOrderProfile {
             put("eligiblePairFound", withOrderPair(source).numBoolVars > source.numBoolVars)
             put("objective", resolved.objective.toString())
             put("scope", "satisfaction projection; no objective or original MiniZinc proof claim")
-        }.toString())
+        }.toString()
+        )
         capture(source, "original", Arm("annotated", prepare = "default"), out, resolved.searchParams)
-        for (arm in listOf(Arm("prepared", prepare = "default"),
+        for (arm in listOf(
+            Arm("prepared", prepare = "default"),
             Arm("default-search", prepare = "default", values = IndomainRandom, variables = Vsids()),
-            Arm("orders-prepared", orders = true, prepare = "default"))) {
+            Arm("orders-prepared", orders = true, prepare = "default"),
+        )) {
             capture(source, "original", arm, out)
         }
     }

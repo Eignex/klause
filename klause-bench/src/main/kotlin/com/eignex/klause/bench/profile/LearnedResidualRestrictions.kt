@@ -24,7 +24,6 @@ internal class LearnedResidualInspection(
     val decline: String?,
 ) {
     val complete: Boolean get() = decline == null && entries.size == storeCount && entries.all { it.support != null }
-
 }
 
 // Store positions identify entries only within one observation, including across compaction.
@@ -65,7 +64,9 @@ internal object LearnedResidualRestrictions {
             val kind = if (clause) "Clause" else prop?.javaClass?.simpleName ?: "unknown"
             val literals = when {
                 clause -> clauseLiterals.invoke(session, index) as IntArray
+
                 kind == "PseudoBooleanPropagator" -> field(requireNotNull(prop), "literals") as IntArray
+
                 else -> {
                     terms++
                     entries += LearnedResidualRestriction(index, kind, permanent, null, null, false)
@@ -94,10 +95,18 @@ internal object LearnedResidualRestrictions {
                     false -> Unit
                 }
             }
-            val factor = if (clause) Clause(literals.copyOf()) else
+            val factor = if (clause) {
+                Clause(literals.copyOf())
+            } else {
                 PseudoBoolean(requireNotNull(weights), literals, op, bound)
+            }
             entries += LearnedResidualRestriction(
-                index, kind, permanent, factor, support.sorted(), degree.signum() <= 0,
+                index,
+                kind,
+                permanent,
+                factor,
+                support.sorted(),
+                degree.signum() <= 0,
             )
         }
         return LearnedResidualInspection(entries, count, if (stop()) "interrupted" else null)

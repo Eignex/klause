@@ -32,12 +32,18 @@ class MakeSetsTest {
         assertEquals(
             listOf(
                 mapOf(
-                    "collection" to "c", "problem" to "a,\"b\"", "feasible" to "1",
-                    "proven" to "1", "elapsed_ms" to "5",
+                    "collection" to "c",
+                    "problem" to "a,\"b\"",
+                    "feasible" to "1",
+                    "proven" to "1",
+                    "elapsed_ms" to "5",
                 ),
                 mapOf(
-                    "collection" to "c", "problem" to "p", "feasible" to "",
-                    "proven" to "0", "elapsed_ms" to "7",
+                    "collection" to "c",
+                    "problem" to "p",
+                    "feasible" to "",
+                    "proven" to "0",
+                    "elapsed_ms" to "7",
                 ),
             ),
             rows,
@@ -51,21 +57,21 @@ class MakeSetsTest {
         val problems = (0 until 40).map { "f${it % 4}/p$it" }
         features.resolve("suite.jsonl").writeText(
             "not a problem\n" + problems.joinToString("\n") { p ->
-            """{"collection":"c","problem":"$p","suite":"suite","family":"${p.substringBefore('/')}",""" +
-                """"format":"MZN","themes":["sat","pb"]}"""
-        } + "\n"
+                """{"collection":"c","problem":"$p","suite":"suite","family":"${p.substringBefore('/')}",""" +
+                    """"format":"MZN","themes":["sat","pb"]}"""
+            } + "\n",
         )
         // Ten easy, twenty medium, five hard and five unproven.
         val references = dir.resolve("references.csv")
         references.writeText(
             "collection,problem,feasible,proven,elapsed_ms\n" + problems.mapIndexed { i, p ->
-            when {
-                i < 10 -> "c,$p,1,1,${i * 10}"
-                i < 30 -> "c,$p,1,1,${1000 + i}"
-                i < 35 -> "c,$p,0,1,${20_000 + i}"
-                else -> "c,$p,,0,5"
-            }
-        }.joinToString("\n") + "\n"
+                when {
+                    i < 10 -> "c,$p,1,1,${i * 10}"
+                    i < 30 -> "c,$p,1,1,${1000 + i}"
+                    i < 35 -> "c,$p,0,1,${20_000 + i}"
+                    else -> "c,$p,,0,5"
+                }
+            }.joinToString("\n") + "\n",
         )
         val sets = dir.resolve("sets")
 

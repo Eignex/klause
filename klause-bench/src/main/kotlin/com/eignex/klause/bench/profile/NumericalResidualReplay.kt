@@ -134,8 +134,12 @@ internal object NumericalResidualReplay {
         val session = entry != "scoped"
         val ownerType = Class.forName(ENGINE + if (session) "LpSolveSession" else "LpScopedSolver")
         val constructor = ownerType.constructors.single { it.parameterCount == if (session) 3 else 9 }
-        val prepare = if (session) null else ownerType.methods.single {
+        val prepare = if (session) {
+            null
+        } else {
+            ownerType.methods.single {
             it.name == "prepare" && it.parameterCount == 1
+        }
         }
         val claim = Class.forName(ENGINE + "LpClaim").enumConstants.single {
             it.toString() == "ATTAINED_OPTIMUM"
@@ -145,7 +149,9 @@ internal object NumericalResidualReplay {
         val model = if (session) {
             val meter = Class.forName(ENGINE + "LpProjectionMeter").getConstructor().newInstance()
             requireNotNull(NumericalResidualProfile.call(state, "toWorkingModel", meter))
-        } else null
+        } else {
+            null
+        }
         fun owner(): Any = if (session) {
             constructor.newInstance(probe.context, pricing, false)
         } else {
@@ -174,7 +180,13 @@ internal object NumericalResidualReplay {
                 val result = if (prepared) {
                     if (entry == "cursor") {
                         val driven = driveCursor(
-                            active, requireNotNull(model), stop, workLimit, observer, quantum, observed,
+                            active,
+                            requireNotNull(model),
+                            stop,
+                            workLimit,
+                            observer,
+                            quantum,
+                            observed,
                         ) { solverField?.get(active)?.let { probe.unwrapped(it) } }
                         cursorResult = driven
                         driven.result
@@ -194,7 +206,9 @@ internal object NumericalResidualReplay {
                 solveNs += elapsed
                 val metricsOwner = if (session) {
                     solverField?.get(active)?.let { probe.unwrapped(it) } ?: cursorResult?.metricsOwner
-                } else active
+                } else {
+                    active
+                }
                 steps += buildJsonObject {
                     put("step", index)
                     put("prepared", prepared)
@@ -215,14 +229,19 @@ internal object NumericalResidualReplay {
                     )
                     put(
                         "metrics",
-                        NumericalResidualProfile.json(metricsOwner?.let {
+                        NumericalResidualProfile.json(
+                            metricsOwner?.let {
                             NumericalResidualProfile.call(it, "getLastMetrics")
-                        }),
+                        }
+                        ),
                     )
                     put(
                         "scopeMetrics",
-                        if (session) JsonNull else
-                            NumericalResidualProfile.json(NumericalResidualProfile.call(active, "getMetrics")),
+                        if (session) {
+                            JsonNull
+                        } else {
+                            NumericalResidualProfile.json(NumericalResidualProfile.call(active, "getMetrics"))
+                        },
                     )
                 }
                 if (!retained) {
@@ -335,16 +354,25 @@ internal object NumericalResidualReplay {
                             put("completed", completed)
                             put("elapsedNs", elapsed)
                             put("checkpointWork", work)
-                            put("metrics", NumericalResidualProfile.json(metricsOwner?.let {
+                            put(
+                                "metrics",
+                                NumericalResidualProfile.json(
+                                    metricsOwner?.let {
                                 NumericalResidualProfile.call(it, "getLastMetrics")
-                            }))
+                            }
+                                )
+                            )
                         }
-                    } else omitted++
+                    } else {
+                        omitted++
+                    }
                 }
                 if (completed) result = requireNotNull(NumericalResidualProfile.call(step, "getValue"))
             }
-            CursorResult(result, metricsOwner, advances, quantum, observed, maximumNs,
-                maximumWork, lastWork, samples, omitted)
+            CursorResult(
+                result, metricsOwner, advances, quantum, observed, maximumNs,
+                maximumWork, lastWork, samples, omitted,
+            )
         }
     }
 }

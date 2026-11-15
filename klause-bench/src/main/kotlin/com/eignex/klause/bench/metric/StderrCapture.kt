@@ -24,10 +24,7 @@ internal data class StderrCaptureStatus(
     val streamComplete: Boolean get() = eof && !processKilled && !drainTimedOut && readFailure == null
 }
 
-internal class StderrCapture(
-    private val input: InputStream,
-    private val openArtifact: (() -> OutputStream)? = null,
-) {
+internal class StderrCapture(private val input: InputStream, private val openArtifact: (() -> OutputStream)? = null) {
     internal data class Result(
         val text: String,
         val refusal: String?,
@@ -40,9 +37,13 @@ internal class StderrCapture(
     private val diagnostics = StderrDiagnostics()
     private val stopped = AtomicBoolean(false)
     private val bytesRead = AtomicLong()
+
     @Volatile private var eof = false
+
     @Volatile private var readFailure: String? = null
+
     @Volatile private var artifactFailure: String? = null
+
     @Volatile private var artifactClosed = false
     private val thread = Thread(::drain, "klause-stderr").apply { isDaemon = true }
 
@@ -75,7 +76,10 @@ internal class StderrCapture(
                 artifactFailure = artifactFailure,
             )
             Result(
-                diagnostics.text, diagnostics.refusal.takeIf { status.streamComplete }, diagnostics.quarantines, status,
+                diagnostics.text,
+                diagnostics.refusal.takeIf { status.streamComplete },
+                diagnostics.quarantines,
+                status,
             )
         }
     }
@@ -168,17 +172,24 @@ internal class StderrDiagnostics {
                 endLine()
                 afterCarriageReturn = true
             }
+
             '\n' -> {
                 if (!afterCarriageReturn) endLine()
                 afterCarriageReturn = false
             }
+
             else -> {
                 afterCarriageReturn = false
                 lineStarted = true
                 retain(char)
                 if (line.length < StderrCapture.DIAGNOSTIC_CAP) line.append(char) else lineTruncated = true
-                exceptionPosition = if (char == EXCEPTION[exceptionPosition]) exceptionPosition + 1
-                    else if (char == EXCEPTION[0]) 1 else 0
+                exceptionPosition = if (char == EXCEPTION[exceptionPosition]) {
+                    exceptionPosition + 1
+                } else if (char == EXCEPTION[0]) {
+                    1
+                } else {
+                    0
+                }
                 if (exceptionPosition == EXCEPTION.length) {
                     crash = true
                     exceptionPosition = 0

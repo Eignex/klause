@@ -59,14 +59,28 @@ class NativeLpAdapterTest {
     ) {
         val root = Files.createTempDirectory("native-cli-command").toFile()
         try {
-            val executable = root.resolve("klause-cli.kexe").apply { writeText("fixture"); setExecutable(true) }
+            val executable = root.resolve("klause-cli.kexe").apply {
+                writeText("fixture");
+                setExecutable(true)
+            }
             val source = root.resolve(filename)
-            val ref = ProblemRef("source", format, ProblemSource.Prepared(source), Category.OPTIMIZATION,
-                Expected.Unknown)
+            val ref = ProblemRef(
+                "source",
+                format,
+                ProblemSource.Prepared(source),
+                Category.OPTIMIZATION,
+                Expected.Unknown,
+            )
             val entry = ResolvedProblem(ref, lazy { error("subprocess commands must not materialize a model") })
 
-            val command = SolverInvocation.klauseCommand(entry,
-                SolverInvocation.Settings(processors = 1, exact = true), Budget(1000), true, source, executable)
+            val command = SolverInvocation.klauseCommand(
+                entry,
+                SolverInvocation.Settings(processors = 1, exact = true),
+                Budget(1000),
+                true,
+                source,
+                executable,
+            )
 
             assertEquals(executable.absolutePath, command.first())
             assertEquals(dialect, SolverInvocation.dialectFor(entry.ref.format).name)

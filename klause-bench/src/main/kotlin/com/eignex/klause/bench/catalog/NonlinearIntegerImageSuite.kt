@@ -9,8 +9,12 @@ internal object NonlinearIntegerImageSuite {
             "powers-three" to Expected.Sat,
             "powers-four" to Expected.Sat,
         )) {
-            vendored(name, expected = expected, relPath = "nonlinear-integer-images-v1/$name.smt2",
-                tags = setOf("nonlinear-integer", "nonlinear-integer-images-v1"))
+            vendored(
+                name,
+                expected = expected,
+                relPath = "nonlinear-integer-images-v1/$name.smt2",
+                tags = setOf("nonlinear-integer", "nonlinear-integer-images-v1"),
+            )
         }
     }
 }

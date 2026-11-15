@@ -29,22 +29,31 @@ object DefinitionValuesProfile {
         if (fork == null) {
             val java = Path.of(System.getProperty("java.home"), "bin", "java").toString()
             for (child in 0 until 3) {
-                val process = ProcessBuilder(java, "-Xms512m", "-Xmx512m", "-XX:ActiveProcessorCount=1",
-                    "-cp", System.getProperty("java.class.path"), DefinitionValuesProfile::class.java.name,
-                    "fork=$child").inheritIO().start()
+                val process = ProcessBuilder(
+                    java,
+                    "-Xms512m",
+                    "-Xmx512m",
+                    "-XX:ActiveProcessorCount=1",
+                    "-cp",
+                    System.getProperty("java.class.path"),
+                    DefinitionValuesProfile::class.java.name,
+                    "fork=$child",
+                ).inheritIO().start()
                 check(process.waitFor() == 0) { "DefinitionValues fork $child failed" }
             }
             return
         }
-        println(buildJsonObject {
-            put("kind", "runtime")
-            put("fork", fork)
-            put("java", System.getProperty("java.runtime.version"))
-            put("os", System.getProperty("os.name"))
-            put("arch", System.getProperty("os.arch"))
-            put("cpu", System.getenv("PROCESSOR_IDENTIFIER") ?: "see lab placement")
-            put("scope", "JVM cache microbenchmark; no solver throughput claim")
-        })
+        println(
+            buildJsonObject {
+                put("kind", "runtime")
+                put("fork", fork)
+                put("java", System.getProperty("java.runtime.version"))
+                put("os", System.getProperty("os.name"))
+                put("arch", System.getProperty("os.arch"))
+                put("cpu", System.getenv("PROCESSOR_IDENTIFIER") ?: "see lab placement")
+                put("scope", "JVM cache microbenchmark; no solver throughput claim")
+            },
+        )
         for (size in intArrayOf(64, 4096, 65_536)) {
             val fixture = Fixture(size)
             for (randomAccess in listOf(false, true)) {
@@ -80,8 +89,11 @@ object DefinitionValuesProfile {
                 consumed = checksum[arm]
                 pending[arm] = if (arm == 0) fixture.array.pending.toIntArray() else fixture.packed.pending.toIntArray()
                 values[arm] = LongArray(fixture.size) { index ->
-                    if (arm == 0) fixture.array.eval(index, fixture.assignment, fixture.domains)
-                    else fixture.packed.eval(index, fixture.assignment, fixture.domains)
+                    if (arm == 0) {
+                        fixture.array.eval(index, fixture.assignment, fixture.domains)
+                    } else {
+                        fixture.packed.eval(index, fixture.assignment, fixture.domains)
+                    }
                 }
             }
             check(checksum[0] == checksum[1]) { "Cache evaluation mismatch" }
@@ -89,31 +101,49 @@ object DefinitionValuesProfile {
                 "Cache pending-definition mismatch"
             }
             check(values[0].contentEquals(values[1])) { "Cache final-value mismatch" }
-            println(buildJsonObject {
-                put("kind", "pair")
-                put("fork", fork)
-                put("size", fixture.size)
-                put("workload", workload.name)
-                put("access", if (randomAccess) "random" else "sequential")
-                put("pair", pair)
-                put("first", if (first == 0) "array" else "packed")
-                put("reads", BATCH.toLong() * rounds)
-                put("arrayNanos", elapsed[0])
-                put("packedNanos", elapsed[1])
-                put("checksum", checksum[0])
-                put("arrayFlagBytes", fixture.size)
-                put("packedFlagBytes", ((fixture.size + 63L) / 64) * 8)
-            })
+            println(
+                buildJsonObject {
+                    put("kind", "pair")
+                    put("fork", fork)
+                    put("size", fixture.size)
+                    put("workload", workload.name)
+                    put("access", if (randomAccess) "random" else "sequential")
+                    put("pair", pair)
+                    put("first", if (first == 0) "array" else "packed")
+                    put("reads", BATCH.toLong() * rounds)
+                    put("arrayNanos", elapsed[0])
+                    put("packedNanos", elapsed[1])
+                    put("checksum", checksum[0])
+                    put("arrayFlagBytes", fixture.size)
+                    put("packedFlagBytes", ((fixture.size + 63L) / 64) * 8)
+                },
+            )
         }
     }
 
-    private fun run(f: Fixture, workload: Workload, random: Boolean, packed: Boolean, rounds: Int): Long =
-        if (packed) exercise(f, workload, random, rounds,
-            { f.packed.eval(it, f.assignment, f.domains) }, f.packed::intChanged,
-            f.packed::boolChanged, f.packed::clear)
-        else exercise(f, workload, random, rounds,
-            { f.array.eval(it, f.assignment, f.domains) }, f.array::intChanged,
-            f.array::boolChanged, f.array::clear)
+    private fun run(f: Fixture, workload: Workload, random: Boolean, packed: Boolean, rounds: Int): Long = if (packed) {
+        exercise(
+            f,
+            workload,
+            random,
+            rounds,
+            { f.packed.eval(it, f.assignment, f.domains) },
+            f.packed::intChanged,
+            f.packed::boolChanged,
+            f.packed::clear,
+        )
+    } else {
+        exercise(
+            f,
+            workload,
+            random,
+            rounds,
+            { f.array.eval(it, f.assignment, f.domains) },
+            f.array::intChanged,
+            f.array::boolChanged,
+            f.array::clear,
+        )
+    }
 
     private inline fun exercise(
         f: Fixture,
@@ -126,18 +156,23 @@ object DefinitionValuesProfile {
         clear: () -> Unit,
     ): Long {
         var checksum = 0L
-        for (round in 0 until rounds) for (step in 0 until BATCH) {
-            val index = if (random) f.probes[step] else step and (f.size - 1)
-            if (workload != Workload.CACHED && step and 15 == 0) {
-                val variable = index / 8
-                f.assignment.setInt(variable, ((step + round) % 1000).toLong())
-                intChanged(variable)
-                f.assignment.setBool(variable, !f.assignment.boolValue(variable))
-                boolChanged(variable)
+        for (round in 0 until rounds) {
+            for (step in 0 until BATCH) {
+                val index = if (random) f.probes[step] else step and (f.size - 1)
+                if (workload != Workload.CACHED && step and 15 == 0) {
+                    val variable = index / 8
+                    f.assignment.setInt(variable, ((step + round) % 1000).toLong())
+                    intChanged(variable)
+                    f.assignment.setBool(variable, !f.assignment.boolValue(variable))
+                    boolChanged(variable)
+                }
+                if ((workload == Workload.MIXED && step and 4095 == 0) ||
+                    (workload == Workload.RESET_HEAVY && step and 255 == 0)
+                ) {
+                    clear()
+                }
+                checksum += eval(index)
             }
-            if ((workload == Workload.MIXED && step and 4095 == 0) ||
-                (workload == Workload.RESET_HEAVY && step and 255 == 0)) clear()
-            checksum += eval(index)
         }
         return checksum
     }
@@ -147,12 +182,24 @@ object DefinitionValuesProfile {
     private class Fixture(val size: Int) {
         val assignment = Assignment(size, size * 2)
         val domains = Array(size * 2) { IntDomain(0, 2000) }
-        private val network = InvariantNetwork(List(size) { index ->
-            if (index and 1 == 0) DefinitionalSweep.SweepNode.Bool2Int(size + index, index / 8)
-            else DefinitionalSweep.SweepNode.IntDef(
-                FunctionalObjective.Plus(size + index, FunctionalObjective.Operand.v(index / 8),
-                    FunctionalObjective.Operand.c(1)), intArrayOf(index / 8))
-        }, size * 2, size)
+        private val network = InvariantNetwork(
+            List(size) { index ->
+                if (index and 1 == 0) {
+                    DefinitionalSweep.SweepNode.Bool2Int(size + index, index / 8)
+                } else {
+                    DefinitionalSweep.SweepNode.IntDef(
+                        FunctionalObjective.Plus(
+                            size + index,
+                            FunctionalObjective.Operand.v(index / 8),
+                            FunctionalObjective.Operand.c(1),
+                        ),
+                        intArrayOf(index / 8),
+                    )
+                }
+            },
+            size * 2,
+            size,
+        )
         val array = DefinitionValues(network)
         val packed = PackedDefinitionValues(network)
         val probes = Random(42).let { rng -> IntArray(BATCH) { rng.nextInt(size) } }

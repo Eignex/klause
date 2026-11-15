@@ -95,7 +95,9 @@ internal object ResidualSnapshots {
         if (prepared.numIntVars != 0 || prepared.numRealVars != 0 || prepared.numBoolVars > MAX_COORDINATES ||
             prepared.factors.any { it !is Clause } || objective.intCoefficients.any { it != 0L } ||
             objective.realCoefficients.any { it != 0.0 }
-        ) return ResidualCapture(null, "unsupported-model-or-objective")
+        ) {
+            return ResidualCapture(null, "unsupported-model-or-objective")
+        }
         if (prepared.factors.size.toLong() + inspection.entries.size > maxBytes / 512L) {
             return ResidualCapture(null, "byte-limit")
         }
@@ -117,13 +119,24 @@ internal object ResidualSnapshots {
             require(sourceWeights.size <= prepared.numBoolVars) { "objective coordinate mismatch" }
             val weights = List(prepared.numBoolVars) { sourceWeights.getOrElse(it) { 0L } }
             val identity = sha256(preparedDocument.toString())
-            val condition = conditionIdentity(identity, weights, objective.constant, values, emptyList(), cutoff,
-                sourceIdentity, preparationIdentity)
+            val condition = conditionIdentity(
+                identity,
+                weights,
+                objective.constant,
+                values,
+                emptyList(),
+                cutoff,
+                sourceIdentity,
+                preparationIdentity,
+            )
             val learned = inspection.entries.map { entry ->
                 check(!stop()) { "interrupted" }
                 val retained = model(prepared.numBoolVars, listOf(requireNotNull(entry.factor)))
                 ResidualRestrictionDocument(
-                    entry.storeIndex, entry.permanentRetention, "unavailable", condition,
+                    entry.storeIndex,
+                    entry.permanentRetention,
+                    "unavailable",
+                    condition,
                     codec.encodeToJsonElement(retained),
                 )
             }
@@ -162,8 +175,14 @@ internal object ResidualSnapshots {
         }
         require(snapshot.openingAssumptions.isEmpty()) { "unsupported opening assumptions" }
         val condition = conditionIdentity(
-            snapshot.preparedIdentity, snapshot.boolWeights, snapshot.objectiveConstant, snapshot.values,
-            snapshot.openingAssumptions, snapshot.activeCutoff, snapshot.sourceIdentity, snapshot.preparationIdentity,
+            snapshot.preparedIdentity,
+            snapshot.boolWeights,
+            snapshot.objectiveConstant,
+            snapshot.values,
+            snapshot.openingAssumptions,
+            snapshot.activeCutoff,
+            snapshot.sourceIdentity,
+            snapshot.preparationIdentity,
         )
         require(snapshot.conditionIdentity == condition) { "condition mismatch" }
         require(snapshot.learned.map { it.storeIndex } == snapshot.learned.indices.toList()) {
@@ -183,14 +202,29 @@ internal object ResidualSnapshots {
         require(snapshot.sourceComponents == components(clauses.map { clause -> clause.map(Lit::variable) })) {
             "source membership mismatch"
         }
-        require(snapshot.fixedObjective == fixedObjective(
-            snapshot.boolWeights, snapshot.objectiveConstant, snapshot.values,
-        ).toString()) { "fixed objective mismatch" }
-        require(snapshot.isolatedObjective == isolatedObjective(
-            snapshot.boolWeights, snapshot.values, clauses,
-        ).toString()) { "isolated objective mismatch" }
-        val all = enforcing(prepared, snapshot.values, snapshot.learned, snapshot.boolWeights,
-            snapshot.objectiveConstant, snapshot.activeCutoff, ExecutionControl.Never)
+        require(
+            snapshot.fixedObjective == fixedObjective(
+            snapshot.boolWeights,
+            snapshot.objectiveConstant,
+            snapshot.values,
+        ).toString()
+        ) { "fixed objective mismatch" }
+        require(
+            snapshot.isolatedObjective == isolatedObjective(
+            snapshot.boolWeights,
+            snapshot.values,
+            clauses,
+        ).toString()
+        ) { "isolated objective mismatch" }
+        val all = enforcing(
+            prepared,
+            snapshot.values,
+            snapshot.learned,
+            snapshot.boolWeights,
+            snapshot.objectiveConstant,
+            snapshot.activeCutoff,
+            ExecutionControl.Never,
+        )
         require(snapshot.enforcingComponents == components(all.map(::support))) { "enforcing membership mismatch" }
         val remapping = VarRemap(inverse.toIntArray(), IntArray(0))
         val expected = model(mapping.size, all.map { it.remap(remapping) })
@@ -233,8 +267,11 @@ internal object ResidualSnapshots {
             check(!stop()) { "interrupted" }
             val clause = factor as Clause
             require(clause.literals.all { Lit.variable(it) in values.indices }) { "unnameable source literal" }
-            if (clause.literals.any { values[Lit.variable(it)] == Lit.isPositive(it) }) null else
+            if (clause.literals.any { values[Lit.variable(it)] == Lit.isPositive(it) }) {
+                null
+            } else {
                 clause.literals.filter { values[Lit.variable(it)] == null }
+            }
         }
 
     @Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
@@ -259,14 +296,19 @@ internal object ResidualSnapshots {
             require(cutoff.provenance == "prepared-incumbent-witness") { "unknown cutoff provenance" }
             val upper = BigInteger(cutoff.strictUpper)
             require(upper == objective(weights, constant, cutoff.witness)) { "cutoff objective mismatch" }
-            require(prepared.factors.all { f -> (f as Clause).literals.any {
-                cutoff.witness[Lit.variable(it)] == Lit.isPositive(it)
-            } }) { "cutoff witness violates prepared source" }
+            require(
+                prepared.factors.all { f ->
+                (f as Clause).literals.any {
+                    cutoff.witness[Lit.variable(it)] == Lit.isPositive(it)
+                }
+            }
+            ) { "cutoff witness violates prepared source" }
             val nonzero = weights.indices.filter { weights[it] != 0L }
             val positive = weights.filter { it > 0 }.fold(BigInteger.ZERO) { a, b -> a + BigInteger.valueOf(b) }
             factors += PseudoBoolean(
                 Array(nonzero.size) { parseBigInt(BigInteger.valueOf(weights[nonzero[it]]).abs().toString()) },
-                IntArray(nonzero.size) { Lit.make(nonzero[it], weights[nonzero[it]] < 0) }, PbOp.GE,
+                IntArray(nonzero.size) { Lit.make(nonzero[it], weights[nonzero[it]] < 0) },
+                PbOp.GE,
                 parseBigInt((positive - (upper - BigInteger.valueOf(constant) - BigInteger.ONE)).toString()),
             )
         }
@@ -275,10 +317,15 @@ internal object ResidualSnapshots {
             when (factor) {
                 is Clause -> {
                     require(factor.literals.all { Lit.variable(it) in values.indices })
-                    if (factor.literals.any { values[Lit.variable(it)] == Lit.isPositive(it) }) null else
+                    if (factor.literals.any { values[Lit.variable(it)] == Lit.isPositive(it) }) {
+                        null
+                    } else {
                         Clause(factor.literals.filter { values[Lit.variable(it)] == null }.toIntArray())
+                    }
                 }
+
                 is PseudoBoolean -> residualPb(factor, values)
+
                 else -> error("unsupported learned kind")
             }
         }
@@ -300,8 +347,12 @@ internal object ResidualSnapshots {
             }
         }
         if (degree.signum() <= 0) return null
-        return PseudoBoolean(Array(free.size) { constants.exactCoeff(free[it]) },
-            IntArray(free.size) { pb.literals[free[it]] }, PbOp.GE, parseBigInt(degree.toString()))
+        return PseudoBoolean(
+            Array(free.size) { constants.exactCoeff(free[it]) },
+            IntArray(free.size) { pb.literals[free[it]] },
+            PbOp.GE,
+            parseBigInt(degree.toString()),
+        )
     }
 
     private fun fixedObjective(weights: List<Long>, constant: Long, values: List<Boolean?>): BigInteger =

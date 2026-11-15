@@ -63,15 +63,19 @@ internal object PreparedArithmeticLearningProfile {
         require(args.isEmpty())
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
-        sources.forEachIndexed { index, source -> out.resolve("source-$index.${if (index == 0) "opb" else "fzn"}")
-            .writeText(source) }
+        sources.forEachIndexed { index, source ->
+            out.resolve("source-$index.${if (index == 0) "opb" else "fzn"}")
+                .writeText(source)
+        }
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
         bean.isThreadAllocatedMemoryEnabled = true
         val thread = Thread.currentThread().threadId()
         val records = out.resolve("prepared-learning.jsonl").apply { writeText("") }
-        val cells = (0..1).flatMap { source -> (0..2).flatMap { route ->
-            listOf(false, true).map { learning -> Triple(source, route, learning) }
-        } }
+        val cells = (0..1).flatMap { source ->
+            (0..2).flatMap { route ->
+                listOf(false, true).map { learning -> Triple(source, route, learning) }
+            }
+        }
         for (pass in 0..3) {
             val order = if (pass % 2 == 0) cells else cells.reversed()
             for ((source, route, learning) in order) {
@@ -93,8 +97,10 @@ internal object PreparedArithmeticLearningProfile {
                     put("intervalEndNs", finished)
                     put("invocationElapsedNs", finished - started)
                     put("invocationThreadAllocatedBytes", allocated)
-                    put("measurement",
-                        "disjoint in-process; parse to point check, release and capture serialization; JFR enabled")
+                    put(
+                        "measurement",
+                        "disjoint in-process; parse to point check, release and capture serialization; JFR enabled",
+                    )
                     put("physicalGcOrRssMeasured", false)
                     put("independentWitnessOrProofCheck", false)
                     put("osName", System.getProperty("os.name"))
@@ -110,13 +116,26 @@ internal object PreparedArithmeticLearningProfile {
 
     private fun invoke(source: Int, route: Int, learning: Boolean): JsonObject {
         val stop = ExecutionControl.after(2.seconds)
-        val original = if (source == 0) Opb.parse(sources[source]).toProblem().problem
-            else parseFlatZinc(sources[source]).problem
+        val original = if (source == 0) {
+            Opb.parse(sources[source]).toProblem().problem
+        } else {
+            parseFlatZinc(sources[source]).problem
+        }
         val codec = ProblemJson()
         val originalJson = codec.encodeToString(original)
-        val prepared = if (route == 0) null else FinitePipeline.prepare(FinitePipelineRequest(
-            original, FiniteEngine.BACKTRACK, cancellation = stop, solveCancellation = stop, randomSeed = 3L,
-        ))
+        val prepared = if (route == 0) {
+            null
+        } else {
+            FinitePipeline.prepare(
+                FinitePipelineRequest(
+            original,
+            FiniteEngine.BACKTRACK,
+            cancellation = stop,
+            solveCancellation = stop,
+            randomSeed = 3L,
+        )
+            )
+        }
         val problem = prepared?.problem ?: original
         val preparedJson = codec.encodeToString(problem)
         if (stop() || prepared?.presolve?.infeasible == true || (route == 2 && problem !is BakedProblem)) {
@@ -130,10 +149,16 @@ internal object PreparedArithmeticLearningProfile {
             }
         }
         if (route == 2) {
-            val result = BacktrackSolver(problem as BakedProblem).solve(BacktrackParams(
-                pbLearning = source == 0 && learning, integerRowLearning = source == 1 && learning,
-                lpConfig = LpConfig.AUTO, randomSeed = 3L, maxDecisions = 1024, cancellation = stop,
-            ))
+            val result = BacktrackSolver(problem as BakedProblem).solve(
+                BacktrackParams(
+                pbLearning = source == 0 && learning,
+                integerRowLearning = source == 1 && learning,
+                lpConfig = LpConfig.AUTO,
+                randomSeed = 3L,
+                maxDecisions = 1024,
+                cancellation = stop,
+            )
+            )
             val sample = (result as? SolveResult.Sat)?.assignment?.let { requireNotNull(prepared).reconstruct(it) }
             val checked = sample?.let { checkPoint(original, it, stop) } ?: false
             return buildJsonObject {
@@ -193,8 +218,11 @@ internal object PreparedArithmeticLearningProfile {
                 }
             }
         }
-        val point = if (source == 0) Sample(booleanArrayOf(true, true, false, true, true), longArrayOf())
-            else Sample(booleanArrayOf(), longArrayOf(2, 4, 11))
+        val point = if (source == 0) {
+            Sample(booleanArrayOf(true, true, false, true, true), longArrayOf())
+        } else {
+            Sample(booleanArrayOf(), longArrayOf(2, 4, 11))
+        }
         val checked = checkPoint(original, point, stop)
         val stores = native.learnedClauseCount
         shared.popTo(0)
@@ -207,8 +235,14 @@ internal object PreparedArithmeticLearningProfile {
             put("fixedSourceCoordinates", identity)
             put("scriptDecline", if (identity) "none" else "preparation-changed-source-identity; no guessed remap")
             put("initialized", initialized::class.simpleName)
-            put("fixedScript", if (source == 0) "b0=true; b1=false; resolve; apply"
-                else "z<=7; x>=2; resolve; apply; pop-to-root; z<=11")
+            put(
+                "fixedScript",
+                if (source == 0) {
+                    "b0=true; b1=false; resolve; apply"
+                } else {
+                    "z<=7; x>=2; resolve; apply; pop-to-root; z<=11"
+                },
+            )
             put("firstDecisionOutcome", firstOutcome)
             put("secondDecisionOutcome", secondOutcome)
             put("secondDecisionConflict", conflict)
@@ -226,11 +260,13 @@ internal object PreparedArithmeticLearningProfile {
     }
 
     internal fun checkPoint(problem: Problem, sample: Sample, stop: ExecutionControl): Boolean {
-        val pinned = problem.withIntDomains(Array(problem.numIntVars) {
+        val pinned = problem.withIntDomains(
+            Array(problem.numIntVars) {
             val value = sample.intValue(it)
             check(value in requireNotNull(problem.intDomainOrNull(it)))
             IntDomain(value, value)
-        })
+        }
+        )
         val checker = PropagationSession(pinned, cancellation = stop)
         if (checker.isUnsatAtRoot) return false
         for (variable in 0 until problem.numBoolVars) {
@@ -282,22 +318,34 @@ internal object PreparedArithmeticLearningProfile {
                 put(name, trace.javaClass.getMethod(getter).invoke(trace) as Long)
             }
             put("words", trace.javaClass.getMethod("getWords").invoke(trace) as Int)
-            put("events", buildJsonArray {
+            put(
+                "events",
+                buildJsonArray {
                 for (event in trace.javaClass.getMethod("getEvents").invoke(trace) as List<*>) {
                     requireNotNull(event)
-                    add(buildJsonObject {
+                    add(
+                        buildJsonObject {
                         put("kind", event.javaClass.getMethod("getKind").invoke(event) as String)
-                        put("data", JsonArray((event.javaClass.getMethod("getData").invoke(event) as LongArray)
-                            .map(::JsonPrimitive)))
-                    })
+                        put(
+                            "data",
+                            JsonArray(
+                            (event.javaClass.getMethod("getData").invoke(event) as LongArray)
+                                .map(::JsonPrimitive),
+                        )
+                        )
+                    }
+                    )
                 }
-            })
+            }
+            )
         }
 
         fun record(kind: String, vararg data: Long) {
             trace.javaClass.getMethod("record", String::class.java, LongArray::class.java).invoke(trace, kind, data)
         }
 
-        fun release() { LivePropagationState.current(native)?.let { field.set(it, null) } }
+        fun release() {
+            LivePropagationState.current(native)?.let { field.set(it, null) }
+        }
     }
 }

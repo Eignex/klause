@@ -103,10 +103,12 @@ internal object MiniZincCompatibility {
             configurationSha256 = hash(File(root, "klause-mzn-lib/share/minizinc/solvers/klause.msc")),
         ).also {
             check(hash(executable) == executableHash) { "MiniZinc executable changed during identity discovery" }
-            System.err.println(buildJsonObject {
+            System.err.println(
+                buildJsonObject {
                 put("phase", "compiler-identity-completed")
                 put("compilerIdentity", Reports.json.encodeToJsonElement(it))
-            })
+            }
+            )
         }
     }
 

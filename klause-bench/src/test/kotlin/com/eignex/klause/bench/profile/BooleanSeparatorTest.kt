@@ -36,11 +36,11 @@ class BooleanSeparatorTest {
         val bridge = mutableListOf(0, 10).apply { add(position, 20) }
         val partition = assertNotNull(
             BooleanSeparators.partition(
-            cycles + listOf(bridge),
-            11,
-            mapOf(10 to true),
-            { true },
-        )
+                cycles + listOf(bridge),
+                11,
+                mapOf(10 to true),
+                { true },
+            ),
         )
 
         assertEquals(listOf((0..4).toList(), (5..9).toList()), partition.components)
@@ -83,11 +83,11 @@ class BooleanSeparatorTest {
     fun `empty residual clause should remain a conflict`() {
         val result = assertNotNull(
             BooleanSeparators.partition(
-            listOf(listOf(0)),
-            1,
-            mapOf(0 to false),
-            { true },
-        )
+                listOf(listOf(0)),
+                1,
+                mapOf(0 to false),
+                { true },
+            ),
         )
 
         assertTrue(result.conflict)

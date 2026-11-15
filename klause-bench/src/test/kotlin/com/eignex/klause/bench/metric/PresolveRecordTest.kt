@@ -45,14 +45,18 @@ class PresolveRecordTest {
         )
         val lines = expected.entries.joinToString("\n") { (key, value) -> "%%%mzn-stat: $key=$value" }
         val result = SolverInvocation.invoke(
-            listOf("sh", "-c", "printf '%s\\n' '$lines'"), SolverInvocation.Dialect.MINIZINC,
+            listOf("sh", "-c", "printf '%s\\n' '$lines'"),
+            SolverInvocation.Dialect.MINIZINC,
         )
         val ref = ProblemRef("php4", Format.DIMACS, corpus("dimacs/php4.cnf"), Category.CSP, Expected.Unknown)
         val (record, _) = SolveMetric.solve(
             ResolvedProblem(ref, lazy { error("subprocess input stays lazy") }),
-            SolverInvocation.Settings(engine = "fixed"), Budget(1000),
-            "time", "revision",
-            installedBuild = { null }, invoke = { _, _, _, _ -> result },
+            SolverInvocation.Settings(engine = "fixed"),
+            Budget(1000),
+            "time",
+            "revision",
+            installedBuild = { null },
+            invoke = { _, _, _, _ -> result },
         )
 
         val restored = Reports.json.decodeFromString<SolveRecord>(Reports.json.encodeToString(record))

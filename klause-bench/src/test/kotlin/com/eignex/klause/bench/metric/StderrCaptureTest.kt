@@ -118,9 +118,15 @@ class StderrCaptureTest {
     fun `artifact failures preserve draining and diagnostic classification`(stage: String) {
         val input = ByteArrayInputStream("klause MPS: declined\n".toByteArray())
         val artifact = object : OutputStream() {
-            override fun write(value: Int) { if (stage == "write") throw IOException("write failed") }
-            override fun flush() { if (stage == "flush") throw IOException("flush failed") }
-            override fun close() { if (stage == "close") throw IOException("close failed") }
+            override fun write(value: Int) {
+                if (stage == "write") throw IOException("write failed")
+            }
+            override fun flush() {
+                if (stage == "flush") throw IOException("flush failed")
+            }
+            override fun close() {
+                if (stage == "close") throw IOException("close failed")
+            }
         }
 
         val result = StderrCapture(input) {

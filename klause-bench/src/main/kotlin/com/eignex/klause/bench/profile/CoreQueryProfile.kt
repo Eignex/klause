@@ -72,9 +72,18 @@ internal object CoreQueryProfile {
                     val sourceBaked = source.bake()
                     val preparationStart = System.nanoTime()
                     val beforePreparation = bean.getThreadAllocatedBytes(thread)
-                    val ordinary = if (prepared) FinitePipeline.prepare(FinitePipelineRequest(
-                        source, FiniteEngine.BACKTRACK, objective, cancellation = ExecutionControl.after(2.seconds),
-                    )) else null
+                    val ordinary = if (prepared) {
+                        FinitePipeline.prepare(
+                            FinitePipelineRequest(
+                        source,
+                        FiniteEngine.BACKTRACK,
+                        objective,
+                        cancellation = ExecutionControl.after(2.seconds),
+                    )
+                        )
+                    } else {
+                        null
+                    }
                     val preparationNs = System.nanoTime() - preparationStart
                     val preparationBytes = bean.getThreadAllocatedBytes(thread) - beforePreparation
                     val model = ordinary?.problem as? BakedProblem ?: sourceBaked
@@ -223,8 +232,11 @@ internal object CoreQueryProfile {
                     val pins = Assumptions(bools = (0 until model.numBoolVars).associateWith { false })
                     for (minimize in listOf(false, true)) {
                         val started = System.nanoTime()
-                        val result = BacktrackSolver(model).satisfyUnderAssumptions(pins,
-                            BacktrackParams(cancellation = ExecutionControl.after(2.seconds)), minimize)
+                        val result = BacktrackSolver(model).satisfyUnderAssumptions(
+                            pins,
+                            BacktrackParams(cancellation = ExecutionControl.after(2.seconds)),
+                            minimize,
+                        )
                         out.resolve("helper-$unrelated-$prepared-$minimize.txt").writeText(
                             "elapsedNs=${System.nanoTime() - started}\n$result\n",
                         )

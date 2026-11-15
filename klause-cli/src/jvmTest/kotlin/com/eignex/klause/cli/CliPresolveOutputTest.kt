@@ -15,7 +15,10 @@ class CliPresolveOutputTest(private val extension: String, private val interrupt
         @JvmStatic
         @Parameterized.Parameters(name = "{0} interrupted={1}")
         fun cases(): List<Array<Any>> = listOf(
-            arrayOf("smt2", false), arrayOf("smt2", true), arrayOf("fzn", false), arrayOf("fzn", true),
+            arrayOf("smt2", false),
+            arrayOf("smt2", true),
+            arrayOf("fzn", false),
+            arrayOf("fzn", true),
         )
     }
 
@@ -23,19 +26,28 @@ class CliPresolveOutputTest(private val extension: String, private val interrupt
     fun `CLI output should retain preparation observations`() {
         val model = File.createTempFile("presolve-output", ".$extension")
         try {
-            model.writeText(if (extension == "smt2") {
+            model.writeText(
+                if (extension == "smt2") {
                 "(set-logic QF_LRA) (declare-const x Real) (assert (<= x 7)) (check-sat)"
             } else {
                 "var 0..10: x; constraint int_lin_le([1], [x], 7); solve satisfy;"
-            })
+            }
+            )
             fun invoke(limit: Long): Map<String, String> {
                 val output = ByteArrayOutputStream()
                 val previous = System.out
                 try {
                     System.setOut(PrintStream(output))
-                    assertEquals(0, runCli(arrayOf("-s", "-e", "fixed", "--presolve", "off,+strengthen,+bve",
+                    assertEquals(
+                        0,
+                        runCli(
+                            arrayOf(
+                                "-s", "-e", "fixed", "--presolve", "off,+strengthen,+bve",
                         "--param", "open-bound-proof=false", "--param", "presolve-work-limit=$limit",
-                        model.absolutePath)))
+                        model.absolutePath,
+                            )
+                        )
+                    )
                 } finally {
                     System.setOut(previous)
                 }
@@ -53,7 +65,9 @@ class CliPresolveOutputTest(private val extension: String, private val interrupt
                     it.endsWith("_Work") && (sourcePass || initialBake)
                 }.values.sumOf { it.toLong() }
                 invoke(if (extension == "smt2") 1L else beforeFinite + 1L)
-            } else complete
+            } else {
+                complete
+            }
             val outcome = if (interrupted) "INTERRUPTED" else "COMPLETE_MISS"
 
             val lane = if (extension == "smt2") "SOURCE" else "FINITE"
@@ -66,9 +80,11 @@ class CliPresolveOutputTest(private val extension: String, private val interrupt
                 assertTrue(stats.getValue("presolveInvocation_FINITE_strengthen_COMPLETE_MISS_Calls").toInt() > 0)
                 assertTrue(stats.getValue("presolveStage_FINITE_ROOT_BAKE_COMPLETE_Calls").toInt() > 0)
             }
-            assertEquals(stats.getValue("presolveWork").toLong(),
+            assertEquals(
+                stats.getValue("presolveWork").toLong(),
                 stats.getValue("presolveInvocationWork").toLong() + stats.getValue("presolveStageWork").toLong() +
-                    stats.getValue("presolveUnattributedWork").toLong())
+                    stats.getValue("presolveUnattributedWork").toLong(),
+            )
         } finally {
             model.delete()
         }

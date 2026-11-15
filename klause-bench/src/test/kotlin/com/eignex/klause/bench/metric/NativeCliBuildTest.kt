@@ -18,8 +18,10 @@ class NativeCliBuildTest {
             /lib/ld-linux-x86-64.so.2 (0x00007f01)
         """.trimIndent()
 
-        assertEquals(listOf(File("/lib/libc.so.6"), File("/lib/ld-linux-x86-64.so.2")),
-            NativeCliBuild.libraryPaths(output))
+        assertEquals(
+            listOf(File("/lib/libc.so.6"), File("/lib/ld-linux-x86-64.so.2")),
+            NativeCliBuild.libraryPaths(output),
+        )
     }
 
     @Test

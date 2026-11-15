@@ -210,14 +210,14 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
             }
         } else {
             when (val result = quadraticResult) {
-            is QuadraticOptimizationResult.UnattainedLimit -> if (result.sense == ObjectiveSense.MINIMIZE) {
-                "unattained-infimum"
-            } else {
-                "unattained-supremum"
-            }
+                is QuadraticOptimizationResult.UnattainedLimit -> if (result.sense == ObjectiveSense.MINIMIZE) {
+                    "unattained-infimum"
+                } else {
+                    "unattained-supremum"
+                }
 
-            else -> verdict.name.lowercase().replace('_', '-')
-        }
+                else -> verdict.name.lowercase().replace('_', '-')
+            }
         }
         return "optimizationStatus=$status"
     }

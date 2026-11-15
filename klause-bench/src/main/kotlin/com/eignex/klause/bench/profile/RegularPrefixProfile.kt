@@ -81,6 +81,7 @@ internal object RegularPrefixProfile {
                     require(parsed.objective == null)
                     parsed.problem
                 }
+
                 Format.MINIZINC -> {
                     require(reference.data == null)
                     directory.resolve("source.mzn").writeBytes(bytes)
@@ -92,6 +93,7 @@ internal object RegularPrefixProfile {
                     require(resolved.objective == null)
                     resolved.problem
                 }
+
                 else -> error("prefix capture requires XCSP3 or a self-contained MiniZinc source")
             }
             capture(problem, directory, replay, fixed)

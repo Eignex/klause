@@ -71,8 +71,7 @@ internal object BenchSelection {
         seed: Long?,
         compatible: (SelectedProblem) -> Boolean = { true },
         accept: (ProblemRef) -> Boolean = { true },
-    ): List<SelectedProblem> =
-        admittedFamilies(candidates, perFamily, seed, compatible, accept).flatMap { it }.toList()
+    ): List<SelectedProblem> = admittedFamilies(candidates, perFamily, seed, compatible, accept).flatMap { it }.toList()
 
     private fun admittedFamilies(
         candidates: List<SelectedProblem>,

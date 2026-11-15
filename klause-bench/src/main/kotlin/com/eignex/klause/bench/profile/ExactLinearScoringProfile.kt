@@ -30,13 +30,25 @@ internal object ExactLinearScoringProfile {
         val thread = Thread.currentThread().threadId()
         out.resolve("scoring.jsonl").bufferedWriter().use { output ->
             for (width in listOf(8, 64, 512, 4096)) {
-                val row = ExactLinear.of(IntArray(width) {
-                    if (it % 2 == 0) Term.ofIntVar(it / 2) else Term.ofRealVar(it / 2)
-                }, List(width) { BigFraction.ofLong(if (it % 3 == 0) -16L else 8L) },
-                    LinearOp.EQ, BigFraction.ZERO)
-                val model = LocalSearchModel.open(Problem(0, width / 2,
-                    Array(width / 2) { IntDomain(-16, 16) }, arrayOf(row), numRealVars = width / 2,
-                    realLower = DoubleArray(width / 2) { -16.0 }, realUpper = DoubleArray(width / 2) { 16.0 }))
+                val row = ExactLinear.of(
+                    IntArray(width) {
+                        if (it % 2 == 0) Term.ofIntVar(it / 2) else Term.ofRealVar(it / 2)
+                    },
+                    List(width) { BigFraction.ofLong(if (it % 3 == 0) -16L else 8L) },
+                    LinearOp.EQ,
+                    BigFraction.ZERO,
+                )
+                val model = LocalSearchModel.open(
+                    Problem(
+                    0,
+                    width / 2,
+                    Array(width / 2) { IntDomain(-16, 16) },
+                    arrayOf(row),
+                    numRealVars = width / 2,
+                    realLower = DoubleArray(width / 2) { -16.0 },
+                    realUpper = DoubleArray(width / 2) { 16.0 },
+                )
+                )
                 val state = LocalSearchState(model, Random(3))
                 val rounds = 256
                 val count = 16

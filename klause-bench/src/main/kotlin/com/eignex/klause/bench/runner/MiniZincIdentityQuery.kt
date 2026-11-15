@@ -36,14 +36,12 @@ internal data class MiniZincIdentityEvidence(
     val policy: String = "minizinc-identity-query-v1",
 )
 
-internal class MiniZincIdentityFailure(
-    val evidence: MiniZincIdentityEvidence,
-    cause: Throwable? = null,
-) : IllegalStateException(
-    "MiniZinc identity ${evidence.phase} ${evidence.outcome} after ${evidence.elapsedNs} ns" +
-        " (exit=${evidence.exitCode}, cancelled=${evidence.cancelled}): ${evidence.diagnostic}",
-    cause,
-)
+internal class MiniZincIdentityFailure(val evidence: MiniZincIdentityEvidence, cause: Throwable? = null) :
+    IllegalStateException(
+        "MiniZinc identity ${evidence.phase} ${evidence.outcome} after ${evidence.elapsedNs} ns" +
+            " (exit=${evidence.exitCode}, cancelled=${evidence.cancelled}): ${evidence.diagnostic}",
+        cause,
+    )
 
 internal class MiniZincIdentityQuery(
     private val timeoutNs: Long = TimeUnit.SECONDS.toNanos(10),
@@ -84,12 +82,14 @@ internal class MiniZincIdentityQuery(
                 process = child
                 startupNs = clock() - began
                 outcome = "query-failed"
-                retain(initial.copy(
+                retain(
+                    initial.copy(
                     outcome = "process-started",
                     elapsedNs = startupNs,
                     startupNs = startupNs,
                     pid = runCatching { child.pid() }.getOrNull(),
-                ))
+                )
+                )
                 val remaining = timeoutNs - (clock() - began)
                 val waitStart = clock()
                 try {
@@ -156,7 +156,9 @@ internal class MiniZincIdentityQuery(
                 !cancelled && !alive && !Thread.currentThread().isInterrupted
             val executableHash = if (hashAttempted) {
                 runCatching { MiniZincCompatibility.hash(executable) }.getOrNull()
-            } else null
+            } else {
+                null
+            }
             val hashNs = if (hashAttempted) clock() - hashStart else null
             if (Thread.currentThread().isInterrupted) {
                 cancelled = true

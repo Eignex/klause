@@ -36,15 +36,21 @@ class TrajectoryModelTest {
         assertEquals(mapOf("x" to 0, "y" to 1), parsed.intVarNames)
         assertEquals(ObjectiveSense.MINIMIZE, parsed.sense)
         assertEquals(0, parsed.problem.numRealVars)
-        assertEquals(2.0, assertNotNull(parsed.objective).toLinearObjective()
-            .evaluate(Sample(booleanArrayOf(), longArrayOf(1, 0))))
+        assertEquals(
+            2.0,
+            assertNotNull(parsed.objective).toLinearObjective()
+                .evaluate(Sample(booleanArrayOf(), longArrayOf(1, 0))),
+        )
     }
 
     @ParameterizedTest
     @ValueSource(strings = ["continuous", "maximize"])
     fun `unsupported MPS trajectories should decline before finite preparation`(variant: String) {
-        val unsupported = if (variant == "continuous") source.replace("BV bound y", "UP bound y 1")
-        else source.replace("ROWS", "OBJSENSE\n MAX\nROWS")
+        val unsupported = if (variant == "continuous") {
+            source.replace("BV bound y", "UP bound y 1")
+        } else {
+            source.replace("ROWS", "OBJSENSE\n MAX\nROWS")
+        }
 
         assertFailsWith<IllegalArgumentException> {
             trajectoryModel(unsupported.encodeToByteArray(), "mps")

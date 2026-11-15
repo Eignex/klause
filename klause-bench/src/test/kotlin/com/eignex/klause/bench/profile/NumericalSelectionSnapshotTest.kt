@@ -21,9 +21,11 @@ import kotlin.test.assertFalse
 
 class NumericalSelectionSnapshotTest {
     private val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
-    private val generation = SourceScope(SourceRevision("selection-import", "exact-affine"),
+    private val generation = SourceScope(
+        SourceRevision("selection-import", "exact-affine"),
         objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
-        condition = SourceCondition(upper = mapOf(x to BigFraction.ONE)))
+        condition = SourceCondition(upper = mapOf(x to BigFraction.ONE)),
+    )
     private val row = SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(2), strict = true)
     private val premise = SourceDerivation.Premise("row")
 
@@ -38,15 +40,26 @@ class NumericalSelectionSnapshotTest {
         assertEquals("Consequence", captured.getValue("claim").jsonPrimitive.content)
         assertEquals("2", captured.getValue("rhs").jsonPrimitive.content)
         assertEquals("true", captured.getValue("strict").jsonPrimitive.content)
-        assertEquals("1", captured.getValue("coefficients").jsonArray.single().jsonObject
-            .getValue("value").jsonPrimitive.content)
+        assertEquals(
+            "1",
+            captured.getValue("coefficients").jsonArray.single().jsonObject
+            .getValue("value").jsonPrimitive.content
+        )
         assertEquals("row", captured.getValue("derivation").jsonObject.getValue("id").jsonPrimitive.content)
     }
 
     @Test
     fun `imported bound capture should preserve its value and strictness`() {
-        val imported = SourceDerivation.Import(SourceEvidence(generation, SourceClaim.Bound(BigFraction.ONE,
-            strict = true), premise))
+        val imported = SourceDerivation.Import(
+            SourceEvidence(
+                generation,
+                SourceClaim.Bound(
+            BigFraction.ONE,
+            strict = true,
+        ),
+            premise
+            )
+        )
 
         val captured = NumericalSelectionSnapshot(ExecutionControl.Never).proof(imported)
 

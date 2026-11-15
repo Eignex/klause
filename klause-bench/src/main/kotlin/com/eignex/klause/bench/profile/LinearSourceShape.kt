@@ -41,7 +41,9 @@ internal object LinearSourceShape {
             val requests = Json.decodeFromString<List<List<String>>>(bytes.decodeToString())
             require(requests.size in 1..8)
             requests.forEachIndexed { index, request -> inspect(request.toTypedArray(), out.resolve("$index")) }
-        } else inspect(args, out)
+        } else {
+            inspect(args, out)
+        }
     }
 
     private fun inspect(args: Array<String>, out: File) {
@@ -61,9 +63,13 @@ internal object LinearSourceShape {
         val admitted = SmtLib.parse(bytes.decodeToString(), cancellation = ExecutionControl.after(10.seconds))
         val parsed = admitted
         val parsingNs = System.nanoTime() - started
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            parsed.source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            parsed.source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
         val model = requireNotNull(invocation.preparedPlan?.model) { "source has no factor inspection view" }
         val exactRows = model.factors.filterIsInstance<ExactLinear>()
         var capturedEntries = 0L
@@ -75,15 +81,20 @@ internal object LinearSourceShape {
                     val constants = row.constants as? IntegralConstants ?: continue
                     capturedEntries += row.size
                     require(capturedEntries <= 262144) { "equality capture exceeds entry limit" }
-                    add(buildJsonObject {
+                    add(
+                        buildJsonObject {
                         put("factor", factorIndex)
                         put("singleEqualityMeaning", factor.linearForm is LinearForm.Conjunction && rows.size == 1)
                         put("taggedRefs", buildJsonArray { repeat(row.size) { add(JsonPrimitive(row.ref(it))) } })
-                        put("coefficients", buildJsonArray {
+                        put(
+                            "coefficients",
+                            buildJsonArray {
                             repeat(row.size) { add(JsonPrimitive(constants.exactCoeff(it).toString())) }
-                        })
+                        }
+                        )
                         put("bound", constants.exactBound.toString())
-                    })
+                    }
+                    )
                 }
             }
         }
@@ -95,7 +106,9 @@ internal object LinearSourceShape {
             predicates += ExactLinear.of(
                 IntArray(row.size, row::ref),
                 List(row.size) { BigFraction.of(constants.exactCoeff(it), BIG_ONE) },
-                row.relation, BigFraction.of(constants.exactBound, BIG_ONE), row.strict,
+                row.relation,
+                BigFraction.of(constants.exactBound, BIG_ONE),
+                row.strict,
             ).structuralKey()
         }
         val shape = buildJsonObject {
@@ -115,28 +128,39 @@ internal object LinearSourceShape {
             put("compiledIntegers", model.numIntVars)
             put("compiledReals", model.numRealVars)
             put("compiledFactors", model.factors.size)
-            put("factorKinds", buildJsonObject {
+            put(
+                "factorKinds",
+                buildJsonObject {
                 model.factors.groupingBy { it::class.simpleName ?: "Factor" }.eachCount().toSortedMap()
                     .forEach { (kind, count) -> put(kind, count) }
-            })
+            }
+            )
             put("exactRows", exactRows.size)
             put("exactRowTerms", exactRows.sumOf { it.size.toLong() })
             put("activatedExactRows", activatedRows.size)
             put("activatedExactRowTerms", activatedRows.sumOf { it.size.toLong() })
-            put("rawExactPredicateEntries", model.numBoolVars.toLong() + model.numIntVars + model.numRealVars +
-                activatedRows.sumOf { it.size.toLong() + 1L })
+            put(
+                "rawExactPredicateEntries",
+                model.numBoolVars.toLong() + model.numIntVars + model.numRealVars +
+                    activatedRows.sumOf { it.size.toLong() + 1L },
+            )
             put("entryScope", "Raw source coordinates and activated exact rows; not an internal admission trace")
             put("constantExactRows", exactRows.count { it.size == 0 })
             put("unconditionalExactRows", exactRows.count { it.activator == LinearRow.ALWAYS })
             put("capturedIntegralEqualities", equalities.size)
             put("capturedIntegralEqualityEntries", capturedEntries)
             put("distinctExactPredicatesIgnoringActivators", predicates.size)
-            put("predicateEquivalence",
-                "ExactLinear structural identity after removing activators; no sign or implication reasoning")
+            put(
+                "predicateEquivalence",
+                "ExactLinear structural identity after removing activators; no sign or implication reasoning",
+            )
             put("javaVersion", System.getProperty("java.version"))
-            put("jvmOptions", buildJsonArray {
+            put(
+                "jvmOptions",
+                buildJsonArray {
                 ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
-            })
+            }
+            )
         }
         out.resolve("shape.json").writeText(shape.toString() + "\n")
         println(shape)

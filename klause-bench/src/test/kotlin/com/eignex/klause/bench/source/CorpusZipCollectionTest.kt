@@ -21,12 +21,14 @@ class CorpusZipCollectionTest {
         val name = "source.mps"
         val archive = ByteArrayOutputStream().also { out ->
             ZipOutputStream(out).use { zip ->
-                zip.putNextEntry(ZipEntry(name).apply {
+                zip.putNextEntry(
+                    ZipEntry(name).apply {
                     method = ZipEntry.STORED
                     size = original.size.toLong()
                     compressedSize = size
                     crc = CRC32().also { it.update(original) }.value
-                })
+                }
+                )
                 zip.write(original)
                 zip.closeEntry()
             }
@@ -46,7 +48,8 @@ class CorpusZipCollectionTest {
                 }
                 override fun getContentLengthLong() = -1L
                 override fun getInputStream() = archive.copyOfRange(
-                    interval[0].toInt(), interval[1].toInt() + 1,
+                    interval[0].toInt(),
+                    interval[1].toInt() + 1,
                 ).inputStream()
             }
         })
@@ -71,16 +74,20 @@ class CorpusZipCollectionTest {
         val archive = ByteArrayOutputStream().also { out ->
             ZipOutputStream(out).use { zip ->
                 val unrelated = ByteArray(524288)
-                zip.putNextEntry(ZipEntry("unrelated").apply {
+                zip.putNextEntry(
+                    ZipEntry("unrelated").apply {
                     method = ZipEntry.STORED
                     size = unrelated.size.toLong()
                     compressedSize = size
                     crc = CRC32().also { it.update(unrelated) }.value
-                })
+                }
+                )
                 zip.write(unrelated)
                 zip.closeEntry()
                 val instances = listOf(
-                    "nested/neos.mps.gz" to gzip, "other.mps" to original, "oversized.mps.gz" to ByteArray(2048),
+                    "nested/neos.mps.gz" to gzip,
+                    "other.mps" to original,
+                    "oversized.mps.gz" to ByteArray(2048),
                 )
                 for ((name, bytes) in instances) {
                     zip.putNextEntry(ZipEntry(name))
@@ -104,7 +111,8 @@ class CorpusZipCollectionTest {
                 }
                 override fun getContentLengthLong() = -1L
                 override fun getInputStream() = archive.copyOfRange(
-                    interval[0].toInt(), interval[1].toInt() + 1,
+                    interval[0].toInt(),
+                    interval[1].toInt() + 1,
                 ).also { transferred += it.size }.inputStream()
             }
         })

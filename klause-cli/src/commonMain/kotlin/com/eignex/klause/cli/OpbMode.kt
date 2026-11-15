@@ -28,7 +28,8 @@ internal object OpbMode : CliMode {
         override fun load(path: String, common: CommonOptions): Solvable {
             val overrides = common.sourceOverrides(opbSemantics)
             val parsed = openTextFile(path).useSource { Opb.parse(it) }.toProblem(
-                common.config.problemSettings(), semanticOverrides = overrides,
+                common.config.problemSettings(),
+                semanticOverrides = overrides,
             )
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${parsed.problem.numBoolVars} factors=${parsed.problem.numFactors}"
@@ -38,7 +39,11 @@ internal object OpbMode : CliMode {
             val render: (Sample) -> String = { s -> renderPbModel(parsed.numDeclaredVars, s) }
             // OPB objectives are minimisations; there is no maximisation form.
             return sourceSolvable(
-                parsed.problem, parsed.objective?.toLinearObjective(), false, common, render,
+                parsed.problem,
+                parsed.objective?.toLinearObjective(),
+                false,
+                common,
+                render,
                 { assignment -> renderPbModel(parsed.numDeclaredVars, assignment::boolValue) },
                 boolFolds = parsed.boolFolds,
             )

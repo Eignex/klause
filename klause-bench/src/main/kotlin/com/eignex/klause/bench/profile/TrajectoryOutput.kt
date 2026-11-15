@@ -22,12 +22,14 @@ internal fun compressTrajectoryOutput(out: File) {
         outputBytes += compressed.length()
         check(record.delete())
     }
-    out.resolve("compression.json").writeText(buildJsonObject {
+    out.resolve("compression.json").writeText(
+        buildJsonObject {
         put("files", records.size)
         put("inputBytes", inputBytes)
         put("outputBytes", outputBytes)
         put("elapsedNanos", System.nanoTime() - started)
         put("allocatedBytes", trajectoryThreadBytes() - before)
         put("includedInWalkAllowance", false)
-    }.toString())
+    }.toString()
+    )
 }

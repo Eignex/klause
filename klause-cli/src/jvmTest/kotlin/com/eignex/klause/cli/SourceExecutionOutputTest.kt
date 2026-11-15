@@ -25,10 +25,13 @@ import kotlin.test.assertTrue
 class SourceExecutionOutputTest {
     @Test
     fun `unchanged open preparation should render effort fields`() {
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
             SmtLib.parse("(declare-const x Real) (assert (> x 0))").source,
-            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
         val solvable = preparedSourceSolvable(invocation, { error("open source is not finite") }, { "point" })
         val common = CommonOptions().apply {
             engine = "cp"
@@ -37,7 +40,9 @@ class SourceExecutionOutputTest {
         }
         var observed: SolveStats? = null
         val output = object : OutputProtocol by SmtLibOutput() {
-            override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) { observed = stats }
+            override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
+                observed = stats
+            }
         }
 
         SolveCore.solve(solvable, common, output)
@@ -54,13 +59,20 @@ class SourceExecutionOutputTest {
     @Test
     fun `linear source output should retain a disabled preparation ledger`() {
         val source = SourceAttachment(
-            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
+            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()),
+            ProblemSettings(),
         )
-        val common = CommonOptions().apply { engine = "cp"; statistics = true; presolve = "off" }
+        val common = CommonOptions().apply {
+            engine = "cp";
+            statistics = true;
+            presolve = "off"
+        }
         val solvable = linearSourceSolvable(source, common, { "point" })
         var observed: SolveStats? = null
         val output = object : OutputProtocol by SmtLibOutput() {
-            override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) { observed = stats }
+            override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
+                observed = stats
+            }
         }
 
         SolveCore.solve(solvable, common, output)
@@ -78,16 +90,24 @@ class SourceExecutionOutputTest {
         val source = SmtLib.parse(
             "(set-logic QF_NRA) (declare-const x Real) (assert (< (* x x) 0))",
         ).source
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            source, ExecutionOperation.SATISFY, FiniteEngine.LOCAL_SEARCH,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.LOCAL_SEARCH,
+        )
+        )
         val rendering = SourceRendering.ExactSource(invocation) { error("a refutation has no witness") }
         val execution = PolynomialTheoryExecution(OpenTheoryResult.Unsat(SolveStats.EMPTY), PolynomialTheoryStats())
         var completed: Verdict? = null
         var verdictContext: VerdictContext? = null
         val output = object : OutputProtocol by SmtLibOutput() {
-            override fun onVerdictContext(context: VerdictContext) { verdictContext = context }
-            override fun onComplete(verdict: Verdict) { completed = verdict }
+            override fun onVerdictContext(context: VerdictContext) {
+                verdictContext = context
+            }
+            override fun onComplete(verdict: Verdict) {
+                completed = verdict
+            }
         }
 
         reportNativeSatisfaction(execution, rendering, output, false, 0L, completePool = false)
@@ -102,18 +122,27 @@ class SourceExecutionOutputTest {
         val source = SmtLib.parse(
             "(set-logic QF_NRA) (declare-const x Real) (assert (< (* x x) 0))",
         ).source
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            source, ExecutionOperation.SATISFY, FiniteEngine.LOCAL_SEARCH,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.LOCAL_SEARCH,
+        )
+        )
         val rendering = SourceRendering.ExactSource(invocation) { error("an incomplete result has no witness") }
         val execution = PolynomialTheoryExecution(
-            OpenTheoryResult.Unknown(TerminationReason.BudgetExhausted, SolveStats.EMPTY), PolynomialTheoryStats(),
+            OpenTheoryResult.Unknown(TerminationReason.BudgetExhausted, SolveStats.EMPTY),
+            PolynomialTheoryStats(),
         )
         var completed: Verdict? = null
         var verdictContext: VerdictContext? = null
         val output = object : OutputProtocol by SmtLibOutput() {
-            override fun onVerdictContext(context: VerdictContext) { verdictContext = context }
-            override fun onComplete(verdict: Verdict) { completed = verdict }
+            override fun onVerdictContext(context: VerdictContext) {
+                verdictContext = context
+            }
+            override fun onComplete(verdict: Verdict) {
+                completed = verdict
+            }
         }
 
         reportNativeSatisfaction(execution, rendering, output, false, 0L, completePool = false)
@@ -125,11 +154,16 @@ class SourceExecutionOutputTest {
     @Test
     fun `open linear satisfaction should publish a witness without an objective`() {
         val source = SourceAttachment(
-            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
+            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()),
+            ProblemSettings(),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
         assertEquals(SourceExecutionKind.LINEAR, SourceSetup.executionKind(invocation))
         val solvable = preparedSourceSolvable(invocation, { error("open source is not finite") }, { "point" })
         val common = CommonOptions().apply { engine = "cp" }

@@ -55,14 +55,16 @@ internal object SourceStageProfile {
         require(recording.length() in 1..128L * 1024 * 1024)
         val hash = sha256(recording.readBytes())
         require(hash == input.getValue("sha256").jsonPrimitive.content)
-        out.resolve("identity.json").writeText(buildJsonObject {
+        out.resolve("identity.json").writeText(
+            buildJsonObject {
             put("revision", Reports.readGitSha())
             put("sourceJob", job)
             put("sourceCase", case)
             put("recording", relative)
             put("sha256", hash)
             put("solverExecuted", false)
-        }.toString())
+        }.toString()
+        )
         PrintStream(out.resolve("profile-summary.txt")).use {
             CliProfile.summarizeCli(recording, it, "retained profile $job")
         }
@@ -70,8 +72,10 @@ internal object SourceStageProfile {
 
     private fun capture(input: JsonObject, out: File) {
         val required = setOf("suite", "problem", "sha256", "engine", "exact")
-        require(input.keys.containsAll(required) &&
-            input.keys - required - setOf("seed", "timeout") == emptySet<String>())
+        require(
+            input.keys.containsAll(required) &&
+                input.keys - required - setOf("seed", "timeout") == emptySet<String>(),
+        )
         val reference = Catalog.uncapped(input.getValue("suite").jsonPrimitive.content).problems
             .single { it.name == input.getValue("problem").jsonPrimitive.content }
         val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use {
@@ -95,21 +99,30 @@ internal object SourceStageProfile {
         val configuration = File(System.getProperty("java.home"), "lib/jfr/profile.jfc").readText()
         val nativeEvent = Regex("<event name=\"jdk.NativeMethodSample\">.*?</event>", RegexOption.DOT_MATCHES_ALL)
         require(nativeEvent.containsMatchIn(configuration))
-        settings.writeText(nativeEvent.replace(configuration) { match ->
-            Regex("<setting name=\"enabled\"[^>]*>.*?</setting>").replace(match.value,
-                "<setting name=\"enabled\">true</setting>")
-        })
+        settings.writeText(
+            nativeEvent.replace(configuration) { match ->
+            Regex("<setting name=\"enabled\"[^>]*>.*?</setting>").replace(
+                match.value,
+                "<setting name=\"enabled\">true</setting>",
+            )
+        }
+        )
         val options = "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1 " +
             "-XX:StartFlightRecording=filename=$recording,settings=$settings," +
             "duration=${timeout + 35_000}ms,dumponexit=true"
         val command = buildList {
             add(SolverInvocation.klauseCliBin().absolutePath)
-            addAll(listOf("--format", format, source.absolutePath, "-t", timeout.toString(), "-r", seed.toString(),
-                "-s", "-a", "--output-objective"))
+            addAll(
+                listOf(
+                    "--format", format, source.absolutePath, "-t", timeout.toString(), "-r", seed.toString(),
+                "-s", "-a", "--output-objective",
+                )
+            )
             if (engine != "default") addAll(listOf("-e", engine))
             if (exact) add("--exact")
         }
-        out.resolve("identity.json").writeText(buildJsonObject {
+        out.resolve("identity.json").writeText(
+            buildJsonObject {
             put("revision", Reports.readGitSha())
             put("sourceSha256", sha256(bytes))
             put("command", JsonArray(command.map(::JsonPrimitive)))
@@ -117,14 +130,21 @@ internal object SourceStageProfile {
             put("debug", true)
             put("sourceVerdictClaim", false)
             put("purpose", "stage attribution under JFR; no throughput claim")
-        }.toString())
+        }.toString()
+        )
         val process = ProcessBuilder(command).redirectOutput(out.resolve("cli.stdout"))
             .redirectError(out.resolve("cli.stderr")).apply {
                 environment().apply {
                     put("KLAUSE_CLI_OPTS", options)
                     put("KLAUSE_DEBUG", "true")
-                    for (name in listOf("OPENBLAS_NUM_THREADS", "VECLIB_MAXIMUM_THREADS", "MKL_NUM_THREADS",
-                        "OMP_NUM_THREADS")) put(name, "1")
+                    for (name in listOf(
+                        "OPENBLAS_NUM_THREADS",
+                        "VECLIB_MAXIMUM_THREADS",
+                        "MKL_NUM_THREADS",
+                        "OMP_NUM_THREADS",
+                    )) {
+                        put(name, "1")
+                    }
                 }
             }.start()
         val snapshots = thread(isDaemon = true, name = "source-profile-snapshots") {
@@ -132,8 +152,12 @@ internal object SourceStageProfile {
                 Thread.sleep(timeout / 3)
                 if (process.isAlive) {
                     runCatching {
-                        val dump = ProcessBuilder(File(System.getProperty("java.home"), "bin/jcmd").absolutePath,
-                            process.pid().toString(), "Thread.print", "-l")
+                        val dump = ProcessBuilder(
+                            File(System.getProperty("java.home"), "bin/jcmd").absolutePath,
+                            process.pid().toString(),
+                            "Thread.print",
+                            "-l",
+                        )
                             .redirectOutput(out.resolve("threads-$index.txt"))
                             .redirectError(out.resolve("threads-$index.stderr")).start()
                         val complete = dump.waitFor(3, TimeUnit.SECONDS)

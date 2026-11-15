@@ -76,9 +76,13 @@ internal class SourceHarnessObservation(private val read: () -> SourceHarnessCou
                     ManagementFactory.getGarbageCollectorMXBeans()
                         .takeIf { it.isNotEmpty() && it.all { bean -> bean.isValid } }
                 }.getOrNull()
-                SourceHarnessCounters(cpu, total(collectors) { it.collectionCount },
-                    total(collectors) { it.collectionTime }, collectors?.map { it.name }?.sorted(),
-                    Thread.currentThread().threadId())
+                SourceHarnessCounters(
+                    cpu,
+                    total(collectors) { it.collectionCount },
+                    total(collectors) { it.collectionTime },
+                    collectors?.map { it.name }?.sorted(),
+                    Thread.currentThread().threadId(),
+                )
             }
         }
 
