@@ -61,7 +61,8 @@ class CompilerLiftTest {
         val expression = IntSum(listOf(IntRef("x"), IntRef("x"), IntLit(1)))
 
         val result = lowering.intVarOf(lowering.materializeIntVar(expression).name)
-        val samples = BacktrackSolver(lowering.buildProblem().bake()).enumerate(BacktrackParams(randomSeed = 0)).toList()
+        val samples = BacktrackSolver(lowering.buildProblem().bake())
+            .enumerate(BacktrackParams(randomSeed = 0)).toList()
 
         assertEquals(5, samples.size)
         for (sample in samples) assertEquals(2 * sample.intValue(x) + 1, sample.intValue(result))
