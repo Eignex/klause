@@ -12,8 +12,12 @@ parts' linear objective contributions for distinct coordinates; repeated-coordin
 linear deltas use a probe of the final values.
 
 Moves that feed definitions score the complete propagated assignment through a
-reversible **probe**. A probe applies all compound inputs together, runs one
-definition pass over the affected cone, reads hard cost and objective, then
+reversible **probe**. Each state retains one `LocalSearchProbe`, which owns saved
+coordinates, first-touch factor grades, scoring cancellation and the preparation,
+application, reading and restoration phases. Assignment, payload and definition
+updates stay in the state's shared mutation machinery. A probe applies all compound
+inputs together, runs one definition pass over the affected cone, reads hard cost
+and objective, then
 restores the saved inputs and outputs directly. Feasible grading reads hard cost and
 objective from the same probe, rejecting a hard violation before valuing the
 objective. Probes record no activity or best-cost observations, and weighted probes
@@ -23,7 +27,8 @@ saved coordinates before returning. A primitive probe edit and its restoration
 remain atomic; read-only extensional scores poll within their scans.
 Probe, objective and read-only scoring visits share their worker's countdown of
 at most 1,024 visits. Charging an inspection does not evaluate cancellation.
-Worker picks and nested probes contribute to that countdown. Unbound scans poll
+Worker picks and probes contribute to that countdown. Direct probe predicates
+check between primitive edits and definition outputs. Unbound scans poll
 within 256 visits, and unbound picks check at entry and
 return; worker publication and suspension force full containing-stop checks.
 
@@ -31,7 +36,9 @@ A functional objective whose every cone definition is a node of the live network
 scores as the linear form of its terms: the probe has already propagated the cone, so
 its delta comes from the probed and restored term values. A gradient view built from
 other definitions evaluates its cones after the probe against the committed value,
-which the state evaluates once per assignment change.
+which the probe owner caches once per assignment change. Element-preserving
+repairs read its saved selections, and Cumulative refinements compare saved and
+probed fractional grades within the same lifecycle.
 
 `ArgminJump` builds coordinated integer targets and maintained-Boolean inverse
 repairs through the generic move sink before comparing their complete weighted

@@ -7,6 +7,7 @@ import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.pollStop
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal class PolynomialRealLowering(
@@ -174,7 +175,7 @@ internal class PolynomialConditional(
 internal class PolynomialSourceInterrupted : RuntimeException("polynomial source lowering interrupted")
 
 internal fun ExecutionControl.polynomialSourceCheckpoint(units: Long = 0) {
-    if (isCancelled()) throw PolynomialSourceInterrupted()
+    if (pollStop()) throw PolynomialSourceInterrupted()
     if (units > 0) charge(units)
-    if (isCancelled()) throw PolynomialSourceInterrupted()
+    if (admission?.exhausted == true || pollStop()) throw PolynomialSourceInterrupted()
 }

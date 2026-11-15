@@ -175,6 +175,8 @@ The invocation owns one live deadline predicate, shared by loading, routing and
 solving. Rearming the deadline updates that predicate. Required source preparation
 retains the invocation stop while its routing accounting sink is active; closing
 preparation releases that sink from retained source requests.
+SMT loading binds its own checkpoint countdown. Parsing visits use that countdown,
+while source entry and admission check the live invocation stop directly.
 
 ### Arithmetic routes
 

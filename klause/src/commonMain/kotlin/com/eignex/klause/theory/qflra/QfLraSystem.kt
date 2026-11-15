@@ -34,6 +34,7 @@ import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.pollStop
 import kotlin.time.TimeSource
 
 internal class QfLraSystem(private val model: Problem) {
@@ -238,10 +239,10 @@ internal class LiveQfLraSystem(
         stop: ExecutionControl,
         committed: (Int) -> Unit,
     ): Boolean {
-        if (lp.state == null) return false
+        if (stop() || lp.state == null) return false
         val batch = SmtSourceBoundBatch(lp, ::assertBounds, committed)
         for ((index, input) in comparisons.withIndex()) {
-            if (stop()) return false
+            if (stop.pollStop()) return false
             if (lp.state?.conflict != null) return true
             require(input.comparison.op != LinearOp.NE)
             if (!batchSourceBounds || lp.state?.depth == 0) {
@@ -254,7 +255,7 @@ internal class LiveQfLraSystem(
             val rows = ArrayList<ExactRationalInequality>(2)
             comparison.rowsInto(rows)
             for ((side, row) in rows.withIndex()) {
-                if (stop()) return false
+                if (stop.pollStop()) return false
                 val negated = comparison.op == LinearOp.GE || (comparison.op == LinearOp.EQ && side == 1)
                 val bound = prepareBound(
                     if (negated) keys.negative else keys.positive,

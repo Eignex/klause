@@ -17943,6 +17943,10 @@ public final class com/eignex/klause/util/PermutationGroup {
 	public static synthetic fun strongGenerators$default (Lcom/eignex/klause/util/PermutationGroup;Ljava/util/List;II[IILjava/lang/Object;)Ljava/util/List;
 }
 
+public final class com/eignex/klause/util/StopPollingKt {
+	public static final fun withBoundedPolling (Lcom/eignex/klause/util/ExecutionControl;)Lcom/eignex/klause/util/ExecutionControl;
+}
+
 public abstract interface class com/eignex/klause/util/WorkMeter {
 	public abstract fun charge (J)V
 }

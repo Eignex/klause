@@ -435,6 +435,9 @@ arithmetic admission source. Adding a stop condition retains the receiver's
 accounting owner; execution boundaries bind a different owner explicitly.
 Charging completed work never evaluates a stop predicate. Solver policy owns
 currency conversions and result semantics.
+`withBoundedPolling()` creates a countdown owned by one executing worker for
+cooperative checkpoints. Direct stop observations remain immediate, and numeric
+admission limits are checked independently of that countdown.
 
 Arithmetic allowance cursors reserve bounded credit from persistent worker and
 containing `WorkCreditPool`s. Reserved capacity is distinct from spent work; a

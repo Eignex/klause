@@ -1369,7 +1369,7 @@ class ExactLiraSearchComponent private constructor(
                 indices += index
             }
         }
-        if (!system.assertComparisons(comparisons, operationStop) { index ->
+        if (!system.assertComparisons(comparisons, lpStop) { index ->
                 val source = indices[index]
                 if (sourceAssertionLevels[source] < 0 && context.decisionLevel > 0) scopedSourceAssertions.add(source)
                 sourceAssertionLevels[source] = context.decisionLevel

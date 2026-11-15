@@ -32,6 +32,9 @@ internal inline fun ExecutionControl.pollStop(work: Int = 1): Boolean {
 internal fun ExecutionControl.bindStopControl(): ExecutionControl =
     if (this === ExecutionControl.Never) this else WorkerStopControl(unboundStopControl())
 
+/** Bind one executing worker's bounded checkpoints; direct stop observations remain immediate. */
+fun ExecutionControl.withBoundedPolling(): ExecutionControl = bindStopControl()
+
 internal fun ExecutionControl.unboundStopControl(): ExecutionControl = if (this is WorkerStopControl) original else this
 
 private class WorkerStopControl(val original: ExecutionControl) : ExecutionControl(original) {

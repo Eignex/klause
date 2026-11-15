@@ -16,6 +16,7 @@ import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.TranscendentalProblem
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
@@ -26,6 +27,7 @@ import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.withBoundedPolling
 import com.eignex.util.io.CharSource
 import com.eignex.util.io.StringCharSource
 import com.eignex.util.numbers.bigIntOf
@@ -39,6 +41,20 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SmtLibAdmissionTest {
+    @Test
+    fun `bounded polling should stop admission at its exact work allowance`() {
+        val budget = PresolveBudget(1)
+
+        assertFailsWith<CancellationException> {
+            SmtLib.parse(
+                "(declare-const x Real) (assert (= x 1)) (check-sat)",
+                cancellation = budget.slice(1).withBoundedPolling(),
+            )
+        }
+
+        assertEquals(1L, budget.spent())
+    }
+
     @Test
     fun `inconsistent integer scalar equations should retain a linear source`() {
         val source = SmtLib.parse(

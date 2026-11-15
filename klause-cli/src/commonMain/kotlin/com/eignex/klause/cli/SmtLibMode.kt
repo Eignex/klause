@@ -14,6 +14,7 @@ import com.eignex.klause.solver.pipeline.symbolicRealValue
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.withBoundedPolling
 import com.eignex.util.io.openTextFile
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.plus
@@ -42,7 +43,7 @@ internal object SmtLibMode : CliMode {
             val overrides = common.sourceOverrides(smtLibSemantics)
             latestSourceObjective = null
             val admissionStart = TimeSource.Monotonic.markNow()
-            val stop = common.invocationCancellation()
+            val stop = common.invocationCancellation().withBoundedPolling()
             val parsed = try {
                 SmtLib.parse(
                     { openTextFile(path) },
