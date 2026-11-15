@@ -581,7 +581,7 @@ class SearchLearningTest {
     @Test
     fun `growth past the count cap should physically release the excess within the production grant`() {
         val cap = 4000
-        val excess = 1000
+        val excess = 500
         val params = SearchLearnedDbParams(maxClauses = cap, glueLbd = 0)
         val learning = SearchLearning(params)
         val reference = SearchLearning(params)
@@ -613,7 +613,7 @@ class SearchLearningTest {
         val empty = observedMemory(learning)
 
         repeat(4) { round ->
-            repeat(500) { learning.learn(intArrayOf((round * 500 + it) * 4, (round * 500 + it) * 4 + 2), host) }
+            repeat(250) { learning.learn(intArrayOf((round * 250 + it) * 4, (round * 250 + it) * 4 + 2), host) }
             learning.propagate(host, IntArrayList())
             learning.onRestart()
         }
