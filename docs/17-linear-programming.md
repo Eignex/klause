@@ -87,6 +87,10 @@ Worker bound assembly and reduced-cost scans contribute to the worker's shared
 stop countdown. Unbound callers check directly. Scoped LP operations share their
 own countdown across projection, reconstruction and source scans; complete batch
 assertions remain atomic, and enclosing query publication checks the full stop.
+Numerical pricing records completed work before checking its immediate numerical
+allowance. It advances the containing stop countdown by the estimated work since
+its preceding check; parent cancellation is observed when that countdown is due.
+The numerical solver binds its accounting sink when it adopts a containing token.
 Retained-source assembly and fixed-layout installation adopt the same immutable exact bound objects after a
 complete match against the current normalized column, including its origin, tag,
 integrality and both bound sides.

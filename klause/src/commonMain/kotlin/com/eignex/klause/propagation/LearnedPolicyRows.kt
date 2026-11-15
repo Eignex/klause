@@ -372,9 +372,9 @@ internal class LearnedPolicyRows(
         val retained = ((count.toLong() + PAGE_MASK) ushr PAGE_SHIFT).toInt()
         if (count == 0) {
             primary?.let {
-            discard(it)
-            work += 8L
-        }
+                discard(it)
+                work += 8L
+            }
         }
         if (count > 0 && count and PAGE_MASK != 0) {
             val last = pageAt((count - 1) ushr PAGE_SHIFT)

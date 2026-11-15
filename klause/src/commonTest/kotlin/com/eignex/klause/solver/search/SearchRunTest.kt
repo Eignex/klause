@@ -152,9 +152,8 @@ class SearchRunTest {
             val run = session.openRun(
                 1,
                 lifecycle = object : SearchRunLifecycle {
-                    override fun onCancellation(
-                        context: SearchContext,
-                    ): SearchRunDisposition = SearchRunDisposition.Pause
+                    override fun onCancellation(context: SearchContext): SearchRunDisposition =
+                        SearchRunDisposition.Pause
                 },
             )
 
@@ -197,9 +196,8 @@ class SearchRunTest {
                 1,
                 modelContinuation = continuation,
                 lifecycle = object : SearchRunLifecycle {
-                    override fun onCancellation(
-                        context: SearchContext,
-                    ): SearchRunDisposition = SearchRunDisposition.Pause
+                    override fun onCancellation(context: SearchContext): SearchRunDisposition =
+                        SearchRunDisposition.Pause
                 },
             )
 
@@ -269,9 +267,8 @@ class SearchRunTest {
         val run = session.openRun(
             0,
             lifecycle = object : SearchRunLifecycle {
-                override fun onCancellation(
-                    context: SearchContext,
-                ): SearchRunDisposition = SearchRunDisposition.Exhausted
+                override fun onCancellation(context: SearchContext): SearchRunDisposition =
+                    SearchRunDisposition.Exhausted
             },
         )
 

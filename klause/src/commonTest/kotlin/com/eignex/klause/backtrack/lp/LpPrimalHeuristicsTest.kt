@@ -850,10 +850,10 @@ class LpPrimalHeuristicsTest {
         val primal = DoubleArray(relaxation.model.n)
         for (v in 0 until 8) {
             primal[relaxation.intColOf[v]] = when (v) {
-            0 -> 0.25
-            in 1..3 -> 0.4
-            else -> 0.5
-        }
+                0 -> 0.25
+                in 1..3 -> 0.4
+                else -> 0.5
+            }
         }
         val factory = RecordingLpEngineFactory()
         LpEngine(

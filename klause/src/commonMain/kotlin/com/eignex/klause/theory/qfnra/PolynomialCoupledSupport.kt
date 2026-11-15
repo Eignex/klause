@@ -98,9 +98,9 @@ private fun coupledEqualities(
         val premises = LinkedHashSet<Int>()
         for (entry in entries) {
             for (premise in entry.premises) {
-            arithmetic.step()
-            premises.add(premise)
-        }
+                arithmetic.step()
+                premises.add(premise)
+            }
         }
         result.add(PolynomialCoupledSupport(PolynomialAtom(polynomial, PolynomialRelation.EQ), premises))
         changed = true

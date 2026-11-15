@@ -7,6 +7,9 @@ import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.StopPolling
+import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.serialArithmeticSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -15,6 +18,35 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RevisedSimplexTheoryPricingTest {
+    @Test
+    fun `a containing quota should stop pricing independently of cancellation polling`() {
+        var charged = 0L
+        val polling = StopPolling(8192).apply { rearm() }
+        val source = serialArithmeticSource(ExecutionControl.Never, { (1L - charged).coerceAtLeast(0L) }) {
+            charged += it
+        }
+        val token = object : ExecutionControl() {
+            override fun isCancelled(): Boolean = false
+            override val stopPolling get() = polling
+            override val accounting = WorkMeter { charged += it }
+            override val admission get() = source
+        }
+        val updates = ArrayList<Int>()
+        val simplex = RevisedSimplex(
+            disturbedSupportModel(),
+            cancellation = token,
+            basisSolverFactory = recordingFactory(updates),
+            pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
+        )
+
+        val result = assertNotNull(simplex.solve())
+
+        assertFalse(result.optimal)
+        assertEquals(1, simplex.lastTheoryPricingResourceStops)
+        assertTrue(updates.isEmpty())
+        assertTrue(charged > 0L)
+    }
+
     @Test
     fun `theory pricing should prefer less transformed non-free support`() {
         val model = disturbedSupportModel()

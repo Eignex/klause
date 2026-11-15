@@ -15,9 +15,12 @@ import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.MAX_SCALAR_COLUMN_ENTRIES
 import com.eignex.klause.simplex.basis.RationalBasisOrder
 import com.eignex.klause.simplex.basis.SymbolicLu
+import com.eignex.klause.util.ArithmeticWorkSource
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SparseSlices
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.cancelledWhen
+import com.eignex.klause.util.pollStop
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.koblas
 import com.eignex.koblas.sparse.dotColumn
@@ -343,15 +346,27 @@ internal class RevisedSimplex(
     // The work counted into [work] is charged to the caller's token at every poll and when a solve ends,
     // so a work-metered token stops the solve at the same pivot however loaded the machine is.
     private var stopToken: ExecutionControl = cancellation
+        set(value) {
+            field = value
+            stopAccounting = value.accounting
+            stopAdmission = value.admission
+        }
+    private var stopAccounting: WorkMeter? = stopToken.accounting
+    private var stopAdmission: ArithmeticWorkSource? = stopToken.admission
     private var chargedOps = 0L
-    private val cancellation: ExecutionControl = cancelledWhen({ stopToken.deadline() }) {
+    private var pricingPollOps = 0L
+    private val cancellation: ExecutionControl = cancelledWhen(
+        { stopToken.deadline() },
+        { stopToken.workScheduled },
+        { stopToken.stopPolling },
+    ) {
         chargeWork()
         stopToken()
     }
 
     private fun chargeWork() {
         val ops = work.ops
-        if (ops > chargedOps) stopToken.charge(ops - chargedOps)
+        if (ops > chargedOps) stopAccounting?.charge(ops - chargedOps)
         chargedOps = ops
     }
 
@@ -1636,6 +1651,7 @@ internal class RevisedSimplex(
         chargeWork()
         work.reset(if (strictProbeWorkLimit > 0L) effectiveWorkLimit else 0L)
         chargedOps = 0L
+        pricingPollOps = 0L
         observations.lastPreparationOps = pendingNumericalWork.ops
         pendingNumericalWork.reset()
         observations.warmStarted = false
@@ -2774,8 +2790,14 @@ internal class RevisedSimplex(
         observations.lastTheoryPricingWorkOps += amount
     }
 
-    private fun pricingResourceStopped(): Boolean =
-        cancellation() || (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit)
+    private fun pricingResourceStopped(): Boolean {
+        chargeWork()
+        val ops = work.ops
+        val units = (ops - pricingPollOps).coerceIn(1L, Int.MAX_VALUE.toLong()).toInt()
+        pricingPollOps = ops
+        return stopAdmission?.exhausted == true || stopToken.pollStop(units) ||
+            (effectiveWorkLimit > 0L && ops >= effectiveWorkLimit)
+    }
 
     private fun candidateOrderingWork(size: Int): Long {
         var levels = 0
