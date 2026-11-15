@@ -357,10 +357,12 @@ completion. Local-search and ALNS workers
 [complete candidates](11-neighborhoods.md#continuous-candidate-completion) through the
 same acceptance, so every engine accepts the same points. Real coordinates that share
 a relation form a component, and acceptance judges each component on its own. A
-component with a product, power, absolute value, extremum or selection over reals
-holds exactly, its declarations and linear rows included, while other components keep
-the slack. A source whose every component holds exactly has no acceptance, so its
-completions stay exact, and sources routed to a
+component with any real relation other than linear rows and finite memberships, such
+as a product, power, absolute value, extremum, selection or distinctness, must hold
+exactly at the accepted point, its declarations, rows and memberships included, while
+the other components read the slack. A refused point completes the whole leaf exactly,
+every component included. A source with no row or membership outside such components
+has no acceptance, so its completions stay exact, and sources routed to a
 [linear theory](15-linear-arithmetic.md) are decided exactly. Completed search
 reports its optimum or refutation under this numerical policy.
 
