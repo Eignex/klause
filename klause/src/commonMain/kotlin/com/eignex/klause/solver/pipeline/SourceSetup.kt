@@ -124,8 +124,12 @@ object SourceSetup {
         onLpStats: ((LpStats) -> Unit)? = null,
     ): PreparedSourceInvocation {
         val selection = selectRoute(request, onLpStats, polynomialCancellation)
-        return (privateGrid(selection) as? SelectedFloatGridPreparation.Prepared)?.invocation
-            ?: PreparedSourceInvocation(selection)
+        val prepared = privateGrid(selection) as? SelectedFloatGridPreparation.Prepared
+            ?: return PreparedSourceInvocation(selection)
+        require(prepared.invocation.selection === selection) {
+            "grid invocation belongs to a different route selection"
+        }
+        return prepared.invocation
     }
 
     internal fun selectRoute(
