@@ -3,9 +3,13 @@ package com.eignex.klause.compile
 import com.eignex.klause.factor.IntFunctionLowering
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.lowering.LinComb
+import com.eignex.klause.lowering.absUpperBound
+import com.eignex.klause.lowering.intAbs
+import com.eignex.klause.lowering.newIntExpression
+import com.eignex.klause.lowering.newIntProduct
+import com.eignex.klause.lowering.productBounds
 import com.eignex.klause.model.IntAbs
-import com.eignex.klause.model.IntCmpOp
-import com.eignex.klause.model.IntCompare
 import com.eignex.klause.model.IntDiv
 import com.eignex.klause.model.IntElement
 import com.eignex.klause.model.IntExpr
@@ -87,21 +91,14 @@ internal fun Lowering.liftMul(left: IntExpr, right: IntExpr): IntExpr {
     val bRef = materializeIntVar(r)
     val aDom = intDomains[intVarOf(aRef.name)]
     val bDom = intDomains[intVarOf(bRef.name)]
-    val cornersLong = longArrayOf(
-        mulExact(aDom.min, bDom.min),
-        mulExact(aDom.min, bDom.max),
-        mulExact(aDom.max, bDom.min),
-        mulExact(aDom.max, bDom.max),
-    )
-    val pMin = cornersLong.min()
-    val pMax = cornersLong.max()
-    require(pMin >= Int.MIN_VALUE && pMax <= Int.MAX_VALUE) {
-        "IntMul product domain overflows Int: $aDom * $bDom = [$pMin, $pMax]"
+    val productDomain = productBounds(aDom, bDom) { a, b -> mulExact(a, b) }
+    require(productDomain.min >= Int.MIN_VALUE && productDomain.max <= Int.MAX_VALUE) {
+        "IntMul product domain overflows Int: $aDom * $bDom = [${productDomain.min}, ${productDomain.max}]"
     }
-    val productDomain = IntDomain(pMin, pMax)
-    val resultName = newAuxIntVar(productDomain)
-    factors += Product(intVarOf(aRef.name), intVarOf(bRef.name), intVarOf(resultName))
-    return IntRef(resultName)
+    val result = problemBuilder.newIntProduct(intVarOf(aRef.name), intVarOf(bRef.name), productDomain) {
+        intVarOf(newAuxIntVar(it))
+    }
+    return IntRef(idToIntName.getValue(result))
 }
 
 /** Force [expr] into a single [IntRef] so a factor that takes raw int var ids (like
@@ -111,20 +108,22 @@ internal fun Lowering.materializeIntVar(expr: IntExpr): IntRef = when (expr) {
 
     else -> {
         val d = domainOf(expr)
-        val name = newAuxIntVar(d)
-        val ref = IntRef(name)
-        assertExpr(IntCompare(ref, IntCmpOp.EQ, expr))
-        ref
+        val negative = subtract(Affine(emptyMap(), 0), affine(expr))
+        val coefficients = HashMap<Int, Long>(negative.coeffs.size)
+        for ((name, coefficient) in negative.coeffs) coefficients[intVarOf(name)] = -coefficient.toLong()
+        val expression = LinComb(coefficients, -negative.constant.toLong())
+        val result = problemBuilder.newIntExpression(expression, d, freshInt = { intVarOf(newAuxIntVar(it)) })
+        IntRef(idToIntName.getValue(result))
     }
 }
 
 internal fun Lowering.liftAbs(child: IntExpr): IntExpr {
     val lifted = lift(child)
     val d = domainOf(lifted)
-    val absMax = if (d.min == Long.MIN_VALUE) Long.MAX_VALUE else maxOf(kotlin.math.abs(d.min), kotlin.math.abs(d.max))
+    val absMax = absUpperBound(d)
     val auxName = newAuxIntVar(IntDomain(0L, absMax))
     val operandId = intVarOf(materializeIntVar(lifted).name)
-    factors += IntFunctionLowering.absFactors(operandId, intVarOf(auxName)) { newBoolVar() }
+    problemBuilder.intAbs(operandId, intVarOf(auxName))
     return IntRef(auxName)
 }
 

@@ -20,6 +20,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.model.IntAbs
 import com.eignex.klause.model.IntDomainSpec
+import com.eignex.klause.model.IntLit
 import com.eignex.klause.model.IntMul
 import com.eignex.klause.model.IntRef
 import com.eignex.klause.model.IntScale
@@ -53,6 +54,29 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CompilerLiftTest {
+    @Test
+    fun `materialized affine operands should preserve repeated terms`() {
+        val lowering = Lowering(ProblemSettings(), schemaSemantics.resolve())
+        val x = lowering.bindIntName("x", lowering.newIntVar(IntDomain(-2, 2)))
+        val expression = IntSum(listOf(IntRef("x"), IntRef("x"), IntLit(1)))
+
+        val result = lowering.intVarOf(lowering.materializeIntVar(expression).name)
+        val samples = BacktrackSolver(lowering.buildProblem().bake()).enumerate(BacktrackParams(randomSeed = 0)).toList()
+
+        assertEquals(5, samples.size)
+        for (sample in samples) assertEquals(2 * sample.intValue(x) + 1, sample.intValue(result))
+    }
+
+    @Test
+    fun `materialization should retain checked schema negation limits`() {
+        for (expression in listOf(IntLit(Int.MIN_VALUE), IntScale(Int.MIN_VALUE, IntRef("x")))) {
+            val lowering = Lowering(ProblemSettings(), schemaSemantics.resolve())
+            lowering.bindIntName("x", lowering.newIntVar(IntDomain(0, 0)))
+
+            assertFailsWith<IllegalArgumentException> { lowering.materializeIntVar(expression) }
+        }
+    }
+
     @Test
     fun `a repeated quotient and remainder alias should reject inconsistent source roles`() {
         val parsed = parseFlatZinc(

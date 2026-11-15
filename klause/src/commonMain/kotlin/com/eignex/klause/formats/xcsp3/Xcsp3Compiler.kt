@@ -9,26 +9,34 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.EffectiveSourceSemantics
-import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.values
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.LinRelation
+import com.eignex.klause.lowering.ProblemBuilder
+import com.eignex.klause.lowering.absBounds
 import com.eignex.klause.lowering.constProduct
 import com.eignex.klause.lowering.constRelationHolds
+import com.eignex.klause.lowering.intAbs
 import com.eignex.klause.lowering.intCombDiff
 import com.eignex.klause.lowering.isConstant
+import com.eignex.klause.lowering.linearBounds
+import com.eignex.klause.lowering.newBooleanInt
+import com.eignex.klause.lowering.newIntExpression
+import com.eignex.klause.lowering.newIntExtreme
+import com.eignex.klause.lowering.newIntProduct
+import com.eignex.klause.lowering.productBounds
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.scaleByConst
 import com.eignex.klause.lowering.scaleIntComb
+import com.eignex.klause.lowering.selectionBounds
 import com.eignex.klause.lowering.sumIntCombs
 import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.lowering.tseitinAnd
@@ -108,13 +116,13 @@ internal object Compiler {
     ) : CnfLowering {
         internal val varIds = LinkedHashMap<String, Int>() // resolved name (incl. array cells) -> int var id
         internal val arrayDims = HashMap<String, IntArray>() // array id -> declared dimension sizes
-        internal val domains = ArrayList<IntDomain>()
+        internal val problemBuilder = ProblemBuilder(settings, semantics)
+        internal val domains get() = problemBuilder.intDomains
         private val affineDistinctness = Xcsp3AffineDistinctness()
         private val divModOperands = HashMap<FExpr, Int>()
         private val divModRelations = com.eignex.klause.lowering.DivModRelationIndex()
-        override val factors = ArrayList<Factor>()
+        override val factors get() = problemBuilder.factors
         internal val classes = Xcsp3ConstraintClasses(factors)
-        internal var nextBool = 0
         internal var objective: LinearObjectiveSpec? = null
         internal var objectiveMaximize = false
 
@@ -248,14 +256,12 @@ internal object Compiler {
         }
 
         internal fun addVar(name: String, dom: IntDomain) {
-            varIds[name] = domains.size
-            domains.add(dom)
+            varIds[name] = problemBuilder.newInt(dom)
         }
         internal fun newAuxVar(lo: Long, hi: Long): Int {
-            domains.add(IntDomain(lo, hi, settings.storage))
-            return domains.size - 1
+            return problemBuilder.newInt(IntDomain(lo, hi, settings.storage))
         }
-        override fun newBool(): Int = nextBool++
+        override fun newBool(): Int = problemBuilder.newBool()
 
         /** The domain of a `<var>`/`<array>`: its inline domain text, or — when that is empty and an
          *  `as="ref"` attribute is present — the domain reused from a previously declared variable or
@@ -382,10 +388,7 @@ internal object Compiler {
                 .flatMap { tok -> expandNames(tok).map { termVar(it) } }.toIntArray()
             require(coeffVars.size == termVars.size) { "sum: <coeffs> length != term count" }
             val products = IntArray(termVars.size) { i ->
-                val (lo, hi) = productBounds(coeffVars[i], termVars[i])
-                val p = newAuxVar(lo, hi)
-                factors.add(Product(coeffVars[i], termVars[i], p))
-                p
+                problemBuilder.newIntProduct(coeffVars[i], termVars[i], productBounds(coeffVars[i], termVars[i]))
             }
             postCondition(IntArray(products.size) { 1 }, products, condText)
         }
@@ -439,23 +442,6 @@ internal object Compiler {
                     }
                 }
             }
-        }
-
-        /** Min/max of a linear expression over its variables' domains. */
-        internal fun linBounds(lin: LinComb): Pair<Long, Long> {
-            var lo = lin.constant
-            var hi = lin.constant
-            for ((v, c) in lin.coeffs) {
-                val d = domains[v]
-                if (c >= 0) {
-                    lo += c * d.min
-                    hi += c * d.max
-                } else {
-                    lo += c * d.max
-                    hi += c * d.min
-                }
-            }
-            return lo to hi
         }
 
         /** Parse a `<condition>` `(op, rhs)` where rhs is a constant or a variable. Returns the
@@ -794,7 +780,11 @@ internal object Compiler {
             else -> null
         }
 
-        override var trueLitCache = -1
+        override var trueLitCache: Int
+            get() = problemBuilder.trueLitCache
+            set(value) {
+                problemBuilder.trueLitCache = value
+            }
 
         internal fun reifyRel(node: FExpr.Call): Int {
             // n-ary eq reifies to the conjunction of its consecutive pairwise equalities.
@@ -930,9 +920,7 @@ internal object Compiler {
                             var acc = materializeVar(nonConst[0])
                             for (idx in 1 until nonConst.size) {
                                 val next = materializeVar(nonConst[idx])
-                                val (lo, hi) = productBounds(acc, next)
-                                val p = newAuxVar(lo, hi)
-                                factors.add(Product(acc, next, p))
+                                val p = problemBuilder.newIntProduct(acc, next, productBounds(acc, next))
                                 acc = p
                             }
                             scaleByConst(IntComb.Narrow(LinComb(mapOf(acc to 1L), 0L)), k)
@@ -950,25 +938,15 @@ internal object Compiler {
 
         /** Channel a literal to a fresh 0/1 int var equal to its truth value. */
         internal fun litTo01(lit: Int): Int {
-            val ch = newAuxVar(0L, 1L)
+            val ch = problemBuilder.newBooleanInt(lit)
             definedVars.add(ch)
-            factors.add(
-                ReifiedLinear(
-                    Lit.variable(lit),
-                    intArrayOf(1),
-                    intArrayOf(ch),
-                    LinearOp.EQ,
-                    if (Lit.isPositive(lit)) 1 else 0,
-                ),
-            )
             return ch
         }
 
         /** `min`/`max` of expressions as a linear term, via [ArrayMinMax] over the materialised args. */
         internal fun minMaxTerm(args: List<FExpr>, max: Boolean): IntComb {
             val vs = args.map { materializeVar(linear(it)) }.toIntArray()
-            val m = newAuxVar(vs.minOf { domains[it].min }, vs.maxOf { domains[it].max })
-            factors.add(ArrayMinMax(result = m, xs = vs, max = max))
+            val m = problemBuilder.newIntExtreme(vs, max, selectionBounds(vs, domains))
             definedVars.add(m)
             return IntComb.Narrow(LinComb(mapOf(m to 1L), 0L))
         }
@@ -1019,20 +997,9 @@ internal object Compiler {
 
         internal fun absOf(lin: IntComb): IntComb {
             val v = materializeVar(lin)
-            val d = domains[v]
-            val hi = if (d.min == Long.MIN_VALUE) {
-                Long.MAX_VALUE
-            } else {
-                maxOf(kotlin.math.abs(d.min), kotlin.math.abs(d.max))
-            }
-            val lo = when {
-                d.min <= 0L && d.max >= 0L -> 0L
-                d.min > 0L -> d.min
-                d.max == Long.MIN_VALUE -> Long.MAX_VALUE
-                else -> -d.max
-            }
-            val a = newAuxVar(lo, hi)
-            factors.add(com.eignex.klause.factor.arithmetic.Abs(v, a))
+            val domain = absBounds(domains[v])
+            val a = problemBuilder.newInt(domain)
+            problemBuilder.intAbs(v, a)
             return IntComb.Narrow(LinComb(mapOf(a to 1L), 0L))
         }
 
@@ -1042,32 +1009,15 @@ internal object Compiler {
         internal fun materializeVar(lin: IntComb): Int {
             val narrow = (lin as? IntComb.Narrow)?.lin
                 ?: throw UnsupportedXcsp3Exception("cannot materialise an over-64-bit expression into a variable")
-            if (narrow.constant == 0L && narrow.coeffs.size == 1 && narrow.coeffs.values.first() == 1L) {
-                return narrow.coeffs.keys.first()
-            }
-            val (lo, hi) = linBounds(narrow)
-            val v = newAuxVar(lo, hi)
-            val vars = narrow.coeffs.keys.toList()
-            val cs = LongArray(vars.size + 1) { if (it < vars.size) -narrow.coeffs.getValue(vars[it]) else 1L }
-            val ids = IntArray(vars.size + 1) { if (it < vars.size) vars[it] else v }
-            factors.add(Linear(cs, ids, LinearOp.EQ, narrow.constant)) // v − expr = 0
-            definedVars.add(v)
-            defineLinear(v, cs, ids, narrow.constant)
-            return v
+            narrow.asSimpleVar()?.let { return it }
+            return problemBuilder.newIntExpression(narrow, linearBounds(narrow, domains),
+                define = { output, coefficients, variables, bound ->
+                    definedVars.add(output)
+                    defineLinear(output, coefficients, variables, bound)
+                })
         }
 
-        /** Integer bounds of the product `a * b` over the two variables' domains. */
-        internal fun productBounds(a: Int, b: Int): Pair<Long, Long> {
-            val da = domains[a]
-            val db = domains[b]
-            val corners = listOf(
-                da.min * db.min,
-                da.min * db.max,
-                da.max * db.min,
-                da.max * db.max,
-            )
-            return corners.min() to corners.max()
-        }
+        internal fun productBounds(a: Int, b: Int): IntDomain = productBounds(domains[a], domains[b]) { x, y -> x * y }
 
         /** Resolve one variable/constant term to a var id. */
         internal fun singleTermVar(text: String): Int {
@@ -1383,18 +1333,7 @@ internal object Compiler {
                 }
             }?.takeIf { mask -> mask.any { it } }
             return Xcsp3Problem(
-                Problem(
-                    settings = settings,
-                    semantics = semantics,
-                    numBoolVars = nextBool,
-                    numIntVars = domains.size,
-                    intDomains = domains.toTypedArray(),
-                    factors = factors.toTypedArray(),
-                    impliedFactorMask = implied,
-                    hasSymmetryBreaking = classes.hasSymmetryBreaking,
-                    // A raw problem: the base bake is deferred to presolve step 0 (`Problem.bake`); construction
-                    // is pure parse. The pipeline folds it (and can LP-tighten a wide domain first).
-                ),
+                problemBuilder.build(impliedFactorMask = implied, hasSymmetryBreaking = classes.hasSymmetryBreaking),
                 objective,
                 intVarNames = LinkedHashMap(varIds),
                 sense = if (objectiveMaximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE,

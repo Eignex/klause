@@ -118,6 +118,11 @@ fewer than two positions impose no constraint.
 
 ### Expressions and selection
 
+XCSP3 allocates columns and constructs finite integer expression relations through
+shared `lowering` helpers on `ProblemBuilder`. Syntax recognition, signed-word
+admission, source index offsets, constraint classes and definition hints belong to
+the frontend.
+
 Integer conditionals retain a native `Element` over their else and then values
 with a 0/1 condition channel. Constant and variable matrix selection retain native
 `Element` factors with row-major index equalities and per-axis bounds, so an

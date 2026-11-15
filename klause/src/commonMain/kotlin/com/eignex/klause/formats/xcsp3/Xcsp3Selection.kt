@@ -3,16 +3,17 @@ package com.eignex.klause.formats.xcsp3
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
+import com.eignex.klause.lowering.newIntSelection
 
 internal fun Compiler.Builder.selectionTerm(condition: Int, whenTrue: Int, whenFalse: Int): IntComb {
     val index = litTo01(condition)
-    val result = newAuxVar(minOf(domains[whenTrue].min, domains[whenFalse].min),
+    val domain = IntDomain(minOf(domains[whenTrue].min, domains[whenFalse].min),
         maxOf(domains[whenTrue].max, domains[whenFalse].max))
-    factors.add(Element(index, result, longArrayOf(whenFalse.toLong(), whenTrue.toLong()),
-        arrIsVars = true, indexOffset = 0))
+    val result = problemBuilder.newIntSelection(index, longArrayOf(whenFalse.toLong(), whenTrue.toLong()), domain)
     definedVars.add(result)
     return IntComb.Narrow(LinComb(mapOf(result to 1L), 0L))
 }
