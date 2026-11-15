@@ -74,9 +74,10 @@ visited, including when its size exactly equals the assignment budget.
 Source setup is the one dispatcher every frontend and the CLI use. Attach a
 canonical `Problem` with `SourceAttachment(problem, definitionHints, searchHints)`
 and call `SourceSetup.prepare(SourceSetupRequest(...))`; the objective uses original
-direction and units. Setup prefers exact arithmetic for pure-real models and for
-linear integer objectives whose range exceeds binary64's exact integers; other finite
-models keep finite execution. Native snapshots (`PolynomialRealProblem`,
+direction and units. Setup prefers exact arithmetic for models without integer columns
+from a source without a positive feasibility tolerance and for linear integer objectives
+whose range exceeds binary64's exact integers; other finite models, including those
+without integer columns from a numerical source, keep finite execution. Native snapshots (`PolynomialRealProblem`,
 `NonlinearIntegerProblem`, `TranscendentalProblem`, `LinearSourceProblem`) attach
 with explicit `ProblemSettings` and keep their exact formula and objective. Hints are
 described under [source definition materialization](10-local-search.md#source-definition-materialization).

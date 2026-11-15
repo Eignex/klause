@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.formats.flatzinc.linearObjective
+import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.prepareSourceExecution
 import com.eignex.klause.formats.flatzinc.sourceAttachment
@@ -54,10 +55,11 @@ class FiniteExecutionTest {
         floatPoints: Boolean = true,
     ): FiniteSolveVerdict {
         val program = parseFlatZinc(source, semanticOverrides = overrides)
-        val objective = program.linearObjective()
+        val maximize = program.sourceProgram.solve is SolveDirective.Maximize
+        val objective = program.sourceProgram.linearObjective()?.let { if (maximize) it.negated() else it }
         val invocation = program.prepareSourceExecution(SourceSetupRequest(program.sourceAttachment(),
             if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE, engine,
-            objective = objective))
+            objective = objective, maximize = maximize))
         val request = SourceExecutionPolicy().finiteRequest(invocation.finiteShape(), engine,
             presolveConfig = PresolveConfig.NONE, cancellation = Cancellation.after(1.seconds),
             toleranceCheck = if (floatPoints) null else exactPointsOnly(program.sourceProgram.problem))
@@ -173,6 +175,27 @@ class FiniteExecutionTest {
                 .replace("solve satisfy;", "solve minimize z;"))
 
         assertEquals(FiniteSolveVerdict.OPTIMAL, verdict)
+    }
+
+    @Test
+    fun `a FlatZinc source without integer columns should be decided within the declared tolerance`() {
+        val sources = mapOf(
+            "within the slack" to "var 0.0..2.0: y; constraint float_lin_eq([3.0], [y], 6.0000000001); " +
+                "solve satisfy;",
+            "beyond the slack" to "var 0.0..2.0: y; constraint float_lin_eq([3.0], [y], 9.0); solve satisfy;",
+            "optimum" to "var 0.0..2.0: y; var 0.0..5.0: z; constraint float_lin_eq([3.0], [y], 6.0000000001); " +
+                "constraint float_lin_le([1.0, 1.0], [y, z], 4.5); solve maximize z;",
+            "unbounded" to "var float: x; var float: y; constraint float_lin_le([1.0, -1.0], [x, y], 3.5); " +
+                "solve maximize x;",
+            "with Booleans" to "var bool: p; var bool: q; var 0.0..2.0: y; constraint bool_clause([p], [q]); " +
+                "constraint float_lin_eq([3.0], [y], 6.0000000001); solve satisfy;",
+        )
+
+        val verdicts = sources.mapValues { (_, source) -> solveFlatZinc(SemanticOverrides(), source = source) }
+
+        assertEquals(mapOf("within the slack" to FiniteSolveVerdict.SAT, "beyond the slack" to FiniteSolveVerdict.UNSAT,
+            "optimum" to FiniteSolveVerdict.OPTIMAL, "unbounded" to FiniteSolveVerdict.UNBOUNDED,
+            "with Booleans" to FiniteSolveVerdict.SAT), verdicts)
     }
 
     @Test
