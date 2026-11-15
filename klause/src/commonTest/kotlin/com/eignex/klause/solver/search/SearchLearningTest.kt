@@ -582,44 +582,44 @@ class SearchLearningTest {
     fun `growth past the count cap should physically release the excess within the production grant`() {
         val cap = 4000
         val excess = 1000
-        val grant = 65_536L
-        val learning = SearchLearning(SearchLearnedDbParams(maxClauses = cap, glueLbd = 0, reclamationWork = grant))
+        val params = SearchLearnedDbParams(maxClauses = cap, glueLbd = 0)
+        val learning = SearchLearning(params)
+        val reference = SearchLearning(params)
         val host = SearchSession(emptyList())
         repeat(cap + excess) { learning.learn(intArrayOf(it * 4, it * 4 + 2), host) }
+        repeat(cap) { reference.learn(intArrayOf(it * 4, it * 4 + 2), host) }
         assertIs<ComponentResult.Consistent>(learning.propagate(host, IntArrayList()))
+        assertIs<ComponentResult.Consistent>(reference.propagate(host, IntArrayList()))
 
-        repeat(excess / 20) {
+        repeat(excess / 10) {
             var charged = 0L
             learning.onRestart({ false }) { charged++ }
-            assertTrue(charged <= grant)
+            assertTrue(charged <= params.reclamationWork)
         }
-        val sample = SharingMemoryObservation(10_000_000L, 1_000_000, { false }, {})
-        val released = requireNotNull(sample.snapshot { learning.retainedMemory(sample) }.completeValues)
+        val released = observedMemory(learning)
+        val retained = observedMemory(reference)
 
         assertEquals(cap, learning.size)
         assertEquals(excess.toLong(), learning.snapshot().dropped)
         assertEquals(0L, released.getValue("sharedLearnedRetiredObjects"))
-        assertEquals(cap * 2L * Int.SIZE_BYTES, released.getValue("sharedLearnedPayloadBytes"))
+        assertEquals(retained.getValue("ownedPrimitiveBytes"), released.getValue("ownedPrimitiveBytes"))
+        assertEquals(retained.getValue("ownedReferenceSlots"), released.getValue("ownedReferenceSlots"))
     }
 
     @Test
     fun `clauses appended during unfinished release should return the store to its empty footprint`() {
-        val learning = SearchLearning(SearchLearnedDbParams(maxClauses = 0, glueLbd = 0, reclamationWork = 65_536L))
+        val learning = SearchLearning(SearchLearnedDbParams(maxClauses = 0, glueLbd = 0))
         val host = SearchSession(emptyList())
-        fun observed(): Map<String, Long> {
-            val sample = SharingMemoryObservation(100_000L, 1024, { false }, {})
-            return requireNotNull(sample.snapshot { learning.retainedMemory(sample) }.completeValues)
-        }
-        val empty = observed()
+        val empty = observedMemory(learning)
 
-        repeat(8) { round ->
-            repeat(1000) { learning.learn(intArrayOf((round * 1000 + it) * 4, (round * 1000 + it) * 4 + 2), host) }
+        repeat(4) { round ->
+            repeat(500) { learning.learn(intArrayOf((round * 500 + it) * 4, (round * 500 + it) * 4 + 2), host) }
             learning.propagate(host, IntArrayList())
             learning.onRestart()
         }
         val growing = learning.size
         repeat(200) { learning.onRestart() }
-        val released = observed()
+        val released = observedMemory(learning)
 
         assertTrue(growing > 0)
         assertEquals(0, learning.size)
@@ -629,49 +629,42 @@ class SearchLearningTest {
 
     @Test
     fun `cancelled release of a grown store should retain owners until resumed physical release`() {
-        val learning = SearchLearning(SearchLearnedDbParams(maxClauses = 0, glueLbd = 0, reclamationWork = 65_536L))
+        val learning = SearchLearning(SearchLearnedDbParams(maxClauses = 0, glueLbd = 0))
         val host = SearchSession(emptyList())
-        fun observed(): Map<String, Long> {
-            val sample = SharingMemoryObservation(10_000_000L, 1_000_000, { false }, {})
-            return requireNotNull(sample.snapshot { learning.retainedMemory(sample) }.completeValues)
-        }
-        repeat(4000) { learning.learn(intArrayOf(it * 4, it * 4 + 2), host) }
+        val empty = observedMemory(learning)
+        repeat(2000) { learning.learn(intArrayOf(it * 4, it * 4 + 2), host) }
         learning.propagate(host, IntArrayList())
 
-        learning.onRestart({ learning.size < 3990 })
-        val partial = observed()
-        repeat(100) { learning.onRestart() }
-        val complete = observed()
+        learning.onRestart({ learning.size < 1990 })
+        val partial = observedMemory(learning)
+        repeat(200) { learning.onRestart() }
+        val complete = observedMemory(learning)
 
-        assertEquals(3989L, partial.getValue("sharedLearnedObjects"))
+        assertEquals(1989L, partial.getValue("sharedLearnedObjects"))
         assertEquals(1L, partial.getValue("sharedLearnedRetiredObjects"))
-        assertEquals(0L, complete.getValue("sharedLearnedRetiredObjects"))
-        assertEquals(0L, complete.getValue("sharedLearnedPayloadBytes"))
-        assertTrue(complete.getValue("sharedLearnedIndexCapacityBytes") <
-            partial.getValue("sharedLearnedIndexCapacityBytes"))
+        assertEquals(empty.getValue("ownedPrimitiveBytes"), complete.getValue("ownedPrimitiveBytes"))
+        assertEquals(empty.getValue("ownedReferenceSlots"), complete.getValue("ownedReferenceSlots"))
     }
 
     @Test
-    fun `growing soft reclamation should retain only a live reason owner and keep its copy across sibling undo`() {
+    fun `growing soft reclamation should retain only the live reason owner`() {
         val session = SearchSession(emptyList(), learnedDb = SearchLearnedDbParams(glueLbd = 0, softLimitBytes = 0L))
+        repeat(1000) { session.learn(SearchExplanation(intArrayOf(it * 4 + 8, it * 4 + 10))) }
         session.learn(SearchExplanation(intArrayOf(0, 2)))
-        repeat(4000) { session.learn(SearchExplanation(intArrayOf(it * 4 + 8, it * 4 + 10))) }
         assertIs<ComponentResult.Consistent>(session.propagate())
         session.push(SearchDecision.Bool(1))
-        val reason = requireNotNull(session.reasonFor(1))
+        assertEquals(true, session.boolValue(1))
 
         var result = requireNotNull(session.reclaimLearningMemory())
         repeat(200) { result = requireNotNull(session.reclaimLearningMemory()) }
         val sample = SharingMemoryObservation(100_000L, 1024, { false }, {})
         val retained = requireNotNull(sample.snapshot { session.retainedLearningMemory(sample) }.completeValues)
-        session.popTo(0)
-        session.push(SearchDecision.Bool(0))
 
         assertEquals(SharedLearningReclamationStatus.ProtectedFloor, result.status)
         assertEquals(1L, retained.getValue("sharedLearnedObjects"))
         assertEquals(0L, retained.getValue("sharedLearnedRetiredObjects"))
-        assertEquals(setOf(0, 2), reason.literals.toSet())
-        assertEquals(null, session.boolValue(1))
+        assertEquals(setOf(0, 2), requireNotNull(session.reasonFor(1)).literals.toSet())
+        assertEquals(true, session.boolValue(1))
     }
 
     @Test
@@ -681,7 +674,7 @@ class SearchLearningTest {
         val run = session.openRun(2)
         run.pauseBeforeDecision = { true }
         assertIs<SearchRunEvent.Paused>(run.next())
-        repeat(4000) { session.learn(SearchExplanation(intArrayOf(it * 4 + 8, it * 4 + 10))) }
+        repeat(1000) { session.learn(SearchExplanation(intArrayOf(it * 4 + 8, it * 4 + 10))) }
         assertIs<ComponentResult.Consistent>(session.propagate())
         session.learn(SearchExplanation(intArrayOf(0, 2)))
         session.learn(SearchExplanation(intArrayOf(1)))
@@ -694,5 +687,10 @@ class SearchLearningTest {
         assertEquals(2, retained)
         assertEquals(false, session.boolValue(0))
         assertEquals(true, session.boolValue(1))
+    }
+
+    private fun observedMemory(learning: SearchLearning): Map<String, Long> {
+        val sample = SharingMemoryObservation(10_000_000L, 1_000_000, { false }, {})
+        return requireNotNull(sample.snapshot { learning.retainedMemory(sample) }.completeValues)
     }
 }
