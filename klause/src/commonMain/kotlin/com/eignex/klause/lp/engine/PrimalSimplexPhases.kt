@@ -173,7 +173,9 @@ internal class PrimalSimplexPhases(
             }
             if (phaseOneLongSteps) {
                 val ratio = phaseOneRatio ?: PrimalPhaseOneRatio(m).also { phaseOneRatio = it }
-                val step = ratio.choose(model, numerical, basicVar, beta, alpha, dir, numerical.boundRangeD(q), tolerance, work)
+                val step = ratio.choose(
+                    model, numerical, basicVar, beta, alpha, dir, numerical.boundRangeD(q), tolerance, work,
+                )
                 if (step != null) {
                     tMax = step.length
                     leaving = step.leaving

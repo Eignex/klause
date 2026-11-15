@@ -305,13 +305,18 @@ internal class RevisedSimplex(
         }
         override fun objectiveDuals(): DoubleArray = duals()
         override fun dotColumn(values: DoubleArray, column: Int): Double = this@RevisedSimplex.dotColumn(values, column)
-        override fun spikeDense(column: Int, out: DoubleArray): DoubleArray = this@RevisedSimplex.spikeDense(column, out)
+        override fun spikeDense(column: Int, out: DoubleArray): DoubleArray =
+            this@RevisedSimplex.spikeDense(column, out)
         override fun foldPivot(row: Int, entering: Int, leaving: Int): PivotFold =
             this@RevisedSimplex.foldPivot(row, entering, leaving, withPivotEta = false)
 
         override fun refactorAtSafePoint(): PrimalPhaseRefactor? = when (refactorAtQualitySafePoint()) {
             null -> null
-            RefactorResult.UNCHANGED -> if (routineRefactor) PrimalPhaseRefactor.UNCHANGED else PrimalPhaseRefactor.RESTART
+            RefactorResult.UNCHANGED -> if (routineRefactor) {
+                PrimalPhaseRefactor.UNCHANGED
+            } else {
+                PrimalPhaseRefactor.RESTART
+            }
             RefactorResult.BASIS_CHANGED -> PrimalPhaseRefactor.BASIS_CHANGED
             RefactorResult.FAILED -> PrimalPhaseRefactor.FAILED
         }
@@ -1761,7 +1766,9 @@ internal class RevisedSimplex(
                         artificialBounds.seats() == 0 -> artificialBounds.drop(model, finiteLower, finiteUpper)
 
                         // The dual never moves a dual-degenerate nonbasic, so widening could not clear such a seat.
-                        artificialBounds.releaseDegenerate(model, numerical, primalOperations, tolerance) > 0 -> continue@iterations
+                        artificialBounds.releaseDegenerate(
+                            model, numerical, primalOperations, tolerance,
+                        ) > 0 -> continue@iterations
 
                         artificialBounds.widenings < MAX_ARTIFICIAL_WIDENINGS -> {
                             // Widening moves only nonbasic seats, so the basis stays dual feasible.
@@ -1861,7 +1868,10 @@ internal class RevisedSimplex(
                     // blocks every entering column. With no artificial seat the basis is dual feasible for the
                     // real bounds, so the iteration is re-derived on them; otherwise the primal decides.
                     if (artificialBounds.seats() > 0) {
-                        if (artificialBounds.releaseDegenerate(model, numerical, primalOperations, tolerance) > 0) continue
+                        if (artificialBounds.releaseDegenerate(
+                                model, numerical, primalOperations, tolerance,
+                            ) > 0
+                        ) continue
                         return handArtificialBasisToPrimal(progress)
                     }
                     artificialBounds.drop(model, finiteLower, finiteUpper)
@@ -2149,7 +2159,9 @@ internal class RevisedSimplex(
 
     @Suppress("ReturnCount", "CyclomaticComplexMethod", "LongMethod")
     private fun trySingletonStart(kept: Boolean, progress: SolveProgress): IterationResult {
-        if (!singletonStart || !kept || model.exactState == null || basicValueCache.model != null || progress.iterations != 0L) {
+        if (!singletonStart || !kept || model.exactState == null ||
+            basicValueCache.model != null || progress.iterations != 0L
+        ) {
             return IterationResult.CONTINUE
         }
         val q = dualFailureColumn
@@ -2687,7 +2699,9 @@ internal class RevisedSimplex(
 
     internal fun probeObjective(token: Cancellation): Double? {
         val values = basicValueCache.values ?: return null
-        if (optimalBasis == null || basicValueCache.model !== model || basicValueCache.primalOnly || basicValueCache.numerical !== numerical) {
+        if (optimalBasis == null || basicValueCache.model !== model ||
+            basicValueCache.primalOnly || basicValueCache.numerical !== numerical
+        ) {
             return null
         }
         val scale = model.exactState?.model?.objective?.scale?.approximation ?: return null
@@ -2713,8 +2727,9 @@ internal class RevisedSimplex(
     } else null
 
     private fun currentProbeValues(point: LpModel, basis: Basis): Boolean = reuseProbeValues &&
-        point === model && optimalBasis === basis && basicValueCache.model === point && basicValueCache.numerical === numerical &&
-        !basicValueCache.primalOnly && basicValueCache.values?.size == m && basicValueCache.status?.size == numVars && optimalPrimal?.size == n
+        point === model && optimalBasis === basis && basicValueCache.model === point &&
+        basicValueCache.numerical === numerical && !basicValueCache.primalOnly &&
+        basicValueCache.values?.size == m && basicValueCache.status?.size == numVars && optimalPrimal?.size == n
 
     private fun probeValueWork(point: LpModel, basis: Basis, columns: IntArray): Long {
         if (!currentProbeValues(point, basis) || columns.any {
