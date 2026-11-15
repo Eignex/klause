@@ -27,11 +27,18 @@ internal class LpPreparationCache private constructor(
     )
 
     /**
-     * Shares this namespace and its publication slots with a compatible view. Only a view whose
-     * ordered factor identities were checked against this one keeps the row layout token.
+     * Shares this namespace and its publication slots with a compatible view under a fresh row layout
+     * token, so the next preparation validates that view's actual factor identities.
      */
-    fun inherited(sameRowLayout: Boolean): LpPreparationCache =
-        LpPreparationCache(namespace, if (sameRowLayout) rowScope else Any(), sourceSlot, finiteSlot)
+    fun inherited(): LpPreparationCache = LpPreparationCache(namespace, Any(), sourceSlot, finiteSlot)
+
+    /**
+     * Shares everything, including the row layout token, which lets template rebinding skip its
+     * per-factor identity scan. Only a caller that has itself checked that the view's ordered factors
+     * are identical to this cache's view may use it.
+     */
+    fun inheritedForIdenticalFactors(): LpPreparationCache =
+        LpPreparationCache(namespace, rowScope, sourceSlot, finiteSlot)
 
     private fun slot(problem: Problem): AtomicReference<LpPreparationState?> =
         if (problem is BakedProblem) finiteSlot else sourceSlot
