@@ -6,7 +6,6 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.factor.scheduling.Cumulative
-import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.randomValue
@@ -25,18 +24,10 @@ import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.ExactIntegerSum
 import com.eignex.klause.util.WorkMeter
-import com.eignex.util.arrays.emptyDoubleArray
 import com.eignex.util.arrays.emptyIntArray
-import com.eignex.util.arrays.emptyLongArray
 import com.eignex.util.collections.IntArrayList
-import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.IntSwapSet
-import com.eignex.util.numbers.BIG_ZERO
-import com.eignex.util.numbers.BigInt
-import com.eignex.util.numbers.minus
-import com.eignex.util.numbers.toDouble
 import kotlin.random.Random
 
 /** Initial weight for factors the model declared implied (redundant / symmetry-breaking). An
@@ -50,8 +41,6 @@ private const val REAL_REFRESH_INTERVAL: Int = 4096
 
 // Bits of the widest anchored draw: values within about a million of the anchor.
 private const val ANCHOR_BITS: Int = 20
-
-private const val MAX_PRESERVED_ELEMENT_SELECTIONS: Int = 32
 
 /**
  * Mutable state of an ongoing solve. Owns the [Assignment], the violated-factor set, the
@@ -153,13 +142,6 @@ class LocalSearchState private constructor(
     val factors: Array<out Invariant> = projection.invariants
     internal val hasSteppedInvariants: Boolean = factors.any { it is SteppedIntInvariant }
 
-    private val cumulativeFactors: IntArray by lazy(LazyThreadSafetyMode.NONE) {
-        problem.factors.indices.filter { problem.factors[it] is Cumulative }.toIntArray()
-    }
-    private var cumulativeFractions: DoubleArray = emptyDoubleArray()
-    private val hasVariableElements: Boolean by lazy(LazyThreadSafetyMode.NONE) {
-        problem.factors.any { it is Element && it.arrIsVars }
-    }
     internal var phaseTimer: LocalSearchPhaseTimer? = null
     internal var inspectionWork: WorkMeter? = null
     internal var repairWork: WorkMeter? = null
@@ -245,82 +227,30 @@ class LocalSearchState private constructor(
     // every flip.
     private val confNeighbours = buffers.confNeighbours
 
-    // A weighted probe saves only degrees that change, avoiding a model-wide copy and scan per candidate.
-    private var degScratch: IntArray? = null
-
-    // Coordinates include definition outputs so a NO_WRITE inverse cannot strand a probe's output.
-    private val probeSlots = IntArrayList()
-    private val probeSlotSet = IntHashSet()
-    private var savedValuesScratch: LongArray = emptyLongArray()
+    private val probe = LocalSearchProbe(this, buffers.probeTouched, buffers.probeWasViolated)
     private val moveIntSeeds = IntArrayList(2)
     private val moveBoolSeeds = IntArrayList(2)
     private var definitionTraversal: DefinitionTraversal? = null
     private var definitionValues: DefinitionValues? = null
     private var moveActive = false
-    private var scoringCancellation: Cancellation = Cancellation.Never
-    private var scoringCountdown = 0
-    private var restoringProbe = false
+    private var repairInitializing = false
+    private var trackedMoveStarted = false
 
-    internal fun scoringPick(cancellation: Cancellation, pick: () -> Move?): Move? {
-        scoringCancellation = cancellation
-        scoringCountdown = 0
-        return try {
-            val timer = phaseTimer
-            if (timer == null) pick() else timer.measureScoringPick(pick)
-        } catch (_: LocalSearchScoringInterrupted) {
-            null
-        } finally {
-            scoringCancellation = Cancellation.Never
-        }
-    }
+    internal fun scoringPick(cancellation: Cancellation, pick: () -> Move?): Move? =
+        probe.scoringPick(cancellation, pick)
 
     internal fun checkScoringWork() {
-        if (moveActive || scoringCancellation === Cancellation.Never) return
-        inspectionWork?.charge(1L)
-        if (scoringCountdown-- > 0) return
-        scoringCountdown = LOCAL_SEARCH_OPERATION_BATCH - 1
-        if (scoringCancellation()) throw LocalSearchScoringInterrupted
+        if (!moveActive && !probe.active) probe.checkScoringWork()
     }
-
-    private fun checkProbeWork() {
-        if (probeActive && !restoringProbe && scoringCancellation !== Cancellation.Never) {
-            inspectionWork?.charge(1L)
-            if (scoringCancellation()) throw LocalSearchScoringInterrupted
-        }
-    }
-
-    private fun checkObjectiveProbeWork() {
-        val active = probeActive && !restoringProbe && scoringCancellation !== Cancellation.Never
-        if (active) inspectionWork?.charge(1L)
-        if (scoringCountdown-- > 0) return
-        scoringCountdown = LOCAL_SEARCH_OPERATION_BATCH - 1
-        if (active && scoringCancellation()) throw LocalSearchScoringInterrupted
-    }
-
-    // Break-count probe scratch. While breakProbeActive, updateViolation records each factor whose
-    // degree changes during a probe's forward apply, snapshotting its pre-probe violated status on
-    // first touch. The break count is then a scan of only the touched factors: a factor can flip
-    // into violation only if its degree changed.
-    private var breakProbeActive = false
-    private val probeTouched: BooleanArray = buffers.probeTouched
-    private val probeWasViolated: BooleanArray = buffers.probeWasViolated
-    private val probeTouchedList: IntArrayList = IntArrayList()
-
-    // Set for the whole apply+revert span of a move probe. While active, applyBoolFlip /
-    // applyIntSet skip configuration-change maintenance: a probe restores its start assignment, so
-    // any conf-change marks would have to be reverted anyway.
-    private var probeActive = false
-    private var activityTracking = true
-    private var trackedMoveStarted = false
 
     // Repair keeps payloads and scores current, but its transient activity epoch is discarded.
     internal fun repairInitialization(repair: () -> Unit) {
-        val wasTracking = activityTracking
-        activityTracking = false
+        val wasInitializing = repairInitializing
+        repairInitializing = true
         try {
             repair()
         } finally {
-            activityTracking = wasTracking
+            repairInitializing = wasInitializing
             resetStepCounters()
         }
     }
@@ -502,7 +432,7 @@ class LocalSearchState private constructor(
      */
     var invariants: InvariantNetwork? = null
         set(value) {
-            check(!probeActive && !moveActive) { "cannot replace definitions during a move" }
+            check(!probe.active && !moveActive) { "cannot replace definitions during a move" }
             field = value
             definitionTraversal = null
             definitionValues = null
@@ -513,12 +443,12 @@ class LocalSearchState private constructor(
     /** Apply [move], updating cost and payloads incrementally; when [invariants] is set, the
      *  affected definitional cone is propagated afterwards through the same primitives. */
     fun apply(move: Move) {
-        check(!probeActive && !moveActive) { "local-search moves cannot be nested" }
+        check(!probe.active && !moveActive) { "local-search moves cannot be nested" }
         val revisionBefore = assignmentRevision
         moveActive = true
         trackedMoveStarted = false
         try {
-            apply(move, null)
+            applyWithDefinitions(move, null)
             if (cost < bestCostSeen) bestCostSeen = cost
         } finally {
             if (assignmentRevision != revisionBefore) boardCoverage.invalidate()
@@ -526,14 +456,14 @@ class LocalSearchState private constructor(
         }
     }
 
-    private fun apply(move: Move, affected: IntArrayList?) {
+    internal fun applyWithDefinitions(move: Move, affected: IntArrayList?) {
         applyCore(move)
         val net = invariants ?: return
         propagateInvariants(net, move, affected)
     }
 
     internal fun applySteps(move: Move): Sequence<Unit> = sequence {
-        check(!probeActive && !moveActive) { "local-search moves cannot be nested" }
+        check(!probe.active && !moveActive) { "local-search moves cannot be nested" }
         val revisionBefore = assignmentRevision
         moveActive = true
         trackedMoveStarted = false
@@ -626,7 +556,7 @@ class LocalSearchState private constructor(
         is Move.Compound -> {
             for (p in move.parts) {
                 applyCore(p)
-                checkProbeWork()
+                probe.checkWork()
             }
         }
     }
@@ -685,7 +615,7 @@ class LocalSearchState private constructor(
             }
         }
         values.pending.clear(idx)
-        checkProbeWork()
+        probe.checkWork()
     }
 
     /**
@@ -775,11 +705,11 @@ class LocalSearchState private constructor(
      * candidates by, paired with [netDelta] for the feasibility/cost side.
      */
     fun objectiveDelta(obj: Objective, move: Move): Double? {
-        check(!probeActive && !moveActive) { "local-search scoring cannot be nested in a move" }
+        check(!probe.active && !moveActive) { "local-search scoring cannot be nested in a move" }
         val scored = scoringView(obj)
         if (feedsDefinitions(move)) return evaluateMove(move, scored).objectiveDelta
         return when (scored) {
-            is LinearObjective -> linearObjectiveDelta(move, scored)
+            is LinearObjective -> probe.linearObjectiveDelta(move, scored)
             is FunctionalObjective -> {
                 val indexed = booleanDelta.takeIf { booleanDeltaOf === scored }
                 if (indexed != null) {
@@ -851,74 +781,14 @@ class LocalSearchState private constructor(
     private var termViewNetwork: InvariantNetwork? = null
     private var termView: LinearObjective? = null
 
-    // Pre-probe value of a functional objective the network does not maintain, valid while the assignment is
-    // unchanged since [committedObjectiveRevision]; every candidate of one pick shares it.
-    private var committedObjectiveOf: FunctionalObjective? = null
-    private var committedObjective: BigInt = BIG_ZERO
-    private var committedObjectiveRevision = -1L
-
     // Counts assignment changes through this state and recomputes after external writes.
-    private var assignmentRevision = 0L
+    internal var assignmentRevision = 0L
+        private set
 
     internal val boardCoverage = BoardSwapCoverage()
     internal val boardRestartInputs: BoardRestartInputs by lazy(LazyThreadSafetyMode.NONE) {
         BoardRestartInputs.capture(this)
     }
-
-    private fun committedValue(objective: FunctionalObjective): BigInt {
-        if (committedObjectiveOf !== objective || committedObjectiveRevision != assignmentRevision) {
-            committedObjective = objective.evaluateExact(assignment)
-            committedObjectiveOf = objective
-            committedObjectiveRevision = assignmentRevision
-        }
-        return committedObjective
-    }
-
-    private fun linearObjectiveDelta(move: Move, obj: LinearObjective): Double {
-        objectiveDeltaSum.reset()
-        var realDelta = 0.0
-        if (move !is Move.Compound) {
-            realDelta = addLinearObjectivePart(move, obj)
-            return objectiveDeltaSum.toDouble() + realDelta
-        }
-        probeSlotSet.clear()
-        for (part in move.parts) {
-            if (!probeSlotSet.add(slotOf(part))) return evaluateMove(move, obj).objectiveDelta
-            realDelta += addLinearObjectivePart(part, obj)
-        }
-        return objectiveDeltaSum.toDouble() + realDelta
-    }
-
-    private fun addLinearObjectivePart(part: Move, obj: LinearObjective): Double {
-        when (part) {
-            is Move.BoolFlip -> {
-                val v = part.varId
-                if (v < obj.boolWeightValues.size) {
-                    val before = if (assignment.boolValue(v)) 1L else 0L
-                    objectiveDeltaSum.addDelta(obj.boolWeightValues[v], before, 1L - before)
-                }
-            }
-
-            is Move.IntSet -> {
-                val v = part.varId
-                if (v < obj.intCoefficientValues.size) {
-                    objectiveDeltaSum.addDelta(obj.intCoefficientValues[v], assignment.intValue(v), part.newValue)
-                }
-            }
-
-            is Move.RealSet -> {
-                val v = part.varId
-                if (v < obj.realCoefficientValues.size) {
-                    return obj.realCoefficientValues[v] * (part.newValue - assignment.realValue(v))
-                }
-            }
-
-            is Move.Compound -> error("nested compound move")
-        }
-        return 0.0
-    }
-
-    private val objectiveDeltaSum = ExactIntegerSum()
 
     /**
      * Synthesize a value-driven move that sets [intVar] to [newValue] and coordinately flips all
@@ -1038,7 +908,7 @@ class LocalSearchState private constructor(
     }
 
     internal fun repairNetDelta(move: Move, weighted: Boolean): Double {
-        if (cost == 0L || cumulativeFactors.isEmpty()) {
+        if (cost == 0L || !probe.hasCumulativeFactors) {
             return if (weighted) weightedNetDelta(move) else netDelta(move).toDouble()
         }
         if (canScoreWithoutCumulativeProbe(move)) {
@@ -1060,82 +930,14 @@ class LocalSearchState private constructor(
         return occurrences.none { problem.factors[it] is Cumulative }
     }
 
-    internal fun cumulativeRepairFraction(): Double {
-        if (cost == 0L) return 0.0
-        var fraction = 0.0
-        for (fid in cumulativeFactors) fraction += cumulativeFraction(fid)
-        return fraction
-    }
+    internal fun cumulativeRepairFraction(): Double = probe.cumulativeRepairFraction()
 
     internal fun elementPreservingMove(move: Move, eligibility: MoveSink): Move? {
-        if (cost == 0L || probeActive || !hasVariableElements) return null
+        if (cost == 0L || probe.active || !probe.hasVariableElements) return null
         val repairs = evaluateMove(move, elementEligibility = eligibility).elementRepairs ?: return null
         if (repairs.isEmpty()) return null
         val parts = if (move is Move.Compound) move.parts else listOf(move)
         return Move.Compound(parts + repairs)
-    }
-
-    private fun elementPreservingRepairs(eligibility: MoveSink): List<Move>? {
-        val targets = LinkedHashMap<Int, Long>()
-        val considered = IntHashSet()
-        for (i in 0 until probeSlots.size) {
-            val slot = probeSlots[i]
-            if (slot < problem.numBoolVars || slot >= problem.numBoolVars + problem.numIntVars) continue
-            if (probeValue(slot) == savedValuesScratch[i]) continue
-            val variable = slot - problem.numBoolVars
-            for (fid in projection.intOccurrences[variable]) {
-                val element = problem.factors[fid] as? Element ?: continue
-                if (!element.arrIsVars || element.idx != variable || !considered.add(fid)) continue
-                if (considered.size > MAX_PRESERVED_ELEMENT_SELECTIONS) return null
-                val wasViolated = if (probeTouched[fid]) probeWasViolated[fid] else factorDegree[fid] > 0
-                if (wasViolated) continue
-                if (!preserveElementTarget(element, eligibility, targets)) return null
-            }
-        }
-        return targets.filter { (variable, value) -> assignment.intValue(variable) != value }
-            .map { (variable, value) -> Move.IntSet(variable, value) }
-    }
-
-    private fun preserveElementTarget(
-        element: Element,
-        eligibility: MoveSink,
-        targets: MutableMap<Int, Long>,
-    ): Boolean {
-        val index = assignment.intValue(element.idx)
-        if (index < element.indexOffset || index >= element.indexOffset.toLong() + element.arr.size) return false
-        val cell = element.arr[(index - element.indexOffset).toInt()].toInt()
-        val value = savedIntValue(element.result)
-        val previous = targets[cell]
-        if (previous != null && previous != value) return false
-        targets[cell] = value
-        if (assignment.intValue(cell) == value) return true
-        if (value !in rootDomains[cell] || !eligibility.allowsInt(cell) ||
-            problem.numBoolVars + cell in probeSlotSet
-        ) return false
-        return true
-    }
-
-    private fun savedIntValue(variable: Int): Long {
-        val slot = problem.numBoolVars + variable
-        for (i in 0 until probeSlots.size) if (probeSlots[i] == slot) return savedValuesScratch[i]
-        return assignment.intValue(variable)
-    }
-
-    private fun cumulativeFraction(factorId: Int): Double {
-        val extra = intPayload[factorId].toLong() - violationSoftCap
-        if (extra <= 0L) return 0.0
-        val lower = 1L shl (Long.SIZE_BITS - extra.countLeadingZeroBits() - 1)
-        return (extra - lower).toDouble() / lower.toDouble()
-    }
-
-    private fun cumulativeFractionDelta(weighted: Boolean): Double {
-        val w = if (weighted && weights.allocated) weights.factorWeights else null
-        var delta = 0.0
-        for (i in cumulativeFactors.indices) {
-            val fid = cumulativeFactors[i]
-            delta += (w?.get(fid) ?: 1.0) * (cumulativeFraction(fid) - cumulativeFractions[i])
-        }
-        return delta
     }
 
     /** Shift [boolBreakCount]/[boolMakeCount] for every bool var of [factorId] by [sign]: a var whose
@@ -1182,15 +984,13 @@ class LocalSearchState private constructor(
     }
 
     private inline fun trackMove(touchedFactors: IntArray, slot: Int, markMovedVar: () -> Unit) {
-        if (activityTracking) {
+        if (!repairInitializing && !probe.active) {
             if (!trackedMoveStarted) {
                 tabu.step++
                 trackedMoveStarted = true
             }
-            if (!probeActive) {
-                markNeighborConfChange(touchedFactors)
-                markMovedVar()
-            }
+            markNeighborConfChange(touchedFactors)
+            markMovedVar()
             tabu.lastTouched[slot] = tabu.step
             if (tabu.touchCount[slot] < Int.MAX_VALUE) tabu.touchCount[slot]++
         }
@@ -1318,7 +1118,7 @@ class LocalSearchState private constructor(
             settle = { settleBreakMake(touched, { false }, {}) },
             markMovedVar = {},
         )
-        if (!probeActive && ++realMovesSinceRefresh >= REAL_REFRESH_INTERVAL) refreshRealRows()
+        if (!probe.active && ++realMovesSinceRefresh >= REAL_REFRESH_INTERVAL) refreshRealRows()
     }
 
     private fun markNeighborConfChange(factorIds: IntArray) {
@@ -1396,59 +1196,16 @@ class LocalSearchState private constructor(
         }
     }
 
-    private fun saveProbeCoordinates(move: Move): IntArrayList? {
-        probeSlots.clear()
-        probeSlotSet.clear()
-        fun saveSlot(slot: Int) {
-            if (probeSlotSet.add(slot)) probeSlots.add(slot)
-        }
-        moveIntSeeds.clear()
-        moveBoolSeeds.clear()
-        fun collect(part: Move) {
-            when (part) {
-                is Move.BoolFlip -> moveBoolSeeds.add(part.varId)
-
-                is Move.IntSet -> moveIntSeeds.add(part.varId)
-
-                is Move.RealSet -> {}
-
-                is Move.Compound -> {
-                    for (p in part.parts) collect(p)
-                    return
-                }
-            }
-            saveSlot(slotOf(part))
-        }
-        collect(move)
-        val net = invariants
-        val affected = net?.let { affectedDefinitions(it) }
-        if (net != null && affected != null) {
-            for (position in 0 until affected.size) {
-                val node = net.node(affected[position])
-                saveSlot(if (node.outIsBool) node.out else problem.numBoolVars + node.out)
-            }
-        }
-        if (savedValuesScratch.size < probeSlots.size) savedValuesScratch = LongArray(probeSlots.size)
-        for (i in 0 until probeSlots.size) savedValuesScratch[i] = probeValue(probeSlots[i])
-        return affected
+    internal fun probeDefinitions(move: Move): IntArrayList? {
+        collectMoveSeeds(move)
+        return invariants?.let { affectedDefinitions(it) }
     }
 
-    private fun probeValue(slot: Int): Long = when {
-        slot < problem.numBoolVars -> if (assignment.boolValue(slot)) 1L else 0L
-        slot < problem.numBoolVars + problem.numIntVars -> assignment.intValue(slot - problem.numBoolVars)
-        else -> assignment.realValue(slot - problem.numBoolVars - problem.numIntVars).toRawBits()
-    }
-
-    private fun restoreProbeCoordinates() {
-        for (i in probeSlots.size - 1 downTo 0) {
-            val slot = probeSlots[i]
-            val value = savedValuesScratch[i]
-            if (probeValue(slot) == value) continue
-            when {
-                slot < problem.numBoolVars -> applyBoolFlip(slot)
-                slot < problem.numBoolVars + problem.numIntVars -> applyIntSet(slot - problem.numBoolVars, value)
-                else -> applyRealSet(slot - problem.numBoolVars - problem.numIntVars, Double.fromBits(value))
-            }
+    internal fun restoreProbeCoordinate(slot: Int, value: Long) {
+        when {
+            slot < problem.numBoolVars -> applyBoolFlip(slot)
+            slot < problem.numBoolVars + problem.numIntVars -> applyIntSet(slot - problem.numBoolVars, value)
+            else -> applyRealSet(slot - problem.numBoolVars - problem.numIntVars, Double.fromBits(value))
         }
     }
 
@@ -1481,162 +1238,20 @@ class LocalSearchState private constructor(
         elementEligibility: MoveSink? = null,
         feasibleObjective: Boolean = false,
         capture: (() -> Unit)? = null,
-    ): MoveEval {
-        check(!probeActive && !moveActive) { "local-search probes cannot be nested" }
-        moveActive = true
-        try {
-            return probeMove(
-                move, objective, refineCumulative, weightedResidual, elementEligibility, feasibleObjective, capture,
-            )
-        } finally {
-            moveActive = false
-        }
+    ): LocalSearchProbe.Evaluation {
+        check(!probe.active && !moveActive) { "local-search probes cannot be nested" }
+        return probe.evaluate(
+            move, objective, booleanDelta.takeIf { booleanDeltaOf === objective },
+            refineCumulative, weightedResidual, elementEligibility, feasibleObjective, capture,
+        )
     }
-
-    private fun probeMove(
-        move: Move,
-        objective: Objective?,
-        refineCumulative: Boolean,
-        weightedResidual: Boolean,
-        elementEligibility: MoveSink?,
-        feasibleObjective: Boolean,
-        capture: (() -> Unit)?,
-    ): MoveEval {
-        val oldCost = cost
-        val oldBestCost = bestCostSeen
-        val oldTracking = activityTracking
-        val indexed = booleanDelta.takeIf { booleanDeltaOf === objective }
-        val oldExactObjective = if (indexed == null) {
-            (objective as? FunctionalObjective)?.let(::committedValue)
-        } else null
-        val oldObjective = if (
-            objective != null && objective !is LinearObjective && objective !is FunctionalObjective
-        ) {
-            objective.evaluate(assignment)
-        } else {
-            0.0
-        }
-        val degBefore = if (weights.allocated || move !is Move.Compound) {
-            (degScratch ?: IntArray(factorDegree.size)).also { degScratch = it }
-        } else {
-            null
-        }
-        if (refineCumulative) {
-            if (cumulativeFractions.size < cumulativeFactors.size) {
-                cumulativeFractions = DoubleArray(cumulativeFactors.size)
-            }
-            for (i in cumulativeFactors.indices) cumulativeFractions[i] = cumulativeFraction(cumulativeFactors[i])
-        }
-        val affected = saveProbeCoordinates(move)
-        probeTouchedList.clear()
-        probeActive = true
-        activityTracking = false
-        breakProbeActive = true
-        try {
-            apply(move, affected)
-            capture?.invoke()
-            breakProbeActive = false
-            var breakCount = 0
-            var makeCount = 0
-            var newlyViolated = 0
-            for (i in 0 until probeTouchedList.size) {
-                val fid = probeTouchedList[i]
-                val degree = factorDegree[fid]
-                if (degree > 0 && !probeWasViolated[fid]) newlyViolated++
-                if (degBefore != null) {
-                    val before = degBefore[fid]
-                    if (degree > before) breakCount++
-                    if (degree < before) makeCount++
-                }
-            }
-            val delta = cost - oldCost
-            val weighted = if (weights.allocated) weightedDegreeDelta(checkNotNull(degBefore)) else delta.toDouble()
-            val objectiveDelta = when {
-                feasibleObjective && cost > 0L -> Double.POSITIVE_INFINITY
-                objective is LinearObjective -> probeLinearObjectiveDelta(objective)
-                indexed != null -> indexed.difference(
-                    assignment, probeSlots, savedValuesScratch, ::checkObjectiveProbeWork,
-                ).also { phaseTimer?.recordObjectiveScoring("indexed") }
-                objective is FunctionalObjective ->
-                    (objective.evaluateExact(assignment) - checkNotNull(oldExactObjective)).toDouble().also {
-                        phaseTimer?.recordObjectiveScoring("generic")
-                    }
-                objective == null -> 0.0
-                else -> objective.evaluate(assignment) - oldObjective
-            }
-            val breaks = if (move is Move.Compound) newlyViolated else breakCount
-            val cumulativeDelta = if (refineCumulative) cumulativeFractionDelta(weightedResidual) else 0.0
-            val elementRepairs = elementEligibility?.let { elementPreservingRepairs(it) }
-            return MoveEval(breaks, makeCount, delta, weighted, objectiveDelta, cumulativeDelta, elementRepairs)
-        } finally {
-            breakProbeActive = false
-            restoringProbe = true
-            restoreProbeCoordinates()
-            restoringProbe = false
-            // Restoration returns every probed coordinate to its committed value, so the cached value stands.
-            if (oldExactObjective != null) committedObjectiveRevision = assignmentRevision
-            for (i in 0 until probeTouchedList.size) probeTouched[probeTouchedList[i]] = false
-            probeActive = false
-            activityTracking = oldTracking
-            bestCostSeen = oldBestCost
-        }
-    }
-
-    private fun probeLinearObjectiveDelta(objective: LinearObjective): Double {
-        objectiveDeltaSum.reset()
-        var realDelta = 0.0
-        for (i in 0 until probeSlots.size) {
-            val slot = probeSlots[i]
-            val old = savedValuesScratch[i]
-            if (slot < problem.numBoolVars) {
-                val coefficient = objective.boolWeightValues.getOrElse(slot) { 0L }
-                objectiveDeltaSum.addDelta(coefficient, old, probeValue(slot))
-            } else if (slot < problem.numBoolVars + problem.numIntVars) {
-                val coefficient = objective.intCoefficientValues.getOrElse(slot - problem.numBoolVars) { 0L }
-                objectiveDeltaSum.addDelta(coefficient, old, probeValue(slot))
-            } else {
-                val real = slot - problem.numBoolVars - problem.numIntVars
-                val coefficient = objective.realCoefficientValues.getOrElse(real) { 0.0 }
-                realDelta += coefficient * (assignment.realValue(real) - Double.fromBits(old))
-            }
-        }
-        return objectiveDeltaSum.toDouble() + realDelta
-    }
-
-    private fun weightedDegreeDelta(degBefore: IntArray): Double {
-        val w = weights.factorWeights
-        var delta = 0.0
-        // Keep factor-id order so floating-point accumulation matches a full degree scan.
-        probeTouchedList.backingData.sort(0, probeTouchedList.size)
-        for (p in 0 until probeTouchedList.size) {
-            val i = probeTouchedList[p]
-            val d = factorDegree[i] - degBefore[i]
-            if (d != 0) delta += w[i] * d
-        }
-        return delta
-    }
-
-    private data class MoveEval(
-        val breakScore: Int,
-        val makeScore: Int,
-        val netDelta: Long,
-        val weightedNetDelta: Double,
-        val objectiveDelta: Double,
-        val cumulativeDelta: Double,
-        val elementRepairs: List<Move>?,
-    )
 
     // Reconcile exact degrees independently of apply status deltas; fused updates avoid a second degree read.
     private fun updateViolation(factorId: Int, newDegree: Int = factors[factorId].violationDegree(this, factorId)) {
         val oldDegree = factorDegree[factorId]
         val delta = newDegree - oldDegree
         if (delta == 0) return
-        if (breakProbeActive && !probeTouched[factorId]) {
-            probeTouched[factorId] = true
-            probeWasViolated[factorId] = oldDegree > 0
-            degScratch?.set(factorId, oldDegree)
-            probeTouchedList.add(factorId)
-        }
+        probe.recordDegreeChange(factorId, oldDegree)
         factorDegree[factorId] = newDegree
         cost += delta
         if (newDegree > 0) violated.add(factorId) else violated.remove(factorId)
