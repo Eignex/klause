@@ -51,7 +51,9 @@ factors, so tight arithmetic and global constraints give the walk a gradient. A
 candidate's `deltaIf*` result must equal the exact degree change the move would
 cause; committed moves reconcile cost and violated membership from the exact
 post-move degrees. The immutable invariant projection is shared; mutable payloads,
-the assignment, weights and random state belong to each `LocalSearchState`.
+the assignment, weights and random state belong to each `LocalSearchState`. Its
+`LocalSearchProbe` owns reversible scoring and restoration through the same
+primitive mutation paths as committed moves.
 
 Unguarded unit-integer `Distinct` maintains multiplicities of exact offset values.
 A source move updates every operand reading that coordinate, including aliases;
