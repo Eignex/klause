@@ -14,7 +14,6 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.Term
-import com.eignex.klause.lp.ExactWitness
 import com.eignex.klause.lp.exactComparison
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -148,7 +147,7 @@ private fun slackedRow(
 private fun BigFraction.magnitude(): BigFraction = if (this < BigFraction.ZERO) negated() else this
 
 // Acceptance of real completions within the tolerance the source declares. It is null when that tolerance is
-// zero or absent, when there is no real coordinate, or when no real component reads the slack.
+// zero or absent, when there is no real coordinate, or when no relation reads the slack.
 //
 // Real coordinates that share a relation form a component, and each component is judged on its own. In a component
 // whose relations are all linear rows and finite memberships, a non-strict active row reads the slack and a finite
@@ -174,7 +173,8 @@ internal fun capturedRealAcceptance(source: Problem, cancellation: Cancellation)
         if (!factor.readsCapturedSlack()) exactRoots[components.find(factor.variables.reals[0])] = true
     }
     val exact = BooleanArray(source.numRealVars) { exactRoots[components.find(it)] }
-    if (exact.all { it }) return null
+    // A real in no relation completes exactly within its declaration, so it alone gives the slack nothing to read.
+    if (checked.all { exact[source.factors[it].variables.reals[0]] }) return null
     return FiniteSourceAcceptance(
         { sample -> acceptsWithinTolerance(source, checked, exact, sample, policy, cancellation) },
         permitsToleranceOptimum = true,
@@ -199,22 +199,18 @@ private fun acceptsWithinTolerance(
         BigFraction.ofDouble(sample.approximateRealValue(it)) ?: return false
     }
     val point = if (sample.exactReals != null) sample else sample.copy(exactReals = reals)
-    fun slack(id: Int, bound: BigFraction) = if (exact[id]) BigFraction.ZERO else capturedSourceSlack(policy, bound)
-    for (id in reals.indices) {
+    fun slack(real: Int, bound: BigFraction) =
+        if (exact[real]) BigFraction.ZERO else capturedSourceSlack(policy, bound)
+    for (real in reals.indices) {
         cancellation.charge(1)
         if (cancellation()) return false
-        val lower = BigFraction.ofDouble(source.realLower[id])
-        val upper = BigFraction.ofDouble(source.realUpper[id])
-        if ((lower != null && reals[id] < lower - slack(id, lower)) ||
-            (upper != null && reals[id] > upper + slack(id, upper))
+        val lower = BigFraction.ofDouble(source.realLower[real])
+        val upper = BigFraction.ofDouble(source.realUpper[real])
+        if ((lower != null && reals[real] < lower - slack(real, lower)) ||
+            (upper != null && reals[real] > upper + slack(real, upper))
         ) return false
     }
-    val witness = object : ExactWitness {
-        override fun truth(boolVar: Int): Boolean = point.boolValue(boolVar)
-        override fun at(column: Int): BigFraction = if (column < source.numRealVars) reals[column] else {
-            BigFraction.of(point.exactIntValue(column - source.numRealVars), BIG_ONE)
-        }
-    }
+    val witness = ExactRealPoint(point, reals)
     fun holds(row: LinearRow): Boolean {
         cancellation.charge(row.size.toLong() + 1L)
         if (cancellation()) return false
@@ -234,7 +230,7 @@ private fun acceptsWithinTolerance(
                 (reals[factor.variable] - member).magnitude() <= slack(factor.variable, member)
             }
         } else if (exact[factor.variables.reals[0]]) {
-            checkExactRealRelation(id, factor, point, reals, cancellation) == null
+            checkExactRealRelation(id, factor, witness, cancellation) == null
         } else if (factor is LinearIndicator) {
             point.exactIntValue(factor.indicator) != bigIntOf(if (factor.whenOne) 1L else 0L) || holds(factor.row)
         } else when (val form = factor.linearForm) {

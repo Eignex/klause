@@ -87,25 +87,36 @@ internal fun verifyRealCoordinates(
             return Verification.Rejected("real $id is outside its declared range")
         }
     }
+    val point = ExactRealPoint(sample, reals)
     for ((id, factor) in model.factors.withIndex()) {
         cancellation.charge(1)
         if (cancellation()) return Verification.Indeterminate("source coordinate check cancelled")
         if (factor.variables.reals.isEmpty() || factor is RealFiniteDomain) continue
-        checkExactRealRelation(id, factor, sample, reals, cancellation)?.let { return it }
+        checkExactRealRelation(id, factor, point, cancellation)?.let { return it }
     }
     return if (cancellation()) Verification.Indeterminate("source coordinate check cancelled")
     else Verification.Accepted(Candidate(sample, Unit))
 }
 
-// The exact verdict of one relation over real coordinates other than a finite membership, where [reals] are the
-// sample's rational real coordinates: null when the relation holds.
+// A sample read at its rational real coordinates [reals]: real column `j` is `reals(j)` and integer `v` is column
+// `reals.size + v`.
+internal class ExactRealPoint(val sample: Sample, val reals: List<BigFraction>) : ExactWitness {
+    override fun truth(boolVar: Int): Boolean = sample.boolValue(boolVar)
+    override fun at(column: Int): BigFraction = if (column < reals.size) reals[column] else {
+        BigFraction.of(sample.exactIntValue(column - reals.size), BIG_ONE)
+    }
+}
+
+// The exact verdict of one relation over real coordinates other than a finite membership: null when the relation
+// holds at [point].
 internal fun checkExactRealRelation(
     id: Int,
     factor: Factor,
-    sample: Sample,
-    reals: List<BigFraction>,
+    point: ExactRealPoint,
     cancellation: Cancellation,
 ): Verification<Nothing, Nothing>? {
+    val sample = point.sample
+    val reals = point.reals
     if (factor is Distinct) {
         return if (factor.isSatisfied(sample::exactIntValue, sample::boolValue, reals::get)) null
         else Verification.Rejected("real factor $id refutes the assignment")
@@ -168,39 +179,33 @@ internal fun checkExactRealRelation(
         return if (selected == reals[factor.result]) null
         else Verification.Rejected("real factor $id refutes the assignment")
     }
-    return checkExactRealRows(id, factor, sample, reals, cancellation)
+    return checkExactRealRows(id, factor, point, cancellation)
 }
 
 private fun checkExactRealRows(
     id: Int,
     factor: Factor,
-    sample: Sample,
-    reals: List<BigFraction>,
+    point: ExactRealPoint,
     cancellation: Cancellation,
 ): Verification<Nothing, Nothing>? {
-    val witness = object : ExactWitness {
-        override fun truth(boolVar: Int): Boolean = sample.boolValue(boolVar)
-        override fun at(column: Int): BigFraction = if (column < reals.size) reals[column] else {
-            BigFraction.of(sample.exactIntValue(column - reals.size), BIG_ONE)
-        }
-    }
-    fun holds(row: LinearRow): Boolean {
-        cancellation.charge(row.size.toLong() + 1L)
-        if (cancellation()) return false
-        return row.exactComparison(
-            reals.size, row.activator == LinearRow.ALWAYS || witness.truth(row.activator), witness::truth,
-        ).holdsAt(witness)
-    }
     val valid = if (factor is LinearIndicator) {
-        sample.exactIntValue(factor.indicator) != bigIntOf(if (factor.whenOne) 1L else 0L) || holds(factor.row)
+        point.sample.exactIntValue(factor.indicator) != bigIntOf(if (factor.whenOne) 1L else 0L) ||
+            point.holdsExactly(factor.row, cancellation)
     } else when (val form = factor.linearForm) {
-        is LinearForm.Conjunction -> form.rows.all(::holds)
-        is LinearForm.Disjunction -> form.rows.any(::holds)
+        is LinearForm.Conjunction -> form.rows.all { point.holdsExactly(it, cancellation) }
+        is LinearForm.Disjunction -> form.rows.any { point.holdsExactly(it, cancellation) }
         is LinearForm.Relaxation, null ->
             return Verification.Indeterminate("real factor $id has no complete witness checker")
     }
     if (cancellation()) return Verification.Indeterminate("source row check cancelled")
     return if (valid) null else Verification.Rejected("real factor $id refutes the assignment")
+}
+
+private fun ExactRealPoint.holdsExactly(row: LinearRow, cancellation: Cancellation): Boolean {
+    cancellation.charge(row.size.toLong() + 1L)
+    if (cancellation()) return false
+    return row.exactComparison(reals.size, row.activator == LinearRow.ALWAYS || truth(row.activator), ::truth)
+        .holdsAt(this)
 }
 
 private fun rationalPowerEquals(

@@ -90,8 +90,10 @@ class FiniteExecutionTest {
 
     @Test
     fun `a nonlinear real relation over a row that needs the slack should keep its component exact`() {
-        val verdict = solveFlatZinc(SemanticOverrides(), declarations = "var 0.0..2.0: b;",
-            constraints = "constraint float_abs(y, b);")
+        val verdict = solveFlatZinc(SemanticOverrides(),
+            declarations = "var 1..2: i; var 0.0..1.0: u; var 0.0..1.0: v;",
+            constraints = "constraint array_float_element(i, [2.0, 1.0], y); " +
+                "constraint float_lin_eq([1.0, 1.0], [u, v], 1.0);")
 
         assertEquals(FiniteSolveVerdict.UNSAT, verdict)
     }
