@@ -51,11 +51,16 @@ class EngineParamsTest {
     fun `learned memory controls should reach fixed and portfolio workers without enabling defaults`() {
         val base = com.eignex.klause.backtrack.BacktrackParams()
         val settings = listOf(
-            "learned-memory-bytes=4096", "learned-memory-work=1234", "learned-memory-scratch-bytes=789",
+            "learned-memory-bytes=4096",
+            "learned-memory-work=1234",
+            "learned-memory-scratch-bytes=789",
         )
 
-        val fixed = applyFixedBacktrackParams(base, EngineParams(settings + "private-rebuild-bytes=456"),
-            allowSelectors = true)
+        val fixed = applyFixedBacktrackParams(
+            base,
+            EngineParams(settings + "private-rebuild-bytes=456"),
+            allowSelectors = true,
+        )
         val worker = applyBacktrackParams(base, EngineParams(settings))
 
         assertEquals(456L, fixed.privateRebuildBytes)
@@ -70,8 +75,14 @@ class EngineParamsTest {
 
     @Test
     fun `companion timing controls should remain separate from admission`() {
-        val selected = scenario(1, listOf("companion-after-incumbent=true", "companion-active-ms=7000",
-            "portfolio-progress=true"))
+        val selected = scenario(
+            1,
+            listOf(
+            "companion-after-incumbent=true",
+            "companion-active-ms=7000",
+            "portfolio-progress=true",
+        )
+        )
 
         assertTrue(selected.companionAfterIncumbent)
         assertEquals(7_000L, selected.companionActiveMillis)
@@ -102,13 +113,18 @@ class EngineParamsTest {
         assertEquals(0, base.rootProbeBatch)
         assertEquals(false, base.rootProbeBinaryGate)
         assertEquals(false, base.rootProbeGeneralGate)
-        val configured = applyBacktrackParams(base, EngineParams(listOf(
+        val configured = applyBacktrackParams(
+            base,
+            EngineParams(
+                listOf(
             "root-simplification=true", "root-simplify-batch=7", "root-probe-batch=3", "root-probe-work=256",
             "root-rebuild-capture-visits=1024", "root-probe-implications=false",
             "root-probe-binary-gate=true",
             "root-probe-general-gate=true",
             "private-rebuild-work=65536",
-        )))
+        )
+            )
+        )
         assertEquals(true, configured.rootSimplification)
         assertEquals(7, configured.rootSimplifyBatch)
         assertEquals(1024, configured.rootRebuildCaptureVisits)
@@ -122,17 +138,31 @@ class EngineParamsTest {
 
     @Test
     fun `inprocessing spending and trigger controls should reach backtrack workers`() {
-        val configured = applyBacktrackParams(com.eignex.klause.backtrack.BacktrackParams(), EngineParams(listOf(
+        val configured = applyBacktrackParams(
+            com.eignex.klause.backtrack.BacktrackParams(),
+            EngineParams(
+                listOf(
             "inprocessing-work=100", "inprocessing-root-work=11", "inprocessing-probe-work=12",
             "inprocessing-subsume-work=13", "inprocessing-vivify-work=14", "inprocessing-interval=15",
             "inprocessing-growth=16", "inprocessing-cooldown=17", "inprocessing-warmup-work=18",
             "inprocessing-probe-interval=20",
-        )))
+        )
+            )
+        )
 
-        assertEquals(listOf(100L, 11L, 12L, 13L, 14L, 15L, 17L, 18L), listOf(configured.inprocessingWork,
-            configured.inprocessingRootWork, configured.inprocessingProbeWork, configured.inprocessingSubsumeWork,
-            configured.inprocessingVivifyWork, configured.inprocessingInterval, configured.inprocessingCooldown,
-            configured.inprocessingWarmupWork))
+        assertEquals(
+            listOf(100L, 11L, 12L, 13L, 14L, 15L, 17L, 18L),
+            listOf(
+            configured.inprocessingWork,
+            configured.inprocessingRootWork,
+            configured.inprocessingProbeWork,
+            configured.inprocessingSubsumeWork,
+            configured.inprocessingVivifyWork,
+            configured.inprocessingInterval,
+            configured.inprocessingCooldown,
+            configured.inprocessingWarmupWork,
+        )
+        )
         assertEquals(16, configured.inprocessingGrowth)
         assertEquals(20L, configured.inprocessingProbeInterval)
     }
@@ -191,16 +221,25 @@ class EngineParamsTest {
 
     @Test
     fun `explicit objective guidance expands one recipe into fresh composition slots`() {
-        val resolved = resolveLocalSearchRecipes(EngineParams(listOf(
-            "arm=cbls-plateau/ils-basin", "objective-guidance=functional,geometric",
-        )))
+        val resolved = resolveLocalSearchRecipes(
+            EngineParams(
+                listOf(
+            "arm=cbls-plateau/ils-basin",
+            "objective-guidance=functional,geometric",
+        )
+            )
+        )
 
         val recipes = resolved.pool!!.map { it() }
 
-        assertEquals(listOf(ObjectiveGuidance.Functional, ObjectiveGuidance.Geometric),
-            recipes.map { it.objectiveGuidance })
-        assertEquals(listOf("cbls-plateau/ils-basin/functional", "cbls-plateau/ils-basin/geometric"),
-            recipes.map { it.label })
+        assertEquals(
+            listOf(ObjectiveGuidance.Functional, ObjectiveGuidance.Geometric),
+            recipes.map { it.objectiveGuidance },
+        )
+        assertEquals(
+            listOf("cbls-plateau/ils-basin/functional", "cbls-plateau/ils-basin/geometric"),
+            recipes.map { it.label },
+        )
         assertTrue(recipes[0].strategy !== recipes[1].strategy)
     }
 
@@ -210,7 +249,6 @@ class EngineParamsTest {
             resolveLocalSearchRecipes(EngineParams(listOf("objective-guidance=geometirc")))
         }
     }
-
 
     private fun scenario(cores: Int, params: List<String> = emptyList(), mix: EngineMix = EngineMix.MIXED) =
         buildPortfolioScenario(

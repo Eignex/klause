@@ -23,16 +23,26 @@ class NativeExecutionSemanticsTest {
     fun `polynomial execution should retain effective real defaults after cancellation`() {
         val source = SmtLib.parse(
             "(declare-const x Real) (assert (= (* x x) 1))",
-            semanticOverrides = SemanticOverrides(undeclaredReals = BoundsOverride(
+            semanticOverrides = SemanticOverrides(
+                undeclaredReals = BoundsOverride(
                 upper = BoundOverride.Value(SemanticRational.ONE),
-            )),
+            )
+            ),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            source.source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            source.source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
 
-        val completed = SourceSetup.execute(SourceExecutionRequest(invocation,
-            polynomial = PolynomialTheoryParams(cancellation = ExecutionControl { true })))
+        val completed = SourceSetup.execute(
+            SourceExecutionRequest(
+            invocation,
+            polynomial = PolynomialTheoryParams(cancellation = ExecutionControl { true }),
+        )
+        )
         val result = assertIs<SourceExecutionResult.Polynomial>(completed).result.result
 
         assertIs<OpenTheoryResult.Unknown>(result)
@@ -41,16 +51,26 @@ class NativeExecutionSemanticsTest {
 
     @Test
     fun `nonlinear integer execution should retain effective integer defaults after cancellation`() {
-        val source = assertIs<NonlinearIntegerProblem>((SmtLib.parse(
+        val source = assertIs<NonlinearIntegerProblem>(
+            (
+                SmtLib.parse(
             "(declare-const x Int) (assert (= (* x x) 1))",
-            semanticOverrides = SemanticOverrides(undeclaredIntegers = BoundsOverride(
+            semanticOverrides = SemanticOverrides(
+                undeclaredIntegers = BoundsOverride(
                 upper = BoundOverride.Value(1L),
-            )),
-        )).source.originalSource)
+            )
+            ),
+        )
+            ).source.originalSource
+        )
 
-        val result = OpenTheoryPipeline.execute(source.pipelineRequest(), NonlinearIntegerTheoryParams(
+        val result = OpenTheoryPipeline.execute(
+            source.pipelineRequest(),
+            NonlinearIntegerTheoryParams(
             polynomial = PolynomialTheoryParams(cancellation = ExecutionControl { true }),
-        ), FiniteEngine.BACKTRACK).result
+        ),
+            FiniteEngine.BACKTRACK
+        ).result
 
         assertIs<OpenTheoryResult.Unknown>(result)
         assertSame(source.semantics, result.semantics)
@@ -58,15 +78,24 @@ class NativeExecutionSemanticsTest {
 
     @Test
     fun `transcendental execution should retain effective real defaults after cancellation`() {
-        val source = assertIs<TranscendentalProblem>((SmtLib.parse(
+        val source = assertIs<TranscendentalProblem>(
+            (
+                SmtLib.parse(
             "(declare-const x Real) (assert (= (exp 0) 1)) (assert (> x 0))",
-            semanticOverrides = SemanticOverrides(undeclaredReals = BoundsOverride(
+            semanticOverrides = SemanticOverrides(
+                undeclaredReals = BoundsOverride(
                 upper = BoundOverride.Value(SemanticRational.ONE),
-            )),
-        )).source.originalSource)
+            )
+            ),
+        )
+            ).source.originalSource
+        )
 
-        val result = OpenTheoryPipeline.execute(source.pipelineRequest(),
-            TranscendentalTheoryParams(cancellation = ExecutionControl { true }), FiniteEngine.BACKTRACK).result
+        val result = OpenTheoryPipeline.execute(
+            source.pipelineRequest(),
+            TranscendentalTheoryParams(cancellation = ExecutionControl { true }),
+            FiniteEngine.BACKTRACK,
+        ).result
 
         assertIs<OpenTheoryResult.Unknown>(result)
         assertSame(source.semantics, result.semantics)
@@ -76,8 +105,14 @@ class NativeExecutionSemanticsTest {
     fun `private polynomial views should preserve the original model interpretation`() {
         val semantics = SourceSemantics(SourceFormat.SCHEMA).resolve()
         val source = Problem(
-            0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0), semantics = semantics,
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+            semantics = semantics,
         )
 
         val request = source.pipelineRequest()
@@ -92,8 +127,11 @@ class NativeExecutionSemanticsTest {
             "(declare-const x Real) (assert (= (* x x) 1))",
         ).realSource()
 
-        val execution = OpenTheoryPipeline.minimize(source.pipelineRequest(),
-            LinearObjective(realCoefficients = doubleArrayOf(1.0)), engine = FiniteEngine.BACKTRACK)
+        val execution = OpenTheoryPipeline.minimize(
+            source.pipelineRequest(),
+            LinearObjective(realCoefficients = doubleArrayOf(1.0)),
+            engine = FiniteEngine.BACKTRACK,
+        )
 
         assertSame(source.semantics, execution.result.semantics)
     }

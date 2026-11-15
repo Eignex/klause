@@ -126,13 +126,17 @@ class PresolveBudget(
     var probeCalls: Long = 0
         private set
 
-    internal fun recordRound() { rounds++ }
+    internal fun recordRound() {
+        rounds++
+    }
 
     internal fun recordPass(pass: PresolvePass) {
         calls[pass.id] = (calls[pass.id] ?: 0) + 1
     }
 
-    internal fun recordProbe() { probeCalls++ }
+    internal fun recordProbe() {
+        probeCalls++
+    }
 
     /** Work units charged so far; may exceed [allowance] by the last charge before a poll noticed. */
     fun spent(): Long = spent
@@ -239,7 +243,9 @@ internal fun ExecutionControl.recordPresolveProbe() {
 }
 
 private fun saturatedSum(total: Long, units: Long): Long =
-    if (units <= 0L) total else if (units > Long.MAX_VALUE - total) {
+    if (units <= 0L) {
+        total
+    } else if (units > Long.MAX_VALUE - total) {
         Long.MAX_VALUE
     } else {
         total + units

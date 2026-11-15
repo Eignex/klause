@@ -140,7 +140,7 @@ data class PolynomialTheoryStats(
             "$prefix)"
         } else {
             "$prefix, dyadicAttempts=$dyadicAttempts, dyadicBases=$dyadicBases, " +
-            "coupledWorkDeclines=$coupledWorkDeclines, dyadicPreExtractionDeclines=$dyadicPreExtractionDeclines)"
+                "coupledWorkDeclines=$coupledWorkDeclines, dyadicPreExtractionDeclines=$dyadicPreExtractionDeclines)"
         }
     }
 
@@ -240,7 +240,9 @@ private fun minimizePolynomial(
     }
     val shared = request.resolvedModel()
     val scope = PolynomialInvocationScope(
-        shared.service, params, concurrent = cores > 1 && engine != FiniteEngine.FIXED,
+        shared.service,
+        params,
+        concurrent = cores > 1 && engine != FiniteEngine.FIXED,
     )
     val completed = PolynomialStrategyAdapters(operation, shared, scope, params.strategy, stop, cores)
         .minimize(objective, engine)
@@ -260,11 +262,15 @@ private fun minimizePolynomial(
         result
     } else {
         when (result) {
-        is MinimizeResult.WithSample -> MinimizeResult.BestFound(
-            result.sample, result.objective, reason, result.stats,
-        )
-        else -> MinimizeResult.Unknown(reason, result.stats)
-    }
+            is MinimizeResult.WithSample -> MinimizeResult.BestFound(
+                result.sample,
+                result.objective,
+                reason,
+                result.stats,
+            )
+
+            else -> MinimizeResult.Unknown(reason, result.stats)
+        }
     }
     return PolynomialOptimizationExecution(published, scope.stats)
 }
@@ -311,8 +317,8 @@ private fun executePolynomial(
         OpenTheoryResult.Unknown(
             reason,
             searchStats.copy(
-            run = searchStats.run.copy(timedOut = reason == TerminationReason.Timeout),
-        )
+                run = searchStats.run.copy(timedOut = reason == TerminationReason.Timeout),
+            ),
         ),
         stats,
     )
@@ -322,7 +328,9 @@ private fun executePolynomial(
     }
     val shared = request.resolvedModel()
     val scope = PolynomialInvocationScope(
-        shared.service, params, concurrent = cores > 1 && engine != FiniteEngine.FIXED,
+        shared.service,
+        params,
+        concurrent = cores > 1 && engine != FiniteEngine.FIXED,
     )
     val solved = PolynomialStrategyAdapters(request.preparedPlan, shared, scope, params.strategy, stop, cores)
         .solve(engine)
@@ -341,10 +349,10 @@ private fun executePolynomial(
             stats = scope.stats
             if (sample == null) {
                 return incomplete(
-                params.sourceVerificationReason(scope.cancellation),
-                stats,
-                result.stats,
-            )
+                    params.sourceVerificationReason(scope.cancellation),
+                    stats,
+                    result.stats,
+                )
             }
             val assignment = ExactNraAssignment(
                 BooleanArray(source.sourceBoolCount) { sample.boolValue(it) },
@@ -355,10 +363,10 @@ private fun executePolynomial(
                 exact
             } else {
                 OpenTheoryAssignment.Rebuilt(
-                exact,
-                assignment.bools,
-                Array(shared.source.numIntVars) { bigIntOf(sample.intValue(it)) },
-            )
+                    exact,
+                    assignment.bools,
+                    Array(shared.source.numIntVars) { bigIntOf(sample.intValue(it)) },
+                )
             }
             if (stop()) {
                 incomplete(

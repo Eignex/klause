@@ -22,8 +22,15 @@ class GeneralWatchMemoryContinuationTest(private val permanentCount: Int) {
     @Test
     fun `partial observations should permit bounded watch cleanup across unchanged roots`() {
         val floor = Clause(intArrayOf(8, 10))
-        val session = PropagationSession(Problem(6, 0, emptyArray(),
-            arrayOf(floor, Clause(intArrayOf(1)))), nativeSat = false)
+        val session = PropagationSession(
+            Problem(
+            6,
+            0,
+            emptyArray(),
+            arrayOf(floor, Clause(intArrayOf(1))),
+        ),
+            nativeSat = false
+        )
         repeat(permanentCount) { session.addLearnedClause(floor, 2, permanent = true) }
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
         repeat(64) { session.addLearnedClause(Clause(intArrayOf(4, 6)), 9) }
@@ -34,8 +41,11 @@ class GeneralWatchMemoryContinuationTest(private val permanentCount: Int) {
         val generation = session.learnedRetirementGeneration
         assertEquals(SharingMemoryStatus.PARTIAL, session.sharingMemory().status)
         val maintenance = LearnedMemoryMaintenance()
-        val params = BacktrackParams(learnedMemoryBytes = 0L,
-            learnedMemoryWork = 32_768L, learnedMemoryScratchBytes = 4096L)
+        val params = BacktrackParams(
+            learnedMemoryBytes = 0L,
+            learnedMemoryWork = 32_768L,
+            learnedMemoryScratchBytes = 4096L,
+        )
 
         repeat(32) {
             val before = session.work

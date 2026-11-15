@@ -21,7 +21,9 @@ internal fun booleanObjectiveCutoff(
     if (problem.numRealVars > 0 || objective.boolWeightValues.size > problem.numBoolVars ||
         objective.intCoefficientValues.any { it != 0L } || objective.realCoefficientValues.any { it != 0.0 } ||
         incumbent.den != BIG_ONE
-    ) return null
+    ) {
+        return null
+    }
     val weights = objective.boolWeightValues
     var positive = 0L
     var magnitude = 0L

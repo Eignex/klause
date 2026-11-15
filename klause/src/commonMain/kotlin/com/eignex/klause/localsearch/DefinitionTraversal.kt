@@ -10,10 +10,11 @@ internal class DefinitionTraversal(val network: InvariantNetwork) {
     private var seedInt = -1
     private var seedBool = -1
 
-    fun reuses(ints: IntArray, intCount: Int, bools: IntArray, boolCount: Int): Boolean =
-        !network.hasDynamicReaders &&
-            ((intCount == 1 && boolCount == 0 && seedInt >= 0 && seedInt == ints[0]) ||
-                (boolCount == 1 && intCount == 0 && seedBool >= 0 && seedBool == bools[0]))
+    fun reuses(ints: IntArray, intCount: Int, bools: IntArray, boolCount: Int): Boolean = !network.hasDynamicReaders &&
+        (
+            (intCount == 1 && boolCount == 0 && seedInt >= 0 && seedInt == ints[0]) ||
+            (boolCount == 1 && intCount == 0 && seedBool >= 0 && seedBool == bools[0])
+        )
 
     fun remember(ints: IntArray, intCount: Int, bools: IntArray, boolCount: Int) {
         seedInt = if (intCount == 1 && boolCount == 0) ints[0] else -1

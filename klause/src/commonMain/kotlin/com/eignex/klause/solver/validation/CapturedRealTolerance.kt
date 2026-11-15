@@ -122,11 +122,13 @@ private fun slackedRow(
         if (cancellation()) return null
         val coefficient = when (constants) {
             is IntegralConstants -> BigFraction.of(constants.exactCoeff(index), BIG_ONE)
-            is RealConstants -> BigFraction.ofDouble(if (index < constants.intCoefficients.size) {
-                constants.intCoefficients.at(index)
-            } else {
-                constants.realCoefficients.at(index - constants.intCoefficients.size)
-            }
+
+            is RealConstants -> BigFraction.ofDouble(
+                if (index < constants.intCoefficients.size) {
+                    constants.intCoefficients.at(index)
+                } else {
+                    constants.realCoefficients.at(index - constants.intCoefficients.size)
+                },
             ) ?: return null
         }
         val reference = row.ref(index)
@@ -240,10 +242,10 @@ private fun acceptsWithinTolerance(
             }
         } else {
             when (val form = factor.linearForm) {
-            is LinearForm.Conjunction -> form.rows.all(::holds)
-            is LinearForm.Disjunction -> form.rows.any(::holds)
-            else -> false
-        }
+                is LinearForm.Conjunction -> form.rows.all(::holds)
+                is LinearForm.Disjunction -> form.rows.any(::holds)
+                else -> false
+            }
         }
         if (!valid) return false
     }

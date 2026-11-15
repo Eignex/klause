@@ -27,23 +27,36 @@ class BooleanProofTasksTest {
 
     @Test
     fun `actual scoped finite refutations should close every leased cube without independent proof authority`() {
-        val problem = Problem(2, 0, emptyArray(), arrayOf(
-            Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)),
-            Clause(intArrayOf(1, 2)), Clause(intArrayOf(1, 3)),
-        )).bake()
+        val problem = Problem(
+            2, 0, emptyArray(),
+            arrayOf(
+            Clause(intArrayOf(0, 2)),
+            Clause(intArrayOf(0, 3)),
+            Clause(intArrayOf(1, 2)),
+            Clause(intArrayOf(1, 3)),
+        )
+        ).bake()
         val tasks = BooleanProofTasks(context, listOf(0))
 
         repeat(tasks.size) { worker ->
             val lease = assertNotNull(tasks.acquire(worker))
-            val assumptions = Assumptions(bools = lease.cube.literals.associate {
+            val assumptions = Assumptions(
+                bools = lease.cube.literals.associate {
                 Lit.variable(it) to Lit.isPositive(it)
-            })
-            val result = BacktrackSolver(problem).solve(BacktrackParams(
-                assumptions = assumptions, nativeSat = false, randomSeed = 17,
-            ))
-            assertTrue(tasks.complete(lease) {
+            }
+            )
+            val result = BacktrackSolver(problem).solve(
+                BacktrackParams(
+                assumptions = assumptions,
+                nativeSat = false,
+                randomSeed = 17,
+            )
+            )
+            assertTrue(
+                tasks.complete(lease) {
                 if (result is SolveResult.Unsat) BooleanTaskCheck.NativeRefutation else BooleanTaskCheck.Unresolved
-            })
+            }
+            )
         }
 
         assertTrue(tasks.nativeCoverageComplete)
@@ -61,9 +74,13 @@ class BooleanProofTasksTest {
             val pins = lease.context.scope.condition.bools + lease.cube.literals.associate {
                 Lit.variable(it) to Lit.isPositive(it)
             }
-            val result = BacktrackSolver(problem).solve(BacktrackParams(
-                assumptions = Assumptions(bools = pins), nativeSat = false, randomSeed = 17,
-            ))
+            val result = BacktrackSolver(problem).solve(
+                BacktrackParams(
+                assumptions = Assumptions(bools = pins),
+                nativeSat = false,
+                randomSeed = 17,
+            )
+            )
             tasks.complete(lease) {
                 if (result is SolveResult.Unsat) BooleanTaskCheck.NativeRefutation else BooleanTaskCheck.Unresolved
             }
@@ -79,9 +96,11 @@ class BooleanProofTasksTest {
         val cubes = List(tasks.size) { assertNotNull(tasks.acquire(it)).cube.literals }
 
         for (assignment in 0 until 8) {
-            val matches = cubes.count { cube -> cube.all {
-                Lit.isPositive(it) == (assignment and (1 shl Lit.variable(it)) != 0)
-            } }
+            val matches = cubes.count { cube ->
+                cube.all {
+                    Lit.isPositive(it) == (assignment and (1 shl Lit.variable(it)) != 0)
+                }
+            }
             assertEquals(1, matches)
         }
         assertNull(tasks.acquire(4))

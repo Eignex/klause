@@ -42,7 +42,9 @@ class AffineObjectiveTest {
     @Test
     fun `objective symmetry should consume translated costs and exclude the reconstructed alias`() {
         val model = Problem(
-            0, 4, arrayOf(IntDomain(1, 4), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
+            0,
+            4,
+            arrayOf(IntDomain(1, 4), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             listOf(
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
                 AllDifferent(intArrayOf(1, 2, 3)),
@@ -77,8 +79,11 @@ class AffineObjectiveTest {
         val before = CpToLpRelaxation(baked, objective)
         before.build(RootDomains(baked))
 
-        val reduced = Presolver.run(baked, PresolveConfig.parse("affine"),
-            PresolveContext.of(objective, transformObjective = true))
+        val reduced = Presolver.run(
+            baked,
+            PresolveConfig.parse("affine"),
+            PresolveContext.of(objective, transformObjective = true),
+        )
         val transformed = assertNotNull(reduced.objective)
         val result = BacktrackSolver(reduced.problem).minimize(transformed)
         val sample = assertNotNull(result.assignment)
@@ -106,7 +111,10 @@ class AffineObjectiveTest {
 
         for (order in AffinePivotOrder.entries) {
             val outcome = PresolvePipeline.run(
-                model, cost, PresolveConfig.parse("affine").withAffinePivotOrder(order), false,
+                model,
+                cost,
+                PresolveConfig.parse("affine").withAffinePivotOrder(order),
+                false,
             )
             val assignments = BacktrackSolver(outcome.problem.bake()).enumerate().map { reduced ->
                 outcome.mapping.requireObjectivePreserved(cost, assertNotNull(outcome.objective), reduced)
@@ -136,7 +144,10 @@ class AffineObjectiveTest {
 
         for (order in AffinePivotOrder.entries) {
             val outcome = PresolvePipeline.run(
-                model, cost, PresolveConfig.parse("affine").withAffinePivotOrder(order), false,
+                model,
+                cost,
+                PresolveConfig.parse("affine").withAffinePivotOrder(order),
+                false,
             )
 
             val transformed = assertNotNull(outcome.objective)

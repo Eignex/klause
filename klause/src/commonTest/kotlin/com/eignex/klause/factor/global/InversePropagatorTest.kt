@@ -28,8 +28,10 @@ class InversePropagatorTest {
             numBoolVars = 0,
             numIntVars = 4,
             intDomains = arrayOf(
-                IntDomain(offset + 1, offset + 1), IntDomain(offset, offset),
-                IntDomain(offset, offset + 1), IntDomain(offset, offset + 1),
+                IntDomain(offset + 1, offset + 1),
+                IntDomain(offset, offset),
+                IntDomain(offset, offset + 1),
+                IntDomain(offset, offset + 1),
             ),
             factors = arrayOf<Factor>(
                 Inverse(intArrayOf(0, 1), intArrayOf(2, 3), Int.MAX_VALUE, Int.MAX_VALUE),

@@ -127,19 +127,19 @@ internal class LpCapturedModel(
 
     private fun matchesIntegerVectors(model: LpModel): Boolean =
         rhs.contentEquals(model.rhs) && cost.contentEquals(model.cost) &&
-        upper.contentEquals(model.upper) && hasUpper.contentEquals(model.hasUpper) &&
-        loShift.contentEquals(model.loShift) && objConstant == model.objConstant && sense == model.sense &&
-        flippedRhs.contentEquals(model.flippedRhs) && probeClampedLo.contentEquals(model.probeClampedLo) &&
-        probeClampedHi.contentEquals(model.probeClampedHi)
+            upper.contentEquals(model.upper) && hasUpper.contentEquals(model.hasUpper) &&
+            loShift.contentEquals(model.loShift) && objConstant == model.objConstant && sense == model.sense &&
+            flippedRhs.contentEquals(model.flippedRhs) && probeClampedLo.contentEquals(model.probeClampedLo) &&
+            probeClampedHi.contentEquals(model.probeClampedHi)
 
     private fun matchesIntegerSources(model: LpModel): Boolean =
         tag.contentEquals(model.tag) && rowGlobal.contentEquals(model.rowGlobal) &&
-        rowStrict.contentEquals(model.rowStrict) &&
-        rowPremises.size == model.rowPremises.size && rowPremises.indices.all { row ->
-            val before = rowPremises[row]
-            val after = model.rowPremises[row]
-            if (before == null) after == null else after != null && before.matches(after)
-        }
+            rowStrict.contentEquals(model.rowStrict) &&
+            rowPremises.size == model.rowPremises.size && rowPremises.indices.all { row ->
+                val before = rowPremises[row]
+                val after = model.rowPremises[row]
+                if (before == null) after == null else after != null && before.matches(after)
+            }
 
     fun copy(): LpCapturedModel = LpCapturedModel(
         n,

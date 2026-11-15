@@ -25,8 +25,10 @@ class CutColumnLayoutTest {
     @Test
     fun `affine columns should decline capture`() {
         val source = CutSource(CutSourceKind.INTEGER, 0)
-        for (column in listOf(CutColumnSource(source, scale = BigFraction.ofLong(2)),
-            CutColumnSource(source, offset = BigFraction.ONE))) {
+        for (column in listOf(
+            CutColumnSource(source, scale = BigFraction.ofLong(2)),
+            CutColumnSource(source, offset = BigFraction.ONE),
+        )) {
             val map = CutSourceMap(Any(), 0, listOf(column))
             assertNull(CutColumnLayout.capture(map, 64L, ExecutionControl.Never) {})
         }
@@ -51,7 +53,10 @@ class CutColumnLayoutTest {
         var cancelled = false
         var work = 0L
 
-        val interrupted = layout.bind(map, ExecutionControl { cancelled }) { work += it; cancelled = true }
+        val interrupted = layout.bind(map, ExecutionControl { cancelled }) {
+            work += it;
+            cancelled = true
+        }
 
         assertNull(interrupted)
         assertTrue(work > 0L)

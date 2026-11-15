@@ -22,9 +22,10 @@ class TranscendentalPortfolioInvocationTest(private val engine: FiniteEngine) {
 
     @Test
     fun `explicit cores should reach the source dispatcher while fixed keeps a single worker`() {
-        val source = assertIs<TranscendentalProblem>((
-            SmtLib.parse(
-                """
+        val source = assertIs<TranscendentalProblem>(
+            (
+                SmtLib.parse(
+                    """
             (declare-const x Real)
             (assert (= (exp x) 2))
             (check-sat)
@@ -50,9 +51,10 @@ class TranscendentalPortfolioInvocationTest(private val engine: FiniteEngine) {
 
     @Test
     fun `parallel invocation should keep common pins without mutating the source`() {
-        val source = assertIs<TranscendentalProblem>((
-            SmtLib.parse(
-                """
+        val source = assertIs<TranscendentalProblem>(
+            (
+                SmtLib.parse(
+                    """
             (declare-const b Bool)
             (declare-const x Real)
             (assert b)
@@ -88,9 +90,10 @@ class TranscendentalPortfolioInvocationTest(private val engine: FiniteEngine) {
 
     @Test
     fun `parallel workers should not optimize a captured function objective`() {
-        val source = assertIs<TranscendentalProblem>((
-            SmtLib.parse(
-                """
+        val source = assertIs<TranscendentalProblem>(
+            (
+                SmtLib.parse(
+                    """
             (declare-const x Real)
             (assert (> (exp x) 0))
             (minimize (exp x))

@@ -125,8 +125,11 @@ internal class Inprocessing(
         if (session.fixpointCancelled || params.cancellation() || session.cancelRequested) return null
         if (publication == null) {
             publication = (context as SearchSession).prepareInitialization { component, shared ->
-                if (component === cp) cp.prepareInitialization(shared)
-                else sequenceOf(ComponentResult.Consistent).iterator()
+                if (component === cp) {
+                    cp.prepareInitialization(shared)
+                } else {
+                    sequenceOf(ComponentResult.Consistent).iterator()
+                }
             }
             publicationVisits = session.problem.numBoolVars.toLong() + session.problem.numIntVars
         }
@@ -157,8 +160,13 @@ internal class Inprocessing(
             val token = ExecutionControl { params.cancellation() || session.work - beforeResume >= limit }
             session.withCancellation(params.cancellation) {
                 session.withInprocessingCancellation(token) {
-                    pendingRoot?.spending?.run(session, params, stats, resumingRoot = true,
-                        containingWork = limit) {
+                    pendingRoot?.spending?.run(
+                        session,
+                        params,
+                        stats,
+                        resumingRoot = true,
+                        containingWork = limit,
+                    ) {
                         session.resumeInprocessingRoot()
                     }
                 }

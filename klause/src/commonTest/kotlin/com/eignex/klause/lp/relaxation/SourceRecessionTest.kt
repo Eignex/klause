@@ -132,8 +132,13 @@ class SourceRecessionTest {
 
     @Test
     fun `strict exact row rays should reject an excluded initial boundary`() {
-        val row = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
-            LinearOp.GE, BigFraction.ZERO, strict = true)
+        val row = ExactLinear.of(
+            intArrayOf(Term.ofRealVar(0)),
+            listOf(BigFraction.ONE),
+            LinearOp.GE,
+            BigFraction.ZERO,
+            strict = true,
+        )
         val cases = listOf(
             Case("strict interior", listOf(row), listOf(1L, 0L), listOf(1L, 0L)) to true,
             Case("excluded initial point", listOf(row), listOf(0L, 0L), listOf(1L, 0L)) to false,
@@ -145,18 +150,27 @@ class SourceRecessionTest {
     @Test
     fun `reified exact row rays should preserve the selected complement boundary`() {
         val cases = listOf(false, true).map { strict ->
-            val row = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
-                LinearOp.LE, BigFraction.ZERO, strict = strict, activator = 0)
+            val row = ExactLinear.of(
+                intArrayOf(Term.ofRealVar(0)),
+                listOf(BigFraction.ONE),
+                LinearOp.LE,
+                BigFraction.ZERO,
+                strict = strict,
+                activator = 0,
+            )
             Case("false boundary strict $strict", listOf(row), listOf(0L, 0L), listOf(1L, 0L), aux = false) to strict
         }
 
         for ((case, expected) in cases) assertEquals(expected, proves(case), case.name)
     }
+
     @Test
     fun `distinct rays should preserve every affine separation`() {
-        val distinct = Distinct((0..1).map {
+        val distinct = Distinct(
+            (0..1).map {
             Distinct.Operand(intArrayOf(Term.ofRealVar(it)), listOf(BigFraction.ONE))
-        })
+        }
+        )
         val cases = listOf(
             Case("separating values", listOf(distinct), listOf(1L, 0L), listOf(1L, 0L)) to true,
             Case("crossing values", listOf(distinct), listOf(0L, 1L), listOf(1L, 0L)) to false,
@@ -168,9 +182,12 @@ class SourceRecessionTest {
 
     @Test
     fun `false distinct rays should retain a permanent affine collision`() {
-        val distinct = Distinct((0..1).map {
+        val distinct = Distinct(
+            (0..1).map {
             Distinct.Operand(intArrayOf(Term.ofRealVar(it)), listOf(BigFraction.ONE))
-        }, activator = 0)
+        },
+            activator = 0
+        )
         val cases = listOf(
             Case("persistent collision", listOf(distinct), listOf(0L, 0L), listOf(1L, 1L), aux = false) to true,
             Case("isolated collision", listOf(distinct), listOf(0L, 0L), listOf(1L, 0L), aux = false) to false,

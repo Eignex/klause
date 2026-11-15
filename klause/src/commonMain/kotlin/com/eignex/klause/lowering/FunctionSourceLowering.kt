@@ -89,7 +89,8 @@ internal class FunctionSourceLowering(
             cancellation.polynomialSourceCheckpoint(1)
             val node = pending.last()
             if ((node is PolynomialExpression && node in expressions) ||
-                (node is PolynomialRealFormula && node in formulas)) {
+                (node is PolynomialRealFormula && node in formulas)
+            ) {
                 pending.removeLast()
                 continue
             }
@@ -115,33 +116,56 @@ internal class FunctionSourceLowering(
     }
 
     fun expression(source: PolynomialExpression): TranscendentalExpression {
-        val result = formula(PolynomialRealFormula.Atom(source, com.eignex.klause.ir.PolynomialRelation.EQ,
-            PolynomialExpression.Constant.of(com.eignex.util.numbers.BIG_ZERO)))
+        val result = formula(
+            PolynomialRealFormula.Atom(
+            source,
+            com.eignex.klause.ir.PolynomialRelation.EQ,
+            PolynomialExpression.Constant.of(com.eignex.util.numbers.BIG_ZERO),
+        )
+        )
         return (result as TranscendentalFormula.Atom).left
     }
 
     private fun children(node: Any): List<Any> = when (node) {
         is PolynomialExpression.Variable -> when (val definition = definitions[node.id.index]) {
             is Definition.Function -> listOf(definition.argument)
+
             is Definition.Conditional -> listOf(
-                definition.value.condition, definition.value.whenTrue, definition.value.whenFalse,
+                definition.value.condition,
+                definition.value.whenTrue,
+                definition.value.whenFalse,
             )
+
             else -> emptyList()
         }
+
         is PolynomialExpression.Sum -> node.operands
+
         is PolynomialExpression.Product -> node.operands
+
         is PolynomialExpression.Power -> listOf(node.base)
+
         is PolynomialRealFormula.BooleanVariable -> booleanDefinitions[node.id.index]?.let {
             listOf(it.condition, it.whenTrue, it.whenFalse)
         } ?: emptyList()
+
         is PolynomialDistinct -> node.operands
+
         is PolynomialRealFormula.Atom -> listOf(node.left, node.right)
+
         is PolynomialSelection -> listOf(
-            PolynomialExpression.Variable(node.result), node.condition, node.whenTrue, node.whenFalse,
+            PolynomialExpression.Variable(node.result),
+            node.condition,
+            node.whenTrue,
+            node.whenFalse,
         )
+
         is PolynomialRealFormula.Not -> listOf(node.operand)
+
         is PolynomialRealFormula.And -> node.operands
+
         is PolynomialRealFormula.Or -> node.operands
+
         else -> emptyList()
     }
 
@@ -151,22 +175,31 @@ internal class FunctionSourceLowering(
         formulas: Map<PolynomialRealFormula, TranscendentalFormula>,
     ): TranscendentalExpression = when (node) {
         is PolynomialExpression.Constant -> TranscendentalExpression.Constant(node)
+
         is PolynomialExpression.Variable -> when (val definition = definitions[node.id.index]) {
             is Definition.Function -> TranscendentalExpression.Function(
-                definition.function, expressions.getValue(definition.argument),
+                definition.function,
+                expressions.getValue(definition.argument),
             )
+
             is Definition.Conditional -> TranscendentalExpression.Conditional(
                 formulas.getValue(definition.value.condition),
-                expressions.getValue(definition.value.whenTrue), expressions.getValue(definition.value.whenFalse),
+                expressions.getValue(definition.value.whenTrue),
+                expressions.getValue(definition.value.whenFalse),
             )
+
             Definition.Pi -> TranscendentalExpression.Pi
+
             null -> {
                 require(node.id.index < originalNumericCount) { "missing original function source coordinate" }
                 TranscendentalExpression.Variable(node.id)
             }
         }
+
         is PolynomialExpression.Sum -> TranscendentalExpression.Sum(node.operands.map(expressions::getValue))
+
         is PolynomialExpression.Product -> TranscendentalExpression.Product(node.operands.map(expressions::getValue))
+
         is PolynomialExpression.Power -> TranscendentalExpression.Power(expressions.getValue(node.base), node.exponent)
     }
 
@@ -176,26 +209,40 @@ internal class FunctionSourceLowering(
         formulas: Map<PolynomialRealFormula, TranscendentalFormula>,
     ): TranscendentalFormula = when (node) {
         is PolynomialRealFormula.Constant -> TranscendentalFormula.Constant(node.value)
+
         is PolynomialRealFormula.BooleanVariable -> booleanDefinitions[node.id.index]?.let {
             TranscendentalFormula.Conditional(
-                formulas.getValue(it.condition), formulas.getValue(it.whenTrue), formulas.getValue(it.whenFalse),
+                formulas.getValue(it.condition),
+                formulas.getValue(it.whenTrue),
+                formulas.getValue(it.whenFalse),
             )
         } ?: run {
             require(node.id.index < originalBoolCount) { "missing original function Boolean coordinate" }
             TranscendentalFormula.BooleanVariable(node.id)
         }
+
         is PolynomialRealFormula.Atom -> TranscendentalFormula.Atom(
-            expressions.getValue(node.left), node.relation, expressions.getValue(node.right),
+            expressions.getValue(node.left),
+            node.relation,
+            expressions.getValue(node.right),
         )
+
         is PolynomialDistinct -> TranscendentalDistinct(node.operands.map(expressions::getValue))
+
         is PolynomialSelection -> TranscendentalFormula.Atom(
             expressions.getValue(PolynomialExpression.Variable(node.result)),
             com.eignex.klause.ir.PolynomialRelation.EQ,
-            TranscendentalExpression.Conditional(formulas.getValue(node.condition),
-                expressions.getValue(node.whenTrue), expressions.getValue(node.whenFalse)),
+            TranscendentalExpression.Conditional(
+                formulas.getValue(node.condition),
+                expressions.getValue(node.whenTrue),
+                expressions.getValue(node.whenFalse),
+            ),
         )
+
         is PolynomialRealFormula.Not -> TranscendentalFormula.Not(formulas.getValue(node.operand))
+
         is PolynomialRealFormula.And -> TranscendentalFormula.And(node.operands.map(formulas::getValue))
+
         is PolynomialRealFormula.Or -> TranscendentalFormula.Or(node.operands.map(formulas::getValue))
     }
 }

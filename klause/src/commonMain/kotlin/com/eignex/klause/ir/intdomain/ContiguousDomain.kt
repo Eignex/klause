@@ -12,8 +12,7 @@ internal class ContiguousDomain(
     override val min: Long,
     override val max: Long,
     storage: DomainStorageSettings = defaultDomainStorageSettings,
-) :
-    AbstractIntDomain(storage),
+) : AbstractIntDomain(storage),
     IntSpan {
     override fun withStorage(settings: DomainStorageSettings): IntDomain =
         if (storage == settings) this else ContiguousDomain(min, max, settings)

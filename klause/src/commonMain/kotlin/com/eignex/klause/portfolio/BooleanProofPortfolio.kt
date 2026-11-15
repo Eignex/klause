@@ -42,8 +42,16 @@ internal class BooleanProofPortfolio private constructor(
         reservations: List<(ExecutionControl, () -> ResumableSolve) -> ResumableSolve>? = null,
         probeFirst: Boolean = false,
         solvers: List<BacktrackSolver>? = null,
-    ) : this(problem, context.scope.condition, { context }, splitVariables, parameters,
-        reservations, probeFirst, solvers) {
+    ) : this(
+        problem,
+        context.scope.condition,
+        { context },
+        splitVariables,
+        parameters,
+        reservations,
+        probeFirst,
+        solvers,
+    ) {
         require(context.scope.objective == null && context.cutoff == null)
     }
 
@@ -84,8 +92,12 @@ internal class BooleanProofPortfolio private constructor(
         require(reservations == null || reservations.size == parameters.size)
         require(condition.lower.isEmpty() && condition.upper.isEmpty() && condition.integerRows.isEmpty())
         require(condition.bools.keys.all { it in 0 until problem.numBoolVars })
-        require(parameters.all { it.assumptions.numInts == 0 && it.assumptions.deductions.isEmpty &&
-            it.assumptions.bools == condition.bools })
+        require(
+            parameters.all {
+            it.assumptions.numInts == 0 && it.assumptions.deductions.isEmpty &&
+                it.assumptions.bools == condition.bools
+        }
+        )
     }
 
     private fun board(splits: List<Int>): BooleanProofScheduler {
@@ -143,15 +155,15 @@ internal class BooleanProofPortfolio private constructor(
             if (board.nativeCoverageComplete) {
                 return finish(
                     SolveResult.Unsat(
-                assumptionCore = Assumptions(bools = condition.bools),
-                semantics = problem.semantics,
-            )
+                        assumptionCore = Assumptions(bools = condition.bools),
+                        semantics = problem.semantics,
+                    ),
                 )
             }
             if (step.reason != null && step.reason != TerminationReason.SearchExhausted) {
                 return finish(
-                SolveResult.Unknown(step.reason, semantics = problem.semantics),
-            )
+                    SolveResult.Unknown(step.reason, semantics = problem.semantics),
+                )
             }
             return null
         }
@@ -172,8 +184,12 @@ internal class BooleanProofPortfolio private constructor(
                 val params = parameters[worker].copy(assumptions = Assumptions.None)
                 (solvers?.get(worker) ?: BacktrackSolver(problem)).openBooleanProof(params).also {
                     probes[worker] = it
-                    it.begin(Assumptions(bools = condition.bools), params.maxDecisions,
-                        Double.POSITIVE_INFINITY, global)
+                    it.begin(
+                        Assumptions(bools = condition.bools),
+                        params.maxDecisions,
+                        Double.POSITIVE_INFINITY,
+                        global,
+                    )
                 }
             } catch (failure: SearchInitializationCancelled) {
                 if (probes[worker] == null) {
@@ -186,30 +202,30 @@ internal class BooleanProofPortfolio private constructor(
             step.sample?.let { sample -> return finish(SolveResult.Sat(sample, semantics = problem.semantics)) }
             if (step.reason != null) {
                 return finish(
-                if (step.reason == TerminationReason.SearchExhausted) {
-                    SolveResult.Unsat(
-                    assumptionCore = Assumptions(bools = condition.bools),
-                    semantics = problem.semantics,
+                    if (step.reason == TerminationReason.SearchExhausted) {
+                        SolveResult.Unsat(
+                            assumptionCore = Assumptions(bools = condition.bools),
+                            semantics = problem.semantics,
+                        )
+                    } else {
+                        SolveResult.Unknown(step.reason, semantics = problem.semantics)
+                    },
                 )
-                } else {
-                    SolveResult.Unknown(step.reason, semantics = problem.semantics)
-                },
-            )
             }
             if (!global()) {
                 search.splitLiteral()?.let { literal ->
-                val replacement = board(listOf(Lit.variable(literal)))
-                try {
-                    if (replacement.adopt(worker, search, literal)) retainedProbes++
-                } catch (failure: Throwable) {
-                    runCatching { replacement.close() }.exceptionOrNull()?.let(failure::addSuppressed)
-                    throw failure
+                    val replacement = board(listOf(Lit.variable(literal)))
+                    try {
+                        if (replacement.adopt(worker, search, literal)) retainedProbes++
+                    } catch (failure: Throwable) {
+                        runCatching { replacement.close() }.exceptionOrNull()?.let(failure::addSuppressed)
+                        throw failure
+                    }
+                    scheduler = replacement
+                    partitionLiteral = literal
+                    probes[worker] = null
+                    probeOwner = null
                 }
-                scheduler = replacement
-                partitionLiteral = literal
-                probes[worker] = null
-                probeOwner = null
-            }
             }
             return null
         }
@@ -249,14 +265,16 @@ internal class BooleanProofPortfolio private constructor(
 
     companion object {
         private inline fun BakedProblem.matchesPreparedModel(model: Problem?, poll: () -> Unit): Boolean =
-            model === this || (model != null && model !is BakedProblem && model.numBoolVars == numBoolVars &&
+            model === this || (
+                model != null && model !is BakedProblem && model.numBoolVars == numBoolVars &&
                 model.numIntVars == 0 && model.numRealVars == 0 && !model.hasSymmetryBreaking &&
                 model.semantics === semantics && model.settings === settings &&
                 model.impliedFactorMask === impliedFactorMask &&
                 model.numFactors == numFactors && factors.indices.all { index ->
                     if (index and 63 == 0) poll()
                     factors[index] === model.factors[index]
-                })
+                }
+            )
 
         fun forWorkers(
             workers: List<PortfolioWorker>,
@@ -277,8 +295,8 @@ internal class BooleanProofPortfolio private constructor(
                         it.firstWitnessOnly
                 }
             ) {
-                    return decline("workers-not-two-canonical-complete")
-                }
+                return decline("workers-not-two-canonical-complete")
+            }
             val recipes = workers.map { it.booleanProofRecipe ?: return decline("builder-ownership-unavailable") }
             val problem = recipes.first().problem
             if (recipes.any {
@@ -286,13 +304,13 @@ internal class BooleanProofPortfolio private constructor(
                         !it.matches(recipes.first())
                 }
             ) {
-                    return decline("worker-model-or-recipe-mismatch")
-                }
+                return decline("worker-model-or-recipe-mismatch")
+            }
             if (problem.numBoolVars !in 2..4096 || problem.numIntVars != 0 || problem.numRealVars != 0 ||
                 problem.hasSymmetryBreaking || problem.rootDeductions is PropagationResult.Unsat
             ) {
-                    return decline("model-ineligible")
-                }
+                return decline("model-ineligible")
+            }
             for (index in problem.factors.indices) {
                 if (index and 63 == 0 && cancellation()) return decline("source-admission-cancelled")
                 if (problem.factors[index] !is Clause) return decline("model-ineligible")
@@ -303,8 +321,8 @@ internal class BooleanProofPortfolio private constructor(
                         worker.evidenceModel?.matches(ModelIdentity.of(problem)) != true
                 }
             ) {
-                    return decline("runtime-invocation-mismatch")
-                }
+                return decline("runtime-invocation-mismatch")
+            }
             val plan = invocation.preparedPlan
             val sourceScope = invocation.scope
             if (invocation.hasSourceObjective || invocation.executionObjective != null ||
@@ -317,21 +335,21 @@ internal class BooleanProofPortfolio private constructor(
                     if (cancellation()) return decline("source-admission-cancelled")
                 }
             ) {
-                    return decline("source-plan-or-objective-ineligible")
-                }
+                return decline("source-plan-or-objective-ineligible")
+            }
             val condition = invocation.executionCondition
             if (condition != invocation.sourceCondition || condition.lower.isNotEmpty() ||
                 condition.upper.isNotEmpty() || condition.integerRows.isNotEmpty()
             ) {
-                    return decline("uncaptured-worker-condition")
-                }
+                return decline("uncaptured-worker-condition")
+            }
             val pins = condition.bools
             val params = recipes.map { recipe ->
                 if (recipe.params.assumptions.numInts != 0 || !recipe.params.assumptions.deductions.isEmpty ||
                     recipe.params.assumptions.bools != pins
                 ) {
-                        return decline("worker-assumption-mismatch")
-                    }
+                    return decline("worker-assumption-mismatch")
+                }
                 recipe.conditioned() ?: return decline("conditioned-sharing-unavailable")
             }
             val count = if (probeFirst) 1 else 2
@@ -345,12 +363,21 @@ internal class BooleanProofPortfolio private constructor(
                 // Runtime bindings own source identity; fresh board ids prevent cross-invocation leases.
                 val identity = newIdentity()
                 val scope = sourceScope?.copy(condition = condition) ?: SourceScope(
-                    SourceRevision(identity, "klause-ir-clauses-v1"), condition,
+                    SourceRevision(identity, "klause-ir-clauses-v1"),
+                    condition,
                 )
                 BooleanProofContext(scope, identity + "/identity-bool-v1")
             }
-            return BooleanProofPortfolio(problem, condition, createContext,
-                splits, params, recipes.map { it.reserve }, probeFirst, recipes.map { it.solver })
+            return BooleanProofPortfolio(
+                problem,
+                condition,
+                createContext,
+                splits,
+                params,
+                recipes.map { it.reserve },
+                probeFirst,
+                recipes.map { it.solver },
+            )
         }
     }
 }

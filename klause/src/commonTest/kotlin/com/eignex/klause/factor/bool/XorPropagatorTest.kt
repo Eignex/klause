@@ -52,9 +52,12 @@ class XorPropagatorTest {
     @Test
     fun `complementary unassigned literals should retain their parity constant`() {
         for (target in 0..1) {
-            val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(
+            val problem = Problem(
+                2, 0, emptyArray(),
+                arrayOf<Factor>(
                 Xor(intArrayOf(Lit.make(0, true), Lit.make(0, false), Lit.make(1, true)), target),
-            ))
+            )
+            )
 
             val session = PropagationSession(problem)
             assertIs<PropagationResult.Implied>(session.seed(Assumptions.None))
@@ -77,18 +80,18 @@ class XorPropagatorTest {
         for (literals in patterns) {
             for (target in 0..1) {
                 for (mask in 0..7) {
-            val values = BooleanArray(3) { mask and (1 shl it) != 0 }
-            val parity = literals.count { Lit.evaluate(it, values[Lit.variable(it)]) } and 1
-            val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(Xor(literals, target)))
+                    val values = BooleanArray(3) { mask and (1 shl it) != 0 }
+                    val parity = literals.count { Lit.evaluate(it, values[Lit.variable(it)]) } and 1
+                    val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(Xor(literals, target)))
 
-            val result = problem.propagate(Assumptions(bools = (0..2).associateWith { values[it] }))
+                    val result = problem.propagate(Assumptions(bools = (0..2).associateWith { values[it] }))
 
-            if (parity == target) {
-                assertIs<PropagationResult.Implied>(result)
-            } else {
-                assertIs<PropagationResult.Unsat>(result)
-            }
-        }
+                    if (parity == target) {
+                        assertIs<PropagationResult.Implied>(result)
+                    } else {
+                        assertIs<PropagationResult.Unsat>(result)
+                    }
+                }
             }
         }
     }

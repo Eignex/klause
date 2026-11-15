@@ -53,11 +53,16 @@ class ResumableMinimizeNodeSliceTest {
         val events = mutableListOf<String>()
         val exchange = object : ClauseExchange {
             override fun onRestart(session: PropagationSession) = Unit
-            override fun onSearchEnd(session: PropagationSession) { events += "end" }
-            override fun onSearchPause(session: PropagationSession) { events += "pause" }
+            override fun onSearchEnd(session: PropagationSession) {
+                events += "end"
+            }
+            override fun onSearchPause(session: PropagationSession) {
+                events += "pause"
+            }
         }
         val search = BacktrackSolver(problem().bake()).resumable(
-            objective(), BacktrackParams(randomSeed = 0L, clauseExchange = exchange),
+            objective(),
+            BacktrackParams(randomSeed = 0L, clauseExchange = exchange),
         )
 
         search.use { it.runSlice(ExecutionControl.Never, sliceMillis = 60_000, sliceNodes = 8L) { } }

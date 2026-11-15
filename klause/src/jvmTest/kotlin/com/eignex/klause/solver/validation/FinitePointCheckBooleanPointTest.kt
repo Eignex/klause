@@ -16,17 +16,23 @@ import kotlin.test.assertIs
 class FinitePointCheckBooleanPointTest(private val point: String, private val feasible: Boolean) {
     @Test
     fun `complete Boolean points should satisfy every original clause`() {
-        val model = Problem(3, 0, emptyArray(), arrayOf(
+        val model = Problem(
+            3, 0, emptyArray(),
+            arrayOf(
             Clause(intArrayOf(0, 2, 4)),
             Clause(intArrayOf(1, 3)),
             Clause(intArrayOf(3, 5)),
-        )).bake()
+        )
+        ).bake()
         val candidate = Candidate(Sample(BooleanArray(3) { point[it] == '1' }, longArrayOf()), Unit)
 
         val result = FinitePointCheck(model).check(candidate, ExecutionControl.Never)
 
-        if (feasible) assertIs<Verification.Accepted<*, *>>(result)
-        else assertIs<Verification.Rejected>(result)
+        if (feasible) {
+            assertIs<Verification.Accepted<*, *>>(result)
+        } else {
+            assertIs<Verification.Rejected>(result)
+        }
     }
 
     companion object {

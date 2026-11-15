@@ -41,9 +41,11 @@ class EncodingLinearTerm private constructor(
         /** Reference a tagged source coordinate or literal. */
         fun source(reference: Int, coefficient: BigFraction): EncodingLinearTerm =
             EncodingLinearTerm(reference, null, null, coefficient)
+
         /** Reference an auxiliary allocated by the receiving scope. */
         fun auxiliary(auxiliary: EncodingAuxiliary, coefficient: BigFraction): EncodingLinearTerm =
             EncodingLinearTerm(null, auxiliary, null, coefficient)
+
         /** Reference an existential real allocated by the receiving scope. */
         fun auxiliary(auxiliary: EncodingRealAuxiliary, coefficient: BigFraction): EncodingLinearTerm =
             EncodingLinearTerm(null, null, auxiliary, coefficient)
@@ -57,6 +59,7 @@ class EncodingAffineExpression(
     val constant: BigFraction = BigFraction.ZERO,
 ) {
     private val capturedTerms = terms.toList()
+
     /** Owned term list. */
     val terms: List<EncodingLinearTerm> get() = capturedTerms.toList()
 }
@@ -68,6 +71,7 @@ sealed class LinearEncodingFormula {
         /** Complete relation in source coordinates. */
         val form: LinearForm,
     ) : LinearEncodingFormula()
+
     /** An affine comparison, with any private terms resolved in this scope. */
     class Comparison(
         /** Exact expression with scoped private terms. */
@@ -79,20 +83,25 @@ sealed class LinearEncodingFormula {
         /** Whether an inequality excludes equality. */
         val strict: Boolean = false,
     ) : LinearEncodingFormula()
+
     /** A reference to a private guard, standing for its defining formula. */
     class Guard(
         /** Name allocated and defined by this installation. */
         val guard: EncodingGuard,
     ) : LinearEncodingFormula()
+
     /** All operands must hold. */
     class And(operands: List<LinearEncodingFormula>) : LinearEncodingFormula() {
         private val values = operands.toTypedArray()
+
         /** Captured complete operands. */
         val operands: List<LinearEncodingFormula> get() = values.toList()
     }
+
     /** At least one operand must hold. */
     class Or(operands: List<LinearEncodingFormula>) : LinearEncodingFormula() {
         private val values = operands.toTypedArray()
+
         /** Captured complete operands. */
         val operands: List<LinearEncodingFormula> get() = values.toList()
     }

@@ -3,8 +3,13 @@ package com.eignex.klause.util
 import com.eignex.util.numbers.maxOf
 
 internal class MutableLongIntIndex {
-    private class Node(var key: Long, var value: Int, var left: Node? = null,
-        var right: Node? = null, var height: Int = 1)
+    private class Node(
+        var key: Long,
+        var value: Int,
+        var left: Node? = null,
+        var right: Node? = null,
+        var height: Int = 1,
+    )
 
     private var root: Node? = null
     var size: Int = 0
@@ -14,6 +19,7 @@ internal class MutableLongIntIndex {
     val primitiveCapacityBytes: Long get() = 12L + size * 16L
     val referenceCapacity: Long get() = 1L + size * 2L
     val readWork: Long get() = height(root) + 1L
+
     // An Int-sized AVL tree has height below 46; the reserve covers its successor walk.
     val mutationWork: Long get() = 16L * (height(root) + 2L) + 32L
 
@@ -81,24 +87,47 @@ internal class MutableLongIntIndex {
     }
 
     private fun insert(node: Node?, key: Long, value: Int): Node {
-        if (node == null) { lastMutationWork += 8L; size++; return Node(key, value) }
+        if (node == null) {
+            lastMutationWork += 8L;
+            size++;
+            return Node(key, value)
+        }
         lastMutationWork += 4L
         return when {
-            key < node.key -> { node.left = insert(node.left, key, value); balance(node) }
-            key > node.key -> { node.right = insert(node.right, key, value); balance(node) }
+            key < node.key -> {
+                node.left = insert(node.left, key, value);
+                balance(node)
+            }
+            key > node.key -> {
+                node.right = insert(node.right, key, value);
+                balance(node)
+            }
             else -> node.also { it.value = value }
         }
     }
 
     private fun delete(node: Node?, key: Long): Node? {
-        if (node == null) { lastMutationWork++; return null }
+        if (node == null) {
+            lastMutationWork++;
+            return null
+        }
         lastMutationWork += 4L
         when {
             key < node.key -> node.left = delete(node.left, key)
+
             key > node.key -> node.right = delete(node.right, key)
+
             else -> {
-                if (node.left == null) { lastMutationWork += 4L; size--; return node.right }
-                if (node.right == null) { lastMutationWork += 4L; size--; return node.left }
+                if (node.left == null) {
+                    lastMutationWork += 4L;
+                    size--;
+                    return node.right
+                }
+                if (node.right == null) {
+                    lastMutationWork += 4L;
+                    size--;
+                    return node.left
+                }
                 var successor = checkNotNull(node.right)
                 while (successor.left != null) {
                     lastMutationWork++
@@ -146,5 +175,7 @@ internal class MutableLongIntIndex {
     }
 
     private fun height(node: Node?): Int = node?.height ?: 0
-    private fun update(node: Node) { node.height = 1 + maxOf(height(node.left), height(node.right)) }
+    private fun update(node: Node) {
+        node.height = 1 + maxOf(height(node.left), height(node.right))
+    }
 }

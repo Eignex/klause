@@ -36,11 +36,19 @@ internal class WideDivMod(
 ) : Factor {
     val convention = DivisionConvention.EUCLIDEAN
 
-    override val variables = IntVars((dividend.coefficients.keys + quotient.coefficients.keys +
-        remainder.coefficients.keys).distinct().toIntArray())
+    override val variables = IntVars(
+        (
+            dividend.coefficients.keys + quotient.coefficients.keys +
+        remainder.coefficients.keys
+        ).distinct().toIntArray()
+    )
 
-    override fun remap(mapping: VarRemap): Factor = WideDivMod(dividend.remap(mapping), divisor,
-        quotient.remap(mapping), remainder.remap(mapping))
+    override fun remap(mapping: VarRemap): Factor = WideDivMod(
+        dividend.remap(mapping),
+        divisor,
+        quotient.remap(mapping),
+        remainder.remap(mapping),
+    )
 
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.WIDE_DIV_MOD) {
         fun words(value: BigInt) = ints(value.toString().map { it.code }.toIntArray())

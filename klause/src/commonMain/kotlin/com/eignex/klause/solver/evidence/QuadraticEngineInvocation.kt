@@ -23,8 +23,10 @@ internal class QuadraticEngineInvocation(
     fun sameSourceObjective(other: QuadraticEngineInvocation): Boolean = when (val original = source) {
         is QuadraticEngineSource.ExactIr ->
             (other.source as? QuadraticEngineSource.ExactIr)?.problem === original.problem
+
         is QuadraticEngineSource.Polynomial ->
             (other.source as? QuadraticEngineSource.Polynomial)?.problem === original.problem
+
         is QuadraticEngineSource.NonlinearInteger ->
             (other.source as? QuadraticEngineSource.NonlinearInteger)?.problem === original.problem
     } && objective === other.objective && affineObjective === other.affineObjective && sense == other.sense
@@ -43,7 +45,9 @@ internal fun PreparedSourcePlan.quadraticEngineInvocation(
 ): QuadraticEngineInvocation? {
     if (!assumptions.deductions.isEmpty || assumptions.bools.keys.any { it !in 0 until sourceBoolCount } ||
         assumptions.ints.keys.any { it !in 0 until sourceIntCount }
-    ) return null
+    ) {
+        return null
+    }
     val source = when (val original = originalSource) {
         is Problem -> QuadraticEngineSource.ExactIr(original)
         is PolynomialRealProblem -> QuadraticEngineSource.Polynomial(original)

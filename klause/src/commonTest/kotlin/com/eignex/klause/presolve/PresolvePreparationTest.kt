@@ -23,7 +23,10 @@ class PresolvePreparationTest {
         val problem = Problem(0, 0, emptyArray(), emptyList())
 
         val token = budget.observePreparation(
-            PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, problem, containing,
+            PresolvePreparationStage.SOURCE_ENCODER,
+            PresolveLane.SOURCE,
+            problem,
+            containing,
         ) { observed, _ -> observed }
 
         assertSame(meter, token.accounting)
@@ -40,7 +43,10 @@ class PresolvePreparationTest {
         val problem = Problem(0, 0, emptyArray(), emptyList())
 
         budget.observePreparation(
-            PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, problem, containing,
+            PresolvePreparationStage.SOURCE_ENCODER,
+            PresolveLane.SOURCE,
+            problem,
+            containing,
         ) { token, _ -> token.charge(7L) }
 
         val stage = budget.preparationStages.single()
@@ -62,7 +68,10 @@ class PresolvePreparationTest {
         val problem = Problem(0, 0, emptyArray(), emptyList())
 
         budget.observePreparation(
-            PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, problem, containing,
+            PresolvePreparationStage.SOURCE_ENCODER,
+            PresolveLane.SOURCE,
+            problem,
+            containing,
         ) { token, _ ->
             token.charge(3L)
             assertTrue(token())
@@ -81,11 +90,17 @@ class PresolvePreparationTest {
         val problem = Problem(0, 0, emptyArray(), emptyList())
 
         budget.observePreparation(
-            PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, problem, ExecutionControl.Never,
+            PresolvePreparationStage.SOURCE_ENCODER,
+            PresolveLane.SOURCE,
+            problem,
+            ExecutionControl.Never,
         ) { outer, _ ->
             outer.charge(2L)
             budget.observePreparation(
-                PresolvePreparationStage.ENGINE_BAKE, PresolveLane.FINITE, problem, outer,
+                PresolvePreparationStage.ENGINE_BAKE,
+                PresolveLane.FINITE,
+                problem,
+                outer,
             ) { inner, _ -> inner.charge(3L) }
             outer.charge(5L)
         }
@@ -105,7 +120,10 @@ class PresolvePreparationTest {
         val problem = Problem(0, 0, emptyArray(), emptyList())
 
         budget.observePreparation(
-            PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, problem, containing,
+            PresolvePreparationStage.SOURCE_ENCODER,
+            PresolveLane.SOURCE,
+            problem,
+            containing,
         ) { token, _ -> (token or ExecutionControl.Never).charge(7L) }
 
         assertEquals(7L, budget.preparationStages.single().nativeWork)

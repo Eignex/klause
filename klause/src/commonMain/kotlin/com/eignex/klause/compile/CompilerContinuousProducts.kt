@@ -22,27 +22,38 @@ internal fun Lowering.assertContinuousEquality(equality: ContinuousRealEquality)
                     newRealVar(expression.constant, expression.constant)
                 } else {
                     val result = newRealVar(
-                        Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY,
+                        Double.NEGATIVE_INFINITY,
+                        Double.POSITIVE_INFINITY,
                     )
                     factors += Linear(
-                        intArrayOf(), doubleArrayOf(), (ids + result).toIntArray(),
-                        (terms.values + -1.0).toDoubleArray(), LinearOp.EQ, -expression.constant,
+                        intArrayOf(),
+                        doubleArrayOf(),
+                        (ids + result).toIntArray(),
+                        (terms.values + -1.0).toDoubleArray(),
+                        LinearOp.EQ,
+                        -expression.constant,
                     )
                     result
                 }
             }
+
             is ContinuousRealExpr.Power -> {
                 val base = lift(expression.base)
                 val result = newRealVar(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)
-                factors += Power(Power.Coordinate.Real(SourceRealId(base)), expression.exponent,
-                    Power.Coordinate.Real(SourceRealId(result)))
+                factors += Power(
+                    Power.Coordinate.Real(SourceRealId(base)),
+                    expression.exponent,
+                    Power.Coordinate.Real(SourceRealId(result)),
+                )
                 result
             }
+
             is ContinuousRealExpr.Multiply -> {
                 val a = lift(expression.left)
                 val b = lift(expression.right)
                 val result = newRealVar(
-                    Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY,
+                    Double.NEGATIVE_INFINITY,
+                    Double.POSITIVE_INFINITY,
                 )
                 continuousProduct(a, b, result)
                 result
@@ -52,10 +63,25 @@ internal fun Lowering.assertContinuousEquality(equality: ContinuousRealEquality)
     fun equate(expression: ContinuousRealExpr, result: Int) {
         when (expression) {
             is ContinuousRealExpr.Multiply -> continuousProduct(lift(expression.left), lift(expression.right), result)
-            is ContinuousRealExpr.Power -> factors.add(Power(Power.Coordinate.Real(SourceRealId(lift(expression.base))),
-                expression.exponent, Power.Coordinate.Real(SourceRealId(result))))
-            is ContinuousRealExpr.Affine -> factors.add(Linear(intArrayOf(), doubleArrayOf(),
-                intArrayOf(lift(expression), result), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0))
+
+            is ContinuousRealExpr.Power -> factors.add(
+                Power(
+                Power.Coordinate.Real(SourceRealId(lift(expression.base))),
+                expression.exponent,
+                Power.Coordinate.Real(SourceRealId(result)),
+            )
+            )
+
+            is ContinuousRealExpr.Affine -> factors.add(
+                Linear(
+                intArrayOf(),
+                doubleArrayOf(),
+                intArrayOf(lift(expression), result),
+                doubleArrayOf(1.0, -1.0),
+                LinearOp.EQ,
+                0.0,
+            )
+            )
         }
     }
     if (equality.left is ContinuousRealExpr.Affine && equality.right !is ContinuousRealExpr.Affine) {

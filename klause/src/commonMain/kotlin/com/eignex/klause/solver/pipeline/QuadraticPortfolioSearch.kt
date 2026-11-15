@@ -14,10 +14,18 @@ internal interface QuadraticPortfolioSearch : ResumableSearch {
 }
 
 internal fun quadraticScalar(
-    point: QuadraticIncumbent, sense: ObjectiveSense, stats: SolveStats,
+    point: QuadraticIncumbent,
+    sense: ObjectiveSense,
+    stats: SolveStats,
 ): MinimizeResult.BestFound {
-    val value = point.value.rational?.toDouble() ?: ((point.value.lowerBound + point.value.upperBound) *
-        BigFraction.ofLong(2).reciprocal()).toDouble()
-    return MinimizeResult.BestFound(point.sample, if (sense == ObjectiveSense.MINIMIZE) value else -value,
-        TerminationReason.BudgetExhausted, stats)
+    val value = point.value.rational?.toDouble() ?: (
+        (point.value.lowerBound + point.value.upperBound) *
+        BigFraction.ofLong(2).reciprocal()
+    ).toDouble()
+    return MinimizeResult.BestFound(
+        point.sample,
+        if (sense == ObjectiveSense.MINIMIZE) value else -value,
+        TerminationReason.BudgetExhausted,
+        stats,
+    )
 }

@@ -17,9 +17,11 @@ class RevisedSimplexSingletonStartTest {
             builder.addRow(intArrayOf(x, z), longArrayOf(-1L, 1L), Relation.EQ, 0L)
             builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 2L)
             val bounded = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
-            val exact = bounded.copy(columns = List(bounded.numVars) { column ->
+            val exact = bounded.copy(
+                columns = List(bounded.numVars) { column ->
                 if (column == z) bounded.column(column).copy(bounds = ExactLpBounds()) else bounded.column(column)
-            })
+            }
+            )
             val model = assertNotNull(LpExactState(exact).toWorkingModel())
             for (singleton in listOf(false, true)) {
                 RevisedSimplex(model, singletonStart = singleton).use { solver ->
@@ -40,9 +42,13 @@ class RevisedSimplexSingletonStartTest {
     fun `a singleton opening should consume its invocation pivot allowance`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val model = ExactLpModel(listOf(listOf(ExactLpEntry(0, one))), listOf(one),
+        val model = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
             listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)))
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
+        )
         val working = assertNotNull(LpExactState(model).toWorkingModel())
         RevisedSimplex(working).use { solver ->
             assertNotNull(solver.prepareLogicals(ExecutionControl.Never))

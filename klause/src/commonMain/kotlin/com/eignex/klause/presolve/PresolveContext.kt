@@ -54,7 +54,9 @@ data class PresolveContext(
             if (weight != 0L) boolCoefficients[variable] = weight
         }
         return copy(
-            objectiveIntCoeffs = coefficients, objectiveBoolCoeffs = boolCoefficients, linearObjective = objective,
+            objectiveIntCoeffs = coefficients,
+            objectiveBoolCoeffs = boolCoefficients,
+            linearObjective = objective,
         )
     }
 

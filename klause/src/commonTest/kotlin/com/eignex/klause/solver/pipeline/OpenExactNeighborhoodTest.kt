@@ -33,8 +33,15 @@ import kotlin.test.assertTrue
 class OpenExactNeighborhoodTest {
     @Test
     fun `real min max completion should publish a checked original source point`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(RealArrayMinMax(2, intArrayOf(0, 1), true)),
-            numRealVars = 3, realLower = doubleArrayOf(0.0, 1.0, 0.0), realUpper = doubleArrayOf(2.0, 3.0, 3.0))
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(RealArrayMinMax(2, intArrayOf(0, 1), true)),
+            numRealVars = 3,
+            realLower = doubleArrayOf(0.0, 1.0, 0.0),
+            realUpper = doubleArrayOf(2.0, 3.0, 3.0),
+        )
         val adapter = OpenExactNeighborhood(source, TheoryParams(maxInstructions = 1000, randomSeed = 17))
 
         val result = adapter.use {

@@ -23,16 +23,24 @@ class PrivateRebuildAffineTest {
         }.toTypedArray<Factor>()
         val session = PropagationSession(Problem(72, 0, emptyArray(), clauses).bake())
         val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
-        val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
-            ExecutionControl.Never, parity = captured))
+        val generation = assertNotNull(
+            PrivateRebuildGeneration.prepare(
+            session,
+            1_048_576L,
+            ExecutionControl.Never,
+            parity = captured,
+        )
+        )
         val privatePoint = BooleanArray(72) { it == 70 }
 
         val lifted = generation.reconstruct(Sample(privatePoint, longArrayOf()))
 
         assertEquals(false, lifted.boolValue(0))
         assertEquals(true, lifted.boolValue(70))
-        assertTrue(clauses.all { factor ->
+        assertTrue(
+            clauses.all { factor ->
             (factor as Clause).literals.any { Lit.evaluate(it, lifted.boolValue(Lit.variable(it))) }
-        })
+        }
+        )
     }
 }

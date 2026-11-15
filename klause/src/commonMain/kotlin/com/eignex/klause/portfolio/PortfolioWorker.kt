@@ -64,8 +64,12 @@ class PortfolioWorker private constructor(
     internal fun <T> withPublicationBatch(cancellation: ExecutionControl, action: () -> T): T {
         val exchange = publicationExchange ?: return action()
         val meter = checkNotNull(sharingMeter)
-        return exchange.withBufferedOffers(cancellation, meter::incumbentEvent,
-            { block -> meter.timed(SharingChannel.Incumbents, block) }, action)
+        return exchange.withBufferedOffers(
+            cancellation,
+            meter::incumbentEvent,
+            { block -> meter.timed(SharingChannel.Incumbents, block) },
+            action,
+        )
     }
 
     /** The reward signals this worker can earn: its engine's own and those of the channels it shares through. */
@@ -283,7 +287,12 @@ class PortfolioWorker private constructor(
                             }
                             val terminal = if (child is InstructionSlicedSearch) {
                                 child.runScheduledSlice(
-                                    global, sliceMillis, sliceInstructions, sliceWork, instructionsPerWork, accept,
+                                    global,
+                                    sliceMillis,
+                                    sliceInstructions,
+                                    sliceWork,
+                                    instructionsPerWork,
+                                    accept,
                                 )
                             } else {
                                 child.runSlice(global, sliceMillis, sliceWork, accept)

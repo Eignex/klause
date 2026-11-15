@@ -29,7 +29,9 @@ internal class RationalPolynomial(coefficients: List<BigFraction>) {
 }
 
 internal data class RationalInterval(val lower: BigFraction, val upper: BigFraction) {
-    init { require(lower <= upper) }
+    init {
+        require(lower <= upper)
+    }
     val isPoint: Boolean get() = lower == upper
 }
 
@@ -47,35 +49,41 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
 
     fun scale(value: RationalPolynomial, coefficient: BigFraction): RationalPolynomial =
         arithmetic.execution.operation {
-        arithmetic.step()
-        return@operation RationalPolynomial(value.coefficients.map {
-            arithmetic.step(it, coefficient)
-            it * coefficient
-        })
-    }
+            arithmetic.step()
+            return@operation RationalPolynomial(
+                value.coefficients.map {
+                arithmetic.step(it, coefficient)
+                it * coefficient
+            }
+            )
+        }
 
     fun multiply(left: RationalPolynomial, right: RationalPolynomial): RationalPolynomial =
         arithmetic.execution.operation {
-        arithmetic.step()
-        if (left.isZero || right.isZero) return@operation RationalPolynomial.ZERO
-        if (left.degree > Int.MAX_VALUE - right.degree) {
-            throw PolynomialResourceLimit(PolynomialResource.DEGREE_OVERFLOW)
+            arithmetic.step()
+            if (left.isZero || right.isZero) return@operation RationalPolynomial.ZERO
+            if (left.degree > Int.MAX_VALUE - right.degree) {
+                throw PolynomialResourceLimit(PolynomialResource.DEGREE_OVERFLOW)
+            }
+            val result = MutableList(arithmetic.denseSize(left.degree + right.degree)) { BigFraction.ZERO }
+            for (i in 0..left.degree) {
+                for (j in 0..right.degree) {
+                arithmetic.step(left[i], right[j])
+                result[i + j] = result[i + j] + left[i] * right[j]
+            }
+            }
+            return@operation RationalPolynomial(result)
         }
-        val result = MutableList(arithmetic.denseSize(left.degree + right.degree)) { BigFraction.ZERO }
-        for (i in 0..left.degree) for (j in 0..right.degree) {
-            arithmetic.step(left[i], right[j])
-            result[i + j] = result[i + j] + left[i] * right[j]
-        }
-        return@operation RationalPolynomial(result)
-    }
 
     fun derivative(value: RationalPolynomial): RationalPolynomial = arithmetic.execution.operation {
         arithmetic.step()
         arithmetic.denseSize((value.degree - 1).coerceAtLeast(-1))
-        return@operation RationalPolynomial((1..value.degree).map {
+        return@operation RationalPolynomial(
+            (1..value.degree).map {
             arithmetic.step(value[it])
             value[it] * BigFraction.ofLong(it.toLong())
-        })
+        }
+        )
     }
 
     fun evaluate(value: RationalPolynomial, at: BigFraction): BigFraction = arithmetic.execution.operation {
@@ -104,33 +112,33 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
 
     fun divide(left: RationalPolynomial, right: RationalPolynomial): Pair<RationalPolynomial, RationalPolynomial> =
         arithmetic.execution.operation {
-        require(!right.isZero)
-        arithmetic.step()
-        val quotient = MutableList(arithmetic.denseSize((left.degree - right.degree).coerceAtLeast(-1))) {
-            BigFraction.ZERO
-        }
-        var remainder = left
-        while (!remainder.isZero && remainder.degree >= right.degree) {
+            require(!right.isZero)
             arithmetic.step()
-            val shift = remainder.degree - right.degree
-            val coefficient = remainder[remainder.degree] * right[right.degree].reciprocal()
-            quotient[shift] = coefficient
-            val terms = remainder.coefficients.toMutableList()
-            for (i in 0..right.degree) {
-                arithmetic.step(coefficient, right[i])
-                terms[shift + i] = terms[shift + i] - coefficient * right[i]
+            val quotient = MutableList(arithmetic.denseSize((left.degree - right.degree).coerceAtLeast(-1))) {
+                BigFraction.ZERO
             }
-            remainder = RationalPolynomial(terms)
+            var remainder = left
+            while (!remainder.isZero && remainder.degree >= right.degree) {
+                arithmetic.step()
+                val shift = remainder.degree - right.degree
+                val coefficient = remainder[remainder.degree] * right[right.degree].reciprocal()
+                quotient[shift] = coefficient
+                val terms = remainder.coefficients.toMutableList()
+                for (i in 0..right.degree) {
+                    arithmetic.step(coefficient, right[i])
+                    terms[shift + i] = terms[shift + i] - coefficient * right[i]
+                }
+                remainder = RationalPolynomial(terms)
+            }
+            return@operation RationalPolynomial(quotient) to remainder
         }
-        return@operation RationalPolynomial(quotient) to remainder
-    }
 
     fun divideExact(left: RationalPolynomial, right: RationalPolynomial): RationalPolynomial =
         arithmetic.execution.operation {
-        val (quotient, remainder) = divide(left, right)
-        require(remainder.isZero) { "nonexact polynomial division" }
-        return@operation quotient
-    }
+            val (quotient, remainder) = divide(left, right)
+            require(remainder.isZero) { "nonexact polynomial division" }
+            return@operation quotient
+        }
 
     fun monic(value: RationalPolynomial): RationalPolynomial = arithmetic.execution.operation {
         arithmetic.step()
@@ -199,11 +207,11 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
 
     fun countOpen(sequence: List<RationalPolynomial>, interval: RationalInterval): Int =
         arithmetic.execution.operation {
-        arithmetic.step()
-        if (interval.isPoint) return@operation 0
-        return@operation variations(sequence, interval.lower) - variations(sequence, interval.upper) -
-            if (evaluate(sequence[0], interval.upper).isZero) 1 else 0
-    }
+            arithmetic.step()
+            if (interval.isPoint) return@operation 0
+            return@operation variations(sequence, interval.lower) - variations(sequence, interval.upper) -
+                if (evaluate(sequence[0], interval.upper).isZero) 1 else 0
+        }
 
     /**
      * Isolating intervals of the distinct real roots in increasing order, by bisecting a Cauchy-style root
@@ -253,12 +261,15 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
 
     fun refine(polynomial: RationalPolynomial, interval: RationalInterval): RationalInterval =
         arithmetic.execution.operation {
-        arithmetic.step()
-        if (interval.isPoint) return@operation interval
-        val midpoint = (interval.lower + interval.upper) * BigFraction.ofLong(2).reciprocal()
-        if (evaluate(polynomial, midpoint).isZero) return@operation RationalInterval(midpoint, midpoint)
-        val left = RationalInterval(interval.lower, midpoint)
-        return@operation if (countOpen(sturm(polynomial), left) == 1) left
-            else RationalInterval(midpoint, interval.upper)
-    }
+            arithmetic.step()
+            if (interval.isPoint) return@operation interval
+            val midpoint = (interval.lower + interval.upper) * BigFraction.ofLong(2).reciprocal()
+            if (evaluate(polynomial, midpoint).isZero) return@operation RationalInterval(midpoint, midpoint)
+            val left = RationalInterval(interval.lower, midpoint)
+            return@operation if (countOpen(sturm(polynomial), left) == 1) {
+                left
+            } else {
+                RationalInterval(midpoint, interval.upper)
+            }
+        }
 }

@@ -6,14 +6,15 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 
 internal enum class RepairEndpoint {
-    PolicyLocalOptimum, FeasibleStall, Restarted, Repaired, Unresolved, Censored,
+    PolicyLocalOptimum,
+    FeasibleStall,
+    Restarted,
+    Repaired,
+    Unresolved,
+    Censored,
 }
 
-internal class RepairTrace(
-    val descentRule: String,
-    val maxAttempts: Int = 32,
-    val maxCoordinates: Int = 4096,
-) {
+internal class RepairTrace(val descentRule: String, val maxAttempts: Int = 32, val maxCoordinates: Int = 4096) {
     init {
         require(descentRule.isNotBlank())
         require(maxAttempts in 1..64 && maxCoordinates in 1..8192)
@@ -80,8 +81,16 @@ internal class RepairTrace(
             declined++
             return null
         }
-        return Attempt(retained.size, owner, seed, center, requestedBools.copyOf(), requestedInts.copyOf(),
-            effectiveBools.copyOf(), effectiveInts.copyOf()).also {
+        return Attempt(
+            retained.size,
+            owner,
+            seed,
+            center,
+            requestedBools.copyOf(),
+            requestedInts.copyOf(),
+            effectiveBools.copyOf(),
+            effectiveInts.copyOf(),
+        ).also {
             retained.add(it)
             record(it, "before", before)
         }

@@ -14,15 +14,24 @@ class ClauseDbReasonOwnershipTest(private val cap: Int, private val native: Bool
         @JvmStatic
         @Parameterized.Parameters(name = "cap={0}, native={1}")
         fun parameters(): List<Array<Any>> = listOf(
-            arrayOf<Any>(4_000, false), arrayOf<Any>(4_000, true),
-            arrayOf<Any>(20_000, false), arrayOf<Any>(20_000, true),
+            arrayOf<Any>(4_000, false),
+            arrayOf<Any>(4_000, true),
+            arrayOf<Any>(20_000, false),
+            arrayOf<Any>(20_000, true),
         )
     }
 
     @Test
     fun `Boolean retirement should progress within small grants at production sizes`() {
-        val session = PropagationSession(Problem(4, 0, emptyArray(),
-            arrayOf(Clause(intArrayOf(4, 6)))), nativeSat = native)
+        val session = PropagationSession(
+            Problem(
+            4,
+            0,
+            emptyArray(),
+            arrayOf(Clause(intArrayOf(4, 6))),
+        ),
+            nativeSat = native
+        )
         assertEquals(native, session.usesNativeSat)
         val clause = Clause(intArrayOf(0, 2))
         repeat(cap) { session.addLearnedClause(clause, 9) }

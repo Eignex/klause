@@ -46,11 +46,16 @@ class LinearPropagatorTest {
     @Test
     fun `linear slack boundaries should retain required bound tightenings`() {
         for ((op, raiseMinimum) in listOf(
-            LinearOp.LE to true, LinearOp.EQ to true, LinearOp.GE to false, LinearOp.EQ to false,
+            LinearOp.LE to true,
+            LinearOp.EQ to true,
+            LinearOp.GE to false,
+            LinearOp.EQ to false,
         )) {
             val state = PropagationState(
                 Problem(
-                    0, 2, Array(2) { IntDomain(0, 3) },
+                    0,
+                    2,
+                    Array(2) { IntDomain(0, 3) },
                     arrayOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), op, 3L)),
                 ),
                 Assumptions.None,
@@ -74,7 +79,9 @@ class LinearPropagatorTest {
             val (op, endpoint) = comparison
             val state = PropagationState(
                 Problem(
-                    0, 1, arrayOf(domain),
+                    0,
+                    1,
+                    arrayOf(domain),
                     arrayOf(Linear(longArrayOf(coefficient), intArrayOf(0), op, coefficient * endpoint)),
                 ),
                 Assumptions.None,
@@ -92,7 +99,9 @@ class LinearPropagatorTest {
         for (op in listOf(LinearOp.LE, LinearOp.GE, LinearOp.EQ)) {
             val state = PropagationState(
                 Problem(
-                    0, 3, Array(3) { IntDomain(0, 3) },
+                    0,
+                    3,
+                    Array(3) { IntDomain(0, 3) },
                     arrayOf(Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), op, 3L)),
                 ),
                 Assumptions.None,

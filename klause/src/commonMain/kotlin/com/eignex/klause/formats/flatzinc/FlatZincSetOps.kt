@@ -10,8 +10,7 @@ import com.eignex.klause.model.PbOp
 import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.collections.IntArrayList
 
-internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Boolean) =
-    emitSetSelection(c, varArray)
+internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Boolean) = emitSetSelection(c, varArray)
 
 internal fun FlatZincCompiler.emitAllDisjoint(c: FznConstraint) {
     expectArity(c, 1)

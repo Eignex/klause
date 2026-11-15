@@ -18,6 +18,27 @@ import kotlin.time.TimeSource
 
 class PresolveBudgetTest {
     @Test
+    fun `nested budget stops should observe charges made by preceding predicates`() {
+        val budget = PresolveBudget(100)
+        val visited = ArrayList<Int>()
+        val first = ExecutionControl {
+            visited += 1;
+            budget.charge(10);
+            false
+        }
+        val last = ExecutionControl {
+            visited += 2;
+            false
+        }
+        val stop = budget.orSpent(first or budget.slice(5) or last)
+
+        assertTrue(stop())
+
+        assertEquals(listOf(1), visited)
+        assertEquals(10L, budget.spent())
+    }
+
+    @Test
     fun `independent budget stops should not narrow the selected admission owner`() {
         val budget = PresolveBudget(100)
         val other = PresolveBudget(100)
@@ -73,6 +94,7 @@ class PresolveBudgetTest {
         assertFalse(containing())
         assertTrue(limited())
     }
+
     @Test
     fun `slice admission should return unused credit without renewing its allowance`() {
         val budget = PresolveBudget(11)
@@ -148,7 +170,10 @@ class PresolveBudgetTest {
             override fun isCancelled(): Boolean = true
             override fun deadline() = deadline
             override val accounting get() = meter
-        } or ExecutionControl { laterCalls++; false }
+        } or ExecutionControl {
+            laterCalls++;
+            false
+        }
         val observed = budget.observeStops(budget.observeStops(token))
 
         observed.charge(7L)

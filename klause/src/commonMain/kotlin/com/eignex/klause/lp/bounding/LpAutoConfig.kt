@@ -136,12 +136,7 @@ object LpAutoConfig {
         return checkNotNull(result)
     }
 
-    internal fun resolve(
-        problem: Problem,
-        config: LpConfig,
-        base: LpPlan,
-        objective: LinearObjective?,
-    ): LpPlan {
+    internal fun resolve(problem: Problem, config: LpConfig, base: LpPlan, objective: LinearObjective?): LpPlan {
         var result: LpPlan? = null
         sequence<Unit> { result = prepare(problem, config, base, objective) }.forEach { }
         return checkNotNull(result)
@@ -411,12 +406,12 @@ object LpAutoConfig {
         ) {
             if (sparseTrialAllowed) {
                 prepareSparseLpAdmission(
-                problem,
-                objective,
-                cancellation,
-                minOf(sparseTrialWork, base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK),
-                sourcePreparation,
-            )
+                    problem,
+                    objective,
+                    cancellation,
+                    minOf(sparseTrialWork, base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK),
+                    sourcePreparation,
+                )
             } else {
                 SparseLpAdmission(mapOf("DeclineProjection" to 1L))
             }
@@ -433,9 +428,13 @@ object LpAutoConfig {
                 componentOwnership = base.componentOwnership, sourcePreparation = sourcePreparation,
             )
         }
-        observe?.invoke(LpAdmission(rows, baseCols, cells, structApplicable,
+        observe?.invoke(
+            LpAdmission(
+                rows, baseCols, cells, structApplicable,
             config.resolved(LpTechnique.BOUNDING), coneRequested || cells <= ceilingCap, base.bounding, plan,
-            if (base.element) null else selection.elementIndexes.toSet(), sparse))
+            if (base.element) null else selection.elementIndexes.toSet(), sparse,
+            )
+        )
         return plan
     }
 
@@ -444,12 +443,7 @@ object LpAutoConfig {
     private fun tableauCells(rows: Long, cols: Long): Long = rows * (cols + rows + 1L)
 
     /** A gated hull's estimated added columns and rows, summed over its factors of one kind. */
-    private class HullEstimate(
-        val key: LpTechnique,
-        val cols: Long,
-        val rows: Long,
-        val elementIndex: Int? = null,
-    )
+    private class HullEstimate(val key: LpTechnique, val cols: Long, val rows: Long, val elementIndex: Int? = null)
 
     private class HullSelection(val techniques: Set<LpTechnique>, val elementIndexes: Set<Int>)
 
@@ -533,7 +527,10 @@ object LpAutoConfig {
             // must not enter the estimate either.
             if (!prepareStatesBothBounds(problem, succ)) continue
             val arcs = prepareCandidateArcCount(
-                succ, selfLoops, CpToLpRelaxation.MAX_CIRCUIT_ARCS, problem::rootDomainOf,
+                succ,
+                selfLoops,
+                CpToLpRelaxation.MAX_CIRCUIT_ARCS,
+                problem::rootDomainOf,
             )
             if (arcs == 0 || arcs > CpToLpRelaxation.MAX_CIRCUIT_ARCS) continue
             any = true

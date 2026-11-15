@@ -79,10 +79,14 @@ class PortfolioCompositionTest {
                     assertEquals(if (problemClass == ProblemClass.Sat) 4096L else 16384L, arm.inprocessingWork)
                     assertEquals(256L, arm.inprocessingRootWork)
                     assertEquals(if (problemClass == ProblemClass.Sat) 3072L else 12288L, arm.inprocessingProbeWork)
-                    assertEquals(if (problemClass == ProblemClass.Sat) 0L else Long.MAX_VALUE,
-                        arm.inprocessingSubsumeWork)
-                    assertEquals(if (problemClass == ProblemClass.Sat) 0L else Long.MAX_VALUE,
-                        arm.inprocessingVivifyWork)
+                    assertEquals(
+                        if (problemClass == ProblemClass.Sat) 0L else Long.MAX_VALUE,
+                        arm.inprocessingSubsumeWork,
+                    )
+                    assertEquals(
+                        if (problemClass == ProblemClass.Sat) 0L else Long.MAX_VALUE,
+                        arm.inprocessingVivifyWork,
+                    )
                     assertEquals(32768L, arm.inprocessingProbeInterval)
                     assertEquals(32L, arm.inprocessingInterval)
                     assertEquals(8, arm.inprocessingGrowth)
@@ -182,9 +186,16 @@ class PortfolioCompositionTest {
     fun `explicit edits should override automatic root maintenance`() {
         val scenario = PortfolioScenario.sequential(Kind.CSP, engine = EngineMix.BACKTRACK).copy(
             btEdit = {
-                it.copy(rootSimplification = false, rootProbeBatch = 0,
-                    rootProbeImplications = true, rootProbeGeneralGate = false, rootProbeWork = 23L,
-                    inprocessingWork = 17L, inprocessingSubsumeWork = 13L, inprocessingVivifyWork = 19L)
+                it.copy(
+                    rootSimplification = false,
+                    rootProbeBatch = 0,
+                    rootProbeImplications = true,
+                    rootProbeGeneralGate = false,
+                    rootProbeWork = 23L,
+                    inprocessingWork = 17L,
+                    inprocessingSubsumeWork = 13L,
+                    inprocessingVivifyWork = 19L,
+                )
             },
         )
         val facts = ProblemFacts.assumed(Kind.CSP, ProblemClass.PseudoBoolean)
@@ -193,11 +204,13 @@ class PortfolioCompositionTest {
             .map { it.recipe.build(1L, null) }
 
         assertTrue(params.isNotEmpty())
-        assertTrue(params.all {
+        assertTrue(
+            params.all {
             !it.rootSimplification && it.rootProbeBatch == 0 &&
                 it.rootProbeImplications && !it.rootProbeGeneralGate && it.rootProbeWork == 23L &&
                 it.inprocessingWork == 17L && it.inprocessingSubsumeWork == 13L && it.inprocessingVivifyWork == 19L
-        })
+        }
+        )
     }
 
     @Test
@@ -344,15 +357,23 @@ class PortfolioCompositionTest {
 
         assertEquals(
             listOf(
-                "satOptimized", "cbls/fixed", "lp-default", "alns-balanced", "cbls-plateau/ils-basin",
+                "satOptimized",
+                "cbls/fixed",
+                "lp-default",
+                "alns-balanced",
+                "cbls-plateau/ils-basin",
                 "conflictDriven",
             ),
             plan.arms.map { it.label },
         )
         assertEquals(
             listOf(
-                ArmRole.LearningProof, ArmRole.FirstSolution, ArmRole.LpBounding, ArmRole.NeighbourhoodImprovement,
-                ArmRole.NeighbourhoodImprovement, ArmRole.LearningProof,
+                ArmRole.LearningProof,
+                ArmRole.FirstSolution,
+                ArmRole.LpBounding,
+                ArmRole.NeighbourhoodImprovement,
+                ArmRole.NeighbourhoodImprovement,
+                ArmRole.LearningProof,
             ),
             plan.roles,
         )
@@ -367,7 +388,11 @@ class PortfolioCompositionTest {
 
         assertEquals(
             listOf(
-                "cbls/fixed", "satOptimized", "lp-default", "conflictDriven", "cbls-plateau/ils-basin",
+                "cbls/fixed",
+                "satOptimized",
+                "lp-default",
+                "conflictDriven",
+                "cbls-plateau/ils-basin",
                 "lp-aggressive",
             ),
             labels,
@@ -378,11 +403,20 @@ class PortfolioCompositionTest {
     fun `a finite model without a relaxation should seat a selector arm before filling`() {
         val cases = listOf(
             Kind.COP to listOf(
-                "satOptimized", "cbls/fixed", "alns-balanced", "selector-switch", "cbls-plateau/ils-basin",
+                "satOptimized",
+                "cbls/fixed",
+                "alns-balanced",
+                "selector-switch",
+                "cbls-plateau/ils-basin",
                 "conflictDriven",
             ),
             Kind.CSP to listOf(
-                "cbls/fixed", "satOptimized", "domwdeg", "conflictDriven", "cbls-plateau/ils-basin", "first-fail",
+                "cbls/fixed",
+                "satOptimized",
+                "domwdeg",
+                "conflictDriven",
+                "cbls-plateau/ils-basin",
+                "first-fail",
             ),
         )
         for ((kind, expected) in cases) {
@@ -416,7 +450,11 @@ class PortfolioCompositionTest {
 
         assertEquals(
             listOf(
-                "cbls/fixed", "satOptimized", "support-aware", "conflictDriven", "cbls-plateau/ils-basin",
+                "cbls/fixed",
+                "satOptimized",
+                "support-aware",
+                "conflictDriven",
+                "cbls-plateau/ils-basin",
                 "propagation-guided",
             ),
             labels,
@@ -486,8 +524,12 @@ class PortfolioCompositionTest {
 
         assertEquals(
             listOf(
-                "learning-proof", "first-solution", "lp-bounding", "neighbourhood-improvement",
-                "rank/neighbourhood-improvement", "rank/learning-proof",
+                "learning-proof",
+                "first-solution",
+                "lp-bounding",
+                "neighbourhood-improvement",
+                "rank/neighbourhood-improvement",
+                "rank/learning-proof",
             ),
             plan.seats,
         )
@@ -617,7 +659,11 @@ class PortfolioCompositionTest {
 
         assertEquals(
             listOf(
-                "conflictDriven", "cbls/fixed", "alns-balanced", "cbls-plateau/ils-basin", "conflictDriven",
+                "conflictDriven",
+                "cbls/fixed",
+                "alns-balanced",
+                "cbls-plateau/ils-basin",
+                "conflictDriven",
                 "cbls-smooth/ils-basin",
             ),
             labels,

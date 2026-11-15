@@ -29,8 +29,12 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.util.ExecutionControl
 
 internal data class LinearAuthorityLpShape(
-    val inputRows: Int, val rows: Int, val columns: Int, val admitted: Boolean,
-    val sparse: Boolean = false, val phase: String? = null,
+    val inputRows: Int,
+    val rows: Int,
+    val columns: Int,
+    val admitted: Boolean,
+    val sparse: Boolean = false,
+    val phase: String? = null,
     val prepared: Boolean = true,
 )
 
@@ -136,13 +140,13 @@ internal class LinearAuthorityLp(
                 workingRows.map { ExactLpNumber.of(it.rhs) },
                 (
                     if (retained == null) {
-                    packed.columns
-                } else {
-                    packed.columns.map {
-                    it.copy(bounds = ExactLpBounds())
-                }
-                }
-                ) + workingRows.map {
+                        packed.columns
+                    } else {
+                        packed.columns.map {
+                            it.copy(bounds = ExactLpBounds())
+                        }
+                    }
+                    ) + workingRows.map {
                     ExactLpColumn(ExactLpBounds(ExactLpSide(zero, it.strict)), integral = false)
                 },
                 workingRows.map { ExactLpRow(strict = it.strict) },
@@ -150,22 +154,24 @@ internal class LinearAuthorityLp(
             )
             val owner = if (retained != null) {
                 retained.bind(packed, objective, token, ::model)
-                ?: return@runPrepared null
+                    ?: return@runPrepared null
             } else {
                 LpScopedSolver(
-                LpExactState(model()),
-                token,
-                context = budget.context,
-                iterationLimit = 1024,
-                workLimit = 2_000_000L,
-            )
+                    LpExactState(model()),
+                    token,
+                    context = budget.context,
+                    iterationLimit = 1024,
+                    workLimit = 2_000_000L,
+                )
             }
             val preparation = owner.metrics.preparationWork
             val refinement = owner.refinementCache.work
             try {
                 val solved = owner.solve(token = token, observer = observer, claim = claim)
-                val result = solved?.takeIf { result -> result.exactPrimal?.admittedSourcePoint() != false &&
-                    result.lowerBound?.let { listOf(it).admittedSourcePoint() } != false } ?: return@runPrepared null
+                val result = solved?.takeIf { result ->
+                    result.exactPrimal?.admittedSourcePoint() != false &&
+                        result.lowerBound?.let { listOf(it).admittedSourcePoint() } != false
+                } ?: return@runPrepared null
                 val boundWeights = result.bound?.dualMultipliers?.map { it.negated() }
                     ?.let { packed.lift(it, costs.map { cost -> cost.negated() }, token) }
                 val conflict = result.rationalConflict
@@ -181,14 +187,24 @@ internal class LinearAuthorityLp(
                 }
                 LinearAuthorityLpResult(result, boundWeights, conflictWeights)
             } finally {
-                budget.observe(preparation = owner.metrics.preparationWork - preparation,
-                    floatWork = owner.lastMetrics.workOps, refinement = owner.refinementCache.work - refinement)
+                budget.observe(
+                    preparation = owner.metrics.preparationWork - preparation,
+                    floatWork = owner.lastMetrics.workOps,
+                    refinement = owner.refinementCache.work - refinement,
+                )
                 if (retained == null) budget.closeOwner(owner)
             }
         }.also {
             val workingRows = prepared?.rows?.size ?: rows.size
-            onShape(LinearAuthorityLpShape(rows.size, workingRows, costs.size,
-                budget.admitsDimensions(costs.size, workingRows.toLong()), prepared = prepared != null))
+            onShape(
+                LinearAuthorityLpShape(
+                rows.size,
+                workingRows,
+                costs.size,
+                budget.admitsDimensions(costs.size, workingRows.toLong()),
+                prepared = prepared != null,
+            )
+            )
         }
     }
 
@@ -216,8 +232,13 @@ internal class LinearAuthorityLp(
         packed.coordinateConflictWeights?.let { weights ->
             retained.invalidateGuidance()
             val result = CertifiedLpResult(null, null, null, null, null, false, { null })
-            return LinearAuthorityLpGuidance(LinearAuthorityLpResult(result, null, null), null,
-                packed.rows.size, false, weights)
+            return LinearAuthorityLpGuidance(
+                LinearAuthorityLpResult(result, null, null),
+                null,
+                packed.rows.size,
+                false,
+                weights,
+            )
         }
         var phase: String? = null
         var workingRows = packed.rows.size
@@ -227,7 +248,13 @@ internal class LinearAuthorityLp(
             guidancePolicy.copy(rowPolicy = SparseSourceLpRowPolicy.IDENTITY)
         }
         return retained.advance(
-            packed, costs, constant, scope, cancellation, policy, observer,
+            packed,
+            costs,
+            constant,
+            scope,
+            cancellation,
+            policy,
+            observer,
         ) guideResult@{ guide, prepared, token ->
             guide.maxLuFill?.let {
                 onCutMetric("QueryFillSamples", 1L)
@@ -246,18 +273,38 @@ internal class LinearAuthorityLp(
                 prepared.sourceRowWeights(multipliers, token)
                     ?.let { expanded -> packed.lift(expanded, List(costs.size) { BigFraction.ZERO }, token) }
             }
-            val result = CertifiedLpResult(null, bound, null, null, conflict, false, { null },
-                conflictSupport = guide.conflictSupport)
+            val result = CertifiedLpResult(
+                null,
+                bound,
+                null,
+                null,
+                conflict,
+                false,
+                { null },
+                conflictSupport = guide.conflictSupport,
+            )
             val raw = guide.primal
             val point = raw?.indices?.map { column ->
                 if (token()) return@guideResult null
                 packed.columns[column].bounds.projectGuidance(raw[column]) ?: return@guideResult null
             }
-            LinearAuthorityLpGuidance(LinearAuthorityLpResult(result, weights, conflictWeights), point,
-                workingRows, guide.paused)
+            LinearAuthorityLpGuidance(
+                LinearAuthorityLpResult(result, weights, conflictWeights),
+                point,
+                workingRows,
+                guide.paused,
+            )
         }.also {
-            onShape(LinearAuthorityLpShape(rows.size, workingRows, costs.size, it != null,
-                sparse = true, phase = phase))
+            onShape(
+                LinearAuthorityLpShape(
+                rows.size,
+                workingRows,
+                costs.size,
+                it != null,
+                sparse = true,
+                phase = phase,
+            )
+            )
         }
     }
 
@@ -294,9 +341,14 @@ internal class LinearAuthorityLp(
                         if (!shape.admitted) observe("PrimalRecoveryComponentDimension", 1L)
                     }
                 }).use { completion ->
-                    completion.solve(residual, List(columns.size) { BigFraction.ZERO }, BigFraction.ZERO, active,
+                    completion.solve(
+                        residual,
+                        List(columns.size) { BigFraction.ZERO },
+                        BigFraction.ZERO,
+                        active,
                         onDecline = { observe("PrimalRecoveryExactAdmission$it", 1L) },
-                        claim = LpClaim.FEASIBLE_COMPLETION)
+                        claim = LpClaim.FEASIBLE_COMPLETION,
+                    )
                         ?.result?.exactPrimal?.take(columns.size)
                 }
             }.also { progress.pending = retained.paused }
@@ -317,8 +369,11 @@ internal class LinearAuthorityLp(
         observe: (String, Long) -> Unit,
     ): List<BigFraction>? = session?.withGuidance(cancellation) { token ->
         refineLinearPrimal(coordinates, point, rows, inactive, costs, token, complete = { residual, objective, active ->
-            val retained = objectiveCompletion ?: LinearResidualCompletion(budget, guidancePolicy,
-                guidancePolicy.floating).also { objectiveCompletion = it }
+            val retained = objectiveCompletion ?: LinearResidualCompletion(
+                budget,
+                guidancePolicy,
+                guidancePolicy.floating,
+            ).also { objectiveCompletion = it }
             retained.complete(residual, objective.size, active, { stage, count ->
                 observe(stage.replace("PrimalRecovery", "PrimalRefinement"), count)
             }, costs = objective, small = { null })
@@ -338,8 +393,8 @@ internal class LinearAuthorityLp(
     ): List<BigFraction>? {
         if (session != null) {
             return LinearAuthorityLp(budget, onShape, onPhase = onPhase).use {
-            it.combination(rows, coefficients, rhs, strict, cancellation)
-        }
+                it.combination(rows, coefficients, rhs, strict, cancellation)
+            }
         }
         val count = rows.size
         val constraints = ArrayList<ExactRationalInequality>()
@@ -349,30 +404,43 @@ internal class LinearAuthorityLp(
             constraints += ExactRationalInequality(ids, ids.map { values[it].negated() }, bound.negated())
         }
         for (column in coefficients.indices) {
-            equality(rows.map { row -> row.columns.indexOf(column).let {
-                if (it < 0) BigFraction.ZERO else row.coefficients[it]
-            } } + if (strict) listOf(BigFraction.ZERO) else emptyList(), coefficients[column])
+            equality(
+                rows.map { row ->
+                row.columns.indexOf(column).let {
+                    if (it < 0) BigFraction.ZERO else row.coefficients[it]
+                }
+            } + if (strict) listOf(BigFraction.ZERO) else emptyList(),
+                coefficients[column]
+            )
         }
         equality(rows.map { it.rhs } + if (strict) listOf(BigFraction.ZERO) else emptyList(), rhs)
         val variables = count + if (strict) 1 else 0
         for (id in 0 until variables) {
             constraints += ExactRationalInequality(
-            intArrayOf(id),
-            listOf(BigFraction.MINUS_ONE),
-            BigFraction.ZERO,
-        )
+                intArrayOf(id),
+                listOf(BigFraction.MINUS_ONE),
+                BigFraction.ZERO,
+            )
         }
         if (strict) {
             val selected = rows.indices.filter { rows[it].strict }
             if (selected.isEmpty()) return null
-            constraints += ExactRationalInequality((selected + count).toIntArray(),
-                List(selected.size) { BigFraction.MINUS_ONE } + BigFraction.ONE, BigFraction.ZERO)
+            constraints += ExactRationalInequality(
+                (selected + count).toIntArray(),
+                List(selected.size) { BigFraction.MINUS_ONE } + BigFraction.ONE,
+                BigFraction.ZERO,
+            )
             constraints += ExactRationalInequality(intArrayOf(count), listOf(BigFraction.ONE), BigFraction.ONE)
         }
-        val result = solve(constraints, List(variables) {
-            if (strict && it == count) BigFraction.MINUS_ONE else BigFraction.ZERO
-        }, BigFraction.ZERO, cancellation,
-            claim = if (strict) LpClaim.ATTAINED_OPTIMUM else LpClaim.FEASIBLE_COMPLETION) ?: return null
+        val result = solve(
+            constraints,
+            List(variables) {
+                if (strict && it == count) BigFraction.MINUS_ONE else BigFraction.ZERO
+            },
+            BigFraction.ZERO,
+            cancellation,
+            claim = if (strict) LpClaim.ATTAINED_OPTIMUM else LpClaim.FEASIBLE_COMPLETION,
+        ) ?: return null
         val point = result.result.exactPrimal ?: return null
         if (strict && point[count] <= BigFraction.ZERO) return null
         return point.take(count)

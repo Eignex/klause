@@ -105,7 +105,9 @@ internal class LocalSearchEngine(
     internal var projection: LocalSearchPreparation =
         LocalSearchPreparation(problem, model.domains, selection = model.selection)
     internal var invariantNetwork = InvariantNetworkPreparation(
-        definitionalSweep, problem.numIntVars, problem.numBoolVars,
+        definitionalSweep,
+        problem.numIntVars,
+        problem.numBoolVars,
     )
 
     // A finite projection may require theory-owned completion before publication.
@@ -114,8 +116,11 @@ internal class LocalSearchEngine(
     // An exact rational completion need not have a zero-violation floating representation.
     private val continuousCompletion = completion != null && problem.numRealVars > 0 &&
         problem.numBoolVars == 0 && problem.numIntVars == 0
-    private val unscoredCandidateCheck = UnscoredCandidateCheck(problem, model.selection,
-        (completion as? FiniteFactorEnforcer)?.enforcingFiniteFactors(problem).orEmpty()).takeIf { it.required }
+    private val unscoredCandidateCheck = UnscoredCandidateCheck(
+        problem,
+        model.selection,
+        (completion as? FiniteFactorEnforcer)?.enforcingFiniteFactors(problem).orEmpty(),
+    ).takeIf { it.required }
 
     /** Objective-as-constraint ratchet handle (opt-in). Set non-null only for an arm whose [problem]
      *  carries an [com.eignex.klause.factor.objective.ObjectiveBoundFactor] sharing this bound: on each
@@ -144,11 +149,11 @@ internal class LocalSearchEngine(
     private fun traceStage(stage: String, state: LocalSearchState) {
         if (tracedRestart != null) {
             repairTrace?.record(
-            tracedRestart,
-            stage,
-            state.assignment.snapshot(),
-            state.cost.takeUnless { stage == "perturbed" },
-        )
+                tracedRestart,
+                stage,
+                state.assignment.snapshot(),
+                state.cost.takeUnless { stage == "perturbed" },
+            )
         }
     }
 
@@ -211,8 +216,7 @@ internal class LocalSearchEngine(
         (configuredRestart as? LubyRestart)?.advanceCadence()
     }
 
-    private fun slicedInitialization(checkpoint: LocalSearchCheckpoint?): Boolean =
-        checkpoint != null
+    private fun slicedInitialization(checkpoint: LocalSearchCheckpoint?): Boolean = checkpoint != null
 
     private suspend fun <T> SequenceScope<T?>.recomputeInitial(
         state: LocalSearchState,
@@ -312,7 +316,8 @@ internal class LocalSearchEngine(
         definitionalSweep?.let {
             prepareSteps(
                 it.pinnedSteps(state.assignment, state.rootDomains, problem.factors, state.assumptions),
-                params, checkpoint,
+                params,
+                checkpoint,
             )
         }
     }
@@ -326,7 +331,9 @@ internal class LocalSearchEngine(
     ): LocalSearchState {
         val prepared = preparedProjection(params, checkpoint)
         val state = preparedValue(
-            LocalSearchState.preparation(model, Random(seed), effectiveAssumptions, prepared), params, checkpoint,
+            LocalSearchState.preparation(model, Random(seed), effectiveAssumptions, prepared),
+            params,
+            checkpoint,
         )
         state.phaseTimer = timing
         state.inspectionWork = checkpoint
@@ -359,19 +366,20 @@ internal class LocalSearchEngine(
             seedFrom(state, sample, recompute = false)
             if (reconcile) {
                 definitionalSweep?.let {
-                it.sweepPinned(state.assignment, state.rootDomains, problem.factors, state.assumptions)
-            }
+                    it.sweepPinned(state.assignment, state.rootDomains, problem.factors, state.assumptions)
+                }
             }
             state.recompute()
         } else {
             prepareSteps(state.initialAssignmentSteps(sample), params, checkpoint)
             if (reconcile) {
                 definitionalSweep?.let {
-                prepareSteps(
-                    it.pinnedSteps(state.assignment, state.rootDomains, problem.factors, state.assumptions),
-                    params, checkpoint,
-                )
-            }
+                    prepareSteps(
+                        it.pinnedSteps(state.assignment, state.rootDomains, problem.factors, state.assumptions),
+                        params,
+                        checkpoint,
+                    )
+                }
             }
             recomputeInitial(state, params, checkpoint)
         }
@@ -532,7 +540,13 @@ internal class LocalSearchEngine(
         var finished = false
         return minimizeStream(objective, params, warm, sink, onFinished = { finished = true })
             .filterNotNull().map { it.withSourceSemantics(problem.semantics) }.asSearchStream(
-                release = { try { if (!finished) sink.stop() } finally { ownership.release() } },
+                release = {
+                    try {
+                    if (!finished) sink.stop()
+                } finally {
+                    ownership.release()
+                }
+                },
                 terminal = { finished },
             )
     }
@@ -636,7 +650,8 @@ internal class LocalSearchEngine(
             } else {
                 preparedValue(
                     Assignment.preparation(problem.numBoolVars, problem.numIntVars, problem.numRealVars),
-                    params, checkpoint,
+                    params,
+                    checkpoint,
                 ).also {
                     prepareSteps(state.assignment.copySteps(it, INITIALIZATION_BATCH), params, checkpoint)
                 }
@@ -889,23 +904,23 @@ internal class LocalSearchEngine(
             feasibleMode == FeasibleDescent.SelfOwned
         ) {
             CompletedMoveEvaluation(
-            state,
-            objective,
-            params.cancellation,
-            mayAttempt = {
-                totalFlips >= nextMoveCompletion && totalFlips < maxFlips &&
-                    params.nodeBudget?.allowance?.movesLeft() != 0L &&
-                    checkpoint?.shouldPause(totalFlips) != true
-            },
-            complete = { candidate ->
-                decide(state, candidate, params.cancellation, sink.ls) { work ->
-                    totalFlips += work
-                    nextMoveCompletion = totalFlips + minOf(work, Long.MAX_VALUE - totalFlips)
-                    progress.charge(totalFlips)
-                }
-            },
-            current = { (liveCompletion as? Completion.Witness)?.sample ?: state.assignment.snapshot() },
-        )
+                state,
+                objective,
+                params.cancellation,
+                mayAttempt = {
+                    totalFlips >= nextMoveCompletion && totalFlips < maxFlips &&
+                        params.nodeBudget?.allowance?.movesLeft() != 0L &&
+                        checkpoint?.shouldPause(totalFlips) != true
+                },
+                complete = { candidate ->
+                    decide(state, candidate, params.cancellation, sink.ls) { work ->
+                        totalFlips += work
+                        nextMoveCompletion = totalFlips + minOf(work, Long.MAX_VALUE - totalFlips)
+                        progress.charge(totalFlips)
+                    }
+                },
+                current = { (liveCompletion as? Completion.Witness)?.sample ?: state.assignment.snapshot() },
+            )
         } else {
             null
         }
@@ -919,8 +934,14 @@ internal class LocalSearchEngine(
                 sink.ls.recordBoardRestarts(it.changedBoardRestarts, it.declinedBoardRestarts)
             }
             progress.optimization(
-                totalFlips, restartCount, stallCount, bestObj, bestSample != null,
-                bestCostInfeasible, bestFoundAtMs, checkpoint,
+                totalFlips,
+                restartCount,
+                stallCount,
+                bestObj,
+                bestSample != null,
+                bestCostInfeasible,
+                bestFoundAtMs,
+                checkpoint,
             )
         }
 
@@ -1175,8 +1196,10 @@ internal class LocalSearchEngine(
                         feasibleMisses = 0
                         if (supportsBoardCoverage && !state.boardCoverage.requested) state.boardCoverage.request(state)
                         if (!state.boardCoverage.requested ||
-                            (!state.boardCoverage.pending && feasibleStrategy.gradesAllBoardImprovements &&
-                                moveEvaluation == null && state.booleanRepairs == null)
+                            (
+                                !state.boardCoverage.pending && feasibleStrategy.gradesAllBoardImprovements &&
+                                moveEvaluation == null && state.booleanRepairs == null
+                            )
                         ) {
                             restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
                             traceEnd(RepairEndpoint.PolicyLocalOptimum, state)
@@ -1366,10 +1389,11 @@ internal class LocalSearchEngine(
             preliminary
         }
         val compatible = if (real is Completion.Witness &&
-            (real.sample.numBoolVars != candidate.numBoolVars || real.sample.numIntVars != candidate.numIntVars ||
+            (
+                real.sample.numBoolVars != candidate.numBoolVars || real.sample.numIntVars != candidate.numIntVars ||
                 (problem.numRealVars > 0 && real.sample.numRealVars != candidate.numRealVars) ||
                 candidate.hammingDistanceTo(real.sample) != 0
-            )
+                )
         ) {
             Completion.Undecided(real.work)
         } else {
@@ -1395,8 +1419,11 @@ internal class LocalSearchEngine(
             real is Completion.Refuted -> CompletionRefutationStage.PROVIDER
             else -> CompletionRefutationStage.POSTCHECK
         }
-        stats?.recordCompletion(refuted = decided is Completion.Refuted, undecided = decided is Completion.Undecided,
-            stage = refutationStage)
+        stats?.recordCompletion(
+            refuted = decided is Completion.Refuted,
+            undecided = decided is Completion.Undecided,
+            stage = refutationStage,
+        )
         if (decided is Completion.Refuted) {
             val weights = state.weights.factorWeights
             for (f in decided.factors) weights[f] += 1.0
@@ -1602,8 +1629,10 @@ internal fun localSearchSupports(model: LocalSearchModel, completes: Boolean = f
     if (problem.factors.indices.any { id ->
             val capabilities = selection?.capabilities(id) ?: problem.factors[id].executionCapabilities()
             capabilities.scoring == com.eignex.klause.solver.ScoringCapability.UNSUPPORTED ||
-                (capabilities.assignmentCheck == AssignmentCheckCapability.UNSUPPORTED &&
-                    problem.factors[id].variables.reals.isNotEmpty())
+                (
+                    capabilities.assignmentCheck == AssignmentCheckCapability.UNSUPPORTED &&
+                    problem.factors[id].variables.reals.isNotEmpty()
+                )
         }
     ) {
         return false

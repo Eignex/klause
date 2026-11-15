@@ -35,8 +35,13 @@ internal class RealDifferenceSystem private constructor(
             guard == ALWAYS || bools[Lit.variable(guard)] == if (Lit.isPositive(guard)) 1 else 0
         }
         var cycle: IntArray? = null
-        val result = graph.potentials(active, stop::invoke, potentials,
-            onNegativeCycle = { cycle = it }, onWork = onWork)
+        val result = graph.potentials(
+            active,
+            stop::invoke,
+            potentials,
+            onNegativeCycle = { cycle = it },
+            onWork = onWork,
+        )
         return when (result) {
             Potentials.Abandoned -> Result.Interrupted
 
@@ -55,9 +60,11 @@ internal class RealDifferenceSystem private constructor(
                 potentials = normalized.takeIf { values ->
                     values.all { it in -Long.MAX_VALUE / 8L..Long.MAX_VALUE / 8L }
                 }
-                Result.Feasible { List(graph.numVars - 1) { column ->
-                    BigFraction.of(bigIntOf(result.values[column] - zero), bigIntOf(scale))
-                } }
+                Result.Feasible {
+                    List(graph.numVars - 1) { column ->
+                        BigFraction.of(bigIntOf(result.values[column] - zero), bigIntOf(scale))
+                    }
+                }
             }
         }
     }
@@ -191,8 +198,13 @@ internal class RealDifferenceSystem private constructor(
             if (stop()) return false
             if (row.columns.size > 2) return false
             if (row.columns.isEmpty()) {
-                edges += Edge(zero, zero, if (row.rhs.signum() < 0) -1L else 0L,
-                    row.strict && row.rhs.isZero, guard)
+                edges += Edge(
+                    zero,
+                    zero,
+                    if (row.rhs.signum() < 0) -1L else 0L,
+                    row.strict && row.rhs.isZero,
+                    guard,
+                )
                 return true
             }
             val coefficient = row.coefficients[0]
@@ -211,8 +223,14 @@ internal class RealDifferenceSystem private constructor(
             }
             val first = row.columns[0]
             val second = row.columns.getOrNull(1) ?: zero
-            edges += Edge(if (positive) second else first, if (positive) first else second,
-                bound.num.toLong(), row.strict, guard, bound.den.toLong())
+            edges += Edge(
+                if (positive) second else first,
+                if (positive) first else second,
+                bound.num.toLong(),
+                row.strict,
+                guard,
+                bound.den.toLong(),
+            )
             return true
         }
     }

@@ -8,10 +8,7 @@ import com.eignex.klause.solver.defaultExecutionCapabilities
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.util.ExecutionControl
 
-internal class SelectedProjectionChecks(
-    selection: PreparedFactorProjections,
-    enforcingPeers: Set<Int> = emptySet(),
-) {
+internal class SelectedProjectionChecks(selection: PreparedFactorProjections, enforcingPeers: Set<Int> = emptySet()) {
     private val source = selection.problem
     private val factors = source.factors.indices.filter { id ->
         id !in enforcingPeers && selection.requiresOriginalCheck(id) && source.factors[id].variables.reals.isEmpty() &&
@@ -30,10 +27,12 @@ internal class SelectedProjectionChecks(
         if (!available) return ComponentCheck.Indeterminate
         val model = original ?: return ComponentCheck.Feasible
         if (cancellation()) return ComponentCheck.Indeterminate
-        val point = model.withIntDomains(Array(model.numIntVars) {
+        val point = model.withIntDomains(
+            Array(model.numIntVars) {
             val value = session.intDomain(it).min
             IntDomain(value, value)
-        })
+        }
+        )
         val checker = PropagationSession(point, cancellation)
         val result = try {
             checkPoint(model.numBoolVars, session, checker, cancellation)

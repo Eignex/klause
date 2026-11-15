@@ -13,8 +13,13 @@ internal object DistinctEncoders {
     }
 
     val polynomial = Encoder(EncoderSupport.EQUIVALENT) { factor, encoding ->
-        val formula = distinctPolynomialFormula(factor as Distinct, encoding::integer, encoding::real,
-            encoding::conditional, encoding.cancellation) ?: return@Encoder EncoderDecline.RESOURCE
+        val formula = distinctPolynomialFormula(
+            factor as Distinct,
+            encoding::integer,
+            encoding::real,
+            encoding::conditional,
+            encoding.cancellation,
+        ) ?: return@Encoder EncoderDecline.RESOURCE
         encoding.polynomial(formula)
         null
     }

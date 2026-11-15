@@ -139,8 +139,10 @@ class BacktrackSolver internal constructor(
         val handle = ResumableMinimize(
             this,
             objective,
-            params.copy(objectiveBoundSupplier = { activeCutoff },
-                cancellation = handleCancellation.withLifetime(handleCancellation)),
+            params.copy(
+                objectiveBoundSupplier = { activeCutoff },
+                cancellation = handleCancellation.withLifetime(handleCancellation),
+            ),
             rebindable = true,
             exactObjectiveBoundSupplier = { activeExactCutoff.takeIf { exactCompletion } },
         )
@@ -167,8 +169,14 @@ class BacktrackSolver internal constructor(
                 cutoff: BigFraction,
                 cancellation: ExecutionControl,
             ) {
-                beginFragment(assumptions, decisionBudget,
-                    SourceObjectiveScore(cutoff.toDouble(), cutoff).pruningBound, cutoff, true, cancellation)
+                beginFragment(
+                    assumptions,
+                    decisionBudget,
+                    SourceObjectiveScore(cutoff.toDouble(), cutoff).pruningBound,
+                    cutoff,
+                    true,
+                    cancellation,
+                )
             }
 
             private fun beginFragment(

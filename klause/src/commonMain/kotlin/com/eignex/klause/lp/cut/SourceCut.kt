@@ -161,19 +161,23 @@ private open class PreparedSourceCutInput(val source: SourceCut, val terms: Int,
         source.projectedPreparationUnits <= source.preparationExtent
 }
 
-private class PreparedSourceCutProjection(
-    val input: PreparedSourceCutInput,
-    val layout: CutColumnLayout,
-    cut: Cut,
-) : PreparedSourceCutInput(input.source, input.terms, input.bits) {
+private class PreparedSourceCutProjection(val input: PreparedSourceCutInput, val layout: CutColumnLayout, cut: Cut) :
+    PreparedSourceCutInput(input.source, input.terms, input.bits) {
     private val columns = cut.cols.copyOf()
     private val coefficients = cut.coeffs.copyOf()
     private val bound = cut.rhs
     override val projection: Boolean get() = true
     override val storageUnits: Long get() = source.projectedPreparationUnits
 
-    fun cut(proof: CutProvenance): Cut = Cut(columns, coefficients, source.relation, bound,
-        global = proof.global, provenance = proof, family = source.family)
+    fun cut(proof: CutProvenance): Cut = Cut(
+        columns,
+        coefficients,
+        source.relation,
+        bound,
+        global = proof.global,
+        provenance = proof,
+        family = source.family,
+    )
 }
 
 internal fun SourceCutPreparation.withoutProjection(): SourceCutPreparation =
@@ -207,9 +211,13 @@ internal class SourceCut(
         val ordered = definitions.values.distinct().sortedBy { it.identityKey }
         val canonical = ordered.withIndex().associate { it.value to CutSource(CutSourceKind.AUXILIARY, it.index) }
         val mapping = definitions.mapValues { requireNotNull(canonical[it.value]) }
-        listOf(key, provenance.model, provenance.facts.filter { !it.global }.mapTo(HashSet()) {
+        listOf(
+            key, provenance.model,
+            provenance.facts.filter { !it.global }.mapTo(HashSet()) {
             it.copy(premise = it.premise.remapSources(mapping))
-        }, provenance.assumptions, ordered)
+        },
+            provenance.assumptions, ordered
+        )
     }
 
     fun toCut(
@@ -222,14 +230,20 @@ internal class SourceCut(
         val prepared = (preparation as? PreparedSourceCutInput)?.takeIf {
             it.source === this && it.terms == limits.terms && it.bits == limits.bits
         }
-        val original = if (prepared != null) provenance else provenance.retainReferencedDefinitions(expression)
+        val original = if (prepared != null) {
+            provenance
+        } else {
+            provenance.retainReferencedDefinitions(expression)
             ?: return CutMapping.Declined(CutMappingDecline.MISSING_SOURCE)
+        }
         if (original.model !== map.model || !map.assumptions.containsAll(original.assumptions)) {
             return CutMapping.Declined(CutMappingDecline.MODEL_SCOPE)
         }
-        if (prepared == null && (expression.terms.size > limits.terms || !limits.accepts(original) ||
+        if (prepared == null && (
+            expression.terms.size > limits.terms || !limits.accepts(original) ||
                 !limits.accepts(rhs) || !limits.accepts(expression.constant) ||
-                expression.terms.values.any { !limits.accepts(it) })
+                expression.terms.values.any { !limits.accepts(it) }
+        )
         ) {
             return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
         }
@@ -300,7 +314,10 @@ internal class SourceCut(
             return CutMapping.Declined(CutMappingDecline.LONG_RANGE)
         }
         val conclusion = CutPremise.Row(expression, relation, rhs)
-        val proof = if (provenance.conclusion == conclusion && facts == provenance.facts) provenance else CutProvenance(
+        val proof = if (provenance.conclusion == conclusion && facts == provenance.facts) {
+            provenance
+        } else {
+            CutProvenance(
             map.model,
             provenance.epoch,
             facts,
@@ -310,6 +327,7 @@ internal class SourceCut(
             provenance.auxiliaryDefinitions,
             family,
         )
+        }
         if (proof !== original && !limits.accepts(proof)) return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
         val result = CutMapping.Mapped(
             Cut(
@@ -330,7 +348,11 @@ internal class SourceCut(
                 val input = (prepared as? PreparedSourceCutProjection)?.input ?: prepared
                     ?: PreparedSourceCutInput(this, limits.terms, limits.bits)
                 PreparedSourceCutProjection(input, layout, result.value)
-            } else if (prepared == null) PreparedSourceCutInput(this, limits.terms, limits.bits) else null
+            } else if (prepared == null) {
+                PreparedSourceCutInput(this, limits.terms, limits.bits)
+            } else {
+                null
+            }
             if (next != null) onPrepared(next)
         }
         return result
@@ -525,10 +547,14 @@ private class SourceCutMapper(
                             ),
                         )
                     }
-                    for (literal in premises.literalEntries()) facts.add(CutProofFact(
+                    for (literal in premises.literalEntries()) {
+                        facts.add(
+                            CutProofFact(
                         CutPremise.Literal(literal),
                         false,
-                    ))
+                    )
+                        )
+                    }
                 }
                 weightedRows.add(CutWeightedRow(rowFact, row.multiplier))
             }

@@ -17,7 +17,9 @@ internal class LiteralChannelRepair(
     private fun propose(variable: Int, target: Long, depth: Int, remaining: Int): Int {
         if (depth >= MAX_DEPTH || remaining <= 0 || target !in 0L..1L ||
             target !in state.rootDomains[variable] || !sink.allowsDefinedInt(variable)
-        ) return 0
+        ) {
+            return 0
+        }
         val network = state.invariants ?: return 0
         val channel = network.literalChannel(variable) ?: return 0
         val b = Lit.variable(channel.literal)
@@ -36,7 +38,9 @@ internal class LiteralChannelRepair(
     private fun proposePredicate(b: Int, desired: Boolean, depth: Int, remaining: Int): Int {
         if (depth >= MAX_DEPTH || remaining <= 0 || state.assumptions.isFrozenBool(b) ||
             !sink.allowsDefinedBool(b) || state.assignment.boolValue(b) == desired
-        ) return 0
+        ) {
+            return 0
+        }
         val network = state.invariants ?: return 0
         val literal = network.booleanLiteral(b)
         if (literal != null) {
@@ -64,10 +68,12 @@ internal class LiteralChannelRepair(
                 if (predicate.value == Long.MAX_VALUE) return 0
                 predicate.value + 1L
             }
+
             !desired && predicate.op == LinearOp.GE -> {
                 if (predicate.value == Long.MIN_VALUE) return 0
                 predicate.value - 1L
             }
+
             else -> predicate.value
         }
         if ((below && threshold < domain.min) || (!below && threshold > domain.max)) return 0

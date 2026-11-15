@@ -314,7 +314,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
 
         /** Bounded propositional opportunity scan; zero disables capture. */
         val rootRebuildCaptureVisits: ExecutionOption<Int> = ExecutionOption(
-            "root-rebuild-capture-visits", ValueKind.INT,
+            "root-rebuild-capture-visits",
+            ValueKind.INT,
         )
 
         /** Private Boolean work; -1 selects bounded automatic parity admission and zero disables it. */
@@ -328,17 +329,20 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
 
         /** Capture conditional binaries from consistent probes without changing failed-literal probing. */
         val rootProbeImplications: ExecutionOption<Boolean> = ExecutionOption(
-            "root-probe-implications", ValueKind.BOOLEAN,
+            "root-probe-implications",
+            ValueKind.BOOLEAN,
         )
 
         /** Skip global Native probes without a root fact or known binary propagation opportunity. */
         val rootProbeBinaryGate: ExecutionOption<Boolean> = ExecutionOption(
-            "root-probe-binary-gate", ValueKind.BOOLEAN,
+            "root-probe-binary-gate",
+            ValueKind.BOOLEAN,
         )
 
         /** Prefer learned Boolean General neighborhoods without root facts or known binaries. */
         val rootProbeGeneralGate: ExecutionOption<Boolean> = ExecutionOption(
-            "root-probe-general-gate", ValueKind.BOOLEAN,
+            "root-probe-general-gate",
+            ValueKind.BOOLEAN,
         )
 
         /** Maximum propagation work per root probe. */
@@ -346,27 +350,37 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
 
         /** Containing work ceiling for one scheduled simplification slice. */
         val inprocessingWork: ExecutionOption<Long> = ExecutionOption("inprocessing-work", ValueKind.LONG)
+
         /** Cheap root scan work ceiling. */
         val inprocessingRootWork: ExecutionOption<Long> = ExecutionOption("inprocessing-root-work", ValueKind.LONG)
+
         /** Non-inprocessing work between optional probing slices; zero follows the shared root trigger. */
         val inprocessingProbeInterval: ExecutionOption<Long> = ExecutionOption(
-            "inprocessing-probe-interval", ValueKind.LONG,
+            "inprocessing-probe-interval",
+            ValueKind.LONG,
         )
 
         /** Failed-literal probe work ceiling. */
         val inprocessingProbeWork: ExecutionOption<Long> = ExecutionOption("inprocessing-probe-work", ValueKind.LONG)
+
         /** Subsumption preparation and matching work ceiling. */
         val inprocessingSubsumeWork: ExecutionOption<Long> = ExecutionOption(
-            "inprocessing-subsume-work", ValueKind.LONG,
+            "inprocessing-subsume-work",
+            ValueKind.LONG,
         )
+
         /** Vivification work ceiling. */
         val inprocessingVivifyWork: ExecutionOption<Long> = ExecutionOption("inprocessing-vivify-work", ValueKind.LONG)
+
         /** Non-inprocessing work between safe-root opportunities; zero disables the trigger. */
         val inprocessingInterval: ExecutionOption<Long> = ExecutionOption("inprocessing-interval", ValueKind.LONG)
+
         /** Learned-clause growth between safe-root opportunities; zero disables the trigger. */
         val inprocessingGrowth: ExecutionOption<Int> = ExecutionOption("inprocessing-growth", ValueKind.INT)
+
         /** Non-inprocessing work required after a simplification attempt. */
         val inprocessingCooldown: ExecutionOption<Long> = ExecutionOption("inprocessing-cooldown", ValueKind.LONG)
+
         /** Non-inprocessing work after the first complete root before optional slices. */
         val inprocessingWarmupWork: ExecutionOption<Long> = ExecutionOption("inprocessing-warmup-work", ValueKind.LONG)
 
@@ -413,15 +427,19 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
 
         /** The `integer-row-learning` execution setting. */
         val integerRowLearning: ExecutionOption<Boolean> = ExecutionOption("integer-row-learning", ValueKind.BOOLEAN)
+
         /** Collect bounded propagation and explanation value diagnostics. */
         val propagationAttribution: ExecutionOption<Boolean> =
             ExecutionOption("propagation-attribution", ValueKind.BOOLEAN)
+
         /** Retry bounded historical Table explanations. */
         val historicalTableReasons: ExecutionOption<Boolean> =
             ExecutionOption("historical-table-reasons", ValueKind.BOOLEAN)
+
         /** Prefer lower measured propagation-family work with bounded queue bypasses. */
         val costAwarePropagation: ExecutionOption<Boolean> =
             ExecutionOption("cost-aware-propagation", ValueKind.BOOLEAN)
+
         /** Check known redundancy failures before reconstructing sibling historical reasons. */
         val reasonPreflight: ExecutionOption<Boolean> = ExecutionOption("reason-preflight", ValueKind.BOOLEAN)
 
@@ -731,11 +749,11 @@ class ExecutionOptions private constructor(
                 val eq = pair.indexOf('=')
                 if (eq <= 0) {
                     return ExecutionOptions(
-                    emptyMap(),
-                    "malformed engine param `$pair`; expected key=value",
-                    captured,
-                    false,
-                )
+                        emptyMap(),
+                        "malformed engine param `$pair`; expected key=value",
+                        captured,
+                        false,
+                    )
                 }
                 val key = pair.take(eq)
                 val value = pair.substring(eq + 1)
@@ -758,12 +776,12 @@ class ExecutionOptions private constructor(
                     OptionValue.Valid(Unit)
                 } else {
                     try {
-                    OptionValue.Valid(option.decode(EngineParams(key, value)))
-                } catch (failure: PipelineConfigException) {
-                    OptionValue.Invalid(requireNotNull(failure.message), configuration = true)
-                } catch (failure: IllegalArgumentException) {
-                    OptionValue.Invalid(requireNotNull(failure.message), configuration = false)
-                }
+                        OptionValue.Valid(option.decode(EngineParams(key, value)))
+                    } catch (failure: PipelineConfigException) {
+                        OptionValue.Invalid(requireNotNull(failure.message), configuration = true)
+                    } catch (failure: IllegalArgumentException) {
+                        OptionValue.Invalid(requireNotNull(failure.message), configuration = false)
+                    }
                 }
             }
             return ExecutionOptions(values, null, captured, false)

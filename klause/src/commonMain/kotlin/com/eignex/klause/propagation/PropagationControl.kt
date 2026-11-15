@@ -12,10 +12,16 @@ internal class PropagationControl(private val parent: ExecutionControl, private 
     override fun isCancelled(): Boolean = parent() || additional()
     override fun deadline() = parent.deadline().let { first ->
         val second = additional.deadline()
-        if (first == null) second else if (second == null || first <= second) first else second
+        if (first == null) second else if (second == null || first <= second) {
+            first
+        } else {
+            second
+        }
     }
 
-    override val admission get() = (nativeControl ?: (parent.withAccounting(owner) or additional).also {
+    override val admission get() = (
+        nativeControl ?: (parent.withAccounting(owner) or additional).also {
         nativeControl = it
-    }).admission
+    }
+    ).admission
 }

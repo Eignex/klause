@@ -3,11 +3,23 @@ package com.eignex.klause.propagation
 import com.eignex.klause.util.SharingMemoryObservation
 
 internal enum class LearnedRetirementStatus {
-    Captured, AlreadyOwned, Pending, Deferred, StaleSelection, Unsupported, ProtectedFloor,
-    Retired, AlreadyGone, Cancelled, ScopeReleased, Idle,
+    Captured,
+    AlreadyOwned,
+    Pending,
+    Deferred,
+    StaleSelection,
+    Unsupported,
+    ProtectedFloor,
+    Retired,
+    AlreadyGone,
+    Cancelled,
+    ScopeReleased,
+    Idle,
 }
 
-internal class LearnedRetirementScope { var active = true }
+internal class LearnedRetirementScope {
+    var active = true
+}
 
 internal class LearnedRetirementHandle internal constructor(internal val scope: LearnedRetirementScope) {
     internal var storedStatus = LearnedRetirementStatus.Captured
@@ -35,8 +47,13 @@ internal class LearnedRetirementRequests {
         var previous: Request? = null
         var next: Request? = null
     }
-    private class IndexNode(val key: Long, val bit: Int, var left: IndexNode? = null,
-        var right: IndexNode? = null, val request: Request? = null)
+    private class IndexNode(
+        val key: Long,
+        val bit: Int,
+        var left: IndexNode? = null,
+        var right: IndexNode? = null,
+        val request: Request? = null,
+    )
 
     private var scope = LearnedRetirementScope()
     private var first: Request? = null
@@ -90,8 +107,11 @@ internal class LearnedRetirementRequests {
             }
             val nodes = if (node == null) 1 else 2
             val requiredRetained = ownedBytes + 55L + nodes * 36L
-            if (requiredRetained > maxRetainedBytes) return result(LearnedRetirementStatus.Deferred, budget).copy(
-                minimumRetainedBytes = requiredRetained)
+            if (requiredRetained > maxRetainedBytes) {
+                return result(LearnedRetirementStatus.Deferred, budget).copy(
+                minimumRetainedBytes = requiredRetained,
+            )
+            }
             requiredWork = budget.work + 48L
             requiredScratch = 256L
             budget.visit(48L, 192L)
@@ -99,11 +119,20 @@ internal class LearnedRetirementRequests {
             val handle = LearnedRetirementHandle(scope)
             val request = Request(index, key, handle)
             val leaf = IndexNode(key, -1, request = request)
-            val replacement = if (node == null) leaf else if (key ushr differing and 1L != 0L) {
+            val replacement = if (node == null) {
+                leaf
+            } else if (key ushr differing and 1L != 0L) {
                 IndexNode(key, differing, node, leaf)
-            } else IndexNode(key, differing, leaf, node)
-            if (parent == null) indexRoot = replacement else if (right) parent.right = replacement
-            else parent.left = replacement
+            } else {
+                IndexNode(key, differing, leaf, node)
+            }
+            if (parent == null) {
+                indexRoot = replacement
+            } else if (right) {
+                parent.right = replacement
+            } else {
+                parent.left = replacement
+            }
             indexNodes += nodes
             request.previous = last
             last?.next = request
@@ -114,7 +143,9 @@ internal class LearnedRetirementRequests {
             result(LearnedRetirementStatus.Captured, budget, handle)
         } catch (_: ReclamationPreparation.Deferred) {
             result(LearnedRetirementStatus.Deferred, budget).copy(
-                minimumWork = requiredWork, minimumScratchBytes = requiredScratch)
+                minimumWork = requiredWork,
+                minimumScratchBytes = requiredScratch,
+            )
         }
     }
 
@@ -151,9 +182,11 @@ internal class LearnedRetirementRequests {
     ): LearnedRetirementResult = try {
         budget.visit(16L, 64L)
         budget.visit(0L)
-        if (!handle.scope.active) result(LearnedRetirementStatus.ScopeReleased, budget, handle)
-        else if (handle.scope !== scope) result(LearnedRetirementStatus.StaleSelection, budget, handle)
-        else {
+        if (!handle.scope.active) {
+            result(LearnedRetirementStatus.ScopeReleased, budget, handle)
+        } else if (handle.scope !== scope) {
+            result(LearnedRetirementStatus.StaleSelection, budget, handle)
+        } else {
             update()
             result(handle.storedStatus, budget, handle)
         }
@@ -178,14 +211,24 @@ internal class LearnedRetirementRequests {
                 return result(handle.storedStatus, budget, handle)
             }
             if (handle.storedStatus != LearnedRetirementStatus.Pending) {
-                return result(if (handle.storedStatus == LearnedRetirementStatus.Captured) {
+                return result(
+                    if (handle.storedStatus == LearnedRetirementStatus.Captured) {
                     LearnedRetirementStatus.Deferred
-                } else handle.storedStatus, budget, handle)
+                } else {
+                    handle.storedStatus
+                },
+                    budget, handle
+                )
             }
             val retired = if (request.index < 0) {
-                LearnedRetirementResult(LearnedRetirementStatus.AlreadyGone, payloadReleased = true,
-                    physicalReleased = true)
-            } else retire(request.index, budget)
+                LearnedRetirementResult(
+                    LearnedRetirementStatus.AlreadyGone,
+                    payloadReleased = true,
+                    physicalReleased = true,
+                )
+            } else {
+                retire(request.index, budget)
+            }
             if (terminal(retired.status)) {
                 handle.storedStatus = retired.status
                 handle.payloadReleased = retired.payloadReleased
@@ -221,8 +264,13 @@ internal class LearnedRetirementRequests {
             indexNodes--
         } else {
             val sibling = if (right) parent.left else parent.right
-            if (grandparent == null) indexRoot = sibling else if (parentRight) grandparent.right = sibling
-            else grandparent.left = sibling
+            if (grandparent == null) {
+                indexRoot = sibling
+            } else if (parentRight) {
+                grandparent.right = sibling
+            } else {
+                grandparent.left = sibling
+            }
             indexNodes -= 2
         }
     }
@@ -285,10 +333,14 @@ internal class LearnedRetirementRequests {
             request = request.next
         }
         indexMemory(indexRoot, sample)
-        sample.record(mapOf("selectedRetirementRequests" to count.toLong(),
+        sample.record(
+            mapOf(
+            "selectedRetirementRequests" to count.toLong(),
             "selectedRetirementPending" to pending.toLong(),
             "selectedRetirementTerminalOwners" to terminalOwners.toLong(),
-            "selectedRetirementOwnedBytes" to ownedBytes))
+            "selectedRetirementOwnedBytes" to ownedBytes,
+        )
+        )
     }
 
     private fun indexMemory(node: IndexNode?, sample: SharingMemoryObservation) {
@@ -300,15 +352,24 @@ internal class LearnedRetirementRequests {
         indexMemory(node.right, sample)
     }
 
-    private fun result(status: LearnedRetirementStatus, budget: ReclamationPreparation,
-        handle: LearnedRetirementHandle? = null): LearnedRetirementResult = LearnedRetirementResult(
-        status, handle, budget.work, handle?.payloadReleased == true,
-        handle?.physicalReleased == true, handle?.acknowledged == true,
+    private fun result(
+        status: LearnedRetirementStatus,
+        budget: ReclamationPreparation,
+        handle: LearnedRetirementHandle? = null,
+    ): LearnedRetirementResult = LearnedRetirementResult(
+        status,
+        handle,
+        budget.work,
+        handle?.payloadReleased == true,
+        handle?.physicalReleased == true,
+        handle?.acknowledged == true,
     )
 
     private fun terminal(status: LearnedRetirementStatus): Boolean = when (status) {
         LearnedRetirementStatus.Retired, LearnedRetirementStatus.AlreadyGone,
-        LearnedRetirementStatus.Cancelled, LearnedRetirementStatus.ScopeReleased -> true
+        LearnedRetirementStatus.Cancelled, LearnedRetirementStatus.ScopeReleased,
+        -> true
+
         else -> false
     }
 }

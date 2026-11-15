@@ -11,8 +11,10 @@ class LpQueryObservationTest {
     fun `exact query capture should reject an expired observation`() {
         val builder = LpBuilder()
         builder.addVar(0L, 3L, cost = 1L)
-        val query = LpQueryObservation(Any(), 1L, builder.build(Sense.MINIMIZE), false, 0L,
-            LpClaim.ATTAINED_OPTIMUM, 0.0, false, LpRefinementLimits(), LpPricingOptions(), false) { null }
+        val query = LpQueryObservation(
+            Any(), 1L, builder.build(Sense.MINIMIZE), false, 0L,
+            LpClaim.ATTAINED_OPTIMUM, 0.0, false, LpRefinementLimits(), LpPricingOptions(), false,
+        ) { null }
         query.release()
 
         assertFailsWith<IllegalStateException> {
@@ -27,8 +29,10 @@ class LpQueryObservationTest {
         builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
         val model = builder.build(Sense.MINIMIZE)
         val original = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
-        val query = LpQueryObservation(Any(), 1L, model, false, 0L,
-            LpClaim.ATTAINED_OPTIMUM, 0.0, false, LpRefinementLimits(), LpPricingOptions(), false) { original }
+        val query = LpQueryObservation(
+            Any(), 1L, model, false, 0L,
+            LpClaim.ATTAINED_OPTIMUM, 0.0, false, LpRefinementLimits(), LpPricingOptions(), false,
+        ) { original }
 
         val captured = assertNotNull(query.captureBasis())
         query.release()

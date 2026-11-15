@@ -64,7 +64,10 @@ internal class AbsPayload(val operand: Int, val result: Int)
 @Serializable
 internal class AffinePayload(
     val vars: IntArray,
-    val coefficients: List<@Serializable(with = BigIntSerializer::class) BigInt>,
+    val coefficients: List<
+        @Serializable(with = BigIntSerializer::class)
+        BigInt,
+        >,
     @Serializable(with = BigIntSerializer::class) val constant: BigInt,
 )
 
@@ -147,10 +150,16 @@ private fun GridCoordinatePayload.toCoordinate(): GridCoordinate = GridCoordinat
 
 private fun Power.payload(): PowerPayload = when (val coordinate = base) {
     is Power.Coordinate.Integer -> PowerPayload(
-        coordinate.id.index, exponent, (result as Power.Coordinate.Integer).id.index,
+        coordinate.id.index,
+        exponent,
+        (result as Power.Coordinate.Integer).id.index,
     )
+
     is Power.Coordinate.Real -> PowerPayload(
-        coordinate.id.index, exponent, (result as Power.Coordinate.Real).id.index, real = true,
+        coordinate.id.index,
+        exponent,
+        (result as Power.Coordinate.Real).id.index,
+        real = true,
     )
 }
 
@@ -211,13 +220,20 @@ internal fun arithmeticFactorCodecs(): List<FactorCodec<*, *>> = listOf(
         "realProduct",
         {
             RealProductPayload(
-                it.intOperand, it.realOperand, it.result,
-                it.realOperandLo.finiteOrNull(-1), it.realOperandHi.finiteOrNull(1),
+                it.intOperand,
+                it.realOperand,
+                it.result,
+                it.realOperandLo.finiteOrNull(-1),
+                it.realOperandHi.finiteOrNull(1),
             )
         },
         {
             RealProduct(
-                it.intOperand, it.realOperand, it.result, it.realLower.orInfinity(-1), it.realUpper.orInfinity(1),
+                it.intOperand,
+                it.realOperand,
+                it.result,
+                it.realLower.orInfinity(-1),
+                it.realUpper.orInfinity(1),
             )
         },
     ),
@@ -251,14 +267,26 @@ internal fun arithmeticFactorCodecs(): List<FactorCodec<*, *>> = listOf(
         "gridAbs",
         {
             GridAbsPayload(
-                it.operand, it.result, it.operandLower, it.operandUpper, it.operandBuckets,
-                it.resultLower, it.resultUpper, it.resultBuckets,
+                it.operand,
+                it.result,
+                it.operandLower,
+                it.operandUpper,
+                it.operandBuckets,
+                it.resultLower,
+                it.resultUpper,
+                it.resultBuckets,
             )
         },
         {
             GridAbs(
-                it.operand, it.result, it.operandLower, it.operandUpper, it.operandBuckets,
-                it.resultLower, it.resultUpper, it.resultBuckets,
+                it.operand,
+                it.result,
+                it.operandLower,
+                it.operandUpper,
+                it.operandBuckets,
+                it.resultLower,
+                it.resultUpper,
+                it.resultBuckets,
             )
         },
     ),

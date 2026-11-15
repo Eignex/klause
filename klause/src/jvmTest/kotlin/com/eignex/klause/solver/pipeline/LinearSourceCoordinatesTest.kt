@@ -33,7 +33,10 @@ class LinearSourceCoordinatesTest(private val realFirst: Boolean, private val ex
         @JvmStatic
         @Parameterized.Parameters(name = "realFirst={0}, exact={1}")
         fun variants(): List<Array<Boolean>> = listOf(
-            arrayOf(false, false), arrayOf(false, true), arrayOf(true, false), arrayOf(true, true),
+            arrayOf(false, false),
+            arrayOf(false, true),
+            arrayOf(true, false),
+            arrayOf(true, true),
         )
     }
 
@@ -45,21 +48,41 @@ class LinearSourceCoordinatesTest(private val realFirst: Boolean, private val ex
         val zColumn = 1 - xColumn
         val source = LinearSourceProblem(
             if (realFirst) listOf(z, x) else listOf(x, z),
-            listOf(LinearSourceRow(listOf(LinearSourceTerm(zColumn, SemanticRational.ONE),
-                LinearSourceTerm(xColumn, SemanticRational.ofLong(-3))),
-                SemanticRational.ofLong(2), SemanticRational.ofLong(2))),
+            listOf(
+                LinearSourceRow(
+                listOf(
+                    LinearSourceTerm(zColumn, SemanticRational.ONE),
+                    LinearSourceTerm(xColumn, SemanticRational.ofLong(-3)),
+                ),
+                SemanticRational.ofLong(2),
+                SemanticRational.ofLong(2),
+            )
+            ),
             LinearSourceObjective(listOf(LinearSourceTerm(zColumn, SemanticRational.ONE))),
-            SourceSemantics(SourceFormat.MPS, feasibilityTolerance = if (exact) SourceTolerance() else
-                SourceTolerance(absolute = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000)))).resolve(),
+            SourceSemantics(
+                SourceFormat.MPS,
+                feasibilityTolerance = if (exact) {
+                    SourceTolerance()
+                } else {
+                    SourceTolerance(absolute = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000)))
+                },
+            ).resolve(),
         )
 
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.FIXED,
+        )
+        )
         val plan = assertNotNull(invocation.preparedPlan)
         val working = invocation.finiteShape().problem
         val values = LongArray(2) { if (it == xColumn) 1 else 5 }
-        val checked = assertIs<LinearSourceCheck.Accepted>(assertNotNull(invocation.linearSource)
-            .check(Sample(booleanArrayOf(), values), ExecutionControl.Never))
+        val checked = assertIs<LinearSourceCheck.Accepted>(
+            assertNotNull(invocation.linearSource)
+                .check(Sample(booleanArrayOf(), values), ExecutionControl.Never),
+        )
 
         assertSame(source, plan.originalSource)
         assertEquals(exact, assertNotNull(invocation.linearSource).claimsCoverTolerance)
@@ -72,12 +95,20 @@ class LinearSourceCoordinatesTest(private val realFirst: Boolean, private val ex
         assertEquals(2L, working.intBounds.lower(zColumn))
         assertEquals(5L, working.intBounds.upper(zColumn))
         assertEquals(xColumn, plan.integerCoordinate(0))
-        assertEquals(SourceCoordinate(SourceCoordinate.Kind.Integer, zColumn),
-            plan.workingCoordinate(SourceCoordinate(SourceCoordinate.Kind.Real, 0)))
+        assertEquals(
+            SourceCoordinate(SourceCoordinate.Kind.Integer, zColumn),
+            plan.workingCoordinate(SourceCoordinate(SourceCoordinate.Kind.Real, 0)),
+        )
         assertFailsWith<IllegalArgumentException> { plan.realCoordinate(0) }
         assertNull(plan.sourceCoordinates(ExecutionControl.Never))
-        assertEquals(if (realFirst) listOf(BigFraction.ofLong(5), BigFraction.ONE) else
-            listOf(BigFraction.ONE, BigFraction.ofLong(5)), checked.witness.values)
+        assertEquals(
+            if (realFirst) {
+                listOf(BigFraction.ofLong(5), BigFraction.ONE)
+            } else {
+                listOf(BigFraction.ONE, BigFraction.ofLong(5))
+            },
+            checked.witness.values,
+        )
         assertEquals(BigFraction.ofLong(5), checked.witness.objective)
     }
 }

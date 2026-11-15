@@ -34,7 +34,11 @@ class Assignment private constructor(
     private val reals: DoubleArray,
 ) {
     constructor(numBoolVars: Int, numIntVars: Int, numRealVars: Int = 0) : this(
-        numBoolVars, numIntVars, numRealVars, Bits(numBoolVars), LongArray(numIntVars),
+        numBoolVars,
+        numIntVars,
+        numRealVars,
+        Bits(numBoolVars),
+        LongArray(numIntVars),
         if (numRealVars == 0) emptyDoubleArray() else DoubleArray(numRealVars),
     )
 
@@ -194,8 +198,9 @@ class Sample private constructor(
 
     internal fun withSourceSemantics(semantics: EffectiveSourceSemantics): Sample {
         val previous = this.semantics
-        require(previous == null ||
-            (previous.declared == semantics.declared && previous.effective == semantics.effective)
+        require(
+            previous == null ||
+                (previous.declared == semantics.declared && previous.effective == semantics.effective),
         ) {
             "sample belongs to a different source interpretation"
         }
@@ -205,8 +210,10 @@ class Sample private constructor(
 
     /** Certified real values indexed by real variable id, when a residual LP supplied them. */
     val exactReals: List<BigFraction>? = exactReals?.let { snapshotValues(it) }
+
     /** Exact rational or algebraic coordinates certified by a polynomial theory component. */
     val algebraicReals: List<AlgebraicReal>? = algebraicReals?.let { snapshotValues(it) }
+
     /** Authoritative exact real expression coordinates, when supplied by a source owner. */
     val symbolicReals: List<ExactRealValue>? = symbolicReals?.let { snapshotValues(it) }
     private val approximateReals = if (owned) reals else reals.copyOf()
@@ -223,9 +230,11 @@ class Sample private constructor(
     init {
         this.exactInts?.let { values ->
             if (values.all { it.fitsLong() }) {
-                require(values.size == integerValues.size && values.indices.all {
+                require(
+                    values.size == integerValues.size && values.indices.all {
                     values[it].toLongExact() == integerValues[it]
-                }) { "exact and finite integer coordinates differ" }
+                }
+                ) { "exact and finite integer coordinates differ" }
             } else {
                 require(integerValues.isEmpty()) { "a wide witness has no finite integer coordinates" }
             }
@@ -294,9 +303,15 @@ class Sample private constructor(
             symbolicReals == other.symbolicReals
     }
     override fun hashCode(): Int =
-        31 * (31 * (31 * (31 * (31 * booleanValues.contentHashCode() + integerValues.contentHashCode()) +
-            (exactInts?.hashCode() ?: 0)) + approximateReals.contentHashCode()) +
-            (exactReals?.hashCode() ?: 0)) + (algebraicReals?.hashCode() ?: 0) + 31 * (symbolicReals?.hashCode() ?: 0)
+        31 * (
+            31 * (
+                31 * (
+                    31 * (31 * booleanValues.contentHashCode() + integerValues.contentHashCode()) +
+            (exactInts?.hashCode() ?: 0)
+                ) + approximateReals.contentHashCode()
+            ) +
+            (exactReals?.hashCode() ?: 0)
+        ) + (algebraicReals?.hashCode() ?: 0) + 31 * (symbolicReals?.hashCode() ?: 0)
 
     /** Authoritative integer coordinate, widened on demand for finite samples. */
     fun exactIntValue(id: Int): BigInt = exactInts?.get(id) ?: bigIntOf(integerValues[id])

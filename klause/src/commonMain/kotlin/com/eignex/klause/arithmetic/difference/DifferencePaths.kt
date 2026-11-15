@@ -1,6 +1,7 @@
 package com.eignex.klause.arithmetic.difference
 
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.IntArrayList
 
 internal enum class DifferencePathCompletion { Completed, Abandoned, Declined }
@@ -26,9 +27,10 @@ internal class DifferencePathScratch(size: Int) {
     private var stamp = 0
 
     fun begin(source: Int, endpoints: IntArray, stop: ExecutionControl): Int {
+        val accounting = stop.accounting
         completion = DifferencePathCompletion.Declined
         if (stamp == Int.MAX_VALUE) {
-            stop.charge(reached.size * 3L)
+            accounting?.charge(reached.size * 3L)
             reached.fill(0)
             settled.fill(0)
             needed.fill(0)
@@ -38,7 +40,7 @@ internal class DifferencePathScratch(size: Int) {
         origin = source
         var pending = 0
         for (node in endpoints) {
-            stop.charge(1)
+            accounting?.charge(1)
             if (needed[node] == stamp) continue
             needed[node] = stamp
             pending++
@@ -58,24 +60,27 @@ internal class DifferencePathScratch(size: Int) {
 
     fun settled(node: Int): Boolean = settled[node] == stamp
     fun reached(node: Int): Boolean = reached[node] == stamp
-    fun reach(node: Int) { reached[node] = stamp }
+    fun reach(node: Int) {
+        reached[node] = stamp
+    }
 
     @Suppress("ReturnCount")
     fun pathTo(node: Int, source: IntArray, stop: ExecutionControl = ExecutionControl.Never): IntArray? {
         if (completion != DifferencePathCompletion.Completed || !settled(node)) return null
-        stop.charge(predecessor.size.toLong())
+        val accounting = stop.accounting
+        accounting?.charge(predecessor.size.toLong())
         if (stop()) return null
         val path = IntArrayList()
         var current = node
         while (current != origin) {
-            stop.charge(1)
+            accounting?.charge(1)
             if (stop() || path.size >= predecessor.size) return null
             val edge = predecessor[current]
             if (edge !in source.indices) return null
             path.add(edge)
             current = source[edge]
         }
-        stop.charge(path.size.toLong())
+        accounting?.charge(path.size.toLong())
         return if (stop()) null else path.toIntArray()
     }
 }
@@ -98,14 +103,15 @@ internal fun differenceShortestPaths(
     stop: ExecutionControl = ExecutionControl.Never,
     skipped: BooleanArray? = null,
 ): DifferencePathCompletion {
+    val accounting = stop.accounting
     var pending = scratch.begin(origin, needed, stop)
     while (!scratch.heap.isEmpty() && pending > 0) {
         if (stop()) return DifferencePathCompletion.Abandoned.also { scratch.completion = it }
-        stop.charge(1)
+        accounting?.charge(1)
         val source = scratch.heap.pop(stop)
         if (scratch.settle(source)) pending--
         for (visit in edges.adjacencyStart[source] until edges.adjacencyStart[source + 1]) {
-            stop.charge(1)
+            accounting?.charge(1)
             if (stop()) return DifferencePathCompletion.Abandoned.also { scratch.completion = it }
             val edge = edges.adjacencyEdge[visit]
             if (!active[edge] || skipped?.get(edge) == true) continue
@@ -158,17 +164,18 @@ internal class DifferenceLongHeap(capacity: Int) {
 
     fun push(id: Int, key: Long, stop: ExecutionControl = ExecutionControl.Never) {
         val p = pos[id]
+        if (p >= 0 && key >= keys[id]) return
+        val accounting = if (stop === ExecutionControl.Never) null else stop.accounting
         if (p >= 0) {
-            if (key >= keys[id]) return
             keys[id] = key
-            siftUp(p, stop)
+            siftUp(p, accounting)
             return
         }
         keys[id] = key
         heap[size] = id
         pos[id] = size
         size++
-        siftUp(size - 1, stop)
+        siftUp(size - 1, accounting)
     }
 
     fun pop(stop: ExecutionControl = ExecutionControl.Never): Int {
@@ -178,15 +185,15 @@ internal class DifferenceLongHeap(capacity: Int) {
         if (size > 0) {
             heap[0] = heap[size]
             pos[heap[0]] = 0
-            siftDown(0, stop)
+            siftDown(0, if (stop === ExecutionControl.Never) null else stop.accounting)
         }
         return top
     }
 
-    private fun siftUp(start: Int, stop: ExecutionControl) {
+    private fun siftUp(start: Int, accounting: WorkMeter?) {
         var i = start
         while (i > 0) {
-            stop.charge(1)
+            accounting?.charge(1)
             val parent = (i - 1) / 2
             if (keys[heap[parent]] <= keys[heap[i]]) break
             swap(i, parent)
@@ -194,10 +201,10 @@ internal class DifferenceLongHeap(capacity: Int) {
         }
     }
 
-    private fun siftDown(start: Int, stop: ExecutionControl) {
+    private fun siftDown(start: Int, accounting: WorkMeter?) {
         var i = start
         while (true) {
-            stop.charge(1)
+            accounting?.charge(1)
             val left = 2 * i + 1
             if (left >= size) break
             val right = left + 1

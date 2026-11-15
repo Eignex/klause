@@ -16,7 +16,9 @@ internal class BoundedCompanionSearch(
     private val activeLimit: Duration = 4_000.milliseconds,
     private val sliceLimit: Duration = 250.milliseconds,
     private val clock: TimeSource = TimeSource.Monotonic,
-) : InstructionSlicedSearch, ReseedGuard, ResumableSearch by search {
+) : InstructionSlicedSearch,
+    ReseedGuard,
+    ResumableSearch by search {
     private var active = Duration.ZERO
     private var terminal: MinimizeResult? = null
     private var retired = false
@@ -33,8 +35,11 @@ internal class BoundedCompanionSearch(
             "${prefix}Optimal" to if (terminal is MinimizeResult.Optimal) 1L else 0L,
             "${prefix}Refuted" to if (terminal is MinimizeResult.Infeasible) 1L else 0L,
         )
-        original.copy(smt = original.smt.copy(
-            completeSearchStages = original.smt.completeSearchStages.orEmpty() + stages))
+        original.copy(
+            smt = original.smt.copy(
+            completeSearchStages = original.smt.completeSearchStages.orEmpty() + stages,
+        )
+        )
     }
 
     override fun runSlice(
@@ -67,8 +72,13 @@ internal class BoundedCompanionSearch(
         }
         val mark = clock.markNow()
         try {
-            terminal = run(minOf(sliceMillis, sliceLimit.inWholeMilliseconds,
-                (activeLimit - active).inWholeMilliseconds.coerceAtLeast(1)))
+            terminal = run(
+                minOf(
+                sliceMillis,
+                sliceLimit.inWholeMilliseconds,
+                (activeLimit - active).inWholeMilliseconds.coerceAtLeast(1),
+            )
+            )
         } finally {
             active += mark.elapsedNow()
         }

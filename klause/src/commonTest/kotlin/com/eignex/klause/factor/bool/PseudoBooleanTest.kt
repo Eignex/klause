@@ -40,8 +40,12 @@ class PseudoBooleanTest {
 
     @Test
     fun `pseudo Boolean sums outside Long range should retain exact source constants`() {
-        val factor = PseudoBoolean(longArrayOf(Long.MAX_VALUE, 1),
-            intArrayOf(Lit.make(0, true), Lit.make(1, true)), PbOp.LE, 0)
+        val factor = PseudoBoolean(
+            longArrayOf(Long.MAX_VALUE, 1),
+            intArrayOf(Lit.make(0, true), Lit.make(1, true)),
+            PbOp.LE,
+            0,
+        )
 
         assertEquals(bigIntOf(Long.MAX_VALUE), factor.constants.exactCoeff(0))
         assertEquals(bigIntOf(1), factor.constants.exactCoeff(1))
@@ -50,8 +54,12 @@ class PseudoBooleanTest {
     @Test
     fun `wide remapping should preserve exact weights and their literal roles`() {
         val wide = parseBigInt("18446744073709551616")
-        val factor = PseudoBoolean(arrayOf(wide, bigIntOf(-2)),
-            intArrayOf(Lit.make(0, true), Lit.make(1, false)), PbOp.GE, wide)
+        val factor = PseudoBoolean(
+            arrayOf(wide, bigIntOf(-2)),
+            intArrayOf(Lit.make(0, true), Lit.make(1, false)),
+            PbOp.GE,
+            wide,
+        )
         val mapping = VarRemap(intArrayOf(1, 1), intArrayOf())
 
         val mapped = assertIs<PseudoBoolean>(factor.remap(mapping))
@@ -59,8 +67,15 @@ class PseudoBooleanTest {
         assertEquals(wide, mapped.constants.exactCoeff(0))
         assertContentEquals(intArrayOf(Lit.make(1, true), Lit.make(1, false)), mapped.literals)
         assertEquals(mapped.structuralKey().hashCode(), factor.remapStructuralHash(mapping))
-        assertNotEquals(factor.structuralKey(), PseudoBoolean(arrayOf(wide, bigIntOf(-2)),
-            factor.literals, PbOp.GE, bigIntOf(0)).structuralKey())
+        assertNotEquals(
+            factor.structuralKey(),
+            PseudoBoolean(
+            arrayOf(wide, bigIntOf(-2)),
+            factor.literals,
+            PbOp.GE,
+            bigIntOf(0),
+        ).structuralKey()
+        )
     }
 
     @Test

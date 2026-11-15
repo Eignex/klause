@@ -48,8 +48,12 @@ internal fun LpEngine.prepareRootComponentOrder(
                 noteNodeOverhead(preparationWork)
             }
         }
-        sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ORDER", outcome,
-            started.elapsedNow().inWholeNanoseconds, preparationWork)
+        sink.lp.observePrimalPhase(
+            "PRIMAL_COMPONENT_ORDER",
+            outcome,
+            started.elapsedNow().inWholeNanoseconds,
+            preparationWork,
+        )
     }
     if (rootPrimalTargets !== targets || cancellation()) return null
     return targets.components
@@ -108,13 +112,16 @@ internal fun LpEngine.retainRootComponentValues(
         values.known[order.members[start]] = true
         outcome = "RETAINED"
     } finally {
-        sink.lp.observePrimalPhase("PRIMAL_COMPONENT_VALUES", outcome,
-            started.elapsedNow().inWholeNanoseconds, totalSolveWork() - before)
+        sink.lp.observePrimalPhase(
+            "PRIMAL_COMPONENT_VALUES",
+            outcome,
+            started.elapsedNow().inWholeNanoseconds,
+            totalSolveWork() - before,
+        )
     }
 }
 
-internal fun rootComponentPreparationBytes(variables: Int): Long =
-    512L + (6L * variables + 2L) * Int.SIZE_BYTES
+internal fun rootComponentPreparationBytes(variables: Int): Long = 512L + (6L * variables + 2L) * Int.SIZE_BYTES
 
 internal fun rootComponentOrder(
     problem: Problem,

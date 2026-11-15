@@ -23,10 +23,12 @@ internal fun Compiler.Builder.assert(top: SExpr) {
     while (work.isNotEmpty()) {
         var node = when (val frame = work.removeLast()) {
             is AssertionFrame.Visit -> frame.expression
+
             is AssertionFrame.PopScope -> {
                 popLetScope()
                 continue
             }
+
             is AssertionFrame.RestoreBindings -> {
                 bindingScope = frame.scope
                 continue

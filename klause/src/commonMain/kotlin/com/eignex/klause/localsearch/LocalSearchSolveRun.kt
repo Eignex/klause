@@ -22,7 +22,8 @@ internal class LocalSearchSolveRun(
     control: LocalSearchRunControl,
     release: () -> Unit,
     private val semantics: EffectiveSourceSemantics,
-) : LocalSearchRun<SolveResult>(sink, control, release), InstructionSlicedSolve {
+) : LocalSearchRun<SolveResult>(sink, control, release),
+    InstructionSlicedSolve {
     override val work: Long get() = control.work
     override val auxiliaryWork: Long get() = control.auxiliaryWork
 

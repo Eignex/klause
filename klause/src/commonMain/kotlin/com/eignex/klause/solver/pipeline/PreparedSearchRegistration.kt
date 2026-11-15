@@ -86,8 +86,11 @@ internal class SearchComponentOpening(
                         outcome(HintIndexOutcome.STOPPED)
                         return SearchCandidateHints.None
                     }
-                    component.partialPointHints(cancellation, defaultOpening = true,
-                        defaultGraphSelections = selections)?.second.also {
+                    component.partialPointHints(
+                        cancellation,
+                        defaultOpening = true,
+                        defaultGraphSelections = selections,
+                    )?.second.also {
                         if (it != null) component.useDefaultDisjunctionHints()
                     }
                 } else {
@@ -118,8 +121,16 @@ internal class SearchComponentOpening(
                 if (factor is Clause) clauses += factor
             }
             accounted = true
-            val compiled = SourceConjunctionHints.create(clauses, source.numBoolVars, variables, hints, cancellation,
-                usage = smtStats?.hintUsage, available = pointAvailable, knownBool = knownBool)
+            val compiled = SourceConjunctionHints.create(
+                clauses,
+                source.numBoolVars,
+                variables,
+                hints,
+                cancellation,
+                usage = smtStats?.hintUsage,
+                available = pointAvailable,
+                knownBool = knownBool,
+            )
             if (compiled != null) {
                 own(compiled)
                 return if (primitiveHintFlips == 0L) SearchCandidateHints.None else compiled
@@ -204,7 +215,10 @@ internal class PreparedSearchRegistrations(
                 components
             }
             session = SearchComponentSet(installed, proposals = opening.branchProposals()).session(
-                maxChecks, cancellation, learnedDb, SearchAtomRegistry(boolCount),
+                maxChecks,
+                cancellation,
+                learnedDb,
+                SearchAtomRegistry(boolCount),
             )
             if (arithmetic.size > 1) {
                 val owners = registrations.indices.flatMap { index ->
@@ -221,9 +235,12 @@ internal class PreparedSearchRegistrations(
                 cp,
                 theory,
                 resources,
-                opening.candidateHints(source, theory.takeIf {
+                opening.candidateHints(
+                    source,
+                    theory.takeIf {
                     arithmetic.size == 1 && (source.numRealVars > 0 || source.numIntVars > 0)
-                }),
+                }
+                ),
             )
         } catch (failure: Throwable) {
             resources.closeAfter(failure)

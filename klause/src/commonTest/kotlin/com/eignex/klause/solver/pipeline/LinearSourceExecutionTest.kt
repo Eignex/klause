@@ -46,19 +46,39 @@ class LinearSourceExecutionTest {
     @Test
     fun `finite companions should retain finite source completion when numerical funding is disabled`() {
         val source = LinearSourceProblem(
-            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
-                LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE)),
-            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE),
-                LinearSourceTerm(1, SemanticRational.ONE)),
-                lower = SemanticRational.of(BIG_ONE, bigIntOf(2)))),
+            listOf(
+                LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
+                LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
+            ),
+            listOf(
+                LinearSourceRow(
+                listOf(
+                    LinearSourceTerm(0, SemanticRational.ONE),
+                    LinearSourceTerm(1, SemanticRational.ONE),
+                ),
+                lower = SemanticRational.of(BIG_ONE, bigIntOf(2)),
+            )
+            ),
             LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.MIXED,
+        )
+        )
         assertIs<SourceProblemRoute.Finite>(invocation.route)
 
-        val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(invocation,
-            ExecutionOptions(ExecutionOption.sourceLpWorkLimit(0)), presolveConfig = PresolveConfig.NONE)))
+        val result = assertIs<SourceExecutionResult.Finite>(
+            SourceSetup.execute(
+                SourceExecutionRequest(
+            invocation,
+            ExecutionOptions(ExecutionOption.sourceLpWorkLimit(0)),
+            presolveConfig = PresolveConfig.NONE,
+        )
+            )
+        )
 
         assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
         assertEquals(BigFraction.ZERO, result.linearSource?.incumbent?.objective)
@@ -70,24 +90,52 @@ class LinearSourceExecutionTest {
     fun `linear source finite companions should consume checked numerical completion`() {
         for (sense in ObjectiveSense.entries) {
             val source = LinearSourceProblem(
-                listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
-                    LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE)),
-                listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE),
-                    LinearSourceTerm(1, SemanticRational.ONE)),
-                    lower = SemanticRational.of(BIG_ONE, bigIntOf(2)))),
-                LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE),
-                    LinearSourceTerm(1, SemanticRational.ONE)), sense = sense),
+                listOf(
+                    LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
+                    LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
+                ),
+                listOf(
+                    LinearSourceRow(
+                    listOf(
+                        LinearSourceTerm(0, SemanticRational.ONE),
+                        LinearSourceTerm(1, SemanticRational.ONE),
+                    ),
+                    lower = SemanticRational.of(BIG_ONE, bigIntOf(2)),
+                )
+                ),
+                LinearSourceObjective(
+                    listOf(
+                    LinearSourceTerm(0, SemanticRational.ONE),
+                    LinearSourceTerm(1, SemanticRational.ONE),
+                ),
+                    sense = sense
+                ),
             )
-            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-                ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
-                maximize = sense == ObjectiveSense.MAXIMIZE))
+            val invocation = SourceSetup.prepare(
+                SourceSetupRequest(
+                SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.MIXED,
+                maximize = sense == ObjectiveSense.MAXIMIZE,
+            )
+            )
 
-            val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(
-                invocation, ExecutionOptions(), presolveConfig = PresolveConfig.NONE)))
+            val result = assertIs<SourceExecutionResult.Finite>(
+                SourceSetup.execute(
+                    SourceExecutionRequest(
+                invocation,
+                ExecutionOptions(),
+                presolveConfig = PresolveConfig.NONE,
+            )
+                )
+            )
 
             assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
-            val expected = if (sense == ObjectiveSense.MAXIMIZE) BigFraction.ofLong(2)
-                else BigFraction.of(BIG_ONE, bigIntOf(2))
+            val expected = if (sense == ObjectiveSense.MAXIMIZE) {
+                BigFraction.ofLong(2)
+            } else {
+                BigFraction.of(BIG_ONE, bigIntOf(2))
+            }
             assertEquals(expected, result.linearSource?.incumbent?.objective)
             val completed = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
             assertEquals(1L, completed.stats.smt.completeSearchStages?.get("finiteNumericalCompanionOptimal"))
@@ -97,23 +145,38 @@ class LinearSourceExecutionTest {
     @Test
     fun `nonzero numerical underflow should decline the linear source`() {
         val tiny = SemanticRational.of(BIG_ONE, parseBigInt("1" + "0".repeat(400)))
-        for (tolerance in listOf(SourceTolerance(), SourceTolerance(
+        for (tolerance in listOf(
+            SourceTolerance(),
+            SourceTolerance(
             absolute = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000)),
             relative = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000)),
-        ))) {
+        )
+        )) {
             val source = LinearSourceProblem(
                 listOf(LinearSourceVariable("x", false, SemanticRational.ZERO, SemanticRational.ONE)),
-                listOf(LinearSourceRow(listOf(LinearSourceTerm(0, tiny)),
-                    lower = SemanticRational.of(BIG_ONE, bigIntOf(10)))),
+                listOf(
+                    LinearSourceRow(
+                    listOf(LinearSourceTerm(0, tiny)),
+                    lower = SemanticRational.of(BIG_ONE, bigIntOf(10)),
+                )
+                ),
                 LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
                 SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance).resolve(),
             )
-            val invocation = SourceSetup.prepare(SourceSetupRequest(
-                SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
-            ))
+            val invocation = SourceSetup.prepare(
+                SourceSetupRequest(
+                SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.MIXED,
+            )
+            )
 
-            val result = SourceSetup.execute(SourceExecutionRequest(invocation,
-                finiteRequest = { error("a wide source row cannot construct a finite consumer") }))
+            val result = SourceSetup.execute(
+                SourceExecutionRequest(
+                invocation,
+                finiteRequest = { error("a wide source row cannot construct a finite consumer") },
+            )
+            )
 
             assertEquals(SourceExecutionKind.LINEAR, SourceSetup.executionKind(invocation))
             assertEquals(TerminationReason.Unsupported, assertIs<SourceExecutionResult.Declined>(result).reason)
@@ -124,20 +187,36 @@ class LinearSourceExecutionTest {
     @Test
     fun `an integral real backing should reconstruct an optimized original source point`() {
         val source = LinearSourceProblem(
-            listOf(LinearSourceVariable("z", false),
-                LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE)),
-            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE),
-                LinearSourceTerm(1, SemanticRational.ofLong(-3))),
-                SemanticRational.ofLong(2), SemanticRational.ofLong(2))),
-            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE)),
-                sense = ObjectiveSense.MAXIMIZE),
+            listOf(
+                LinearSourceVariable("z", false),
+                LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
+            ),
+            listOf(
+                LinearSourceRow(
+                listOf(
+                    LinearSourceTerm(0, SemanticRational.ONE),
+                    LinearSourceTerm(1, SemanticRational.ofLong(-3)),
+                ),
+                SemanticRational.ofLong(2),
+                SemanticRational.ofLong(2),
+            )
+            ),
+            LinearSourceObjective(
+                listOf(LinearSourceTerm(0, SemanticRational.ONE)),
+                sense = ObjectiveSense.MAXIMIZE,
+            ),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK,
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.BACKTRACK,
             maximize = true,
-        ))
+        )
+        )
 
-        val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
+        val result = SourceSetup.execute(
+            SourceExecutionRequest(invocation, finiteRequest = { shape ->
             FiniteSolveRequest(
                 shape, FiniteEngine.BACKTRACK, PresolveConfig(), false, false, ExecutionControl.Never,
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
@@ -147,7 +226,8 @@ class LinearSourceExecutionTest {
                 solveBudgetMillis = null, allSolutions = false, solutionCap = null,
                 deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
             )
-        }))
+        })
+        )
 
         val finite = assertIs<SourceExecutionResult.Finite>(result)
         val completed = assertIs<FiniteSolveOutcome.Completed>(finite.result.outcome)
@@ -167,15 +247,23 @@ class LinearSourceExecutionTest {
     fun `a complete finite portfolio should certify an embedded original objective`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("n", true, SemanticRational.ZERO, SemanticRational.ofLong(2))),
-            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE)),
-                sense = ObjectiveSense.MAXIMIZE),
+            emptyList(),
+            LinearSourceObjective(
+                listOf(LinearSourceTerm(0, SemanticRational.ONE)),
+                sense = ObjectiveSense.MAXIMIZE,
+            ),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK,
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.BACKTRACK,
             maximize = true,
-        ))
+        )
+        )
 
-        val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
+        val result = SourceSetup.execute(
+            SourceExecutionRequest(invocation, finiteRequest = { shape ->
             FiniteSolveRequest(
                 shape, FiniteEngine.BACKTRACK, PresolveConfig.NONE, false, false, ExecutionControl.Never,
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
@@ -185,7 +273,8 @@ class LinearSourceExecutionTest {
                 solveBudgetMillis = null, allSolutions = false, solutionCap = null,
                 deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
             )
-        }))
+        })
+        )
 
         val finite = assertIs<SourceExecutionResult.Finite>(result)
         val outcome = assertIs<FiniteSolveOutcome.Completed>(finite.result.outcome)
@@ -199,18 +288,33 @@ class LinearSourceExecutionTest {
     fun `declining optional bound closure should retain open linear source execution`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("n", true, SemanticRational.ZERO)),
-            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE)),
-                upper = SemanticRational.ofLong(5))),
-            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE)),
-                sense = ObjectiveSense.MAXIMIZE),
+            listOf(
+                LinearSourceRow(
+                listOf(LinearSourceTerm(0, SemanticRational.ONE)),
+                upper = SemanticRational.ofLong(5),
+            )
+            ),
+            LinearSourceObjective(
+                listOf(LinearSourceTerm(0, SemanticRational.ONE)),
+                sense = ObjectiveSense.MAXIMIZE,
+            ),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
-            maximize = true, boundCancellation = ExecutionControl { true },
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.FIXED,
+            maximize = true,
+            boundCancellation = ExecutionControl { true },
+        )
+        )
 
-        val result = SourceSetup.execute(SourceExecutionRequest(invocation,
-            finiteRequest = { error("declined closure installed finite execution") }))
+        val result = SourceSetup.execute(
+            SourceExecutionRequest(
+            invocation,
+            finiteRequest = { error("declined closure installed finite execution") },
+        )
+        )
 
         assertIs<SourceExecutionResult.Linear>(result)
         val outcome = assertNotNull(result.linearSource)
@@ -222,15 +326,24 @@ class LinearSourceExecutionTest {
     fun `zero source tolerance should retain an exact one sided real optimum`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", false)),
-            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ofLong(10))),
-                lower = SemanticRational.ONE)),
+            listOf(
+                LinearSourceRow(
+                listOf(LinearSourceTerm(0, SemanticRational.ofLong(10))),
+                lower = SemanticRational.ONE,
+            )
+            ),
             LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.FIXED,
+        )
+        )
 
-        val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
+        val result = SourceSetup.execute(
+            SourceExecutionRequest(invocation, finiteRequest = { shape ->
             FiniteSolveRequest(
                 shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
@@ -239,7 +352,8 @@ class LinearSourceExecutionTest {
                 solveBudgetMillis = null, allSolutions = false, solutionCap = null,
                 deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
             )
-        }))
+        })
+        )
 
         val outcome = assertNotNull(result.linearSource)
         assertEquals(LinearSourceConclusion.OPTIMAL, outcome.conclusion)
@@ -251,16 +365,25 @@ class LinearSourceExecutionTest {
     fun `an extra exact source filter should remain separate from optimum permission`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", false)),
-            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ofLong(10))),
-                lower = SemanticRational.ONE)),
+            listOf(
+                LinearSourceRow(
+                listOf(LinearSourceTerm(0, SemanticRational.ofLong(10))),
+                lower = SemanticRational.ONE,
+            )
+            ),
             LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.FIXED,
+        )
+        )
         var checked = 0
 
-        val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
+        val result = SourceSetup.execute(
+            SourceExecutionRequest(invocation, finiteRequest = { shape ->
             FiniteSolveRequest(
                 shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
@@ -268,9 +391,13 @@ class LinearSourceExecutionTest {
                 zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
                 solveBudgetMillis = null, allSolutions = false, solutionCap = null,
                 deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
-                toleranceCheck = { checked++; true },
+                toleranceCheck = {
+                    checked++;
+                    true
+                },
             )
-        }))
+        })
+        )
 
         val outcome = assertNotNull(result.linearSource)
         assertTrue(checked > 0)
@@ -289,18 +416,18 @@ class LinearSourceExecutionTest {
             ),
             listOf(
                 LinearSourceRow(
-                listOf(LinearSourceTerm(1, SemanticRational.ofLong(3))),
-                lower = SemanticRational.ONE,
-                upper = SemanticRational.ONE,
-            )
+                    listOf(LinearSourceTerm(1, SemanticRational.ofLong(3))),
+                    lower = SemanticRational.ONE,
+                    upper = SemanticRational.ONE,
+                ),
             ),
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.FIXED,
-        )
+                SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.FIXED,
+            ),
         )
         val exact = BigFraction.ofLong(3).reciprocal()
         val sample = Sample(
@@ -606,29 +733,29 @@ class LinearSourceExecutionTest {
             SourceSemantics(
                 SourceFormat.MPS,
                 feasibilityTolerance = SourceTolerance(
-                absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
-            )
+                    absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
+                ),
             ).resolve(),
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.FIXED,
-        )
+                SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.FIXED,
+            ),
         )
 
         val result = SourceSetup.execute(
             SourceExecutionRequest(invocation, finiteRequest = { shape ->
-            FiniteSolveRequest(
-                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
-                presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
-                randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
-                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
-                solveBudgetMillis = null, allSolutions = false, solutionCap = null,
-                deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
-            )
-        })
+                FiniteSolveRequest(
+                    shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
+                    presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
+                    randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
+                    zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                    solveBudgetMillis = null, allSolutions = false, solutionCap = null,
+                    deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
+                )
+            }),
         )
 
         val point = assertNotNull(assertNotNull(result.linearSource).incumbent)
@@ -648,29 +775,29 @@ class LinearSourceExecutionTest {
             SourceSemantics(
                 SourceFormat.MPS,
                 feasibilityTolerance = SourceTolerance(
-                absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
-            )
+                    absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
+                ),
             ).resolve(),
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.FIXED,
-        )
+                SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.FIXED,
+            ),
         )
 
         val result = SourceSetup.execute(
             SourceExecutionRequest(invocation, finiteRequest = { shape ->
-            FiniteSolveRequest(
-                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
-                presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
-                randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
-                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
-                solveBudgetMillis = null, allSolutions = false, solutionCap = null,
-                deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
-            )
-        })
+                FiniteSolveRequest(
+                    shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
+                    presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
+                    randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
+                    zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                    solveBudgetMillis = null, allSolutions = false, solutionCap = null,
+                    deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
+                )
+            }),
         )
 
         val outcome = assertNotNull(result.linearSource)
@@ -691,10 +818,10 @@ class LinearSourceExecutionTest {
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.FIXED,
-        )
+                SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.FIXED,
+            ),
         )
         val point = Sample(
             booleanArrayOf(),
@@ -704,10 +831,10 @@ class LinearSourceExecutionTest {
         )
         val native = OpenTheoryExecution.Optimize(
             OpenTheoryOptimum.Optimal(
-            OpenTheoryAssignment.Sampled(point),
-            BigFraction.ZERO,
-            SolveStats.EMPTY,
-        )
+                OpenTheoryAssignment.Sampled(point),
+                BigFraction.ZERO,
+                SolveStats.EMPTY,
+            ),
         )
 
         val result = executeLinearSource(SourceExecutionRequest(invocation), SourceExecutionCallbacks()) { _, _, _ ->
@@ -730,32 +857,32 @@ class LinearSourceExecutionTest {
             ),
             listOf(
                 LinearSourceRow(
-                listOf(LinearSourceTerm(1, SemanticRational.ONE)),
-                lower = SemanticRational.ONE,
-                indicator = LinearSourceIndicator(0, true),
-            )
+                    listOf(LinearSourceTerm(1, SemanticRational.ONE)),
+                    lower = SemanticRational.ONE,
+                    indicator = LinearSourceIndicator(0, true),
+                ),
             ),
             LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE))),
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.FIXED,
-        )
+                SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.FIXED,
+            ),
         )
 
         val result = SourceSetup.execute(
             SourceExecutionRequest(invocation, finiteRequest = { shape ->
-            FiniteSolveRequest(
-                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
-                presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
-                randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
-                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
-                solveBudgetMillis = null, allSolutions = false, solutionCap = null,
-                deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
-            )
-        })
+                FiniteSolveRequest(
+                    shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
+                    presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
+                    randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
+                    zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                    solveBudgetMillis = null, allSolutions = false, solutionCap = null,
+                    deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
+                )
+            }),
         )
 
         val outcome = assertNotNull(result.linearSource)
@@ -773,10 +900,10 @@ class LinearSourceExecutionTest {
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.FIXED,
-        )
+                SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.FIXED,
+            ),
         )
         val points = mutableListOf<LinearSourceWitness>()
 
@@ -802,24 +929,24 @@ class LinearSourceExecutionTest {
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.FIXED,
-        )
+                SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.FIXED,
+            ),
         )
 
         val result = SourceSetup.execute(
             SourceExecutionRequest(invocation, finiteRequest = { shape ->
-            FiniteSolveRequest(
-                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
-                presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
-                randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
-                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
-                solveBudgetMillis = null, allSolutions = false, solutionCap = null,
-                deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
-                toleranceCheck = { false },
-            )
-        })
+                FiniteSolveRequest(
+                    shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
+                    presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
+                    randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
+                    zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                    solveBudgetMillis = null, allSolutions = false, solutionCap = null,
+                    deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
+                    toleranceCheck = { false },
+                )
+            }),
         )
 
         val outcome = assertNotNull(result.linearSource)
@@ -869,12 +996,23 @@ class LinearSourceExecutionTest {
     }
 
     private fun openMpsResult(text: String): SourceExecutionResult {
-        val source = checkNotNull(Mps.parse(text).toLinearSourceProblem(
+        val source = checkNotNull(
+            Mps.parse(text).toLinearSourceProblem(
             SemanticOverrides(feasibilityTolerance = SourceTolerance()),
-        ))
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED))
-        return SourceSetup.execute(SourceExecutionRequest(invocation,
-            finiteRequest = { error("an open source has no finite consumer") }))
+        )
+        )
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.FIXED,
+        )
+        )
+        return SourceSetup.execute(
+            SourceExecutionRequest(
+            invocation,
+            finiteRequest = { error("an open source has no finite consumer") },
+        )
+        )
     }
 }

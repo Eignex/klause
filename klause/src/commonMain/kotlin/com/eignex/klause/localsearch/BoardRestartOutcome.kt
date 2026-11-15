@@ -56,7 +56,9 @@ internal class PreparedBoardRestart private constructor(
     private fun admissible(state: LocalSearchState, variable: Int): Boolean {
         if (state.assumptions.isFrozenInt(variable) || state.rootDomains[variable].isFixed ||
             state.invariants?.isDefinedInt(variable) == true
-        ) return false
+        ) {
+            return false
+        }
         val owner = state.seeding.ownerInt?.get(variable) ?: -1
         return owner < 0 || scope.owns(owner)
     }
@@ -66,16 +68,14 @@ internal class PreparedBoardRestart private constructor(
             val scope = state.boardRestartInputs
             if (scope.inputs.isEmpty()) return null
             return PreparedBoardRestart(
-                scope, LongArray(scope.inputs.size) { state.assignment.intValue(scope.inputs[it]) },
+                scope,
+                LongArray(scope.inputs.size) { state.assignment.intValue(scope.inputs[it]) },
             )
         }
     }
 }
 
-internal class BoardRestartInputs private constructor(
-    private val owners: IntHashSet,
-    val inputs: IntArray,
-) {
+internal class BoardRestartInputs private constructor(private val owners: IntHashSet, val inputs: IntArray) {
     fun owns(factor: Int): Boolean = owners.size != 0 && factor in owners
 
     companion object {

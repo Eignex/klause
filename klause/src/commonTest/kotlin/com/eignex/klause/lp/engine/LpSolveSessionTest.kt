@@ -24,17 +24,24 @@ class LpSolveSessionTest {
         val pricing = LpPricingOptions(tieSeed = 7L)
         val context = LpSolveContext(onQuery = { query ->
             queries += query
-            captures += LpExactCapture.capture(assertNotNull(query.model.exactState),
-                LpReplaySettings("query", query.pricing.tieSeed, workLimit = query.workLimit), emptyList()).encode()
+            captures += LpExactCapture.capture(
+                assertNotNull(query.model.exactState),
+                LpReplaySettings("query", query.pricing.tieSeed, workLimit = query.workLimit),
+                emptyList(),
+            ).encode()
         })
 
         LpSolveSession(context, pricing, componentSplit = false).use { owner ->
-            assertEquals(BigFraction.ONE,
-                owner.solve(assertNotNull(trail.state.ownerWorkingModel()), workLimit = 100_000L).lowerBound)
+            assertEquals(
+                BigFraction.ONE,
+                owner.solve(assertNotNull(trail.state.ownerWorkingModel()), workLimit = 100_000L).lowerBound,
+            )
             assertTrue(trail.push())
             assertTrue(trail.assertBound(x, false, ExactLpSide(ExactLpNumber.of(3L)), 7L))
-            assertEquals(BigFraction.ofLong(3L),
-                owner.solve(assertNotNull(trail.state.ownerWorkingModel()), workLimit = 200_000L).lowerBound)
+            assertEquals(
+                BigFraction.ofLong(3L),
+                owner.solve(assertNotNull(trail.state.ownerWorkingModel()), workLimit = 200_000L).lowerBound,
+            )
         }
 
         assertEquals(listOf(1L, 2L), queries.map { it.sequence })
@@ -43,10 +50,14 @@ class LpSolveSessionTest {
         assertEquals(listOf(100_000L, 200_000L), queries.map { it.workLimit })
         assertTrue(queries.all { it.claim == LpClaim.ATTAINED_OPTIMUM && !it.componentSplit })
         assertTrue(queries.all { it.pricing === pricing })
-        assertEquals(BigFraction.ZERO,
-            assertNotNull(LpExactCapture.decode(captures[0]).initialState.model.column(x).bounds.lower).number.value)
-        assertEquals(BigFraction.ofLong(3L),
-            assertNotNull(LpExactCapture.decode(captures[1]).initialState.model.column(x).bounds.lower).number.value)
+        assertEquals(
+            BigFraction.ZERO,
+            assertNotNull(LpExactCapture.decode(captures[0]).initialState.model.column(x).bounds.lower).number.value,
+        )
+        assertEquals(
+            BigFraction.ofLong(3L),
+            assertNotNull(LpExactCapture.decode(captures[1]).initialState.model.column(x).bounds.lower).number.value,
+        )
     }
 
     @Test
@@ -56,8 +67,13 @@ class LpSolveSessionTest {
             val x = builder.addRealVar(0.0, 5.0, cost = 1.0)
             builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
         }
-        val model = assertNotNull(LpExactState(assertNotNull(
-            builder.build(Sense.MINIMIZE).authoritativeModel())).ownerWorkingModel())
+        val model = assertNotNull(
+            LpExactState(
+                assertNotNull(
+            builder.build(Sense.MINIMIZE).authoritativeModel(),
+        )
+            ).ownerWorkingModel()
+        )
         var observations = 0
         val context = LpSolveContext(onQuery = { observations++ })
 
@@ -68,8 +84,10 @@ class LpSolveSessionTest {
                 assertIs<LpSolveStep.Paused>(step)
                 var pauses = 0
                 while (step is LpSolveStep.Paused && pauses++ < 64) step = cursor.advance(1L)
-                assertEquals(LpVerdict.ATTAINED_OPTIMUM,
-                    assertIs<LpSolveStep.Completed<CertifiedLpResult>>(step).value.verdict)
+                assertEquals(
+                    LpVerdict.ATTAINED_OPTIMUM,
+                    assertIs<LpSolveStep.Completed<CertifiedLpResult>>(step).value.verdict,
+                )
             }
         }
 
@@ -81,8 +99,13 @@ class LpSolveSessionTest {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 5.0, cost = 1.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
-        val model = assertNotNull(LpExactState(assertNotNull(
-            builder.build(Sense.MINIMIZE).authoritativeModel())).ownerWorkingModel())
+        val model = assertNotNull(
+            LpExactState(
+                assertNotNull(
+            builder.build(Sense.MINIMIZE).authoritativeModel(),
+        )
+            ).ownerWorkingModel()
+        )
         val primary = IllegalArgumentException("capture stopped")
         val factory = RecordingLpEngineFactory()
         val queries = ArrayList<LpQueryObservation>()
@@ -126,7 +149,13 @@ class LpSolveSessionTest {
                 pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
                 )
                 return object : PersistentLpSolver by delegate {
                     override fun solve(warm: Basis?): FloatLpResult? {

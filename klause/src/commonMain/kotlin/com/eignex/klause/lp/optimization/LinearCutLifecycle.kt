@@ -29,9 +29,16 @@ internal class LinearCutLifecycle(private val budget: SourceLpBudget) {
 
     fun <T> containing(recipe: String, block: () -> T): T {
         this.recipe = recipe
-        fun costs() = listOf(budget.measuredPreparationWork, budget.measuredFloatWork,
-            budget.measuredContinuationWork, budget.measuredRefinementWork, budget.measuredBoundCertificationWork,
-            budget.measuredConflictCertificationWork, budget.reservedAllocation, budget.activeNanos)
+        fun costs() = listOf(
+            budget.measuredPreparationWork,
+            budget.measuredFloatWork,
+            budget.measuredContinuationWork,
+            budget.measuredRefinementWork,
+            budget.measuredBoundCertificationWork,
+            budget.measuredConflictCertificationWork,
+            budget.reservedAllocation,
+            budget.activeNanos,
+        )
         val before = costs()
         val attempted = families
         val owned = ownedFamilies
@@ -39,8 +46,16 @@ internal class LinearCutLifecycle(private val budget: SourceLpBudget) {
             return block()
         } finally {
             val after = costs()
-            val stages = listOf("PreparationWork", "FloatWork", "ContinuationWork", "RefinementWork",
-                "BoundCertificationWork", "ConflictCertificationWork", "ModeledAllocation", "ActiveNanos")
+            val stages = listOf(
+                "PreparationWork",
+                "FloatWork",
+                "ContinuationWork",
+                "RefinementWork",
+                "BoundCertificationWork",
+                "ConflictCertificationWork",
+                "ModeledAllocation",
+                "ActiveNanos",
+            )
             for (index in stages.indices) {
                 val delta = after[index] - before[index]
                 val key = "numericalCutLifecycleRECIPE_${recipe}_${stages[index]}"

@@ -6,8 +6,17 @@ import com.eignex.klause.simplex.exact.ContinuationPhase
 internal enum class LpContinuationSite { EARLY, LATE }
 internal enum class LpRefinementBudget { UNREACHED, AVAILABLE, WORK_EMPTY, ALLOCATION_EMPTY, BOTH_EMPTY }
 internal enum class LpRefinementStage {
-    ADMISSION, PRIOR, ENTRY_CHARGE, RUN, SOURCE_BASIS, SOURCE_AUTHORITY, KNOWN_POINT,
-    STRICT_ELIGIBILITY, STRICT_MARGIN, CHILD_ADMISSION, COMPLETION,
+    ADMISSION,
+    PRIOR,
+    ENTRY_CHARGE,
+    RUN,
+    SOURCE_BASIS,
+    SOURCE_AUTHORITY,
+    KNOWN_POINT,
+    STRICT_ELIGIBILITY,
+    STRICT_MARGIN,
+    CHILD_ADMISSION,
+    COMPLETION,
 }
 
 internal class LpRefinementPath(val preferBasis: Boolean) {
@@ -38,7 +47,9 @@ internal class LpRejectionPairing {
     fun observe(result: LpContinuationVerification, site: LpContinuationSite, floatPresent: Boolean) {
         if (result.metrics.phase != ContinuationPhase.VERIFY ||
             result.metrics.decline != ContinuationDecline.CANDIDATE
-        ) return
+        ) {
+            return
+        }
         val index = result.pointRejection?.ordinal ?: LpPointRejection.entries.size
         counts[index]++
         routes[(index * LpContinuationSite.entries.size + site.ordinal) * 2 + if (floatPresent) 1 else 0]++
@@ -73,12 +84,14 @@ internal class LpRejectionPairing {
                     for ((call, path) in refinementPaths.withIndex()) {
                         if (path == null) continue
                         observer.observeContinuationRejection(
-                            "VERIFY_CANDIDATE_ENTRY_${context}_${call + 1}_${path.label()}_$outcome", routed,
+                            "VERIFY_CANDIDATE_ENTRY_${context}_${call + 1}_${path.label()}_$outcome",
+                            routed,
                         )
                     }
                     if (refinementCalls > refinementPaths.size) {
                         observer.observeContinuationRejection(
-                            "VERIFY_CANDIDATE_ENTRY_${context}_LIMIT_UNAVAILABLE_$outcome", routed,
+                            "VERIFY_CANDIDATE_ENTRY_${context}_LIMIT_UNAVAILABLE_$outcome",
+                            routed,
                         )
                     }
                 }

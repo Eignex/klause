@@ -4,8 +4,10 @@ package com.eignex.klause.solver.search
 enum class SearchBranchKind {
     /** Source Boolean choices. */
     Boolean,
+
     /** Finite-domain splits. */
     Finite,
+
     /** Exact arithmetic splits. */
     Arithmetic,
 }
@@ -47,8 +49,10 @@ interface SearchBranchSelection {
         private val order = order.toList()
 
         init {
-            require(this.order.size == SearchBranchKind.entries.size &&
-                this.order.toSet() == SearchBranchKind.entries.toSet()) { "priority must contain every category once" }
+            require(
+                this.order.size == SearchBranchKind.entries.size &&
+                    this.order.toSet() == SearchBranchKind.entries.toSet(),
+            ) { "priority must contain every category once" }
         }
 
         override fun alternatives(sources: SearchBranchSources): List<SearchDecision>? {

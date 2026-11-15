@@ -25,8 +25,14 @@ import kotlin.test.assertNull
 class LinearSpecializationTest {
     @Test
     fun `normalizing greater-equal rows at signed word endpoints should preserve pinned solutions`() {
-        for ((coefficient, bound) in listOf(2L to Long.MIN_VALUE, Long.MIN_VALUE to 0L,
-            Long.MIN_VALUE to Long.MIN_VALUE, Long.MIN_VALUE + 2 to 0L, 2L to Long.MIN_VALUE + 2, 2L to 1L)) {
+        for ((coefficient, bound) in listOf(
+            2L to Long.MIN_VALUE,
+            Long.MIN_VALUE to 0L,
+            Long.MIN_VALUE to Long.MIN_VALUE,
+            Long.MIN_VALUE + 2 to 0L,
+            2L to Long.MIN_VALUE + 2,
+            2L to 1L,
+        )) {
             val source = Linear(longArrayOf(coefficient), intArrayOf(0), LinearOp.GE, bound)
             val normalized = assertNotNull((object : Factor by source {}).equivalentLinear())
             for (value in -1L..2L) {

@@ -37,7 +37,8 @@ internal class FiniteExactNeighborhood(
     private val params: TheoryParams,
     private val objective: LinearObjective?,
     private val certify: (Sample) -> Unit,
-) : ExactNeighborhoodCompletion, AutoCloseable {
+) : ExactNeighborhoodCompletion,
+    AutoCloseable {
     private val geometry = OpenExactNeighborhood(source.withIntDomains(source.rootIntDomainsInPlace), params, objective)
     private var adapter: OpenExactNeighborhood? = null
     val exhausted: Boolean get() = adapter?.exhausted == true
@@ -61,12 +62,21 @@ internal class FiniteExactNeighborhood(
             }
         }
         val fragment = encoded.rebindEncoding(canonical, encoded.factors + pins, null)
-        val plan = ComponentPlan(canonical, Array(canonical.numIntVars) { IntVariableOwner.CP }, owners,
+        val plan = ComponentPlan(
+            canonical,
+            Array(canonical.numIntVars) { IntVariableOwner.CP },
+            owners,
             if (canonical.numIntVars == 0) ProblemPipeline.EXACT_LRA else ProblemPipeline.EXACT_LIRA,
-            factorProjections = projections, installedFragment = fragment)
+            factorProjections = projections,
+            installedFragment = fragment,
+        )
         if (stop()) return null
-        return OpenExactNeighborhood(canonical, params, objective,
-            preparedSource = canonical.preparedWithComponents(plan, objective = objective)).also { adapter = it }
+        return OpenExactNeighborhood(
+            canonical,
+            params,
+            objective,
+            preparedSource = canonical.preparedWithComponents(plan, objective = objective),
+        ).also { adapter = it }
     }
 
     override fun check(
@@ -88,10 +98,15 @@ internal class FiniteExactNeighborhood(
         }
     }
 
-    fun search(adaptive: Boolean, seed: Long): ExactNeighborhood = geometry.search(adaptive, seed, completion = this,
+    fun search(adaptive: Boolean, seed: Long): ExactNeighborhood = geometry.search(
+        adaptive,
+        seed,
+        completion = this,
         maximumImprovementMoves = if (adaptive) params.alnsIterations.toLong() else null,
-        nativeWork = { adapter?.work ?: 0 }, completionStats = { adapter?.stats ?: SolveStats.EMPTY },
-        onClose = ::close)
+        nativeWork = { adapter?.work ?: 0 },
+        completionStats = { adapter?.stats ?: SolveStats.EMPTY },
+        onClose = ::close,
+    )
 
     override fun close() {
         adapter?.close()
@@ -122,10 +137,15 @@ internal fun finiteExactNeighborhoodWorker(
         retained = created
         return created
     }
-    worker = exactNeighborhoodWorker(if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood",
-        armId, objective, ExecutionControl.Never, exhausted = { retained?.exhausted == true },
+    worker = exactNeighborhoodWorker(
+        if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood",
+        armId,
+        objective,
+        ExecutionControl.Never,
+        exhausted = { retained?.exhausted == true },
         declined = { retained?.declined == true },
-        open = { adapter().search(adaptive, seed) })
+        open = { adapter().search(adaptive, seed) },
+    )
         .bindEvidence(ModelIdentity.of(source, objective), provesResults = false)
     return worker
 }

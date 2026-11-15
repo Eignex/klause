@@ -434,5 +434,4 @@ class RationalTheoryDescentTest {
             ),
         )
     }
-
 }

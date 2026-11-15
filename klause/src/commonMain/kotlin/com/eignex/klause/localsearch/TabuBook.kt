@@ -21,7 +21,8 @@ class TabuBook private constructor(
     val touchCount: IntArray,
 ) {
     constructor(problem: Problem) : this(
-        problem, LongArray(problem.numBoolVars + problem.numIntVars + problem.numRealVars),
+        problem,
+        LongArray(problem.numBoolVars + problem.numIntVars + problem.numRealVars),
         IntArray(problem.numBoolVars + problem.numIntVars + problem.numRealVars),
     )
 

@@ -44,5 +44,4 @@ class QfLiraSourceBoundTest {
             assertIs<ComponentCheck.Feasible>(session.check())
         }
     }
-
 }

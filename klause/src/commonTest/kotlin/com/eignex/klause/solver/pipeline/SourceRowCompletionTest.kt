@@ -27,8 +27,13 @@ class SourceRowCompletionTest {
     ): SourceRowCompletion.Packet {
         val model = problem.bake()
         val objective = LinearObjective(intCoefficients = LongArray(model.numIntVars) { if (it == 0) 1L else 0L })
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
-            ExecutionControl.Never))
+        val source = assertNotNull(
+            model.linearAuthorityContext(
+            objective,
+            ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never,
+        )
+        )
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
         val packets = SourceRowCompletion(model, source, funding, frozen) { funding.paused }
             .complete(Sample(booleanArrayOf(), center), listOf(seed)) { it == seed.first }
@@ -42,9 +47,13 @@ class SourceRowCompletionTest {
 
     @Test
     fun `a blocked seed should complete through every equality its move breaks`() {
-        val chain = Problem(0, 5, Array(5) { IntDomain(0, 1) }, listOf(
+        val chain = Problem(
+            0, 5, Array(5) { IntDomain(0, 1) },
+            listOf(
             Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0L),
-            Linear(longArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0L)))
+            Linear(longArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0L),
+        )
+        )
 
         val packet = complete(chain, longArrayOf(1, 1, 1, 0, 0), 0 to -1)
 
@@ -57,9 +66,12 @@ class SourceRowCompletionTest {
     @Test
     fun `branching equality repairs should retain compensators in source order`() {
         val count = 12
-        val problem = Problem(0, count, Array(count) { IntDomain(0, 1) }, (1 until count).map {
+        val problem = Problem(
+            0, count, Array(count) { IntDomain(0, 1) },
+            (1 until count).map {
             Linear(longArrayOf(1, -1), intArrayOf(0, it), LinearOp.EQ, 0L)
-        })
+        }
+        )
 
         val packet = complete(problem, LongArray(count) { 1L }, 0 to -1)
 
@@ -68,8 +80,12 @@ class SourceRowCompletionTest {
 
     @Test
     fun `row slack should leave a seed without added inputs`() {
-        val knapsack = Problem(0, 3, Array(3) { IntDomain(0, 1) },
-            listOf(Linear(longArrayOf(2, 3, 4), intArrayOf(0, 1, 2), LinearOp.GE, 5L)))
+        val knapsack = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 1) },
+            listOf(Linear(longArrayOf(2, 3, 4), intArrayOf(0, 1, 2), LinearOp.GE, 5L)),
+        )
 
         val packet = complete(knapsack, longArrayOf(1, 1, 1), 0 to -1)
 
@@ -79,8 +95,12 @@ class SourceRowCompletionTest {
 
     @Test
     fun `integer compensators should move just far enough to restore the row`() {
-        val scaled = Problem(0, 2, Array(2) { IntDomain(0, 5) },
-            listOf(Linear(longArrayOf(2, -1), intArrayOf(0, 1), LinearOp.EQ, 0L)))
+        val scaled = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 5) },
+            listOf(Linear(longArrayOf(2, -1), intArrayOf(0, 1), LinearOp.EQ, 0L)),
+        )
 
         val packet = complete(scaled, longArrayOf(2, 4), 0 to -1)
 
@@ -90,8 +110,12 @@ class SourceRowCompletionTest {
 
     @Test
     fun `a pinned compensator should decline the packet as unrepairable`() {
-        val exchange = Problem(0, 2, Array(2) { IntDomain(0, 1) },
-            listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1L)))
+        val exchange = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
+            listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1L)),
+        )
 
         val packet = complete(exchange, longArrayOf(1, 0), 0 to -1, frozen = { it == 1 })
 
@@ -102,8 +126,12 @@ class SourceRowCompletionTest {
 
     @Test
     fun `a seed without a domain step in its direction should be immovable`() {
-        val exchange = Problem(0, 2, Array(2) { IntDomain(0, 1) },
-            listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1L)))
+        val exchange = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
+            listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1L)),
+        )
 
         val packet = complete(exchange, longArrayOf(1, 0), 0 to 1)
 

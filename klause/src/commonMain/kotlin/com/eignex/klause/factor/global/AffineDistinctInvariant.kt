@@ -97,7 +97,9 @@ internal class AffineDistinctInvariant(private val vars: IntArray, private val o
         fun consider(source: Long) {
             if (value(occupant, source) in counts.values) return
             candidates++
-            if (filled < targets.size) targets[filled++] = source else {
+            if (filled < targets.size) {
+                targets[filled++] = source
+            } else {
                 val slot = state.rng.nextInt(candidates)
                 if (slot < targets.size) targets[slot] = source
             }
@@ -120,8 +122,11 @@ internal class AffineDistinctInvariant(private val vars: IntArray, private val o
         if (!sink.allowsInt(variable)) return
         val before = sink.size
         val start = state.rng.nextInt(sources.size)
-        val attempts = minOf(sources.size, AllDifferentInvariant.MAX_STRUCTURED_SWAPS *
-            AllDifferentInvariant.SWAP_ATTEMPT_STRIDE)
+        val attempts = minOf(
+            sources.size,
+            AllDifferentInvariant.MAX_STRUCTURED_SWAPS *
+                AllDifferentInvariant.SWAP_ATTEMPT_STRIDE,
+        )
         for (step in 0 until attempts) {
             val other = sources[(start + step) % sources.size]
             if (!sink.allowsInt(other)) continue

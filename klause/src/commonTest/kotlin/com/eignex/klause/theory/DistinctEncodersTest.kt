@@ -37,28 +37,51 @@ class DistinctEncodersTest {
     @Test
     fun `selected exact distinct linear encoding should preserve whole Boolean reification`() {
         for (truth in listOf(false, true)) {
-            val distinct = Distinct((0..1).map {
+            val distinct = Distinct(
+                (0..1).map {
                 Distinct.Operand(intArrayOf(Term.ofRealVar(it)), listOf(BigFraction.ONE))
-            }, activator = 0)
-            val source = Problem(1, 0, emptyArray(),
+            },
+                activator = 0
+            )
+            val source = Problem(
+                1,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(distinct, Clause(intArrayOf(Lit.make(0, truth)))),
-                numRealVars = 2, realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0))
-            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-                if (factor === distinct && target == EncodingTarget.LINEAR) DistinctEncoders.linear
-                else BuiltInEncoderProvider.select(factor, target)
-            })
+                numRealVars = 2,
+                realLower = doubleArrayOf(1.0, 1.0),
+                realUpper = doubleArrayOf(1.0, 1.0),
+            )
+            val providers = FactorProjectionProviders(
+                encoder = EncoderProvider { factor, target ->
+                if (factor === distinct && target == EncodingTarget.LINEAR) {
+                    DistinctEncoders.linear
+                } else {
+                    BuiltInEncoderProvider.select(factor, target)
+                }
+            }
+            )
             val plan = source.prepareExecutionPlan(providers)
-            val request = OpenTheoryRequest(source, componentPlan = assertNotNull(plan.componentPlan),
-                preparedPlan = plan).withPresolve(PresolveConfig.NONE)
+            val request = OpenTheoryRequest(
+                source,
+                componentPlan = assertNotNull(plan.componentPlan),
+                preparedPlan = plan,
+            ).withPresolve(PresolveConfig.NONE)
 
             val execution = OpenTheoryPipeline.execute(request, TheoryParams(), FiniteEngine.BACKTRACK)
             val result = assertIs<OpenTheoryExecution.Satisfy>(execution).result
 
-            if (truth) assertIs<OpenTheoryResult.Unsat>(result) else {
+            if (truth) {
+                assertIs<OpenTheoryResult.Unsat>(result)
+            } else {
                 val witness = assertIs<OpenTheoryResult.Sat>(result).assignment
                 val exact = (0..1).map { TheoryCompletion.parseRational(witness.realValue(it)) }
-                val point = Sample(booleanArrayOf(witness.boolValue(0)), longArrayOf(),
-                    DoubleArray(2) { exact[it].toDouble() }, exactReals = exact)
+                val point = Sample(
+                    booleanArrayOf(witness.boolValue(0)),
+                    longArrayOf(),
+                    DoubleArray(2) { exact[it].toDouble() },
+                    exactReals = exact,
+                )
                 assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, point))
             }
         }
@@ -67,16 +90,30 @@ class DistinctEncodersTest {
     @Test
     fun `selected exact distinct rows should preserve integer and real namespaces`() {
         for ((real, expectedSat) in listOf(1.0 to false, 2.0 to true)) {
-            val distinct = Distinct(listOf(
+            val distinct = Distinct(
+                listOf(
                 Distinct.Operand(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE)),
                 Distinct.Operand(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE)),
-            ))
-            val source = Problem(0, 1, arrayOf(IntDomain(1, 1)), arrayOf(distinct), numRealVars = 1,
-                realLower = doubleArrayOf(real), realUpper = doubleArrayOf(real))
-            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-                if (factor === distinct && target == EncodingTarget.LINEAR) DistinctEncoders.linear
-                else BuiltInEncoderProvider.select(factor, target)
-            })
+            )
+            )
+            val source = Problem(
+                0,
+                1,
+                arrayOf(IntDomain(1, 1)),
+                arrayOf(distinct),
+                numRealVars = 1,
+                realLower = doubleArrayOf(real),
+                realUpper = doubleArrayOf(real),
+            )
+            val providers = FactorProjectionProviders(
+                encoder = EncoderProvider { factor, target ->
+                if (factor === distinct && target == EncodingTarget.LINEAR) {
+                    DistinctEncoders.linear
+                } else {
+                    BuiltInEncoderProvider.select(factor, target)
+                }
+            }
+            )
             val installed = assertNotNull(providers.prepare(source).linearTheoryModel(EncodingTarget.LINEAR))
 
             val result = BacktrackSolver.source(installed).solve()
@@ -87,15 +124,29 @@ class DistinctEncodersTest {
 
     @Test
     fun `selected polynomial distinct encoding should refute a pinned affine collision`() {
-        val distinct = Distinct((0..1).map {
+        val distinct = Distinct(
+            (0..1).map {
             Distinct.Operand(intArrayOf(Term.ofRealVar(it)), listOf(BigFraction.ONE))
-        })
-        val source = Problem(0, 0, emptyArray(), arrayOf(distinct), numRealVars = 2,
-            realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0))
-        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-            if (factor === distinct && target == EncodingTarget.POLYNOMIAL) DistinctEncoders.polynomial
-            else BuiltInEncoderProvider.select(factor, target)
-        })
+        }
+        )
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(distinct),
+            numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 1.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
+        )
+        val providers = FactorProjectionProviders(
+            encoder = EncoderProvider { factor, target ->
+            if (factor === distinct && target == EncodingTarget.POLYNOMIAL) {
+                DistinctEncoders.polynomial
+            } else {
+                BuiltInEncoderProvider.select(factor, target)
+            }
+        }
+        )
         val shared = assertNotNull(source.preparePolynomialExecutionPlan(providers = providers).polynomialModel)
 
         val result = shared.service.invocation().use { it.check(PolynomialCondition()) }
@@ -106,16 +157,29 @@ class DistinctEncodersTest {
 
     @Test
     fun `cancelled distinct installation should publish no partial enforcing relation`() {
-        val distinct = Distinct((0..2).map {
+        val distinct = Distinct(
+            (0..2).map {
             Distinct.Operand(intArrayOf(Term.ofRealVar(it)), listOf(BigFraction.ONE))
-        })
-        val source = Problem(0, 0, emptyArray(), arrayOf(distinct), numRealVars = 3,
+        }
+        )
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(distinct),
+            numRealVars = 3,
             realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
-        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-            if (factor === distinct && target == EncodingTarget.LINEAR) DistinctEncoders.linear
-            else BuiltInEncoderProvider.select(factor, target)
-        })
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
+        )
+        val providers = FactorProjectionProviders(
+            encoder = EncoderProvider { factor, target ->
+            if (factor === distinct && target == EncodingTarget.LINEAR) {
+                DistinctEncoders.linear
+            } else {
+                BuiltInEncoderProvider.select(factor, target)
+            }
+        }
+        )
         var work = 0L
         val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work > 0L
@@ -123,8 +187,12 @@ class DistinctEncodersTest {
         }
         val declines = mutableListOf<EncoderDecline>()
 
-        val installed = providers.prepare(source).installLinearFactor(0, EncodingTarget.LINEAR,
-            cancellation = cancellation, onDecline = declines::add)
+        val installed = providers.prepare(source).installLinearFactor(
+            0,
+            EncodingTarget.LINEAR,
+            cancellation = cancellation,
+            onDecline = declines::add,
+        )
 
         assertNull(installed)
         assertEquals(listOf(EncoderDecline.RESOURCE), declines)

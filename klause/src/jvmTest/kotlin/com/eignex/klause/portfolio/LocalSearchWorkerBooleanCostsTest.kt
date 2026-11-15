@@ -41,27 +41,59 @@ class LocalSearchWorkerBooleanCostsTest(
     @Test
     fun `selected Boolean cost guidance should preserve the original point and objective`() {
         val source = Dimacs.parseWcnf("7 1 2 0\n11 -1 2 0\n").toProblem()
-        val attached = if (wcnf) source.problem else Problem(source.problem.numBoolVars, 0,
-            emptyArray(), source.problem.factors)
+        val attached = if (wcnf) {
+            source.problem
+        } else {
+            Problem(
+            source.problem.numBoolVars,
+            0,
+            emptyArray(),
+            source.problem.factors,
+        )
+        }
         val canonical = source.objective.toLinearObjective().let { if (minimize) it else it.negated() }
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
             SourceAttachment(attached, intArrayOf(), source.boolFolds),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.LOCAL_SEARCH, canonical,
-        ))
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.LOCAL_SEARCH,
+            canonical,
+        )
+        )
         val shape = invocation.finiteShape()
-        val preparation = FinitePipeline.prepare(FinitePipelineRequest(shape.problem, FiniteEngine.LOCAL_SEARCH,
-            shape.linearObjective, PresolveConfig.NONE, preparedPlan = shape.preparedPlan))
+        val preparation = FinitePipeline.prepare(
+            FinitePipelineRequest(
+            shape.problem,
+            FiniteEngine.LOCAL_SEARCH,
+            shape.linearObjective,
+            PresolveConfig.NONE,
+            preparedPlan = shape.preparedPlan,
+        )
+        )
         val problem = assertIs<BakedProblem>(preparation.problem)
-        val hints = assertNotNull(invocation.heuristicHints(problem, preparation.objective, preparation.sourceMapping,
-            ExecutionControl.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
-            assertNotNull(preparation.executionPlan).capabilities))
+        val hints = assertNotNull(
+            invocation.heuristicHints(
+            problem,
+            preparation.objective,
+            preparation.sourceMapping,
+            ExecutionControl.Never,
+            setOf(ExecutionStrategy.LOCAL_SEARCH),
+            assertNotNull(preparation.executionPlan).capabilities,
+        )
+        )
         assertNull(hints.sweep)
         val gradient = assertNotNull(hints.objective)
         val supplied = if (existingSweep) {
             assertNotNull(DefinitionalSweep.infer(problem, boolFolds = source.boolFolds.take(1)))
-        } else null
-        val recipe = LocalSearchRecipe("boolean-cost", Cbls(), perMoveInvariants = perMove,
-            objectiveGuidance = guidance)
+        } else {
+            null
+        }
+        val recipe = LocalSearchRecipe(
+            "boolean-cost",
+            Cbls(),
+            perMoveInvariants = perMove,
+            objectiveGuidance = guidance,
+        )
         val worker = LocalSearchWorkerConfig(recipe, reportPhaseTimes = true).materialize(
             problem, 0, 0, 3L, 1.0, canonical, gradient, supplied, null, null,
         )
@@ -70,14 +102,22 @@ class LocalSearchWorkerBooleanCostsTest(
         }.snapshot()
 
         val result = worker.use {
-            worker.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never,
-                warmStart = warm, maxInstructions = 16L).last()
+            worker.improvements(
+                { Double.POSITIVE_INFINITY },
+                ExecutionControl.Never,
+                warmStart = warm,
+                maxInstructions = 16L,
+            ).last()
         }
 
         val point = assertIs<MinimizeResult.WithSample>(result).sample
         val first = point.boolValue(0)
         val second = point.boolValue(1)
-        val cost = if (second) 0L else if (first) 11L else 7L
+        val cost = if (second) 0L else if (first) {
+            11L
+        } else {
+            7L
+        }
         val expected = if (minimize) cost else -cost
         assertEquals(expected, canonical.evaluateLong(point))
         assertEquals(expected.toDouble(), result.objectiveValue)
@@ -96,9 +136,12 @@ class LocalSearchWorkerBooleanCostsTest(
         @JvmStatic
         @Parameterized.Parameters(name = "minimize={0}, guidance={1}, perMove={2}, existing={3}, wcnf={4}")
         fun cases(): List<Array<Any>> = listOf(false, true).flatMap { minimize ->
-            listOf(ObjectiveGuidance.Functional to true, ObjectiveGuidance.Functional to false,
-                ObjectiveGuidance.Canonical to true, ObjectiveGuidance.Geometric to true).flatMap {
-                (guidance, perMove) ->
+            listOf(
+                ObjectiveGuidance.Functional to true,
+                ObjectiveGuidance.Functional to false,
+                ObjectiveGuidance.Canonical to true,
+                ObjectiveGuidance.Geometric to true,
+            ).flatMap { (guidance, perMove) ->
                 listOf(false, true).flatMap { existing ->
                     listOf(false, true).map { wcnf -> arrayOf<Any>(minimize, guidance, perMove, existing, wcnf) }
                 }

@@ -66,8 +66,10 @@ class MpsCompilerLoweringTest {
         val row = compiled.model.factors.flatMap { it.linearRows }.single { it.size == 2 }
 
         val constants = row.constants as IntegralConstants
-        assertEquals(mapOf(Term.ofRealVar(0) to "9", Term.ofIntVar(0) to "10"),
-            (0 until row.size).associate { row.ref(it) to constants.exactCoeff(it).toString() })
+        assertEquals(
+            mapOf(Term.ofRealVar(0) to "9", Term.ofIntVar(0) to "10"),
+            (0 until row.size).associate { row.ref(it) to constants.exactCoeff(it).toString() },
+        )
         assertEquals("540", constants.exactBound.toString())
     }
 
@@ -79,8 +81,10 @@ class MpsCompilerLoweringTest {
         )
 
         val constants = row.constants as IntegralConstants
-        assertEquals(listOf("4000000000000000", "1"),
-            (0 until row.size).map { constants.exactCoeff(it).toString() })
+        assertEquals(
+            listOf("4000000000000000", "1"),
+            (0 until row.size).map { constants.exactCoeff(it).toString() },
+        )
         assertEquals("4000000000000000", constants.exactBound.toString())
     }
 
@@ -145,8 +149,10 @@ class MpsCompilerLoweringTest {
         assertEquals(coefficients[0].toDouble(), coefficients[1].toDouble())
         assertEquals("9999999999999999999", constants.exactBound.toString())
         val bounds = source.sourceNumbers().variableBounds
-        assertEquals(BigFraction.of(BIG_ONE, parseBigInt("18014398509481984")),
-            checkNotNull(bounds[0].second).fraction - checkNotNull(bounds[0].first).fraction)
+        assertEquals(
+            BigFraction.of(BIG_ONE, parseBigInt("18014398509481984")),
+            checkNotNull(bounds[0].second).fraction - checkNotNull(bounds[0].first).fraction,
+        )
         assertEquals("9999999999999999999", bounds[1].second?.fraction.toString())
         assertTrue(compiled.model.intBounds.isOpenUpper(1))
         val wideUpper = rows.single {
@@ -187,8 +193,10 @@ class MpsCompilerLoweringTest {
 
         val compiled = source.toProblem()
 
-        assertEquals((-0.0).toRawBits(),
-            source.sourceNumbers().variableBounds.single().second?.double?.toRawBits())
+        assertEquals(
+            (-0.0).toRawBits(),
+            source.sourceNumbers().variableBounds.single().second?.double?.toRawBits(),
+        )
         assertEquals((-0.0).toRawBits(), source.sourceNumbers().objectiveConstant.double.toRawBits())
         assertEquals((-0.0).toRawBits(), compiled.model.realUpper[compiled.columns.single().id].toRawBits())
         val linear = assertNotNull(source.toLinearSourceProblem())
@@ -204,8 +212,10 @@ class MpsCompilerLoweringTest {
         )
 
         val compiled = source.toProblem()
-        val witness = assertNotNull(assertNotNull(source.toLinearSourceProblem())
-            .checkMpsWitness(listOf(BigFraction.ofLong(4))))
+        val witness = assertNotNull(
+            assertNotNull(source.toLinearSourceProblem())
+                .checkMpsWitness(listOf(BigFraction.ofLong(4))),
+        )
 
         assertTrue(compiled.maximize)
         assertEquals(2L, compiled.model.intBounds.lower(0))
@@ -258,12 +268,18 @@ class MpsCompilerLoweringTest {
         assertEquals(5.0, comparison.bound)
         val definition = rows.single { it.relation == LinearOp.EQ }
         val constants = definition.constants as RealConstants
-        assertEquals(mapOf(Term.ofRealVar(compiled.columns.single().id) to 7.0,
-            Term.ofRealVar(auxiliary) to -1.0),
-            (0 until definition.size).associate { definition.ref(it) to constants.realCoefficients.at(it) })
+        assertEquals(
+            mapOf(
+                Term.ofRealVar(compiled.columns.single().id) to 7.0,
+                Term.ofRealVar(auxiliary) to -1.0,
+            ),
+            (0 until definition.size).associate { definition.ref(it) to constants.realCoefficients.at(it) },
+        )
         assertEquals(0.0, constants.bound)
-        assertEquals(BigFraction.ofLong(7) * BigFraction.ofLong(2).reciprocal(),
-            assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ofLong(2).reciprocal()))).objective)
+        assertEquals(
+            BigFraction.ofLong(7) * BigFraction.ofLong(2).reciprocal(),
+            assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ofLong(2).reciprocal()))).objective,
+        )
         assertNull(linear.checkMpsWitness(listOf(BigFraction.ofLong(3).reciprocal() * BigFraction.ofLong(2))))
     }
 
@@ -277,19 +293,24 @@ class MpsCompilerLoweringTest {
         )
         parsed.objective.indices[0] = 1
         val source = parsed.copy(
-            variables = parsed.variables.reversed(), constraints = parsed.constraints.reversed(),
+            variables = parsed.variables.reversed(),
+            constraints = parsed.constraints.reversed(),
         )
 
-        val linear = assertNotNull(source.toLinearSourceProblem(
+        val linear = assertNotNull(
+            source.toLinearSourceProblem(
             SemanticOverrides(feasibilityTolerance = SourceTolerance()),
-        ))
+        )
+        )
 
         val numbers = source.sourceNumbers()
         assertEquals("9007199254740993", numbers.variableBounds[1].second?.fraction.toString())
         assertEquals(BigFraction.ofLong(3), numbers.constraintBounds[0].second?.fraction)
         assertEquals("9007199254740993", numbers.constraintBounds[1].second?.fraction.toString())
-        assertEquals("9007199254740993",
-            assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ZERO, BigFraction.ONE))).objective.toString())
+        assertEquals(
+            "9007199254740993",
+            assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ZERO, BigFraction.ONE))).objective.toString(),
+        )
     }
 
     @Test
@@ -303,8 +324,13 @@ class MpsCompilerLoweringTest {
                 MpsVar("y", integer = false, lower = 2.0, upper = Double.POSITIVE_INFINITY),
             ),
             listOf(
-                MpsConstraint("open-row", intArrayOf(0), doubleArrayOf(1.0),
-                    Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY),
+                MpsConstraint(
+                    "open-row",
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    Double.NEGATIVE_INFINITY,
+                    Double.POSITIVE_INFINITY,
+                ),
                 MpsConstraint("upper-row", intArrayOf(1), doubleArrayOf(1.0), Double.NEGATIVE_INFINITY, 7.0),
             ),
         )

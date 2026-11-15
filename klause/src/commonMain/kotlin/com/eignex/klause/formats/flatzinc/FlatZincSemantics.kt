@@ -45,11 +45,18 @@ internal class FlatZincSemantics(
     fun resolve(overrides: SemanticOverrides): EffectiveSourceSemantics {
         val defaults = checkNotNull(flatZincSemantics.undeclaredIntegers)
         val legacy = flatZincSemantics.copy(
-            floats = if (exactFloats) FloatSemantics.Continuous else FloatSemantics.Grid(
-                floatBuckets, floatScale, UndeclaredRealBounds(
-                    semanticFloat(unboundedFloatLo), semanticFloat(unboundedFloatHi),
+            floats = if (exactFloats) {
+                FloatSemantics.Continuous
+            } else {
+                FloatSemantics.Grid(
+                floatBuckets,
+                floatScale,
+                UndeclaredRealBounds(
+                    semanticFloat(unboundedFloatLo),
+                    semanticFloat(unboundedFloatHi),
                 ),
-            ),
+            )
+            },
             feasibilityTolerance = if (exactFloats) SourceTolerance() else flatZincSemantics.feasibilityTolerance,
             undeclaredIntegers = UndeclaredIntegerBounds(
                 unboundedIntLo ?: defaults.lower,
@@ -76,8 +83,11 @@ private fun SemanticRational.binary64(role: String): Double {
     require(exponent in 0..1074 && denominator == BIG_ONE shl exponent) {
         "$role cannot be represented exactly in binary64"
     }
-    val scale = if (exponent <= 1022) Double.fromBits((1023L - exponent) shl 52)
-        else Double.fromBits(1L shl (1074 - exponent))
+    val scale = if (exponent <= 1022) {
+        Double.fromBits((1023L - exponent) shl 52)
+    } else {
+        Double.fromBits(1L shl (1074 - exponent))
+    }
     val value = numerator.toDouble() * scale
     require(value.isFinite() && BigFraction.ofDouble(value) == exact) {
         "$role cannot be represented exactly in binary64"
@@ -87,6 +97,7 @@ private fun SemanticRational.binary64(role: String): Double {
 
 internal fun EffectiveSourceSemantics.gridDefaults(): FloatSemantics.Grid =
     effective.floats as? FloatSemantics.Grid ?: FloatSemantics.Grid(
-        DEFAULT_FLOAT_BUCKETS, DEFAULT_FLOAT_SCALE,
+        DEFAULT_FLOAT_BUCKETS,
+        DEFAULT_FLOAT_SCALE,
         UndeclaredRealBounds(semanticFloat(DEFAULT_UNBOUNDED_FLOAT_LO), semanticFloat(DEFAULT_UNBOUNDED_FLOAT_HI)),
     )

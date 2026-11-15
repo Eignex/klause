@@ -29,7 +29,9 @@ internal class LinearAuthorityCut(
 ) {
     val owners: Set<Int> = owners.toSet()
 
-    init { require(owner in this.owners && this.owners.all { it >= 0 }) }
+    init {
+        require(owner in this.owners && this.owners.all { it >= 0 })
+    }
 }
 
 internal class LinearAuthorityCuts private constructor(
@@ -40,7 +42,8 @@ internal class LinearAuthorityCuts private constructor(
     val pointDirected: Boolean,
 ) {
     fun withAdditional(
-        additional: List<LinearAuthorityCut>, maximumCandidates: Int = Int.MAX_VALUE,
+        additional: List<LinearAuthorityCut>,
+        maximumCandidates: Int = Int.MAX_VALUE,
     ): LinearAuthorityCuts {
         require(maximumCandidates >= additional.size)
         val retained = minOf(rows.size, maximumCandidates - additional.size)
@@ -88,9 +91,14 @@ internal class LinearAuthorityCuts private constructor(
                 if (cancellation()) return null
                 val cuts = ArrayList<LinearAuthorityCut>()
                 val observations = linkedMapOf(
-                    "MixedRowsVisited" to 0L, "MixedEligibleRows" to 0L, "MixedMissingBounds" to 0L,
-                    "MixedIntegralShiftedRhs" to 0L, "MixedRetentionLimited" to 0L, "MixedWidthLimited" to 0L,
-                    "BoundScanLimited" to 0L, "RowScanLimited" to 0L,
+                    "MixedRowsVisited" to 0L,
+                    "MixedEligibleRows" to 0L,
+                    "MixedMissingBounds" to 0L,
+                    "MixedIntegralShiftedRhs" to 0L,
+                    "MixedRetentionLimited" to 0L,
+                    "MixedWidthLimited" to 0L,
+                    "BoundScanLimited" to 0L,
+                    "RowScanLimited" to 0L,
                 )
                 fun observe(name: String) {
                     observations[name] = (observations[name] ?: 0L) + 1L
@@ -114,8 +122,8 @@ internal class LinearAuthorityCuts private constructor(
                                 it.den.magnitudeBitLength() > 4096
                         }
                     ) {
-                            continue
-                        }
+                        continue
+                    }
                     bounds.getOrPut(coordinate to (coefficient > BigFraction.ZERO)) {
                         row to SourceDerivation.Premise(id)
                     }
@@ -141,8 +149,8 @@ internal class LinearAuthorityCuts private constructor(
                                 it.den.magnitudeBitLength() > 4096
                         }
                     ) {
-                            continue
-                        }
+                        continue
+                    }
                     val integerValues = coefficients.filterKeys { it.kind == SourceCoordinate.Kind.Integer }.values
                     if (integerValues.isEmpty()) continue
                     if (mixed) observe("MixedRowsVisited")
@@ -160,10 +168,16 @@ internal class LinearAuthorityCuts private constructor(
                     }
                     if (divisor.isZero()) continue
                     val multiplier = BigFraction.of(scale, divisor)
-                    val normalized = SourceInequality(coefficients.mapValues { (_, value) -> value * multiplier },
-                        row.rhs * multiplier, row.strict)
-                    val combination = SourceDerivation.Combination(listOf(
-                        SourceDerivation.Combination.Term(multiplier, SourceDerivation.Premise(entry.key))))
+                    val normalized = SourceInequality(
+                        coefficients.mapValues { (_, value) -> value * multiplier },
+                        row.rhs * multiplier,
+                        row.strict,
+                    )
+                    val combination = SourceDerivation.Combination(
+                        listOf(
+                        SourceDerivation.Combination.Term(multiplier, SourceDerivation.Premise(entry.key)),
+                    )
+                    )
                     if (mixed) {
                         val sides = coefficients.filterKeys { it.kind == SourceCoordinate.Kind.Real }
                             .map { (id, value) ->
@@ -176,26 +190,26 @@ internal class LinearAuthorityCuts private constructor(
                         val preferred = sides.filterNotNull()
                         val alternatives = if (complementary) {
                             coefficients
-                            .filterKeys { it.kind == SourceCoordinate.Kind.Real }.map { (id, value) ->
-                                val opposite = bounds[id to (value < BigFraction.ZERO)]
-                                val original = bounds[id to (value > BigFraction.ZERO)]
-                                val at = point?.get(id)
-                                fun distance(bound: Pair<SourceInequality, SourceDerivation>?): Double? {
-                                    if (bound == null || at == null || !at.isFinite()) return null
-                                    val row = bound.first
-                                    val endpoint = row.rhs.toDouble() / row.coefficients.getValue(id).toDouble()
-                                    return abs(at - endpoint).takeIf { it.isFinite() }
-                                }
-                                val originalDistance = distance(original)
-                                val oppositeDistance = distance(opposite)
-                                if (originalDistance != null && oppositeDistance != null &&
-                                    originalDistance <= oppositeDistance
-                                ) {
+                                .filterKeys { it.kind == SourceCoordinate.Kind.Real }.map { (id, value) ->
+                                    val opposite = bounds[id to (value < BigFraction.ZERO)]
+                                    val original = bounds[id to (value > BigFraction.ZERO)]
+                                    val at = point?.get(id)
+                                    fun distance(bound: Pair<SourceInequality, SourceDerivation>?): Double? {
+                                        if (bound == null || at == null || !at.isFinite()) return null
+                                        val row = bound.first
+                                        val endpoint = row.rhs.toDouble() / row.coefficients.getValue(id).toDouble()
+                                        return abs(at - endpoint).takeIf { it.isFinite() }
+                                    }
+                                    val originalDistance = distance(original)
+                                    val oppositeDistance = distance(opposite)
+                                    if (originalDistance != null && oppositeDistance != null &&
+                                        originalDistance <= oppositeDistance
+                                    ) {
                                         original
                                     } else {
                                         opposite ?: original
                                     }
-                            }.filterNotNull()
+                                }.filterNotNull()
                         } else {
                             preferred
                         }
@@ -233,7 +247,9 @@ internal class LinearAuthorityCuts private constructor(
                                 continue
                             }
                             if ((conclusion.coefficients.values + conclusion.rhs).any {
-                                    it.num.magnitudeBitLength() > 4096 || it.den.magnitudeBitLength() > 4096 }) {
+                                    it.num.magnitudeBitLength() > 4096 || it.den.magnitudeBitLength() > 4096
+                            }
+                            ) {
                                 observe("MixedWidthLimited")
                                 continue
                             }

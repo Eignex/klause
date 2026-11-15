@@ -66,9 +66,13 @@ class ResumableOpenTheoryTest {
         assertNull(search.runSlice(ExecutionControl.Never, sliceMillis = Long.MAX_VALUE, sliceWork = 1))
         val paused = search.stats
 
-        val result = assertIs<OpenTheoryResult.Unknown>(search.runSlice(
-            ExecutionControl { true }, sliceMillis = Long.MAX_VALUE, sliceWork = 1,
-        ))
+        val result = assertIs<OpenTheoryResult.Unknown>(
+            search.runSlice(
+            ExecutionControl { true },
+            sliceMillis = Long.MAX_VALUE,
+            sliceWork = 1,
+        )
+        )
         search.close()
 
         assertEquals(TerminationReason.Cancelled, result.reason)
@@ -86,9 +90,13 @@ class ResumableOpenTheoryTest {
             TheoryParams(),
         )
 
-        val result = assertIs<OpenTheoryResult.Sat>(search.runSlice(
-            ExecutionControl.Never, sliceMillis = Long.MAX_VALUE, sliceWork = Long.MAX_VALUE,
-        ))
+        val result = assertIs<OpenTheoryResult.Sat>(
+            search.runSlice(
+            ExecutionControl.Never,
+            sliceMillis = Long.MAX_VALUE,
+            sliceWork = Long.MAX_VALUE,
+        )
+        )
         search.close()
 
         assertEquals(source.prepared.stats, result.stats.presolve)
@@ -111,9 +119,13 @@ class ResumableOpenTheoryTest {
         )
         val search = ResumableOpenTheory(engine, TheoryParams(cancellation = ExecutionControl { stopped }))
 
-        val result = assertIs<OpenTheoryResult.Unknown>(search.runSlice(
-            ExecutionControl.Never, sliceMillis = Long.MAX_VALUE, sliceWork = 1,
-        ))
+        val result = assertIs<OpenTheoryResult.Unknown>(
+            search.runSlice(
+            ExecutionControl.Never,
+            sliceMillis = Long.MAX_VALUE,
+            sliceWork = 1,
+        )
+        )
         search.close()
 
         assertEquals(TerminationReason.Cancelled, result.reason)
@@ -125,9 +137,14 @@ class ResumableOpenTheoryTest {
     private fun preparedChain(): OpenSourcePreparation.Planned {
         val problem = chain(8, total = 20)
         val prepared = PreparedSource(
-            problem, problem, infeasible = false, objective = null,
-            passesFired = listOf(PresolvePass.PROBE_OPEN_RANGES), rebuild = SourceRebuilds.NONE,
-            budget = PresolveBudget(1_000).apply { charge(31) }, elapsed = 17.milliseconds,
+            problem,
+            problem,
+            infeasible = false,
+            objective = null,
+            passesFired = listOf(PresolvePass.PROBE_OPEN_RANGES),
+            rebuild = SourceRebuilds.NONE,
+            budget = PresolveBudget(1_000).apply { charge(31) },
+            elapsed = 17.milliseconds,
         )
         return OpenSourcePreparation.Planned(prepared, problem, problem.componentPlan())
     }

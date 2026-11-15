@@ -130,8 +130,15 @@ class QuadraticSourceWitnessTest {
             "(declare-const x Real) (declare-const n Int) (assert (= (* x x) (to_real n)))",
             allowIntegers = true,
         ).let {
-            NonlinearIntegerProblem(it.formula, it.realCount, it.boolCount,
-                it.intVarNames, it.realVarNames, it.boolVarNames, smtLibSemantics.resolve())
+            NonlinearIntegerProblem(
+                it.formula,
+                it.realCount,
+                it.boolCount,
+                it.intVarNames,
+                it.realVarNames,
+                it.boolVarNames,
+                smtLibSemantics.resolve(),
+            )
         }
         val root = AlgebraicArithmetic().roots(
             RationalPolynomial(
@@ -156,8 +163,15 @@ class QuadraticSourceWitnessTest {
             "(declare-const x Real) (declare-const n Int) (assert (= (* x x) (to_real n)))",
             allowIntegers = true,
         ).let {
-            NonlinearIntegerProblem(it.formula, it.realCount, it.boolCount,
-                it.intVarNames, it.realVarNames, it.boolVarNames, smtLibSemantics.resolve())
+            NonlinearIntegerProblem(
+                it.formula,
+                it.realCount,
+                it.boolCount,
+                it.intVarNames,
+                it.realVarNames,
+                it.boolVarNames,
+                smtLibSemantics.resolve(),
+            )
         }
         val point = Sample(
             booleanArrayOf(),
@@ -183,8 +197,15 @@ class QuadraticSourceWitnessTest {
                 "(assert (= n 9223372036854775808)) (assert (= (* x x) 2))",
             allowIntegers = true,
         ).let {
-            NonlinearIntegerProblem(it.formula, it.realCount, it.boolCount,
-                it.intVarNames, it.realVarNames, it.boolVarNames, smtLibSemantics.resolve())
+            NonlinearIntegerProblem(
+                it.formula,
+                it.realCount,
+                it.boolCount,
+                it.intVarNames,
+                it.realVarNames,
+                it.boolVarNames,
+                smtLibSemantics.resolve(),
+            )
         }
         val request = source.pipelineRequest()
         val objective = QuadraticObjectiveSpec(

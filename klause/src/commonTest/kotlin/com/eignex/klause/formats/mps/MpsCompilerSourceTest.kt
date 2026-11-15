@@ -16,9 +16,11 @@ import kotlin.test.assertTrue
 class MpsCompilerSourceTest {
     @Test
     fun `a source witness check should reject a violated source row`() {
-        val source = assertNotNull(Mps.parse(
+        val source = assertNotNull(
+            Mps.parse(
             "ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 1\nRHS\n RHS R 1\nBOUNDS\n LO B X 0\nENDATA",
-        ).toLinearSourceProblem(SemanticOverrides(feasibilityTolerance = SourceTolerance())))
+        ).toLinearSourceProblem(SemanticOverrides(feasibilityTolerance = SourceTolerance()))
+        )
 
         val witness = source.checkMpsWitness(listOf(BigFraction.ZERO))
 
@@ -27,10 +29,12 @@ class MpsCompilerSourceTest {
 
     @Test
     fun `source coordinates should retain integer values beyond Long`() {
-        val source = assertNotNull(Mps.parse(
+        val source = assertNotNull(
+            Mps.parse(
             "ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1\n" +
                 " M1 'MARKER' 'INTEND'\nBOUNDS\n FR B I\nENDATA",
-        ).toLinearSourceProblem())
+        ).toLinearSourceProblem()
+        )
         val value = BigFraction.of(parseBigInt("10000000000000000000"), BIG_ONE)
 
         val witness = assertNotNull(source.checkMpsWitness(listOf(value)))
@@ -41,10 +45,12 @@ class MpsCompilerSourceTest {
 
     @Test
     fun `source coordinates should require exact integer integrality`() {
-        val source = assertNotNull(Mps.parse(
+        val source = assertNotNull(
+            Mps.parse(
             "ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1\n" +
                 " M1 'MARKER' 'INTEND'\nBOUNDS\n FR B I\nENDATA",
-        ).toLinearSourceProblem())
+        ).toLinearSourceProblem()
+        )
 
         assertNull(source.checkMpsWitness(listOf(BigFraction.ofLong(2L).reciprocal())))
     }
@@ -65,8 +71,10 @@ class MpsCompilerSourceTest {
         )
 
         val compiled = parsed.toProblem()
-        val witness = assertNotNull(assertNotNull(parsed.toLinearSourceProblem())
-            .checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ofLong(5L))))
+        val witness = assertNotNull(
+            assertNotNull(parsed.toLinearSourceProblem())
+                .checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ofLong(5L))),
+        )
 
         assertEquals(0, compiled.model.numRealVars)
         assertEquals(2L, compiled.model.intBounds.lower(1))
@@ -84,8 +92,10 @@ class MpsCompilerSourceTest {
         )
 
         val compiled = parsed.toProblem()
-        val witness = assertNotNull(assertNotNull(parsed.toLinearSourceProblem())
-            .checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ofLong(2L).reciprocal())))
+        val witness = assertNotNull(
+            assertNotNull(parsed.toLinearSourceProblem())
+                .checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ofLong(2L).reciprocal())),
+        )
 
         assertEquals(1, compiled.columns.count { it.real })
         assertEquals("1/2", witness.objective.toString())
@@ -100,8 +110,10 @@ class MpsCompilerSourceTest {
         )
 
         val compiled = parsed.toProblem()
-        val witness = assertNotNull(assertNotNull(parsed.toLinearSourceProblem())
-            .checkMpsWitness(listOf(BigFraction.ZERO, BigFraction.ofLong(2L).reciprocal())))
+        val witness = assertNotNull(
+            assertNotNull(parsed.toLinearSourceProblem())
+                .checkMpsWitness(listOf(BigFraction.ZERO, BigFraction.ofLong(2L).reciprocal())),
+        )
 
         assertEquals(1, compiled.columns.count { it.real })
         assertEquals("1/2", witness.objective.toString())
@@ -126,8 +138,10 @@ class MpsCompilerSourceTest {
         )
 
         val compiled = parsed.toProblem()
-        val witness = assertNotNull(assertNotNull(parsed.toLinearSourceProblem())
-            .checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ofLong(10_000_000_000_000_001L))))
+        val witness = assertNotNull(
+            assertNotNull(parsed.toLinearSourceProblem())
+                .checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ofLong(10_000_000_000_000_001L))),
+        )
 
         assertEquals(0, compiled.model.numRealVars)
         assertTrue(compiled.sourceExact)
@@ -142,8 +156,10 @@ class MpsCompilerSourceTest {
         )
 
         val compiled = parsed.toProblem()
-        val witness = assertNotNull(assertNotNull(parsed.toLinearSourceProblem())
-            .checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ofLong(2L))))
+        val witness = assertNotNull(
+            assertNotNull(parsed.toLinearSourceProblem())
+                .checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ofLong(2L))),
+        )
 
         assertEquals(1, compiled.floatColumns)
         assertEquals(0, compiled.columns.count { it.real })
@@ -158,8 +174,10 @@ class MpsCompilerSourceTest {
         )
 
         val compiled = parsed.toProblem()
-        val witness = assertNotNull(assertNotNull(parsed.toLinearSourceProblem())
-            .checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ofLong(3L))))
+        val witness = assertNotNull(
+            assertNotNull(parsed.toLinearSourceProblem())
+                .checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ofLong(3L))),
+        )
 
         assertEquals(1, compiled.floatColumns)
         assertEquals(0, compiled.columns.count { it.real })
@@ -179,10 +197,12 @@ class MpsCompilerSourceTest {
 
     @Test
     fun `the source check should reject a marker integer above its implicit binary bound`() {
-        val source = assertNotNull(Mps.parse(
+        val source = assertNotNull(
+            Mps.parse(
             "ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X COST 1\n" +
                 " M1 'MARKER' 'INTEND'\nENDATA",
-        ).toLinearSourceProblem())
+        ).toLinearSourceProblem()
+        )
 
         assertNull(source.checkMpsWitness(listOf(BigFraction.ofLong(2L))))
     }
@@ -194,8 +214,10 @@ class MpsCompilerSourceTest {
         )
 
         val compiled = parsed.toProblem()
-        val witness = assertNotNull(assertNotNull(parsed.toLinearSourceProblem())
-            .checkMpsWitness(listOf(BigFraction.ofLong(3L).reciprocal())))
+        val witness = assertNotNull(
+            assertNotNull(parsed.toLinearSourceProblem())
+                .checkMpsWitness(listOf(BigFraction.ofLong(3L).reciprocal())),
+        )
 
         assertTrue(compiled.sourceExact)
         assertTrue(compiled.copy().sourceExact)
@@ -214,8 +236,10 @@ class MpsCompilerSourceTest {
 
         assertFalse(compiled.sourceExact)
         assertEquals("row 'R' coefficient", compiled.sourceDifference)
-        assertNull(assertNotNull(parsed.toLinearSourceProblem())
-            .checkMpsWitness(listOf(BigFraction.ofLong(2L).reciprocal())))
+        assertNull(
+            assertNotNull(parsed.toLinearSourceProblem())
+                .checkMpsWitness(listOf(BigFraction.ofLong(2L).reciprocal())),
+        )
     }
 
     @Test
@@ -225,8 +249,10 @@ class MpsCompilerSourceTest {
         )
 
         val compiled = parsed.toProblem()
-        val witness = assertNotNull(assertNotNull(parsed.toLinearSourceProblem())
-            .checkMpsWitness(listOf(BigFraction.ofLong(3L).reciprocal())))
+        val witness = assertNotNull(
+            assertNotNull(parsed.toLinearSourceProblem())
+                .checkMpsWitness(listOf(BigFraction.ofLong(3L).reciprocal())),
+        )
 
         assertFalse(compiled.sourceExact)
         assertEquals("objective coefficient 'X'", compiled.sourceDifference)
@@ -248,8 +274,10 @@ class MpsCompilerSourceTest {
 
         assertTrue(compiled.sourceExact)
         assertNull(compiled.sourceDifference)
-        assertNull(assertNotNull(parsed.toLinearSourceProblem(exact))
-            .checkMpsWitness(listOf(BigFraction.of(parseBigInt("-10000000000000000001"), BIG_ONE))))
+        assertNull(
+            assertNotNull(parsed.toLinearSourceProblem(exact))
+                .checkMpsWitness(listOf(BigFraction.of(parseBigInt("-10000000000000000001"), BIG_ONE))),
+        )
     }
 
     @Test
@@ -267,8 +295,10 @@ class MpsCompilerSourceTest {
 
         assertTrue(compiled.sourceExact)
         assertNull(compiled.sourceDifference)
-        assertNull(assertNotNull(parsed.toLinearSourceProblem(exact))
-            .checkMpsWitness(listOf(BigFraction.of(parseBigInt("10000000000000000001"), BIG_ONE))))
+        assertNull(
+            assertNotNull(parsed.toLinearSourceProblem(exact))
+                .checkMpsWitness(listOf(BigFraction.of(parseBigInt("10000000000000000001"), BIG_ONE))),
+        )
     }
 
     @Test
@@ -280,8 +310,10 @@ class MpsCompilerSourceTest {
         )
 
         val compiled = parsed.toProblem()
-        val witness = assertNotNull(assertNotNull(parsed.toLinearSourceProblem())
-            .checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ONE)))
+        val witness = assertNotNull(
+            assertNotNull(parsed.toLinearSourceProblem())
+                .checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ONE)),
+        )
 
         assertEquals(1L, compiled.objectiveScale)
         assertTrue(compiled.sourceExact)
@@ -296,8 +328,10 @@ class MpsCompilerSourceTest {
         )
 
         val compiled = parsed.toProblem()
-        val witness = assertNotNull(assertNotNull(parsed.toLinearSourceProblem())
-            .checkMpsWitness(listOf(BigFraction.ofLong(2L))))
+        val witness = assertNotNull(
+            assertNotNull(parsed.toLinearSourceProblem())
+                .checkMpsWitness(listOf(BigFraction.ofLong(2L))),
+        )
 
         assertTrue(compiled.maximize)
         assertTrue(compiled.sourceExact)
@@ -306,21 +340,28 @@ class MpsCompilerSourceTest {
 
     @Test
     fun `the tolerance check should admit a row violation only below the MPS tolerance`() {
-        val source = assertNotNull(Mps.parse(
+        val source = assertNotNull(
+            Mps.parse(
             "ROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R 1\nRHS\n RHS R 1\nBOUNDS\n UP BND X 10\nENDATA",
-        ).toLinearSourceProblem())
+        ).toLinearSourceProblem()
+        )
 
         for ((value, admitted) in listOf(1.0 - 1e-9 to true, 1.0 - 1e-3 to false, 1.0 to true)) {
-            assertEquals(admitted,
-                source.checkMpsWitness(listOf(checkNotNull(BigFraction.ofDouble(value)))) != null, "$value")
+            assertEquals(
+                admitted,
+                source.checkMpsWitness(listOf(checkNotNull(BigFraction.ofDouble(value)))) != null,
+                "$value",
+            )
         }
     }
 
     @Test
     fun `the tolerance check should judge a row whose binary64 terms overflow by its exact activity`() {
-        val source = assertNotNull(Mps.parse(
+        val source = assertNotNull(
+            Mps.parse(
             "ROWS\n N COST\n L R\nCOLUMNS\n X COST 1 R 1e308\n Y COST 1 R -1e308\nRHS\n RHS R 0\nENDATA",
-        ).toLinearSourceProblem())
+        ).toLinearSourceProblem()
+        )
 
         val points = listOf(
             doubleArrayOf(10.0, 9.0) to false,
@@ -336,28 +377,37 @@ class MpsCompilerSourceTest {
     @Test
     fun `the tolerance check should read a coefficient past binary64 range at its exact value`() {
         // The two entries sum to 2e308, which no binary64 holds.
-        val source = assertNotNull(Mps.parse(
+        val source = assertNotNull(
+            Mps.parse(
             "ROWS\n N COST\n L R\nCOLUMNS\n X COST 1 R 1e308\n X R 1e308\nRHS\n RHS R 1\nENDATA",
-        ).toLinearSourceProblem())
+        ).toLinearSourceProblem()
+        )
 
         for ((value, admitted) in listOf(0.0 to true, 1.0 to false)) {
-            assertEquals(admitted,
-                source.checkMpsWitness(listOf(checkNotNull(BigFraction.ofDouble(value)))) != null, "$value")
+            assertEquals(
+                admitted,
+                source.checkMpsWitness(listOf(checkNotNull(BigFraction.ofDouble(value)))) != null,
+                "$value",
+            )
         }
     }
 
     @Test
     fun `the source objective of a float point should be exact in its doubles`() {
-        val source = assertNotNull(Mps.parse(
+        val source = assertNotNull(
+            Mps.parse(
             "ROWS\n N COST\n G R\nCOLUMNS\n Y COST 1e5 R 1\n X COST 99999.9999999701976776123046875 R 1\n" +
                 "RHS\n RHS R 1\nBOUNDS\n FR BND Y\nENDATA",
-        ).toLinearSourceProblem())
+        ).toLinearSourceProblem()
+        )
         val y = -999_999_999_999.0
         val x = 1e12
 
-        val objective = assertNotNull(source.checkMpsWitness(
+        val objective = assertNotNull(
+            source.checkMpsWitness(
             listOf(checkNotNull(BigFraction.ofDouble(y)), checkNotNull(BigFraction.ofDouble(x))),
-        )).objective
+        )
+        ).objective
 
         val expected = BigFraction.ofLong(100_000L) * BigFraction.ofLong(-999_999_999_999L) +
             BigFraction.ofDouble(99999.9999999701976776123046875)!! * BigFraction.ofLong(1_000_000_000_000L)

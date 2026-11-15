@@ -26,13 +26,21 @@ internal class GridArrayMinMaxInvariant(private val factor: GridArrayMinMax) : I
             val current = if (variable == changed) value else state.assignment.intValue(variable)
             activity += constants.exactCoeff(position) * bigIntOf(current)
         }
-        return if (row.op == LinearOp.EQ) activity == constants.exactBound
-            else activity <= constants.exactBound
+        return if (row.op == LinearOp.EQ) {
+            activity == constants.exactBound
+        } else {
+            activity <= constants.exactBound
+        }
     }
 
     private fun degree(state: LocalSearchState, changed: Int = -1, value: Long = 0L): Int =
         if (bounds.all { holds(it, state, changed, value) } &&
-            equalities.any { holds(it, state, changed, value) }) 0 else 1
+            equalities.any { holds(it, state, changed, value) }
+        ) {
+                0
+            } else {
+                1
+            }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = degree(state) != 0
 
@@ -50,8 +58,10 @@ internal class GridArrayMinMaxInvariant(private val factor: GridArrayMinMax) : I
             val coefficient = constants.exactCoeff(position)
             if (coefficient == BIG_ZERO) continue
             var residual = constants.exactBound
-            for (index in row.vars.indices) if (index != position) {
+            for (index in row.vars.indices) {
+                if (index != position) {
                 residual -= constants.exactCoeff(index) * bigIntOf(state.assignment.intValue(row.vars[index]))
+            }
             }
             val target = residual / coefficient
             if (!target.fitsLong()) continue

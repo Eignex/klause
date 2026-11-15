@@ -80,7 +80,9 @@ internal val PresolvePass.baseWorkWeight: Long
     get() = when (this) {
         // Relation admission and scans are metered before reading payloads, including declined diagrams.
         PresolvePass.COMPOSE_EXTENSIONAL, PresolvePass.SUBSTITUTE_TUPLE_PACKING,
-        PresolvePass.SUBSTITUTE_TABLE_VALUES -> 0L
+        PresolvePass.SUBSTITUTE_TABLE_VALUES,
+        -> 0L
+
         PresolvePass.REMOVE_REDUNDANT -> 63L
 
         PresolvePass.FOLD_COMPARISON_CLAUSES -> 18L
@@ -186,7 +188,8 @@ object Presolver {
                 }
                 if (pass != PresolvePass.DERIVE_XOR_UNITS) return null
                 val inputs = parityInputs ?: ParityInputRevision(
-                    current, ctx.presolveBudget?.orSpent(cancellation) ?: cancellation,
+                    current,
+                    ctx.presolveBudget?.orSpent(cancellation) ?: cancellation,
                 ).also { parityInputs = it }
                 return inputs.current(current)
             }
@@ -194,7 +197,9 @@ object Presolver {
             override fun runPass(pass: PresolvePass, slice: ExecutionControl?): PassOutcome {
                 val token = (slice ?: ctx.cancellation).let { ctx.presolveBudget?.observeStops(it) ?: it }
                 return ctx.presolveBudget.observeRoundPass(
-                    pass, PresolveLane.SOURCE, token,
+                    pass,
+                    PresolveLane.SOURCE,
+                    token,
                     { current.presolveSize() },
                     { pass.namespaceEligible(current) },
                 ) { invocation ->
@@ -210,8 +215,14 @@ object Presolver {
                         return@observeRoundPass PassOutcome.UNCHANGED
                     }
                     invocation.recordDelta(current.factors, delta.droppedIndices, delta.addedFactors)
-                    invocation.recordStructuralImpact(current, delta.droppedIndices, delta.addedFactors,
-                        delta.rebuild, config.structuralImpactLimit, token)
+                    invocation.recordStructuralImpact(
+                        current,
+                        delta.droppedIndices,
+                        delta.addedFactors,
+                        delta.rebuild,
+                        config.structuralImpactLimit,
+                        token,
+                    )
                     val narrowed = delta.bounds?.let { narrowedColumns(current.intBounds, it, invocation) } ?: 0
                     invocation?.narrowedColumns = narrowed
                     // A proved range can empty a column whose declaration it intersects, which refutes the
@@ -224,11 +235,11 @@ object Presolver {
                     )
                     for (inputs in linearInputs.values) {
                         inputs.recordDelta(
-                        current.factors,
-                        delta.droppedIndices,
-                        delta.addedFactors,
-                        deductionsChanged = delta.bounds != null,
-                    )
+                            current.factors,
+                            delta.droppedIndices,
+                            delta.addedFactors,
+                            deductionsChanged = delta.bounds != null,
+                        )
                     }
                     current = current.withSourcePassDelta(delta) ?: return@observeRoundPass PassOutcome.INFEASIBLE
                     ctx = ctx.withObjective(delta.objective)
@@ -262,11 +273,7 @@ object Presolver {
         )
     }
 
-    private fun trackAfterCompletedMiss(
-        pass: PresolvePass,
-        invocation: PresolveInvocation?,
-        revision: () -> Long?,
-    ) {
+    private fun trackAfterCompletedMiss(pass: PresolvePass, invocation: PresolveInvocation?, revision: () -> Long?) {
         if (!pass.tracksLinearInputs || invocation?.interrupted == true) return
         revision()
         // Dependency tracking follows the completed kernel; its stop cannot revoke that completion.
@@ -312,8 +319,11 @@ object Presolver {
         val earlyRefutation = if (PresolvePass.STRENGTHEN_COEFFICIENTS in passes) {
             val token = context.presolveBudget?.observeStops(cancellation) ?: cancellation
             context.presolveBudget.observeRoundPass(
-                PresolvePass.STRENGTHEN_COEFFICIENTS, PresolveLane.FINITE, token,
-                { problem.presolveSize() }, { true },
+                PresolvePass.STRENGTHEN_COEFFICIENTS,
+                PresolveLane.FINITE,
+                token,
+                { problem.presolveSize() },
+                { true },
             ) { invocation ->
                 val units = PresolveEntrySize(context.presolveBudget).units(problem, token)
                 invocation.recordEntries(units)
@@ -348,7 +358,13 @@ object Presolver {
         // EXHAUSTIVE pass (probing, implication graph, BVE / BCE), which keeps the fresh-rebuild path.
         if (passes.none { it.timing == PresolveTiming.EXHAUSTIVE }) {
             return runIncremental(
-                problem, passes, maxRounds, ctx, cancellation, config.abortFraction, config.structuralImpactLimit,
+                problem,
+                passes,
+                maxRounds,
+                ctx,
+                cancellation,
+                config.abortFraction,
+                config.structuralImpactLimit,
             )
         }
 
@@ -372,7 +388,8 @@ object Presolver {
                 }
                 if (pass != PresolvePass.DERIVE_XOR_UNITS) return null
                 val inputs = parityInputs ?: ParityInputRevision(
-                    current, ctx.presolveBudget?.orSpent(cancellation) ?: cancellation,
+                    current,
+                    ctx.presolveBudget?.orSpent(cancellation) ?: cancellation,
                 ).also { parityInputs = it }
                 return inputs.current(current)
             }
@@ -380,7 +397,9 @@ object Presolver {
             override fun runPass(pass: PresolvePass, slice: ExecutionControl?): PassOutcome {
                 val token = (slice ?: ctx.cancellation).let { ctx.presolveBudget?.observeStops(it) ?: it }
                 return ctx.presolveBudget.observeRoundPass(
-                    pass, PresolveLane.FINITE, token,
+                    pass,
+                    PresolveLane.FINITE,
+                    token,
                     { current.presolveSize() },
                     { pass.namespaceEligible(current) },
                 ) { invocation ->
@@ -395,8 +414,14 @@ object Presolver {
                         return@observeRoundPass PassOutcome.UNCHANGED
                     }
                     invocation.recordDelta(current.factors, delta.droppedIndices, delta.addedFactors)
-                    invocation.recordStructuralImpact(current, delta.droppedIndices, delta.addedFactors,
-                        delta.rebuild, config.structuralImpactLimit, token)
+                    invocation.recordStructuralImpact(
+                        current,
+                        delta.droppedIndices,
+                        delta.addedFactors,
+                        delta.rebuild,
+                        config.structuralImpactLimit,
+                        token,
+                    )
                     delta.reconstruct?.let(reconstructs::add)
                     if (delta.reconstruct != null && delta.rebuild.isEmpty) liftDescribedByRebuild = false
                     if (!delta.rebuild.isEmpty) rebuilds.add(delta.rebuild)
@@ -420,10 +445,17 @@ object Presolver {
             override fun changedUnits(): Long = changed
         }
         val rounds = PresolveRoundEngine.run(
-            passes, maxRounds, cancellation, ctx.presolveBudget, host, config.abortFraction,
+            passes,
+            maxRounds,
+            cancellation,
+            ctx.presolveBudget,
+            host,
+            config.abortFraction,
         )
         val mapping = SourceMapping(
-            problem, host.current, rounds.fired.transformationGuarantees(),
+            problem,
+            host.current,
+            rounds.fired.transformationGuarantees(),
             SourceRebuilds.compose(host.rebuilds),
             liftDescribedByRebuild = host.liftDescribedByRebuild,
             lift = composeReconstructs(host.reconstructs),
@@ -458,7 +490,10 @@ object Presolver {
     ): Presolved {
         var ctx = initialContext
         val session = ctx.presolveBudget.observePreparation(
-            PresolvePreparationStage.FINITE_SESSION, PresolveLane.FINITE, problem, cancellation,
+            PresolvePreparationStage.FINITE_SESSION,
+            PresolveLane.FINITE,
+            problem,
+            cancellation,
         ) { token, observation ->
             PresolveSession(problem, ctx.bakeConfig, token).also {
                 if (it.infeasible) observation.preparationRefuted()
@@ -481,7 +516,9 @@ object Presolver {
                 if (pass.tracksLinearInputs) {
                     val inputs = linearInputs.getOrPut(pass) {
                         LinearInputRevision(
-                            session.passInput(), pass, ctx.presolveBudget?.orSpent(cancellation) ?: cancellation,
+                            session.passInput(),
+                            pass,
+                            ctx.presolveBudget?.orSpent(cancellation) ?: cancellation,
                         )
                     }
                     return inputs.current { v ->
@@ -491,7 +528,8 @@ object Presolver {
                 }
                 if (pass != PresolvePass.DERIVE_XOR_UNITS) return null
                 val inputs = parityInputs ?: ParityInputRevision(
-                    session.passInput(), ctx.presolveBudget?.orSpent(cancellation) ?: cancellation,
+                    session.passInput(),
+                    ctx.presolveBudget?.orSpent(cancellation) ?: cancellation,
                 ).also { parityInputs = it }
                 return inputs.current(session::boolValueOf) { v ->
                     val domain = session.intDomainOf(v)
@@ -514,10 +552,17 @@ object Presolver {
             override fun runPass(pass: PresolvePass, slice: ExecutionControl?): PassOutcome {
                 val token = (slice ?: ctx.cancellation).let { ctx.presolveBudget?.observeStops(it) ?: it }
                 return ctx.presolveBudget.observeRoundPass(
-                    pass, PresolveLane.FINITE, token,
-                    { PresolveSizeStats(
-                        session.liveFactorCount, problem.numBoolVars, problem.numIntVars, reals = problem.numRealVars,
-                    ) },
+                    pass,
+                    PresolveLane.FINITE,
+                    token,
+                    {
+                        PresolveSizeStats(
+                            session.liveFactorCount,
+                            problem.numBoolVars,
+                            problem.numIntVars,
+                            reals = problem.numRealVars,
+                        )
+                    },
                     { pass.namespaceEligible(problem, session.liveFactorCount) && incrementalEligible(pass, token) },
                 ) { invocation ->
                     // Before the context: [passOccurrence] is keyed against the factor list [passInput] fixes.
@@ -534,8 +579,14 @@ object Presolver {
                         return@observeRoundPass PassOutcome.UNCHANGED
                     }
                     invocation.recordDelta(input.factors, delta.droppedIndices, delta.addedFactors)
-                    invocation.recordStructuralImpact(input, delta.droppedIndices, delta.addedFactors,
-                        delta.rebuild, structuralImpactLimit, token)
+                    invocation.recordStructuralImpact(
+                        input,
+                        delta.droppedIndices,
+                        delta.addedFactors,
+                        delta.rebuild,
+                        structuralImpactLimit,
+                        token,
+                    )
                     delta.reconstruct?.let(reconstructs::add)
                     if (delta.reconstruct != null && delta.rebuild.isEmpty) liftDescribedByRebuild = false
                     if (!delta.rebuild.isEmpty) rebuilds.add(delta.rebuild)
@@ -614,13 +665,18 @@ object Presolver {
         }
 
         val transformed = ctx.presolveBudget.observePreparation(
-            PresolvePreparationStage.FINITE_MATERIALIZATION, PresolveLane.FINITE, problem, cancellation,
+            PresolvePreparationStage.FINITE_MATERIALIZATION,
+            PresolveLane.FINITE,
+            problem,
+            cancellation,
             output = { it },
         ) { _, observation ->
             session.materialize().also { if (session.infeasible) observation.preparationRefuted() }
         }
         val mapping = SourceMapping(
-            problem, transformed, rounds.fired.transformationGuarantees(),
+            problem,
+            transformed,
+            rounds.fired.transformationGuarantees(),
             SourceRebuilds.compose(host.rebuilds),
             liftDescribedByRebuild = host.liftDescribedByRebuild,
             lift = composeReconstructs(host.reconstructs),

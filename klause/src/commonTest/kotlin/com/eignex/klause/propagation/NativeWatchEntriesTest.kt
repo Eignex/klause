@@ -14,8 +14,10 @@ class NativeWatchEntriesTest {
 
             repeat(65) { entries.add(it.toLong() shl 32 or (64 - it).toLong()) }
 
-            assertEquals(List(65) { it.toLong() shl 32 or (64 - it).toLong() },
-                List(entries.size) { entries[it] })
+            assertEquals(
+                List(65) { it.toLong() shl 32 or (64 - it).toLong() },
+                List(entries.size) { entries[it] },
+            )
         }
     }
 
@@ -65,7 +67,9 @@ class NativeWatchEntriesTest {
         val allPages = assertNotNull(all.snapshot { entries.sharingMemory(all) { true } }.completeValues)
 
         assertEquals(firstPage.getValue("ownedPrimitiveBytes"), allPages.getValue("ownedPrimitiveBytes"))
-        assertEquals(16L * Long.SIZE_BYTES,
-            allPages.getValue("protectedPrimitiveBytes") - firstPage.getValue("protectedPrimitiveBytes"))
+        assertEquals(
+            16L * Long.SIZE_BYTES,
+            allPages.getValue("protectedPrimitiveBytes") - firstPage.getValue("protectedPrimitiveBytes"),
+        )
     }
 }

@@ -51,8 +51,11 @@ internal class DifferenceSystem(
         }
         for (guard in indexGuards.values) ints.add(guard.variable)
         variables = MixedVars(
-            boundInts = if (privateVertices) indexGuards.values.map { it.variable }.distinct().toIntArray()
-                else ints.toIntArray(),
+            boundInts = if (privateVertices) {
+                indexGuards.values.map { it.variable }.distinct().toIntArray()
+            } else {
+                ints.toIntArray()
+            },
             boolVars = bools.toIntArray(),
         )
     }
@@ -60,10 +63,16 @@ internal class DifferenceSystem(
     override fun remap(mapping: VarRemap): Factor = DifferenceSystem(
         edges.map { e ->
             DifferenceEdge(
-                source = if (privateVertices || e.source == DifferenceFragment.ZERO) e.source
-                    else mapping.int(e.source),
-                target = if (privateVertices || e.target == DifferenceFragment.ZERO) e.target
-                    else mapping.int(e.target),
+                source = if (privateVertices || e.source == DifferenceFragment.ZERO) {
+                    e.source
+                } else {
+                    mapping.int(e.source)
+                },
+                target = if (privateVertices || e.target == DifferenceFragment.ZERO) {
+                    e.target
+                } else {
+                    mapping.int(e.target)
+                },
                 bound = e.bound,
                 guard = if (e.guard == DifferenceEdge.ALWAYS) {
                     e.guard
@@ -88,8 +97,14 @@ internal class DifferenceSystem(
         bool(privateVertices)
         int(edges.size)
         for ((index, e) in edges.withIndex().sortedWith(
-            compareBy({ it.value.source }, { it.value.target }, { it.value.bound }, { it.value.guard },
-                { indexGuards[it.index]?.variable ?: -1 }, { indexGuards[it.index]?.value ?: 0L }),
+            compareBy(
+                { it.value.source },
+                { it.value.target },
+                { it.value.bound },
+                { it.value.guard },
+                { indexGuards[it.index]?.variable ?: -1 },
+                { indexGuards[it.index]?.value ?: 0L },
+            ),
         )) {
             int(e.source)
             int(e.target)

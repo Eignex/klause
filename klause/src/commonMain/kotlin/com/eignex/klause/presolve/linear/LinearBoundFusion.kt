@@ -101,9 +101,11 @@ internal object LinearBoundFusion {
                 for (index in group.droppable) visit(scan)
                 for (variable in group.terms.vars) visit(scan)
                 dropped.addAll(group.droppable)
-                added.add(integralLinear(group.terms.vars, group.terms.exactCoefficients(), LinearOp.EQ, upper) {
+                added.add(
+                    integralLinear(group.terms.vars, group.terms.exactCoefficients(), LinearOp.EQ, upper) {
                     visit(scan)
-                })
+                }
+                )
             }
         }
         if (!scan.check()) throw Interrupted()
@@ -134,9 +136,12 @@ internal object LinearBoundFusion {
         val constants = row.constants as? IntegralConstants ?: return null
         if (row.activator != LinearRow.ALWAYS || row.relation == LinearOp.NE) return null
         if ((0 until row.size).any {
-            visit(scan)
-            !Term.isInt(row.ref(it))
-        }) return null
+                visit(scan)
+                !Term.isInt(row.ref(it))
+            }
+        ) {
+                return null
+            }
         if (constants is IntegerConstants) {
             try {
                 return canonicalizeLong(row, constants, scan)
@@ -240,13 +245,17 @@ internal object LinearBoundFusion {
             it.key
         }.toIntArray()
         val key = if (coefficients.all {
-            visit(scan)
-            it.fitsLong()
-        }) {
-            Terms(vars, LongArray(coefficients.size) {
+                visit(scan)
+                it.fitsLong()
+            }
+        ) {
+            Terms(
+                vars,
+                LongArray(coefficients.size) {
                 visit(scan)
                 coefficients[it].toLongExact()
-            })
+            }
+            )
         } else {
             Terms(vars, null, coefficients)
         }

@@ -18,19 +18,19 @@ internal class CutColumnLayout private constructor(private val kinds: IntArray, 
         var matches = kinds.size == map.columnCount
         if (matches) {
             for (index in kinds.indices) {
-            if (cancellation()) {
-                matches = false
-                break
+                if (cancellation()) {
+                    matches = false
+                    break
+                }
+                work++
+                val column = map.column(index)
+                if ((column?.source?.kind?.ordinal ?: -1) != kinds[index] ||
+                    (column?.source?.id ?: -1) != ids[index] || !canonical(column)
+                ) {
+                    matches = false
+                    break
+                }
             }
-            work++
-            val column = map.column(index)
-            if ((column?.source?.kind?.ordinal ?: -1) != kinds[index] ||
-                (column?.source?.id ?: -1) != ids[index] || !canonical(column)
-            ) {
-                matches = false
-                break
-            }
-        }
         }
         onWork(work + if (matches) 4L else 0L)
         return if (matches && !cancellation()) BoundCutColumns(map, this) else null

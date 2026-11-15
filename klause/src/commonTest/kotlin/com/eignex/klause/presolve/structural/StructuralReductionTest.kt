@@ -40,8 +40,11 @@ class StructuralReductionTest {
                 val budget = PresolveBudget(10_000L)
                 val token = budget.orSpent(ExecutionControl.Never)
 
-                val empty = if (source) StructuralReduction.reduceSource(problem, token).isEmpty
-                else StructuralReduction.reduce(problem, token).isEmpty
+                val empty = if (source) {
+                    StructuralReduction.reduceSource(problem, token).isEmpty
+                } else {
+                    StructuralReduction.reduce(problem, token).isEmpty
+                }
 
                 assertTrue(empty)
                 assertEquals(30L, budget.spent())
@@ -64,8 +67,11 @@ class StructuralReductionTest {
             val budget = PresolveBudget(80L)
             val token = budget.orSpent(ExecutionControl.Never)
 
-            val empty = if (source) StructuralReduction.reduceSource(problem, token).isEmpty
-            else StructuralReduction.reduce(problem, token).isEmpty
+            val empty = if (source) {
+                StructuralReduction.reduceSource(problem, token).isEmpty
+            } else {
+                StructuralReduction.reduce(problem, token).isEmpty
+            }
 
             assertTrue(empty)
             assertFalse(called)
@@ -91,7 +97,11 @@ class StructuralReductionTest {
                 clause,
             )
             val problem = BakedProblem(
-                2, 2, arrayOf(IntDomain(2, 2), IntDomain(0, 100)), factors, alreadyFolded = true,
+                2,
+                2,
+                arrayOf(IntDomain(2, 2), IntDomain(0, 100)),
+                factors,
+                alreadyFolded = true,
             )
 
             val (dropped, added) = if (source) {
@@ -175,8 +185,11 @@ class StructuralReductionTest {
             val budget = PresolveBudget(200L)
             val token = budget.orSpent(ExecutionControl.Never)
 
-            val empty = if (source) StructuralReduction.reduceSource(problem, token).isEmpty
-            else StructuralReduction.reduce(problem, token).isEmpty
+            val empty = if (source) {
+                StructuralReduction.reduceSource(problem, token).isEmpty
+            } else {
+                StructuralReduction.reduce(problem, token).isEmpty
+            }
 
             assertTrue(empty)
             assertTrue(reads in 1..10)

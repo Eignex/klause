@@ -31,11 +31,19 @@ internal class BooleanProofRecipe(
 
     fun deterministicClauseQuery(nativeOnly: Boolean = false): Boolean {
         val query = normalized()
-        val firstFail = BacktrackParams(variableSelector = SmallestDomain, valueSelector = IndomainMin,
-            lubyRestartBase = 256L, nativeSat = true)
-        return query == firstFail || (!nativeOnly && query == BacktrackParams(
-            variableSelector = InputOrder, valueSelector = IndomainMin, nativeSat = false,
-        ))
+        val firstFail = BacktrackParams(
+            variableSelector = SmallestDomain,
+            valueSelector = IndomainMin,
+            lubyRestartBase = 256L,
+            nativeSat = true,
+        )
+        return query == firstFail || (
+            !nativeOnly && query == BacktrackParams(
+            variableSelector = InputOrder,
+            valueSelector = IndomainMin,
+            nativeSat = false,
+        )
+        )
     }
 
     fun matches(other: BooleanProofRecipe): Boolean = normalized() == other.normalized()

@@ -26,7 +26,13 @@ class RevisedSimplexPricingTest {
             val model = builder.build(Sense.MINIMIZE)
             assertNotNull(model.doubleView).colVal[2] = 0.0
             val duals = listOf(
-                DoubleArray(rows) { row -> if (row == 0) 1e16 else if (row == 1) 5e15 else 1.0 },
+                DoubleArray(rows) { row ->
+                    if (row == 0) 1e16 else if (row == 1) {
+                    5e15
+                } else {
+                    1.0
+                }
+                },
                 DoubleArray(rows) { row -> if (row == 2) Double.POSITIVE_INFINITY else 1.0 },
                 DoubleArray(rows) { row -> if (row == rows - 1) Double.NaN else -0.0 },
             )
@@ -60,8 +66,11 @@ class RevisedSimplexPricingTest {
                     solver.sparseAxpy(destination, alpha, 0)
 
                     for (row in destination.indices) {
-                        assertEquals(expected[row].toBits(), destination[row].toBits(),
-                            "rows $rows alpha $alpha row $row")
+                        assertEquals(
+                            expected[row].toBits(),
+                            destination[row].toBits(),
+                            "rows $rows alpha $alpha row $row",
+                        )
                     }
                 }
             }
@@ -183,9 +192,15 @@ class RevisedSimplexPricingTest {
             val before = solver.columnDot(doubleArrayOf(0.5), 1)
             assertEquals(BigFraction.ofLong(2L), certifyLpResult(model, solver, first).lowerBound)
             assertTrue(
-                trail.replaceObjective(ExactLpObjective(listOf(
-                    ExactLpNumber.of(1L), ExactLpNumber.of(3L), ExactLpNumber.of(0L),
-                ))),
+                trail.replaceObjective(
+                    ExactLpObjective(
+                        listOf(
+                    ExactLpNumber.of(1L),
+                    ExactLpNumber.of(3L),
+                    ExactLpNumber.of(0L),
+                )
+                    )
+                ),
             )
 
             assertTrue(solver.adopt(trail.state, ExecutionControl.Never))

@@ -56,8 +56,12 @@ class LinearAuthorityLpTest {
     @Test
     fun `nonfinite advice should remain unavailable for every bound shape`() {
         val side = ExactLpSide(ExactLpNumber.of(0L))
-        for (bounds in listOf(ExactLpBounds(), ExactLpBounds(lower = side),
-            ExactLpBounds(upper = side), ExactLpBounds(side, side))) {
+        for (bounds in listOf(
+            ExactLpBounds(),
+            ExactLpBounds(lower = side),
+            ExactLpBounds(upper = side),
+            ExactLpBounds(side, side),
+        )) {
             for (value in listOf(Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)) {
                 assertNull(bounds.projectGuidance(value))
             }

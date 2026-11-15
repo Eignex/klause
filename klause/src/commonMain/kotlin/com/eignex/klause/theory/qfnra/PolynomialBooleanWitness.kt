@@ -12,7 +12,10 @@ internal class PolynomialBooleanWitness(
     private val parents: List<List<Int>>,
     private val arithmetic: PolynomialArithmetic,
 ) {
-    private val supported = IntArray(nodes.size) { arithmetic.step(); UNASSIGNED }
+    private val supported = IntArray(nodes.size) {
+        arithmetic.step();
+        UNASSIGNED
+    }
     private val trueChildren = IntArray(nodes.size)
     private val falseChildren = IntArray(nodes.size)
     private val pending = IntArrayDeque()
@@ -52,8 +55,11 @@ internal class PolynomialBooleanWitness(
         if (value == UNASSIGNED) return UNASSIGNED
         val confirmed = when (val node = nodes[index]) {
             is FormulaNode.Constant -> value == if (node.value) TRUE else FALSE
+
             is FormulaNode.BooleanVariable, is FormulaNode.Atom -> true
+
             is FormulaNode.Not -> supported[node.child] == TRUE - value
+
             is FormulaNode.Junction -> {
                 val count = if (value == TRUE) trueChildren[index] else falseChildren[index]
                 val decisive = if (node.conjunction) FALSE else TRUE

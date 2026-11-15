@@ -40,9 +40,9 @@ internal fun sourceDefinitionSweep(
         val claims = if (hint is DefinitionHint.Boolean) booleanClaims else integerClaims
         if (claims.getOrDefault(hint.output, 0) != 1) continue
         if (hint is DefinitionHint.Integer && (
-            !problem.intBounds.hasLower(hint.output) ||
-                problem.intBounds.lower(hint.output) == Long.MIN_VALUE
-        )
+                !problem.intBounds.hasLower(hint.output) ||
+                    problem.intBounds.lower(hint.output) == Long.MIN_VALUE
+                )
         ) {
             continue
         }
@@ -92,8 +92,7 @@ internal fun DefinitionHint.Operand.nativeOperand(): FunctionalObjective.Operand
     is DefinitionHint.Operand.Constant -> FunctionalObjective.Operand.c(value)
 }
 
-internal fun DefinitionHint.Operand.variableOrNull(): Int? =
-    (this as? DefinitionHint.Operand.Variable)?.id
+internal fun DefinitionHint.Operand.variableOrNull(): Int? = (this as? DefinitionHint.Operand.Variable)?.id
 
 internal class CapturedBooleanDefinition(private val hint: DefinitionHint.Boolean) : SweepNode {
     override val out: Int get() = hint.output

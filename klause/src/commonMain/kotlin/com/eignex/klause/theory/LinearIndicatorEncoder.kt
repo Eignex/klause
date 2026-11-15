@@ -14,21 +14,38 @@ import com.eignex.klause.simplex.exact.BigFraction
 internal object LinearIndicatorEncoder {
     val linear = Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
         view as LinearIndicator
-        val inactive = LinearEncodingFormula.Comparison(EncodingAffineExpression(listOf(
+        val inactive = LinearEncodingFormula.Comparison(
+            EncodingAffineExpression(
+                listOf(
             EncodingLinearTerm.source(Term.ofIntVar(view.indicator), BigFraction.ONE),
-        )), LinearOp.NE, BigFraction.ofLong(if (view.whenOne) 1 else 0))
-        encoding.linearFormula(LinearEncodingFormula.Or(listOf(inactive,
-            LinearEncodingFormula.Relation(view.row.linearForm))))
+        )
+            ),
+            LinearOp.NE, BigFraction.ofLong(if (view.whenOne) 1 else 0)
+        )
+        encoding.linearFormula(
+            LinearEncodingFormula.Or(
+                listOf(
+            inactive,
+            LinearEncodingFormula.Relation(view.row.linearForm),
+        )
+            )
+        )
         null
     }
 
     val polynomial = Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
         view as LinearIndicator
-        val inactive = PolynomialRealFormula.Atom(encoding.integer(SourceIntId(view.indicator)),
-            PolynomialRelation.NE, PolynomialRealLowering.constant(BigFraction.ofLong(if (view.whenOne) 1 else 0)))
-        val enabled = polynomialRow(view.row,
+        val inactive = PolynomialRealFormula.Atom(
+            encoding.integer(SourceIntId(view.indicator)),
+            PolynomialRelation.NE,
+            PolynomialRealLowering.constant(BigFraction.ofLong(if (view.whenOne) 1 else 0)),
+        )
+        val enabled = polynomialRow(
+            view.row,
             { id -> encoding.integer(SourceIntId(id)) },
-            { id -> encoding.real(SourceRealId(id)) }, encoding::conditional)
+            { id -> encoding.real(SourceRealId(id)) },
+            encoding::conditional,
+        )
         encoding.polynomial(PolynomialRealFormula.Or(listOf(inactive, enabled)))
         null
     }

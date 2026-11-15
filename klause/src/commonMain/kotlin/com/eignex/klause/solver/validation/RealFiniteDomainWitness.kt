@@ -49,8 +49,13 @@ private fun finiteDomainCoordinates(
                 exact == value
             } else {
                 val root = requireNotNull(algebraic)
-                root.rational?.let { it == value } ?: isolatedRationalRoot(root.definingCoefficients,
-                    root.lowerBound, root.upperBound, value, cancellation)
+                root.rational?.let { it == value } ?: isolatedRationalRoot(
+                    root.definingCoefficients,
+                    root.lowerBound,
+                    root.upperBound,
+                    value,
+                    cancellation,
+                )
                     ?: return Verification.Indeterminate("finite real membership check cancelled")
             }
             if (matches) {

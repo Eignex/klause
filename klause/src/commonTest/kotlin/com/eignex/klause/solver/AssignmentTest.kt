@@ -281,7 +281,11 @@ class AssignmentTest {
     @Test
     fun `replacing witness coordinates should discard source semantic qualification`() {
         val source = Problem(
-            1, 0, emptyArray(), emptyArray(), semantics = SourceSemantics(SourceFormat.DIMACS).resolve(),
+            1,
+            0,
+            emptyArray(),
+            emptyArray(),
+            semantics = SourceSemantics(SourceFormat.DIMACS).resolve(),
         )
         val sample = Sample(booleanArrayOf(true), longArrayOf())
         val runtime = EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source))
@@ -293,5 +297,4 @@ class AssignmentTest {
 
         assertNull(replaced.semantics)
     }
-
 }

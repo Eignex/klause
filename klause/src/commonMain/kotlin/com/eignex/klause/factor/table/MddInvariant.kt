@@ -35,8 +35,7 @@ internal class MddInvariant(
         state.factorDegree[factorId] = violationDegree(state, factorId)
     }
 
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
-        violationDegree(state, factorId) != 0
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = violationDegree(state, factorId) != 0
 
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
         val st = state.refPayload[factorId] as? MddLsState ?: return fullDegree(state)
@@ -268,7 +267,12 @@ internal class MddInvariant(
         return if (accepting.any {
                 poll()
                 it == current
-            }) weight else null
+            }
+        ) {
+                weight
+            } else {
+                null
+            }
     }
 
     private fun buildState(state: LocalSearchState): MddLsState {
@@ -427,7 +431,12 @@ internal class MddInvariant(
         path[0] = initial
         for (i in 0 until n) {
             val nxt = mddStep(
-                layerStarts, transitions, recordStride, path[i], state.assignment.intValue(seq[i]), i,
+                layerStarts,
+                transitions,
+                recordStride,
+                path[i],
+                state.assignment.intValue(seq[i]),
+                i,
                 state::checkScoringWork,
             )
             if (nxt < 0) return
@@ -443,7 +452,13 @@ internal class MddInvariant(
             val from = path[i]
             val to = path[i + 1]
             val curWeight = mddRecordWeight(
-                layerStarts, transitions, recordStride, from, cur, i, state::checkScoringWork,
+                layerStarts,
+                transitions,
+                recordStride,
+                from,
+                cur,
+                i,
+                state::checkScoringWork,
             )
             val d = state.rootDomains[seq[i]]
             var pick = -1L

@@ -22,7 +22,9 @@ internal fun privateLinearCompletion(encoded: Problem, sample: Sample, cancellat
     val values = sample.exactReals ?: return null
     if (values.size != encoded.encodingSourceRealCount || sample.numIntVars != encoded.numIntVars ||
         sample.numBoolVars != encoded.numBoolVars
-    ) return null
+    ) {
+        return null
+    }
     val factors = ArrayList<Factor>()
     factors.addAll(encoded.factors)
     for (id in 0 until encoded.numBoolVars) {
@@ -33,8 +35,12 @@ internal fun privateLinearCompletion(encoded: Problem, sample: Sample, cancellat
     for (id in 0 until encoded.numIntVars) {
         if (cancellation()) return null
         cancellation.charge(1)
-        factors += ExactSearchRow.of(intArrayOf(Term.ofIntVar(id)), listOf(BigFraction.ONE), LinearOp.EQ,
-            BigFraction.of(sample.exactIntValue(id), BIG_ONE))
+        factors += ExactSearchRow.of(
+            intArrayOf(Term.ofIntVar(id)),
+            listOf(BigFraction.ONE),
+            LinearOp.EQ,
+            BigFraction.of(sample.exactIntValue(id), BIG_ONE),
+        )
     }
     for (id in values.indices) {
         if (cancellation()) return null
@@ -44,11 +50,15 @@ internal fun privateLinearCompletion(encoded: Problem, sample: Sample, cancellat
     val model = encoded.rebindEncoding(encoded, factors.toTypedArray(), null)
     val factory = prepareExactLiraSource(model, cancellation) ?: return null
     factory.open().use { component ->
-        val session = SearchComponentSet(listOf(component)).session(cancellation = cancellation,
-            atoms = SearchAtomRegistry(encoded.numBoolVars))
+        val session = SearchComponentSet(listOf(component)).session(
+            cancellation = cancellation,
+            atoms = SearchAtomRegistry(encoded.numBoolVars),
+        )
         return when (session.initialize()) {
             is ComponentResult.Conflict -> false
+
             ComponentResult.Indeterminate -> null
+
             ComponentResult.Consistent -> when (session.solve(encoded.numBoolVars)) {
                 SearchResult.Exhausted -> false
                 SearchResult.Indeterminate -> null

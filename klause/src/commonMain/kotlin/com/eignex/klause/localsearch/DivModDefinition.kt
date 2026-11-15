@@ -18,8 +18,10 @@ internal class DivModDefinition(private val relation: DivMod, override val out: 
         ?: intArrayOf(relation.dividend)
 
     override fun eval(assignment: Assignment, domains: Array<IntDomain>): Long {
-        val outputs = relation.outputs(bigIntOf(assignment.intValue(relation.dividend)),
-            relation.divisor?.let { bigIntOf(assignment.intValue(it)) } ?: checkNotNull(relation.constantDivisor))
+        val outputs = relation.outputs(
+            bigIntOf(assignment.intValue(relation.dividend)),
+            relation.divisor?.let { bigIntOf(assignment.intValue(it)) } ?: checkNotNull(relation.constantDivisor),
+        )
             ?: return SweepNode.NO_WRITE
         val exact = if (out == relation.quotient) outputs.first else outputs.second
         val domain = domains[out]
@@ -46,7 +48,9 @@ internal fun divModDefinitions(
             if (cancellation()) return emptyList()
             if (relation.quotient == relation.remainder || output == relation.dividend || output == relation.divisor ||
                 !problem.intBounds.hasLower(output) || problem.intBounds.lower(output) == Long.MIN_VALUE
-            ) continue
+            ) {
+                continue
+            }
             definitions += DivModDefinition(relation, output)
         }
     }

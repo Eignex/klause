@@ -57,9 +57,16 @@ class NValuePropagatorTest {
             numBoolVars = 1,
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 1), IntDomain(2, 2), IntDomain(0, 0)),
-            factors = arrayOf(NValue(2, intArrayOf(0, 1), presents = intArrayOf(
-                Lit.make(0, true), Lit.make(0, false),
-            ), exceptSet = longArrayOf(0, 1, 2))),
+            factors = arrayOf(
+                NValue(
+                    2, intArrayOf(0, 1),
+                    presents = intArrayOf(
+                Lit.make(0, true),
+                Lit.make(0, false),
+            ),
+                exceptSet = longArrayOf(0, 1, 2)
+                )
+            ),
         )
         val state = PropagationState(problem, Assumptions.None)
         state.currentFactor = 0

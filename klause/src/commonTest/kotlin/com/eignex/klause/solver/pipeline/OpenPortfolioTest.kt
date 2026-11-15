@@ -23,13 +23,25 @@ import kotlin.time.Duration.Companion.seconds
 class OpenPortfolioTest {
     @Test
     fun `real min max portfolio should retain an incumbent without quarantining workers`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(RealArrayMinMax(2, intArrayOf(0, 1), true)),
-            numRealVars = 3, realLower = doubleArrayOf(0.0, 1.0, 0.0), realUpper = doubleArrayOf(2.0, 3.0, 3.0))
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(RealArrayMinMax(2, intArrayOf(0, 1), true)),
+            numRealVars = 3,
+            realLower = doubleArrayOf(0.0, 1.0, 0.0),
+            realUpper = doubleArrayOf(2.0, 3.0, 3.0),
+        )
         val objective = LinearObjective(realCoefficients = doubleArrayOf(0.0, 0.0, 1.0))
         val request = OpenTheoryRequest(source, objective)
 
-        val result = optimum(OpenTheoryPipeline.execute(request,
-            TheoryParams(maxInstructions = 1000, randomSeed = 17), FiniteEngine.MIXED))
+        val result = optimum(
+            OpenTheoryPipeline.execute(
+            request,
+            TheoryParams(maxInstructions = 1000, randomSeed = 17),
+            FiniteEngine.MIXED,
+        )
+        )
 
         val point = when (result) {
             is OpenTheoryOptimum.Optimal -> result.assignment
@@ -40,7 +52,6 @@ class OpenPortfolioTest {
         assertTrue(result.stats.portfolio.arms.isNotEmpty())
         assertTrue(result.stats.portfolio.arms.all { it.failure == null })
     }
-
 
     private fun openColumns(n: Int, vararg factors: Factor): Problem {
         val open = Bits(n).also { bits -> for (v in 0 until n) bits.set(v) }

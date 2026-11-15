@@ -36,7 +36,9 @@ private fun Compiler.Builder.reifyLogical(literals: List<Int>, conjunction: Bool
     for (literal in literals) {
         booleanWork(1L)
         if (constant >= 0) {
-            val value = if (literal == constant) true else if (literal == Lit.negate(constant)) {
+            val value = if (literal == constant) {
+                true
+            } else if (literal == Lit.negate(constant)) {
                 false
             } else {
                 null

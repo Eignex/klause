@@ -30,17 +30,33 @@ class ProblemPipelineFiniteTest(private val engine: FiniteEngine, private val te
     fun `a native finite source should not install unused arithmetic relations`() {
         val source = SmtLib.parse(text)
         var installations = 0
-        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+        val providers = FactorProjectionProviders(
+            encoder = EncoderProvider { factor, target ->
             val selected = BuiltInEncoderProvider.select(factor, target)
-            if (!selected.enforcesSource) selected else Encoder(selected.support,
-                selected.requiredIntegers, selected.requiredBooleans) { view, encoding ->
+            if (!selected.enforcesSource) {
+                selected
+            } else {
+                Encoder(
+                selected.support,
+                selected.requiredIntegers,
+                selected.requiredBooleans,
+            ) { view, encoding ->
                 installations++
                 selected.install(view, encoding)
             }
-        })
+            }
+        }
+        )
 
-        val invocation = SourceSetup.prepare(SourceSetupRequest(source.source, ExecutionOperation.SATISFY, engine,
-            providers = providers, boundCancellation = ExecutionControl { true }))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            source.source,
+            ExecutionOperation.SATISFY,
+            engine,
+            providers = providers,
+            boundCancellation = ExecutionControl { true },
+        )
+        )
 
         assertIs<SourceProblemRoute.Finite>(invocation.route)
         assertEquals(0, installations)

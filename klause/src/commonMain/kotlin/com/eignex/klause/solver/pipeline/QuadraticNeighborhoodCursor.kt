@@ -14,7 +14,9 @@ internal class QuadraticNeighborhoodAllowance(
     val maximumInstructions: Long,
     private val nodeBudget: NodeAllowance?,
 ) {
-    init { require(maximumMoves >= 0 && maximumInstructions >= 0) }
+    init {
+        require(maximumMoves >= 0 && maximumInstructions >= 0)
+    }
     var moves: Long = 0
         private set
     var instructions: Long = 0
@@ -60,7 +62,9 @@ internal class QuadraticNeighborhoodCursor(
     val work: Long get() = allowance.instructions - initialInstructions
     val stats: SolveStats get() = sink.snapshot()
 
-    init { require(coordinates >= 0) }
+    init {
+        require(coordinates >= 0)
+    }
 
     fun advance(
         segment: ExecutionControl,
@@ -77,12 +81,12 @@ internal class QuadraticNeighborhoodCursor(
                 0
             } else {
                 random.nextInt(weights.size).let { draw ->
-                if (random.nextDouble() < weights[draw] / requireNotNull(weights.maxOrNull())) draw else 2
-            }
+                    if (random.nextDouble() < weights[draw] / requireNotNull(weights.maxOrNull())) draw else 2
+                }
             }
             val amount = when (operator) {
-                0 -> 1;
-                1 -> maxOf(1, coordinates / 2);
+                0 -> 1
+                1 -> maxOf(1, coordinates / 2)
                 else -> coordinates
             }
             val released = when {
@@ -101,9 +105,13 @@ internal class QuadraticNeighborhoodCursor(
             }
             val improved = result is ExactNeighborhoodResult.Witness && accept(result.sample)
             sink.ls.recordCompletion(
-                result is ExactNeighborhoodResult.Refuted, result is ExactNeighborhoodResult.Undecided,
+                result is ExactNeighborhoodResult.Refuted,
+                result is ExactNeighborhoodResult.Undecided,
             )
-            if (improved) radius = BigFraction.ONE else { radius += radius; stalls++ }
+            if (improved) radius = BigFraction.ONE else {
+                radius += radius;
+                stalls++
+            }
             if (adaptive) weights[operator] = weights[operator] * 0.8 + if (improved) 1.0 else 0.2
             sink.ls.recordWork(allowance.moves - initialMoves, 0, stalls)
             if (coordinates == 0) finished = true

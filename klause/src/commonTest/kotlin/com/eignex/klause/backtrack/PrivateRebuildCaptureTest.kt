@@ -15,12 +15,19 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PrivateRebuildCaptureTest {
-    private fun source(): Problem = Problem(5, 0, emptyArray(), arrayOf<Factor>(
-        Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 4)),
-        Clause(intArrayOf(0, 6)), Clause(intArrayOf(0, 6, 2)),
-        Clause(intArrayOf(1, 6)), Clause(intArrayOf(1, 6, 4)),
-        Clause(intArrayOf(6, 8)), Clause(intArrayOf(6, 9)),
-    ))
+    private fun source(): Problem = Problem(
+        5, 0, emptyArray(),
+        arrayOf<Factor>(
+        Clause(intArrayOf(0, 2)),
+        Clause(intArrayOf(1, 4)),
+        Clause(intArrayOf(0, 6)),
+        Clause(intArrayOf(0, 6, 2)),
+        Clause(intArrayOf(1, 6)),
+        Clause(intArrayOf(1, 6, 4)),
+        Clause(intArrayOf(6, 8)),
+        Clause(intArrayOf(6, 9)),
+    )
+    )
 
     private fun capture(session: PropagationSession, limit: Int = 1024, work: Long = 4096L): Map<String, Long> {
         val stats = SearchStatsSink()
@@ -79,8 +86,11 @@ class PrivateRebuildCaptureTest {
     fun `assumptions and conditional cutoffs should withhold capture`() {
         for (scoped in listOf(false, true)) {
             val session = PropagationSession(source().bake())
-            if (scoped) session.addLearnedClause(Clause(intArrayOf(6)), 1, permanent = true)
-            else session.seed(Assumptions(bools = mapOf(3 to true)))
+            if (scoped) {
+                session.addLearnedClause(Clause(intArrayOf(6)), 1, permanent = true)
+            } else {
+                session.seed(Assumptions(bools = mapOf(3 to true)))
+            }
 
             val result = capture(session)
 

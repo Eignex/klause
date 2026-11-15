@@ -4,10 +4,7 @@ import com.eignex.klause.ir.PolynomialDistinct
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 
-internal fun polynomialDistinctEncoding(
-    distinct: PolynomialDistinct,
-    checkpoint: () -> Unit,
-): PolynomialRealFormula {
+internal fun polynomialDistinctEncoding(distinct: PolynomialDistinct, checkpoint: () -> Unit): PolynomialRealFormula {
     checkpoint()
     val operands = distinct.operands
     val comparisons = ArrayList<PolynomialRealFormula>()

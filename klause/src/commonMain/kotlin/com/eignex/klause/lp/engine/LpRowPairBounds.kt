@@ -18,14 +18,18 @@ internal fun expandPairedRows(
             meter.step()
             if (continuousCounts[entry.row] == 1 && selected[entry.row] &&
                 state.rows.row(entry.row).active && !entry.number.value.isZero
-            ) relevant = true
+            ) {
+                relevant = true
+            }
         }
         if (!relevant) continue
         for (entry in entries) {
             meter.step()
             if (continuousCounts[entry.row] == 1 && state.rows.row(entry.row).active &&
                 !entry.number.value.isZero
-            ) selected[entry.row] = true
+            ) {
+                selected[entry.row] = true
+            }
         }
     }
 }
@@ -48,7 +52,9 @@ internal fun pairedRowBounds(
             meter.step()
             if (continuousCounts[entry.row] == 1 && rows[entry.row].isNotEmpty() &&
                 state.rows.row(entry.row).active && !entry.number.value.isZero
-            ) candidates.add(entry)
+            ) {
+                candidates.add(entry)
+            }
         }
         var attempts = 0
         pairs@ for (first in 0 until candidates.lastIndex) {
@@ -69,10 +75,14 @@ private fun projectPair(
     meter: MixedCertificateMeter,
     completed: MutableList<LpRowBound>,
 ) {
-    val multiplier = meter.multiply(meter.read(first.number.value).negated(),
-        meter.read(meter.read(second.number.value).reciprocal()))
-    val rhs = meter.add(meter.read(state.model.rhs(first.row).value),
-        meter.multiply(multiplier, meter.read(state.model.rhs(second.row).value)))
+    val multiplier = meter.multiply(
+        meter.read(first.number.value).negated(),
+        meter.read(meter.read(second.number.value).reciprocal()),
+    )
+    val rhs = meter.add(
+        meter.read(state.model.rhs(first.row).value),
+        meter.multiply(multiplier, meter.read(state.model.rhs(second.row).value)),
+    )
     meter.reserve((rows[first.row].size.toLong() + rows[second.row].size + 2L) * 32L + 320L)
     val left = rows[first.row] + LpRowBoundTerm(state.model.n + first.row, BigFraction.ONE, 1L)
     val right = rows[second.row] + LpRowBoundTerm(state.model.n + second.row, BigFraction.ONE, 1L)

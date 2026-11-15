@@ -310,13 +310,23 @@ internal fun FlatZincCompiler.emitDisjunctive(c: FznConstraint, strict: Boolean)
     val starts = evalIntVarArray(c.args[0])
     val (durations, durationVars) = resolveIntArrayConstOrVars(c.args[1])
     factors.add(Cumulative.unary(starts = starts, durations = durations, durationVars = durationVars))
-    val canBeEmpty = if (durationVars.isEmpty()) durations.any { it == 0L } else
+    val canBeEmpty = if (durationVars.isEmpty()) {
+        durations.any { it == 0L }
+    } else {
         durationVars.any { 0L in intDomains[it] }
+    }
     if (strict && canBeEmpty) {
         // A zero-duration task must still be ordered outside every other task's interior.
         val zero = resolveIntVar(FznExpr.IntLit(0))
-        factors.add(Diffn(starts, IntArray(starts.size) { zero }, durations,
-            LongArray(starts.size) { 1L }, widthVars = durationVars.takeIf { it.isNotEmpty() }))
+        factors.add(
+            Diffn(
+            starts,
+            IntArray(starts.size) { zero },
+            durations,
+            LongArray(starts.size) { 1L },
+            widthVars = durationVars.takeIf { it.isNotEmpty() },
+        )
+        )
     }
 }
 
@@ -439,8 +449,11 @@ internal fun FlatZincCompiler.emitCountEq(c: FznConstraint) {
     val value = evalIntConst(c.args[1])
     val (countConst, countVar) = resolveLongConstOrVar(c.args[2])
     if (xs.isEmpty()) {
-        if (countVar >= 0) factors.add(Linear(intArrayOf(1), intArrayOf(countVar), LinearOp.EQ, 0))
-        else if (countConst != 0L) postFalseFactor()
+        if (countVar >= 0) {
+            factors.add(Linear(intArrayOf(1), intArrayOf(countVar), LinearOp.EQ, 0))
+        } else if (countConst != 0L) {
+            postFalseFactor()
+        }
         return
     }
     if (countVar < 0 && countConst !in 0L..xs.size.toLong()) {

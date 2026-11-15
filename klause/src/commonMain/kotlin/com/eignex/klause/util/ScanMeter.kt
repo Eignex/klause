@@ -16,7 +16,7 @@ internal class ScanMeter(private val cancellation: ExecutionControl) : AutoClose
     @Suppress("NOTHING_TO_INLINE") // Scalar scans keep only their local counters in the loop.
     inline fun visit(units: Long): Boolean {
         if (stopped) return false
-        if (remaining-- <= 0 && !check()) return false
+        if (remaining-- <= 0 && !poll()) return false
         if (native == null) {
             pending += minOf(units, Long.MAX_VALUE - pending)
             return true
@@ -58,9 +58,15 @@ internal class ScanMeter(private val cancellation: ExecutionControl) : AutoClose
     }
 
     fun check(): Boolean {
-        remaining = 63
         flush()
+        return poll()
+    }
+
+    private fun poll(): Boolean {
+        remaining = 1023
+        if (native == null) flush()
         if (!stopped && (cancellation() || source?.exhausted == true)) stopped = true
+        if (stopped) flush()
         return !stopped
     }
 

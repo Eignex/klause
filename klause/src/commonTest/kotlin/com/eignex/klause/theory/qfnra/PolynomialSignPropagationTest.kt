@@ -75,8 +75,12 @@ class PolynomialSignPropagationTest {
         val equations = (1..16).joinToString(" ") { "(assert (= x$it (* x${it - 1} x${it - 1})))" }
         val source = SmtLibPolynomial.parse("$declarations $equations (assert (> x0 0)) (assert (= x16 0))")
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = 50_000))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = 50_000),
+        )
 
         val refuted = assertIs<QfNraResult.Unsatisfiable>(result)
         assertEquals(0L, refuted.stats.dyadicAttempts)
@@ -122,8 +126,12 @@ class PolynomialSignPropagationTest {
             "$declarations (assert (< x0 0)) (assert (= x1 (- (* x0 x0)))) (assert (>= x1 0))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = 50_000))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = 50_000),
+        )
 
         assertIs<QfNraResult.Unsatisfiable>(result)
     }

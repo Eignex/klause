@@ -27,8 +27,8 @@ internal fun mixedIntegerRounding(
                 (id.kind == SourceCoordinate.Kind.Integer && value.den != BIG_ONE)
         }
     ) {
-            return null
-        }
+        return null
+    }
     val sides = linkedMapOf<SourceCoordinate, Pair<BigFraction, Boolean>>()
     var shifted = bounded(row.rhs)
     for (bound in bounds) {

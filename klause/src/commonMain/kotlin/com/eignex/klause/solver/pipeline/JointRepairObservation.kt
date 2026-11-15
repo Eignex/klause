@@ -127,9 +127,20 @@ internal class JointRepairObservationCapture(
         return result
     }
 
-    fun proposal(sequence: Long, operator: Int, schedulingRound: Long, proposalRound: Long,
-        requested: Int, effective: Int, kind: String, centers: List<BigFraction>, integers: Int,
-        eligible: IntArray?, roots: List<Int>, condition: ExactNeighborhoodCondition) = capture {
+    fun proposal(
+        sequence: Long,
+        operator: Int,
+        schedulingRound: Long,
+        proposalRound: Long,
+        requested: Int,
+        effective: Int,
+        kind: String,
+        centers: List<BigFraction>,
+        integers: Int,
+        eligible: IntArray?,
+        roots: List<Int>,
+        condition: ExactNeighborhoodCondition,
+    ) = capture {
         val copied = linkedMapOf<Int, BigFraction>()
         val freed = mutableListOf<Int>()
         for (id in eligible?.asIterable() ?: (0 until integers)) {
@@ -150,15 +161,22 @@ internal class JointRepairObservationCapture(
             refutationRoots += root
         }
         if (!scalar(condition.cutoff)) return@capture null
-        JointRepairObservation(sequence, 0L, "proposal", "constructed", operator, schedulingRound,
+        JointRepairObservation(
+            sequence, 0L, "proposal", "constructed", operator, schedulingRound,
             proposalRound, requested, effective, kind, copied, bools, lower, upper, freed, refutationRoots,
             cutoff = condition.cutoff, integerCount = integers, realCount = centers.size - integers,
-            booleanCount = condition.bools.size)
+            booleanCount = condition.bools.size,
+        )
     }
 
-    fun feedback(proposal: Long, query: Long, disposition: String,
-        assumptions: Set<SourceDerivation.Assumption>?, condition: ExactNeighborhoodCondition,
-        integers: Int) = capture {
+    fun feedback(
+        proposal: Long,
+        query: Long,
+        disposition: String,
+        assumptions: Set<SourceDerivation.Assumption>?,
+        condition: ExactNeighborhoodCondition,
+        integers: Int,
+    ) = capture {
         val support = mutableListOf<JointRepairObservedBound>()
         for (assumption in assumptions.orEmpty()) {
             if (!entry()) return@capture null

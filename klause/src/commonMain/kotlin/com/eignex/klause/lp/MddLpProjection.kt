@@ -138,10 +138,7 @@ private fun Mdd.forwardReach(domainOf: (Int) -> IntDomain): MddReach? {
     return result
 }
 
-private suspend fun SequenceScope<Unit>.prepareForwardReach(
-    factor: Mdd,
-    domainOf: (Int) -> IntDomain,
-): MddReach? {
+private suspend fun SequenceScope<Unit>.prepareForwardReach(factor: Mdd, domainOf: (Int) -> IntDomain): MddReach? {
     val n = factor.seq.size
     val stride = factor.recordStride
     val trans = factor.transitions

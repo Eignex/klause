@@ -8,7 +8,8 @@ class SourceExecutionProjectionTest {
     @Test
     fun `root bounds should refute an exact contradiction beyond binary64 range`() {
         val huge = "1" + "0".repeat(399) + ".0"
-        val source = SmtLib.parse("""
+        val source = SmtLib.parse(
+            """
             (declare-const x Real)
             (assert (>= x $huge))
             (assert (<= x 1.0))
@@ -30,7 +31,8 @@ class SourceExecutionProjectionTest {
     @Test(timeout = 300)
     fun `mixed search should refute an unprojectable disjunct without a solver time limit`() {
         val tiny = "(/ 1.0 1" + "0".repeat(400) + ".0)"
-        val source = SmtLib.parse("""
+        val source = SmtLib.parse(
+            """
             (declare-const x Real)
             (declare-const n Int)
             (declare-const b Bool)

@@ -13,7 +13,8 @@ internal class DeferredCompanionSearch(
     private val unavailableReason: () -> TerminationReason,
     private val clock: TimeSource = TimeSource.Monotonic,
     private val open: (ExecutionControl, Long) -> ResumableSearch?,
-) : InstructionSlicedSearch, ReseedGuard {
+) : InstructionSlicedSearch,
+    ReseedGuard {
     private var search: ResumableSearch? = null
     private var terminal: MinimizeResult? = null
     private var closed = false

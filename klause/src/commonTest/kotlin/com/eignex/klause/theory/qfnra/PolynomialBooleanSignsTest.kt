@@ -21,8 +21,12 @@ class PolynomialBooleanSignsTest {
             "$declarations (declare-const b Bool) (assert (or b (>= (+ (* x0 x0) (* x1 x1)) 0)))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         assertIs<QfNraResult.Satisfiable>(result)
         assertEquals(0L, result.stats.projectedPolynomials)
@@ -150,8 +154,12 @@ class PolynomialBooleanSignsTest {
         val complete = solveQfNra(source.formula, source.boolCount, source.realCount)
         assertIs<QfNraResult.Satisfiable>(complete)
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = complete.stats.workSpent - 1))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = complete.stats.workSpent - 1),
+        )
 
         assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(result).reason)
     }

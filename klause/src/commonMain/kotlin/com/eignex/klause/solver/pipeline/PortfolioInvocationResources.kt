@@ -47,7 +47,9 @@ internal class PortfolioInvocationResources(
     nodeBudget: NodeBudget?,
     completeSlots: Set<Int> = emptySet(),
 ) : AutoCloseable {
-    init { require(count > 0 && parallelism > 0) }
+    init {
+        require(count > 0 && parallelism > 0)
+    }
     val lanes: Int = minOf(count, parallelism)
     private val quotas = if (lanes > 1) nodeBudget?.quotas(count) else null
     private val workerSlots: List<PortfolioWorkerSlot> = List(count) { index ->

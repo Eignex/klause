@@ -122,8 +122,11 @@ internal class LocalSearchStatsSink {
     var objectiveScoring: (() -> Map<String, Long>)? = null
 
     /** Count one decided candidate: [refuted] or [undecided] when it was not accepted. */
-    fun recordCompletion(refuted: Boolean, undecided: Boolean,
-        stage: CompletionRefutationStage = CompletionRefutationStage.PROVIDER) {
+    fun recordCompletion(
+        refuted: Boolean,
+        undecided: Boolean,
+        stage: CompletionRefutationStage = CompletionRefutationStage.PROVIDER,
+    ) {
         completions++
         if (refuted) {
             completionsRefuted++

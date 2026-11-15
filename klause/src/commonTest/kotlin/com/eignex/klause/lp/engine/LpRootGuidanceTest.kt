@@ -63,8 +63,12 @@ class LpRootGuidanceTest {
             override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
         }
         LpScopedSolver(LpExactState(model), ExecutionControl { cancelled }).use { owner ->
-            val guide = owner.advanceRootGuidance(100_000L, LpFloatAllowance(100_000L, 100), ReconstructionLimits(),
-                observer = observer)
+            val guide = owner.advanceRootGuidance(
+                100_000L,
+                LpFloatAllowance(100_000L, 100),
+                ReconstructionLimits(),
+                observer = observer,
+            )
 
             assertNull(guide.conflict)
             assertNull(guide.conflictSupport)

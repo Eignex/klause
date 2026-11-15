@@ -86,7 +86,10 @@ internal object RedundantConstraints {
         cancellation: ExecutionControl,
         memo: SubsumeMemo? = null,
     ): SourceDelta = computeFull(
-        problem, ColumnRanges.of(problem.intBounds), cancellation, memo?.subsets,
+        problem,
+        ColumnRanges.of(problem.intBounds),
+        cancellation,
+        memo?.subsets,
     ).asSourceDelta()
 
     // Debug switch: every incremental firing also recomputes the full delta and asserts the two agree, so a
@@ -167,9 +170,10 @@ internal object RedundantConstraints {
         }
         // Unit-coefficient clause rows have the same bound; their duplicates were removed by keys.
         if (deduped.all {
-            visit(scan)
-            it is Clause
-        }) {
+                visit(scan)
+                it is Clause
+            }
+        ) {
             return deduped
         }
         // Phase 2: bucket the ≤-normalised Linear inequalities by coefficient vector; the bucket's
@@ -589,21 +593,19 @@ internal object RedundantConstraints {
 
     /** Every exact [LinearRow] of [f] as `≤`-normalised [IneqForm]s (each `=` row carries its opposite
      *  direction), for offering into the dominator buckets. Clause-shaped rows are skipped (see [rowForm]). */
-    private fun offerForms(f: Factor, scan: ScanMeter? = null): List<IneqForm> =
-        f.impliedLinearRows.mapNotNull {
-            visit(scan)
-            rowForm(it, scan)
-        }
+    private fun offerForms(f: Factor, scan: ScanMeter? = null): List<IneqForm> = f.impliedLinearRows.mapNotNull {
+        visit(scan)
+        rowForm(it, scan)
+    }
 
     /** The `≤`-normalised [IneqForm] of [f] when it is a single-row inequality (the only shape this pass
      *  drops as dominated), else `null` — a multi-row factor (cardinality, increasing chain) offers its
      *  rows but is never itself dropped here. */
-    private fun dropForm(f: Factor, scan: ScanMeter? = null): IneqForm? =
-        if (f.linearForm is LinearForm.Conjunction) {
-            f.impliedLinearRows.singleOrNull()?.let { rowForm(it, scan) }
-        } else {
-            null
-        }
+    private fun dropForm(f: Factor, scan: ScanMeter? = null): IneqForm? = if (f.linearForm is LinearForm.Conjunction) {
+        f.impliedLinearRows.singleOrNull()?.let { rowForm(it, scan) }
+    } else {
+        null
+    }
 
     /**
      * A single exact [LinearRow] as its `≤`-normalised [IneqForm], keyed uniformly over the row's tagged
@@ -661,11 +663,10 @@ internal object RedundantConstraints {
         return true
     }
 
-    private fun negated(xs: LongArray, scan: ScanMeter? = null): LongArray =
-        LongArray(xs.size) {
-            visit(scan)
-            -xs[it]
-        }
+    private fun negated(xs: LongArray, scan: ScanMeter? = null): LongArray = LongArray(xs.size) {
+        visit(scan)
+        -xs[it]
+    }
 
     /** A `≤`-form `Σ coeffs·refs ≤ bound`, GCD-reduced so proportional rows (`x+y ≤ 2` and `2x+2y ≤ 4`)
      *  share a bucket even when coefficient strengthening hasn't normalised them

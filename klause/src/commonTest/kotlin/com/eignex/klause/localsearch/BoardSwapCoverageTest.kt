@@ -140,7 +140,15 @@ class BoardSwapCoverageTest {
         val state = state()
         state.assumptions = Assumptions(ints = mapOf(0 to 0L))
         val sink = MoveSink(state.assumptions)
-        sink.setOwners(IntArray(10) { if (it == 1) 99 else if (it < 5) 0 else 1 })
+        sink.setOwners(
+            IntArray(10) {
+            if (it == 1) 99 else if (it < 5) {
+            0
+        } else {
+            1
+        }
+        }
+        )
         val source = SatisfiedStructured.structural(1)
         val moves = mutableListOf<Move>()
 
@@ -186,9 +194,13 @@ class BoardSwapCoverageTest {
                 val counted = assertIs<InstructionSlicedSearch>(handle)
                 var result: MinimizeResult? = null
                 repeat(if (sliced) 256 else 1) {
-                    if (!handle.isDone) result = counted.runInstructionSlice(
-                        ExecutionControl.Never, Long.MAX_VALUE, if (sliced) 1L else Long.MAX_VALUE,
+                    if (!handle.isDone) {
+                        result = counted.runInstructionSlice(
+                        ExecutionControl.Never,
+                        Long.MAX_VALUE,
+                        if (sliced) 1L else Long.MAX_VALUE,
                     ) {}
+                    }
                 }
                 assertEquals(0.0, assertIs<MinimizeResult.BestFound>(result).objective)
                 assertEquals(64L, handle.stats.ls.moves.sum.toLong())
@@ -199,7 +211,9 @@ class BoardSwapCoverageTest {
     @Test
     fun `maintained board outputs should never become partial swaps`() {
         val problem = Problem(
-            0, 7, Array(7) { IntDomain(0, 4) },
+            0,
+            7,
+            Array(7) { IntDomain(0, 4) },
             arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3, 4), 0, 5), Product(5, 6, 0)),
         )
         val state = freshState(problem, 7L)
@@ -312,7 +326,9 @@ class BoardSwapCoverageTest {
     @Test
     fun `definition scoring probes should retain unchanged board coverage`() {
         val problem = Problem(
-            0, 11, Array(11) { IntDomain(0, if (it == 10) 16L else 4L) },
+            0,
+            11,
+            Array(11) { IntDomain(0, if (it == 10) 16L else 4L) },
             arrayOf<Factor>(
                 AllDifferent(intArrayOf(0, 1, 2, 3, 4), 0, 5),
                 AllDifferent(intArrayOf(5, 6, 7, 8, 9), 0, 5),
@@ -364,7 +380,10 @@ class BoardSwapCoverageTest {
             feasibleResampleCap = 2,
         )
         val engine = LocalSearchEngine(
-            initial.model, strategy = strategy, restartPolicy = policy, seedImplicitOnRestart = true,
+            initial.model,
+            strategy = strategy,
+            restartPolicy = policy,
+            seedImplicitOnRestart = true,
         )
 
         engine.resumable(
@@ -433,7 +452,10 @@ class BoardSwapCoverageTest {
             deferredSink.clear()
             SatisfiedStructured.sampled(1).generate(sampled, sampledSink)
             SatisfiedStructured.structural(1).generate(
-                deferred, deferredSink, ExecutionControl.Never, retainCoverage = false,
+                deferred,
+                deferredSink,
+                ExecutionControl.Never,
+                retainCoverage = false,
             )
 
             assertEquals(sampledSink.list, deferredSink.list)
@@ -444,7 +466,9 @@ class BoardSwapCoverageTest {
     @Test
     fun `retained draws should preserve the one board proposal scope`() {
         val problem = Problem(
-            0, 15, Array(15) { IntDomain(0, 4) },
+            0,
+            15,
+            Array(15) { IntDomain(0, 4) },
             Array<Factor>(3) { board -> AllDifferent(IntArray(5) { board * 5 + it }, 0, 5) },
         )
         val state = freshState(problem, 7L)
@@ -485,7 +509,9 @@ class BoardSwapCoverageTest {
     @Test
     fun `retained board coverage should leave other elected globals eligible`() {
         val problem = Problem(
-            0, 6, Array(6) { if (it < 2) IntDomain(0, 1) else IntDomain(0, 3) },
+            0,
+            6,
+            Array(6) { if (it < 2) IntDomain(0, 1) else IntDomain(0, 3) },
             arrayOf<Factor>(AllDifferent(intArrayOf(0, 1), 0, 2), Circuit(intArrayOf(2, 3, 4, 5))),
         )
         val state = freshState(problem, 7L)
@@ -501,19 +527,25 @@ class BoardSwapCoverageTest {
             moves.addAll(sink.list)
         }
 
-        assertTrue(moves.any { move ->
+        assertTrue(
+            moves.any { move ->
             (move as Move.Compound).parts.any { (it as Move.IntSet).varId >= 2 }
-        })
-        assertTrue(moves.any { move ->
+        }
+        )
+        assertTrue(
+            moves.any { move ->
             (move as Move.Compound).parts.any { (it as Move.IntSet).varId < 2 }
-        })
+        }
+        )
     }
 
     @Test
     fun `cyclic pair coverage should include every unordered pair once`() {
         for (size in listOf(2, 3, 4, 5, 7, 8)) {
             val problem = Problem(
-                0, size, Array(size) { IntDomain(0, (size - 1).toLong()) },
+                0,
+                size,
+                Array(size) { IntDomain(0, (size - 1).toLong()) },
                 arrayOf<Factor>(AllDifferent(IntArray(size) { it }, 0, size)),
             )
             val state = freshState(problem, 7L)
@@ -541,7 +573,9 @@ class BoardSwapCoverageTest {
     @Test
     fun `configuration filtered coverage should not report a board optimum`() {
         val problem = Problem(
-            0, 3, Array(3) { IntDomain(0, 2) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
             arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), 0, 3)),
         )
         val initial = freshState(problem, 7L)
@@ -634,7 +668,9 @@ class BoardSwapCoverageTest {
 
     private fun state(size: Int = 5): LocalSearchState {
         val problem = Problem(
-            0, size * 2, Array(size * 2) { IntDomain(0, (size - 1).toLong()) },
+            0,
+            size * 2,
+            Array(size * 2) { IntDomain(0, (size - 1).toLong()) },
             Array<Factor>(2) { board -> AllDifferent(IntArray(size) { board * size + it }, 0, size) },
         )
         return freshState(problem, 7L).also { state ->

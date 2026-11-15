@@ -22,7 +22,8 @@ internal class MddPropagator(
     private val recordStride: Int,
     private val cost: Int,
     private val transitionIndex: MddTransitionIndex? = null,
-) : InterruptiblePropagator, ExtensionalSupportProvider {
+) : InterruptiblePropagator,
+    ExtensionalSupportProvider {
 
     override fun supportCounts(
         state: PropagationState,
@@ -58,7 +59,9 @@ internal class MddPropagator(
 
     override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =
         if (payload[0] == MddIncrementalState.PRUNE) {
-            val value = if (payload.size < 4) null else {
+            val value = if (payload.size < 4) {
+                null
+            } else {
                 (payload[2].toLong() shl 32) or (payload[3].toLong() and 0xFFFFFFFFL)
             }
             explainer.prune(state, payload[1], atTrail, value)

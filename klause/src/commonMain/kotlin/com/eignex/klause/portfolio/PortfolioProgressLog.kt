@@ -4,9 +4,11 @@ import com.eignex.klause.solver.result.PortfolioLifecycleStats
 import com.eignex.klause.solver.result.PortfolioPhaseStats
 
 internal class PortfolioProgressLog(workers: List<PortfolioWorker>) {
-    private val phases = Array(workers.size) { Array(PortfolioPhase.entries.size) { phase ->
-        PortfolioPhaseStats(PortfolioPhase.entries[phase])
-    } }
+    private val phases = Array(workers.size) {
+        Array(PortfolioPhase.entries.size) { phase ->
+            PortfolioPhaseStats(PortfolioPhase.entries[phase])
+        }
+    }
     private val lifecycle = Array(workers.size) { arm ->
         PortfolioLifecycleStats(workers[arm].createdNanos, workers[arm].constructionNanos)
     }
@@ -32,16 +34,30 @@ internal class PortfolioProgressLog(workers: List<PortfolioWorker>) {
         val old = lifecycle[arm]
         lifecycle[arm] = when (kind) {
             PortfolioLifecycleKind.CREATED -> old
+
             PortfolioLifecycleKind.FIRST_QUERY -> old.copy(firstQueryNanos = old.firstQueryNanos ?: nanos)
-            PortfolioLifecycleKind.INCUMBENT_AVAILABLE -> if (old.incumbentAvailableNanos != null) old else
+
+            PortfolioLifecycleKind.INCUMBENT_AVAILABLE -> if (old.incumbentAvailableNanos != null) {
+                old
+            } else {
                 old.copy(incumbentAvailableNanos = nanos)
+            }
+
             PortfolioLifecycleKind.INCUMBENT_READ -> old.copy(
-                incumbentReadNanos = old.incumbentReadNanos ?: nanos, incumbentReads = old.incumbentReads + 1)
+                incumbentReadNanos = old.incumbentReadNanos ?: nanos,
+                incumbentReads = old.incumbentReads + 1,
+            )
+
             PortfolioLifecycleKind.INCUMBENT_IMPORTED -> old.copy(
                 incumbentImportedNanos = old.incumbentImportedNanos ?: nanos,
-                incumbentImports = old.incumbentImports + 1)
+                incumbentImports = old.incumbentImports + 1,
+            )
+
             PortfolioLifecycleKind.INCUMBENT_CONSUMED -> old.copy(
-                incumbentConsumedNanos = old.incumbentConsumedNanos ?: nanos, incumbentUses = old.incumbentUses + 1)
+                incumbentConsumedNanos = old.incumbentConsumedNanos ?: nanos,
+                incumbentUses = old.incumbentUses + 1,
+            )
+
             PortfolioLifecycleKind.RETIRED -> old.copy(retiredNanos = old.retiredNanos ?: nanos)
         }
     }

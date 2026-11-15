@@ -102,8 +102,15 @@ class PolynomialBooleanRegionsTest {
 
         val regions = formula.booleanRegions(arithmetic).asSequence().filterNotNull().toList()
 
-        assertEquals(listOf(mapOf(1 to true, 3 to true), mapOf(1 to true, 2 to true),
-            mapOf(0 to true, 3 to true), mapOf(0 to true, 2 to true)), regions.map { it.bools })
+        assertEquals(
+            listOf(
+            mapOf(1 to true, 3 to true),
+            mapOf(1 to true, 2 to true),
+            mapOf(0 to true, 3 to true),
+            mapOf(0 to true, 2 to true),
+        ),
+            regions.map { it.bools }
+        )
     }
 
     @Test
@@ -145,8 +152,13 @@ class PolynomialBooleanRegionsTest {
 
         val regions = formula.booleanRegions(arithmetic).asSequence().filterNotNull().toList()
 
-        assertEquals(listOf(PolynomialBooleanRegion(mapOf(0 to true), emptyMap()),
-            PolynomialBooleanRegion(emptyMap(), mapOf(0 to true))), regions)
+        assertEquals(
+            listOf(
+            PolynomialBooleanRegion(mapOf(0 to true), emptyMap()),
+            PolynomialBooleanRegion(emptyMap(), mapOf(0 to true)),
+        ),
+            regions
+        )
     }
 
     @Test
@@ -164,8 +176,15 @@ class PolynomialBooleanRegionsTest {
 
         assertFailsWith<PolynomialInterrupted> { pending.next() }
         val regions = formula.booleanRegions(PolynomialArithmetic()).asSequence().filterNotNull().toList()
-        assertEquals(listOf(mapOf(1 to true, 3 to true), mapOf(1 to true, 2 to true),
-            mapOf(0 to true, 3 to true), mapOf(0 to true, 2 to true)), regions.map { it.bools })
+        assertEquals(
+            listOf(
+            mapOf(1 to true, 3 to true),
+            mapOf(1 to true, 2 to true),
+            mapOf(0 to true, 3 to true),
+            mapOf(0 to true, 2 to true),
+        ),
+            regions.map { it.bools }
+        )
     }
 
     @Test
@@ -182,12 +201,14 @@ class PolynomialBooleanRegionsTest {
         val algebraic = AlgebraicArithmetic()
         for ((gate, value) in listOf(false to BigFraction.ZERO, true to BigFraction.ONE)) {
             val point = mapOf(0 to algebraic.rational(value))
-            assertTrue(regions.any { region ->
+            assertTrue(
+                regions.any { region ->
                 region.bools[0] == gate && region.atoms.all { (index, required) ->
                     val atom = formula.atoms[index]
                     atom.holds(algebraic.signAt(atom.polynomial, point)) == required
                 }
-            })
+            }
+            )
         }
     }
 
@@ -209,8 +230,10 @@ class PolynomialBooleanRegionsTest {
         assertTrue(regions.isNotEmpty())
         assertTrue(regions.all { it.bools.getValue(0) && it.atoms.isEmpty() })
         assertEquals(1L, progress.partialConflicts)
-        assertEquals(mapOf(PolynomialRelation.GT to 2, PolynomialRelation.LT to 1),
-            conflicts.single().groupingBy { it.relation }.eachCount())
+        assertEquals(
+            mapOf(PolynomialRelation.GT to 2, PolynomialRelation.LT to 1),
+            conflicts.single().groupingBy { it.relation }.eachCount(),
+        )
     }
 
     @Test
@@ -240,10 +263,12 @@ class PolynomialBooleanRegionsTest {
 
     @Test
     fun `changing the query condition releases a joint refutation of its numeric branch`() {
-        val source = SmtLibPolynomial.parse("(declare-const gate Bool) (declare-const x Real) " +
-            "(declare-const y Real) (declare-const z Real) (assert (or gate (and " +
-            "(= (* x x) 1) (= (* y y) 1) (= (* z z) 1) " +
-            "(= (* x y) 1) (= (* y z) 1) (= (* x z) (- 1)))))")
+        val source = SmtLibPolynomial.parse(
+            "(declare-const gate Bool) (declare-const x Real) " +
+                "(declare-const y Real) (declare-const z Real) (assert (or gate (and " +
+                "(= (* x x) 1) (= (* y y) 1) (= (* z z) 1) " +
+                "(= (* x y) 1) (= (* y z) 1) (= (* x z) (- 1)))))",
+        )
         val arithmetic = PolynomialArithmetic()
         val coupled = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
         val progress = PolynomialQueryProgress()
@@ -266,9 +291,14 @@ class PolynomialBooleanRegionsTest {
     fun `a replacement snapshot cannot reuse a joint exclusion with the same atom indices`() {
         val declarations = "(declare-const x Real) (declare-const y Real) (declare-const z Real) " +
             "(declare-const gate Bool) "
-        fun formula(closing: String) = PolynomialFormula.normalize(SmtLibPolynomial.parse(declarations +
-            "(assert (or gate (and (= (* x x) 1) (= (* y y) 1) (= (* z z) 1) " +
-            "(= (* x y) 1) (= (* y z) 1) (= (* x z) $closing))))").formula, PolynomialArithmetic())
+        fun formula(closing: String) = PolynomialFormula.normalize(
+            SmtLibPolynomial.parse(
+            declarations +
+                "(assert (or gate (and (= (* x x) 1) (= (* y y) 1) (= (* z z) 1) " +
+                "(= (* x y) 1) (= (* y z) 1) (= (* x z) $closing))))",
+        ).formula,
+            PolynomialArithmetic()
+        )
         val progress = PolynomialQueryProgress()
         val coupled = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
 
@@ -370,9 +400,12 @@ class PolynomialBooleanRegionsTest {
         val formula = PolynomialFormula.normalize(source.formula, arithmetic)
         val progress = PolynomialQueryProgress()
         val original = formula.booleanRegions(arithmetic, progress).asSequence().filterNotNull().toList()
-        val replacement = formula.withAtoms(formula.atoms.map { atom ->
+        val replacement = formula.withAtoms(
+            formula.atoms.map { atom ->
             if (atom.relation == PolynomialRelation.LT) atom.copy(relation = PolynomialRelation.GT) else atom
-        }, arithmetic)
+        },
+            arithmetic
+        )
 
         val regions = replacement.booleanRegions(arithmetic).asSequence().filterNotNull().toList()
 
@@ -442,7 +475,9 @@ class PolynomialBooleanRegionsTest {
                     assertEquals(BigFraction.ZERO, witness.realValue(0).rational)
                     assertEquals(BigFraction.MINUS_ONE, witness.realValue(1).rational)
                     assertEquals(33, witness.realCount)
-                } else assertIs<QfNraResult.Unsatisfiable>(result)
+                } else {
+                    assertIs<QfNraResult.Unsatisfiable>(result)
+                }
             }
         }
     }
@@ -455,8 +490,13 @@ class PolynomialBooleanRegionsTest {
                 "(assert (or gate (and (> x0 0) (> x1 0) (< (* x0 x1) 0))))",
         )
         val plain = solveQfNra(source.formula, source.boolCount, source.realCount)
-        val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
-            QfNraParams(), PolynomialCondition())
+        val query = QfNraQuery(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(),
+            PolynomialCondition(),
+        )
         val conflicts = ArrayList<List<PolynomialAtom>>()
         query.partialConflictObserver = { conflicts.add(it) }
 
@@ -472,8 +512,12 @@ class PolynomialBooleanRegionsTest {
     fun `graph substitutions expose strict nonzero factors within the matrix allowance`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         for ((predicate, sign) in listOf(
-            "(distinct x2 0)" to 0, "(> x2 0)" to 1, "(< x2 0)" to -1,
-            "(not (= x2 0))" to 0, "(not (<= x2 0))" to 1, "(not (>= x2 0))" to -1,
+            "(distinct x2 0)" to 0,
+            "(> x2 0)" to 1,
+            "(< x2 0)" to -1,
+            "(not (= x2 0))" to 0,
+            "(not (<= x2 0))" to 1,
+            "(not (>= x2 0))" to -1,
         )) {
             val source = SmtLibPolynomial.parse(
                 """
@@ -484,8 +528,12 @@ class PolynomialBooleanRegionsTest {
                 """.trimIndent(),
             )
 
-            val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-                QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 25)))
+            val result = solveQfNra(
+                source.formula,
+                source.boolCount,
+                source.realCount,
+                QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 25)),
+            )
 
             val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
             val algebraic = AlgebraicArithmetic(PolynomialArithmetic())
@@ -557,8 +605,12 @@ class PolynomialBooleanRegionsTest {
             """.trimIndent(),
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
         assertTrue(witness.boolValue(0))
@@ -587,8 +639,13 @@ class PolynomialBooleanRegionsTest {
                 assertEquals(pin, witness.boolValue(0))
                 if (pin) {
                     assertTrue(algebraic.sign(witness.realValue(2)) != 0)
-                    assertEquals(0, algebraic.compare(witness.realValue(2),
-                        algebraic.multiply(witness.realValue(0), witness.realValue(1))))
+                    assertEquals(
+                        0,
+                        algebraic.compare(
+                        witness.realValue(2),
+                        algebraic.multiply(witness.realValue(0), witness.realValue(1)),
+                    )
+                    )
                 } else {
                     assertEquals(0, algebraic.sign(witness.realValue(0)))
                     assertEquals(0, algebraic.sign(witness.realValue(2)))
@@ -607,8 +664,12 @@ class PolynomialBooleanRegionsTest {
             """.trimIndent(),
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         assertIs<QfNraResult.Unsatisfiable>(result)
         assertEquals(0L, result.stats.liftedCells)
@@ -640,8 +701,12 @@ class PolynomialBooleanRegionsTest {
             """.trimIndent(),
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 25)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 25)),
+        )
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
         val algebraic = AlgebraicArithmetic(PolynomialArithmetic())
@@ -769,8 +834,13 @@ class PolynomialBooleanRegionsTest {
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
         val algebraic = AlgebraicArithmetic(PolynomialArithmetic())
-        assertEquals(0, algebraic.compare(algebraic.multiply(witness.realValue(0), witness.realValue(0)),
-            algebraic.rational(BigFraction.ofLong(2))))
+        assertEquals(
+            0,
+            algebraic.compare(
+            algebraic.multiply(witness.realValue(0), witness.realValue(0)),
+            algebraic.rational(BigFraction.ofLong(2)),
+        )
+        )
         assertEquals(33, witness.realCount)
     }
 
@@ -812,8 +882,12 @@ class PolynomialBooleanRegionsTest {
         )
         val completed = assertIs<QfNraResult.Unsatisfiable>(solveQfNra(source.formula, 0, 33))
 
-        val result = solveQfNra(source.formula, 0, 33,
-            QfNraParams(maximumWork = completed.stats.workSpent - 1))
+        val result = solveQfNra(
+            source.formula,
+            0,
+            33,
+            QfNraParams(maximumWork = completed.stats.workSpent - 1),
+        )
 
         assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(result).reason)
     }
@@ -829,8 +903,12 @@ class PolynomialBooleanRegionsTest {
             """.trimIndent(),
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
         assertTrue(witness.boolValue(0))
@@ -849,8 +927,12 @@ class PolynomialBooleanRegionsTest {
             "$declarations (assert (and (not (distinct x0 (* x1 x1))) (= (* x1 x1) 2)))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
         val algebraic = AlgebraicArithmetic(PolynomialArithmetic())
@@ -865,8 +947,12 @@ class PolynomialBooleanRegionsTest {
             "$declarations (assert (and (= x0 0) (= (* x0 (+ (* x1 x1) (* x2 x2) (- 1))) 0)))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
         for (variable in 0..32) assertEquals(BigFraction.ZERO, witness.realValue(variable).rational)
@@ -892,8 +978,13 @@ class PolynomialBooleanRegionsTest {
                 val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
                 assertEquals(pin, witness.boolValue(0))
                 val algebraic = AlgebraicArithmetic(PolynomialArithmetic())
-                assertEquals(0, algebraic.compare(witness.realValue(0),
-                    algebraic.rational(BigFraction.ofLong(if (pin) 2L else 3L))))
+                assertEquals(
+                    0,
+                    algebraic.compare(
+                    witness.realValue(0),
+                    algebraic.rational(BigFraction.ofLong(if (pin) 2L else 3L)),
+                )
+                )
             }
         }
     }
@@ -906,9 +997,13 @@ class PolynomialBooleanRegionsTest {
         )
         val fixed = mapOf(0 to BigFraction.ZERO)
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
             QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
-            PolynomialCondition(lower = fixed, upper = fixed))
+            PolynomialCondition(lower = fixed, upper = fixed),
+        )
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
         assertTrue(witness.boolValue(0))
@@ -924,8 +1019,12 @@ class PolynomialBooleanRegionsTest {
         )
         val fixed = mapOf(0 to BigFraction.ZERO)
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            condition = PolynomialCondition(lower = fixed, upper = fixed))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            condition = PolynomialCondition(lower = fixed, upper = fixed),
+        )
 
         assertIs<QfNraResult.Unsatisfiable>(result)
         assertNull(result.stats.booleanTheoryRegions)
@@ -936,17 +1035,24 @@ class PolynomialBooleanRegionsTest {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val fixed = mapOf(0 to BigFraction.ZERO)
         for ((operator, rhs, truth) in listOf(
-            Triple("=", "0", true), Triple("distinct", "0", false),
-            Triple("<", "1", true), Triple("<=", "(- 1)", false),
-            Triple(">", "(- 1)", true), Triple(">=", "1", false),
+            Triple("=", "0", true),
+            Triple("distinct", "0", false),
+            Triple("<", "1", true),
+            Triple("<=", "(- 1)", false),
+            Triple(">", "(- 1)", true),
+            Triple(">=", "1", false),
         )) {
             val source = SmtLibPolynomial.parse(
                 "$declarations (declare-const b Bool) (assert (or (not ($operator x0 $rhs)) (and b (= x1 3))))",
             )
 
-            val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            val result = solveQfNra(
+                source.formula,
+                source.boolCount,
+                source.realCount,
                 QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
-                PolynomialCondition(lower = fixed, upper = fixed))
+                PolynomialCondition(lower = fixed, upper = fixed),
+            )
 
             val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
             assertEquals(truth, witness.boolValue(0), operator)
@@ -984,8 +1090,12 @@ class PolynomialBooleanRegionsTest {
             """.trimIndent(),
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
         assertTrue(witness.boolValue(0))
@@ -1002,8 +1112,12 @@ class PolynomialBooleanRegionsTest {
             """.trimIndent(),
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         assertIs<QfNraResult.Unsatisfiable>(result)
     }
@@ -1019,8 +1133,12 @@ class PolynomialBooleanRegionsTest {
             """.trimIndent(),
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         val stopped = assertIs<QfNraResult.Unknown>(result)
         assertEquals(QfNraReason.ResourceLimit, stopped.reason)
@@ -1037,8 +1155,12 @@ class PolynomialBooleanRegionsTest {
             """.trimIndent(),
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
         assertTrue(witness.boolValue(0))
@@ -1054,8 +1176,12 @@ class PolynomialBooleanRegionsTest {
             "$declarations (assert (or (and (= x0 0) (= x0 1)) (= x0 3)))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         assertEquals(BigFraction.ofLong(3), assertIs<QfNraResult.Satisfiable>(result).assignment.realValue(0).rational)
     }
@@ -1070,8 +1196,12 @@ class PolynomialBooleanRegionsTest {
             """.trimIndent(),
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         assertIs<QfNraResult.Unsatisfiable>(result)
     }
@@ -1109,8 +1239,12 @@ class PolynomialBooleanRegionsTest {
         )
         val complete = solveQfNra(source.formula, source.boolCount, source.realCount)
 
-        val stopped = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = complete.stats.workSpent - 1))
+        val stopped = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = complete.stats.workSpent - 1),
+        )
 
         assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(stopped).reason)
     }
@@ -1123,8 +1257,11 @@ class PolynomialBooleanRegionsTest {
         )) {
             val result = solveQfNra(formula, 0, 33)
 
-            if (feasible) assertIs<QfNraResult.Satisfiable>(result)
-            else assertIs<QfNraResult.Unsatisfiable>(result)
+            if (feasible) {
+                assertIs<QfNraResult.Satisfiable>(result)
+            } else {
+                assertIs<QfNraResult.Unsatisfiable>(result)
+            }
         }
     }
 
@@ -1138,8 +1275,12 @@ class PolynomialBooleanRegionsTest {
                 "$declarations (assert (and $guard (or $guard (= (+ (* x0 x0) (* x1 x1)) 1))))",
             )
 
-            val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-                QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+            val result = solveQfNra(
+                source.formula,
+                source.boolCount,
+                source.realCount,
+                QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+            )
 
             val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
             assertEquals(33, witness.realCount)
@@ -1159,8 +1300,12 @@ class PolynomialBooleanRegionsTest {
             """.trimIndent(),
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
         assertTrue(witness.boolValue(0))
@@ -1174,8 +1319,12 @@ class PolynomialBooleanRegionsTest {
             "$declarations (declare-const b Bool) (assert (or b (= (+ (* x0 x0) (* x1 x1)) 1)))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         assertTrue(assertIs<QfNraResult.Satisfiable>(result).assignment.boolValue(0))
     }
@@ -1190,8 +1339,12 @@ class PolynomialBooleanRegionsTest {
             """.trimIndent(),
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         assertEquals(PolynomialResource.MATRIX_CELLS, assertIs<QfNraResult.Unknown>(result).resource)
     }
@@ -1203,8 +1356,12 @@ class PolynomialBooleanRegionsTest {
             "$declarations (declare-const b Bool) (assert (and b (not (= (+ (* x0 x0) (* x1 x1)) 1))))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         assertEquals(PolynomialResource.MATRIX_CELLS, assertIs<QfNraResult.Unknown>(result).resource)
     }
@@ -1219,8 +1376,12 @@ class PolynomialBooleanRegionsTest {
             """.trimIndent(),
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         assertEquals(PolynomialResource.MATRIX_CELLS, assertIs<QfNraResult.Unknown>(result).resource)
     }
@@ -1232,8 +1393,12 @@ class PolynomialBooleanRegionsTest {
             "$declarations (declare-const b Bool) (assert (and b (not b) (= (+ (* x0 x0) (* x1 x1)) 1)))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         assertIs<QfNraResult.Unsatisfiable>(result)
         assertEquals(0L, result.stats.projectedPolynomials)
@@ -1249,8 +1414,12 @@ class PolynomialBooleanRegionsTest {
             """.trimIndent(),
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         assertEquals(BigFraction.ofLong(3), assertIs<QfNraResult.Satisfiable>(result).assignment.realValue(0).rational)
     }
@@ -1265,8 +1434,12 @@ class PolynomialBooleanRegionsTest {
             """.trimIndent(),
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
         assertEquals(BigFraction.ofLong(3), witness.realValue(0).rational)
@@ -1283,8 +1456,12 @@ class PolynomialBooleanRegionsTest {
             """.trimIndent(),
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         assertIs<QfNraResult.Unsatisfiable>(result)
     }
@@ -1313,9 +1490,13 @@ class PolynomialBooleanRegionsTest {
         )
         val fixed = mapOf(1 to BigFraction.ofLong(7))
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
             QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
-            PolynomialCondition(lower = fixed, upper = fixed))
+            PolynomialCondition(lower = fixed, upper = fixed),
+        )
 
         assertEquals(BigFraction.ofLong(7), assertIs<QfNraResult.Satisfiable>(result).assignment.realValue(1).rational)
     }
@@ -1337,12 +1518,22 @@ class PolynomialBooleanRegionsTest {
         val source = SmtLibPolynomial.parse(
             "$declarations (declare-const b Bool) (assert (and b (or b (= (+ (* x0 x0) (* x1 x1)) 1))))",
         )
-        val complete = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val complete = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
-        val stopped = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = complete.stats.workSpent - 1,
-                polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val stopped = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(
+                maximumWork = complete.stats.workSpent - 1,
+                polynomialLimits = PolynomialLimits(maxMatrixCells = 0),
+            ),
+        )
 
         assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(stopped).reason)
     }

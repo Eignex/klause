@@ -18,16 +18,27 @@ sealed interface DefinitionHint {
         if (target < 0) return null
         return when (this) {
             is Abs -> Abs(target, input.remapped(mapping) ?: return null)
+
             is Extreme -> Extreme(target, inputs.remapped(mapping) ?: return null, maximum)
+
             is Product -> Product(
-                target, left.remapped(mapping) ?: return null, right.remapped(mapping) ?: return null,
+                target,
+                left.remapped(mapping) ?: return null,
+                right.remapped(mapping) ?: return null,
             )
+
             is Power -> Power(target, base.remapped(mapping) ?: return null, exponent)
+
             is Plus -> Plus(
-                target, left.remapped(mapping) ?: return null, right.remapped(mapping) ?: return null,
+                target,
+                left.remapped(mapping) ?: return null,
+                right.remapped(mapping) ?: return null,
             )
+
             is Linear -> Linear(target, coefficients, inputs.remapped(mapping) ?: return null, bound)
+
             is BooleanValue -> BooleanValue(target, literal.remappedLiteral(mapping) ?: return null)
+
             is Element -> {
                 val sourceIndex = mapping.int(index)
                 if (sourceIndex < 0) return null
@@ -35,10 +46,18 @@ sealed interface DefinitionHint {
                 if (mapped?.any { it < 0 } == true) return null
                 Element(target, sourceIndex, mapped, values, offset)
             }
+
             is Comparison -> Comparison(
-                target, coefficients, inputs.remapped(mapping) ?: return null, bound, relation, strict,
+                target,
+                coefficients,
+                inputs.remapped(mapping) ?: return null,
+                bound,
+                relation,
+                strict,
             )
+
             is Membership -> mapping.int(input).takeIf { it >= 0 }?.let { Membership(target, it, values) }
+
             is Fold -> {
                 val literals = IntArray(definition.lits.size)
                 for (k in literals.indices) {
@@ -46,7 +65,9 @@ sealed interface DefinitionHint {
                 }
                 Fold(BoolFoldDefinition(target, literals, definition.isAnd))
             }
+
             is IntegerReference -> IntegerReference(target)
+
             is BooleanReference -> BooleanReference(target, literal.remappedLiteral(mapping) ?: return null)
         }
     }
@@ -193,6 +214,7 @@ private fun DefinitionHint.Operand.remapped(mapping: VarRemap): DefinitionHint.O
     is DefinitionHint.Operand.Variable -> mapping.int(id).takeIf { it >= 0 }?.let {
         DefinitionHint.Operand.Variable(it)
     }
+
     is DefinitionHint.Operand.Constant -> this
 }
 

@@ -12,11 +12,14 @@ import com.eignex.klause.simplex.exact.BigFraction
 internal fun Compiler.Builder.assertDistinct(args: List<SExpr>) {
     val values = args.map { argument ->
         sourceCancellation.polynomialSourceCheckpoint(1)
-        evalTerm(argument, when {
-            isBoolExpr(argument) -> Sort.BOOL
-            isRealExpr(argument) -> Sort.REAL
-            else -> Sort.INT
-        })
+        evalTerm(
+            argument,
+            when {
+                isBoolExpr(argument) -> Sort.BOOL
+                isRealExpr(argument) -> Sort.REAL
+                else -> Sort.INT
+            },
+        )
     }
     if (values.any { it is Res.B } && values.any { it !is Res.B }) {
         smtUnsupported("distinct requires operands of the same sort")
@@ -48,7 +51,9 @@ private fun Compiler.Builder.distinctOperand(value: Res): Distinct.Operand {
     sourceCancellation.polynomialSourceCheckpoint(1)
     val term = when (value) {
         is Res.B -> return Distinct.Operand(intArrayOf(Term.ofLit(value.lit)), listOf(BigFraction.ONE))
+
         is Res.R -> value.comb
+
         is Res.I -> when (val integer = value.term) {
             is IntComb.Narrow -> integer.lin.toRealComb()
             is IntComb.Wide -> integer.lin.toRealComb()

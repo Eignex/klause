@@ -33,7 +33,10 @@ internal class AllDifferentTuplesPayload(val tuples: List<IntArray>)
 @Serializable
 internal class DistinctOperandPayload(
     val terms: IntArray,
-    val coefficients: List<@Serializable(with = BigFractionSerializer::class) BigFraction>,
+    val coefficients: List<
+        @Serializable(with = BigFractionSerializer::class)
+        BigFraction,
+        >,
     @Serializable(with = BigFractionSerializer::class) val constant: BigFraction = BigFraction.ZERO,
 )
 
@@ -104,12 +107,18 @@ internal fun globalFactorCodecs(): List<FactorCodec<*, *>> = listOf(
         "allDifferent",
         {
             AllDifferentPayload(
-                it.vars, it.presents.orNullIfEmpty(), it.exceptSet.orNullIfEmpty(), it.boundsConsistent,
+                it.vars,
+                it.presents.orNullIfEmpty(),
+                it.exceptSet.orNullIfEmpty(),
+                it.boundsConsistent,
             )
         },
         {
             AllDifferent(
-                it.vars, it.presents ?: IntArray(0), it.except ?: LongArray(0), it.boundsConsistent,
+                it.vars,
+                it.presents ?: IntArray(0),
+                it.except ?: LongArray(0),
+                it.boundsConsistent,
             )
         },
     ),
@@ -123,12 +132,24 @@ internal fun globalFactorCodecs(): List<FactorCodec<*, *>> = listOf(
         "globalCardinality",
         {
             GlobalCardinalityPayload(
-                it.xs, it.cover, it.countVars, it.countLow, it.countHigh, it.closed, it.presents.orNullIfEmpty(),
+                it.xs,
+                it.cover,
+                it.countVars,
+                it.countLow,
+                it.countHigh,
+                it.closed,
+                it.presents.orNullIfEmpty(),
             )
         },
         {
             GlobalCardinality(
-                it.xs, it.cover, it.countVars, it.countLow, it.countHigh, it.closed, it.presents ?: IntArray(0),
+                it.xs,
+                it.cover,
+                it.countVars,
+                it.countLow,
+                it.countHigh,
+                it.closed,
+                it.presents ?: IntArray(0),
             )
         },
     ),

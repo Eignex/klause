@@ -224,7 +224,6 @@ data class SearchStats(
         clausalPrimalInfeasible = SumResult(clausalPrimalInfeasible.sum + o.clausalPrimalInfeasible.sum),
         clausalPrimalIncomplete = SumResult(clausalPrimalIncomplete.sum + o.clausalPrimalIncomplete.sum),
 
-
     )
 }
 
@@ -240,7 +239,6 @@ internal class SearchStatsSink {
     var clausalPrimalRejected: Long = 0L
     var clausalPrimalInfeasible: Long = 0L
     var clausalPrimalIncomplete: Long = 0L
-
 
     var propagationWork: () -> Long = { 0L }
     var rootPropagationWork: () -> Long = { 0L }
@@ -343,7 +341,6 @@ internal class SearchStatsSink {
         clausalPrimalRejected = SumResult(clausalPrimalRejected.toDouble()),
         clausalPrimalInfeasible = SumResult(clausalPrimalInfeasible.toDouble()),
         clausalPrimalIncomplete = SumResult(clausalPrimalIncomplete.toDouble()),
-
 
     )
 }

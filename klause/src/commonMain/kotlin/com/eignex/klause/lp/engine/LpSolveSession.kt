@@ -33,15 +33,25 @@ internal class LpSolveSession(
             val previous = solver
             val current = prepare(model, cancellation, workLimit)
                 ?: return CertifiedLpResult(null, null, null, null, null, false, { null })
-            observeQuery(model, current, current === previous, workLimit, claim,
-                floatOffset, floatAccept != null, refinementLimits)
+            observeQuery(
+                model,
+                current,
+                current === previous,
+                workLimit,
+                claim,
+                floatOffset,
+                floatAccept != null,
+                refinementLimits,
+            )
             val result = try {
                 if (current === previous) current.resolveBounds(LpFloatAllowance(workLimit, 0)) else current.solve()
             } finally {
                 observer?.observeSolve(current.lastMetrics, current is ComponentLpSolverCapability)
             }
-            return certification.certify(model, current, result, cancellation, observer, counterResults,
-                refinementLimits, floatAccept, floatOffset, claim)
+            return certification.certify(
+                model, current, result, cancellation, observer, counterResults,
+                refinementLimits, floatAccept, floatOffset, claim,
+            )
         } catch (primary: Throwable) {
             try {
                 releaseSolvers()
@@ -67,8 +77,16 @@ internal class LpSolveSession(
         try {
             val previous = solver
             val current = prepare(model, cancellation, workLimit) ?: return null
-            observeQuery(model, current, current === previous, workLimit, LpClaim.FEASIBLE_COMPLETION,
-                floatOffset, true, LpRefinementLimits())
+            observeQuery(
+                model,
+                current,
+                current === previous,
+                workLimit,
+                LpClaim.FEASIBLE_COMPLETION,
+                floatOffset,
+                true,
+                LpRefinementLimits(),
+            )
             val result = try {
                 if (current === previous) current.resolveBounds(LpFloatAllowance(workLimit, 0)) else current.solve()
             } finally {
@@ -102,8 +120,16 @@ internal class LpSolveSession(
                 val previous = solver
                 val current = prepare(model, cancellation, workLimit)
                     ?: return@LpSolveCursor cancelledResult()
-                observeQuery(model, current, current === previous, workLimit, claim,
-                    floatOffset, floatAccept != null, null)
+                observeQuery(
+                    model,
+                    current,
+                    current === previous,
+                    workLimit,
+                    claim,
+                    floatOffset,
+                    floatAccept != null,
+                    null,
+                )
                 val stage = solveFloating(current, current === previous, cancellation, observer, workLimit)
                 val result = when (stage) {
                     is FloatingStage.Completed -> stage.result
@@ -114,8 +140,10 @@ internal class LpSolveSession(
                 }
                 checkpoint(current.lastMetrics.workOps)
                 if (cancellation()) return@LpSolveCursor cancelledResult()
-                certification.certify(model, current, result, cancellation, observer, null,
-                    floatAccept = floatAccept, floatOffset = floatOffset, claim = claim)
+                certification.certify(
+                    model, current, result, cancellation, observer, null,
+                    floatAccept = floatAccept, floatOffset = floatOffset, claim = claim,
+                )
             } catch (primary: Throwable) {
                 try {
                     releaseSolvers()
@@ -190,9 +218,11 @@ internal class LpSolveSession(
     ) {
         val observer = context.onQuery ?: return
         check(querySequence < Long.MAX_VALUE) { "LP query sequence exhausted" }
-        val query = LpQueryObservation(checkNotNull(queryOwner), ++querySequence, model, retained,
+        val query = LpQueryObservation(
+            checkNotNull(queryOwner), ++querySequence, model, retained,
             workLimit, claim, floatOffset, hasFloatAcceptance, refinementLimits ?: LpRefinementLimits(),
-            pricing, componentSplit) {
+            pricing, componentSplit,
+        ) {
             solver.continuationBasis(model)
         }
         try {
@@ -216,7 +246,10 @@ internal class LpSolveSession(
         previous?.close()
         if (cancellation()) return null
         return newRetainedLpSolver(model, cancellation, componentSplit, context.engineFactory, pricing, workLimit)
-            .also { it.deferUnscaledSourceDiagnostics(); solver = it }
+            .also {
+                it.deferUnscaledSourceDiagnostics();
+                solver = it
+            }
     }
 
     fun releaseSolvers() {
@@ -236,7 +269,9 @@ internal class LpSolveSession(
             try {
                 owner.close()
             } catch (cleanup: Throwable) {
-                if (failure == null) failure = cleanup else if (failure !== cleanup) {
+                if (failure == null) {
+                    failure = cleanup
+                } else if (failure !== cleanup) {
                     failure.addSuppressed(cleanup)
                 }
             }

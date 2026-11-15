@@ -55,8 +55,16 @@ private fun projectedPolynomialPoint(
         } else {
             return SourceEvidenceCheck.Unavailable("polynomial witness has no exact source coordinates")
         }
-    return checkProjectedPolynomialFormula(source.formula, source.totalBoolCount, source.totalRealCount,
-        point.bools, values.withIndex().associate { it.index to it.value }, cancellation, arithmetic, limits)
+    return checkProjectedPolynomialFormula(
+        source.formula,
+        source.totalBoolCount,
+        source.totalRealCount,
+        point.bools,
+        values.withIndex().associate { it.index to it.value },
+        cancellation,
+        arithmetic,
+        limits,
+    )
 }
 
 internal fun checkProjectedPolynomialFormula(
@@ -86,7 +94,9 @@ internal fun checkProjectedPolynomialFormula(
         booleans[it]
     }
     val checked = solveQfNra(
-        PolynomialRealFormula.And(terms), boolCount, realCount,
+        PolynomialRealFormula.And(terms),
+        boolCount,
+        realCount,
         QfNraParams(cancellation = cancellation, polynomialLimits = limits),
         PolynomialCondition(bools, fixed, fixed),
     )
@@ -120,9 +130,12 @@ private fun polynomialRootCondition(
     var polynomial: PolynomialExpression = polynomialConstant(coefficients.last())
     for (index in coefficients.lastIndex - 1 downTo 0) {
         arithmetic.step()
-        polynomial = PolynomialExpression.Sum(listOf(
-            PolynomialExpression.Product(listOf(polynomial, variable)), polynomialConstant(coefficients[index]),
-        ))
+        polynomial = PolynomialExpression.Sum(
+            listOf(
+            PolynomialExpression.Product(listOf(polynomial, variable)),
+            polynomialConstant(coefficients[index]),
+        )
+        )
     }
     return listOf(
         PolynomialRealFormula.Atom(polynomial, PolynomialRelation.EQ, polynomialConstant(BigFraction.ZERO)),

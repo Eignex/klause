@@ -51,8 +51,11 @@ internal fun verifyProjectedSourceWitness(
         if (!admitted) return Verification.Rejected("additional source acceptance filter refutes the assignment")
     }
     if (cancellation()) return Verification.Indeterminate("source verification cancelled")
-    return points.check(Candidate(sample, Unit), cancellation,
-        onWork = { cancellation.charge(it) })
+    return points.check(
+        Candidate(sample, Unit),
+        cancellation,
+        onWork = { cancellation.charge(it) },
+    )
 }
 
 private fun checkProjectedRealBounds(

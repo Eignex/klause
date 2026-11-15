@@ -523,8 +523,12 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     fun observeTemplateFunding(nanos: Long, work: Long, completedUnits: Long, recorded: Boolean) {
         val key = "TEMPLATE_FUNDING_${probeRoute.name}"
         val outcome = if (recorded) "RECORDED" else "RETAINED"
-        val delta = LpPhaseStats(calls = 1L, nanos = nanos, work = work,
-            outcomes = mapOf(outcome to 1L, "COMPLETED_UNITS_SUM" to completedUnits))
+        val delta = LpPhaseStats(
+            calls = 1L,
+            nanos = nanos,
+            work = work,
+            outcomes = mapOf(outcome to 1L, "COMPLETED_UNITS_SUM" to completedUnits),
+        )
         phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
     }
 
@@ -561,7 +565,11 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     }
 
     fun observeTemplateUse(
-        rows: Int = 0, bounds: Int = 0, exactBounds: Int = 0, boundChecks: Int = 0, rowsOmitted: Int = 0,
+        rows: Int = 0,
+        bounds: Int = 0,
+        exactBounds: Int = 0,
+        boundChecks: Int = 0,
+        rowsOmitted: Int = 0,
     ) {
         if (!templateAssemblySeen) {
             templateAssemblySeen = true
@@ -586,9 +594,15 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         return phases.toMutableMap().apply {
             if (directionalCalls != 0L) {
                 val key = "DIRECTIONAL_BRANCH_NODE"
-                put(key, getValue(key).mergedWith(LpPhaseStats(
-                    calls = directionalCalls, outcomes = directionalOutcomes.toMap(),
-                )))
+                put(
+                    key,
+                    getValue(key).mergedWith(
+                        LpPhaseStats(
+                    calls = directionalCalls,
+                    outcomes = directionalOutcomes.toMap(),
+                )
+                    )
+                )
             }
             if (templatePreparationSeen) {
                 val outcomes = buildMap {
@@ -605,14 +619,24 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                     }
                 }
                 val key = "TEMPLATE_PREPARATION_${probeRoute.name}"
-                put(key, getValue(key).mergedWith(LpPhaseStats(
+                put(
+                    key,
+                    getValue(key).mergedWith(
+                        LpPhaseStats(
                     calls = templatePrepared + templateDeclined,
-                    nanos = templateNanos, work = templateWork, outcomes = outcomes,
-                )))
+                    nanos = templateNanos,
+                    work = templateWork,
+                    outcomes = outcomes,
+                )
+                    )
+                )
             }
             if (templateAssemblySeen) {
                 val key = "TEMPLATE_ASSEMBLY_${probeRoute.name}"
-                put(key, getValue(key).mergedWith(LpPhaseStats(
+                put(
+                    key,
+                    getValue(key).mergedWith(
+                        LpPhaseStats(
                     work = templateBoundChecks + templateBoundColumnWork,
                     outcomes = buildMap {
                         put("ROWS", templateRows)
@@ -624,7 +648,9 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                             put("SOURCE_ROWS_OMITTED", templateRowsOmitted)
                         }
                     },
-                )))
+                )
+                    )
+                )
             }
         }
     }
@@ -734,33 +760,55 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
      * so their denominator ([solves]) always names the same route. */
     fun observeEngineCost(route: LpRoute, metrics: LpSolveMetrics, finished: Boolean = true) {
         val effectiveRoute = if (route == LpRoute.NODE) probeRoute else route
-        cutLifecycle.shared("SOLVE", LpPhaseStats(calls = if (finished) 1L else 0L,
-            work = metrics.workOps + metrics.preparationOps, pivots = metrics.pivots.toLong(),
-            outcomes = mapOf("COMPONENT_SOLVED" to metrics.componentSolves.toLong(),
+        cutLifecycle.shared(
+            "SOLVE",
+            LpPhaseStats(
+            calls = if (finished) 1L else 0L,
+            work = metrics.workOps + metrics.preparationOps,
+            pivots = metrics.pivots.toLong(),
+            outcomes = mapOf(
+                "COMPONENT_SOLVED" to metrics.componentSolves.toLong(),
                 "COMPONENT_REUSED" to metrics.componentReuses.toLong(),
                 "COLD_FACTOR" to metrics.initialRefactorizations.toLong(),
                 "WARM_FACTOR" to metrics.warmStartRefactorizations.toLong(),
-                "SINGULAR_FACTOR" to metrics.singularRecoveryRefactorizations.toLong())))
-        val basisBuild = LpPhaseStats(work = metrics.basisBuildWork,
-            outcomes = mapOf("DECLINED" to metrics.basisBuildDeclines,
-                "UNMEASURED" to metrics.basisBuildUnmeasured, "FACTOR_ENTRIES" to metrics.factorEntriesBuilt))
+                "SINGULAR_FACTOR" to metrics.singularRecoveryRefactorizations.toLong(),
+            ),
+        )
+        )
+        val basisBuild = LpPhaseStats(
+            work = metrics.basisBuildWork,
+            outcomes = mapOf(
+                "DECLINED" to metrics.basisBuildDeclines,
+                "UNMEASURED" to metrics.basisBuildUnmeasured,
+                "FACTOR_ENTRIES" to metrics.factorEntriesBuilt,
+            ),
+        )
         val basisKey = "BASIS_BUILD_${effectiveRoute.name}"
         phases[basisKey] = (phases[basisKey] ?: LpPhaseStats()).mergedWith(basisBuild)
         cutLifecycle.shared("BASIS_BUILD", basisBuild)
         if (metrics.componentSolves > 0 || metrics.componentReuses > 0) {
             val key = "COMPONENT_LIFECYCLE_${effectiveRoute.name}"
             phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(
-                LpPhaseStats(calls = metrics.componentSolves.toLong() + metrics.componentReuses,
-                    outcomes = mapOf("SOLVED" to metrics.componentSolves.toLong(),
-                        "REUSED" to metrics.componentReuses.toLong())),
+                LpPhaseStats(
+                    calls = metrics.componentSolves.toLong() + metrics.componentReuses,
+                    outcomes = mapOf(
+                        "SOLVED" to metrics.componentSolves.toLong(),
+                        "REUSED" to metrics.componentReuses.toLong(),
+                    ),
+                ),
             )
         }
         if (metrics.sourceResidualCalls > 0L) {
             val key = "SOURCE_RESIDUALS_${effectiveRoute.name}"
             phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(
-                LpPhaseStats(calls = metrics.sourceResidualCalls, nanos = metrics.sourceResidualNanos,
-                    outcomes = mapOf("SCALED" to metrics.sourceResidualScaledCalls,
-                        "UNSCALED" to metrics.sourceResidualCalls - metrics.sourceResidualScaledCalls)),
+                LpPhaseStats(
+                    calls = metrics.sourceResidualCalls,
+                    nanos = metrics.sourceResidualNanos,
+                    outcomes = mapOf(
+                        "SCALED" to metrics.sourceResidualScaledCalls,
+                        "UNSCALED" to metrics.sourceResidualCalls - metrics.sourceResidualScaledCalls,
+                    ),
+                ),
             )
         }
         if (effectiveRoute != LpRoute.NODE) routeMetrics[effectiveRoute.ordinal].observe(metrics, finished)
@@ -812,9 +860,14 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                     }
                 }
                 override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
-                    cutLifecycle.shared("CERTIFIER_${certifier.name}", LpPhaseStats(calls = 1L,
+                    cutLifecycle.shared(
+                        "CERTIFIER_${certifier.name}",
+                        LpPhaseStats(
+                        calls = 1L,
                         work = (cost as? LpCertifierCost.Metered)?.work ?: 0L,
-                        outcomes = mapOf((if (success) "CERTIFIED" else "DECLINED") to 1L)))
+                        outcomes = mapOf((if (success) "CERTIFIED" else "DECLINED") to 1L),
+                    )
+                    )
                     val i = certifier.ordinal
                     certifierAttempts[i]++
                     if (success) certifierSuccesses[i]++ else certifierDeclines[i]++
@@ -825,17 +878,32 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                 override fun observeContinuation(metrics: ExactContinuationMetrics) {
                     continuation = continuation.mergedWith(metrics.toStats())
                     for ((phase, work) in metrics.workByPhase) {
-                        cutLifecycle.shared("CONTINUATION_${phase.name}", LpPhaseStats(calls = 1L, work = work,
-                            outcomes = mapOf((metrics.decline?.name ?: "COMPLETED") to 1L,
-                                "ALLOCATION" to (metrics.allocationByPhase[phase] ?: 0L))))
+                        cutLifecycle.shared(
+                            "CONTINUATION_${phase.name}",
+                            LpPhaseStats(
+                            calls = 1L,
+                            work = work,
+                            outcomes = mapOf(
+                                (metrics.decline?.name ?: "COMPLETED") to 1L,
+                                "ALLOCATION" to (metrics.allocationByPhase[phase] ?: 0L),
+                            ),
+                        )
+                        )
                     }
                 }
                 override fun observeBasisVerification(metrics: ExactBasisMetrics) {
                     for (operation in metrics.operations) {
-                        cutLifecycle.shared("BASIS_${operation.phase.name}", LpPhaseStats(calls = 1L,
-                            work = operation.work, outcomes = mapOf(
+                        cutLifecycle.shared(
+                            "BASIS_${operation.phase.name}",
+                            LpPhaseStats(
+                            calls = 1L,
+                            work = operation.work,
+                            outcomes = mapOf(
                                 (metrics.decline?.name ?: "COMPLETED") to 1L,
-                                "ALLOCATION" to operation.allocation)))
+                                "ALLOCATION" to operation.allocation,
+                            ),
+                        )
+                        )
                     }
                     basisVerification = basisVerification.mergedWith(
                         LpBasisVerificationStats(

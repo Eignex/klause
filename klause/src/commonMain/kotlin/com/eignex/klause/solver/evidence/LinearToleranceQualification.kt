@@ -226,18 +226,18 @@ internal class LinearToleranceQualification(
                 val positive = coefficient.signum() > 0
                 nonnegative = nonnegative && (
                     if (positive) {
-                    low?.signum()?.let { it >= 0 }
-                } else {
-                    high?.signum()?.let { it <= 0 }
-                }
-                ) == true
+                        low?.signum()?.let { it >= 0 }
+                    } else {
+                        high?.signum()?.let { it <= 0 }
+                    }
+                    ) == true
                 nonpositive = nonpositive && (
                     if (positive) {
-                    high?.signum()?.let { it <= 0 }
-                } else {
-                    low?.signum()?.let { it >= 0 }
-                }
-                ) == true
+                        high?.signum()?.let { it <= 0 }
+                    } else {
+                        low?.signum()?.let { it >= 0 }
+                    }
+                    ) == true
                 magnitude = if (low == null || high == null) {
                     null
                 } else {
@@ -250,8 +250,11 @@ internal class LinearToleranceQualification(
             if (stopped()) return null
             divisor = divisor.gcd((coefficient * BigFraction.of(denominator, BIG_ONE)).num.abs())
         }
-        return RowLattice(BigFraction.of(divisor, denominator), magnitude,
-            coefficients.count { !it.isZero } == 1 || nonnegative || nonpositive)
+        return RowLattice(
+            BigFraction.of(divisor, denominator),
+            magnitude,
+            coefficients.count { !it.isZero } == 1 || nonnegative || nonpositive,
+        )
     }
 }
 

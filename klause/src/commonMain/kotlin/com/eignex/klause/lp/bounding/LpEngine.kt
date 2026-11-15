@@ -163,8 +163,12 @@ internal class LpEngine(
 ) : AutoCloseable {
     init {
         projections?.requireSource(problem)
-        require(rootQueryPolicy == LpRootQueryPolicy.SHARED_WORK || (params0.lpPlan.boundMaxDepth == 0 &&
-            lpWorkAllowance(params0.solveBudgetMillis, params0.lpPlan.lpWorkBudgetFraction) > 0L))
+        require(
+            rootQueryPolicy == LpRootQueryPolicy.SHARED_WORK || (
+                params0.lpPlan.boundMaxDepth == 0 &&
+            lpWorkAllowance(params0.solveBudgetMillis, params0.lpPlan.lpWorkBudgetFraction) > 0L
+            )
+        )
     }
 
     private var closed = false
@@ -313,7 +317,7 @@ internal class LpEngine(
         val charged = if (retainedRootEnabled) {
             metrics.copy(
                 workOps =
-            saturatingAdd(metrics.workOps, metrics.preparationOps)
+                saturatingAdd(metrics.workOps, metrics.preparationOps),
             )
         } else {
             metrics
@@ -336,8 +340,13 @@ internal class LpEngine(
         noteNodeOverhead(work)
         val primal = result.primal.copyOf()
         if (cancellation()) return
-        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, result.basis, primal,
-            sourceProblem = problem)
+        rootRoundingWarmStart = RootRoundingWarmStart(
+            objective,
+            relaxation,
+            result.basis,
+            primal,
+            sourceProblem = problem,
+        )
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
     }
 
@@ -396,13 +405,12 @@ internal class LpEngine(
             additionalBytes <= ROOT_PRIMAL_GUIDANCE_BYTES
     }
 
-    private fun rootTargetBytes(targets: RootPrimalTargets?, rounding: RootRoundingWarmStart?): Long =
-        targets?.let {
-            ROOT_PRIMAL_TARGET_HEADER_BYTES + (it.intColumns.size.toLong() + it.booleanColumns.size) * Int.SIZE_BYTES +
-                (if (it.coordinates === rounding?.primal) 0L else it.coordinates.size.toLong() * Double.SIZE_BYTES) +
-                (if (it.knownColumns === rounding?.knownColumns) 0L else it.knownColumns?.size?.toLong() ?: 0L) +
-                (it.components?.retainedBytes ?: 0L)
-        } ?: 0L
+    private fun rootTargetBytes(targets: RootPrimalTargets?, rounding: RootRoundingWarmStart?): Long = targets?.let {
+        ROOT_PRIMAL_TARGET_HEADER_BYTES + (it.intColumns.size.toLong() + it.booleanColumns.size) * Int.SIZE_BYTES +
+            (if (it.coordinates === rounding?.primal) 0L else it.coordinates.size.toLong() * Double.SIZE_BYTES) +
+            (if (it.knownColumns === rounding?.knownColumns) 0L else it.knownColumns?.size?.toLong() ?: 0L) +
+            (it.components?.retainedBytes ?: 0L)
+    } ?: 0L
 
     internal fun prepareRootComponentRounding(
         targets: RootPrimalTargets,
@@ -451,36 +459,37 @@ internal class LpEngine(
         return repair
     }
 
-    internal fun rootComponentRepairWorkAvailable(): Boolean =
-        retainedRootRemainingWork() > 0L &&
-            retainedRootCumulativeWork() > saturatingAdd(primalPropagationWork, sink.lp.standaloneWork)
+    internal fun rootComponentRepairWorkAvailable(): Boolean = retainedRootRemainingWork() > 0L &&
+        retainedRootCumulativeWork() > saturatingAdd(primalPropagationWork, sink.lp.standaloneWork)
 
     // Numerical pivots spend the containing allowance, not the separate transport and construction cap.
     internal fun rootComponentPreparationAllowed(targets: RootPrimalTargets, bytes: Long, minimumWork: Long): Boolean =
         rootComponentPreparationDecline(targets, bytes, minimumWork) == null
 
-    internal fun rootComponentPreparationDecline(
-        targets: RootPrimalTargets,
-        bytes: Long,
-        minimumWork: Long,
-    ): String? = when {
-        rootPrimalTargets !== targets -> "EXPIRED_TARGETS"
-        !rootGuidanceFits(bytes) -> "STORAGE"
-        lpWorkAllowanceSpent(minimumWork) -> "LP_WORK"
-        retainedRootCumulativeWork() < minimumWork -> "ROOT_WORK"
-        SPARSE_LP_MAX_PREPARATION_WORK - minOf(SPARSE_LP_MAX_PREPARATION_WORK, totalOverheadOps) < minimumWork ->
-            "PREPARATION_WORK"
-        else -> null
-    }
+    internal fun rootComponentPreparationDecline(targets: RootPrimalTargets, bytes: Long, minimumWork: Long): String? =
+        when {
+            rootPrimalTargets !== targets -> "EXPIRED_TARGETS"
+
+            !rootGuidanceFits(bytes) -> "STORAGE"
+
+            lpWorkAllowanceSpent(minimumWork) -> "LP_WORK"
+
+            retainedRootCumulativeWork() < minimumWork -> "ROOT_WORK"
+
+            SPARSE_LP_MAX_PREPARATION_WORK - minOf(SPARSE_LP_MAX_PREPARATION_WORK, totalOverheadOps) < minimumWork ->
+                "PREPARATION_WORK"
+
+            else -> null
+        }
 
     internal fun rootComponentPreparationWork(targets: RootPrimalTargets, bytes: Long): Long =
         if (rootPrimalTargets !== targets || !rootGuidanceFits(bytes) || lpWorkAllowanceSpent(1L)) {
             0L
         } else {
             minOf(
-            retainedRootRemainingWork(),
-            SPARSE_LP_MAX_PREPARATION_WORK - minOf(SPARSE_LP_MAX_PREPARATION_WORK, totalOverheadOps),
-        )
+                retainedRootRemainingWork(),
+                SPARSE_LP_MAX_PREPARATION_WORK - minOf(SPARSE_LP_MAX_PREPARATION_WORK, totalOverheadOps),
+            )
         }
 
     internal fun retainRootPrimalTargets(cancellation: ExecutionControl): Boolean {
@@ -498,8 +507,13 @@ internal class LpEngine(
         }
         noteNodeOverhead(1L)
         // Transfer the private buffers; pinning state and basis remain owned by the rounding attempt.
-        rootPrimalTargets = RootPrimalTargets(guide.relaxation.intColOf, guide.relaxation.boolColOf,
-            coordinates, guide.knownColumns, auxiliary = guide.auxiliaryPoint)
+        rootPrimalTargets = RootPrimalTargets(
+            guide.relaxation.intColOf,
+            guide.relaxation.boolColOf,
+            coordinates,
+            guide.knownColumns,
+            auxiliary = guide.auxiliaryPoint,
+        )
         restartRootTargets = null
         sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "RETAINED", 0L)
         if (guide.auxiliaryPoint) {
@@ -546,8 +560,12 @@ internal class LpEngine(
             }
             return fresh() || replayRootPrimalTargets(cancellation)
         } finally {
-            sink.lp.observePrimalPhase("PRIMAL_RESTART_GUIDANCE", outcome,
-                started.elapsedNow().inWholeNanoseconds, totalSolveWork() - before)
+            sink.lp.observePrimalPhase(
+                "PRIMAL_RESTART_GUIDANCE",
+                outcome,
+                started.elapsedNow().inWholeNanoseconds,
+                totalSolveWork() - before,
+            )
         }
     }
 
@@ -568,8 +586,13 @@ internal class LpEngine(
             outcome = "CANCELLED"
             if (cancellation()) return false
             // A fresh handle expires queued readers while the engine keeps its own value buffers.
-            val replay = RootPrimalTargets(saved.intColumns, saved.booleanColumns, saved.coordinates,
-                saved.knownColumns, auxiliary = saved.auxiliary)
+            val replay = RootPrimalTargets(
+                saved.intColumns,
+                saved.booleanColumns,
+                saved.coordinates,
+                saved.knownColumns,
+                auxiliary = saved.auxiliary,
+            )
             replay.components = saved.components
             replay.componentOrderAttempted = saved.components != null
             replay.components?.offered = false
@@ -579,8 +602,12 @@ internal class LpEngine(
             outcome = "RETAINED"
             return true
         } finally {
-            sink.lp.observePrimalPhase("PRIMAL_RESTART_REPLAY", outcome,
-                started.elapsedNow().inWholeNanoseconds, totalSolveWork() - before)
+            sink.lp.observePrimalPhase(
+                "PRIMAL_RESTART_REPLAY",
+                outcome,
+                started.elapsedNow().inWholeNanoseconds,
+                totalSolveWork() - before,
+            )
         }
     }
 
@@ -630,8 +657,12 @@ internal class LpEngine(
         if (!params.lpPlan.componentOwnership) return
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "PARTIAL_OWNER_ATTEMPTED", 0L)
         var ownerState = "NOT_READ"
-        val outcome = retainPartialPrimalGuidance(relaxation, cancellation, "PARTIAL_OWNER_RETAINED",
-            retainedOwnerRead = true) {
+        val outcome = retainPartialPrimalGuidance(
+            relaxation,
+            cancellation,
+            "PARTIAL_OWNER_RETAINED",
+            retainedOwnerRead = true,
+        ) {
             ownerState = propagator.primalGuidanceState
             propagator.partialPrimalGuidance(cancellation)
         }
@@ -683,8 +714,13 @@ internal class LpEngine(
             return PartialPrimalRead.INVALID_SHAPE
         }
         if (cancellation()) return PartialPrimalRead.CANCELLED
-        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
-            primal = guidance.coordinates, knownColumns = guidance.known, sourceProblem = problem)
+        rootRoundingWarmStart = RootRoundingWarmStart(
+            objective,
+            relaxation,
+            primal = guidance.coordinates,
+            knownColumns = guidance.known,
+            sourceProblem = problem,
+        )
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", outcome, started.elapsedNow().inWholeNanoseconds)
         return PartialPrimalRead.RETAINED
     }
@@ -718,8 +754,14 @@ internal class LpEngine(
         // The auxiliary solver has closed; its completed output buffer belongs to this private worker.
         // Pause bookkeeping preserves it while future pinning polls the next invocation's token.
         noteNodeOverhead(1L)
-        rootRoundingWarmStart = RootRoundingWarmStart(guidanceObjective, relaxation, result.basis, result.primal,
-            sourceProblem = sourceProblem, auxiliaryPoint = true)
+        rootRoundingWarmStart = RootRoundingWarmStart(
+            guidanceObjective,
+            relaxation,
+            result.basis,
+            result.primal,
+            sourceProblem = sourceProblem,
+            auxiliaryPoint = true,
+        )
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
     }
 
@@ -765,9 +807,12 @@ internal class LpEngine(
         private set
 
     internal val pricingOptions: LpPricingOptions
-        get() = LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L,
+        get() = LpPricingOptions(
+            params.zeroObjectivePricing,
+            params.randomSeed ?: 0L,
             if (retainedRootEnabled) SPARSE_LP_MAX_FACTOR_ENTRIES else Long.MAX_VALUE,
-            if (retainedRootEnabled) SPARSE_LP_MAX_FACTOR_WORK else Long.MAX_VALUE)
+            if (retainedRootEnabled) SPARSE_LP_MAX_FACTOR_WORK else Long.MAX_VALUE,
+        )
 
     internal val retainedRootEnabled: Boolean get() = sparseTrialActive || params.lpPlan.componentOwnership
 
@@ -806,10 +851,10 @@ internal class LpEngine(
         if (params.lpPlan.mirEnabled) families.add(CutFamily.MIR)
         for (family in families) {
             sink.lp.cutLifecycle.event(
-            family,
-            "APPLICABILITY",
-            if (supported) "SUPPORTED" else "UNSUPPORTED",
-        )
+                family,
+                "APPLICABILITY",
+                if (supported) "SUPPORTED" else "UNSUPPORTED",
+            )
         }
         lpLadder.setCutsSupported(supported)
         return supported
@@ -824,56 +869,57 @@ internal class LpEngine(
         plan: LpPlan,
         suppressedHullFactors: Set<Int> = emptySet(),
         deferred: Boolean = false,
-    ): CpToLpRelaxation? =
-        if (plan.bounding) {
-            CpToLpRelaxation(
-                problem,
-                objective,
-                elementHull = plan.element,
-                tableHull = plan.table,
-                cumulative = plan.cumulative,
-                diffn = plan.diffn,
-                cumulativeTimeIndexed = plan.cumulativeTimeIndexed,
-                nValueHull = plan.nValue,
-                regularHull = plan.regular,
-                mddHull = plan.mdd,
-                gccCountHull = plan.gccCount,
-                circuitArcs = plan.circuit,
-                objectiveCone = plan.objectiveCone,
-                realResidual = plan.realResidual,
-                linMaxTightFace = plan.linMaxTightFace,
-                productMcCormick = plan.productMcCormick,
-                booleanRlt = plan.booleanRlt,
-                suppressedHullFactors = suppressedHullFactors,
-                auxiliarySources = auxiliarySources,
-                deferred = deferred,
-                projections = projections,
-                elementIndexes = elementIndexes,
-                templateStats = sink.lp,
-                preparationCancellation = params.cancellation,
-                reuseSourceTemplates = sourcePreparation != LpSourcePreparation.DISABLED,
-                reuseTemplateIndexes = sourcePreparation != LpSourcePreparation.OBJECT,
-                reuseTemplateMetadata = sourcePreparation == LpSourcePreparation.ADMITTED,
-                earnTemplatePreparation = !retainedRootEnabled && !eagerSourcePreparation &&
-                    sourcePreparation == LpSourcePreparation.ADMITTED,
-                omitBoundRows = !retainedRootEnabled && sourcePreparation == LpSourcePreparation.ADMITTED,
-                onTemplateWork = ::noteNodeOverhead,
-            )
-        } else {
-            null
-        }
+    ): CpToLpRelaxation? = if (plan.bounding) {
+        CpToLpRelaxation(
+            problem,
+            objective,
+            elementHull = plan.element,
+            tableHull = plan.table,
+            cumulative = plan.cumulative,
+            diffn = plan.diffn,
+            cumulativeTimeIndexed = plan.cumulativeTimeIndexed,
+            nValueHull = plan.nValue,
+            regularHull = plan.regular,
+            mddHull = plan.mdd,
+            gccCountHull = plan.gccCount,
+            circuitArcs = plan.circuit,
+            objectiveCone = plan.objectiveCone,
+            realResidual = plan.realResidual,
+            linMaxTightFace = plan.linMaxTightFace,
+            productMcCormick = plan.productMcCormick,
+            booleanRlt = plan.booleanRlt,
+            suppressedHullFactors = suppressedHullFactors,
+            auxiliarySources = auxiliarySources,
+            deferred = deferred,
+            projections = projections,
+            elementIndexes = elementIndexes,
+            templateStats = sink.lp,
+            preparationCancellation = params.cancellation,
+            reuseSourceTemplates = sourcePreparation != LpSourcePreparation.DISABLED,
+            reuseTemplateIndexes = sourcePreparation != LpSourcePreparation.OBJECT,
+            reuseTemplateMetadata = sourcePreparation == LpSourcePreparation.ADMITTED,
+            earnTemplatePreparation = !retainedRootEnabled && !eagerSourcePreparation &&
+                sourcePreparation == LpSourcePreparation.ADMITTED,
+            omitBoundRows = !retainedRootEnabled && sourcePreparation == LpSourcePreparation.ADMITTED,
+            onTemplateWork = ::noteNodeOverhead,
+        )
+    } else {
+        null
+    }
 
     internal fun primalRelaxer(
         objective: LinearObjective,
         source: Problem = problem,
         selected: PreparedFactorProjections? = projections,
-    ): CpToLpRelaxation = CpToLpRelaxation(source, objective, projections = selected, templateStats = sink.lp,
+    ): CpToLpRelaxation = CpToLpRelaxation(
+        source, objective, projections = selected, templateStats = sink.lp,
         reuseSourceTemplates = sourcePreparation != LpSourcePreparation.DISABLED,
         reuseTemplateIndexes = sourcePreparation != LpSourcePreparation.OBJECT,
         reuseTemplateMetadata = sourcePreparation == LpSourcePreparation.ADMITTED,
         earnTemplatePreparation = !eagerSourcePreparation && sourcePreparation == LpSourcePreparation.ADMITTED,
         omitBoundRows = sourcePreparation == LpSourcePreparation.ADMITTED,
-        onTemplateWork = ::noteNodeOverhead)
+        onTemplateWork = ::noteNodeOverhead,
+    )
 
     /** The active relaxer. Rebuilt once by [pruneIneffectiveHulls] when a hull is dropped; otherwise the
      *  [params]-resolved one for the whole search. */
@@ -992,9 +1038,9 @@ internal class LpEngine(
         workAllowance = lpWorkAllowance(params.solveBudgetMillis, params.lpPlan.lpWorkBudgetFraction).let {
             if (sparseTrialRequested) {
                 minOf(
-                it.takeIf { work -> work > 0L } ?: SPARSE_LP_MAX_WORK,
-                SPARSE_LP_MAX_WORK,
-            )
+                    it.takeIf { work -> work > 0L } ?: SPARSE_LP_MAX_WORK,
+                    SPARSE_LP_MAX_WORK,
+                )
             } else {
                 it
             }
@@ -1037,8 +1083,10 @@ internal class LpEngine(
     }
 
     internal fun rootQueryStopView(): String {
-        val rootCap = minOf(params.lpPlan.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK,
-            SPARSE_LP_MAX_WORK)
+        val rootCap = minOf(
+            params.lpPlan.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK,
+            SPARSE_LP_MAX_WORK,
+        )
         val rootSpent = totalSolveOps >= rootCap ||
             workSpentExceeds(params.lpPlan.rootMaxWork, sink.lp.standaloneWork)
         val lpState = if (lpWorkAllowanceSpent(sink.lp.standaloneWork)) "LP_SPENT" else "LP_OPEN"
@@ -1054,8 +1102,10 @@ internal class LpEngine(
     }
 
     private fun retainedRootCumulativeWork(): Long {
-        val cap = minOf(params.lpPlan.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK,
-            SPARSE_LP_MAX_WORK)
+        val cap = minOf(
+            params.lpPlan.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK,
+            SPARSE_LP_MAX_WORK,
+        )
         var remaining = (cap - minOf(cap, totalSolveOps)).coerceAtLeast(0L)
         lpEffortGovernor.remainingWork()?.let { remaining = minOf(remaining, it) }
         return remaining
@@ -1076,9 +1126,9 @@ internal class LpEngine(
     internal fun nodeQueryWorkBudget(): Long? {
         if (sparseTrialActive) {
             return minOf(
-            retainedRootRemainingWork().coerceAtLeast(1L),
-            if (adaptiveWork) lpWorkBudget.ops() else SPARSE_LP_MAX_WORK,
-        )
+                retainedRootRemainingWork().coerceAtLeast(1L),
+                if (adaptiveWork) lpWorkBudget.ops() else SPARSE_LP_MAX_WORK,
+            )
         }
         val offered = nodeWorkAllowance()?.coerceAtLeast(1L) ?: return null
         val containing = nodeWorkBudget()
@@ -1177,8 +1227,10 @@ internal class LpEngine(
     }
 
     internal fun observeNodeWorkStop(solver: LpSolver) {
-        if ((rootQueryPolicy == LpRootQueryPolicy.SHARED_WORK ||
-                rootQueryPolicy == LpRootQueryPolicy.INTERRUPTED_WORK) && adaptiveWork &&
+        if ((
+            rootQueryPolicy == LpRootQueryPolicy.SHARED_WORK ||
+                rootQueryPolicy == LpRootQueryPolicy.INTERRUPTED_WORK
+        ) && adaptiveWork &&
             solver.lastTermination == LpFloatTermination.WORK && solver.lastPivots > 0
         ) {
             lpWorkBudget.observeWorkStop()
@@ -1285,9 +1337,9 @@ internal class LpEngine(
         },
         onPreparation = if (separateNodePreparation) {
             { metrics ->
-            sink.lp.observeEngineCost(LpRoute.NODE, metrics)
-            noteSolveOps(metrics.workOps)
-        }
+                sink.lp.observeEngineCost(LpRoute.NODE, metrics)
+                noteSolveOps(metrics.workOps)
+            }
         } else {
             null
         },
@@ -1417,18 +1469,23 @@ internal class LpEngine(
                 complete(admitted)
             }.iterator()
         } else {
-            relaxer.prepareBuild(RootDomains(problem), token,
+            relaxer.prepareBuild(
+                RootDomains(problem),
+                token,
                 onWork = {
                     charged += it
                     noteNodeOverhead(it * LpNodeOverhead.BUILD)
                 },
-                onComplete = complete)
+                onComplete = complete,
+            )
         }
     }
 
     private fun prepareRootNumericalOwner(cancellation: ExecutionControl) {
-        val timer = LpPhaseTimer(sink.lp.certificationObserver(LpRoute.ROOT),
-            LpSolvePhase.ROOT_NUMERICAL_PREPARATION)
+        val timer = LpPhaseTimer(
+            sink.lp.certificationObserver(LpRoute.ROOT),
+            LpSolvePhase.ROOT_NUMERICAL_PREPARATION,
+        )
         val before = totalSolveWork()
         var outcome = "DECLINED"
         try {
@@ -1776,8 +1833,11 @@ internal class LpEngine(
                 cutsAllowed = cutsAllowed,
             )
             // What this node's LP cost against the nodes explored; the allowance was charged as it spent.
-            lpEffortGovernor.observeSolve(pendingSolveOps, outcome.prune,
-                nodeWorkStoppedAfterProgress && outcome.basis == null)
+            lpEffortGovernor.observeSolve(
+                pendingSolveOps,
+                outcome.prune,
+                nodeWorkStoppedAfterProgress && outcome.basis == null,
+            )
             pendingSolveOps = 0L
             if (lpEffortGovernor.isDemoted) sink.lp.observeDemoted()
             lpPivotBudget.observe(pruned = outcome.prune, couldPrune = effectiveBound.isFinite())
@@ -1888,9 +1948,16 @@ internal class LpEngine(
     internal fun preparation(): Iterator<Unit> = sequence {
         params.lpConfig?.let { config ->
             val plan = with(LpAutoConfig) {
-                prepare(problem, config, requestedPlan, objective, params.cancellation,
+                prepare(
+                    problem,
+                    config,
+                    requestedPlan,
+                    objective,
+                    params.cancellation,
                     sparseTrialAllowed = projections?.builtInRelaxation != false,
-                    sparseTrialWork = retainedRootRemainingWork(), sourcePreparation = sourcePreparation) { admission ->
+                    sparseTrialWork = retainedRootRemainingWork(),
+                    sourcePreparation = sourcePreparation,
+                ) { admission ->
                     elementIndexes = admission.elementIndexes
                     admission.sparseTrial?.let { trial ->
                         sparseTrialActive = trial.admitted

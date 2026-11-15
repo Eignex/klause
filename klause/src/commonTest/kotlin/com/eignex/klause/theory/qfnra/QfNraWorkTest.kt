@@ -15,10 +15,14 @@ class QfNraWorkTest {
     fun `an opaque containing meter should remain live after arithmetic construction`() {
         var charged = 0L
         var active: WorkMeter? = null
-        val work = QfNraWork(QfNraParams(cancellation = object : ExecutionControl() {
+        val work = QfNraWork(
+            QfNraParams(
+                cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
             override val accounting: WorkMeter? get() = active
-        }))
+        }
+            )
+        )
         val arithmetic = PolynomialArithmetic(work)
         active = WorkMeter { charged += it }
 
@@ -31,11 +35,15 @@ class QfNraWorkTest {
     @Test
     fun `an optional probe should retain a containing stop that clears after observation`() {
         var pulse = false
-        val work = QfNraWork(QfNraParams(cancellation = ExecutionControl {
+        val work = QfNraWork(
+            QfNraParams(
+                cancellation = ExecutionControl {
             val observed = pulse
             pulse = false
             observed
-        }))
+        }
+            )
+        )
         val arithmetic = PolynomialArithmetic(work)
 
         assertFailsWith<PolynomialInterrupted> {

@@ -61,8 +61,13 @@ class ExecutionSemanticsTest {
     @Test
     fun `interrupted open entry points should retain the original source interpretation`() {
         val source = Problem(
-            0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
         )
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
         val request = OpenTheoryRequest(source, objective)
@@ -83,15 +88,26 @@ class ExecutionSemanticsTest {
     @Test
     fun `qualified open optimization should preserve its accepted publication and native verdict`() {
         val source = Problem(
-            0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
         )
         val request = OpenTheoryRequest(source, LinearObjective(realCoefficients = doubleArrayOf(1.0)))
         val observed = mutableListOf<SourceIncumbentPublication>()
 
-        val execution = assertIs<OpenTheoryExecution.Optimize>(OpenTheoryPipeline.execute(
-            request, TheoryParams(openWorkLimit = 1000), FiniteEngine.BACKTRACK, 1, observed::add,
-        ))
+        val execution = assertIs<OpenTheoryExecution.Optimize>(
+            OpenTheoryPipeline.execute(
+            request,
+            TheoryParams(openWorkLimit = 1000),
+            FiniteEngine.BACKTRACK,
+            1,
+            observed::add,
+        )
+        )
         val qualified = assertIs<OpenTheoryExecution.Optimize>(execution.withSourceSemantics(source.semantics))
 
         assertSame(source.semantics, execution.semantics)
@@ -103,16 +119,26 @@ class ExecutionSemanticsTest {
     @Test
     fun `qualified quadratic optimization should preserve its accepted publication and exact verdict`() {
         val source = Problem(
-            0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
         )
         val x = QuadraticVariable.Real(SourceRealId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
         val observed = mutableListOf<QuadraticIncumbentPublication>()
 
         val execution = OpenTheoryPipeline.minimize(
-            source.pipelineRequest(), objective, PolynomialTheoryParams(maximumWork = 10000),
-            FiniteEngine.BACKTRACK, ObjectiveSense.MINIMIZE, 1, observed::add,
+            source.pipelineRequest(),
+            objective,
+            PolynomialTheoryParams(maximumWork = 10000),
+            FiniteEngine.BACKTRACK,
+            ObjectiveSense.MINIMIZE,
+            1,
+            observed::add,
         )
         val qualified = execution.withSourceSemantics(source.semantics)
 
@@ -129,8 +155,15 @@ class ExecutionSemanticsTest {
         val open = OpenTheoryExecution.Optimize(OpenTheoryOptimum.Infeasible(SolveStats.EMPTY))
             .withSourceSemantics(semantics)
         val quadratic = QuadraticOptimizationExecution(
-            QuadraticOptimizationResult.Unknown(null, TerminationReason.Cancelled, ObjectiveSense.MINIMIZE,
-                SolveStats.EMPTY), PolynomialTheoryStats(), 0, 0,
+            QuadraticOptimizationResult.Unknown(
+                null,
+                TerminationReason.Cancelled,
+                ObjectiveSense.MINIMIZE,
+                SolveStats.EMPTY,
+            ),
+            PolynomialTheoryStats(),
+            0,
+            0,
         ).withSourceSemantics(semantics)
 
         assertFailsWith<IllegalArgumentException> { open.withSourceSemantics(foreign) }
@@ -143,9 +176,11 @@ class ExecutionSemanticsTest {
     fun `a cancelled direct theory solve should retain effective declaration defaults`() {
         val source = SmtLib.parse(
             "(declare-const x Int) (declare-const y Int) (assert (> x y))",
-            semanticOverrides = SemanticOverrides(undeclaredIntegers = BoundsOverride(
+            semanticOverrides = SemanticOverrides(
+                undeclaredIntegers = BoundsOverride(
                 lower = BoundOverride.Value(2L),
-            )),
+            )
+            ),
         ).model
         val engine = OpenTheoryEngine(source, source.componentPlan().theoryPipeline)
 
@@ -159,9 +194,11 @@ class ExecutionSemanticsTest {
     fun `a cancelled direct minimizer should retain its effective declaration defaults`() {
         val source = SmtLib.parse(
             "(declare-const x Int) (declare-const y Int) (assert (> x y))",
-            semanticOverrides = SemanticOverrides(undeclaredIntegers = BoundsOverride(
+            semanticOverrides = SemanticOverrides(
+                undeclaredIntegers = BoundsOverride(
                 lower = BoundOverride.Value(2L),
-            )),
+            )
+            ),
         ).model
         val minimizer = OpenTheoryMinimizer(source, LinearObjective(intCoefficients = longArrayOf(1, 0)))
 
@@ -175,17 +212,29 @@ class ExecutionSemanticsTest {
     fun `source context decoration should preserve its captured interpretation`() {
         val source = SmtLib.parse(
             "(declare-const x Int) (declare-const y Int) (assert (> x y))",
-            semanticOverrides = SemanticOverrides(undeclaredIntegers = BoundsOverride(
+            semanticOverrides = SemanticOverrides(
+                undeclaredIntegers = BoundsOverride(
                 lower = BoundOverride.Value(2L),
-            )),
+            )
+            ),
         ).model
-        val scope = SourceScope(SourceRevision("context-source", "klause-ir-exact-v1"),
-            objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
-        val context = assertNotNull(source.sourceProofContext(scope,
-            LinearObjective(intCoefficients = longArrayOf(1, 0))))
+        val scope = SourceScope(
+            SourceRevision("context-source", "klause-ir-exact-v1"),
+            objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
+        )
+        val context = assertNotNull(
+            source.sourceProofContext(
+            scope,
+            LinearObjective(intCoefficients = longArrayOf(1, 0)),
+        )
+        )
 
-        val contexts = listOf(context, context.withLinearAuthority(), context.atScope(scope.copy()),
-            context.numericContext())
+        val contexts = listOf(
+            context,
+            context.withLinearAuthority(),
+            context.atScope(scope.copy()),
+            context.numericContext(),
+        )
 
         for (captured in contexts) assertSame(source.semantics, captured.semantics)
     }
@@ -194,14 +243,22 @@ class ExecutionSemanticsTest {
     fun `linear source execution should retain policy without inventing a checked claim`() {
         val source = SmtLib.parse(
             "(declare-const x Int) (declare-const y Int) (assert (> x y))",
-            semanticOverrides = SemanticOverrides(undeclaredIntegers = BoundsOverride(
+            semanticOverrides = SemanticOverrides(
+                undeclaredIntegers = BoundsOverride(
                 lower = BoundOverride.Value(2L),
-            )),
+            )
+            ),
         ).model
-        val scope = SourceScope(SourceRevision("linear-source", "klause-ir-exact-v1"),
-            objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
-        val context = assertNotNull(source.sourceProofContext(scope,
-            LinearObjective(intCoefficients = longArrayOf(1, 0)))).withLinearAuthority()
+        val scope = SourceScope(
+            SourceRevision("linear-source", "klause-ir-exact-v1"),
+            objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
+        )
+        val context = assertNotNull(
+            source.sourceProofContext(
+            scope,
+            LinearObjective(intCoefficients = longArrayOf(1, 0)),
+        )
+        ).withLinearAuthority()
 
         val result = OpenTheoryPipeline.optimizeLinear(context, TheoryParams(cancellation = ExecutionControl { true }))
 
@@ -216,9 +273,13 @@ class ExecutionSemanticsTest {
     fun `a linear context without a source owner should keep its result unbound`() {
         val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val context = SourceProofContext(
-            SourceScope(SourceRevision("unbound-context", "klause-ir-exact-v1"),
-                objective = SourceObjective("x", ObjectiveSense.MINIMIZE)),
-            setOf(coordinate), emptyMap(), mapOf(coordinate to BigFraction.ONE),
+            SourceScope(
+                SourceRevision("unbound-context", "klause-ir-exact-v1"),
+                objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
+            ),
+            setOf(coordinate),
+            emptyMap(),
+            mapOf(coordinate to BigFraction.ONE),
         )
 
         val result = OpenTheoryPipeline.optimizeLinear(context, TheoryParams(cancellation = ExecutionControl { true }))
@@ -234,10 +295,24 @@ class ExecutionSemanticsTest {
         val point = Sample(booleanArrayOf(), longArrayOf(2))
         val assignment = OpenTheoryAssignment.Difference(point)
         val scope = SourceScope(SourceRevision("retained-context", "klause-ir-exact-v1"))
-        val linear = LinearOptimizationResult(scope, null, null, point, BigFraction.ofLong(2),
-            TerminationReason.BudgetExhausted, SolveStats.EMPTY, semantics)
-        val native = OpenTheoryOptimum.Bounded(assignment, BigFraction.ofLong(2), TerminationReason.BudgetExhausted,
-            SolveStats.EMPTY, linear, semantics = null)
+        val linear = LinearOptimizationResult(
+            scope,
+            null,
+            null,
+            point,
+            BigFraction.ofLong(2),
+            TerminationReason.BudgetExhausted,
+            SolveStats.EMPTY,
+            semantics,
+        )
+        val native = OpenTheoryOptimum.Bounded(
+            assignment,
+            BigFraction.ofLong(2),
+            TerminationReason.BudgetExhausted,
+            SolveStats.EMPTY,
+            linear,
+            semantics = null,
+        )
 
         val result = assertIs<OpenTheoryOptimum.Bounded>(native.withSourceSemantics(semantics))
 
@@ -252,11 +327,23 @@ class ExecutionSemanticsTest {
     fun `an open optimum should reject a foreign checked linear interpretation`() {
         val semantics = SourceSemantics(SourceFormat.IR).resolve()
         val linear = LinearOptimizationResult(
-            SourceScope(SourceRevision("foreign-context", "klause-ir-exact-v1")), null, null, null, null,
-            TerminationReason.Cancelled, SolveStats.EMPTY, semantics,
+            SourceScope(SourceRevision("foreign-context", "klause-ir-exact-v1")),
+            null,
+            null,
+            null,
+            null,
+            TerminationReason.Cancelled,
+            SolveStats.EMPTY,
+            semantics,
         )
-        val result = OpenTheoryOptimum.Bounded(null, null, TerminationReason.Cancelled, SolveStats.EMPTY,
-            linear, semantics = null)
+        val result = OpenTheoryOptimum.Bounded(
+            null,
+            null,
+            TerminationReason.Cancelled,
+            SolveStats.EMPTY,
+            linear,
+            semantics = null,
+        )
 
         assertFailsWith<IllegalArgumentException> {
             result.withSourceSemantics(SourceSemantics(SourceFormat.SMTLIB).resolve())
@@ -264,5 +351,4 @@ class ExecutionSemanticsTest {
 
         assertSame(linear, result.linearResult)
     }
-
 }

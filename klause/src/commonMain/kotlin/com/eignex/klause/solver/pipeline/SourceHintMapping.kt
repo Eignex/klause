@@ -91,7 +91,8 @@ private fun SourceMapping.translatedCoordinates(cancellation: ExecutionControl):
             }
         }
         translated = translated.followedBy(
-            VarRemap(IntArray(retained.boolCount) { retained.bool(it) }, ints), cancellation,
+            VarRemap(IntArray(retained.boolCount) { retained.bool(it) }, ints),
+            cancellation,
         ) ?: return null
     }
     return if (cancellation()) null else translated
@@ -215,8 +216,10 @@ internal fun DefinitionHint.Linear.reconstructed(
         null
     } else {
         DefinitionHint.Linear(
-            target, kept.values.toLongArray(),
-            kept.keys.map { DefinitionHint.Operand.Variable(it) }.toTypedArray(), rhs,
+            target,
+            kept.values.toLongArray(),
+            kept.keys.map { DefinitionHint.Operand.Variable(it) }.toTypedArray(),
+            rhs,
         )
     }
 } catch (_: CheckedLongOverflowException) {
@@ -259,8 +262,14 @@ internal fun DefinitionHint.Comparison.reconstructed(
         cancellation.charge(3L * terms.size)
         if (cancellation()) return null
         val kept = terms.filterValues { it != 0L }
-        DefinitionHint.Comparison(output, kept.values.toLongArray(),
-            kept.keys.map { DefinitionHint.Operand.Variable(it) }.toTypedArray(), rhs, relation, strict)
+        DefinitionHint.Comparison(
+            output,
+            kept.values.toLongArray(),
+            kept.keys.map { DefinitionHint.Operand.Variable(it) }.toTypedArray(),
+            rhs,
+            relation,
+            strict,
+        )
     } catch (_: CheckedLongOverflowException) {
         null
     }

@@ -25,6 +25,7 @@ import com.eignex.util.numbers.times
 enum class DivisionConvention {
     /** Quotient rounds toward zero; a nonzero remainder has the dividend's sign. */
     TRUNCATING,
+
     /** Remainder is nonnegative and smaller than the divisor's magnitude. */
     EUCLIDEAN,
 }
@@ -50,20 +51,41 @@ class DivMod private constructor(
     val convention: DivisionConvention,
 ) : Factor {
     /** Construct division by an integer source coordinate. */
-    constructor(dividend: Int, divisor: Int, quotient: Int, remainder: Int,
-        convention: DivisionConvention = DivisionConvention.TRUNCATING) :
+    constructor(
+        dividend: Int,
+        divisor: Int,
+        quotient: Int,
+        remainder: Int,
+        convention: DivisionConvention = DivisionConvention.TRUNCATING,
+    ) :
         this(dividend, divisor, null, quotient, remainder, convention)
 
     /** Construct division by an exact integer literal, including arbitrary-width constants. */
-    constructor(dividend: Int, divisor: BigInt, quotient: Int, remainder: Int,
-        convention: DivisionConvention = DivisionConvention.TRUNCATING) :
+    constructor(
+        dividend: Int,
+        divisor: BigInt,
+        quotient: Int,
+        remainder: Int,
+        convention: DivisionConvention = DivisionConvention.TRUNCATING,
+    ) :
         this(dividend, null, divisor, quotient, remainder, convention)
 
-    override val variables: VarList = IntVars(if (divisor == null) intArrayOf(dividend, quotient, remainder)
-        else intArrayOf(dividend, divisor, quotient, remainder))
+    override val variables: VarList = IntVars(
+        if (divisor == null) {
+            intArrayOf(dividend, quotient, remainder)
+        } else {
+            intArrayOf(dividend, divisor, quotient, remainder)
+        },
+    )
 
-    override fun remap(mapping: VarRemap): Factor = DivMod(mapping.int(dividend), divisor?.let(mapping::int),
-        constantDivisor, mapping.int(quotient), mapping.int(remainder), convention)
+    override fun remap(mapping: VarRemap): Factor = DivMod(
+        mapping.int(dividend),
+        divisor?.let(mapping::int),
+        constantDivisor,
+        mapping.int(quotient),
+        mapping.int(remainder),
+        convention,
+    )
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.DIV_MOD, ::buildKey)
 
@@ -73,8 +95,11 @@ class DivMod private constructor(
         sink.enum(convention)
         sink.intVar(dividend)
         sink.bool(divisor != null)
-        if (divisor != null) sink.intVar(divisor)
-        else sink.constInts(checkNotNull(constantDivisor).toString().map { it.code }.toIntArray())
+        if (divisor != null) {
+            sink.intVar(divisor)
+        } else {
+            sink.constInts(checkNotNull(constantDivisor).toString().map { it.code }.toIntArray())
+        }
         sink.intVar(quotient)
         sink.intVar(remainder)
     }

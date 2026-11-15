@@ -515,8 +515,15 @@ class DefinitionalSweep internal constructor(
 
                 else -> return null
             }
-            cone.add(FunctionalObjective.Definition(node.out, node.outIsBool, node,
-                keepsOutputOnNoWrite = node is ElementResultDefinition, compute = compute))
+            cone.add(
+                FunctionalObjective.Definition(
+                node.out,
+                node.outIsBool,
+                node,
+                keepsOutputOnNoWrite = node is ElementResultDefinition,
+                compute = compute,
+            )
+            )
             for (input in node.intInputs) {
                 cancellation.charge(1)
                 if (cancellation()) return null

@@ -97,7 +97,8 @@ internal class SliceBudget(
 
     /** Work spent so far: nodes plus LP and propagation work, charged or not. */
     fun spent(): Long = addWork(
-        addWork(nodeCount(), lpWork() / LP_WORK_PER_NODE), propagationWork() / PROPAGATION_WORK_PER_NODE,
+        addWork(nodeCount(), lpWork() / LP_WORK_PER_NODE),
+        propagationWork() / PROPAGATION_WORK_PER_NODE,
     )
 
     /** Whether the armed slice has spent its allowance. */
@@ -137,8 +138,7 @@ internal class SliceBudget(
     }
 }
 
-private fun addWork(left: Long, right: Long): Long =
-    if (right > Long.MAX_VALUE - left) Long.MAX_VALUE else left + right
+private fun addWork(left: Long, right: Long): Long = if (right > Long.MAX_VALUE - left) Long.MAX_VALUE else left + right
 
 // Converts simplex and node-LP work to approximate CP-node cost for slice accounting.
 internal const val LP_WORK_PER_NODE = 600L

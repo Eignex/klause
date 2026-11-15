@@ -84,7 +84,9 @@ class PolynomialMagnitudeRefutationTest {
     @Test
     fun `unsupported signs and missing coordinate bounds supply no refutation`() {
         for (premise in listOf(
-            "(<= (+ (* x x) y) 1)", "(<= (- (* x x) (* y y)) 1)", "(<= (* x x) 1)",
+            "(<= (+ (* x x) y) 1)",
+            "(<= (- (* x x) (* y y)) 1)",
+            "(<= (* x x) 1)",
         )) {
             val source = SmtLibPolynomial.parse(
                 "(declare-const x Real) (declare-const y Real) (assert $premise) (assert (> (* x y) 1))",
@@ -168,8 +170,12 @@ class PolynomialMagnitudeRefutationTest {
         )
         val completed = assertIs<QfNraResult.Unsatisfiable>(solveQfNra(source.formula, 0, 2))
 
-        val stopped = solveQfNra(source.formula, 0, 2,
-            QfNraParams(maximumWork = completed.stats.workSpent - 1))
+        val stopped = solveQfNra(
+            source.formula,
+            0,
+            2,
+            QfNraParams(maximumWork = completed.stats.workSpent - 1),
+        )
 
         assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(stopped).reason)
     }

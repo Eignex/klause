@@ -16,9 +16,11 @@ internal fun divModEncoder(factor: DivMod, target: EncodingTarget): Encoder = wh
         encoding.linearFormula(divModLinearFormula(view, divisor))
         null
     }
+
     EncodingTarget.POLYNOMIAL -> Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
         encoding.polynomial(divModPolynomialFormula(view as DivMod) { encoding.integer(SourceIntId(it)) })
         null
     }
+
     else -> Encoder(EncoderSupport.UNSUPPORTED)
 }

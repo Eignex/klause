@@ -30,19 +30,27 @@ internal fun matchSourceClaims(
     algebraic.arithmetic.step()
     val matches = when (first) {
         is SourceClaim.Witness -> second is SourceClaim.Witness && matchSample(first.sample, second.sample, algebraic)
-        is SourceClaim.Bound -> second is SourceClaim.Bound && first.strict == second.strict &&
+
+        is SourceClaim.Bound ->
+            second is SourceClaim.Bound && first.strict == second.strict &&
             matchValue(first.value, second.value, algebraic)
-        is SourceClaim.Optimal -> second is SourceClaim.Optimal &&
+
+        is SourceClaim.Optimal ->
+            second is SourceClaim.Optimal &&
             matchSample(first.sample, second.sample, algebraic) &&
             matchValue(first.value, second.value, algebraic)
 
         is SourceClaim.Limit -> second is SourceClaim.Limit && matchSample(first.sample, second.sample, algebraic) &&
             matchValue(first.value, second.value, algebraic)
-        is SourceClaim.Unbounded -> second is SourceClaim.Unbounded &&
+
+        is SourceClaim.Unbounded ->
+            second is SourceClaim.Unbounded &&
             matchSample(first.sample, second.sample, algebraic)
 
         is SourceClaim.Clause -> second is SourceClaim.Clause && first.literals == second.literals
-        is SourceClaim.Ray -> second is SourceClaim.Ray && first.direction == second.direction &&
+
+        is SourceClaim.Ray ->
+            second is SourceClaim.Ray && first.direction == second.direction &&
             matchSample(first.sample, second.sample, algebraic)
 
         is SourceClaim.Consequence -> second is SourceClaim.Consequence && first.inequality == second.inequality

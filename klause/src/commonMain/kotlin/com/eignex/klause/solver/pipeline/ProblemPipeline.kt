@@ -307,9 +307,9 @@ private fun Problem.pipelineRouteObserved(
         routed.nativeFiniteSource(projections, preparationStop)
     val finiteCompletion = nativeFiniteAfterBounds || (
         finiteIntegerRanges &&
-        objective?.realCoefficientValues?.any { it != 0.0 } != true &&
-        routed.requiresPolynomialCompletion(projections) && routed.finiteRealCompletionSupported(projections)
-    )
+            objective?.realCoefficientValues?.any { it != 0.0 } != true &&
+            routed.requiresPolynomialCompletion(projections) && routed.finiteRealCompletionSupported(projections)
+        )
     val arithmeticStop = if (routed.requiresPolynomialCompletion(projections, preferFinite = finiteCompletion)) {
         polynomialCancellation
     } else {

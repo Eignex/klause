@@ -2,10 +2,7 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.simplex.exact.BigFraction
 
-internal data class AffineFloatImage(
-    val terms: Map<Int, BigFraction>,
-    val constant: BigFraction = BigFraction.ZERO,
-) {
+internal data class AffineFloatImage(val terms: Map<Int, BigFraction>, val constant: BigFraction = BigFraction.ZERO) {
     fun scaled(scale: BigFraction): AffineFloatImage = AffineFloatImage(
         terms.mapValues { (_, coefficient) -> coefficient * scale }.filterValues { !it.isZero },
         constant * scale,

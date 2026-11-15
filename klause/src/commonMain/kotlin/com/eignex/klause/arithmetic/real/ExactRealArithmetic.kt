@@ -9,10 +9,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 internal class RealCertificationUnavailable : RuntimeException()
 internal class RealDomainInvalid : RuntimeException()
 
-internal class ExactRealArithmetic(
-    val transcendental: TranscendentalArithmetic,
-    val algebraic: AlgebraicArithmetic,
-) {
+internal class ExactRealArithmetic(val transcendental: TranscendentalArithmetic, val algebraic: AlgebraicArithmetic) {
     fun rational(value: BigFraction): ExactRealValue = scalar(algebraic.rational(value))
     fun scalar(value: AlgebraicReal): ExactRealValue = ExactRealValue(ExactRealExpression.Algebraic(value))
     fun pi(): ExactRealValue = ExactRealValue(ExactRealExpression.Pi)
@@ -30,7 +27,9 @@ internal class ExactRealArithmetic(
         }
         if (function == ExactRealFunction.EXP && node is ExactRealExpression.Function &&
             node.function == ExactRealFunction.LOG
-        ) return ExactRealValue(node.argument)
+        ) {
+            return ExactRealValue(node.argument)
+        }
         if (argument.rational?.isZero == true) {
             return rational(if (function == ExactRealFunction.SIN) BigFraction.ZERO else BigFraction.ONE)
         }
@@ -48,8 +47,18 @@ internal class ExactRealArithmetic(
                         if (integer.startsWith("-")) (4 - residue) % 4 else residue
                     }
                     val value = if (function == ExactRealFunction.SIN) {
-                        when (quadrant) { 1 -> 1L; 3 -> -1L; else -> 0L }
-                    } else when (quadrant) { 0 -> 1L; 2 -> -1L; else -> 0L }
+                        when (quadrant) {
+                            1 -> 1L;
+                            3 -> -1L;
+                            else -> 0L
+                        }
+                    } else {
+                        when (quadrant) {
+                            0 -> 1L;
+                            2 -> -1L;
+                            else -> 0L
+                        }
+                    }
                     return rational(BigFraction.ofLong(value))
                 }
             }
@@ -64,8 +73,11 @@ internal class ExactRealArithmetic(
             transcendental.step()
             val nodes = (value.expression as? ExactRealExpression.Sum)?.operands ?: listOf(value.expression)
             for (node in nodes) {
-                if (node is ExactRealExpression.Algebraic) constant = algebraic.add(constant, node.value)
-                else operands.add(node)
+                if (node is ExactRealExpression.Algebraic) {
+                    constant = algebraic.add(constant, node.value)
+                } else {
+                    operands.add(node)
+                }
             }
         }
         var index = 0
@@ -79,20 +91,28 @@ internal class ExactRealArithmetic(
             if (opposite != null) {
                 operands.removeAt(opposite)
                 operands.removeAt(index)
-            } else index++
+            } else {
+                index++
+            }
         }
         index = 0
         while (index < operands.size) {
             val first = trigSquare(operands[index])
-            val mate = if (first == null) null else (index + 1 until operands.size).firstOrNull { other ->
+            val mate = if (first == null) {
+                null
+            } else {
+                (index + 1 until operands.size).firstOrNull { other ->
                 val second = trigSquare(operands[other])
                 second != null && first.function != second.function && same(first.argument, second.argument)
+            }
             }
             if (mate != null) {
                 operands.removeAt(mate)
                 operands.removeAt(index)
                 constant = algebraic.add(constant, algebraic.rational(BigFraction.ONE))
-            } else index++
+            } else {
+                index++
+            }
         }
         if (algebraic.sign(constant) != 0 || operands.isEmpty()) operands.add(ExactRealExpression.Algebraic(constant))
         return ExactRealValue(if (operands.size == 1) operands.single() else ExactRealExpression.Sum(operands))
@@ -105,8 +125,11 @@ internal class ExactRealArithmetic(
             transcendental.step()
             val nodes = (value.expression as? ExactRealExpression.Product)?.operands ?: listOf(value.expression)
             for (node in nodes) {
-                if (node is ExactRealExpression.Algebraic) constant = algebraic.multiply(constant, node.value)
-                else operands.add(node)
+                if (node is ExactRealExpression.Algebraic) {
+                    constant = algebraic.multiply(constant, node.value)
+                } else {
+                    operands.add(node)
+                }
             }
         }
         if (algebraic.sign(constant) == 0) return scalar(constant)
@@ -137,7 +160,9 @@ internal class ExactRealArithmetic(
         val second = right.expression as? ExactRealExpression.Function
         if (first != null && second != null && first.function == second.function &&
             first.function in setOf(ExactRealFunction.EXP, ExactRealFunction.LOG)
-        ) return compare(ExactRealValue(first.argument), ExactRealValue(second.argument), maximumTerms)
+        ) {
+            return compare(ExactRealValue(first.argument), ExactRealValue(second.argument), maximumTerms)
+        }
         if (first?.function == ExactRealFunction.EXP && right.rational?.signum()?.let { it <= 0 } == true) return 1
         if (second?.function == ExactRealFunction.EXP && left.rational?.signum()?.let { it <= 0 } == true) return -1
         val difference = add(listOf(left, negate(right)))
@@ -180,27 +205,35 @@ internal class ExactRealArithmetic(
                     repeat(terms) { if (refined.rational == null) refined = algebraic.refine(refined) }
                     RationalEnclosure(refined.lowerBound, refined.upperBound)
                 }
+
                 ExactRealExpression.Pi -> transcendental.pi(terms)
+
                 is ExactRealExpression.Function -> {
                     val argument = computed.getValue(node.argument)
                     when (node.function) {
                         ExactRealFunction.EXP -> transcendental.exp(argument, terms)
+
                         ExactRealFunction.LOG -> {
                             if (argument.lower.signum() <= 0) throw RealCertificationUnavailable()
                             transcendental.log(argument, terms)
                         }
+
                         ExactRealFunction.SIN -> transcendental.sin(argument, terms)
+
                         ExactRealFunction.COS -> transcendental.cos(argument, terms)
                     }
                 }
+
                 is ExactRealExpression.Sum -> children.fold(RationalEnclosure.point(BigFraction.ZERO)) { sum, child ->
                     transcendental.add(sum, computed.getValue(child))
                 }
+
                 is ExactRealExpression.Product -> children.fold(
                     RationalEnclosure.point(BigFraction.ONE),
                 ) { product, child ->
                     transcendental.multiply(product, computed.getValue(child))
                 }
+
                 is ExactRealExpression.Power -> transcendental.power(computed.getValue(node.base), node.exponent)
             }
         }
@@ -228,12 +261,17 @@ internal class ExactRealArithmetic(
                         return false
                     }
                 }
+
                 ExactRealExpression.Pi -> if (second !== ExactRealExpression.Pi) return false
+
                 is ExactRealExpression.Function -> {
                     if (second !is ExactRealExpression.Function || first.function != second.function) return false
                 }
+
                 is ExactRealExpression.Sum -> if (second !is ExactRealExpression.Sum) return false
+
                 is ExactRealExpression.Product -> if (second !is ExactRealExpression.Product) return false
+
                 is ExactRealExpression.Power -> {
                     if (second !is ExactRealExpression.Power || first.exponent != second.exponent) return false
                 }
@@ -264,7 +302,9 @@ internal class ExactRealArithmetic(
         if (node === ExactRealExpression.Pi) return BigFraction.ONE
         if (node is ExactRealExpression.Product && node.operands.size == 2 &&
             node.operands[1] === ExactRealExpression.Pi
-        ) return (node.operands[0] as? ExactRealExpression.Algebraic)?.value?.rational
+        ) {
+            return (node.operands[0] as? ExactRealExpression.Algebraic)?.value?.rational
+        }
         return null
     }
 }

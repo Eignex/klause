@@ -21,7 +21,10 @@ internal fun refutePolynomialBooleans(
         for (term in atom.polynomial.terms) {
             arithmetic.step()
             if (term.coefficient.num.magnitudeBitLength() > maximumBits ||
-                term.coefficient.den.magnitudeBitLength() > maximumBits) return false
+                term.coefficient.den.magnitudeBitLength() > maximumBits
+            ) {
+                    return false
+                }
         }
     }
     var references = 0

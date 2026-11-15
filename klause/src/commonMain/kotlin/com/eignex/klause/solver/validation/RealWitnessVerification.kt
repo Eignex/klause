@@ -108,7 +108,9 @@ internal fun verifyRealCoordinates(
         cancellation.charge(row.size.toLong() + 1L)
         if (cancellation()) return false
         return row.exactComparison(
-            model.numRealVars, row.activator == LinearRow.ALWAYS || witness.truth(row.activator), witness::truth,
+            model.numRealVars,
+            row.activator == LinearRow.ALWAYS || witness.truth(row.activator),
+            witness::truth,
         ).holdsAt(witness)
     }
     for ((id, factor) in model.factors.withIndex()) {
@@ -123,8 +125,12 @@ internal fun verifyRealCoordinates(
             continue
         }
         if (factor is Power && factor.base is Power.Coordinate.Real) {
-            val matches = rationalPowerEquals(reals[factor.base.id.index], factor.exponent,
-                reals[(factor.result as Power.Coordinate.Real).id.index], cancellation)
+            val matches = rationalPowerEquals(
+                reals[factor.base.id.index],
+                factor.exponent,
+                reals[(factor.result as Power.Coordinate.Real).id.index],
+                cancellation,
+            )
                 ?: return Verification.Indeterminate("source power check unavailable or cancelled")
             if (cancellation()) return Verification.Indeterminate("source power check cancelled")
             if (!matches) {
@@ -232,7 +238,9 @@ private fun rationalPowerEquals(
         exponent == 0 || value == BigFraction.ONE -> expected == BigFraction.ONE
 
         value.isZero -> expected.isZero
-        value == BigFraction.MINUS_ONE -> expected ==
+
+        value == BigFraction.MINUS_ONE ->
+            expected ==
             if (exponent and 1 == 0) BigFraction.ONE else BigFraction.MINUS_ONE
 
         expected.isZero || (expected.signum() < 0) != (value.signum() < 0 && exponent and 1 != 0) -> false

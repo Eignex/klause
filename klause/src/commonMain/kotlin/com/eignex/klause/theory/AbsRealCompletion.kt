@@ -77,8 +77,12 @@ internal class AbsRealCompletion(private val source: Problem) {
         for (id in 0 until source.numIntVars) {
             if (cancellation()) return Result.Undecided
             cancellation.charge(1)
-            factors += ExactSearchRow.of(intArrayOf(Term.ofIntVar(id)), listOf(BigFraction.ONE), LinearOp.EQ,
-                BigFraction.of(sample.exactIntValue(id), BIG_ONE))
+            factors += ExactSearchRow.of(
+                intArrayOf(Term.ofIntVar(id)),
+                listOf(BigFraction.ONE),
+                LinearOp.EQ,
+                BigFraction.of(sample.exactIntValue(id), BIG_ONE),
+            )
         }
         val model = encoded.rebindEncoding(encoded, factors.toTypedArray(), null)
         val factory = prepareExactLiraSource(model, cancellation) ?: return Result.Undecided
@@ -91,8 +95,11 @@ internal class AbsRealCompletion(private val source: Problem) {
             }
         }.use { component ->
             component.solveWith(solveContext)
-            val session = SearchComponentSet(listOf(component)).session(cancellation = cancellation,
-                atoms = SearchAtomRegistry(model.numBoolVars), executionControls = controls)
+            val session = SearchComponentSet(listOf(component)).session(
+                cancellation = cancellation,
+                atoms = SearchAtomRegistry(model.numBoolVars),
+                executionControls = controls,
+            )
             return when (session.initialize()) {
                 is ComponentResult.Conflict -> Result.Refuted
 

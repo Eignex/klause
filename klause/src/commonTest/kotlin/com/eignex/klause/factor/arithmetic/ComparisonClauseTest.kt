@@ -36,8 +36,11 @@ class ComparisonClauseTest {
             Triple(1, -1, Long.MAX_VALUE),
             Triple(-1, 0, Long.MIN_VALUE),
         )) {
-            val clause = ComparisonClause(intArrayOf(0, 0), arrayOf(LinearOp.LE, LinearOp.GE),
-                longArrayOf(0, constant))
+            val clause = ComparisonClause(
+                intArrayOf(0, 0),
+                arrayOf(LinearOp.LE, LinearOp.GE),
+                longArrayOf(0, constant),
+            )
             val before = clause.structuralKey()
 
             assertFalse(clause.canSubstituteAffine(0, scale, offset, 1))

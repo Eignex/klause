@@ -174,24 +174,41 @@ object BacktrackCatalog {
      *  Keeps [BacktrackArm.label] and the produced recipe's [BacktrackRecipe.label] in lockstep. */
     private fun make(arm: BacktrackArm): BacktrackRecipe = when (arm) {
         BacktrackArm.SatOptimized -> satOptimized()
+
         BacktrackArm.ClausalBalanced -> clausal(arm, 0.975, maxLearned = 4000)
+
         BacktrackArm.ClausalStable -> clausal(arm, 0.99)
+
         BacktrackArm.ConflictDriven -> conflictDriven()
+
         BacktrackArm.SupportAware -> supportAware()
+
         BacktrackArm.PropagationGuided -> propagationGuided()
+
         BacktrackArm.CoreGuided -> BacktrackRecipe(BacktrackArm.CoreGuided.label) { seed, event ->
             BacktrackPresets.satOptimized(randomSeed = seed, inprocess = false, onEvent = event)
         }
+
         BacktrackArm.LpAggressive -> lpArm(LpEmphasis.AGGRESSIVE)
+
         BacktrackArm.LpDefault -> lpArm(LpEmphasis.DEFAULT)
+
         BacktrackArm.LpLbTree -> lpTreeSearchArm()
+
         BacktrackArm.LpConservative -> lpArm(LpEmphasis.CONSERVATIVE)
+
         BacktrackArm.LinUcb -> linUcb()
+
         BacktrackArm.Free -> free()
+
         BacktrackArm.SelectorSwitch -> selectorSwitch()
+
         BacktrackArm.FirstFail -> firstFail()
+
         BacktrackArm.DomWdeg -> domWdeg()
+
         BacktrackArm.Activity -> activity()
+
         BacktrackArm.ObjectiveGuided -> objectiveGuided()
     }
 

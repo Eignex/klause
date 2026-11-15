@@ -17,9 +17,14 @@ import com.eignex.klause.util.ExecutionControl
 internal fun allDifferentLinearFormula(factor: AllDifferent, cancellation: ExecutionControl): LinearEncodingFormula? {
     if (cancellation()) return null
     fun comparison(terms: List<Pair<Int, BigFraction>>, op: LinearOp, bound: BigFraction) =
-        LinearEncodingFormula.Comparison(EncodingAffineExpression(terms.map { (term, coefficient) ->
+        LinearEncodingFormula.Comparison(
+            EncodingAffineExpression(
+                terms.map { (term, coefficient) ->
             EncodingLinearTerm.source(term, coefficient)
-        }), op, bound)
+        }
+            ),
+            op, bound
+        )
     val clauses = ArrayList<LinearEncodingFormula>()
     for (i in factor.vars.indices) {
         for (j in i + 1 until factor.vars.size) {
@@ -27,24 +32,28 @@ internal fun allDifferentLinearFormula(factor: AllDifferent, cancellation: Execu
             if (cancellation()) return null
             val a = Term.ofIntVar(factor.vars[i])
             val b = Term.ofIntVar(factor.vars[j])
-            val choices = arrayListOf<LinearEncodingFormula>(comparison(
-                listOf(a to BigFraction.ONE, b to BigFraction.ONE.negated()), LinearOp.NE, BigFraction.ZERO,
-            ))
+            val choices = arrayListOf<LinearEncodingFormula>(
+                comparison(
+                listOf(a to BigFraction.ONE, b to BigFraction.ONE.negated()),
+                LinearOp.NE,
+                BigFraction.ZERO,
+            )
+            )
             for (position in intArrayOf(i, j)) {
                 if (factor.presents.isNotEmpty()) {
                     choices += comparison(
-                    listOf(Term.ofLit(factor.presents[position]) to BigFraction.ONE),
-                    LinearOp.EQ,
-                    BigFraction.ZERO,
-                )
+                        listOf(Term.ofLit(factor.presents[position]) to BigFraction.ONE),
+                        LinearOp.EQ,
+                        BigFraction.ZERO,
+                    )
                 }
             }
             for (value in factor.exceptSet) {
                 choices += comparison(
-                listOf(a to BigFraction.ONE),
-                LinearOp.EQ,
-                BigFraction.ofLong(value),
-            )
+                    listOf(a to BigFraction.ONE),
+                    LinearOp.EQ,
+                    BigFraction.ofLong(value),
+                )
             }
             clauses += LinearEncodingFormula.Or(choices)
         }
@@ -74,10 +83,10 @@ internal fun allDifferentPolynomialFormula(
             }
             for (value in factor.exceptSet) {
                 choices += PolynomialRealFormula.Atom(
-                a,
-                PolynomialRelation.EQ,
-                PolynomialRealLowering.constant(BigFraction.ofLong(value)),
-            )
+                    a,
+                    PolynomialRelation.EQ,
+                    PolynomialRealLowering.constant(BigFraction.ofLong(value)),
+                )
             }
             clauses += PolynomialRealFormula.Or(choices)
         }

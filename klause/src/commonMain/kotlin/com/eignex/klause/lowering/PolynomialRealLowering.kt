@@ -74,8 +74,7 @@ internal class PolynomialRealLowering(
         fun negate(
             operand: PolynomialExpression,
             cancellation: ExecutionControl = ExecutionControl.Never,
-        ): PolynomialExpression =
-            product(listOf(constant(BigFraction.MINUS_ONE), operand), cancellation)
+        ): PolynomialExpression = product(listOf(constant(BigFraction.MINUS_ONE), operand), cancellation)
 
         fun power(
             base: PolynomialExpression,
@@ -91,7 +90,8 @@ internal class PolynomialRealLowering(
                 else -> {
                     val coefficient = rational(base) ?: return PolynomialExpression.Power(base, exponent)
                     val minimumBits = maxOf(
-                        coefficient.num.magnitudeBitLength(), coefficient.den.magnitudeBitLength(),
+                        coefficient.num.magnitudeBitLength(),
+                        coefficient.den.magnitudeBitLength(),
                     ) - 1L
                     if (minimumBits * exponent + 1 > Int.MAX_VALUE) return PolynomialExpression.Power(base, exponent)
                     var value = BigFraction.ONE

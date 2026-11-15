@@ -14,34 +14,52 @@ class RevisedSimplexTest {
 
     @Test
     fun `basis directional costs preserve source units and seated directions`() {
-        for (sense in listOf(Sense.MINIMIZE, Sense.MAXIMIZE)) for (upperSeated in listOf(false, true)) {
+        for (sense in listOf(Sense.MINIMIZE, Sense.MAXIMIZE)) {
+            for (upperSeated in listOf(false, true)) {
             for ((coefficient, objectiveScale) in listOf(2L to 1L, 2048L to 1L, 2L to 4L)) {
                 val sign = if (sense == Sense.MAXIMIZE) -1L else 1L
                 val builder = LpBuilder()
                 val x = builder.addVar(0, 2)
                 val down = builder.addVar(0, 1, cost = (if (upperSeated) -3L else 3L) * sign)
                 val up = builder.addVar(0, 1, cost = 5L * sign)
-                builder.addRow(intArrayOf(x, down, up),
+                builder.addRow(
+                    intArrayOf(x, down, up),
                     longArrayOf(coefficient, if (upperSeated) -coefficient else coefficient, -coefficient),
-                    Relation.EQ, if (upperSeated) -coefficient / 2 else coefficient / 2)
+                    Relation.EQ,
+                    if (upperSeated) -coefficient / 2 else coefficient / 2,
+                )
                 val trail = LpBoundTrail(assertNotNull(builder.build(sense).authoritativeModel()))
                 val objective = trail.state.model.objective
-                assertTrue(trail.replaceObjective(ExactLpObjective(List(objective.size) { objective.cost(it) },
-                    scale = ExactLpNumber.of(objectiveScale), externalConstant = ExactLpNumber.of(1L shl 60))))
+                assertTrue(
+                    trail.replaceObjective(
+                        ExactLpObjective(
+                    List(objective.size) { objective.cost(it) },
+                    scale = ExactLpNumber.of(objectiveScale),
+                    externalConstant = ExactLpNumber.of(1L shl 60),
+                )
+                    )
+                )
                 val model = assertNotNull(trail.state.ownerWorkingModel())
                 RevisedSimplex(model).use { solver ->
                     val optimum = assertNotNull(solver.solve())
                     assertEquals(0.5, optimum.primal[x], 1e-8)
                     var work = 0L
 
-                    val costs = assertNotNull(solver.directionalCosts(model, intArrayOf(x), 100_000L,
-                        ExecutionControl.Never) { work += it })
+                    val costs = assertNotNull(
+                        solver.directionalCosts(
+                        model,
+                        intArrayOf(x),
+                        100_000L,
+                        ExecutionControl.Never,
+                    ) { work += it }
+                    )
 
                     assertEquals(3.0 / objectiveScale, assertNotNull(costs.single()).down, 1e-7)
                     assertEquals(5.0 / objectiveScale, assertNotNull(costs.single()).up, 1e-7)
                     assertTrue(work in 1L..100_000L)
                 }
             }
+        }
         }
     }
 
@@ -50,31 +68,51 @@ class RevisedSimplexTest {
         for (exact in listOf(false, true)) {
             val builder = LpBuilder()
             val variables = Array(4) { block ->
-                intArrayOf(builder.addVar(0, 2), builder.addVar(0, 1, cost = 3L + block),
-                    builder.addVar(0, 1, cost = 5L + block))
+                intArrayOf(
+                    builder.addVar(0, 2),
+                    builder.addVar(0, 1, cost = 3L + block),
+                    builder.addVar(0, 1, cost = 5L + block),
+                )
             }
             val columns = variables.flatMap { it.asList() }.toIntArray()
             for (row in variables.indices) {
-                builder.addRow(columns, LongArray(columns.size) { term ->
+                builder.addRow(
+                    columns,
+                    LongArray(columns.size) { term ->
                     (if (term / 3 == row) 4L else 2L) * (if (term % 3 == 2) -1L else 1L)
-                }, Relation.EQ, 5L)
+                },
+                    Relation.EQ, 5L
+                )
             }
             val built = builder.build(Sense.MINIMIZE)
             val model = if (exact) {
                 assertNotNull(LpExactState(assertNotNull(built.authoritativeModel())).ownerWorkingModel())
-            } else built
+            } else {
+                built
+            }
             RevisedSimplex(model).use { solver ->
                 assertNotNull(solver.solve())
                 var independentWork = 0L
                 val independent = variables.take(2).map { variable ->
-                    assertNotNull(solver.directionalCosts(model, intArrayOf(variable[0]), 100_000L,
-                        ExecutionControl.Never) { independentWork += it }).single()
+                    assertNotNull(
+                        solver.directionalCosts(
+                        model,
+                        intArrayOf(variable[0]),
+                        100_000L,
+                        ExecutionControl.Never,
+                    ) { independentWork += it }
+                    ).single()
                 }
                 var pairedWork = 0L
 
-                val together = assertNotNull(solver.directionalCosts(model,
-                    intArrayOf(variables[0][0], variables[1][0]), independentWork - 1L,
-                    ExecutionControl.Never) { pairedWork += it })
+                val together = assertNotNull(
+                    solver.directionalCosts(
+                    model,
+                    intArrayOf(variables[0][0], variables[1][0]),
+                    independentWork - 1L,
+                    ExecutionControl.Never,
+                ) { pairedWork += it }
+                )
 
                 assertEquals(independent.size, together.size)
                 for (index in together.indices) {
@@ -103,12 +141,20 @@ class RevisedSimplexTest {
             val built = builder.build(Sense.MINIMIZE)
             val model = if (exact) {
                 assertNotNull(LpExactState(assertNotNull(built.authoritativeModel())).ownerWorkingModel())
-            } else built
+            } else {
+                built
+            }
             RevisedSimplex(model).use { solver ->
                 assertNotNull(solver.solve())
                 var work = 0L
-                val costs = assertNotNull(solver.directionalCosts(model, columns, 100_000L,
-                    ExecutionControl.Never) { work += it })
+                val costs = assertNotNull(
+                    solver.directionalCosts(
+                    model,
+                    columns,
+                    100_000L,
+                    ExecutionControl.Never,
+                ) { work += it }
+                )
                 assertEquals(3.0, assertNotNull(costs[0]).down, 1e-7)
                 assertEquals(5.0, assertNotNull(costs[0]).up, 1e-7)
                 assertEquals(7.0, assertNotNull(costs[1]).down, 1e-7)
@@ -117,8 +163,12 @@ class RevisedSimplexTest {
                 val required = work
                 work = 0L
 
-                val unavailable = solver.directionalCosts(model, columns, required - 1L,
-                    ExecutionControl.Never) { work += it }
+                val unavailable = solver.directionalCosts(
+                    model,
+                    columns,
+                    required - 1L,
+                    ExecutionControl.Never,
+                ) { work += it }
 
                 assertNull(unavailable)
                 assertEquals(0L, work)
@@ -136,9 +186,16 @@ class RevisedSimplexTest {
                 var work = 0L
                 val columns = if (decline == "too-many") intArrayOf(0, 1, 2) else intArrayOf(0)
 
-                val costs = solver.directionalCosts(if (decline == "stale") halfIntegralModel() else model,
-                    columns, when (decline) { "unfunded" -> 1L; "zero" -> 0L; else -> 100_000L },
-                    ExecutionControl { decline == "cancelled" }) { work += it }
+                val costs = solver.directionalCosts(
+                    if (decline == "stale") halfIntegralModel() else model,
+                    columns,
+                    when (decline) {
+                        "unfunded" -> 1L;
+                        "zero" -> 0L;
+                        else -> 100_000L
+                    },
+                    ExecutionControl { decline == "cancelled" },
+                ) { work += it }
 
                 assertNull(costs, decline)
                 assertEquals(0L, work, decline)
@@ -179,8 +236,10 @@ class RevisedSimplexTest {
 
                 assertTrue(result.optimal, "size=$size termination=${solver.lastTermination}")
                 assertTrue(result.primal.all { it == 0.0 })
-                assertTrue(solver.lastMetrics.workOps in 1L..allowance,
-                    "size=$size work=${solver.lastMetrics.workOps} allowance=$allowance")
+                assertTrue(
+                    solver.lastMetrics.workOps in 1L..allowance,
+                    "size=$size work=${solver.lastMetrics.workOps} allowance=$allowance",
+                )
             }
         }
     }
@@ -397,16 +456,31 @@ class RevisedSimplexTest {
             var completed = 0
             var work = 0L
 
-            val values = owner.directionalValues(LpProbeSource(model, point.basis), intArrayOf(0, 1), longArrayOf(0, 0),
-                1_000_000L, ExecutionControl.Never) { completed += it.completed; work += it.work }
+            val values = owner.directionalValues(
+                LpProbeSource(model, point.basis),
+                intArrayOf(0, 1),
+                longArrayOf(0, 0),
+                1_000_000L,
+                ExecutionControl.Never,
+            ) {
+                completed += it.completed;
+                work += it.work
+            }
 
             assertNotNull(values)
             assertEquals(listOf(LpDirectionalValues(8.0, 8.0), LpDirectionalValues(8.0, 8.0)), values)
             assertEquals(4, completed)
             assertTrue(work in 1L..1_000_000L)
             assertEquals(metrics, owner.lastMetrics)
-            assertNull(owner.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
-                1_000_000L, ExecutionControl.Never) {})
+            assertNull(
+                owner.directionalGains(
+                model,
+                intArrayOf(0, 1),
+                longArrayOf(0, 0),
+                1_000_000L,
+                ExecutionControl.Never,
+            ) {}
+            )
         }
     }
 

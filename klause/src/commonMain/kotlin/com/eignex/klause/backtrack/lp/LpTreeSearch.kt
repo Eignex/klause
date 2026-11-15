@@ -69,8 +69,10 @@ internal fun LpEngine.lbTreeSearch(
     val token = object : ExecutionControl() {
         override fun isCancelled(): Boolean {
             accountPropagation()
-            return stop() || (params.lpPlan.rootBudgetFraction > 0.0 &&
-                workSpentExceeds(params.lpPlan.rootMaxWork, sink.lp.standaloneWork)) ||
+            return stop() || (
+                params.lpPlan.rootBudgetFraction > 0.0 &&
+                workSpentExceeds(params.lpPlan.rootMaxWork, sink.lp.standaloneWork)
+            ) ||
                 lpWorkAllowanceSpent(sink.lp.standaloneWork)
         }
         override fun deadline() = stop.deadline()
@@ -118,7 +120,9 @@ internal fun LpEngine.lbTreeSearch(
                             ?: requireNotNull(leafSolver).solve(sample, token, toleranceCheck, work)
                         when (leaf.verdict) {
                             LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED,
-                            LpVerdict.TOLERANCE_OPTIMUM -> Unit
+                            LpVerdict.TOLERANCE_OPTIMUM,
+                            -> Unit
+
                             else -> return false
                         }
                         if (leaf.verdict == LpVerdict.TOLERANCE_OPTIMUM && toleranceCheck == null) return false
@@ -213,8 +217,12 @@ internal fun LpEngine.lbTreeSearch(
                                 val domain = session.intDomain(variable)
                                 if (upper <= domain.min || upper > domain.max) continue
                             }
-                            split = LpFractionalBranch(variable, value,
-                                relaxation.colIsBool[column], registered = false)
+                            split = LpFractionalBranch(
+                                variable,
+                                value,
+                                relaxation.colIsBool[column],
+                                registered = false,
+                            )
                             break
                         }
                         return SearchNodeDisposition.Expand

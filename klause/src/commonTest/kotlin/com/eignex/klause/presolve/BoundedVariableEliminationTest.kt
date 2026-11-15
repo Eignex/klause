@@ -65,8 +65,10 @@ class BoundedVariableEliminationTest {
         val contradictions = listOf(
             listOf(clause(pos(0)), clause(neg(0))),
             listOf(
-                clause(pos(0), pos(1)), clause(pos(0), neg(1)),
-                clause(neg(0), pos(1)), clause(neg(0), neg(1)),
+                clause(pos(0), pos(1)),
+                clause(pos(0), neg(1)),
+                clause(neg(0), pos(1)),
+                clause(neg(0), neg(1)),
             ),
         )
         for (clauses in contradictions) {
@@ -81,7 +83,9 @@ class BoundedVariableEliminationTest {
             assertTrue(source.addedFactors.isEmpty())
             val budget = PresolveBudget(Long.MAX_VALUE)
             val prepared = Presolver.runSource(
-                problem, PresolveConfig.parse("off,+bve"), PresolveContext(presolveBudget = budget),
+                problem,
+                PresolveConfig.parse("off,+bve"),
+                PresolveContext(presolveBudget = budget),
                 budget.orSpent(ExecutionControl.Never),
             )
             assertTrue(prepared.infeasible)
@@ -115,7 +119,10 @@ class BoundedVariableEliminationTest {
         val token = budget.orSpent(ExecutionControl.Never)
 
         val prepared = Presolver.runSource(
-            problem, PresolveConfig.parse("off,+bve"), PresolveContext(presolveBudget = budget), token,
+            problem,
+            PresolveConfig.parse("off,+bve"),
+            PresolveContext(presolveBudget = budget),
+            token,
         )
 
         assertTrue(prepared.infeasible)

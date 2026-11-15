@@ -95,7 +95,10 @@ class RootBakerTest {
             },
         )
         val problem = BakedProblem(
-            0, 4, Array(4) { IntDomain(0, 3) }, factors,
+            0,
+            4,
+            Array(4) { IntDomain(0, 3) },
+            factors,
             seedDeductions = seed,
             alreadyFolded = true,
             cancellation = budget.orSpent(ExecutionControl.Never),
@@ -148,7 +151,10 @@ class RootBakerTest {
                     PropagationResult.Implied.EMPTY
                 }
                 val problem = BakedProblem(
-                    0, 1, arrayOf(domain), listOf(factor),
+                    0,
+                    1,
+                    arrayOf(domain),
+                    listOf(factor),
                     seedDeductions = seed,
                     alreadyFolded = true,
                     cancellation = budget.orSpent(ExecutionControl { ++polls > 200 }),
@@ -156,7 +162,8 @@ class RootBakerTest {
                 polls = 0
 
                 val result = RootBaker.bake(
-                    problem, BakeConfig(probeIntHoles = true, probeBudgetPerVar = 4),
+                    problem,
+                    BakeConfig(probeIntHoles = true, probeBudgetPerVar = 4),
                 )
 
                 val expectedPins = expected.filter { !excluded || it != expected[2] }.take(6)
@@ -172,7 +179,9 @@ class RootBakerTest {
     fun `SAC observations should count tightened columns without requiring fixings`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 3) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 3) },
             listOf(
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),

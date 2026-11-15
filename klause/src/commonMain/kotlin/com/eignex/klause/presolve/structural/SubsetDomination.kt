@@ -112,12 +112,14 @@ internal class SubsetDomination {
             val activity = Activity(
                 candidate.signature,
                 candidate.signature.terms.map { (v, coefficient) ->
-                if (!ranges.isClosed(v)) null else if (coefficient >= 0L) {
-                    ranges.max(v)
-                } else {
-                    ranges.min(v)
-                }
-            }
+                    if (!ranges.isClosed(v)) {
+                        null
+                    } else if (coefficient >= 0L) {
+                        ranges.max(v)
+                    } else {
+                        ranges.min(v)
+                    }
+                },
             )
             active.add(activity)
             activities.add(candidate to activity)

@@ -111,18 +111,35 @@ internal class LinearAuthorityInvocation(
     fun captureTo(journal: LinearAuthorityCapture) = component.captureTo(journal)
     val work: Long get() = state.work.spent + funding.spent / LP_WORK_PER_NODE
     val stats: SolveStats get() = SolveStats(
-        run = SolveStats.EMPTY.run.copy(backend = "linear-authority",
-            wallMs = started.elapsedNow().inWholeMilliseconds, timedOut = params.timeout()),
-        smt = state.smt.snapshot().let { snapshot -> snapshot.copy(
-            completeSearchStages = snapshot.completeSearchStages.orEmpty() + component.observations() +
-            externalOffers +
-            mapOf("numericalFundedWork" to funding.spent, "numericalFundedAllocation" to funding.allocated,
-                "numericalImportedIncumbents" to importedIncumbents) +
-            (frontier?.let { mapOf("numericalFrontierPending" to it.pending.toLong(),
-                "numericalFrontierPeakPending" to it.peakPending.toLong()) } ?: emptyMap())) },
+        run = SolveStats.EMPTY.run.copy(
+            backend = "linear-authority",
+            wallMs = started.elapsedNow().inWholeMilliseconds,
+            timedOut = params.timeout(),
+        ),
+        smt = state.smt.snapshot().let { snapshot ->
+            snapshot.copy(
+                completeSearchStages = snapshot.completeSearchStages.orEmpty() + component.observations() +
+                    externalOffers +
+                    mapOf(
+                        "numericalFundedWork" to funding.spent,
+                        "numericalFundedAllocation" to funding.allocated,
+                        "numericalImportedIncumbents" to importedIncumbents,
+                    ) +
+                    (
+                        frontier?.let {
+                        mapOf(
+                            "numericalFrontierPending" to it.pending.toLong(),
+                            "numericalFrontierPeakPending" to it.peakPending.toLong(),
+                        )
+                    } ?: emptyMap()
+                    ),
+            )
+        },
         openTheory = state.work.snapshot(),
-        search = state.progress(if (closed) null else session))
-    private val component = LinearAuthorityTraversal(context,
+        search = state.progress(if (closed) null else session),
+    )
+    private val component = LinearAuthorityTraversal(
+        context,
         budget, stop, ::paused, ::offer,
         {
             incumbent?.let { sample ->
@@ -149,10 +166,10 @@ internal class LinearAuthorityInvocation(
         stop,
         atoms = if (params.sourceRefutationPropagation || params.sourceRefutationResolution) {
             SearchAtomRegistry(
-            context.coordinates.filter {
-                it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
-            }.maxOfOrNull { it.id + 1 } ?: 0,
-        )
+                context.coordinates.filter {
+                    it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
+                }.maxOfOrNull { it.id + 1 } ?: 0,
+            )
         } else {
             null
         },
@@ -163,44 +180,46 @@ internal class LinearAuthorityInvocation(
     private val branching = if (params.openBranching != OpenBranching.Activity) {
         BooleanBranching.SourceOrder(
             context.coordinates.count {
-            it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
-        }
+                it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
+            },
         )
     } else {
         HeuristicBooleanBranching(
             Vsids(),
             context.coordinates.count {
-        it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
-    }
+                it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
+            },
         )
     }
     private val run = if (boundOrdered) {
         null
     } else {
         session.openRun(
-        context.coordinates.count {
-            it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
-        },
-        SearchSolveParams(state.remainingDecisions()),
-        decisionBudget = state.decisionBudget,
-        booleanBranching = branching,
-        nodePolicy = component,
-    )
+            context.coordinates.count {
+                it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
+            },
+            SearchSolveParams(state.remainingDecisions()),
+            decisionBudget = state.decisionBudget,
+            booleanBranching = branching,
+            nodePolicy = component,
+        )
     }
     private val frontier = if (!boundOrdered) {
         null
     } else {
         SearchFrontierRun(
-        session, SearchSolveParams(state.remainingDecisions()), branching, component, state.decisionBudget,
-        component::frontierRank, Comparator { left, right ->
-            when {
-                left == null && right == null -> 0
-                left == null -> -1
-                right == null -> 1
-                else -> left.compareTo(right)
-            }
-        }, ::paused, { incumbentRevision },
-    )
+            session, SearchSolveParams(state.remainingDecisions()), branching, component, state.decisionBudget,
+            component::frontierRank,
+                Comparator { left, right ->
+                when {
+                    left == null && right == null -> 0
+                    left == null -> -1
+                    right == null -> 1
+                    else -> left.compareTo(right)
+                }
+            },
+                ::paused, { incumbentRevision },
+        )
     }
 
     fun run(onIncumbent: (Sample, BigFraction) -> Unit): LinearInvocationResult {
@@ -229,13 +248,13 @@ internal class LinearAuthorityInvocation(
             }
             funding.grant(
                 if (work < 0) {
-                20_000_000L
-            } else {
-                maxOf(
-                20_000_000L,
-                work.coerceIn(1L, 150_000L) * LP_WORK_PER_NODE,
-            )
-            }
+                    20_000_000L
+                } else {
+                    maxOf(
+                        20_000_000L,
+                        work.coerceIn(1L, 150_000L) * LP_WORK_PER_NODE,
+                    )
+                },
             )
             external()?.takeUnless { it === incumbent }?.let { sample ->
                 val before = incumbentRevision
@@ -253,13 +272,13 @@ internal class LinearAuthorityInvocation(
             }
             if (stop()) {
                 return finish(
-                null,
-                if (params.timeout()) {
-                    TerminationReason.Timeout
-                } else {
-                    TerminationReason.Cancelled
-                },
-            )
+                    null,
+                    if (params.timeout()) {
+                        TerminationReason.Timeout
+                    } else {
+                        TerminationReason.Cancelled
+                    },
+                )
             }
             if (funding.exhausted) return finish(null, TerminationReason.BudgetExhausted)
             if (!initialized) {
@@ -285,14 +304,23 @@ internal class LinearAuthorityInvocation(
                         },
                     )
                 }
-                is SearchRunEvent.Indeterminate -> finish(null, when {
-                    params.timeout() -> TerminationReason.Timeout
-                    stop() -> TerminationReason.Cancelled
-                    event == SearchRunEvent.Indeterminate.Budget -> TerminationReason.BudgetExhausted
-                    session.workExhausted() || session.checkBudgetExhausted() ||
-                        session.decisionBudgetExhausted() -> TerminationReason.BudgetExhausted
-                    else -> TerminationReason.Unsupported
-                })
+
+                is SearchRunEvent.Indeterminate -> finish(
+                    null,
+                    when {
+                        params.timeout() -> TerminationReason.Timeout
+
+                        stop() -> TerminationReason.Cancelled
+
+                        event == SearchRunEvent.Indeterminate.Budget -> TerminationReason.BudgetExhausted
+
+                        session.workExhausted() || session.checkBudgetExhausted() ||
+                            session.decisionBudgetExhausted() -> TerminationReason.BudgetExhausted
+
+                        else -> TerminationReason.Unsupported
+                    },
+                )
+
                 is SearchRunEvent.Satisfied ->
                     error("linear authority resolves an optimized node before model assembly")
             }
@@ -333,8 +361,14 @@ internal class LinearAuthorityInvocation(
             observeExternalOffer(external, "MissingExactReals")
             return
         }
-        val checked = SourceEvidenceVerifier(context.withLinearAuthority()).verify(SourceEvidence(context.scope,
-            SourceClaim.Witness(sample), SourceDerivation.SourceWitness), checking)
+        val checked = SourceEvidenceVerifier(context.withLinearAuthority()).verify(
+            SourceEvidence(
+            context.scope,
+            SourceClaim.Witness(sample),
+            SourceDerivation.SourceWitness,
+        ),
+            checking
+        )
         if (checked != SourceEvidenceCheck.Checked) {
             observeExternalOffer(
                 external,
@@ -367,8 +401,8 @@ internal class LinearAuthorityInvocation(
 
     val objectiveBound: SourceEvidence? get() = component.rootBound
 
-    fun snapshot(reason: TerminationReason): LinearInvocationResult = result ?:
-        LinearInvocationResult(null, component.rootBound, incumbent, value, reason, stats)
+    fun snapshot(reason: TerminationReason): LinearInvocationResult = result
+        ?: LinearInvocationResult(null, component.rootBound, incumbent, value, reason, stats)
 
     private fun finish(terminal: SourceEvidence?, reason: TerminationReason): LinearInvocationResult {
         val cancelled = stop()

@@ -151,15 +151,10 @@ fun BoolExpr.mapReferences(rename: (String) -> String): BoolExpr = when (this) {
 /** Returns this set expression with every set-variable reference replaced by `rename(name)`. */
 fun SetExpr.mapReferences(rename: (String) -> String): SetExpr = when (this) {
     is SetRef -> copy(name = rename(name))
-
     is SetLiteral -> this
-
     is SetNominalLiteral -> this
-
     is SetUnion -> copy(left = left.mapReferences(rename), right = right.mapReferences(rename))
-
     is SetIntersect -> copy(left = left.mapReferences(rename), right = right.mapReferences(rename))
-
     is SetDiff -> copy(left = left.mapReferences(rename), right = right.mapReferences(rename))
 }
 
@@ -192,9 +187,7 @@ fun ContinuousRealExpr.mapReferences(rename: (String) -> String): ContinuousReal
  */
 fun SchemaEntry.mapReferences(rename: (String) -> String): SchemaEntry = when (this) {
     is NamedConstraint -> copy(expr = expr.mapReferences(rename))
-
     is PresenceSpec -> copy(valueName = rename(valueName))
-
     is BoolSpec, is NominalSpec, is IntSpec, is IntDomainSpec, is FloatSpec, is SetSpec, is MultipleSpec -> this
 }
 
@@ -215,8 +208,7 @@ fun SchemaDef<SchemaEntry>.renameDeclarations(rename: (String) -> String): Schem
     return SchemaDef(renamed)
 }
 
-private fun List<IntExpr>.mapIntReferences(rename: (String) -> String): List<IntExpr> =
-    map { it.mapReferences(rename) }
+private fun List<IntExpr>.mapIntReferences(rename: (String) -> String): List<IntExpr> = map { it.mapReferences(rename) }
 
 private fun List<BoolExpr>.mapBoolReferences(rename: (String) -> String): List<BoolExpr> =
     map { it.mapReferences(rename) }

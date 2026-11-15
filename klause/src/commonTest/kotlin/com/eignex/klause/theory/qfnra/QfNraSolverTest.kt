@@ -53,8 +53,13 @@ class QfNraSolverTest {
                 "(= x$it (+ (* x${it + 1} x${it + 1}) 1))"
             }
             val source = SmtLibPolynomial.parse("$declarations (assert (and $graphs (= x$length 2)))")
-            val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
-                QfNraParams(maximumWork = 500_000), PolynomialCondition())
+            val query = QfNraQuery(
+                source.formula,
+                source.boolCount,
+                source.realCount,
+                QfNraParams(maximumWork = 500_000),
+                PolynomialCondition(),
+            )
 
             var result: QfNraResult? = null
             while (result == null) {
@@ -74,8 +79,13 @@ class QfNraSolverTest {
             "(declare-const x Real) (declare-const y Real) " +
                 "(assert (and (= x (+ (* y y) 1)) (= y 2)))",
         )
-        val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = 100_000), PolynomialCondition())
+        val query = QfNraQuery(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = 100_000),
+            PolynomialCondition(),
+        )
 
         var result: QfNraResult? = null
         while (result == null) result = query.next()
@@ -98,7 +108,10 @@ class QfNraSolverTest {
         val spent = work.spentWork
         var entered = false
 
-        work.probe { entered = true; null }
+        work.probe {
+            entered = true;
+            null
+        }
 
         assertFalse(entered)
         assertEquals(spent, work.spentWork)
@@ -121,8 +134,12 @@ class QfNraSolverTest {
                 "(not $postcondition)))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = 5_000_000))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = 5_000_000),
+        )
 
         val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
         assertEquals(33, point.realCount)
@@ -131,29 +148,53 @@ class QfNraSolverTest {
         val v = point.realValue(3)
         val step = algebraic.add(u, algebraic.multiply(hundredth, v))
         assertEquals(0, algebraic.compare(point.realValue(0), step))
-        val sine = algebraic.evaluate(RationalPolynomial(listOf(BigFraction.ZERO, BigFraction.ONE,
-            BigFraction.ZERO, BigFraction.of(bigIntOf(-1), bigIntOf(6)), BigFraction.ZERO,
-            BigFraction.of(bigIntOf(1), bigIntOf(120)))), u)
+        val sine = algebraic.evaluate(
+            RationalPolynomial(
+                listOf(
+            BigFraction.ZERO,
+            BigFraction.ONE,
+            BigFraction.ZERO,
+            BigFraction.of(bigIntOf(-1), bigIntOf(6)),
+            BigFraction.ZERO,
+            BigFraction.of(bigIntOf(1), bigIntOf(120)),
+        )
+            ),
+            u
+        )
         val acceleration = algebraic.subtract(
             algebraic.multiply(algebraic.rational(BigFraction.of(bigIntOf(-1), bigIntOf(2))), v),
-            algebraic.multiply(algebraic.rational(BigFraction.of(bigIntOf(981), bigIntOf(100))), sine))
-        assertEquals(0, algebraic.compare(point.realValue(1),
-            algebraic.add(v, algebraic.multiply(hundredth, acceleration))))
+            algebraic.multiply(algebraic.rational(BigFraction.of(bigIntOf(981), bigIntOf(100))), sine),
+        )
+        assertEquals(
+            0,
+            algebraic.compare(
+            point.realValue(1),
+            algebraic.add(v, algebraic.multiply(hundredth, acceleration)),
+        )
+        )
         val inside = ArrayList<Boolean>()
         for ((a, b) in listOf(u to v, point.realValue(0) to point.realValue(1))) {
-            val value = listOf(algebraic.power(a, 2),
-                algebraic.multiply(algebraic.rational(BigFraction.of(bigIntOf(1), bigIntOf(25))),
-                    algebraic.multiply(a, b)),
-                algebraic.multiply(algebraic.rational(BigFraction.of(bigIntOf(1), bigIntOf(10))),
-                    algebraic.power(b, 2)),
+            val value = listOf(
+                algebraic.power(a, 2),
+                algebraic.multiply(
+                    algebraic.rational(BigFraction.of(bigIntOf(1), bigIntOf(25))),
+                    algebraic.multiply(a, b),
+                ),
+                algebraic.multiply(
+                    algebraic.rational(BigFraction.of(bigIntOf(1), bigIntOf(10))),
+                    algebraic.power(b, 2),
+                ),
                 algebraic.multiply(algebraic.rational(BigFraction.of(bigIntOf(-3), bigIntOf(20))), a),
-                algebraic.multiply(algebraic.rational(BigFraction.of(bigIntOf(-1), bigIntOf(50))), b))
+                algebraic.multiply(algebraic.rational(BigFraction.of(bigIntOf(-1), bigIntOf(50))), b),
+            )
                 .fold(algebraic.rational(BigFraction.ZERO), algebraic::add)
-            inside.add(algebraic.compare(a, algebraic.rational(BigFraction.MINUS_ONE)) >= 0 &&
-                algebraic.compare(a, algebraic.rational(BigFraction.of(bigIntOf(6), bigIntOf(5)))) <= 0 &&
-                algebraic.compare(b, algebraic.rational(BigFraction.of(bigIntOf(-16), bigIntOf(5)))) >= 0 &&
-                algebraic.compare(b, algebraic.rational(BigFraction.of(bigIntOf(33), bigIntOf(10)))) <= 0 &&
-                algebraic.compare(value, algebraic.rational(BigFraction.of(bigIntOf(111), bigIntOf(100)))) <= 0)
+            inside.add(
+                algebraic.compare(a, algebraic.rational(BigFraction.MINUS_ONE)) >= 0 &&
+                    algebraic.compare(a, algebraic.rational(BigFraction.of(bigIntOf(6), bigIntOf(5)))) <= 0 &&
+                    algebraic.compare(b, algebraic.rational(BigFraction.of(bigIntOf(-16), bigIntOf(5)))) >= 0 &&
+                    algebraic.compare(b, algebraic.rational(BigFraction.of(bigIntOf(33), bigIntOf(10)))) <= 0 &&
+                    algebraic.compare(value, algebraic.rational(BigFraction.of(bigIntOf(111), bigIntOf(100)))) <= 0,
+            )
         }
         assertEquals(listOf(true, false), inside)
     }
@@ -170,16 +211,30 @@ class QfNraSolverTest {
                 "$declarations (assert (= (+ (* x0 x0) (* x1 x1)) 1)) (assert $lower) (assert $upper)",
             )
 
-            val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-                QfNraParams(maximumWork = 500_000, polynomialLimits = PolynomialLimits(maxMatrixCells = 9)))
+            val result = solveQfNra(
+                source.formula,
+                source.boolCount,
+                source.realCount,
+                QfNraParams(maximumWork = 500_000, polynomialLimits = PolynomialLimits(maxMatrixCells = 9)),
+            )
 
             val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
-            assertTrue(algebraic.compare(witness.realValue(0),
-                algebraic.rational(BigFraction.ofLong(4).reciprocal())) > 0)
-            assertTrue(algebraic.compare(witness.realValue(0),
-                algebraic.rational(BigFraction.ofLong(3).reciprocal())) < 0)
-            val norm = algebraic.add(algebraic.power(witness.realValue(0), 2),
-                algebraic.power(witness.realValue(1), 2))
+            assertTrue(
+                algebraic.compare(
+                witness.realValue(0),
+                algebraic.rational(BigFraction.ofLong(4).reciprocal()),
+            ) > 0
+            )
+            assertTrue(
+                algebraic.compare(
+                witness.realValue(0),
+                algebraic.rational(BigFraction.ofLong(3).reciprocal()),
+            ) < 0
+            )
+            val norm = algebraic.add(
+                algebraic.power(witness.realValue(0), 2),
+                algebraic.power(witness.realValue(1), 2),
+            )
             assertEquals(0, algebraic.compare(norm, algebraic.rational(BigFraction.ONE)))
             assertEquals(33, witness.realCount)
         }
@@ -226,13 +281,19 @@ class QfNraSolverTest {
         }
         val source = SmtLibPolynomial.parse("$declarations $constraints")
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = 2_000_000))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = 2_000_000),
+        )
 
         val point = assertIs<QfNraResult.Satisfiable>(result, result.toString()).assignment
         for (index in 0 until 8) {
-            val norm = algebraic.add(algebraic.power(point.realValue(2 * index), 2),
-                algebraic.power(point.realValue(2 * index + 1), 2))
+            val norm = algebraic.add(
+                algebraic.power(point.realValue(2 * index), 2),
+                algebraic.power(point.realValue(2 * index + 1), 2),
+            )
             assertEquals(0, algebraic.compare(norm, algebraic.rational(BigFraction.ONE)))
         }
     }
@@ -262,8 +323,13 @@ class QfNraSolverTest {
         val result = solveQfNra(source.formula, source.boolCount, source.realCount)
 
         val point = assertIs<QfNraResult.Satisfiable>(result).assignment
-        assertEquals(0, algebraic.compare(algebraic.power(point.realValue(0), 2),
-            algebraic.rational(BigFraction.ONE)))
+        assertEquals(
+            0,
+            algebraic.compare(
+            algebraic.power(point.realValue(0), 2),
+            algebraic.rational(BigFraction.ONE),
+        )
+        )
         assertTrue(algebraic.sign(algebraic.power(point.realValue(1), 2)) > 0)
     }
 
@@ -292,10 +358,20 @@ class QfNraSolverTest {
         val result = solveQfNra(source.formula, source.boolCount, source.realCount)
 
         val point = assertIs<QfNraResult.Satisfiable>(result).assignment
-        assertEquals(0, algebraic.compare(algebraic.power(point.realValue(0), 2),
-            algebraic.rational(BigFraction.ofLong(2))))
-        assertEquals(0, algebraic.compare(algebraic.multiply(point.realValue(0), point.realValue(1)),
-            algebraic.rational(BigFraction.ONE)))
+        assertEquals(
+            0,
+            algebraic.compare(
+            algebraic.power(point.realValue(0), 2),
+            algebraic.rational(BigFraction.ofLong(2)),
+        )
+        )
+        assertEquals(
+            0,
+            algebraic.compare(
+            algebraic.multiply(point.realValue(0), point.realValue(1)),
+            algebraic.rational(BigFraction.ONE),
+        )
+        )
     }
 
     @Test
@@ -325,8 +401,14 @@ class QfNraSolverTest {
         val point = assertIs<QfNraResult.Satisfiable>(result).assignment
         val norm = algebraic.add(algebraic.power(point.realValue(0), 2), algebraic.power(point.realValue(1), 2))
         assertEquals(0, algebraic.compare(norm, algebraic.rational(BigFraction.ONE)))
-        assertTrue(algebraic.sign(algebraic.add(algebraic.power(point.realValue(0), 4),
-            algebraic.power(point.realValue(1), 4))) > 0)
+        assertTrue(
+            algebraic.sign(
+                algebraic.add(
+            algebraic.power(point.realValue(0), 4),
+            algebraic.power(point.realValue(1), 4),
+        )
+            ) > 0
+        )
     }
 
     @Test
@@ -336,8 +418,13 @@ class QfNraSolverTest {
             "$declarations (assert (= (* x0 x0) 2)) (assert (= (* x0 x1) 1))",
         )
         lateinit var query: QfNraQuery
-        query = QfNraQuery(source.formula, source.boolCount, source.realCount,
-            QfNraParams(cancellation = ExecutionControl { query.stats.liftedCells > 0L }), PolynomialCondition())
+        query = QfNraQuery(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(cancellation = ExecutionControl { query.stats.liftedCells > 0L }),
+            PolynomialCondition(),
+        )
         var result: QfNraResult? = null
         while (result == null) result = query.next()
 
@@ -353,8 +440,13 @@ class QfNraSolverTest {
             "$declarations (assert (= x0 (* x1 x1))) (assert (not (= x0 0)))",
         )
         val plain = solveQfNra(source.formula, source.boolCount, source.realCount)
-        val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
-            QfNraParams(), PolynomialCondition())
+        val query = QfNraQuery(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(),
+            PolynomialCondition(),
+        )
         var atoms: List<PolynomialAtom>? = null
         query.reducedRegionObserver = { atoms = it }
 
@@ -391,18 +483,36 @@ class QfNraSolverTest {
                 "(>= x3 x1) (<= x3 (+ x1 1))))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
         val square = algebraic.power(witness.realValue(1), 2)
-        assertEquals(0, algebraic.compare(witness.realValue(0),
-            algebraic.add(square, algebraic.rational(BigFraction.ONE))))
-        assertEquals(0, algebraic.compare(witness.realValue(2),
-            algebraic.add(witness.realValue(0), witness.realValue(3))))
+        assertEquals(
+            0,
+            algebraic.compare(
+            witness.realValue(0),
+            algebraic.add(square, algebraic.rational(BigFraction.ONE)),
+        )
+        )
+        assertEquals(
+            0,
+            algebraic.compare(
+            witness.realValue(2),
+            algebraic.add(witness.realValue(0), witness.realValue(3)),
+        )
+        )
         assertTrue(algebraic.compare(witness.realValue(3), witness.realValue(1)) >= 0)
-        assertTrue(algebraic.compare(witness.realValue(3),
-            algebraic.add(witness.realValue(1), algebraic.rational(BigFraction.ONE))) <= 0)
+        assertTrue(
+            algebraic.compare(
+            witness.realValue(3),
+            algebraic.add(witness.realValue(1), algebraic.rational(BigFraction.ONE)),
+        ) <= 0
+        )
         assertEquals(33, witness.realCount)
     }
 
@@ -413,8 +523,12 @@ class QfNraSolverTest {
             "$declarations (assert (and (= x0 (+ x1 1)) (>= x0 0) (<= x1 (- 2))))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         assertIs<QfNraResult.Unsatisfiable>(result)
         assertEquals(1L, result.stats.equationalSections)
@@ -432,7 +546,9 @@ class QfNraSolverTest {
                 val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
                 assertEquals(0, algebraic.compare(witness.realValue(0), algebraic.rational(BigFraction.ONE)))
                 assertEquals(33, witness.realCount)
-            } else assertIs<QfNraResult.Unsatisfiable>(result)
+            } else {
+                assertIs<QfNraResult.Unsatisfiable>(result)
+            }
         }
     }
 
@@ -463,8 +579,12 @@ class QfNraSolverTest {
             "$declarations (assert (and (> x0 x1) (> x1 x2) (>= x2 x0)))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         assertIs<QfNraResult.Unsatisfiable>(result)
     }
@@ -540,8 +660,12 @@ class QfNraSolverTest {
                 "(assert (or (and b (not (<= x0 x1))) (and (not b) (<= x0 x1))))",
         )
         for (truth in listOf(true, false, true)) {
-            val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-                condition = PolynomialCondition(bools = mapOf(0 to truth)))
+            val result = solveQfNra(
+                source.formula,
+                source.boolCount,
+                source.realCount,
+                condition = PolynomialCondition(bools = mapOf(0 to truth)),
+            )
 
             val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
             assertEquals(truth, witness.boolValue(0))
@@ -559,8 +683,12 @@ class QfNraSolverTest {
                     "(>= (* x0 x0 x1 x1 (+ x0 x1)) 0) (<= (* x0 x0 x1 x1 (- x0 x1)) 0)))",
             )
 
-            val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-                QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+            val result = solveQfNra(
+                source.formula,
+                source.boolCount,
+                source.realCount,
+                QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+            )
 
             val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
             assertEquals(0, algebraic.sign(witness.realValue(fixed)))
@@ -577,8 +705,12 @@ class QfNraSolverTest {
                 "(>= (* x0 x0 x0 x1 (+ x0 x1)) 0)))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         assertIs<QfNraResult.Unsatisfiable>(result)
     }
@@ -590,8 +722,12 @@ class QfNraSolverTest {
             "$declarations (assert (and (> x0 0) (>= (* x0 x1) 1) (<= (* x0 x1) 2)))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
         val product = algebraic.multiply(witness.realValue(0), witness.realValue(1))
@@ -608,8 +744,12 @@ class QfNraSolverTest {
             "$declarations (assert (and (>= x0 0) (<= x0 0) (>= (* x0 x1) 0) (>= (+ (* x0 x1) 1) 0)))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)),
+        )
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
         assertEquals(0, algebraic.sign(witness.realValue(0)))
@@ -1054,10 +1194,17 @@ class QfNraSolverTest {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" } +
             (0 until 4).joinToString(" ") { " (declare-const a$it Bool) (declare-const b$it Bool)" }
         val prefix = (0 until 4).joinToString(" ") { "(or a$it b$it)" }
-        val source = SmtLibPolynomial.parse("$declarations (assert (and $prefix (= (* x3 x4) 1) " +
-            "(= (* x0 x0) 2) (= (* x1 x1) 2) (= (* x2 x2) 3) (= (+ (* x1 x2) x1 x2) 1)))")
-        val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
-            QfNraParams(coupledSections = true), PolynomialCondition())
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and $prefix (= (* x3 x4) 1) " +
+                "(= (* x0 x0) 2) (= (* x1 x1) 2) (= (* x2 x2) 3) (= (+ (* x1 x2) x1 x2) 1)))",
+        )
+        val query = QfNraQuery(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(coupledSections = true),
+            PolynomialCondition(),
+        )
 
         var result: QfNraResult? = null
         while (result == null) result = query.next()

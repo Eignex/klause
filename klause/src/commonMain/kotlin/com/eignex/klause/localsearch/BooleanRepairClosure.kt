@@ -90,25 +90,25 @@ internal class BooleanRepairClosure private constructor(
                 }
                 if (!satisfied) {
                     when (residual.size) {
-                    0 -> inconsistent = true
+                        0 -> inconsistent = true
 
-                    1 -> units.add(residual[0])
+                        1 -> units.add(residual[0])
 
-                    2 -> {
-                        checkNotNull(edgeLists[Lit.negate(residual[0])]).add(residual[1])
-                        checkNotNull(edgeLists[Lit.negate(residual[1])]).add(residual[0])
-                    }
+                        2 -> {
+                            checkNotNull(edgeLists[Lit.negate(residual[0])]).add(residual[1])
+                            checkNotNull(edgeLists[Lit.negate(residual[1])]).add(residual[0])
+                        }
 
-                    else -> {
-                        val row = clauses.size
-                        clauses.add(residual.toIntArray())
-                        for (position in 0 until residual.size) {
-                            val literal = residual[position]
-                            checkNotNull(occurrenceLists[Lit.negate(literal)]).add(row)
-                            if (++visits % 256 == 0) yield(null)
+                        else -> {
+                            val row = clauses.size
+                            clauses.add(residual.toIntArray())
+                            for (position in 0 until residual.size) {
+                                val literal = residual[position]
+                                checkNotNull(occurrenceLists[Lit.negate(literal)]).add(row)
+                                if (++visits % 256 == 0) yield(null)
+                            }
                         }
                     }
-                }
                 }
                 if ((index + 1) % 256 == 0) yield(null)
             }
@@ -167,12 +167,16 @@ internal class BooleanRepairClosure private constructor(
                 null
             }
             @Suppress("UNCHECKED_CAST")
-            yield(PreparedBooleanRepairs(BooleanRepairClosure(
+            yield(
+                PreparedBooleanRepairs(
+                    BooleanRepairClosure(
                 edges as Array<IntArray>, units.toIntArray(), clauses.toTypedArray(),
                 occurrences as Array<IntArray>, frozen, stamps, values, queue,
                 seedStamps, seedParity, seeds, inconsistent, support,
                 state.repairWork,
-            )))
+            )
+                )
+            )
         }
     }
 

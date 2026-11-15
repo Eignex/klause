@@ -65,7 +65,10 @@ class PortfolioWorkerTest {
         assertTrue(assertIs<ReseedGuard>(handle).incumbentTrialPending)
 
         val terminal = assertIs<InstructionSlicedSearch>(handle).runInstructionSlice(
-            ExecutionControl.Never, 1L, 17L, points::add,
+            ExecutionControl.Never,
+            1L,
+            17L,
+            points::add,
         )
 
         assertEquals(listOf(17L), allowances)

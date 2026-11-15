@@ -35,11 +35,15 @@ class SourceResultCapture private constructor(
 
     internal companion object {
         fun forOriginal(
-            context: SourceProofContext, source: Problem, objective: LinearObjective?,
+            context: SourceProofContext,
+            source: Problem,
+            objective: LinearObjective?,
         ): SourceResultCapture = SourceResultCapture(context, OriginalSourceBinding(source, null, objective))
 
         fun forQuadratic(
-            context: SourceProofContext, source: Problem, objective: QuadraticObjectiveSpec,
+            context: SourceProofContext,
+            source: Problem,
+            objective: QuadraticObjectiveSpec,
         ): SourceResultCapture = SourceResultCapture(context, OriginalSourceBinding(source, objective))
     }
 
@@ -129,10 +133,14 @@ class SourceResultCapture private constructor(
             is MinimizeResult.Optimal -> SourceClaim.Optimal(result.sample, checkNotNull(value))
 
             is MinimizeResult.Infeasible -> SourceClaim.Refutation
-            is MinimizeResult.Unbounded -> SourceClaim.Ray(result.sample,
+
+            is MinimizeResult.Unbounded -> SourceClaim.Ray(
+                result.sample,
                 result.direction.withIndex().associate { (id, step) ->
                     SourceCoordinate(SourceCoordinate.Kind.Real, id) to step
-                })
+                },
+            )
+
             is MinimizeResult.BestFound -> checkNotNull(witness)
 
             is MinimizeResult.Unknown -> return result
@@ -148,9 +156,13 @@ class SourceResultCapture private constructor(
             }
             add(SourceEvidence(context.scope, claim, proof))
         }
-        val payload = SourceResultEvidence(context.scope, evidence,
-            listOf(SourceEngineAttestation(producer, claim))).withMappings(
-            context.scope, result.evidence?.mappings.orEmpty(),
+        val payload = SourceResultEvidence(
+            context.scope,
+            evidence,
+            listOf(SourceEngineAttestation(producer, claim)),
+        ).withMappings(
+            context.scope,
+            result.evidence?.mappings.orEmpty(),
         )
         return when (result) {
             is MinimizeResult.Optimal -> result.copy(evidence = payload)
@@ -168,20 +180,28 @@ class SourceResultCapture private constructor(
         for ((id, coefficient) in objective.boolWeights.withIndex()) {
             if (sample.boolValue(id)) {
                 value = arithmetic.add(
-                value,
-                arithmetic.rational(BigFraction.ofLong(coefficient)),
-            )
+                    value,
+                    arithmetic.rational(BigFraction.ofLong(coefficient)),
+                )
             }
         }
         for ((id, coefficient) in objective.intCoefficients.withIndex()) {
-            value = arithmetic.add(value, arithmetic.rational(
+            value = arithmetic.add(
+                value,
+                arithmetic.rational(
                 BigFraction.of(sample.exactIntValue(id), BIG_ONE) * BigFraction.ofLong(coefficient),
-            ))
+            )
+            )
         }
         for ((id, coefficient) in objective.realCoefficients.withIndex()) {
             val scalar = requireNotNull(BigFraction.ofDouble(coefficient))
-            value = arithmetic.add(value, arithmetic.multiply(checkNotNull(sample.algebraicReals)[id],
-                arithmetic.rational(scalar)))
+            value = arithmetic.add(
+                value,
+                arithmetic.multiply(
+                checkNotNull(sample.algebraicReals)[id],
+                arithmetic.rational(scalar),
+            )
+            )
         }
         return value.rational?.let { SourceValue.Rational(it) } ?: SourceValue.Algebraic(value)
     }

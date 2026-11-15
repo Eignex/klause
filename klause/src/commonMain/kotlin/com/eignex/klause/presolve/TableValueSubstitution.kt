@@ -28,7 +28,9 @@ internal object TableValueSubstitution {
         if (context.solutionSetSensitive || problem.semantics.isApproximate || problem.numRealVars != 0 ||
             problem.numIntVars > MAX_COLUMNS || objective.realCoefficientValues.isNotEmpty() ||
             objective.intCoefficientValues.size > problem.numIntVars || context.cancellation()
-        ) return PassDelta()
+        ) {
+            return PassDelta()
+        }
         val work = Work(context.cancellation)
         val readers = arrayOfNulls<MutableList<Table>>(problem.numIntVars)
         val eligible = BooleanArray(problem.numIntVars)
@@ -46,9 +48,11 @@ internal object TableValueSubstitution {
                 table.tuples.size <= MAX_CELLS
             if (supported) {
                 checkNotNull(table)
-                for (i in table.xs.indices) for (j in 0 until i) {
+                for (i in table.xs.indices) {
+                    for (j in 0 until i) {
                     if (!work.visit()) return PassDelta()
                     if (table.xs[i] == table.xs[j]) supported = false
+                }
                 }
             }
             for (v in factor.intVars) {
@@ -90,7 +94,10 @@ internal object TableValueSubstitution {
                         if (!work.visit()) return PassDelta()
                         when (includes(table, v, a, b, work)) {
                             null -> return PassDelta()
-                            false -> { verified = false; break }
+                            false -> {
+                                verified = false;
+                                break
+                            }
                             true -> Unit
                         }
                     }
@@ -138,7 +145,10 @@ internal object TableValueSubstitution {
                         break
                     }
                 }
-                if (matches) { found = true; break }
+                if (matches) {
+                    found = true;
+                    break
+                }
             }
             if (!found) return false
         }

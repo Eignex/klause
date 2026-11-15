@@ -41,11 +41,7 @@ internal fun LpEngine.activateCutAttribution(relaxation: LpRelaxation) {
     noteNodeOverhead(families.size.toLong())
 }
 
-internal fun LpEngine.observeCutUse(
-    relaxation: LpRelaxation,
-    certificate: LpDeductionCertificate?,
-    outcome: String,
-) {
+internal fun LpEngine.observeCutUse(relaxation: LpRelaxation, certificate: LpDeductionCertificate?, outcome: String) {
     if (certificate == null) return
     val families = relaxation.sourceMap?.parentFamilies() ?: return
     for ((row, family) in families) {
@@ -74,7 +70,9 @@ internal fun LpEngine.observeAcceptedCutBoundUse(
     val certified = certificate?.let {
         if (relaxation.model.hasIntegralObjective()) {
             it.objectiveBoundCeil(relaxation.objectiveConstant)?.let(BigFraction::ofLong)
-        } else it.exactObjectiveBound() + BigFraction.ofLong(relaxation.objectiveConstant)
+        } else {
+            it.exactObjectiveBound() + BigFraction.ofLong(relaxation.objectiveConstant)
+        }
     }
     if (certified != null && certified >= required) {
         observeCutUse(relaxation, certificate, outcome)
@@ -91,6 +89,11 @@ internal fun LpEngine.observeAcceptedCutBoundUse(
 }
 
 internal fun LpEngine.observeCutFill(fill: Double, rows: Int) {
-    sink.lp.cutLifecycle.shared("FILL", LpPhaseStats(calls = 1L,
-        outcomes = mapOf("SOLVE_MAX_RATIO_MICROS_SUM" to (fill * 1_000_000.0).toLong(), "ROWS" to rows.toLong())))
+    sink.lp.cutLifecycle.shared(
+        "FILL",
+        LpPhaseStats(
+        calls = 1L,
+        outcomes = mapOf("SOLVE_MAX_RATIO_MICROS_SUM" to (fill * 1_000_000.0).toLong(), "ROWS" to rows.toLong()),
+    )
+    )
 }

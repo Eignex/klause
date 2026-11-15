@@ -96,8 +96,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     internal fun allowsInt(varId: Int): Boolean =
         !assumptions.isFrozenInt(varId) && invariants?.isDefinedInt(varId) != true && !ownedByOther(varId)
 
-    internal fun allowsDefinedInt(varId: Int): Boolean =
-        !assumptions.isFrozenInt(varId) && !ownedByOther(varId)
+    internal fun allowsDefinedInt(varId: Int): Boolean = !assumptions.isFrozenInt(varId) && !ownedByOther(varId)
 
     /** Queue a Boolean-flip move on [varId]. */
     fun addBoolFlip(varId: Int) {
@@ -255,11 +254,8 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         val move = state.synthesizeChannelingMove(varId, newValue)
         when (val m = move) {
             is Move.IntSet -> addIntSet(varId, newValue)
-
             is Move.Compound -> addCompound(m.parts)
-
             is Move.BoolFlip -> addBoolFlip(m.varId)
-
             is Move.RealSet -> addRealSet(m.varId, m.newValue)
         }
         addElementPreservingVariant(state, move)

@@ -828,7 +828,12 @@ class LpExplanationTest {
         }.build(Sense.MINIMIZE)
         model.rowGlobal[0] = global
         val relaxation = LpRelaxation(
-            model, intArrayOf(0, 1), booleanArrayOf(false, false), 0L, intArrayOf(0, 1), intArrayOf(),
+            model,
+            intArrayOf(0, 1),
+            booleanArrayOf(false, false),
+            0L,
+            intArrayOf(0, 1),
+            intArrayOf(),
         )
         return relaxation to session
     }

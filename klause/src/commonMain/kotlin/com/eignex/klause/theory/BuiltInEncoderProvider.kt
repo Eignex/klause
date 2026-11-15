@@ -60,80 +60,133 @@ object BuiltInEncoderProvider : EncoderProvider {
     }
     private val polynomialRows = Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
         val form = checkNotNull(view.linearForm)
-        val rows = form.rows.map { polynomialRow(it,
-            { id -> encoding.integer(SourceIntId(id)) },
-            { id -> encoding.real(SourceRealId(id)) }, encoding::conditional) }
-        encoding.polynomial(if (form is LinearForm.Disjunction) PolynomialRealFormula.Or(rows)
-            else PolynomialRealFormula.And(rows))
+        val rows = form.rows.map {
+            polynomialRow(
+                it,
+                { id -> encoding.integer(SourceIntId(id)) },
+                { id -> encoding.real(SourceRealId(id)) },
+                encoding::conditional,
+            )
+        }
+        encoding.polynomial(
+            if (form is LinearForm.Disjunction) {
+                PolynomialRealFormula.Or(rows)
+            } else {
+                PolynomialRealFormula.And(rows)
+            },
+        )
         null
     }
     private val mixedProduct = Encoder(EncoderSupport.DIRECT) { view, encoding ->
         view as RealProduct
-        encoding.polynomial(PolynomialRealFormula.Atom(
-            PolynomialExpression.Product(listOf(encoding.integer(SourceIntId(view.intOperand)),
-                encoding.real(SourceRealId(view.realOperand)))), PolynomialRelation.EQ,
-            encoding.real(SourceRealId(view.result))))
+        encoding.polynomial(
+            PolynomialRealFormula.Atom(
+            PolynomialExpression.Product(
+                listOf(
+                encoding.integer(SourceIntId(view.intOperand)),
+                encoding.real(SourceRealId(view.realOperand)),
+            )
+            ),
+            PolynomialRelation.EQ,
+            encoding.real(SourceRealId(view.result)),
+        )
+        )
         null
     }
 
     override fun select(factor: Factor, target: EncodingTarget): Encoder = when {
         target !in EncodingTarget.entries -> unsupported
+
         target == EncodingTarget.POLYNOMIAL && factor is Clause -> polynomialClause
+
         factor is AllDifferent -> when (target) {
             EncodingTarget.LINEAR -> AllDifferentEncoder.linear
             EncodingTarget.POLYNOMIAL -> AllDifferentEncoder.polynomial
             else -> unsupported
         }
+
         factor is Distinct -> when (target) {
             EncodingTarget.LINEAR -> DistinctEncoders.linear
             EncodingTarget.POLYNOMIAL -> DistinctEncoders.polynomial
             else -> unsupported
         }
+
         factor is LinearIndicator -> when (target) {
             EncodingTarget.LINEAR -> LinearIndicatorEncoder.linear
             EncodingTarget.POLYNOMIAL -> LinearIndicatorEncoder.polynomial
             else -> unsupported
         }
+
         factor is ArrayMinMax || factor is Element -> selectionEncoder
+
         factor is Abs && target == EncodingTarget.LINEAR -> AbsEncoding.linear
+
         factor is Abs && target == EncodingTarget.POLYNOMIAL -> AbsEncoding.polynomial
+
         factor is ExactRealEquality -> exactRealEqualityEncoder(factor, target)
+
         factor is Power -> PowerEncoders.select(factor, target)
+
         factor is GridArithmetic -> gridArithmeticEncoder(factor, target)
+
         factor is WideDivMod -> wideDivModEncoder(target)
+
         factor is DivMod -> divModEncoder(factor, target)
+
         factor is AffineAbs && target == EncodingTarget.LINEAR -> AbsEncoding.affineLinear
+
         factor is AffineAbs && target == EncodingTarget.POLYNOMIAL -> AbsEncoding.affinePolynomial
+
         factor is RealAbs && target == EncodingTarget.LINEAR -> AbsEncoding.realLinear
+
         factor is RealAbs && target == EncodingTarget.POLYNOMIAL -> AbsEncoding.realPolynomial
+
         factor is GridAbs && target == EncodingTarget.LINEAR -> AbsEncoding.gridLinear
+
         factor is GridAbs && target == EncodingTarget.POLYNOMIAL -> AbsEncoding.gridPolynomial
+
         factor is GridArrayMinMax && target != EncodingTarget.DIFFERENCE -> selectionEncoder
+
         factor is RealElement && target != EncodingTarget.DIFFERENCE -> selectionEncoder
+
         factor is RealArrayMinMax && target != EncodingTarget.DIFFERENCE -> selectionEncoder
+
         factor is ContinuousProduct -> continuousProductEncoder(factor, target)
+
         factor is RealFiniteDomain -> realFiniteDomainEncoder(target)
+
         target == EncodingTarget.POLYNOMIAL && factor is RealProduct -> mixedProduct
+
         target == EncodingTarget.LINEAR && factor is RealProduct -> conditionedProduct(factor)
-        factor.exactTheoryOwnable && (target != EncodingTarget.DIFFERENCE ||
-            (factor.variables.reals.isEmpty() && differenceSupported(factor))) -> when {
+
+        factor.exactTheoryOwnable && (
+            target != EncodingTarget.DIFFERENCE ||
+            (factor.variables.reals.isEmpty() && differenceSupported(factor))
+        ) -> when {
             target == EncodingTarget.POLYNOMIAL -> polynomialRows
             factor is LinearRow -> nativeLinear
             else -> equivalentLinear
         }
+
         factor.linearForm is LinearForm.Relaxation -> relaxation
+
         else -> unsupported
     }
 
     private fun conditionedProduct(factor: RealProduct): Encoder = Encoder(
-        EncoderSupport.CONDITIONED, listOf(SourceIntId(factor.intOperand)),
+        EncoderSupport.CONDITIONED,
+        listOf(SourceIntId(factor.intOperand)),
     ) { view, encoding ->
         view as RealProduct
         val value = encoding.fixedInteger(SourceIntId(view.intOperand)) ?: return@Encoder EncoderDecline.CONDITIONS
-        encoding.linear(ExactSearchRow.of(
+        encoding.linear(
+            ExactSearchRow.of(
             intArrayOf(Term.ofRealVar(view.result), Term.ofRealVar(view.realOperand)),
-            listOf(BigFraction.ONE, BigFraction.of(value, BIG_ONE).negated()), LinearOp.EQ, BigFraction.ZERO,
-        ).linearForm)
+            listOf(BigFraction.ONE, BigFraction.of(value, BIG_ONE).negated()),
+            LinearOp.EQ,
+            BigFraction.ZERO,
+        ).linearForm
+        )
         null
     }
 
@@ -146,9 +199,14 @@ object BuiltInEncoderProvider : EncoderProvider {
         if (factor.intVars.isEmpty()) return true
         val form = factor.linearForm as? LinearForm.Conjunction ?: return false
         if (form.rows.any { row ->
-                row.size > 2 || (row.isIntegerOnly && row.constants is IntegerConstants && row.size == 2 &&
-                    row.coeff(0) != Long.MIN_VALUE && row.coeff(0) != -row.coeff(1))
-            }) return false
+                row.size > 2 || (
+                    row.isIntegerOnly && row.constants is IntegerConstants && row.size == 2 &&
+                    row.coeff(0) != Long.MIN_VALUE && row.coeff(0) != -row.coeff(1)
+                )
+            }
+        ) {
+                return false
+            }
         return hasCompleteDifferenceCoverage(arrayOf(factor))
     }
 }

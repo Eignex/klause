@@ -74,10 +74,13 @@ internal fun PropagationState.atomLevelForConflict(atomId: Int): Int {
             // already-dead value. A bound exclusion takes the first crossing's level.
             when {
                 holeHistHas(v, k) -> holeLevelFor(v, k)
+
                 k < d.min -> boundEstablishmentLevel(v, k + 1, lower = true)
                     ?: endpointLevel(v, viaMax = false)
+
                 k > d.max -> boundEstablishmentLevel(v, k - 1, lower = false)
                     ?: endpointLevel(v, viaMax = true)
+
                 else -> holeLevelFor(v, k)
             }
         }

@@ -19,9 +19,14 @@ class MddInvariantTest {
     @Test
     fun `a path cost aliased to a repeated symbol should stay exact through stepped edits`() {
         val factor = Mdd(
-            intArrayOf(0, 0), intArrayOf(1, 2, 1), intArrayOf(0, 8, 16),
+            intArrayOf(0, 0),
+            intArrayOf(1, 2, 1),
+            intArrayOf(0, 8, 16),
             longArrayOf(0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0),
-            0, intArrayOf(0), 4, 0,
+            0,
+            intArrayOf(0),
+            4,
+            0,
         )
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(factor))
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
@@ -45,9 +50,14 @@ class MddInvariantTest {
             starts[layer] = records.size
             for (from in 0 until if (layer == 0) 1 else 2) {
                 for (symbol in 0..1) {
-                    records.addAll(listOf(
-                        from.toLong(), symbol.toLong(), (from xor symbol).toLong(), 2L + from + symbol,
-                    ))
+                    records.addAll(
+                        listOf(
+                        from.toLong(),
+                        symbol.toLong(),
+                        (from xor symbol).toLong(),
+                        2L + from + symbol,
+                    )
+                    )
                 }
             }
         }
@@ -81,10 +91,12 @@ class MddInvariantTest {
 
         val random = Random(29)
         repeat(40) {
-            val move = Move.Compound(listOf(
+            val move = Move.Compound(
+                listOf(
                 Move.IntSet(random.nextInt(3), random.nextLong(3)),
                 Move.IntSet(3, random.nextLong(21)),
-            ))
+            )
+            )
             val before = state.assignment.snapshot()
             val cost = state.cost
             val predicted = state.netDelta(move)

@@ -169,11 +169,11 @@ internal class SmtLibAffineRealTables(cancellation: ExecutionControl, entryLimit
         var input = -1
         for (entry in entries) {
             for (literal in entry.cube) {
-            work.spend()
-            val variable = Lit.variable(literal)
-            if (input >= 0 && input != variable) return false
-            input = variable
-        }
+                work.spend()
+                val variable = Lit.variable(literal)
+                if (input >= 0 && input != variable) return false
+                input = variable
+            }
         }
         return true
     }
@@ -182,16 +182,16 @@ internal class SmtLibAffineRealTables(cancellation: ExecutionControl, entryLimit
         val support = HashSet<Int>()
         for (entry in entries) {
             for (literal in entry.cube) {
-            work.spend()
-            support.add(Lit.variable(literal))
-            if (support.size > MAX_INPUTS) return null
-        }
+                work.spend()
+                support.add(Lit.variable(literal))
+                if (support.size > MAX_INPUTS) return null
+            }
         }
         if (channels != null) {
             for (input in support) {
-            work.spend()
-            if (input !in channels) return null
-        }
+                work.spend()
+                if (input !in channels) return null
+            }
         }
         work.spend(support.size.toLong() * (MAX_INPUTS + 2L) + 1L)
         val inputs = support.sorted().toIntArray()
@@ -259,7 +259,9 @@ internal class SmtLibAffineRealTables(cancellation: ExecutionControl, entryLimit
         work.spend(8L * coefficients.size + 1L)
         return ExactLinear.of(
             intArrayOf(Term.ofRealVar(table.variable)) + channels.map { Term.ofRealVar(it.variable) }.toIntArray(),
-            coefficients.map { BigFraction.of(it, BIG_ONE) }, LinearOp.EQ, BigFraction.of(rhs, BIG_ONE),
+            coefficients.map { BigFraction.of(it, BIG_ONE) },
+            LinearOp.EQ,
+            BigFraction.of(rhs, BIG_ONE),
         )
     }
 

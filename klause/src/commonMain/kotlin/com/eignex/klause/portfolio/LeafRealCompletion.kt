@@ -37,7 +37,9 @@ internal class LeafRealCompletion(
     private val toleranceCheck: ((Sample) -> Boolean)?,
     private val context: LpSolveContext = if (!toleranceCheck.permitsToleranceOptimum()) {
         LpSolveContext.Production.copy(sparsePointRecovery = true)
-    } else LpSolveContext.Production,
+    } else {
+        LpSolveContext.Production
+    },
 ) : CandidateCompletion {
     constructor(problem: Problem, objective: LinearObjective?) : this(problem, objective, null)
 
@@ -58,29 +60,39 @@ internal class LeafRealCompletion(
                         val sample = candidate.copy(reals = coordinates, exactReals = result.reals)
                         if (verifyRealCoordinates(problem, sample) is Verification.Accepted) {
                             Completion.Witness(sample, work)
-                        } else Completion.Undecided(work)
+                        } else {
+                            Completion.Undecided(work)
+                        }
                     }
+
                     AbsRealCompletion.Result.Refuted -> Completion.Refuted(
                         problem.factors.indices.filter { factor ->
                             problem.factors[factor].variables.reals.isNotEmpty()
                         }.toIntArray(),
                         work,
                     )
+
                     AbsRealCompletion.Result.Undecided -> Completion.Undecided(work)
                 }
             }
         }
         val encoded = encoding.modelFor(candidate, cancellation) ?: return Completion.Undecided(movesFor(0.0))
         val sink = LpStatsSink(LpRoute.STANDALONE)
-        val check = if (observeFloat == null) toleranceCheck else FiniteSourceAcceptance(
+        val check = if (observeFloat == null) {
+            toleranceCheck
+        } else {
+            FiniteSourceAcceptance(
             { sample ->
                 observeFloat?.invoke(sample)
                 toleranceCheck?.invoke(sample) == true
             },
             toleranceCheck.permitsToleranceOptimum(),
         )
-        val real = leafRealFeasibility(problem, objective, candidate, cancellation, sink = sink,
-            context = context, toleranceCheck = check, encoders = encoders, sourceEncoding = encoded)
+        }
+        val real = leafRealFeasibility(
+            problem, objective, candidate, cancellation, sink = sink,
+            context = context, toleranceCheck = check, encoders = encoders, sourceEncoding = encoded,
+        )
         val stats = sink.snapshot()
         val pointWork = stats.phases["EXACT_POINT_RECOVERY_STANDALONE"]?.work?.toDouble() ?: 0.0
         val work = movesFor(stats.standaloneWorkOps.sum + stats.componentWorkOps.sum + pointWork)
@@ -94,7 +106,9 @@ internal class LeafRealCompletion(
                 val completed = candidate.copy(reals = real.reals, exactReals = null)
                 if (toleranceCheck?.invoke(completed) == true && !cancellation()) {
                     Completion.Witness(completed, work)
-                } else Completion.Undecided(work)
+                } else {
+                    Completion.Undecided(work)
+                }
             }
 
             // The rows the proof combines are what the candidate's discrete part cannot satisfy together.

@@ -43,9 +43,16 @@ internal class LpQueryObservation(
         if (cancellation() || current.m > maxRetainedRows) return null
         val state = current.exactState ?: return null
         if (state.model.m > maxRetainedRows) return null
-        val settings = LpReplaySettings(label, pricing.tieSeed, LpReplaySolverKind.PERSISTENT,
-            componentSplit = componentSplit, pivotLimit = iterationLimit, workLimit = workLimit,
-            refactorUpdateLimit = refactorUpdateLimit, trackDegeneracy = trackDegeneracy)
+        val settings = LpReplaySettings(
+            label,
+            pricing.tieSeed,
+            LpReplaySolverKind.PERSISTENT,
+            componentSplit = componentSplit,
+            pivotLimit = iterationLimit,
+            workLimit = workLimit,
+            refactorUpdateLimit = refactorUpdateLimit,
+            trackDegeneracy = trackDegeneracy,
+        )
         return LpExactCapture.capture(state, settings, emptyList(), maxRetainedRows)
             .encodeWithin(valueLimit, byteLimit, cancellation)
     }

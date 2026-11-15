@@ -14,10 +14,20 @@ internal class OpenLinearPortfolioSearch(val native: LinearPortfolioSearch) : Re
     ): MinimizeResult? = native.runSlice(global, sliceMillis, sliceNodes, onIncumbent)?.let { result ->
         // Captured source objectives can differ from the IR telemetry; only typed terminals can finish this arm.
         when (result) {
-            is MinimizeResult.WithSample -> MinimizeResult.BestFound(result.sample, result.objective,
-                incompleteReason(result), result.stats, result.evidence)
-            is MinimizeResult.Infeasible -> MinimizeResult.Unknown(TerminationReason.Unsupported,
-                result.stats, result.evidence)
+            is MinimizeResult.WithSample -> MinimizeResult.BestFound(
+                result.sample,
+                result.objective,
+                incompleteReason(result),
+                result.stats,
+                result.evidence,
+            )
+
+            is MinimizeResult.Infeasible -> MinimizeResult.Unknown(
+                TerminationReason.Unsupported,
+                result.stats,
+                result.evidence,
+            )
+
             is MinimizeResult.Unknown -> result.copy(reason = incompleteReason(result))
         }
     }

@@ -24,7 +24,8 @@ internal class PortfolioEvidence(
     private var invocation: EngineInvocation? = null
 
     fun bindInvocation(
-        binding: EngineInvocation, cancellation: ExecutionControl = ExecutionControl.Never,
+        binding: EngineInvocation,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): PortfolioEvidence = also {
         require(model.matches(binding.model)) { "runtime invocation differs from the portfolio model" }
         require(invocation?.matches(binding) != false) { "portfolio cannot change its runtime invocation" }
@@ -37,7 +38,8 @@ internal class PortfolioEvidence(
     }
 
     fun bindSourceScope(
-        scope: SourceScope, cancellation: ExecutionControl = ExecutionControl.Never,
+        scope: SourceScope,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): PortfolioEvidence = also {
         require(sourceScope == null || sourceScope == scope) { "portfolio cannot change its source invocation" }
         require(invocation == null || invocation?.scope == scope) { "portfolio has another runtime capture scope" }
@@ -113,7 +115,9 @@ internal class PortfolioEvidence(
             EvidenceKind.Infeasible -> ModelEvidence.Infeasible(identity, certificate)
 
             EvidenceKind.Unbounded -> ModelEvidence.Unbounded(
-                identity, Candidate(checkNotNull(sample), value), certificate,
+                identity,
+                Candidate(checkNotNull(sample), value),
+                certificate,
             )
 
             EvidenceKind.Witness -> error("a witness is checked separately")

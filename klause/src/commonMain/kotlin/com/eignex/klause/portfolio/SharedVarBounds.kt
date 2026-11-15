@@ -48,8 +48,13 @@ internal class SharedVarBounds(
     }
 
     fun publish(publication: CompletedEnginePublication.IntegerWindow, origin: Int = NO_ORIGIN) = publish(
-        publication.coordinate, publication.lower, publication.upper, origin,
-        publication.model, EvidenceCertificate.published(publication))
+        publication.coordinate,
+        publication.lower,
+        publication.upper,
+        origin,
+        publication.model,
+        EvidenceCertificate.published(publication),
+    )
 
     // The arm that published each side's tightest bound; [NO_ORIGIN] while none did, or when it named none.
     private val loOrigin = IntArray(numIntVars) { NO_ORIGIN }
@@ -72,8 +77,11 @@ internal class SharedVarBounds(
             if (expected != null) {
                 if (model == null) return@withLock
                 val verifier = ModelEvidenceVerifier<Unit, Pair<Long, Long>>(expected, CandidateVerifier.trusting())
-                val verified = verifier.verify(ModelEvidence.IntegerWindow(model, varId, lower, upper, certificate),
-                    invocation?.scope, invocation)
+                val verified = verifier.verify(
+                    ModelEvidence.IntegerWindow(model, varId, lower, upper, certificate),
+                    invocation?.scope,
+                    invocation,
+                )
                 if (verified !is Verification.Accepted) return@withLock
             }
             if (lower > lo[varId]) {

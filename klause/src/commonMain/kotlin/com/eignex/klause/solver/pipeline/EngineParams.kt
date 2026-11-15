@@ -193,7 +193,10 @@ private val BACKTRACK_SELECTOR_KEYS = setOf("var-selector", "val-selector")
 fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackParams) -> BacktrackParams)? =
     backtrackOverride(p.reader(), allowSelectors)
 
-internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean): ((BacktrackParams) -> BacktrackParams)? {
+internal fun backtrackOverride(
+    p: ExecutionOptionReader,
+    allowSelectors: Boolean,
+): ((BacktrackParams) -> BacktrackParams)? {
     val maxDecisions = p[ExecutionOption.maxDecisions]
     val luby = p[ExecutionOption.luby]
     val adaptiveRestart = p[ExecutionOption.adaptiveRestart]
@@ -355,8 +358,7 @@ internal fun applyFixedBacktrackParams(
     base: BacktrackParams,
     p: EngineParams,
     allowSelectors: Boolean,
-): BacktrackParams =
-    applyFixedBacktrackParams(base, p.reader(), allowSelectors)
+): BacktrackParams = applyFixedBacktrackParams(base, p.reader(), allowSelectors)
 
 internal fun applyFixedBacktrackParams(
     base: BacktrackParams,
@@ -515,8 +517,7 @@ private fun applyEdits(
  * `-e ls` with no overrides keeps the curated pool unchanged (a null pool). `dry-run-solver=on` lists
  * the resolved arms instead of solving.
  */
-fun resolveLocalSearchRecipes(p: EngineParams): LsResolution =
-    resolveLocalSearchRecipes(p.reader())
+fun resolveLocalSearchRecipes(p: EngineParams): LsResolution = resolveLocalSearchRecipes(p.reader())
 
 internal fun resolveLocalSearchRecipes(p: ExecutionOptionReader): LsResolution {
     val guidance = p[ExecutionOption.objectiveGuidance]?.split(',')?.map { raw ->
@@ -723,10 +724,18 @@ internal fun buildPortfolioScenario(
     val rootMaintenance = p[ExecutionOption.rootMaintenance] ?: true
     val sharingMemory = p[ExecutionOption.sharingMemory] ?: false
     val sharingMemoryBytes = p[ExecutionOption.sharingMemoryBytes]
-    if (sharingMemoryBytes != null && sharingMemoryBytes < 0L) pipelineConfigError("sharing memory bytes must be nonnegative")
+    if (sharingMemoryBytes != null && sharingMemoryBytes < 0L) {
+        pipelineConfigError(
+        "sharing memory bytes must be nonnegative",
+    )
+    }
     val sharingMemoryWork = p[ExecutionOption.sharingMemoryWork] ?: 32_768L
     val sharingMemoryScratch = p[ExecutionOption.sharingMemoryScratch] ?: 4_096
-    if (sharingMemoryWork < 0L || sharingMemoryScratch < 0) pipelineConfigError("sharing memory limits must be nonnegative")
+    if (sharingMemoryWork < 0L || sharingMemoryScratch < 0) {
+        pipelineConfigError(
+        "sharing memory limits must be nonnegative",
+    )
+    }
     val earlyCoreAdmission = p[ExecutionOption.coreEarly] ?: false
     val companionIntegers = p[ExecutionOption.companionIntegers] ?: false
     val companionAfterIncumbent = p[ExecutionOption.companionAfterIncumbent] ?: false
@@ -740,11 +749,16 @@ internal fun buildPortfolioScenario(
     val phaseRetention = p[ExecutionOption.phaseRetention]
     val rewardPolicy = when (val reward = p[ExecutionOption.portfolioReward]?.lowercase()) {
         null, "ordinary" -> null
+
         "source" -> SourceProgressReward
+
         "source-rate" -> SourceRateReward()
+
         "source-rate-family" -> SourceRateReward(priceFamilies = true)
+
         else -> pipelineConfigError(
-            "portfolio-reward expects ordinary|source|source-rate|source-rate-family, got `$reward`")
+            "portfolio-reward expects ordinary|source|source-rate|source-rate-family, got `$reward`",
+        )
     }
     val reseedStaleThreshold = p[ExecutionOption.reseedStaleThreshold]
     val reportLsResiduals = p[ExecutionOption.lsResiduals] ?: false
@@ -759,7 +773,10 @@ internal fun buildPortfolioScenario(
     if (sliceGrowth != null && (!sliceGrowth.isFinite() || sliceGrowth < 1.0)) {
         pipelineConfigError("slice-growth must be finite and >= 1")
     }
-    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, slice-max-work, slice-growth, portfolio-work, root-maintenance, sharing-memory, sharing-memory-bytes, sharing-memory-work, sharing-memory-scratch, portfolio-progress, portfolio-reward, core-early, companion-integers, companion-after-incumbent, companion-active-ms, core-refinement, phase-retention, reseed-stale-threshold, ls-residuals, ls-phase-times")
+    p.finish(
+        "portfolio",
+        "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, slice-max-work, slice-growth, portfolio-work, root-maintenance, sharing-memory, sharing-memory-bytes, sharing-memory-work, sharing-memory-scratch, portfolio-progress, portfolio-reward, core-early, companion-integers, companion-after-incumbent, companion-active-ms, core-refinement, phase-retention, reseed-stale-threshold, ls-residuals, ls-phase-times",
+    )
     if (armsParam != null && (ls != null || bt != null)) {
         pipelineConfigError("portfolio: set either `arms=N` or `ls=/bt=`, not both")
     }
@@ -778,7 +795,9 @@ internal fun buildPortfolioScenario(
     }
     require(arms >= 1) { "portfolio needs arms ≥ 1 (got $arms)" }
     if (earlyCoreAdmission && (cores != 1 || kind != Kind.COP || engine != EngineMix.MIXED || btPool != null)) {
-        pipelineConfigError("core-early requires a mixed optimization pool with automatic backtrack workers on one core")
+        pipelineConfigError(
+            "core-early requires a mixed optimization pool with automatic backtrack workers on one core",
+        )
     }
     var scenario = PortfolioScenario(
         cores = cores,
@@ -845,8 +864,7 @@ class BtResolution(
  * A pinned pool is the *set* of arms; the worker *count* still comes from `arms=`/`bt=`/the default and wraps
  * over it, exactly as `lsPool` does.
  */
-fun resolveBtRecipes(p: EngineParams, kind: Kind): BtResolution =
-    resolveBtRecipes(p.reader(), kind)
+fun resolveBtRecipes(p: EngineParams, kind: Kind): BtResolution = resolveBtRecipes(p.reader(), kind)
 
 internal fun resolveBtRecipes(p: ExecutionOptionReader, kind: Kind): BtResolution {
     val btArm = p[ExecutionOption.backtrackArmsByLabel]

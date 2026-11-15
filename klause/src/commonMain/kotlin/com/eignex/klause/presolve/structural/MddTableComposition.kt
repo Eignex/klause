@@ -15,7 +15,9 @@ internal object MddTableComposition {
     ): ExtensionalIntersection? {
         if (mdd.seq.size > ExtensionalComposition.MAX_SCOPE || mdd.seq.toSet().size != mdd.seq.size ||
             mdd.transitions.size / mdd.recordStride > limits.records
-        ) return null
+        ) {
+            return null
+        }
         val columns = IntArray(mdd.seq.size) { table.xs.indexOf(mdd.seq[it]) }
         if (columns.count { it >= 0 } < 2) return null
         var stateCount = 0L
@@ -30,12 +32,17 @@ internal object MddTableComposition {
             val end = mdd.layerStarts[layer + 1]
             if (start < 0 || start > end || end > mdd.transitions.size ||
                 start % mdd.recordStride != 0 || end % mdd.recordStride != 0
-            ) return null
+            ) {
+                return null
+            }
         }
         // Index construction is atomic after the bounded input has been charged and polled.
         repeat(mdd.transitions.size / mdd.recordStride) { if (!visit()) return null }
         val index = MddTransitionIndex.build(
-            mdd.transitions, mdd.layerStarts, mdd.numStatesPerLayer, mdd.recordStride,
+            mdd.transitions,
+            mdd.layerStarts,
+            mdd.numStatesPerLayer,
+            mdd.recordStride,
         )
         val suffix = Array(mdd.seq.size + 1) { BooleanArray(mdd.numStatesPerLayer[it]) }
         for (state in mdd.accepting) {
@@ -73,7 +80,9 @@ internal object MddTableComposition {
                 val value = table.tuples[row * table.arity + column]
                 var next = nodes[node].getOrDefault(value, -1)
                 if (next < 0) {
-                    next = if (depth == selected.lastIndex) 0 else {
+                    next = if (depth == selected.lastIndex) {
+                        0
+                    } else {
                         if (nodes.size >= maxStates) return null
                         nodes.size.also { nodes.add(MutableLongIntMap()) }
                     }
@@ -191,8 +200,14 @@ internal object MddTableComposition {
         }
         offsets[mdd.seq.size] = kept.size
         return Mdd(
-            mdd.seq, counts, offsets, kept.toLongArray(), 0, IntArray(counts.last()) { it },
-            mdd.recordStride, mdd.cost,
+            mdd.seq,
+            counts,
+            offsets,
+            kept.toLongArray(),
+            0,
+            IntArray(counts.last()) { it },
+            mdd.recordStride,
+            mdd.cost,
         )
     }
 

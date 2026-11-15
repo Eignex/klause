@@ -15,8 +15,12 @@ internal class JointRepairCenter(
     private val stop: ExecutionControl,
     private val eligible: (Int) -> Boolean,
 ) {
-    class Step(val condition: ExactNeighborhoodCondition, val coordinate: Int,
-        val before: BigFraction, val after: BigFraction)
+    class Step(
+        val condition: ExactNeighborhoodCondition,
+        val coordinate: Int,
+        val before: BigFraction,
+        val after: BigFraction,
+    )
 
     private fun pay(work: Long, bytes: Long = 0L): Boolean {
         val funding = budget.funding ?: return false
@@ -27,8 +31,11 @@ internal class JointRepairCenter(
         return !stop() && !funding.exhausted
     }
 
-    fun suggest(assumptions: Set<SourceDerivation.Assumption>, captured: ExactNeighborhoodCondition,
-        original: ExactNeighborhoodCondition): Step? {
+    fun suggest(
+        assumptions: Set<SourceDerivation.Assumption>,
+        captured: ExactNeighborhoodCondition,
+        original: ExactNeighborhoodCondition,
+    ): Step? {
         if (captured.cutoff != null) return null
         var visited = 0
         for (assumption in assumptions) {
@@ -38,8 +45,8 @@ internal class JointRepairCenter(
             if (coordinate.kind != SourceCoordinate.Kind.Integer || id !in 0 until model.numIntVars ||
                 !eligible(id)
             ) {
-                    continue
-                }
+                continue
+            }
             val before = captured.lower[id] ?: continue
             if (captured.upper[id] != before || before.den != BIG_ONE) continue
             val bits = before.num.magnitudeBitLength().toLong() + before.den.magnitudeBitLength()
@@ -61,13 +68,18 @@ internal class JointRepairCenter(
             (!bounds.hasUpper(id) || value <= BigFraction.ofLong(bounds.upper(id)))
     }
 
-    fun apply(step: Step, centers: MutableList<BigFraction>, bools: BooleanArray,
-        condition: ExactNeighborhoodCondition, cancellation: ExecutionControl): Boolean {
+    fun apply(
+        step: Step,
+        centers: MutableList<BigFraction>,
+        bools: BooleanArray,
+        condition: ExactNeighborhoodCondition,
+        cancellation: ExecutionControl,
+    ): Boolean {
         if (step.condition !== condition || condition.cutoff != null || cancellation() ||
             step.coordinate !in 0 until model.numIntVars || !eligible(step.coordinate)
         ) {
-                return false
-            }
+            return false
+        }
         val entries = condition.bools.size.toLong() + condition.lower.size + condition.upper.size
         if (entries > MAX_ENTRIES || !pay(1L + entries, 64L)) return false
         for ((id, value) in condition.bools) {
@@ -75,17 +87,17 @@ internal class JointRepairCenter(
         }
         for (bounds in listOf(condition.lower, condition.upper)) {
             for ((id, value) in bounds) {
-            if (id !in 0 until model.numIntVars || id !in centers.indices) return false
-            val bits = value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength()
-            if (bits > MAX_SCALAR_BITS || !pay(1L + bits * bits / 64L) || cancellation()) return false
-            if (centers[id] != value || condition.lower[id] != condition.upper[id]) return false
-        }
+                if (id !in 0 until model.numIntVars || id !in centers.indices) return false
+                val bits = value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength()
+                if (bits > MAX_SCALAR_BITS || !pay(1L + bits * bits / 64L) || cancellation()) return false
+                if (centers[id] != value || condition.lower[id] != condition.upper[id]) return false
+            }
         }
         if (step.coordinate !in centers.indices || centers[step.coordinate] != step.before ||
             !pay(1L, 64L) || cancellation() || !legal(step.coordinate, step.after)
         ) {
-                return false
-            }
+            return false
+        }
         centers[step.coordinate] = step.after
         return true
     }

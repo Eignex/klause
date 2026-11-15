@@ -43,15 +43,29 @@ class SourceStrategyEngineTest(private val engine: FiniteEngine) {
 
     @Test
     fun `explicit source optimization should retain an open integer lower bound`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(-3, 3)),
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(-3, 3)),
             arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 42)),
-            openIntLo = booleanArrayOf(true), openIntHi = booleanArrayOf(true))
-        val options = ExecutionOptions.parse(listOf(
-            "seed=17", "node-limit=100", "nia-candidates=32", "nia-moves=1", "max-flips=1", "alns-iterations=1",
-        ))
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
+        val options = ExecutionOptions.parse(
+            listOf(
+            "seed=17",
+            "node-limit=100",
+            "nia-candidates=32",
+            "nia-moves=1",
+            "max-flips=1",
+            "alns-iterations=1",
+        )
+        )
 
         val execution = BacktrackSolver.source(source).optimize(
-            LinearObjective(intCoefficients = longArrayOf(1)), engine, options,
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            engine,
+            options,
         )
 
         val result = assertIs<QuadraticOptimizationResult.WithIncumbent>(execution.result)
@@ -66,7 +80,9 @@ class SourceStrategyEngineTest(private val engine: FiniteEngine) {
 
         assertFailsWith<PipelineConfigException> {
             BacktrackSolver.source(source).solve(
-                engine, ExecutionOptions(ExecutionOption.nodeLimit(2)), nodeBudget = budget,
+                engine,
+                ExecutionOptions(ExecutionOption.nodeLimit(2)),
+                nodeBudget = budget,
             )
         }
         assertEquals(0L, budget.spent)

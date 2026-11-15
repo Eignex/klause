@@ -40,8 +40,12 @@ class PolynomialEquationalProjectionTest {
         val second = arithmetic.subtract(y, arithmetic.power(z, 2))
         val boundary = arithmetic.subtract(arithmetic.power(z, 2), Polynomial.constant(BigFraction.ofLong(2)))
 
-        val projection = PolynomialProjection.compute(listOf(first, second, boundary), 3,
-            arithmetic, listOf(first, second))
+        val projection = PolynomialProjection.compute(
+            listOf(first, second, boundary),
+            3,
+            arithmetic,
+            listOf(first, second),
+        )
 
         assertEquals(listOf(2, 1, 0), (0..2).map(projection::variable))
         assertEquals(arithmetic.power(y, 2), projection.section(2))
@@ -54,8 +58,12 @@ class PolynomialEquationalProjectionTest {
         val first = arithmetic.subtract(x, y)
         val second = arithmetic.subtract(first, Polynomial.ONE)
 
-        val projection = PolynomialProjection.compute(listOf(first, second), 2,
-            arithmetic, listOf(first, second))
+        val projection = PolynomialProjection.compute(
+            listOf(first, second),
+            2,
+            arithmetic,
+            listOf(first, second),
+        )
 
         assertTrue(projection.inconsistentEquations)
         assertEquals(1, projection.equationalSections)
@@ -82,15 +90,19 @@ class PolynomialEquationalProjectionTest {
 
     @Test
     fun `nonlinear coordinate equations retain ordinary root change boundaries`() {
-        val equation = arithmetic.subtract(arithmetic.add(arithmetic.power(x, 2), arithmetic.power(y, 2)),
-            Polynomial.ONE)
+        val equation = arithmetic.subtract(
+            arithmetic.add(arithmetic.power(x, 2), arithmetic.power(y, 2)),
+            Polynomial.ONE,
+        )
 
         val projection = PolynomialProjection.compute(listOf(equation), 2, arithmetic, listOf(equation))
 
         assertEquals(0, projection.equationalSections)
-        assertTrue(projection.polynomials(0).any {
+        assertTrue(
+            projection.polynomials(0).any {
             arithmetic.substitute(it, 0, Polynomial.ONE).isZero
-        })
+        }
+        )
     }
 
     @Test

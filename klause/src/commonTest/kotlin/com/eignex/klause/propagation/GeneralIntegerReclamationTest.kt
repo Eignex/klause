@@ -18,10 +18,28 @@ import kotlin.test.assertTrue
 class GeneralIntegerReclamationTest {
     @Test
     fun `an empty integer cache should release event ownership beside a growing permanent floor`() {
-        val session = PropagationSession(Problem(6, 1, arrayOf(IntDomain(0, 10)),
-            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10))), nativeSat = false)
-        val row = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
-            longArrayOf(1), intArrayOf(0), LinearOp.LE, 10), useLo = true))
+        val session = PropagationSession(
+            Problem(
+            6,
+            1,
+            arrayOf(IntDomain(0, 10)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10)),
+        ),
+            nativeSat = false
+        )
+        val row = assertNotNull(
+            IntegerConflictRow.source(
+                LinearPropagator(
+            intArrayOf(),
+            intArrayOf(0),
+            longArrayOf(1),
+            intArrayOf(0),
+            LinearOp.LE,
+            10,
+        ),
+            useLo = true
+            )
+        )
         repeat(64) { session.addLearnedIntegerRow(row, 9) }
         session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false }
         assertEquals(0, session.activeLearnedClauseCount)
@@ -41,8 +59,19 @@ class GeneralIntegerReclamationTest {
         assertEquals(generation, session.learnedRetirementGeneration)
         session.pinBool(4, false)
         assertEquals(true, session.boolValue(5))
-        val next = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
-            longArrayOf(1), intArrayOf(0), LinearOp.LE, 8), useLo = true))
+        val next = assertNotNull(
+            IntegerConflictRow.source(
+                LinearPropagator(
+            intArrayOf(),
+            intArrayOf(0),
+            longArrayOf(1),
+            intArrayOf(0),
+            LinearOp.LE,
+            8,
+        ),
+            useLo = true
+            )
+        )
         session.addLearnedIntegerRow(next, 2)
         assertNotNull(state.intEvents.overflow)
         assertEquals(IntDomain(0, 8), session.intDomain(0))
@@ -52,11 +81,29 @@ class GeneralIntegerReclamationTest {
     fun `cancellation after funding should preserve an empty integer event owner until retry`() {
         var limit = Long.MAX_VALUE
         lateinit var session: PropagationSession
-        session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 10)),
-            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10))), nativeSat = false,
-            cancellation = ExecutionControl { limit != Long.MAX_VALUE && session.work >= limit })
-        val row = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
-            longArrayOf(1), intArrayOf(0), LinearOp.LE, 10), useLo = true))
+        session = PropagationSession(
+            Problem(
+                0,
+                1,
+                arrayOf(IntDomain(0, 10)),
+                arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10)),
+            ),
+            nativeSat = false,
+            cancellation = ExecutionControl { limit != Long.MAX_VALUE && session.work >= limit },
+        )
+        val row = assertNotNull(
+            IntegerConflictRow.source(
+                LinearPropagator(
+            intArrayOf(),
+            intArrayOf(0),
+            longArrayOf(1),
+            intArrayOf(0),
+            LinearOp.LE,
+            10,
+        ),
+            useLo = true
+            )
+        )
         session.addLearnedIntegerRow(row, 9)
         session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false }
         assertEquals(0, session.activeLearnedClauseCount)
@@ -74,10 +121,28 @@ class GeneralIntegerReclamationTest {
 
     @Test
     fun `a surviving integer cache should release spare reference slots within its own grant`() {
-        val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 10)),
-            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10))), nativeSat = false)
-        val row = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
-            longArrayOf(1), intArrayOf(0), LinearOp.LE, 10), useLo = true))
+        val session = PropagationSession(
+            Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 10)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10)),
+        ),
+            nativeSat = false
+        )
+        val row = assertNotNull(
+            IntegerConflictRow.source(
+                LinearPropagator(
+            intArrayOf(),
+            intArrayOf(0),
+            longArrayOf(1),
+            intArrayOf(0),
+            LinearOp.LE,
+            10,
+        ),
+            useLo = true
+            )
+        )
         repeat(64) { session.addLearnedIntegerRow(row, 9) }
         session.maintainCapWindow(1, 65_536L, 1_048_576L, { false }) { it == 0 }
         val rows = assertNotNull(session.explanationState.learned.integerRows)
@@ -97,10 +162,28 @@ class GeneralIntegerReclamationTest {
 
     @Test
     fun `nonempty integer event cleanup should release retired entries beside a permanent floor`() {
-        val session = PropagationSession(Problem(6, 66, Array(66) { IntDomain(0, 10) },
-            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10))), nativeSat = false)
-        val live = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 1),
-            longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 8), useLo = true))
+        val session = PropagationSession(
+            Problem(
+            6,
+            66,
+            Array(66) { IntDomain(0, 10) },
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10)),
+        ),
+            nativeSat = false
+        )
+        val live = assertNotNull(
+            IntegerConflictRow.source(
+                LinearPropagator(
+            intArrayOf(),
+            intArrayOf(0, 1),
+            longArrayOf(1, 1),
+            intArrayOf(0, 1),
+            LinearOp.LE,
+            8,
+        ),
+            useLo = true
+            )
+        )
         session.addLearnedIntegerRow(live, 2)
         val state = session.explanationState
         val events = assertNotNull(state.intEvents.overflow)
@@ -108,8 +191,19 @@ class GeneralIntegerReclamationTest {
         val references = events.referenceCapacity
         val reason = state.intMaxReason[0]
         repeat(64) { variable ->
-            val row = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(variable + 2),
-                longArrayOf(1), intArrayOf(variable + 2), LinearOp.LE, 10), useLo = true))
+            val row = assertNotNull(
+                IntegerConflictRow.source(
+                    LinearPropagator(
+                intArrayOf(),
+                intArrayOf(variable + 2),
+                longArrayOf(1),
+                intArrayOf(variable + 2),
+                LinearOp.LE,
+                10,
+            ),
+                useLo = true
+                )
+            )
             session.addLearnedIntegerRow(row, 9)
         }
         repeat(8) { session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false } }
@@ -134,10 +228,28 @@ class GeneralIntegerReclamationTest {
 
     @Test
     fun `growing integer retirements should release event ownership at an unchanged root`() {
-        val session = PropagationSession(Problem(6, 66, Array(66) { IntDomain(0, 10) },
-            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10))), nativeSat = false)
-        val live = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 1),
-            longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 8), useLo = true))
+        val session = PropagationSession(
+            Problem(
+            6,
+            66,
+            Array(66) { IntDomain(0, 10) },
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10)),
+        ),
+            nativeSat = false
+        )
+        val live = assertNotNull(
+            IntegerConflictRow.source(
+                LinearPropagator(
+            intArrayOf(),
+            intArrayOf(0, 1),
+            longArrayOf(1, 1),
+            intArrayOf(0, 1),
+            LinearOp.LE,
+            8,
+        ),
+            useLo = true
+            )
+        )
         session.addLearnedIntegerRow(live, 2)
         val state = session.explanationState
         val events = assertNotNull(state.intEvents.overflow)
@@ -147,14 +259,27 @@ class GeneralIntegerReclamationTest {
         repeat(20_000) { session.addLearnedClause(floor, 2, permanent = true) }
         val generation = session.learnedRetirementGeneration
         val maintenance = LearnedMemoryMaintenance()
-        val params = BacktrackParams(learnedMemoryBytes = 0L,
-            learnedMemoryWork = 32_768L, learnedMemoryScratchBytes = 4096L)
+        val params = BacktrackParams(
+            learnedMemoryBytes = 0L,
+            learnedMemoryWork = 32_768L,
+            learnedMemoryScratchBytes = 4096L,
+        )
 
         repeat(3) {
             repeat(64) { variable ->
-                val row = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(),
-                    intArrayOf(variable + 2), longArrayOf(1), intArrayOf(variable + 2), LinearOp.LE, 10),
-                    useLo = true))
+                val row = assertNotNull(
+                    IntegerConflictRow.source(
+                    LinearPropagator(
+                        intArrayOf(),
+                        intArrayOf(variable + 2),
+                        longArrayOf(1),
+                        intArrayOf(variable + 2),
+                        LinearOp.LE,
+                        10,
+                    ),
+                    useLo = true,
+                )
+                )
                 session.addLearnedIntegerRow(row, 9)
             }
             repeat(8) { session.maintainCapWindow(0, 32_768L, 4096L, { false }) { false } }
@@ -177,14 +302,54 @@ class GeneralIntegerReclamationTest {
 
     @Test
     fun `small scratch retirement should preserve current and historical integer reasons`() {
-        val session = PropagationSession(Problem(6, 2, Array(2) { IntDomain(0, 10) },
-            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10))), nativeSat = false)
-        val first = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
-            longArrayOf(1), intArrayOf(0), LinearOp.LE, 8), useLo = true))
-        val second = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
-            longArrayOf(1), intArrayOf(0), LinearOp.LE, 6), useLo = true))
-        val unused = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(1),
-            longArrayOf(1), intArrayOf(1), LinearOp.LE, 10), useLo = true))
+        val session = PropagationSession(
+            Problem(
+            6,
+            2,
+            Array(2) { IntDomain(0, 10) },
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10)),
+        ),
+            nativeSat = false
+        )
+        val first = assertNotNull(
+            IntegerConflictRow.source(
+                LinearPropagator(
+            intArrayOf(),
+            intArrayOf(0),
+            longArrayOf(1),
+            intArrayOf(0),
+            LinearOp.LE,
+            8,
+        ),
+            useLo = true
+            )
+        )
+        val second = assertNotNull(
+            IntegerConflictRow.source(
+                LinearPropagator(
+            intArrayOf(),
+            intArrayOf(0),
+            longArrayOf(1),
+            intArrayOf(0),
+            LinearOp.LE,
+            6,
+        ),
+            useLo = true
+            )
+        )
+        val unused = assertNotNull(
+            IntegerConflictRow.source(
+                LinearPropagator(
+            intArrayOf(),
+            intArrayOf(1),
+            longArrayOf(1),
+            intArrayOf(1),
+            LinearOp.LE,
+            10,
+        ),
+            useLo = true
+            )
+        )
         session.addLearnedIntegerRow(first, 9)
         session.addLearnedIntegerRow(second, 9)
         session.addLearnedIntegerRow(unused, 9)
@@ -205,15 +370,43 @@ class GeneralIntegerReclamationTest {
         assertEquals(IntDomain(0, 6), session.intDomain(0))
     }
 
-
     @Test
     fun `cancellation after funding should preserve paged integer cache capacity`() {
-        val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 10)),
-            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10))), nativeSat = false)
-        val live = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
-            longArrayOf(1), intArrayOf(0), LinearOp.LE, 8), useLo = true))
-        val unused = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
-            longArrayOf(1), intArrayOf(0), LinearOp.LE, 10), useLo = true))
+        val session = PropagationSession(
+            Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 10)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10)),
+        ),
+            nativeSat = false
+        )
+        val live = assertNotNull(
+            IntegerConflictRow.source(
+                LinearPropagator(
+            intArrayOf(),
+            intArrayOf(0),
+            longArrayOf(1),
+            intArrayOf(0),
+            LinearOp.LE,
+            8,
+        ),
+            useLo = true
+            )
+        )
+        val unused = assertNotNull(
+            IntegerConflictRow.source(
+                LinearPropagator(
+            intArrayOf(),
+            intArrayOf(0),
+            longArrayOf(1),
+            intArrayOf(0),
+            LinearOp.LE,
+            10,
+        ),
+            useLo = true
+            )
+        )
         session.addLearnedIntegerRow(live, 2)
         repeat(255) { session.addLearnedIntegerRow(unused, 9) }
         session.maintainCapWindow(1, 65_536L, 1_048_576L, { false }) { it == 0 }
@@ -230,5 +423,4 @@ class GeneralIntegerReclamationTest {
         assertEquals(1, rows.capacity)
         assertEquals(IntDomain(0, 8), session.intDomain(0))
     }
-
 }

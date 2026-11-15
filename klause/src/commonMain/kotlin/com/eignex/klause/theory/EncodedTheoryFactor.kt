@@ -28,7 +28,10 @@ internal class EncodedTheoryFactor private constructor(
     override val variables: VarList,
 ) : Factor by source {
     constructor(source: Factor, linearForm: LinearForm, attribution: EncodingAttribution) : this(
-        source, linearForm, attribution, MixedVars(
+        source,
+        linearForm,
+        attribution,
+        MixedVars(
             boundInts = (source.intVars.toList() + attribution.integers.map { it.index }).distinct().toIntArray(),
             boolVars = source.boolVars,
             reals = (source.variables.reals.toList() + attribution.auxiliaries.map { it.index })
@@ -53,8 +56,15 @@ internal fun PreparedFactorProjections.linearTheoryModel(
     completeFiniteConditions: Boolean = false,
 ): Problem? {
     require(target != EncodingTarget.POLYNOMIAL)
-    val request = requestEncoders(target, indices, fixedIntegers, fixedBooleans, cancellation,
-        completeFiniteConditions, onDecline) ?: return null
+    val request = requestEncoders(
+        target,
+        indices,
+        fixedIntegers,
+        fixedBooleans,
+        cancellation,
+        completeFiniteConditions,
+        onDecline,
+    ) ?: return null
     return linearTheoryModel(request, onDecline)
 }
 
@@ -75,9 +85,11 @@ internal fun PreparedFactorProjections.linearTheoryModel(
     val conditions = EncodingConditions(request.fixedIntegers, request.fixedBooleans)
     for (position in request.indices.indices) {
         val index = request.indices[position]
-        val relations = installSelectedLinearFactor(index, request.target, request.encoders[position],
+        val relations = installSelectedLinearFactor(
+            index, request.target, request.encoders[position],
             request.fixedIntegers, request.fixedBooleans, stop, allocator,
-            onDecline, request.completeFiniteConditions, conditions) ?: return null
+            onDecline, request.completeFiniteConditions, conditions,
+        ) ?: return null
         factors += relations
         repeat(relations.size) { origins += index }
     }
@@ -85,10 +97,16 @@ internal fun PreparedFactorProjections.linearTheoryModel(
         onDecline(EncoderDecline.RESOURCE)
         return null
     }
-    return EncodedTheoryModel(problem, factors.toTypedArray(),
-        problem.impliedFactorMask?.let { mask -> BooleanArray(factors.size) { local ->
-            mask[origins[local]]
-        } }, allocator.count)
+    return EncodedTheoryModel(
+        problem,
+        factors.toTypedArray(),
+        problem.impliedFactorMask?.let { mask ->
+            BooleanArray(factors.size) { local ->
+                mask[origins[local]]
+            }
+        },
+        allocator.count,
+    )
 }
 
 internal fun PreparedFactorProjections.installLinearFactor(
@@ -101,11 +119,20 @@ internal fun PreparedFactorProjections.installLinearFactor(
     onDecline: (EncoderDecline) -> Unit = {},
     completeFiniteConditions: Boolean = false,
 ): List<EncodedTheoryFactor>? {
-    val request = requestEncoders(target, listOf(index), integerPins, booleanPins, cancellation,
-        completeFiniteConditions, onDecline) ?: return null
-    return installSelectedLinearFactor(index, target, request.encoders.single(), request.fixedIntegers,
+    val request = requestEncoders(
+        target,
+        listOf(index),
+        integerPins,
+        booleanPins,
+        cancellation,
+        completeFiniteConditions,
+        onDecline,
+    ) ?: return null
+    return installSelectedLinearFactor(
+        index, target, request.encoders.single(), request.fixedIntegers,
         request.fixedBooleans, request.cancellation, allocator ?: EncodingRealAllocator(problem.numRealVars),
-        onDecline, completeFiniteConditions)
+        onDecline, completeFiniteConditions,
+    )
 }
 
 private fun PreparedFactorProjections.installSelectedLinearFactor(
@@ -146,8 +173,10 @@ private fun PreparedFactorProjections.installSelectedLinearFactor(
             }
         }
     }
-    val encoding = LinearTheoryEncoding(target, sourceIndex, integerPins, booleanPins, cancellation,
-        booleans, integers, reals, allocator)
+    val encoding = LinearTheoryEncoding(
+        target, sourceIndex, integerPins, booleanPins, cancellation,
+        booleans, integers, reals, allocator,
+    )
     val forms = try {
         val decline = selected.install(source, encoding)
         if (decline != null) {
@@ -174,11 +203,11 @@ private fun PreparedFactorProjections.installSelectedLinearFactor(
     } else {
         EncodingAttribution(
             sourceIndex,
-        booleans.sorted().map(::SourceBoolId), integers.sorted().map(::SourceIntId),
-        reals.sorted().map(::SourceRealId), integerConditions = integerPins,
-        booleanConditions = booleanPins, auxiliaries = encoding.realAuxiliaries,
-        affineAuxiliaries = encoding.auxiliaryDefinitions(),
-        linearGuards = encoding.guardDefinitions(), conditions = conditions,
+            booleans.sorted().map(::SourceBoolId), integers.sorted().map(::SourceIntId),
+            reals.sorted().map(::SourceRealId), integerConditions = integerPins,
+            booleanConditions = booleanPins, auxiliaries = encoding.realAuxiliaries,
+            affineAuxiliaries = encoding.auxiliaryDefinitions(),
+            linearGuards = encoding.guardDefinitions(), conditions = conditions,
         )
     }
     return forms.map { EncodedTheoryFactor(source, it, attribution) }
@@ -206,7 +235,9 @@ private class LinearTheoryEncoding(
     override fun fixedInteger(id: SourceIntId): BigInt? = fixedIntegers[id]
     override fun fixedBoolean(id: SourceBoolId): Boolean? = fixedBooleans[id]
 
-    override fun linear(form: LinearForm) { linearFormula(LinearEncodingFormula.Relation(form)) }
+    override fun linear(form: LinearForm) {
+        linearFormula(LinearEncodingFormula.Relation(form))
+    }
 
     override fun linearFormula(formula: LinearEncodingFormula) {
         lowering.checkpoint()
@@ -264,12 +295,14 @@ private class LinearTheoryEncoding(
     }
 
     private fun validate(reference: Int) {
-        require(when {
-            Term.isInt(reference) -> Term.intVar(reference) in integers
-            Term.isReal(reference) -> Term.realVar(reference) in reals
-            Term.isBool(reference) -> (Term.lit(reference) ushr 1) in booleans
-            else -> false
-        }) { "foreign source coordinate in encoding" }
+        require(
+            when {
+                Term.isInt(reference) -> Term.intVar(reference) in integers
+                Term.isReal(reference) -> Term.realVar(reference) in reals
+                Term.isBool(reference) -> (Term.lit(reference) ushr 1) in booleans
+                else -> false
+            },
+        ) { "foreign source coordinate in encoding" }
     }
 
     private fun expand(
@@ -305,10 +338,7 @@ private class LinearTheoryEncoding(
         return coefficients.filterValues { it != BigFraction.ZERO } to constant
     }
 
-    private fun clauses(
-        formula: LinearEncodingFormula,
-        active: Set<Int> = emptySet(),
-    ): List<List<LinearRow>> {
+    private fun clauses(formula: LinearEncodingFormula, active: Set<Int> = emptySet()): List<List<LinearRow>> {
         lowering.checkpoint()
         return when (formula) {
             is LinearEncodingFormula.Relation -> {
@@ -322,8 +352,13 @@ private class LinearTheoryEncoding(
 
             is LinearEncodingFormula.Comparison -> {
                 val (terms, constant) = expand(formula.expression)
-                val row = ExactSearchRow.of(terms.keys.toIntArray(), terms.values.toList(), formula.relation,
-                    formula.bound - constant, formula.strict)
+                val row = ExactSearchRow.of(
+                    terms.keys.toIntArray(),
+                    terms.values.toList(),
+                    formula.relation,
+                    formula.bound - constant,
+                    formula.strict,
+                )
                 lowering.relation(row.linearForm)
             }
 

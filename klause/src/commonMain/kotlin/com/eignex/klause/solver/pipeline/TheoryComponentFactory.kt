@@ -52,24 +52,31 @@ internal fun ComponentPlan.theoryComponentFactory(
         contribution: (ExactLiraAssignment, SearchModel) -> Unit,
     ): List<SearchComponent> {
         val factory = preparedSource() ?: prepareExactLiraSource(fragment, opening.cancellation)
-        if (factory == null) return listOf(object : SearchComponent {
+        if (factory == null) {
+            return listOf(object : SearchComponent {
             override fun initialize(context: SearchContext): ComponentResult = ComponentResult.Indeterminate
             override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Indeterminate
         })
-        return listOf(factory.open(cpIntVars, contribution).also { component ->
+        }
+        return listOf(
+            factory.open(cpIntVars, contribution).also { component ->
             opening.ownComponent(component)
             component.useSolveStop(opening.theorySolveStop)
             opening.smtStats?.let(component::observeWith)
             if (opening.openHintFlips != null) {
                 component.partialPointHints(opening.cancellation)?.let { (variables, hints) ->
                     opening.registerCandidateHints(
-                        variables, hints, component::releasePartialPointHints,
-                        component::partialPointHintAvailable, component::partialPointHintBool,
+                        variables,
+                        hints,
+                        component::releasePartialPointHints,
+                        component::partialPointHintAvailable,
+                        component::partialPointHintBool,
                         openHintFlips = opening.openHintFlips,
                     )
                 }
             }
-        })
+        }
+        )
     }
     return when (theoryPipeline) {
         ProblemPipeline.DIFFERENCE_THEORY -> {
@@ -78,8 +85,10 @@ internal fun ComponentPlan.theoryComponentFactory(
             val factory: (SearchComponentOpening) -> List<SearchComponent> = { opening ->
                 val component = DifferenceSearchComponent.withRootBounds(fragment, owned, finite)
                 opening.own(AutoCloseable { component.releaseSearchState() })
-                if (finite.isEmpty()) component.prepareRelativeBranches(opening.cancellation)
+                if (finite.isEmpty()) {
+                    component.prepareRelativeBranches(opening.cancellation)
                     ?.let(opening::registerBranchProposal)
+                }
                 listOf(component)
             }
             factory

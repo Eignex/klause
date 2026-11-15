@@ -25,10 +25,8 @@ interface TypedSearchValueKey<V : Any> : SearchValueKey {
  * Identity key for one component-owned value. Keep the same key instance for publication and reads.
  * [capture] freezes borrowed state; its default requires an already immutable value.
  */
-class SearchModelKey<V : Any>(
-    override val valueType: KClass<V>,
-    private val capture: (V) -> V = { it },
-) : TypedSearchValueKey<V> {
+class SearchModelKey<V : Any>(override val valueType: KClass<V>, private val capture: (V) -> V = { it }) :
+    TypedSearchValueKey<V> {
     override fun snapshot(value: V): V = capture(value)
 }
 

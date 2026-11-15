@@ -44,9 +44,12 @@ class Xcsp3Test {
         """.trimIndent()
 
         val error = assertFailsWith<UnsupportedXcsp3Exception> {
-            Xcsp3.parse(xml, semanticOverrides = SemanticOverrides(
+            Xcsp3.parse(
+                xml,
+                semanticOverrides = SemanticOverrides(
                 undeclaredIntegers = BoundsOverride(lower = BoundOverride.Open),
-            ))
+            )
+            )
         }
 
         assertTrue("undeclared integer bounds do not apply" in error.message.orEmpty())
@@ -69,7 +72,6 @@ class Xcsp3Test {
             KlauseConfig.current = saved
         }
     }
-
 
     private fun sat(xml: String): IntArray {
         val r = BacktrackSolver(Xcsp3.parse(xml).problem.bake()).solve(BacktrackParams())

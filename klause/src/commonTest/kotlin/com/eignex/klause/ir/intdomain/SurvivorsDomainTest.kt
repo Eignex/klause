@@ -10,7 +10,8 @@ class SurvivorsDomainTest {
     @Test
     fun `hole iteration should stop at the largest signed word`() {
         val domain = SurvivorsDomain(
-            Long.MAX_VALUE - 4, Long.MAX_VALUE,
+            Long.MAX_VALUE - 4,
+            Long.MAX_VALUE,
             longArrayOf(Long.MAX_VALUE - 4, Long.MAX_VALUE - 2, Long.MAX_VALUE),
         )
         val holes = mutableListOf<Long>()

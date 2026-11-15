@@ -54,7 +54,10 @@ internal enum class LpPointRejection {
 internal enum class ReconstructionPhase { INPUT, POINT, DUAL, RAY, SUPPORT, VIOLATION, VECTOR, BASIS, SCHEDULE }
 
 internal data class ReconstructionDualRejection(
-    val column: Int, val upper: Boolean, val reduced: BigFraction, val basic: Boolean? = null,
+    val column: Int,
+    val upper: Boolean,
+    val reduced: BigFraction,
+    val basic: Boolean? = null,
 )
 internal data class ReconstructionVectorRejection(val commonDenominator: BigInt, val limit: BigInt)
 internal data class ReconstructionEntryRejection(val row: Int, val value: BigFraction)
@@ -655,8 +658,8 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
         } ?: run {
             if (usesBasis) {
                 meter.basisDualRejection = meter.dualRejection?.let {
-                it.copy(basic = basis?.status?.get(it.column) == VarStatus.BASIC)
-            }
+                    it.copy(basic = basis?.status?.get(it.column) == VarStatus.BASIC)
+                }
             }
             return
         }
@@ -726,9 +729,17 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
             if (!validHeadings(basis)) return null
             meter.phase = ReconstructionPhase.BASIS
             val layout = try {
-                LogicalBasisLayout.prepare(a.n, a.m, basis.basicVars, { a.matrix[it] },
-                    { work, bytes -> meter.step(work); if (bytes > 0L) meter.storage(bytes) },
-                    { reason -> throw ReconstructionLayoutStop(reason) })
+                LogicalBasisLayout.prepare(
+                    a.n,
+                    a.m,
+                    basis.basicVars,
+                    { a.matrix[it] },
+                    { work, bytes ->
+                        meter.step(work);
+                        if (bytes > 0L) meter.storage(bytes)
+                    },
+                    { reason -> throw ReconstructionLayoutStop(reason) },
+                )
             } catch (stop: ReconstructionLayoutStop) {
                 meter.basisRepair = ReconstructionBasisMetrics(decline = stop.reason.name)
                 return null
@@ -918,8 +929,13 @@ private fun reconstructCandidates(
                     }
                     if (current.bound != null) break
                 }
-                val defect = violation ?: reconstructionViolation(authority, x, y ?: rho,
-                    ray = y == null && rho != null, meter).also { violation = it }
+                val defect = violation ?: reconstructionViolation(
+                    authority,
+                    x,
+                    y ?: rho,
+                    ray = y == null && rho != null,
+                    meter,
+                ).also { violation = it }
                 meter.phase = ReconstructionPhase.SCHEDULE
                 val denominator = if (defect.isZero) {
                     RECONSTRUCTION_FLOOR
@@ -1021,8 +1037,12 @@ private fun reconstructRationalEntries(
     return values.mapIndexed { row, value ->
         meter.step()
         val floating = value.toDouble()
-        val part = reconstructRational(floating, maxDenominator = limit,
-            tolerance = 1e-9 * maxOf(1.0, kotlin.math.abs(floating)), onStep = { meter.step() })
+        val part = reconstructRational(
+            floating,
+            maxDenominator = limit,
+            tolerance = 1e-9 * maxOf(1.0, kotlin.math.abs(floating)),
+            onStep = { meter.step() },
+        )
         if (part == null) {
             meter.entryRejection = ReconstructionEntryRejection(row, value)
             reconstructExactVector(listOf(value), denominator, meter)?.single() ?: return null
@@ -1158,8 +1178,18 @@ internal fun certifyLpConflictOnly(
         LpClaimObservation(LpClaim.CONTRADICTION, it)
     }
     val checked = certifyLpConflictOnlyWithin(model, ray, limits, cancellation, observation ?: observer, policy)
-    observation?.finish(CertifiedLpResult(null, checked.bound, null, null, checked.conflict,
-        false, { null }, reconstruction = checked.metrics))
+    observation?.finish(
+        CertifiedLpResult(
+        null,
+        checked.bound,
+        null,
+        null,
+        checked.conflict,
+        false,
+        { null },
+        reconstruction = checked.metrics,
+    )
+    )
     return checked
 }
 
@@ -1179,8 +1209,15 @@ private fun certifyLpConflictOnlyWithin(
     if (conflict != null && accepted == null) (observer as? LpClaimObservation)?.refuse("POLICY_REFUSED")
     observer?.observe(LpCertifier.RATIONAL, conflict != null, LpCertifierCost.Metered(metrics.work))
     timer.finish(metrics.decline?.name ?: if (accepted != null) "CONFLICT" else "REFUSED", metrics.work)
-    return ReconstructedCertificate(null, null, accepted, checked.conflictSupport.takeIf { accepted != null },
-        false, false, metrics)
+    return ReconstructedCertificate(
+        null,
+        null,
+        accepted,
+        checked.conflictSupport.takeIf { accepted != null },
+        false,
+        false,
+        metrics,
+    )
 }
 
 internal fun certifyLpIntegerBoundOnly(
@@ -1195,8 +1232,18 @@ internal fun certifyLpIntegerBoundOnly(
         LpClaimObservation(LpClaim.BOUND, it)
     }
     val checked = certifyLpIntegerBoundWithin(model, duals, limits, cancellation, observation ?: observer, policy)
-    observation?.finish(CertifiedLpResult(null, checked.bound, null, null, null,
-        false, { null }, reconstruction = checked.metrics))
+    observation?.finish(
+        CertifiedLpResult(
+        null,
+        checked.bound,
+        null,
+        null,
+        null,
+        false,
+        { null },
+        reconstruction = checked.metrics,
+    )
+    )
     return checked
 }
 
@@ -1280,8 +1327,18 @@ internal fun certifyLpBoundOnly(
         LpClaimObservation(LpClaim.BOUND, it)
     }
     val checked = certifyLpBoundOnlyWithin(model, duals, limits, cancellation, observation ?: observer, policy, basis)
-    observation?.finish(CertifiedLpResult(null, checked.bound, null, null, checked.conflict,
-        false, { null }, reconstruction = checked.metrics))
+    observation?.finish(
+        CertifiedLpResult(
+        null,
+        checked.bound,
+        null,
+        null,
+        checked.conflict,
+        false,
+        { null },
+        reconstruction = checked.metrics,
+    )
+    )
     return checked
 }
 
@@ -1313,10 +1370,21 @@ private fun certifyLpBoundOnlyWithin(
     if (bound != null && accepted == null) (observer as? LpClaimObservation)?.refuse("POLICY_REFUSED")
     observer?.observe(LpCertifier.RATIONAL, bound != null, LpCertifierCost.Metered(metrics.work - metrics.basisWork))
     if (metrics.basisWork > 0L) {
-        observer?.observe(LpCertifier.EXACT_BASIS, bound != null && checked.boundUsesBasis,
-            LpCertifierCost.Metered(metrics.basisWork))
+        observer?.observe(
+            LpCertifier.EXACT_BASIS,
+            bound != null && checked.boundUsesBasis,
+            LpCertifierCost.Metered(metrics.basisWork),
+        )
     }
     timer.finish(metrics.decline?.name ?: if (accepted != null) "BOUND" else "REFUSED", metrics.work)
-    return ReconstructedCertificate(null, accepted, null, null, false, false, metrics,
-        boundUsesBasis = accepted != null && checked.boundUsesBasis)
+    return ReconstructedCertificate(
+        null,
+        accepted,
+        null,
+        null,
+        false,
+        false,
+        metrics,
+        boundUsesBasis = accepted != null && checked.boundUsesBasis,
+    )
 }

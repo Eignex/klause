@@ -45,11 +45,14 @@ internal class ObjectiveCoordinateView private constructor(
                     it.numBoolVars != target.numBoolVars || it.numIntVars != target.numIntVars || it.numRealVars != 0
                 }
             ) {
-                    return null
-                }
+                return null
+            }
             val verifier = finiteWitnessVerifier(target, targetObjective, cancellation)
             return ObjectiveCoordinateView(
-                privateProblem, privateObjective, hints, ModelIdentity.of(target, targetObjective),
+                privateProblem,
+                privateObjective,
+                hints,
+                ModelIdentity.of(target, targetObjective),
             ) { point ->
                 if (cancellation() || point.numBoolVars != privateProblem.numBoolVars ||
                     point.numIntVars != privateProblem.numIntVars || point.numRealVars != 0

@@ -25,8 +25,14 @@ class SourceLpFundingTest {
         val budget = SourceLpBudget(funding = funding)
         funding.grant(20)
 
-        budget.observe(preparation = 1, floatWork = 2, continuation = 3, refinement = 4,
-            boundCertification = 5, conflictCertification = 6)
+        budget.observe(
+            preparation = 1,
+            floatWork = 2,
+            continuation = 3,
+            refinement = 4,
+            boundCertification = 5,
+            conflictCertification = 6,
+        )
 
         assertEquals(21L, funding.spent)
         assertTrue(funding.exhausted)

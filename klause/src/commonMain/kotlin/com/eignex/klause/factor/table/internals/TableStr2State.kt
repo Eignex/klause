@@ -44,9 +44,13 @@ internal class TableStr2State(
         clearRows = started && live != null && numValid < maxOf(64, live.size * 2)
         val delta = started && index != null && !clearRows && changedValues * 2 <= numValid.toLong() * xs.size
         if (delta) filterDelta()
-        sweepDomains = if (index == null) null else Array(xs.size) {
+        sweepDomains = if (index == null) {
+            null
+        } else {
+            Array(xs.size) {
             state.checkFiniteWork()
             state.intDomains[xs[it]]
+        }
         }
         return delta
     }

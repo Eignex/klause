@@ -1,9 +1,7 @@
 package com.eignex.klause.portfolio
 
-internal class SourceRateReward(
-    val priceFamilies: Boolean = false,
-    families: List<ArmFamily> = emptyList(),
-) : PortfolioRewardPolicy {
+internal class SourceRateReward(val priceFamilies: Boolean = false, families: List<ArmFamily> = emptyList()) :
+    PortfolioRewardPolicy {
     private class Account {
         var cost = 0.0
         var pendingCost = 0.0
@@ -33,7 +31,12 @@ internal class SourceRateReward(
         val family = families.getOrNull(progress.arm)
         val familyAccount = family?.let { familyAccounts.getOrPut(it) { Account() } }
         familyReward = if (familyAccount != null &&
-            (progress.phase != PortfolioPhase.FEASIBILITY || accepted != null)) 0.0 else null
+            (progress.phase != PortfolioPhase.FEASIBILITY || accepted != null)
+        ) {
+                0.0
+            } else {
+                null
+            }
         if (!progress.idleCredit) {
             val cost = progress.nanos.coerceAtLeast(0L).toDouble() +
                 progress.constructionNanos.coerceAtLeast(0L)

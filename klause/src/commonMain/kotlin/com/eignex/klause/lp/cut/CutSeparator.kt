@@ -52,7 +52,9 @@ internal class CutContext(
             val expression = CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, variable) to BigFraction.ONE))
             for (upper in listOf(false, true)) {
                 val premise = CutPremise.Bound(
-                    expression, upper, BigFraction.ofLong(if (upper) domain.max else domain.min),
+                    expression,
+                    upper,
+                    BigFraction.ofLong(if (upper) domain.max else domain.min),
                 )
                 facts.add(CutProofFact(premise, map.isGlobal(premise)))
             }

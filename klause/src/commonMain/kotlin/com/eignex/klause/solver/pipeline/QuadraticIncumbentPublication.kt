@@ -10,9 +10,7 @@ data class QuadraticIncumbentPublication(
     val incumbent: QuadraticIncumbent,
 )
 
-internal class QuadraticPublicationObserver(
-    private val callback: ((QuadraticIncumbentPublication) -> Unit)?,
-) {
+internal class QuadraticPublicationObserver(private val callback: ((QuadraticIncumbentPublication) -> Unit)?) {
     var latest: QuadraticIncumbentPublication? = null
         private set
     private var failure: Throwable? = null
@@ -39,5 +37,4 @@ internal class QuadraticPublicationObserver(
         if (primary !== error) primary.addSuppressed(error)
         throw primary
     }
-
 }

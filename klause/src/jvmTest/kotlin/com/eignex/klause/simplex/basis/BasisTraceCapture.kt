@@ -162,8 +162,10 @@ internal object BasisTraceCapture {
 
     private fun prepareSmt(text: String): PreparedCapture {
         val parsed = SmtLib.parse(text)
-        require(parsed.objective == null && parsed.quadraticObjective == null &&
-            parsed.source.embeddedObjectiveSense == null) { "SMT source-derived optimization capture is unsupported" }
+        require(
+            parsed.objective == null && parsed.quadraticObjective == null &&
+                parsed.source.embeddedObjectiveSense == null,
+        ) { "SMT source-derived optimization capture is unsupported" }
         val source = requireNotNull(parsed.source.originalSource as? Problem) {
             "SMT basis capture requires an original factor source"
         }

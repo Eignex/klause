@@ -32,9 +32,12 @@ import kotlin.test.assertTrue
 class BacktrackWorkerConfigTest {
     @Test
     fun `guidance observation should preserve cutoff reads and improving witnesses`() {
-        val problem = Problem(8, 0, emptyArray(), arrayOf<Factor>(
+        val problem = Problem(
+            8, 0, emptyArray(),
+            arrayOf<Factor>(
             Cardinality(IntArray(8) { Lit.make(it, true) }, min = 3, max = 8),
-        )).bake()
+        )
+        ).bake()
         val objective = LinearObjective(boolWeights = longArrayOf(7L, 3L, 5L, 9L, 1L, 8L, 2L, 6L))
         val events = mutableListOf<PooledGuidanceObservation>()
         val witnesses = mutableListOf<List<Double>>()
@@ -45,21 +48,40 @@ class BacktrackWorkerConfigTest {
                 offer(Sample(BooleanArray(8) { it < 3 }, longArrayOf()), 15.0)
             }
             val recipe = BacktrackRecipe("guided") { _, _ ->
-                BacktrackParams(valueSelector = SolutionGuided(IndomainMin),
-                    lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false))
+                BacktrackParams(
+                    valueSelector = SolutionGuided(IndomainMin),
+                    lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false),
+                )
             }
             val config = BacktrackWorkerConfig(recipe).let { config ->
-                if (observed) config.withGuidanceObserver { worker, event ->
+                if (observed) {
+                    config.withGuidanceObserver { worker, event ->
                     assertEquals("bt/guided", worker)
                     events += event
-                } else config
+                }
+                } else {
+                    config
+                }
             }
-            val worker = config.materialize(problem, index = 0, armId = 0, seed = 0L, lsLambda = 1.0,
+            val worker = config.materialize(
+                problem, index = 0, armId = 0, seed = 0L, lsLambda = 1.0,
                 objective = objective, lsObjective = null, definitionalSweep = null, onEvent = null,
-                pools = SharedPools(null, null, identity = ModelIdentity.of(problem, objective),
-                    acceptedIncumbents = exchange))
-            witnesses += worker.use { it.improvements({ cutoffReads++; Double.POSITIVE_INFINITY },
-                ExecutionControl.Never).mapNotNull { it.objectiveValue }.toList() }
+                pools = SharedPools(
+                    null,
+                    null,
+                    identity = ModelIdentity.of(problem, objective),
+                    acceptedIncumbents = exchange,
+                ),
+                    )
+            witnesses += worker.use {
+                it.improvements(
+                    {
+                        cutoffReads++;
+                        Double.POSITIVE_INFINITY
+                    },
+                    ExecutionControl.Never,
+                ).mapNotNull { it.objectiveValue }.toList()
+            }
             reads += cutoffReads
         }
 
@@ -72,32 +94,51 @@ class BacktrackWorkerConfigTest {
         assertTrue(imported.preferred)
         assertTrue(events.any { it.kind == PooledGuidanceKind.COMMIT && it.preferred && it.decision != null })
         assertTrue(events.any { it.kind == PooledGuidanceKind.LOCAL })
-        assertTrue(events.groupBy { it.kind }.all { (kind, values) ->
+        assertTrue(
+            events.groupBy { it.kind }.all { (kind, values) ->
             values.size <= if (kind == PooledGuidanceKind.IMPORT || kind == PooledGuidanceKind.LOCAL) 16 else 128
-        })
+        }
+        )
     }
 
     @Test
     fun `a worker should read canonical guidance only for the same model and objective`() {
-        val problem = Problem(8, 0, emptyArray(), arrayOf<Factor>(
+        val problem = Problem(
+            8, 0, emptyArray(),
+            arrayOf<Factor>(
             Cardinality(IntArray(8) { Lit.make(it, true) }, min = 3, max = 8),
-        )).bake()
+        )
+        ).bake()
         val objective = LinearObjective(boolWeights = longArrayOf(7L, 3L, 5L, 9L, 1L, 8L, 2L, 6L))
         val exchange = IncumbentExchange.minimizing<Sample>().apply {
             offer(Sample(BooleanArray(8) { it < 3 }, longArrayOf()), 15.0)
         }
-        for ((identity, shouldRead) in listOf(ModelIdentity.of(problem, objective) to true,
-            ModelIdentity.of(Any(), objective) to false, ModelIdentity.of(problem, Any()) to false)) {
+        for ((identity, shouldRead) in listOf(
+            ModelIdentity.of(problem, objective) to true,
+            ModelIdentity.of(Any(), objective) to false,
+            ModelIdentity.of(problem, Any()) to false,
+        )) {
             var reads = 0
             val recipe = BacktrackRecipe("guided") { _, _ ->
-                BacktrackParams(valueSelector = SolutionGuided(IndomainMin),
-                    lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false))
+                BacktrackParams(
+                    valueSelector = SolutionGuided(IndomainMin),
+                    lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false),
+                )
             }
-            val worker = BacktrackWorkerConfig(recipe).materialize(problem, index = 0, armId = 0,
+            val worker = BacktrackWorkerConfig(recipe).materialize(
+                problem, index = 0, armId = 0,
                 seed = 0L, lsLambda = 1.0, objective = objective, lsObjective = null,
                 definitionalSweep = null, onEvent = null,
-                pools = SharedPools(null, null, identity = identity,
-                    acceptedIncumbents = IncumbentSource { reads++; exchange.current() }))
+                pools = SharedPools(
+                    null,
+                    null,
+                    identity = identity,
+                    acceptedIncumbents = IncumbentSource {
+                        reads++;
+                        exchange.current()
+                    },
+                ),
+                    )
 
             worker.use { it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never).last() }
 
@@ -126,7 +167,6 @@ class BacktrackWorkerConfigTest {
             assertSame(params, actual)
         }
     }
-
 
     private fun signalsOf(recipe: BacktrackRecipe, objective: LinearObjective?, pools: SharedPools): Set<Signal> {
         val problem = Problem(
@@ -222,6 +262,7 @@ class BacktrackWorkerConfigTest {
         assertTrue(SharingChannel.Clauses in sharing.channels)
         assertTrue(sharing.clauses.getValue("sessions") > 0L)
     }
+
     @Test
     fun `a worker should account for a consumed peer import and release its filter`() {
         for (objective in listOf(null, LinearObjective(boolWeights = longArrayOf(1L, 1L)))) {
@@ -244,8 +285,11 @@ class BacktrackWorkerConfigTest {
             )
 
             worker.use {
-                if (objective == null) it.solve(ExecutionControl.Never)
-                else it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never).last()
+                if (objective == null) {
+                    it.solve(ExecutionControl.Never)
+                } else {
+                    it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never).last()
+                }
             }
 
             val stats = assertNotNull(worker.sharingMeter).snapshot()

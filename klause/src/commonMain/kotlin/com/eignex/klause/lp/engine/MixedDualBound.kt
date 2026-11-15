@@ -132,10 +132,10 @@ internal fun nodeDualCertificate(
     if (cancellation()) return null
     for (candidate in candidates) {
         if (candidate !== accepted) {
-        onAdditionalCertificate?.invoke(
-            if (objectiveRows != null) IntegralObjectiveCertificate(candidate, objectiveRows) else candidate,
-        )
-    }
+            onAdditionalCertificate?.invoke(
+                if (objectiveRows != null) IntegralObjectiveCertificate(candidate, objectiveRows) else candidate,
+            )
+        }
     }
     val selected = accepted ?: return null
     return if (objectiveRows != null) IntegralObjectiveCertificate(selected, objectiveRows) else selected
@@ -197,8 +197,13 @@ private fun integralObjectiveAfterRow(
     val source = checkNotNull(model.exactState).model
     val scale = meter.read(source.objective.scale.value)
     val fixed = checkNotNull(model.exactBounds(model.slackCol(row)).lower).number.value
-    var constant = meter.add(model.exactConstant(), meter.multiply(multiplier,
-        meter.add(model.exactRhs(row), fixed.negated())))
+    var constant = meter.add(
+        model.exactConstant(),
+        meter.multiply(
+        multiplier,
+        meter.add(model.exactRhs(row), fixed.negated()),
+    )
+    )
     for (column in 0 until model.n) {
         var cost = costs[column]
         model.forEachRationalColumn(column) { r, value ->
@@ -385,8 +390,8 @@ private fun finiteEndpointCancellation(
                         counts[it.row] == 1 && !it.number.value.isZero
                 }
             ) {
-                    continue
-                }
+                continue
+            }
             var residual = meter.read(model.exactCost(column))
             model.forEachRationalColumn(column) { row, coefficient ->
                 meter.step()
@@ -504,19 +509,19 @@ private fun repairMixedColumn(
     }
     val bounds = model.exactBounds(column)
     if (!(
-        (residual.signum() > 0 && bounds.lower == null) ||
-            (residual.signum() < 0 && bounds.upper == null)
-    )
+            (residual.signum() > 0 && bounds.lower == null) ||
+                (residual.signum() < 0 && bounds.upper == null)
+            )
     ) {
-                return false
-            }
+        return false
+    }
     for (entry in state.model.columnEntries(column)) {
         meter.step()
         if (!state.rows.row(entry.row).active || continuousCounts[entry.row] != 1 ||
             entry.number.value.isZero
         ) {
-                continue
-            }
+            continue
+        }
         val inverse = meter.read(meter.read(entry.number.value).reciprocal())
         val candidate = meter.add(y[entry.row], meter.multiply(residual, inverse))
         val slack = model.slackCol(entry.row)
@@ -525,8 +530,8 @@ private fun repairMixedColumn(
         if ((slackBounds.lower == null && candidate < slackCost) ||
             (slackBounds.upper == null && candidate > slackCost)
         ) {
-                continue
-            }
+            continue
+        }
         // A singleton continuous row cancels this residual without changing another real reduced cost.
         y[entry.row] = candidate
         return true

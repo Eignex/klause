@@ -25,9 +25,13 @@ class LinearSourceSemanticsChecker(
     init {
         require(this.premises.all { it.inequality.coefficients.keys.all(this.coordinates::contains) })
         require(this.objective.keys.all(this.coordinates::contains))
-        require(this.premises.all { premise -> premise.guards.keys.all {
-            SourceCoordinate(SourceCoordinate.Kind.Boolean, it) in this.coordinates
-        } })
+        require(
+            this.premises.all { premise ->
+            premise.guards.keys.all {
+                SourceCoordinate(SourceCoordinate.Kind.Boolean, it) in this.coordinates
+            }
+        }
+        )
         require(this.premises.all { premise -> premise.integerPins.keys.all(this.coordinates::contains) })
         for (kind in SourceCoordinate.Kind.entries) {
             val ids = this.coordinates.filter { it.kind == kind }.map { it.id }.sorted()
@@ -60,9 +64,9 @@ class LinearSourceSemanticsChecker(
             evaluated = algebraic.add(
                 evaluated,
                 algebraic.multiply(
-                at(sample, id, algebraic),
-                algebraic.rational(coefficient),
-            )
+                    at(sample, id, algebraic),
+                    algebraic.rational(coefficient),
+                ),
             )
         }
         if (algebraic.compare(evaluated, expected) == 0) {
@@ -133,8 +137,13 @@ class LinearSourceSemanticsChecker(
             val row = premise.inequality
             var value = algebraic.rational(BigFraction.ZERO)
             for ((id, coefficient) in row.coefficients) {
-                value = algebraic.add(value, algebraic.multiply(at(sample, id, algebraic),
-                    algebraic.rational(coefficient)))
+                value = algebraic.add(
+                    value,
+                    algebraic.multiply(
+                    at(sample, id, algebraic),
+                    algebraic.rational(coefficient),
+                )
+                )
             }
             val comparison = algebraic.compare(value, algebraic.rational(row.rhs))
             if (comparison > 0 || (comparison == 0 && row.strict)) {
@@ -150,16 +159,17 @@ class LinearSourceSemanticsChecker(
         premise.guards.all { (id, value) -> sample.boolValue(id) == value } &&
             premise.integerPins.all { (id, value) -> sample.exactIntValue(id.id) == value.num }
 
-    private fun at(
-        sample: Sample, id: SourceCoordinate, algebraic: AlgebraicArithmetic,
-    ): AlgebraicReal = when (id.kind) {
-        SourceCoordinate.Kind.Boolean -> algebraic.rational(
-            if (sample.boolValue(id.id)) BigFraction.ONE else BigFraction.ZERO,
-        )
-        SourceCoordinate.Kind.Integer -> algebraic.rational(BigFraction.of(sample.exactIntValue(id.id), BIG_ONE))
-        SourceCoordinate.Kind.Real -> sample.algebraicReals?.get(id.id)
-            ?: algebraic.rational(checkNotNull(sample.exactReals)[id.id])
-    }
+    private fun at(sample: Sample, id: SourceCoordinate, algebraic: AlgebraicArithmetic): AlgebraicReal =
+        when (id.kind) {
+            SourceCoordinate.Kind.Boolean -> algebraic.rational(
+                if (sample.boolValue(id.id)) BigFraction.ONE else BigFraction.ZERO,
+            )
+
+            SourceCoordinate.Kind.Integer -> algebraic.rational(BigFraction.of(sample.exactIntValue(id.id), BIG_ONE))
+
+            SourceCoordinate.Kind.Real -> sample.algebraicReals?.get(id.id)
+                ?: algebraic.rational(checkNotNull(sample.exactReals)[id.id])
+        }
 
     private fun dot(left: Map<SourceCoordinate, BigFraction>, right: Map<SourceCoordinate, BigFraction>): BigFraction =
         left.entries.fold(BigFraction.ZERO) { sum, (id, value) -> sum + value * (right[id] ?: BigFraction.ZERO) }

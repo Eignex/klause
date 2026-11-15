@@ -109,28 +109,33 @@ internal object ExtensionalComposition {
         var current = target
         for (a in neighbors.indices) {
             for (b in a + 1 until neighbors.size) {
-            meter.pairRemaining = Int.MAX_VALUE
-            if (meter.cyclicAttempts >= meter.limits.cyclicAttempts || !meter.visit()) {
-                return if (current === target) null else ExtensionalIntersection.Restricted(current)
+                meter.pairRemaining = Int.MAX_VALUE
+                if (meter.cyclicAttempts >= meter.limits.cyclicAttempts || !meter.visit()) {
+                    return if (current === target) null else ExtensionalIntersection.Restricted(current)
+                }
+                val left = neighbors[a]
+                val right = neighbors[b]
+                val bridge = CyclicTableComposition.sharedOutsideTarget(current, left, right, meter::visit)
+                if (bridge == null) {
+                    return if (current === target) null else ExtensionalIntersection.Restricted(current)
+                }
+                if (bridge.isEmpty()) continue
+                meter.cyclicAttempts++
+                meter.pairRemaining = meter.limits.cyclicWork
+                val intersection = CyclicTableComposition.intersect(
+                    current,
+                    left,
+                    right,
+                    meter::visit,
+                    meter.limits.cyclicCells,
+                    bridge,
+                ) ?: continue
+                if (intersection === ExtensionalIntersection.Refuted) return intersection
+                val next = (intersection as ExtensionalIntersection.Restricted).factor as Table
+                if (next.tuples.size > meter.limits.retainedCells - meter.retained) continue
+                meter.retained += next.tuples.size
+                current = next
             }
-            val left = neighbors[a]
-            val right = neighbors[b]
-            val bridge = CyclicTableComposition.sharedOutsideTarget(current, left, right, meter::visit)
-            if (bridge == null) {
-                return if (current === target) null else ExtensionalIntersection.Restricted(current)
-            }
-            if (bridge.isEmpty()) continue
-            meter.cyclicAttempts++
-            meter.pairRemaining = meter.limits.cyclicWork
-            val intersection = CyclicTableComposition.intersect(
-                current, left, right, meter::visit, meter.limits.cyclicCells, bridge,
-            ) ?: continue
-            if (intersection === ExtensionalIntersection.Refuted) return intersection
-            val next = (intersection as ExtensionalIntersection.Restricted).factor as Table
-            if (next.tuples.size > meter.limits.retainedCells - meter.retained) continue
-            meter.retained += next.tuples.size
-            current = next
-        }
         }
         return if (current === target) null else ExtensionalIntersection.Restricted(current)
     }

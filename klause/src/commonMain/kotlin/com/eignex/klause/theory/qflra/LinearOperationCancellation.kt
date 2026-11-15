@@ -9,7 +9,7 @@ internal class LinearOperationCancellation(
     private val containingStopped: () -> Boolean,
 ) : ExecutionControl() {
     private var active = false
-    private val polling = StopPolling(2048)
+    private val polling = StopPolling(8192)
     private var stopped = false
     private var boundAccounting: WorkMeter? = null
 

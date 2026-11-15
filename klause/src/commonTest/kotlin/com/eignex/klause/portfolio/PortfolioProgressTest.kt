@@ -25,8 +25,12 @@ class PortfolioProgressTest {
             val events = mutableListOf<PortfolioEvent>()
             val worker = trackingWorker("search", 0, ScriptedSearch({ false }) { })
 
-            Portfolio.thompson(listOf(worker), baseSliceWork = 1,
-                diagnostics = PortfolioDiagnostics(1), onProgress = events::add).also {
+            Portfolio.thompson(
+                listOf(worker),
+                baseSliceWork = 1,
+                diagnostics = PortfolioDiagnostics(1),
+                onProgress = events::add,
+            ).also {
                 it.workerExitReporting = reporting
             }.use { it.minimize(ExecutionControl.Never) }
 
@@ -38,8 +42,10 @@ class PortfolioProgressTest {
     @Test
     fun `worker exit should retain the native return before proof reinterpretation`() {
         val sample = Sample(BooleanArray(0), LongArray(0))
-        for (native in listOf(MinimizeResult.Unknown(TerminationReason.SearchExhausted),
-            MinimizeResult.BestFound(sample, 1.0, TerminationReason.SearchExhausted))) {
+        for (native in listOf(
+            MinimizeResult.Unknown(TerminationReason.SearchExhausted),
+            MinimizeResult.BestFound(sample, 1.0, TerminationReason.SearchExhausted),
+        )) {
             val events = mutableListOf<PortfolioEvent>()
             val search = TrackingResumableSearch(native)
             val worker = trackingWorker("proof", 0, search).also { it.controlsObjectiveCutoff = true }
@@ -72,9 +78,15 @@ class PortfolioProgressTest {
             ScriptedSearch({ true }, perSlice = 2) { reads += bound() }
         }) { _, _, _, _ -> error("retained search required") }
 
-        Portfolio.thompson(listOf(worker), baseSliceWork = 1, maxSliceWork = 1,
-            sliceGrowth = 1.0, reseedStaleThreshold = 0,
-            diagnostics = PortfolioDiagnostics(6), onProgress = events::add).use {
+        Portfolio.thompson(
+            listOf(worker),
+            baseSliceWork = 1,
+            maxSliceWork = 1,
+            sliceGrowth = 1.0,
+            reseedStaleThreshold = 0,
+            diagnostics = PortfolioDiagnostics(6),
+            onProgress = events::add,
+        ).use {
             it.minimize(ExecutionControl.Never)
         }
 
@@ -85,8 +97,11 @@ class PortfolioProgressTest {
         assertNull(exit.reason)
         assertEquals(998.0.toRawBits(), exit.cutoffBits)
         assertEquals(2L, exit.incumbentVersion)
-        assertEquals(4L, events.filterIsInstance<PortfolioEvent.Lifecycle>()
-            .last { it.kind == PortfolioLifecycleKind.INCUMBENT_AVAILABLE }.version)
+        assertEquals(
+            4L,
+            events.filterIsInstance<PortfolioEvent.Lifecycle>()
+            .last { it.kind == PortfolioLifecycleKind.INCUMBENT_AVAILABLE }.version
+        )
     }
 
     @Test
@@ -97,9 +112,13 @@ class PortfolioProgressTest {
         }) { _, _, _, _ -> error("retained search required") }
         val unread = trackingWorker("unread", 1, TrackingResumableSearch(null))
 
-        Portfolio.thompson(listOf(reader, unread), baseSliceWork = 1, maxSliceWork = 1,
+        Portfolio.thompson(
+            listOf(reader, unread),
+            baseSliceWork = 1,
+            maxSliceWork = 1,
             diagnostics = PortfolioDiagnostics(2),
-            onProgress = events::add).use { it.minimize(ExecutionControl.Never) }
+            onProgress = events::add,
+        ).use { it.minimize(ExecutionControl.Never) }
 
         val exits = events.filterIsInstance<PortfolioEvent.WorkerExit>().sortedBy { it.arm }
         assertEquals(listOf("reader", "unread"), exits.map { it.worker })
@@ -112,8 +131,10 @@ class PortfolioProgressTest {
         val events = mutableListOf<PortfolioEvent>()
         val search = TrackingResumableSearch(null, onRun = { error("worker failed") })
 
-        Portfolio.thompson(listOf(trackingWorker("failing", 0, search)),
-            onProgress = events::add).use { it.minimize(ExecutionControl.Never) }
+        Portfolio.thompson(
+            listOf(trackingWorker("failing", 0, search)),
+            onProgress = events::add,
+        ).use { it.minimize(ExecutionControl.Never) }
 
         val exit = events.filterIsInstance<PortfolioEvent.WorkerExit>().single()
         assertEquals("failure", exit.cause)
@@ -147,8 +168,12 @@ class PortfolioProgressTest {
             SolveResult.Unknown(TerminationReason.Unsupported)
         }
 
-        Portfolio.thompson(listOf(worker), baseSliceWork = 1, diagnostics = PortfolioDiagnostics(1),
-            onProgress = events::add).use { it.solve(ExecutionControl.Never) }
+        Portfolio.thompson(
+            listOf(worker),
+            baseSliceWork = 1,
+            diagnostics = PortfolioDiagnostics(1),
+            onProgress = events::add,
+        ).use { it.solve(ExecutionControl.Never) }
 
         val exit = events.filterIsInstance<PortfolioEvent.WorkerExit>().single()
         assertEquals("invocation-close", exit.cause)
@@ -164,10 +189,15 @@ class PortfolioProgressTest {
         val workers = searches.mapIndexed { i, search -> trackingWorker("worker-$i", i, search) }
 
         assertFailsWith<IllegalStateException> {
-            Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1,
-                diagnostics = PortfolioDiagnostics(2), onProgress = {
-                if (it is PortfolioEvent.WorkerExit) error("sink failed")
-            }).use { it.minimize(ExecutionControl.Never) }
+            Portfolio.thompson(
+                workers,
+                baseSliceWork = 1,
+                maxSliceWork = 1,
+                diagnostics = PortfolioDiagnostics(2),
+                onProgress = {
+                    if (it is PortfolioEvent.WorkerExit) error("sink failed")
+                },
+            ).use { it.minimize(ExecutionControl.Never) }
         }
 
         assertEquals(listOf(1, 1), searches.map { it.closes })
@@ -195,9 +225,15 @@ class PortfolioProgressTest {
             }
         }
 
-        val result = Portfolio.thompson(listOf(trackingWorker("producer", 0, search)),
-            baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0, reseedStaleThreshold = 0,
-            diagnostics = PortfolioDiagnostics(5), onProgress = events::add).use {
+        val result = Portfolio.thompson(
+            listOf(trackingWorker("producer", 0, search)),
+            baseSliceWork = 1,
+            maxSliceWork = 1,
+            sliceGrowth = 1.0,
+            reseedStaleThreshold = 0,
+            diagnostics = PortfolioDiagnostics(5),
+            onProgress = events::add,
+        ).use {
             it.minimize(ExecutionControl.Never)
         }
 
@@ -219,24 +255,36 @@ class PortfolioProgressTest {
             override val repaidWork: Long get() = error("reporting is disabled")
         }
 
-        val result = Portfolio.thompson(listOf(trackingWorker("producer", 0, search)),
-            baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0, reseedStaleThreshold = 0,
-            diagnostics = PortfolioDiagnostics(5)).use { it.minimize(ExecutionControl.Never) }
+        val result = Portfolio.thompson(
+            listOf(trackingWorker("producer", 0, search)),
+            baseSliceWork = 1,
+            maxSliceWork = 1,
+            sliceGrowth = 1.0,
+            reseedStaleThreshold = 0,
+            diagnostics = PortfolioDiagnostics(5),
+        ).use { it.minimize(ExecutionControl.Never) }
 
         assertTrue(result.stats.portfolio.arms.single().work > 1L)
     }
 
     @Test
     fun `a failed continuation observer should release its retained handle`() {
-        val search = TrackingResumableSearch(null,
-            MinimizeResult.BestFound(Sample(BooleanArray(0), LongArray(0)), 1.0, TerminationReason.BudgetExhausted))
+        val search = TrackingResumableSearch(
+            null,
+            MinimizeResult.BestFound(Sample(BooleanArray(0), LongArray(0)), 1.0, TerminationReason.BudgetExhausted),
+        )
 
         assertFailsWith<IllegalStateException> {
-            Portfolio.thompson(listOf(trackingWorker("producer", 0, search)),
-                baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
-                diagnostics = PortfolioDiagnostics(10), onProgress = {
+            Portfolio.thompson(
+                listOf(trackingWorker("producer", 0, search)),
+                baseSliceWork = 1,
+                maxSliceWork = 1,
+                sliceGrowth = 1.0,
+                diagnostics = PortfolioDiagnostics(10),
+                onProgress = {
                     if (it is PortfolioEvent.Continuation) error("sink failed")
-                }).use { it.minimize(ExecutionControl.Never) }
+                },
+            ).use { it.minimize(ExecutionControl.Never) }
         }
 
         assertEquals(1, search.closes)
@@ -247,8 +295,12 @@ class PortfolioProgressTest {
         val events = mutableListOf<PortfolioEvent>()
         val worker = trackingWorker("finder", 0, ScriptedSearch({ true }, perSlice = 3) { })
 
-        Portfolio.thompson(listOf(worker), baseSliceWork = 1,
-            diagnostics = PortfolioDiagnostics(1), onProgress = events::add).use {
+        Portfolio.thompson(
+            listOf(worker),
+            baseSliceWork = 1,
+            diagnostics = PortfolioDiagnostics(1),
+            onProgress = events::add,
+        ).use {
             it.minimize(ExecutionControl.Never)
         }
 
@@ -260,11 +312,17 @@ class PortfolioProgressTest {
     @Test
     fun `repeated incumbents should preserve the first availability timestamp`() {
         val clock = TestTimeSource()
-        val worker = trackingWorker("finder", 0, ScriptedSearch({ true }, perSlice = 3) {
+        val worker = trackingWorker(
+            "finder", 0,
+            ScriptedSearch({ true }, perSlice = 3) {
             clock += 10.nanoseconds
-        })
-        val result = Portfolio.thompson(listOf(worker), baseSliceWork = 1,
-            diagnostics = PortfolioDiagnostics(1)).also {
+        }
+        )
+        val result = Portfolio.thompson(
+            listOf(worker),
+            baseSliceWork = 1,
+            diagnostics = PortfolioDiagnostics(1),
+        ).also {
             it.runTimeSource = clock
             it.invocationStarted = clock.markNow()
         }.use {
@@ -280,8 +338,14 @@ class PortfolioProgressTest {
             trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { }),
             trackingWorker("trial", 1, ScriptedSearch({ false }) { }).also { it.improvementOnly = true },
         )
-        val result = Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
-            diagnostics = PortfolioDiagnostics(80), rewardPolicy = PortfolioRewardPolicy { 1.0 }).also {
+        val result = Portfolio.thompson(
+            workers,
+            baseSliceWork = 1,
+            maxSliceWork = 1,
+            sliceGrowth = 1.0,
+            diagnostics = PortfolioDiagnostics(80),
+            rewardPolicy = PortfolioRewardPolicy { 1.0 },
+        ).also {
             it.incumbentProbeArms = setOf(1)
         }.use { it.minimize(ExecutionControl.Never) }
 
@@ -294,15 +358,26 @@ class PortfolioProgressTest {
         val pools = SharedPools(null, null)
         val workers = listOf(
             trackingWorker("producer", 0, ScriptedSearch({ false }) { }),
-            trackingWorker("consumer", 1, ScriptedSearch({ it == 0 }) {
+            trackingWorker(
+                "consumer", 1,
+                ScriptedSearch({ it == 0 }) {
                 pools.contributions.note(Contribution.Clause, 0)
-            }),
+            }
+            ),
         ).onEach { it.sharedPools = pools }
         workers[0].sharing = setOf(Contribution.Clause)
 
-        val result = Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
+        val result = Portfolio.thompson(
+            workers,
+            baseSliceWork = 1,
+            maxSliceWork = 1,
+            sliceGrowth = 1.0,
             diagnostics = PortfolioDiagnostics(3),
-            rewardPolicy = PortfolioRewardPolicy { observed += it; it.ordinaryReward }).use {
+            rewardPolicy = PortfolioRewardPolicy {
+                observed += it;
+                it.ordinaryReward
+            },
+        ).use {
             it.minimize(ExecutionControl.Never)
         }
 
@@ -333,9 +408,15 @@ class PortfolioProgressTest {
             trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { }).also { it.family = ArmFamily.LocalSearch },
             trackingWorker("proof", 1, ScriptedSearch({ false }) { }),
         )
-        val result = Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
-            reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(80),
-            rewardPolicy = PortfolioRewardPolicy { if (it.arm == 0) 1.0 else 0.0 }).use {
+        val result = Portfolio.thompson(
+            workers,
+            baseSliceWork = 1,
+            maxSliceWork = 1,
+            sliceGrowth = 1.0,
+            reseedStaleThreshold = 0,
+            diagnostics = PortfolioDiagnostics(80),
+            rewardPolicy = PortfolioRewardPolicy { if (it.arm == 0) 1.0 else 0.0 },
+        ).use {
             it.minimize(ExecutionControl.Never)
         }
 
@@ -363,10 +444,17 @@ class PortfolioProgressTest {
                 }
             }
         }
-        val result = Portfolio.thompson(listOf(trackingWorker("search", 0, search)),
-            baseSliceWork = 1, sliceGrowth = 1.0, reseedStaleThreshold = 0,
+        val result = Portfolio.thompson(
+            listOf(trackingWorker("search", 0, search)),
+            baseSliceWork = 1,
+            sliceGrowth = 1.0,
+            reseedStaleThreshold = 0,
             diagnostics = PortfolioDiagnostics(10),
-            rewardPolicy = PortfolioRewardPolicy { observations += it; it.ordinaryReward }).use {
+            rewardPolicy = PortfolioRewardPolicy {
+                observations += it;
+                it.ordinaryReward
+            },
+        ).use {
             it.minimize(ExecutionControl.Never)
         }
 
@@ -380,10 +468,14 @@ class PortfolioProgressTest {
     fun `refuted witness checking should cost work without accepted progress or reward`() {
         val events = mutableListOf<PortfolioEvent>()
         val worker = trackingWorker("search", 0, ScriptedSearch({ true }) { })
-        val result = Portfolio(listOf(worker), fixedBandit(1, 0),
+        val result = Portfolio(
+            listOf(worker),
+            fixedBandit(1, 0),
             witnessCheck = WitnessCheck { _, _ -> "invalid fixture witness" },
-            diagnostics = PortfolioDiagnostics(10), onProgress = events::add,
-            rewardPolicy = PortfolioRewardPolicy { error("refuted claims must not earn rewards") }).use {
+            diagnostics = PortfolioDiagnostics(10),
+            onProgress = events::add,
+            rewardPolicy = PortfolioRewardPolicy { error("refuted claims must not earn rewards") },
+        ).use {
             it.minimize(ExecutionControl.Never)
         }
 
@@ -398,25 +490,40 @@ class PortfolioProgressTest {
     @Test
     fun `deferred queries should require an accepted global improvement`() {
         for ((improves, rejected, perSlice) in listOf(
-            Triple(false, false, 1), Triple(true, false, 1), Triple(true, true, 1), Triple(true, false, 2),
+            Triple(false, false, 1),
+            Triple(true, false, 1),
+            Triple(true, true, 1),
+            Triple(true, false, 2),
         )) {
             var accepted = 0
             var queries = 0
             val secondProbe = improves && perSlice == 1
             val workers = listOf(
-                trackingWorker("finder", 0,
-                    ScriptedSearch({ it == 0 || (secondProbe && it == 1) }, perSlice = perSlice) { }),
+                trackingWorker(
+                    "finder",
+                    0,
+                    ScriptedSearch({ it == 0 || (secondProbe && it == 1) }, perSlice = perSlice) { },
+                ),
                 trackingWorker("local", 1, ScriptedSearch({ true }, start = 2_000.0) { }),
-                trackingWorker("deferred", 2, ScriptedSearch({ false }) {
+                trackingWorker(
+                    "deferred", 2,
+                    ScriptedSearch({ false }) {
                     assertTrue(accepted >= 2)
                     queries++
-                }).also { it.startAfterAcceptedImprovement = true },
+                }
+                ).also { it.startAfterAcceptedImprovement = true },
             )
-            Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
-                reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(24),
+            Portfolio.thompson(
+                workers,
+                baseSliceWork = 1,
+                maxSliceWork = 1,
+                sliceGrowth = 1.0,
+                reseedStaleThreshold = 0,
+                diagnostics = PortfolioDiagnostics(24),
                 witnessCheck = WitnessCheck { _, value ->
                     if (rejected && value == 998.0) "rejected improvement" else null
-                }).use { it.minimize(ExecutionControl.Never) { accepted++ } }
+                },
+            ).use { it.minimize(ExecutionControl.Never) { accepted++ } }
 
             assertEquals(improves && !rejected, queries > 0)
         }
@@ -429,8 +536,13 @@ class PortfolioProgressTest {
             trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { }),
             trackingWorker("deferred", 1, ScriptedSearch({ false }) { }).also { it.startAfterIncumbent = true },
         )
-        Portfolio.thompson(workers, baseSliceWork = 1, sliceGrowth = 1.0,
-            diagnostics = PortfolioDiagnostics(10), onProgress = events::add).use {
+        Portfolio.thompson(
+            workers,
+            baseSliceWork = 1,
+            sliceGrowth = 1.0,
+            diagnostics = PortfolioDiagnostics(10),
+            onProgress = events::add,
+        ).use {
             it.minimize(ExecutionControl.Never)
         }
 
@@ -450,16 +562,30 @@ class PortfolioProgressTest {
             var accepted = 0
             var queries = 0
             val workers = listOf(
-                trackingWorker("finder", 0, ScriptedSearch({ it == 0 },
-                    start = if (improves) 998.0 else 1_000.0) { }),
-                trackingWorker("deferred", 1, ScriptedSearch({ false }) {
+                trackingWorker(
+                    "finder", 0,
+                    ScriptedSearch(
+                    { it == 0 },
+                    start = if (improves) 998.0 else 1_000.0,
+                ) { }
+                ),
+                trackingWorker(
+                    "deferred", 1,
+                    ScriptedSearch({ false }) {
                     assertEquals(1, accepted)
                     queries++
-                }).also { it.startAfterAcceptedImprovement = true },
+                }
+                ).also { it.startAfterAcceptedImprovement = true },
             )
 
-            Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
-                reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(12)).use {
+            Portfolio.thompson(
+                workers,
+                baseSliceWork = 1,
+                maxSliceWork = 1,
+                sliceGrowth = 1.0,
+                reseedStaleThreshold = 0,
+                diagnostics = PortfolioDiagnostics(12),
+            ).use {
                 it.minimize(ExecutionControl.Never, { accepted++ }, incumbents)
             }
 
@@ -490,8 +616,14 @@ class PortfolioProgressTest {
                     .also { it.startAfterAcceptedImprovement = true },
             )
 
-            Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
-                reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(12)).use {
+            Portfolio.thompson(
+                workers,
+                baseSliceWork = 1,
+                maxSliceWork = 1,
+                sliceGrowth = 1.0,
+                reseedStaleThreshold = 0,
+                diagnostics = PortfolioDiagnostics(12),
+            ).use {
                 it.minimize(ExecutionControl.Never)
             }
 
@@ -510,8 +642,14 @@ class PortfolioProgressTest {
                 .also { it.startAfterAcceptedImprovement = true },
         )
 
-        Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
-            reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(12)).use {
+        Portfolio.thompson(
+            workers,
+            baseSliceWork = 1,
+            maxSliceWork = 1,
+            sliceGrowth = 1.0,
+            reseedStaleThreshold = 0,
+            diagnostics = PortfolioDiagnostics(12),
+        ).use {
             it.minimize(ExecutionControl { accepted == 2 }) { accepted++ }
         }
 
@@ -524,8 +662,11 @@ class PortfolioProgressTest {
         val worker = trackingWorker("search", 0, ScriptedSearch({ false }) { })
 
         assertFailsWith<IllegalArgumentException> {
-            Portfolio.thompson(listOf(worker), diagnostics = PortfolioDiagnostics(1),
-                rewardPolicy = PortfolioRewardPolicy { Double.NaN }).use { it.minimize(ExecutionControl.Never) }
+            Portfolio.thompson(
+                listOf(worker),
+                diagnostics = PortfolioDiagnostics(1),
+                rewardPolicy = PortfolioRewardPolicy { Double.NaN },
+            ).use { it.minimize(ExecutionControl.Never) }
         }
     }
 }

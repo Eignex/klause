@@ -7,6 +7,8 @@ internal fun PolynomialTheoryRequest.affineOperation(
     objective: LinearObjective,
     sense: ObjectiveSense,
 ): PolynomialTheoryRequest = PolynomialTheoryRequest(
-    problem, preparedPlan.withObjective(objective, sense == ObjectiveSense.MAXIMIZE),
-    sourcePreparation, originalPlan.withObjective(objective, sense == ObjectiveSense.MAXIMIZE),
+    problem,
+    preparedPlan.withObjective(objective, sense == ObjectiveSense.MAXIMIZE),
+    sourcePreparation,
+    originalPlan.withObjective(objective, sense == ObjectiveSense.MAXIMIZE),
 )

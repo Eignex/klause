@@ -9,10 +9,19 @@ import com.eignex.klause.lowering.LinComb
 
 internal fun Compiler.Builder.selectionTerm(condition: Int, whenTrue: Int, whenFalse: Int): IntComb {
     val index = litTo01(condition)
-    val result = newAuxVar(minOf(domains[whenTrue].min, domains[whenFalse].min),
-        maxOf(domains[whenTrue].max, domains[whenFalse].max))
-    factors.add(Element(index, result, longArrayOf(whenFalse.toLong(), whenTrue.toLong()),
-        arrIsVars = true, indexOffset = 0))
+    val result = newAuxVar(
+        minOf(domains[whenTrue].min, domains[whenFalse].min),
+        maxOf(domains[whenTrue].max, domains[whenFalse].max),
+    )
+    factors.add(
+        Element(
+        index,
+        result,
+        longArrayOf(whenFalse.toLong(), whenTrue.toLong()),
+        arrIsVars = true,
+        indexOffset = 0,
+    )
+    )
     definedVars.add(result)
     return IntComb.Narrow(LinComb(mapOf(result to 1L), 0L))
 }
@@ -61,8 +70,21 @@ internal fun Compiler.Builder.elementConstantMatrix(
     factors.add(Element(row, length, lengths, arrIsVars = false, indexOffset = rowOffset))
     factors.add(Linear(longArrayOf(1), intArrayOf(column), LinearOp.GE, columnOffset.toLong()))
     factors.add(Linear(longArrayOf(1, -1), intArrayOf(column, length), LinearOp.LE, columnOffset.toLong() - 1))
-    factors.add(Linear(longArrayOf(1, 1, -1), intArrayOf(start, column, index), LinearOp.EQ,
-        columnOffset.toLong()))
-    factors.add(Element(index, result, rows.flatMap { it.map(Int::toLong) }.toLongArray(),
-        arrIsVars = false, indexOffset = 0))
+    factors.add(
+        Linear(
+        longArrayOf(1, 1, -1),
+        intArrayOf(start, column, index),
+        LinearOp.EQ,
+        columnOffset.toLong(),
+    )
+    )
+    factors.add(
+        Element(
+        index,
+        result,
+        rows.flatMap { it.map(Int::toLong) }.toLongArray(),
+        arrIsVars = false,
+        indexOffset = 0,
+    )
+    )
 }

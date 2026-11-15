@@ -19,12 +19,23 @@ class NonlinearIntegerCursorTest {
     @Test
     fun `complement steering should preserve charged attempts and reach new allowed tuples`() {
         val parsed = SmtLibPolynomial.parse(
-            "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2))", allowIntegers = true,
+            "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2))",
+            allowIntegers = true,
         )
-        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
-            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
-        val params = NonlinearIntegerParams(arithmetic = QfNraParams(cellRefinement = true),
-            strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 6, reuseSourceCells = true)
+        val source = NonlinearIntegerProblem(
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.intVarNames,
+            parsed.realVarNames,
+            parsed.boolVarNames,
+        )
+        val params = NonlinearIntegerParams(
+            arithmetic = QfNraParams(cellRefinement = true),
+            strategy = NonlinearIntegerStrategy.SEARCH,
+            maximumCandidates = 6,
+            reuseSourceCells = true,
+        )
         val baseline = solveNonlinearIntegers(source, params)
 
         val steered = solveNonlinearIntegers(source, params.copy(steerSourceCells = true))
@@ -39,13 +50,25 @@ class NonlinearIntegerCursorTest {
     fun `steering should preserve slices and disposal for traversal and real repairs`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const n Int) (declare-const q Int) (declare-const r Real) " +
-                "(assert (= (* n n) 2)) (assert (= (* r r) 0))", allowIntegers = true,
+                "(assert (= (* n n) 2)) (assert (= (* r r) 0))",
+            allowIntegers = true,
         )
-        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
-            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
+        val source = NonlinearIntegerProblem(
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.intVarNames,
+            parsed.realVarNames,
+            parsed.boolVarNames,
+        )
         for (strategy in NonlinearIntegerStrategy.entries) {
-            val params = NonlinearIntegerParams(arithmetic = QfNraParams(cellRefinement = true),
-                strategy = strategy, maximumCandidates = 4, reuseSourceCells = true, steerSourceCells = true)
+            val params = NonlinearIntegerParams(
+                arithmetic = QfNraParams(cellRefinement = true),
+                strategy = strategy,
+                maximumCandidates = 4,
+                reuseSourceCells = true,
+                steerSourceCells = true,
+            )
             val whole = solveNonlinearIntegers(source, params)
             val cursor = NonlinearIntegerCursor(source, params, PolynomialCondition())
             assertNull(cursor.runSlice(maximumCandidates = 2))
@@ -65,12 +88,22 @@ class NonlinearIntegerCursorTest {
     @Test
     fun `source cells should avoid completions of unvisited tuples with repeated support`() {
         val parsed = SmtLibPolynomial.parse(
-            "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2))", allowIntegers = true,
+            "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2))",
+            allowIntegers = true,
         )
-        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
-            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
-        val params = NonlinearIntegerParams(arithmetic = QfNraParams(cellRefinement = true),
-            strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 12)
+        val source = NonlinearIntegerProblem(
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.intVarNames,
+            parsed.realVarNames,
+            parsed.boolVarNames,
+        )
+        val params = NonlinearIntegerParams(
+            arithmetic = QfNraParams(cellRefinement = true),
+            strategy = NonlinearIntegerStrategy.SEARCH,
+            maximumCandidates = 12,
+        )
         val baseline = solveNonlinearIntegers(source, params)
 
         val reused = solveNonlinearIntegers(source, params.copy(reuseSourceCells = true))
@@ -90,13 +123,25 @@ class NonlinearIntegerCursorTest {
                 "(assert (= (* (- (* n n) 2) (- n 2)) 0)) (assert (= (* r r) 0))",
             allowIntegers = true,
         )
-        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
-            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
+        val source = NonlinearIntegerProblem(
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.intVarNames,
+            parsed.realVarNames,
+            parsed.boolVarNames,
+        )
 
-        val execution = solveNonlinearIntegers(source, NonlinearIntegerParams(
-            arithmetic = QfNraParams(cellRefinement = true), strategy = NonlinearIntegerStrategy.SEARCH,
-            maximumCandidates = 8, reuseSourceCells = true, steerSourceCells = true,
-        ))
+        val execution = solveNonlinearIntegers(
+            source,
+            NonlinearIntegerParams(
+            arithmetic = QfNraParams(cellRefinement = true),
+            strategy = NonlinearIntegerStrategy.SEARCH,
+            maximumCandidates = 8,
+            reuseSourceCells = true,
+            steerSourceCells = true,
+        )
+        )
 
         val assignment = assertIs<QfNraResult.Satisfiable>(execution.result).assignment
         assertEquals(BigFraction.ofLong(2), assignment.realValue(1).rational)
@@ -110,11 +155,21 @@ class NonlinearIntegerCursorTest {
                 "(assert (or (and b (= (* n n) 2)) (and (not b) (= (* n n) 4))))",
             allowIntegers = true,
         )
-        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
-            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
-        val params = NonlinearIntegerParams(arithmetic = QfNraParams(cellRefinement = true),
-            strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 8, reuseSourceCells = true,
-            steerSourceCells = true)
+        val source = NonlinearIntegerProblem(
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.intVarNames,
+            parsed.realVarNames,
+            parsed.boolVarNames,
+        )
+        val params = NonlinearIntegerParams(
+            arithmetic = QfNraParams(cellRefinement = true),
+            strategy = NonlinearIntegerStrategy.SEARCH,
+            maximumCandidates = 8,
+            reuseSourceCells = true,
+            steerSourceCells = true,
+        )
         val first = solveNonlinearIntegers(source, params, PolynomialCondition(bools = mapOf(0 to true)))
         assertIs<QfNraResult.Unknown>(first.result)
         assertTrue(first.stats.cells.declined > 0)
@@ -131,21 +186,33 @@ class NonlinearIntegerCursorTest {
     @Test
     fun `producer and integer hull work should charge the containing meter once across completions`() {
         val parsed = SmtLibPolynomial.parse(
-            "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2))", allowIntegers = true,
+            "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2))",
+            allowIntegers = true,
         )
-        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
-            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
+        val source = NonlinearIntegerProblem(
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.intVarNames,
+            parsed.realVarNames,
+            parsed.boolVarNames,
+        )
         var charged = 0L
         val lifetime = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
             override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
-        val execution = solveNonlinearIntegers(source, NonlinearIntegerParams(
+        val execution = solveNonlinearIntegers(
+            source,
+            NonlinearIntegerParams(
             arithmetic = QfNraParams(cancellation = lifetime, maximumWork = 8_000, cellRefinement = true),
-            strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 12, reuseSourceCells = true,
+            strategy = NonlinearIntegerStrategy.SEARCH,
+            maximumCandidates = 12,
+            reuseSourceCells = true,
             steerSourceCells = true,
-        ))
+        )
+        )
 
         assertEquals(execution.stats.polynomial.workSpent, charged)
         assertTrue(charged > 0)
@@ -155,12 +222,23 @@ class NonlinearIntegerCursorTest {
     @Test
     fun `cell reuse should preserve slicing and a cancelled turn without resetting work`() {
         val parsed = SmtLibPolynomial.parse(
-            "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2))", allowIntegers = true,
+            "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2))",
+            allowIntegers = true,
         )
-        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
-            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
-        val params = NonlinearIntegerParams(arithmetic = QfNraParams(cellRefinement = true),
-            strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 12, reuseSourceCells = true)
+        val source = NonlinearIntegerProblem(
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.intVarNames,
+            parsed.realVarNames,
+            parsed.boolVarNames,
+        )
+        val params = NonlinearIntegerParams(
+            arithmetic = QfNraParams(cellRefinement = true),
+            strategy = NonlinearIntegerStrategy.SEARCH,
+            maximumCandidates = 12,
+            reuseSourceCells = true,
+        )
         val whole = solveNonlinearIntegers(source, params)
         NonlinearIntegerCursor(source, params, PolynomialCondition()).use { cursor ->
             assertNull(cursor.runSlice(maximumCandidates = 6))
@@ -194,9 +272,13 @@ class NonlinearIntegerCursorTest {
 
         val execution = solveNonlinearIntegers(
             source,
-            NonlinearIntegerParams(arithmetic = QfNraParams(cellRefinement = true),
-                strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 4,
-                reuseSourceCells = true, steerSourceCells = true),
+            NonlinearIntegerParams(
+                arithmetic = QfNraParams(cellRefinement = true),
+                strategy = NonlinearIntegerStrategy.SEARCH,
+                maximumCandidates = 4,
+                reuseSourceCells = true,
+                steerSourceCells = true,
+            ),
             condition,
         )
 
@@ -412,10 +494,17 @@ class NonlinearIntegerCursorTest {
     @Test
     fun `an empty integer root set should refute a rootless square despite its real roots`() {
         val parsed = SmtLibPolynomial.parse(
-            "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2))", allowIntegers = true,
+            "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2))",
+            allowIntegers = true,
         )
-        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
-            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
+        val source = NonlinearIntegerProblem(
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.intVarNames,
+            parsed.realVarNames,
+            parsed.boolVarNames,
+        )
         val params = NonlinearIntegerParams(strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 12)
         val baseline = solveNonlinearIntegers(source, params)
 
@@ -433,8 +522,14 @@ class NonlinearIntegerCursorTest {
             "(declare-const n Int) (declare-const q Int) (assert (= (* (- (* n n) 2) (- n 2)) 0))",
             allowIntegers = true,
         )
-        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
-            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
+        val source = NonlinearIntegerProblem(
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.intVarNames,
+            parsed.realVarNames,
+            parsed.boolVarNames,
+        )
         val params = NonlinearIntegerParams(strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 12)
         val baseline = solveNonlinearIntegers(source, params)
 
@@ -448,19 +543,33 @@ class NonlinearIntegerCursorTest {
     @Test
     fun `changed windows should refute only scopes that miss every admitted root`() {
         val parsed = SmtLibPolynomial.parse(
-            "(declare-const n Int) (assert (= (* (- n 2) (- (* 2 n) 1)) 0))", allowIntegers = true,
+            "(declare-const n Int) (assert (= (* (- n 2) (- (* 2 n) 1)) 0))",
+            allowIntegers = true,
         )
-        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
-            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
-        val params = NonlinearIntegerParams(strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 4,
-            admitIntegerRoots = true)
+        val source = NonlinearIntegerProblem(
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.intVarNames,
+            parsed.realVarNames,
+            parsed.boolVarNames,
+        )
+        val params = NonlinearIntegerParams(
+            strategy = NonlinearIntegerStrategy.SEARCH,
+            maximumCandidates = 4,
+            admitIntegerRoots = true,
+        )
         val roots = NonlinearIntegerRootStore(source)
         val rational = PolynomialCondition(lower = mapOf(0 to BigFraction.ZERO), upper = mapOf(0 to BigFraction.ONE))
         val baseline = solveNonlinearIntegers(source, params.copy(admitIntegerRoots = false), rational)
 
         val narrow = solveNonlinearIntegers(source, params, rational, roots)
-        val widened = solveNonlinearIntegers(source, params,
-            PolynomialCondition(lower = mapOf(0 to BigFraction.ZERO), upper = mapOf(0 to BigFraction.ofLong(3))), roots)
+        val widened = solveNonlinearIntegers(
+            source,
+            params,
+            PolynomialCondition(lower = mapOf(0 to BigFraction.ZERO), upper = mapOf(0 to BigFraction.ofLong(3))),
+            roots,
+        )
 
         assertIs<QfNraResult.Unknown>(baseline.result)
         assertIs<QfNraResult.Unsatisfiable>(narrow.result)
@@ -477,10 +586,19 @@ class NonlinearIntegerCursorTest {
                 "(assert (or (and b (= (* n n) 2)) (and (not b) (= (* n n) 4))))",
             allowIntegers = true,
         )
-        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
-            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
-        val params = NonlinearIntegerParams(strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 8,
-            admitIntegerRoots = true)
+        val source = NonlinearIntegerProblem(
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.intVarNames,
+            parsed.realVarNames,
+            parsed.boolVarNames,
+        )
+        val params = NonlinearIntegerParams(
+            strategy = NonlinearIntegerStrategy.SEARCH,
+            maximumCandidates = 8,
+            admitIntegerRoots = true,
+        )
 
         val guarded = solveNonlinearIntegers(source, params, PolynomialCondition(bools = mapOf(0 to true)))
         val alternative = solveNonlinearIntegers(source, params, PolynomialCondition(bools = mapOf(0 to false)))
@@ -498,15 +616,25 @@ class NonlinearIntegerCursorTest {
             "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 4)) (assert (= (* q q) (+ n 4)))",
             allowIntegers = true,
         )
-        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
-            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
+        val source = NonlinearIntegerProblem(
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.intVarNames,
+            parsed.realVarNames,
+            parsed.boolVarNames,
+        )
         var charged = 0L
         val lifetime = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
             override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
-        val params = NonlinearIntegerParams(arithmetic = QfNraParams(cancellation = lifetime),
-            strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 6, admitIntegerRoots = true)
+        val params = NonlinearIntegerParams(
+            arithmetic = QfNraParams(cancellation = lifetime),
+            strategy = NonlinearIntegerStrategy.SEARCH,
+            maximumCandidates = 6,
+            admitIntegerRoots = true,
+        )
         val whole = solveNonlinearIntegers(source, params)
         val wholeCharge = charged
         NonlinearIntegerCursor(source, params, PolynomialCondition()).use { cursor ->

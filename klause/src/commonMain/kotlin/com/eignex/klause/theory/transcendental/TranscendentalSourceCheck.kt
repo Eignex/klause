@@ -32,15 +32,20 @@ internal class TranscendentalSourceCheck(
             if (node in expressions) continue
             val children = when (node) {
                 is TranscendentalExpression.Function -> listOf(node.argument)
+
                 is TranscendentalExpression.Sum -> node.operands
+
                 is TranscendentalExpression.Product -> node.operands
+
                 is TranscendentalExpression.Power -> listOf(node.base)
+
                 is TranscendentalExpression.Conditional -> when (check(node.condition)) {
                     SourceTruth.TRUE -> listOf(node.whenTrue)
                     SourceTruth.FALSE -> listOf(node.whenFalse)
                     SourceTruth.DOMAIN_INVALID -> throw RealDomainInvalid()
                     SourceTruth.UNKNOWN, SourceTruth.DOMAIN_UNKNOWN -> throw RealCertificationUnavailable()
                 }
+
                 else -> emptyList()
             }
             if (!combine && children.isNotEmpty()) {
@@ -50,22 +55,31 @@ internal class TranscendentalSourceCheck(
             }
             expressions[node] = when (node) {
                 is TranscendentalExpression.ExactValue -> node.value
+
                 is TranscendentalExpression.Constant -> arithmetic.rational(
                     BigFraction.of(node.value.numerator, node.value.denominator),
                 )
+
                 is TranscendentalExpression.Variable -> coordinates[node.id.index]
+
                 TranscendentalExpression.Pi -> arithmetic.pi()
+
                 is TranscendentalExpression.Function -> arithmetic.function(
                     when (node.function) {
                         com.eignex.klause.ir.TranscendentalFunction.EXP -> ExactRealFunction.EXP
                         com.eignex.klause.ir.TranscendentalFunction.LOG -> ExactRealFunction.LOG
                         com.eignex.klause.ir.TranscendentalFunction.SIN -> ExactRealFunction.SIN
                         com.eignex.klause.ir.TranscendentalFunction.COS -> ExactRealFunction.COS
-                    }, expressions.getValue(node.argument),
+                    },
+                    expressions.getValue(node.argument),
                 )
+
                 is TranscendentalExpression.Sum -> arithmetic.add(children.map(expressions::getValue))
+
                 is TranscendentalExpression.Product -> arithmetic.multiply(children.map(expressions::getValue))
+
                 is TranscendentalExpression.Power -> arithmetic.power(expressions.getValue(node.base), node.exponent)
+
                 is TranscendentalExpression.Conditional -> expressions.getValue(children.single())
             }
         }
@@ -80,17 +94,24 @@ internal class TranscendentalSourceCheck(
             val (node, _) = pending.removeLast()
             if (node in formulas) continue
             val children = when (node) {
-                is TranscendentalDistinct -> listOf(distincts.getOrPut(node) {
+                is TranscendentalDistinct -> listOf(
+                    distincts.getOrPut(node) {
                     transcendentalDistinctEncoding(node, arithmetic.transcendental::step)
-                })
+                }
+                )
+
                 is TranscendentalFormula.Not -> listOf(node.operand)
+
                 is TranscendentalFormula.And -> node.operands
+
                 is TranscendentalFormula.Or -> node.operands
+
                 is TranscendentalFormula.Conditional -> when (formulas[node.condition]) {
                     SourceTruth.TRUE -> listOf(node.condition, node.whenTrue)
                     SourceTruth.FALSE -> listOf(node.condition, node.whenFalse)
                     else -> listOf(node.condition)
                 }
+
                 else -> emptyList()
             }
             if (children.any { it !in formulas }) {
@@ -100,11 +121,15 @@ internal class TranscendentalSourceCheck(
             }
             formulas[node] = when (node) {
                 is TranscendentalFormula.Constant -> if (node.value) SourceTruth.TRUE else SourceTruth.FALSE
+
                 is TranscendentalFormula.BooleanVariable -> {
                     if (bools[node.id.index]) SourceTruth.TRUE else SourceTruth.FALSE
                 }
+
                 is TranscendentalFormula.Atom -> atom(node)
+
                 is TranscendentalDistinct -> formulas.getValue(children.single())
+
                 is TranscendentalFormula.Not -> when (formulas.getValue(node.operand)) {
                     SourceTruth.TRUE -> SourceTruth.FALSE
                     SourceTruth.FALSE -> SourceTruth.TRUE
@@ -112,11 +137,13 @@ internal class TranscendentalSourceCheck(
                     SourceTruth.DOMAIN_INVALID -> SourceTruth.DOMAIN_INVALID
                     SourceTruth.DOMAIN_UNKNOWN -> SourceTruth.DOMAIN_UNKNOWN
                 }
+
                 is TranscendentalFormula.Conditional -> when (val selected = formulas.getValue(node.condition)) {
                     SourceTruth.TRUE -> formulas.getValue(node.whenTrue)
                     SourceTruth.FALSE -> formulas.getValue(node.whenFalse)
                     else -> selected
                 }
+
                 is TranscendentalFormula.And, is TranscendentalFormula.Or -> {
                     val truth = children.map(formulas::getValue)
                     when {
@@ -136,7 +163,9 @@ internal class TranscendentalSourceCheck(
 
     private fun atom(atom: TranscendentalFormula.Atom): SourceTruth = try {
         val comparison = arithmetic.compare(evaluate(atom.left), evaluate(atom.right))
-        if (comparison == null) SourceTruth.UNKNOWN else {
+        if (comparison == null) {
+            SourceTruth.UNKNOWN
+        } else {
             val holds = when (atom.relation) {
                 PolynomialRelation.EQ -> comparison == 0
                 PolynomialRelation.NE -> comparison != 0

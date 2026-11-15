@@ -49,8 +49,10 @@ data class SharingStats(
     constructor(channels: Map<SharingChannel, ChannelTraffic> = emptyMap()) : this(channels, emptyMap(), emptyMap())
 
     /** Copy traffic and clause observations while retaining incumbent observations. */
-    fun copy(channels: Map<SharingChannel, ChannelTraffic> = this.channels,
-        clauses: Map<String, Long> = this.clauses): SharingStats = SharingStats(channels, clauses, incumbents)
+    fun copy(
+        channels: Map<SharingChannel, ChannelTraffic> = this.channels,
+        clauses: Map<String, Long> = this.clauses,
+    ): SharingStats = SharingStats(channels, clauses, incumbents)
 
     /** Copy channel traffic while retaining clause observations. */
     fun copy(channels: Map<SharingChannel, ChannelTraffic> = this.channels): SharingStats =

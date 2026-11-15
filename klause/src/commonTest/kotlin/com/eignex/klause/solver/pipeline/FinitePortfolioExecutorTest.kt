@@ -38,13 +38,22 @@ class FinitePortfolioExecutorTest {
         val source = Problem(0, 3, Array(3) { IntDomain(0, 1) }, emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 2, 3))
         val prepared = source.prepareExecutionPlan(objective, preferFinite = true)
-        val scenario = PortfolioScenario(cores = 1, arms = PortfolioScenario.DEFAULT_ARMS,
-            kind = Kind.COP, engine = EngineMix.MIXED)
-        val schedules = listOf(InitialProbePolicy.FAMILY_WORK, InitialProbePolicy.HEURISTIC_WORK,
-            InitialProbePolicy.ALNS_WORK).map { policy ->
-            val invocation = FinitePipeline.portfolioExecutor(source.bake(), scenario, objective, null, null,
+        val scenario = PortfolioScenario(
+            cores = 1,
+            arms = PortfolioScenario.DEFAULT_ARMS,
+            kind = Kind.COP,
+            engine = EngineMix.MIXED,
+        )
+        val schedules = listOf(
+            InitialProbePolicy.FAMILY_WORK,
+            InitialProbePolicy.HEURISTIC_WORK,
+            InitialProbePolicy.ALNS_WORK,
+        ).map { policy ->
+            val invocation = FinitePipeline.portfolioExecutor(
+                source.bake(), scenario, objective, null, null,
                 null, null, prepared, ExecutionControl.after(1.seconds), numericalCompletion = false,
-                probePolicy = policy)
+                probePolicy = policy,
+            )
             invocation.use { it.minimize(ExecutionControl { true }, null) }.stats.portfolio
         }
 
@@ -102,11 +111,14 @@ class FinitePortfolioExecutorTest {
         val visits = mutableListOf<Int>()
         val elapsed = LongArray(3)
         val workers = List(3) { arm ->
-            trackingWorker("worker$arm", arm, ScriptedSearch({ arm == 2 && it == 0 }) {
+            trackingWorker(
+                "worker$arm", arm,
+                ScriptedSearch({ arm == 2 && it == 0 }) {
                 visits += arm
                 elapsed[arm] += 100L
                 clock += 100.milliseconds
-            }).also { if (arm == 2) it.family = ArmFamily.LocalSearch }
+            }
+            ).also { if (arm == 2) it.family = ArmFamily.LocalSearch }
         }
 
         Portfolio(workers, fixedBandit(3, 2), reseedStaleThreshold = 0).also {
@@ -121,8 +133,16 @@ class FinitePortfolioExecutorTest {
 
     @Test
     fun `LP transfers should preserve non-LP sibling probe shares`() {
-        val labels = listOf("bt/satOptimized", "bt/lp-default", "ls/fixed", "ls/plateau",
-            "ls/smooth", "ls/sa", "alns/balanced", "bt/lp-aggressive")
+        val labels = listOf(
+            "bt/satOptimized",
+            "bt/lp-default",
+            "ls/fixed",
+            "ls/plateau",
+            "ls/smooth",
+            "ls/sa",
+            "alns/balanced",
+            "bt/lp-aggressive",
+        )
         val workers = labels.mapIndexed { arm, label ->
             trackingWorker(label, arm, ScriptedSearch({ false }) {}).also {
                 if (arm in 2..6) it.family = ArmFamily.LocalSearch
@@ -200,8 +220,11 @@ class FinitePortfolioExecutorTest {
             }
 
             Portfolio(workers, fixedBandit(3, 0)).also {
-                it.initialProbeWeights = if (transfer) lpTransferredProbeWeights(workers)
-                else leadingProbeWeights(workers)
+                it.initialProbeWeights = if (transfer) {
+                    lpTransferredProbeWeights(workers)
+                } else {
+                    leadingProbeWeights(workers)
+                }
             }.use { it.minimize(ExecutionControl { visits.size >= 3 }) }
 
             assertEquals(listOf(0, 1, 2), visits)
@@ -226,11 +249,14 @@ class FinitePortfolioExecutorTest {
         for (failed in listOf(false, true)) {
             val visits = mutableListOf<Int>()
             val workers = List(3) { arm ->
-                trackingWorker(if (arm == 0) "bt/lp-default" else "worker$arm", arm,
+                trackingWorker(
+                    if (arm == 0) "bt/lp-default" else "worker$arm",
+                    arm,
                     ScriptedSearch({ false }) {
                         visits += arm
                         if (failed && arm == 1) error("initial attempt failed")
-                    }).also { if (arm == 2) it.family = ArmFamily.LocalSearch }
+                    },
+                ).also { if (arm == 2) it.family = ArmFamily.LocalSearch }
             }
             val observer = deferredLpProbes(workers)
 
@@ -246,8 +272,11 @@ class FinitePortfolioExecutorTest {
     fun `an accepted incumbent should admit deferred LP before the remaining initial probes`() {
         val visits = mutableListOf<Int>()
         val workers = List(3) { arm ->
-            trackingWorker(if (arm == 0) "bt/lp-default" else "worker$arm", arm,
-                ScriptedSearch({ arm == 1 && it == 0 }) { visits += arm })
+            trackingWorker(
+                if (arm == 0) "bt/lp-default" else "worker$arm",
+                arm,
+                ScriptedSearch({ arm == 1 && it == 0 }) { visits += arm },
+            )
                 .also { if (arm == 2) it.family = ArmFamily.LocalSearch }
         }
         val observer = deferredLpProbes(workers)
@@ -264,14 +293,17 @@ class FinitePortfolioExecutorTest {
         val clock = TestTimeSource()
         val elapsed = LongArray(3)
         val workers = List(3) { arm ->
-            trackingWorker(if (arm == 0) "bt/lp-default" else "worker$arm", arm,
+            trackingWorker(
+                if (arm == 0) "bt/lp-default" else "worker$arm",
+                arm,
                 ScriptedSearch({ arm == 1 && it == 0 }) {
                     elapsed[arm] += 100L
                     clock += 100.milliseconds
-                }).also {
-                    if (arm == 1) it.restartingSearch = true
-                    if (arm == 2) it.family = ArmFamily.LocalSearch
-                }
+                },
+            ).also {
+                if (arm == 1) it.restartingSearch = true
+                if (arm == 2) it.family = ArmFamily.LocalSearch
+            }
         }
         val observer = deferredLpProbes(workers)
 
@@ -288,12 +320,22 @@ class FinitePortfolioExecutorTest {
             val source = exactlyOneOver(8)
             val objective = LinearObjective(LongArray(8) { (8 - it).toLong() })
             val prepared = source.prepareExecutionPlan(objective, preferFinite = true)
-            val scenario = PortfolioScenario(cores = 1, arms = 6, kind = Kind.COP, engine = EngineMix.MIXED,
-                seed = 17, sliceWork = 1, maxSliceWork = 4, diagnosticWorkLimit = 256)
+            val scenario = PortfolioScenario(
+                cores = 1,
+                arms = 6,
+                kind = Kind.COP,
+                engine = EngineMix.MIXED,
+                seed = 17,
+                sliceWork = 1,
+                maxSliceWork = 4,
+                diagnosticWorkLimit = 256,
+            )
             val trace = mutableListOf<PortfolioEvent>()
-            val executor = FinitePipeline.portfolioExecutor(source.bake(), scenario, objective, null, null,
+            val executor = FinitePipeline.portfolioExecutor(
+                source.bake(), scenario, objective, null, null,
                 { _, event -> if (event is SearchEvent.PortfolioDiagnostic) trace += event.event },
-                null, prepared, ExecutionControl.Never)
+                null, prepared, ExecutionControl.Never,
+            )
 
             executor.use { it.minimize(ExecutionControl.Never, null) }
             trace

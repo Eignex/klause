@@ -12,7 +12,9 @@ internal interface ArithmeticWorkSource {
 internal class WorkReservation(val capacity: Int, private val settlement: (Int) -> Unit) {
     private var settled = false
 
-    init { require(capacity > 0) }
+    init {
+        require(capacity > 0)
+    }
 
     fun settle(used: Int) {
         require(used in 0..capacity)
@@ -40,19 +42,27 @@ internal fun ArithmeticWorkSource.withQuota(bound: ArithmeticWorkSource): Arithm
         override val quotaRemaining: Long? get() {
             val own = this@withQuota.quotaRemaining
             val remaining = bound.quotaRemaining
-            return if (own == null) remaining else if (remaining == null) own else minOf(own, remaining)
+            return if (own == null) remaining else if (remaining == null) {
+                own
+            } else {
+                minOf(own, remaining)
+            }
         }
         override val quotaAvailable: Long? get() {
             val own = this@withQuota.quotaAvailable
             val available = bound.quotaAvailable
-            return if (own == null) available else if (available == null) own else minOf(own, available)
+            return if (own == null) available else if (available == null) {
+                own
+            } else {
+                minOf(own, available)
+            }
         }
         override val exhausted: Boolean get() = this@withQuota.exhausted || quotaRemaining?.let { it <= 0L } == true
-    override fun reserve(maximum: Int): WorkReservation? {
+        override fun reserve(maximum: Int): WorkReservation? {
             val capacity = minOf(maximum.toLong(), quotaAvailable?.coerceAtLeast(0L) ?: Long.MAX_VALUE).toInt()
-        return if (capacity == 0) null else this@withQuota.reserve(capacity)
+            return if (capacity == 0) null else this@withQuota.reserve(capacity)
+        }
     }
-}
 
 internal fun serialArithmeticSource(
     parent: ExecutionControl,
@@ -88,7 +98,7 @@ internal class ArithmeticExecution(
     private var metered = false
     val unchecked: Boolean = cancellation === ExecutionControl.Never
     private var depth = 0
-    private var quantum = 2048
+    private var quantum = 8192
     private var untilPoll = quantum
     private var reservation: WorkReservation? = null
     private var used = 0
@@ -97,7 +107,7 @@ internal class ArithmeticExecution(
     val batching: Boolean get() = depth != 0
     val admittedWork: Long get() = if (reservation == null) 0L else used.toLong()
 
-    inline fun <T> operation(quantum: Int = 2048, body: () -> T): T {
+    inline fun <T> operation(quantum: Int = 8192, body: () -> T): T {
         if (unchecked) {
             require(quantum > 0)
             return body()
@@ -196,7 +206,7 @@ internal class ArithmeticExecution(
         if (reservation == null) {
             while (reservation == null) {
                 // A sibling can temporarily hold the remaining credit without having spent it.
-                reservation = source!!.reserve(minOf(quantum, 4096) * 8)
+                reservation = source!!.reserve(32768)
                 if (reservation == null) checkpoint()
             }
         }
@@ -246,7 +256,7 @@ internal class ArithmeticExecution(
             if (stopped) interrupted()
             if (metered && reservation == null) {
                 while (reservation == null) {
-                    reservation = source!!.reserve(minOf(quantum, 4096) * 8)
+                    reservation = source!!.reserve(32768)
                     if (reservation == null) checkpoint()
                 }
             }

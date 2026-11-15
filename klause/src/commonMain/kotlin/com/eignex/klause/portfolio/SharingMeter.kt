@@ -109,9 +109,8 @@ internal class SharingMeter {
 }
 
 /** This source read through [meter], charging each read to [SharingChannel.Incumbents]. */
-internal fun <A, V> IncumbentSource<A, V>.metered(meter: SharingMeter): IncumbentSource<A, V> =
-    IncumbentSource {
-        meter.timed(SharingChannel.Incumbents) {
-            current().also { meter.observed(SharingChannel.Incumbents, it?.version ?: 0L) }
-        }
+internal fun <A, V> IncumbentSource<A, V>.metered(meter: SharingMeter): IncumbentSource<A, V> = IncumbentSource {
+    meter.timed(SharingChannel.Incumbents) {
+        current().also { meter.observed(SharingChannel.Incumbents, it?.version ?: 0L) }
     }
+}

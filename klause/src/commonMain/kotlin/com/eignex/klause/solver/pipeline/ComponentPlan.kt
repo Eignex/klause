@@ -136,8 +136,11 @@ class ComponentPlan internal constructor(
                 val kept = fragment.factors.indices.filter { index ->
                     (fragment.factors[index] as EncodedTheoryFactor).attribution.sourceFactorIndex < spec.numFactors
                 }
-                fragment.rebindEncoding(spec, Array(kept.size) { fragment.factors[kept[it]] },
-                    fragment.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } })
+                fragment.rebindEncoding(
+                    spec,
+                    Array(kept.size) { fragment.factors[kept[it]] },
+                    fragment.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } },
+                )
             },
         )
     }
@@ -201,13 +204,17 @@ class ComponentPlan internal constructor(
     fun theoryFragment(spec: Problem): Problem {
         requireBelongsTo(spec)
         val kept = selectedTheoryFactorIndices()
-        return spec.withFactors(Array(kept.size) { spec.factors[kept[it]] },
-            spec.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } })
+        return spec.withFactors(
+            Array(kept.size) { spec.factors[kept[it]] },
+            spec.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } },
+        )
     }
 
     private fun selectedTheoryFactorIndices(): List<Int> = factorOwners.indices.filter {
-        encodingFactors[it] || (theoryPipeline != ProblemPipeline.FINITE_CP &&
-            theoryPipeline != ProblemPipeline.DIFFERENCE_THEORY && factorOwners[it] == FactorOwner.SHARED)
+        encodingFactors[it] || (
+            theoryPipeline != ProblemPipeline.FINITE_CP &&
+            theoryPipeline != ProblemPipeline.DIFFERENCE_THEORY && factorOwners[it] == FactorOwner.SHARED
+        )
     }
 
     internal fun encodedTheoryFragment(spec: Problem): Problem? {
@@ -219,8 +226,10 @@ class ComponentPlan internal constructor(
     internal fun theoryOwnedFragment(spec: Problem): Problem {
         requireBelongsTo(spec)
         val kept = encodedFactorIndices
-        return spec.withFactors(Array(kept.size) { spec.factors[kept[it]] },
-            spec.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } })
+        return spec.withFactors(
+            Array(kept.size) { spec.factors[kept[it]] },
+            spec.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } },
+        )
     }
 
     internal fun forObjectiveRound(
@@ -234,14 +243,15 @@ class ComponentPlan internal constructor(
         if (appended) {
             val selected = source.factors.last()
             val replacement = spec.factors.last()
-            require(selected is Linear &&
-                replacement is Linear &&
-                selected.op == replacement.op && selected.vars.contentEquals(replacement.vars) &&
-                selected.constants is IntegralConstants &&
-                replacement.constants is IntegralConstants &&
-                selected.vars.indices.all { k ->
-                    selected.constants.exactCoeff(k) == replacement.constants.exactCoeff(k)
-                }
+            require(
+                selected is Linear &&
+                    replacement is Linear &&
+                    selected.op == replacement.op && selected.vars.contentEquals(replacement.vars) &&
+                    selected.constants is IntegralConstants &&
+                    replacement.constants is IntegralConstants &&
+                    selected.vars.indices.all { k ->
+                        selected.constants.exactCoeff(k) == replacement.constants.exactCoeff(k)
+                    },
             ) { "objective round must retain the planned row's columns and coefficients" }
         }
         val selection = if (appended) {
@@ -273,10 +283,11 @@ class ComponentPlan internal constructor(
     }
 
     private fun requireSamePrefix(spec: Problem, count: Int) {
-        require(spec.numBoolVars == source.numBoolVars && spec.numIntVars == source.numIntVars &&
-            spec.numRealVars == source.numRealVars && spec.realLower.contentEquals(source.realLower) &&
-            spec.realUpper.contentEquals(source.realUpper) && spec.factors.size >= count &&
-            (0 until count).all { spec.factors[it] === source.factors[it] }
+        require(
+            spec.numBoolVars == source.numBoolVars && spec.numIntVars == source.numIntVars &&
+                spec.numRealVars == source.numRealVars && spec.realLower.contentEquals(source.realLower) &&
+                spec.realUpper.contentEquals(source.realUpper) && spec.factors.size >= count &&
+                (0 until count).all { spec.factors[it] === source.factors[it] },
         ) { "component plan belongs to a different source model" }
         for (v in 0 until source.numIntVars) {
             val before = source.intBounds
@@ -293,7 +304,7 @@ class ComponentPlan internal constructor(
                     (
                         narrowed != null && narrowed.min >= declared.min && narrowed.max <= declared.max &&
                             narrowed == declared.withMinAtLeast(narrowed.min).withMaxAtMost(narrowed.max)
-                    ),
+                        ),
             ) {
                 "objective round must only narrow declared values"
             }
@@ -318,16 +329,26 @@ class ComponentPlan internal constructor(
         if (spec.numIntVars == 0 && spec.numRealVars == 0 && !retainEmptyTheory) return this
         val selected = spec.componentPlan(factorProjections, cancellation = cancellation)
         if (selected.theoryPipeline == ProblemPipeline.UNSUPPORTED_OPEN) return null
-        val fragment = factorProjections.linearTheoryModel(EncodingTarget.LINEAR,
-            selected.selectedTheoryFactorIndices(), cancellation = cancellation,
-            completeFiniteConditions = true) ?: return null
+        val fragment = factorProjections.linearTheoryModel(
+            EncodingTarget.LINEAR,
+            selected.selectedTheoryFactorIndices(),
+            cancellation = cancellation,
+            completeFiniteConditions = true,
+        ) ?: return null
         val route = when {
             fragment.supportsExactLra() -> ProblemPipeline.EXACT_LRA
             fragment.supportsExactLira() -> ProblemPipeline.EXACT_LIRA
             else -> return null
         }
-        return ComponentPlan(spec, intOwners, selected.factorOwners, route, factorProjections = factorProjections,
-            encodingFactors = selected.encodingFactors, installedFragment = fragment)
+        return ComponentPlan(
+            spec,
+            intOwners,
+            selected.factorOwners,
+            route,
+            factorProjections = factorProjections,
+            encodingFactors = selected.encodingFactors,
+            installedFragment = fragment,
+        )
     }
 
     internal fun requireSource(spec: Problem) = requireBelongsTo(spec)
@@ -363,8 +384,7 @@ class CpProblemProjection internal constructor(
     private val cpToSource: IntArray,
 ) {
     /** CP location for a source integer, or null when theory-owned. */
-    fun cpId(sourceIntVar: SourceIntId): CpIntId? =
-        cpId(sourceIntVar.index).takeIf { it >= 0 }?.let(::CpIntId)
+    fun cpId(sourceIntVar: SourceIntId): CpIntId? = cpId(sourceIntVar.index).takeIf { it >= 0 }?.let(::CpIntId)
 
     /** Source location for an integer owned by this CP projection. */
     fun sourceId(cpIntVar: CpIntId): SourceIntId = SourceIntId(sourceId(cpIntVar.index))
@@ -385,12 +405,11 @@ fun Problem.componentPlan(projections: PreparedFactorProjections, preferFinite: 
     componentPlan(projections, preferFinite, ExecutionControl.Never)
 
 /** Select component ownership from the source model. */
-fun Problem.componentPlan(preferFinite: Boolean = false, cancellation: ExecutionControl): ComponentPlan =
-    componentPlan(
-        (this as? BakedProblem)?.factorProjections ?: FactorProjectionProviders.Default.prepare(this),
-        preferFinite,
-        cancellation,
-    )
+fun Problem.componentPlan(preferFinite: Boolean = false, cancellation: ExecutionControl): ComponentPlan = componentPlan(
+    (this as? BakedProblem)?.factorProjections ?: FactorProjectionProviders.Default.prepare(this),
+    preferFinite,
+    cancellation,
+)
 
 /** Select component ownership using the descriptors captured for this canonical source. */
 fun Problem.componentPlan(
@@ -432,9 +451,15 @@ internal fun Problem.buildComponentPlan(
     val stop = cancellation.encodingPreparationScope()
     fun install(target: EncodingTarget, indices: List<Int>, onDecline: (EncoderDecline) -> Unit): Problem? =
         preparationBudget.observePreparation(PresolvePreparationStage.SOURCE_ROWS, PresolveLane.SOURCE, this, stop) {
-                token, _ ->
+                token,
+                _,
+            ->
             retained?.model(target, indices, token) ?: projections.requestEncoders(
-                target, indices, cancellation = token, completeFiniteConditions = true, onDecline = onDecline,
+                target,
+                indices,
+                cancellation = token,
+                completeFiniteConditions = true,
+                onDecline = onDecline,
             )?.let {
                 projections.linearTheoryModel(it, onDecline)
             }
@@ -451,15 +476,19 @@ internal fun Problem.buildComponentPlan(
         null
     } else {
         install(EncodingTarget.DIFFERENCE, allFactors) {
-        fullDifferenceDecline = it
-        if (it == EncoderDecline.RESOURCE) initialResourceDecline = true
-    }
+            fullDifferenceDecline = it
+            if (it == EncoderDecline.RESOURCE) initialResourceDecline = true
+        }
     }
     val completeTheory = when {
         linear?.supportsExactLra() == true -> ProblemPipeline.EXACT_LRA
 
         difference != null && numRealVars == 0 && supportsCompleteDifferenceTheory(
-            difference.factors, numIntVars, intBounds) -> ProblemPipeline.DIFFERENCE_THEORY
+            difference.factors,
+            numIntVars,
+            intBounds,
+        ) -> ProblemPipeline.DIFFERENCE_THEORY
+
         linear?.supportsExactLira() == true -> ProblemPipeline.EXACT_LIRA
 
         else -> null
@@ -502,23 +531,23 @@ internal fun Problem.buildComponentPlan(
             if (!enforcesSource(index) ||
                 (
                     !encoded[index] && factor.intVars.none { relevantIntegers[it] } &&
-                    factor.variables.reals.none { relevantReals[it] }
-                )
+                        factor.variables.reals.none { relevantReals[it] }
+                    )
             ) {
                 continue
             }
             encoded[index] = true
             for (variable in factor.intVars) {
                 if (!relevantIntegers[variable]) {
-                relevantIntegers[variable] = true
-                changed = true
-            }
+                    relevantIntegers[variable] = true
+                    changed = true
+                }
             }
             for (variable in factor.variables.reals) {
                 if (!relevantReals[variable]) {
-                relevantReals[variable] = true
-                changed = true
-            }
+                    relevantReals[variable] = true
+                    changed = true
+                }
             }
         }
     }
@@ -584,12 +613,17 @@ internal fun Problem.buildComponentPlan(
         fragment?.supportsExactLra() == true -> ProblemPipeline.EXACT_LRA
 
         differenceFragment != null && numRealVars == 0 && supportsCompleteDifferenceTheory(
-            differenceFragment.factors, numIntVars, intBounds) -> ProblemPipeline.DIFFERENCE_THEORY
+            differenceFragment.factors,
+            numIntVars,
+            intBounds,
+        ) -> ProblemPipeline.DIFFERENCE_THEORY
+
         fragment?.supportsExactLira() == true -> ProblemPipeline.EXACT_LIRA
 
         else -> ProblemPipeline.UNSUPPORTED_OPEN
     }
-    return ComponentPlan(this, intOwners, factorOwners, route,
+    return ComponentPlan(
+        this, intOwners, factorOwners, route,
         unownedOpenColumn?.let { unplaceable(it, projections, factorOwners) }, projections, encoded,
         when {
             preparationStopped || stop() -> null
@@ -601,11 +635,11 @@ internal fun Problem.buildComponentPlan(
         } else if (preparationStopped || stop() || linearDecline == EncoderDecline.RESOURCE ||
             differenceDecline == EncoderDecline.RESOURCE
         ) {
-                EncoderDecline.RESOURCE
-            } else {
-                linearDecline ?: differenceDecline ?: fullLinearDecline ?: fullDifferenceDecline
-            },
-                )
+            EncoderDecline.RESOURCE
+        } else {
+            linearDecline ?: differenceDecline ?: fullLinearDecline ?: fullDifferenceDecline
+        },
+    )
 }
 
 /**

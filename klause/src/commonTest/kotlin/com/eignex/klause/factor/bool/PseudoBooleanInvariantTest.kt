@@ -30,7 +30,8 @@ class PseudoBooleanInvariantTest {
         val factor = PseudoBoolean(weights, literals, PbOp.EQ, wide)
         val problem = Problem(2, 0, emptyArray(), arrayOf(factor))
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
-        for (mask in 0 until 4) for (variable in 0..1) {
+        for (mask in 0 until 4) {
+            for (variable in 0..1) {
             for (v in 0..1) state.assignment.setBool(v, mask and (1 shl v) != 0)
             state.recompute()
             var sourceSum = BIG_ZERO
@@ -47,6 +48,7 @@ class PseudoBooleanInvariantTest {
 
             assertEquals(predicted, state.cost - before)
         }
+        }
     }
 
     @Test
@@ -55,7 +57,8 @@ class PseudoBooleanInvariantTest {
         val factor = ReifiedPseudoBoolean(0, arrayOf(wide), intArrayOf(Lit.make(1, false)), PbOp.EQ, wide)
         val problem = Problem(2, 0, emptyArray(), arrayOf(factor))
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
-        for (indicator in listOf(false, true)) for (body in listOf(false, true)) {
+        for (indicator in listOf(false, true)) {
+            for (body in listOf(false, true)) {
             state.assignment.setBool(0, indicator)
             state.assignment.setBool(1, body)
             state.recompute()
@@ -63,6 +66,7 @@ class PseudoBooleanInvariantTest {
             assertEquals(!body, factor.holdsNow(state, 0))
             assertEquals(indicator == !body, state.cost == 0L)
             assertEquals(body, factor.residualNow(state, 0, state.violationSoftCap) > 0)
+        }
         }
     }
 

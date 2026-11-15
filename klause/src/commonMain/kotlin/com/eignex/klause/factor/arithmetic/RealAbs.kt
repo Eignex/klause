@@ -29,8 +29,7 @@ class RealAbs(
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.REAL_ABS, ::buildKey)
 
-    override fun remapStructuralHash(mapping: VarRemap): Int =
-        hashRemappedKey(FactorKind.REAL_ABS, mapping, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.REAL_ABS, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.realVar(operand)
@@ -41,10 +40,22 @@ class RealAbs(
 
     override val linearForm: LinearForm = LinearForm.Relaxation(
         listOf(
-            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(operand, result),
-                doubleArrayOf(1.0, -1.0), LinearOp.LE, 0.0),
-            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(operand, result),
-                doubleArrayOf(-1.0, -1.0), LinearOp.LE, 0.0),
+            Linear(
+                intArrayOf(),
+                doubleArrayOf(),
+                intArrayOf(operand, result),
+                doubleArrayOf(1.0, -1.0),
+                LinearOp.LE,
+                0.0,
+            ),
+            Linear(
+                intArrayOf(),
+                doubleArrayOf(),
+                intArrayOf(operand, result),
+                doubleArrayOf(-1.0, -1.0),
+                LinearOp.LE,
+                0.0,
+            ),
         ),
     )
 }

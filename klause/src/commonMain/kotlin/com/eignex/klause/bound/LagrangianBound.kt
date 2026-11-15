@@ -83,9 +83,11 @@ internal class LagrangianBound(
         var visits = 0
         val numInt = problem.numIntVars
         var blocks: List<IntArray> = emptyList()
-        if (objective != null) for (next in chooseBlocks(problem)) {
+        if (objective != null) {
+            for (next in chooseBlocks(problem)) {
             if (next != null) blocks = next
             yield(Unit)
+        }
         }
         if (blocks.isEmpty()) {
             vars = emptyIntArray()

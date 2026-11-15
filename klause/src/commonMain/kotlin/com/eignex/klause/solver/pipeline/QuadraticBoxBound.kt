@@ -22,13 +22,18 @@ internal fun quadraticBoxBound(
             val value = if (it) BigFraction.ONE else BigFraction.ZERO
             value to value
         } ?: (BigFraction.ZERO to BigFraction.ONE)
+
         is QuadraticVariable.Int -> assumptions.intValueOrNull(variable.id.index)?.let {
             val value = BigFraction.ofLong(it)
             value to value
         } ?: variable.id.index.let { id ->
-            if (!source.intBounds.hasLower(id) || !source.intBounds.hasUpper(id)) null
-            else BigFraction.ofLong(source.intBounds.lower(id)) to BigFraction.ofLong(source.intBounds.upper(id))
+            if (!source.intBounds.hasLower(id) || !source.intBounds.hasUpper(id)) {
+                null
+            } else {
+                BigFraction.ofLong(source.intBounds.lower(id)) to BigFraction.ofLong(source.intBounds.upper(id))
+            }
         }
+
         is QuadraticVariable.Real -> variable.id.index.let { id ->
             val lower = BigFraction.ofDouble(source.realLower[id])
             val upper = BigFraction.ofDouble(source.realUpper[id])

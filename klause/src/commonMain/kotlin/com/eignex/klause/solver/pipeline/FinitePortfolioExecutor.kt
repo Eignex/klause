@@ -116,16 +116,24 @@ internal fun FinitePipeline.portfolioExecutor(
     if (deferLpProbes && !curatedFiniteInteger) {
         pipelineConfigError("portfolio-lp-start requires a curated single-core mixed finite integer optimization")
     }
-    if (bufferedPublications && (!curatedFiniteInteger || scenario.diagnosticWorkLimit != null ||
-            cancellation.deadline() == null || problem.numRealVars != 0)) {
+    if (bufferedPublications && (
+        !curatedFiniteInteger || scenario.diagnosticWorkLimit != null ||
+            cancellation.deadline() == null || problem.numRealVars != 0
+    )
+    ) {
         pipelineConfigError(
             "portfolio-publications requires curated elapsed single-core mixed finite integer optimization",
         )
     }
-    if (probePolicy != InitialProbePolicy.ORDINARY && (!supportedProbeSource || scenario.diagnosticWorkLimit != null ||
-            cancellation.deadline() == null)) {
-        pipelineConfigError("portfolio-probes requires curated elapsed single-core mixed finite optimization " +
-            "within the selected policy's source scope")
+    if (probePolicy != InitialProbePolicy.ORDINARY && (
+        !supportedProbeSource || scenario.diagnosticWorkLimit != null ||
+            cancellation.deadline() == null
+    )
+    ) {
+        pipelineConfigError(
+            "portfolio-probes requires curated elapsed single-core mixed finite optimization " +
+                "within the selected policy's source scope",
+        )
     }
     val identity = ModelIdentity.of(problem, objective)
     val binding = EngineInvocation(preparedPlan, identity, objective)
@@ -142,7 +150,9 @@ internal fun FinitePipeline.portfolioExecutor(
         pipelineConfigError("funded companion admission requires companion-after-incumbent and a solve deadline")
     }
     val companionAdmission = if (fundedCompanions && companionEligibility?.admitted == true) {
-        FiniteNumericalCompanions.admission(problem, requireNotNull(objective),
+        FiniteNumericalCompanions.admission(
+            problem,
+            requireNotNull(objective),
             cancellation or requireNotNull(numericalCompanions).cancellation or numericalCompanions.timeout,
             companionEligibility.requirements.construction,
         )
@@ -152,8 +162,8 @@ internal fun FinitePipeline.portfolioExecutor(
     val companionComparison: ((SearchEvent.CompanionComparison) -> Unit)? =
         if (scenario.reportPortfolioProgress && onEvent != null) {
             { event ->
-            onEvent("ls/finite-joint-companion", event)
-        }
+                onEvent("ls/finite-joint-companion", event)
+            }
         } else {
             null
         }
@@ -161,7 +171,8 @@ internal fun FinitePipeline.portfolioExecutor(
         { seed, observation -> report("ls/finite-joint-companion", seed, observation) }
     }
     val companionPreparation = if (!fundedCompanions && companionEligibility?.admitted == true) {
-        FiniteNumericalCompanions.prepare(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
+        FiniteNumericalCompanions.prepare(
+            problem, requireNotNull(objective), requireNotNull(numericalCompanions),
             cancellation, companionEligibility.requirements.construction, scenario.companionAfterIncumbent,
             incumbentCompletionCheck, adaptiveRepair = adaptiveCompanionRepair, onComparison = companionComparison,
             onObservation = companionObservation,
@@ -170,7 +181,8 @@ internal fun FinitePipeline.portfolioExecutor(
         null
     }
     val companions = if (companionAdmission?.initiallyFunded == true) {
-        FiniteNumericalCompanions.deferred(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
+        FiniteNumericalCompanions.deferred(
+            problem, requireNotNull(objective), requireNotNull(numericalCompanions),
             cancellation, requireNotNull(companionEligibility).requirements.construction, companionAdmission,
             incumbentCompletionCheck, afterImprovement = waitForCompanionImprovement,
             adaptiveRepair = adaptiveCompanionRepair, onComparison = companionComparison,
@@ -188,12 +200,24 @@ internal fun FinitePipeline.portfolioExecutor(
             eligibility.declines
         }
         val frontier = eligibility.requirements
-        val repair = frontier.copy(authority = WorkerProofAuthority.WITNESS_ONLY,
-            construction = frontier.construction.copy(sliceMillis = 250))
-        for ((label, requirements) in listOf("numerical/finite-companion" to frontier,
-            "ls/finite-joint-companion" to repair)) {
-            onEvent?.invoke("portfolio", SearchEvent.WorkerAdmission(label, declines.isEmpty(),
-                requirements.toString(), declines, selected = declines.isEmpty()))
+        val repair = frontier.copy(
+            authority = WorkerProofAuthority.WITNESS_ONLY,
+            construction = frontier.construction.copy(sliceMillis = 250),
+        )
+        for ((label, requirements) in listOf(
+            "numerical/finite-companion" to frontier,
+            "ls/finite-joint-companion" to repair,
+        )) {
+            onEvent?.invoke(
+                "portfolio",
+                SearchEvent.WorkerAdmission(
+                label,
+                declines.isEmpty(),
+                requirements.toString(),
+                declines,
+                selected = declines.isEmpty(),
+            )
+            )
         }
     }
     val finiteFactories = PortfolioBuilder.factories(
@@ -237,8 +261,8 @@ internal fun FinitePipeline.portfolioExecutor(
             booleanProofTasks = booleanProofTasks,
             onProgress = if (scenario.reportPortfolioProgress) {
                 { event ->
-                onEvent?.invoke("portfolio", SearchEvent.PortfolioDiagnostic(event))
-            }
+                    onEvent?.invoke("portfolio", SearchEvent.PortfolioDiagnostic(event))
+                }
             } else {
                 null
             },
@@ -254,10 +278,12 @@ internal fun FinitePipeline.portfolioExecutor(
         onFault,
         optimizationIncumbents = companions?.incumbents,
         preparationStages = companionPreparation?.let {
-            mapOf("finiteCompanionPreparationAttempts" to 1L,
+            mapOf(
+                "finiteCompanionPreparationAttempts" to 1L,
                 "finiteCompanionPreparationNs" to it.elapsedNanos,
                 "finiteCompanionPreparationReady" to if (companions != null) 1L else 0L,
-                "finiteCompanionPreparationUnavailable" to if (companions == null) 1L else 0L)
+                "finiteCompanionPreparationUnavailable" to if (companions == null) 1L else 0L,
+            )
         }.orEmpty(),
         livePreparationStages = companionAdmission?.let { it::stages },
         objectiveBound = companions?.let { { it.objectiveBound } },
@@ -305,7 +331,8 @@ internal fun FinitePipeline.portfolioExecutor(
                 if (workers[arm].label == "numerical/finite-companion") 3 else 1
             }
         }
-        PortfolioInvocationPolicy(profile, reserved, reserveBeforeIncumbentOnly = true, probes = probes,
+        PortfolioInvocationPolicy(
+            profile, reserved, reserveBeforeIncumbentOnly = true, probes = probes,
             probeWeights = probeWeights,
             probeRanks = if (probePolicy == InitialProbePolicy.HEURISTIC_SECOND) {
                 heuristicSecondProbeRanks(workers)
@@ -327,8 +354,8 @@ internal fun FinitePipeline.portfolioExecutor(
             },
             heuristicTargets = if (probePolicy == InitialProbePolicy.ALNS_WORK) {
                 workers.indices.filter { arm ->
-                workers[arm].family == ArmFamily.Lns && !workers[arm].auxiliaryProof
-            }.toSet()
+                    workers[arm].family == ArmFamily.Lns && !workers[arm].auxiliaryProof
+                }.toSet()
             } else {
                 null
             },

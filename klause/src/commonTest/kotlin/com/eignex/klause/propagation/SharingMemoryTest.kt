@@ -21,8 +21,15 @@ class SharingMemoryTest {
     @Test
     fun `base clause watch capacity should fit a bounded observation on both stores`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(Problem(2, 0, emptyArray(),
-                Array(512) { Clause(intArrayOf(0, 2)) }), nativeSat = native)
+            val session = PropagationSession(
+                Problem(
+                2,
+                0,
+                emptyArray(),
+                Array(512) { Clause(intArrayOf(0, 2)) },
+            ),
+                nativeSat = native
+            )
             assertEquals(native, session.usesNativeSat)
             val expected = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
 
@@ -34,8 +41,15 @@ class SharingMemoryTest {
 
     @Test
     fun `four thousand permanent native rows should fit the default observation allowance`() {
-        val session = PropagationSession(Problem(4, 0, emptyArray(),
-            arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = true)
+        val session = PropagationSession(
+            Problem(
+            4,
+            0,
+            emptyArray(),
+            arrayOf(Clause(intArrayOf(6, 7))),
+        ),
+            nativeSat = true
+        )
         assertTrue(session.usesNativeSat)
         repeat(4000) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 2, permanent = true) }
         val expected = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
@@ -48,8 +62,15 @@ class SharingMemoryTest {
 
     @Test
     fun `twenty thousand permanent native rows should fit the default observation allowance`() {
-        val session = PropagationSession(Problem(4, 0, emptyArray(),
-            arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = true)
+        val session = PropagationSession(
+            Problem(
+            4,
+            0,
+            emptyArray(),
+            arrayOf(Clause(intArrayOf(6, 7))),
+        ),
+            nativeSat = true
+        )
         assertTrue(session.usesNativeSat)
         repeat(20_000) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 2, permanent = true) }
         val expected = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
@@ -62,8 +83,15 @@ class SharingMemoryTest {
 
     @Test
     fun `native retained counts should include retired rows until compaction`() {
-        val session = PropagationSession(Problem(8, 0, emptyArray(),
-            arrayOf(Clause(intArrayOf(12, 14)))), nativeSat = true)
+        val session = PropagationSession(
+            Problem(
+            8,
+            0,
+            emptyArray(),
+            arrayOf(Clause(intArrayOf(12, 14))),
+        ),
+            nativeSat = true
+        )
         assertTrue(session.usesNativeSat)
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
         session.addLearnedClause(Clause(intArrayOf(4, 6)), 9, origin = 0)
@@ -92,8 +120,15 @@ class SharingMemoryTest {
 
     @Test
     fun `an unprotected page neighbor should not increase protected payload bytes`() {
-        val session = PropagationSession(Problem(6, 0, emptyArray(),
-            arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = true)
+        val session = PropagationSession(
+            Problem(
+            6,
+            0,
+            emptyArray(),
+            arrayOf(Clause(intArrayOf(8, 10))),
+        ),
+            nativeSat = true
+        )
         assertTrue(session.usesNativeSat)
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
         session.pinBool(0, false)
@@ -102,15 +137,25 @@ class SharingMemoryTest {
         session.addLearnedClause(Clause(intArrayOf(4, 6)), 9)
         val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
 
-        assertEquals(after.getValue("learnedMetadataCapacityBytes") - before.getValue("learnedMetadataCapacityBytes"),
-            after.getValue("protectedPrimitiveBytes") - before.getValue("protectedPrimitiveBytes"))
+        assertEquals(
+            after.getValue("learnedMetadataCapacityBytes") - before.getValue("learnedMetadataCapacityBytes"),
+            after.getValue("protectedPrimitiveBytes") - before.getValue("protectedPrimitiveBytes"),
+        )
     }
 
     @Test
     fun `tiny allowances stop observations before completing either learned store`() {
-        for (native in listOf(false, true)) for (allowance in listOf(0L, 1L, 7L)) {
-            val session = PropagationSession(Problem(32, 0, emptyArray(),
-                arrayOf(Clause(intArrayOf(62, 63)))), nativeSat = native)
+        for (native in listOf(false, true)) {
+            for (allowance in listOf(0L, 1L, 7L)) {
+            val session = PropagationSession(
+                Problem(
+                32,
+                0,
+                emptyArray(),
+                arrayOf(Clause(intArrayOf(62, 63))),
+            ),
+                nativeSat = native
+            )
             assertEquals(native, session.usesNativeSat)
             repeat(8) { session.addLearnedClause(Clause(intArrayOf(it * 2, it * 2 + 2)), 2) }
             val before = session.work
@@ -123,16 +168,25 @@ class SharingMemoryTest {
             assertNull(sample.completeValues)
             assertEquals(8, session.learnedClauseCount)
         }
+        }
     }
 
     @Test
     fun `cancellation sees each charged diagnostic visit before the next visit`() {
-        for (native in listOf(false, true)) for (allowance in listOf(5L, 80L)) {
+        for (native in listOf(false, true)) {
+            for (allowance in listOf(5L, 80L)) {
             var limit = Long.MAX_VALUE
             lateinit var session: PropagationSession
-            session = PropagationSession(Problem(32, 0, emptyArray(),
-                arrayOf(Clause(intArrayOf(62, 63)))), nativeSat = native,
-                cancellation = ExecutionControl { limit != Long.MAX_VALUE && session.work >= limit })
+            session = PropagationSession(
+                Problem(
+                    32,
+                    0,
+                    emptyArray(),
+                    arrayOf(Clause(intArrayOf(62, 63))),
+                ),
+                nativeSat = native,
+                cancellation = ExecutionControl { limit != Long.MAX_VALUE && session.work >= limit },
+            )
             assertEquals(native, session.usesNativeSat)
             repeat(8) { session.addLearnedClause(Clause(intArrayOf(it * 2, it * 2 + 2)), 2) }
             val before = session.work
@@ -145,13 +199,21 @@ class SharingMemoryTest {
             assertEquals(allowance, session.work - before)
             assertNull(sample.completeValues)
         }
+        }
     }
 
     @Test
     fun `scratch exhaustion preserves an active reason through compaction`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(Problem(4, 0, emptyArray(),
-                arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = native)
+            val session = PropagationSession(
+                Problem(
+                4,
+                0,
+                emptyArray(),
+                arrayOf(Clause(intArrayOf(6, 7))),
+            ),
+                nativeSat = native
+            )
             assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
             session.pinBool(0, false)
@@ -170,8 +232,15 @@ class SharingMemoryTest {
     @Test
     fun `complete snapshots expose protected reasons on both stores`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(Problem(4, 0, emptyArray(),
-                arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = native)
+            val session = PropagationSession(
+                Problem(
+                4,
+                0,
+                emptyArray(),
+                arrayOf(Clause(intArrayOf(6, 7))),
+            ),
+                nativeSat = native
+            )
             assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
             session.pinBool(0, false)
@@ -188,12 +257,21 @@ class SharingMemoryTest {
 
     @Test
     fun `partial observation preserves an integer reason saved in undo history`() {
-        val session = PropagationSession(Problem(1, 1, arrayOf(IntDomain(0, 10)),
-            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10))))
+        val session = PropagationSession(
+            Problem(
+            1,
+            1,
+            arrayOf(IntDomain(0, 10)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10)),
+        )
+        )
         session.addLearnedClause(Clause(intArrayOf(0, 1)), 4)
-        val row = requireNotNull(IntegerConflictRow.source(
+        val row = requireNotNull(
+            IntegerConflictRow.source(
             LinearPropagator(intArrayOf(), intArrayOf(0), longArrayOf(1), intArrayOf(0), LinearOp.LE, 8),
-            useLo = true))
+            useLo = true,
+        )
+        )
         session.addLearnedIntegerRow(row, 2)
         session.pinIntAtMost(0, 4)
         val complete = session.sharingMemory()
@@ -237,13 +315,16 @@ class SharingMemoryTest {
                 state.watches.pos.primitiveCapacityBytes + state.learned.capRanking.primitiveBytes +
                 state.learned.store.primitiveBytes + 44L
             for (literal in listOf(0, 2)) {
-                dependencies += (state.watches.byLit[literal].backingData.size.toLong() +
-                    state.watches.blockersByLit[literal].backingData.size) * Int.SIZE_BYTES
+                dependencies += (
+                    state.watches.byLit[literal].backingData.size.toLong() +
+                    state.watches.blockersByLit[literal].backingData.size
+                ) * Int.SIZE_BYTES
             }
             val sample = SharingMemoryObservation(1_000_000L, 4096, { false }, {})
             val before = assertNotNull(sample.snapshot { state.sharingMemory(sample) }.completeValues)
 
-            val after = assertNotNull(sample.snapshot {
+            val after = assertNotNull(
+                sample.snapshot {
                 for (column in columns) {
                     sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, true)
                 }
@@ -258,16 +339,21 @@ class SharingMemoryTest {
                         sample.owned(posting.backingData, posting.backingData.size.toLong() * Int.SIZE_BYTES, true)
                     }
                 }
-            }.completeValues)
+            }.completeValues
+            )
 
             assertEquals(before.getValue("ownedPrimitiveBytes"), after.getValue("ownedPrimitiveBytes"))
             assertEquals(before.getValue("ownedReferenceSlots"), after.getValue("ownedReferenceSlots"))
-            assertEquals(if (permanent) 0L else dependencies,
-                after.getValue("protectedPrimitiveBytes") - before.getValue("protectedPrimitiveBytes"))
+            assertEquals(
+                if (permanent) 0L else dependencies,
+                after.getValue("protectedPrimitiveBytes") - before.getValue("protectedPrimitiveBytes"),
+            )
             val references = state.learned.store.referenceCapacity + state.refPayloadStore.size +
                 state.watches.pos.referenceCapacity + 4L
-            assertEquals(if (permanent) 0L else references,
-                after.getValue("protectedReferenceSlots") - before.getValue("protectedReferenceSlots"))
+            assertEquals(
+                if (permanent) 0L else references,
+                after.getValue("protectedReferenceSlots") - before.getValue("protectedReferenceSlots"),
+            )
         }
     }
 
@@ -278,29 +364,37 @@ class SharingMemoryTest {
         val state = session.explanationState
         val native = assertNotNull(state.nativeEngine)
         val sample = SharingMemoryObservation(1_000_000L, 4096, { false }, {})
-        val baseline = assertNotNull(sample.snapshot {
+        val baseline = assertNotNull(
+            sample.snapshot {
             native.sharingMemory(sample, sample.seenIds())
-        }.completeValues)
+        }.completeValues
+        )
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
         session.pinBool(0, false)
         val reason = state.boolReason[1] - state.baseFactorCount
         assertEquals(0, reason)
-        val before = assertNotNull(sample.snapshot {
+        val before = assertNotNull(
+            sample.snapshot {
             native.sharingMemory(sample, sample.seenIds())
-        }.completeValues)
+        }.completeValues
+        )
 
-        val after = assertNotNull(sample.snapshot {
+        val after = assertNotNull(
+            sample.snapshot {
             val protected = sample.seenIds()
             sample.retain(protected, reason)
             native.sharingMemory(sample, protected)
-        }.completeValues)
+        }.completeValues
+        )
 
         val dependencies = before.getValue("learnedMetadataCapacityBytes") +
             before.getValue("learnedArenaCapacityBytes") + before.getValue("sessionWatchCapacityBytes") -
             baseline.getValue("sessionWatchCapacityBytes")
         assertEquals(before.getValue("ownedPrimitiveBytes"), after.getValue("ownedPrimitiveBytes"))
-        assertEquals(dependencies,
-            after.getValue("protectedPrimitiveBytes") - before.getValue("protectedPrimitiveBytes"))
+        assertEquals(
+            dependencies,
+            after.getValue("protectedPrimitiveBytes") - before.getValue("protectedPrimitiveBytes"),
+        )
     }
 
     @Test
@@ -314,24 +408,38 @@ class SharingMemoryTest {
         val sample = SharingMemoryObservation(1_000_000L, 4096, { false }, {})
         val before = assertNotNull(sample.snapshot { state.sharingMemory(sample) }.completeValues)
 
-        val after = assertNotNull(sample.snapshot {
+        val after = assertNotNull(
+            sample.snapshot {
             sample.owned(posting, posting.size.toLong() * Int.SIZE_BYTES, true)
             sample.owned(blockers, blockers.size.toLong() * Int.SIZE_BYTES, true)
-        }.completeValues)
+        }.completeValues
+        )
 
-        assertEquals((posting.size.toLong() + blockers.size) * Int.SIZE_BYTES,
-            after.getValue("protectedPrimitiveBytes") - before.getValue("protectedPrimitiveBytes"))
+        assertEquals(
+            (posting.size.toLong() + blockers.size) * Int.SIZE_BYTES,
+            after.getValue("protectedPrimitiveBytes") - before.getValue("protectedPrimitiveBytes"),
+        )
     }
 
     @Test
     fun `integer event dependencies should be protected only by a retained integer row`() {
         for (active in listOf(false, true)) {
-            val session = PropagationSession(Problem(1, 1, arrayOf(IntDomain(0, 10)),
-                arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10))))
+            val session = PropagationSession(
+                Problem(
+                1,
+                1,
+                arrayOf(IntDomain(0, 10)),
+                arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10)),
+            )
+            )
             session.addLearnedClause(Clause(intArrayOf(0, 1)), 2, permanent = true)
-            val row = requireNotNull(IntegerConflictRow.source(
+            val row = requireNotNull(
+                IntegerConflictRow.source(
                 LinearPropagator(intArrayOf(), intArrayOf(0), longArrayOf(1), intArrayOf(0), LinearOp.LE, 8),
-                useLo = true, guard = 0))
+                useLo = true,
+                guard = 0,
+            )
+            )
             session.addLearnedIntegerRow(row, 2)
             if (active) session.pinBool(0, true)
             val state = session.explanationState
@@ -344,7 +452,8 @@ class SharingMemoryTest {
             val sample = SharingMemoryObservation(1_000_000L, 4096, { false }, {})
             val before = assertNotNull(sample.snapshot { state.sharingMemory(sample) }.completeValues)
 
-            val after = assertNotNull(sample.snapshot {
+            val after = assertNotNull(
+                sample.snapshot {
                 rows.sharingMemory(sample, true)
                 sample.owned(overflow, overflow.primitiveCapacityBytes, true)
                 sample.ownedReferences(overflow, overflow.referenceCapacity.toLong(), true)
@@ -352,14 +461,19 @@ class SharingMemoryTest {
                     val array = posting.backingData
                     sample.owned(array, array.size.toLong() * Int.SIZE_BYTES, true)
                 }
-            }.completeValues)
+            }.completeValues
+            )
 
             assertEquals(before.getValue("ownedPrimitiveBytes"), after.getValue("ownedPrimitiveBytes"))
             assertEquals(before.getValue("ownedReferenceSlots"), after.getValue("ownedReferenceSlots"))
-            assertEquals(if (active) 0L else dependencies,
-                after.getValue("protectedPrimitiveBytes") - before.getValue("protectedPrimitiveBytes"))
-            assertEquals(if (active) 0L else rows.referenceCapacity + overflow.referenceCapacity,
-                after.getValue("protectedReferenceSlots") - before.getValue("protectedReferenceSlots"))
+            assertEquals(
+                if (active) 0L else dependencies,
+                after.getValue("protectedPrimitiveBytes") - before.getValue("protectedPrimitiveBytes"),
+            )
+            assertEquals(
+                if (active) 0L else rows.referenceCapacity + overflow.referenceCapacity,
+                after.getValue("protectedReferenceSlots") - before.getValue("protectedReferenceSlots"),
+            )
         }
     }
 }

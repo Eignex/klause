@@ -22,13 +22,13 @@ internal class AllDifferentTuplesPropagator(private val factor: AllDifferentTupl
             val key = TupleValues(LongArray(tuple.size) { state.intDomains[tuple[it]].min })
             val previous = fixed.put(key, index) ?: continue
             state.propagatorFailures[this] = collectHoleAndBoundAntecedents(
-                state, factor.tuples[previous] + tuple,
+                state,
+                factor.tuples[previous] + tuple,
             ) ?: IntArray(0)
             return false
         }
         return true
     }
 
-    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        state.propagatorFailures[this]
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = state.propagatorFailures[this]
 }

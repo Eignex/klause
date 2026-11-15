@@ -169,8 +169,10 @@ private fun privateImage(
 
         is RealAbs -> {
             val input = range(factor.operand) ?: return null
-            interval(if (input.lo <= 0 && input.hi >= 0) 0.0 else minOf(abs(input.lo), abs(input.hi)),
-                maxOf(abs(input.lo), abs(input.hi)))
+            interval(
+                if (input.lo <= 0 && input.hi >= 0) 0.0 else minOf(abs(input.lo), abs(input.hi)),
+                maxOf(abs(input.lo), abs(input.hi)),
+            )
         }
 
         is RealArrayMinMax -> {
@@ -180,8 +182,10 @@ private fun privateImage(
                 if (cancellation()) return null
                 inputs += range(input) ?: return null
             }
-            interval(if (factor.max) inputs.maxOf { it.lo } else inputs.minOf { it.lo },
-                if (factor.max) inputs.maxOf { it.hi } else inputs.minOf { it.hi })
+            interval(
+                if (factor.max) inputs.maxOf { it.lo } else inputs.minOf { it.lo },
+                if (factor.max) inputs.maxOf { it.hi } else inputs.minOf { it.hi },
+            )
         }
 
         is RealElement -> if (factor.arrIsVars) {

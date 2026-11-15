@@ -18,8 +18,14 @@ class NativeSatStateTest {
         val session = session(8, or(6, true, 7, true))
         val configuration = NativeCapConfiguration(false, 2, 6)
         repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
-        session.maintainCapWindow(31, 65_536L, 1_048_576L,
-            { false }, canDrop = { false }, nativePolicy = configuration) { false }
+        session.maintainCapWindow(
+            31,
+            65_536L,
+            1_048_576L,
+            { false },
+            canDrop = { false },
+            nativePolicy = configuration,
+        ) { false }
         session.addLearnedClause(Clause(or(2, true, 3, true)), 10)
 
         repeat(64) {
@@ -41,10 +47,24 @@ class NativeSatStateTest {
             val session = session(8, or(6, true, 7, true))
             val configuration = NativeCapConfiguration(false, 2, 6)
             repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
-            session.maintainCapWindow(31, 65_536L, 1_048_576L,
-                { false }, canDrop = { false }, nativePolicy = configuration) { false }
-            val handle = assertNotNull(session.queueLearnedRetirement(0, session.learnedRetirementGeneration,
-                256L, 256L, 1_024L, { false }).handle)
+            session.maintainCapWindow(
+                31,
+                65_536L,
+                1_048_576L,
+                { false },
+                canDrop = { false },
+                nativePolicy = configuration,
+            ) { false }
+            val handle = assertNotNull(
+                session.queueLearnedRetirement(
+                0,
+                session.learnedRetirementGeneration,
+                256L,
+                256L,
+                1_024L,
+                { false },
+            ).handle
+            )
             session.authorizeLearnedRetirement(handle, true, 256L, 256L) { false }
 
             repeat(8) {
@@ -65,19 +85,41 @@ class NativeSatStateTest {
         val session = session(8, or(6, true, 7, true))
         val configuration = NativeCapConfiguration(false, 2, 6)
         repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
-        session.maintainCapWindow(31, 65_536L, 1_048_576L,
-            { false }, canDrop = { false }, nativePolicy = configuration) { false }
+        session.maintainCapWindow(
+            31,
+            65_536L,
+            1_048_576L,
+            { false },
+            canDrop = { false },
+            nativePolicy = configuration,
+        ) { false }
         session.addLearnedClause(Clause(or(0, true, 1, true)), 10)
-        session.maintainCapWindow(32, 65_536L, 1_048_576L,
-            { false }, nativePolicy = configuration) { false }
+        session.maintainCapWindow(
+            32,
+            65_536L,
+            1_048_576L,
+            { false },
+            nativePolicy = configuration,
+        ) { false }
         session.reclaimLearnedMemory(Long.MAX_VALUE, 65_536L, 1_048_576L)
         session.addLearnedClause(Clause(or(2, true, 3, true)), 11)
         repeat(4) { session.maintainCapWindow(32, 65_536L, 1_048_576L, { false }) { false } }
         session.addLearnedClause(Clause(or(4, true, 5, true)), 12)
-        session.maintainCapWindow(32, 65_536L, 1_048_576L,
-            { false }, canDrop = { false }, nativePolicy = configuration) { false }
-        session.maintainCapWindow(32, 65_536L, 1_048_576L,
-            { false }, nativePolicy = configuration) { false }
+        session.maintainCapWindow(
+            32,
+            65_536L,
+            1_048_576L,
+            { false },
+            canDrop = { false },
+            nativePolicy = configuration,
+        ) { false }
+        session.maintainCapWindow(
+            32,
+            65_536L,
+            1_048_576L,
+            { false },
+            nativePolicy = configuration,
+        ) { false }
 
         repeat(128) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
         val memory = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
@@ -90,18 +132,40 @@ class NativeSatStateTest {
         val session = session(8, or(6, true, 7, true))
         val configuration = NativeCapConfiguration(false, 2, 6)
         repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
-        session.maintainCapWindow(31, 65_536L, 1_048_576L,
-            { false }, canDrop = { false }, nativePolicy = configuration) { false }
+        session.maintainCapWindow(
+            31,
+            65_536L,
+            1_048_576L,
+            { false },
+            canDrop = { false },
+            nativePolicy = configuration,
+        ) { false }
         session.addLearnedClause(Clause(or(0, true, 1, true)), 10)
-        session.maintainCapWindow(32, 65_536L, 1_048_576L,
-            { false }, nativePolicy = configuration) { false }
+        session.maintainCapWindow(
+            32,
+            65_536L,
+            1_048_576L,
+            { false },
+            nativePolicy = configuration,
+        ) { false }
         repeat(2) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
         assertTrue(session.explanationState.forgetLearnedClauses(10_000_000L, 1_048_576L) { id, _ -> id < 16 })
         session.addLearnedClause(Clause(or(2, true, 3, true)), 11)
-        session.maintainCapWindow(16, 65_536L, 1_048_576L,
-            { false }, canDrop = { false }, nativePolicy = configuration) { false }
-        session.maintainCapWindow(16, 65_536L, 1_048_576L,
-            { false }, nativePolicy = configuration) { false }
+        session.maintainCapWindow(
+            16,
+            65_536L,
+            1_048_576L,
+            { false },
+            canDrop = { false },
+            nativePolicy = configuration,
+        ) { false }
+        session.maintainCapWindow(
+            16,
+            65_536L,
+            1_048_576L,
+            { false },
+            nativePolicy = configuration,
+        ) { false }
 
         repeat(128) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
         val memory = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
@@ -115,12 +179,23 @@ class NativeSatStateTest {
             val session = session(8, or(6, true, 7, true))
             val configuration = NativeCapConfiguration(false, 2, 6)
             repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
-            session.maintainCapWindow(31, 65_536L, 1_048_576L, { false },
-                canDrop = { false }, nativePolicy = configuration) { false }
+            session.maintainCapWindow(
+                31,
+                65_536L,
+                1_048_576L,
+                { false },
+                canDrop = { false },
+                nativePolicy = configuration,
+            ) { false }
             repeat(fillers) { session.addLearnedClause(Clause(or(2, true, 3, true)), 2, permanent = true) }
             session.addLearnedClause(Clause(or(0, true, 1, true)), 10)
-            session.maintainCapWindow(32 + fillers, 65_536L, 1_048_576L,
-                { false }, nativePolicy = configuration) { false }
+            session.maintainCapWindow(
+                32 + fillers,
+                65_536L,
+                1_048_576L,
+                { false },
+                nativePolicy = configuration,
+            ) { false }
             assertEquals(32 + fillers, session.activeLearnedClauseCount)
             val before = session.ownershipWork
 
@@ -138,15 +213,31 @@ class NativeSatStateTest {
             val session = session(8, or(6, true, 7, true))
             val configuration = NativeCapConfiguration(false, 2, 6)
             repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
-            session.maintainCapWindow(31, 65_536L, 1_048_576L,
-                { false }, canDrop = { false }, nativePolicy = configuration) { false }
+            session.maintainCapWindow(
+                31,
+                65_536L,
+                1_048_576L,
+                { false },
+                canDrop = { false },
+                nativePolicy = configuration,
+            ) { false }
             session.addLearnedClause(Clause(or(0, true, 1, true)), 10)
-            session.maintainCapWindow(32, 65_536L, 1_048_576L,
-                { false }, nativePolicy = configuration) { false }
+            session.maintainCapWindow(
+                32,
+                65_536L,
+                1_048_576L,
+                { false },
+                nativePolicy = configuration,
+            ) { false }
             repeat(slices) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
             session.addLearnedClause(Clause(or(0, true, 1, true)), 11)
-            session.maintainCapWindow(32, 65_536L, 1_048_576L,
-                { false }, nativePolicy = configuration) { false }
+            session.maintainCapWindow(
+                32,
+                65_536L,
+                1_048_576L,
+                { false },
+                nativePolicy = configuration,
+            ) { false }
 
             repeat(128) {
                 val before = session.work
@@ -166,17 +257,33 @@ class NativeSatStateTest {
         repeat(32) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
         var attempts = 0
         while (session.activeLearnedClauseCount > 31 && attempts++ < 32) {
-            session.maintainCapWindow(31, 4096L, 1_048_576L,
-                { false }, nativePolicy = configuration) { false }
+            session.maintainCapWindow(
+                31,
+                4096L,
+                1_048_576L,
+                { false },
+                nativePolicy = configuration,
+            ) { false }
         }
         assertEquals(31, session.activeLearnedClauseCount)
         session.addLearnedClause(Clause(or(2, true, 3, true)), 10)
         repeat(4) {
-            session.maintainCapWindow(31, 65_536L, 1_048_576L,
-                { false }, canDrop = { false }, nativePolicy = configuration) { false }
+            session.maintainCapWindow(
+                31,
+                65_536L,
+                1_048_576L,
+                { false },
+                canDrop = { false },
+                nativePolicy = configuration,
+            ) { false }
         }
-        session.maintainCapWindow(31, 65_536L, 1_048_576L,
-            { false }, nativePolicy = configuration) { false }
+        session.maintainCapWindow(
+            31,
+            65_536L,
+            1_048_576L,
+            { false },
+            nativePolicy = configuration,
+        ) { false }
 
         repeat(128) { session.reclaimLearnedMemory(Long.MAX_VALUE, 40L, 1_048_576L) }
         val memory = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
@@ -189,8 +296,13 @@ class NativeSatStateTest {
         val session = session(4, or(2, true, 3, true))
         repeat(16) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
         val configuration = NativeCapConfiguration(false, 2, 6)
-        session.maintainCapWindow(1, 65_536L, 1_048_576L,
-            { session.nativeCapTraversalVisits >= 2L }, nativePolicy = configuration) { false }
+        session.maintainCapWindow(
+            1,
+            65_536L,
+            1_048_576L,
+            { session.nativeCapTraversalVisits >= 2L },
+            nativePolicy = configuration,
+        ) { false }
         assertEquals(16, session.activeLearnedClauseCount)
         assertTrue(session.nativeCapWindowPending)
 
@@ -230,8 +342,13 @@ class NativeSatStateTest {
         val session = session(4, or(2, true, 3, true))
         repeat(16) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
         val configuration = NativeCapConfiguration(false, 2, 6)
-        session.maintainCapWindow(1, 65_536L, 1_048_576L,
-            { session.nativeCapTraversalVisits >= 2L }, nativePolicy = configuration) { false }
+        session.maintainCapWindow(
+            1,
+            65_536L,
+            1_048_576L,
+            { session.nativeCapTraversalVisits >= 2L },
+            nativePolicy = configuration,
+        ) { false }
         val before = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
 
         assertTrue(session.explanationState.forgetLearnedClauses(10_000_000L, 1_048_576L) { id, _ -> id == 15 })
@@ -302,8 +419,10 @@ class NativeSatStateTest {
 
         assertEquals(129, session.learnedClauseCount)
         assertEquals(2, session.activeLearnedClauseCount)
-        assertTrue(after.getValue("learnedPayloadReferenceCapacity") <
-            before.getValue("learnedPayloadReferenceCapacity"))
+        assertTrue(
+            after.getValue("learnedPayloadReferenceCapacity") <
+                before.getValue("learnedPayloadReferenceCapacity"),
+        )
     }
 
     @Test
@@ -335,9 +454,11 @@ class NativeSatStateTest {
         assertEquals(8192L, before.getValue("learnedPayloadBytes"))
         assertEquals(0L, after.getValue("learnedPayloadBytes"))
         assertEquals(0L, after.getValue("learnedArenaCapacityBytes"))
-        assertEquals(8192L + before.getValue("learnedMetadataCapacityBytes") -
-            after.getValue("learnedMetadataCapacityBytes"),
-            before.getValue("ownedPrimitiveBytes") - after.getValue("ownedPrimitiveBytes"))
+        assertEquals(
+            8192L + before.getValue("learnedMetadataCapacityBytes") -
+                after.getValue("learnedMetadataCapacityBytes"),
+            before.getValue("ownedPrimitiveBytes") - after.getValue("ownedPrimitiveBytes"),
+        )
         assertEquals(0L, after.getValue("learnedPayloadReferenceCapacity"))
         assertEquals(before.getValue("sessionWatchCapacityBytes"), after.getValue("sessionWatchCapacityBytes"))
         assertEquals(1, session.learnedClauseCount)
@@ -534,11 +655,17 @@ class NativeSatStateTest {
     fun `successive active watch moves through retired holes should preserve the survivor phase`() {
         val session = session(6, or(4, true, 5, true))
         session.addLearnedClause(Clause(or(0, true, 4, true)), 9)
-        session.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true), Lit.make(3, true))),
-            9, permanent = true)
+        session.addLearnedClause(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true), Lit.make(3, true))),
+            9,
+            permanent = true,
+        )
         session.addLearnedClause(Clause(or(0, true, 5, true)), 9)
-        session.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), Lit.make(3, true), Lit.make(4, true))),
-            9, permanent = true)
+        session.addLearnedClause(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(3, true), Lit.make(4, true))),
+            9,
+            permanent = true,
+        )
         session.addLearnedClause(Clause(or(0, true, 1, true)), 9, permanent = true)
         session.addLearnedClause(Clause(or(0, true, 1, false)), 9, permanent = true)
         repeat(8) { session.maintainCapWindow(4, 65_536L, 1_048_576L, { false }) { false } }

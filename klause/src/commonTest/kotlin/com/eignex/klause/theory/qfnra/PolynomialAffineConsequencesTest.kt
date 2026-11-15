@@ -14,23 +14,34 @@ import kotlin.test.assertTrue
 class PolynomialAffineConsequencesTest {
     @Test
     fun `affine endpoints retain strictness beside nonlinear coordinate predicates`() {
-        for (lowerStrict in listOf(false, true)) for (upperStrict in listOf(false, true)) {
+        for (lowerStrict in listOf(false, true)) {
+            for (upperStrict in listOf(false, true)) {
             val arithmetic = PolynomialArithmetic()
             val x = Polynomial.variable(0)
             val y = Polynomial.variable(1)
             val cube = arithmetic.power(x, 3)
             val atoms = listOf(
                 PolynomialAtom(y, if (lowerStrict) PolynomialRelation.GT else PolynomialRelation.GE),
-                PolynomialAtom(arithmetic.subtract(cube, y),
-                    if (upperStrict) PolynomialRelation.GT else PolynomialRelation.GE),
+                PolynomialAtom(
+                    arithmetic.subtract(cube, y),
+                    if (upperStrict) PolynomialRelation.GT else PolynomialRelation.GE,
+                ),
                 PolynomialAtom(arithmetic.subtract(arithmetic.power(y, 2), Polynomial.ONE), PolynomialRelation.GE),
             )
 
             val consequences = preparePolynomialAffineConsequences(atoms, arithmetic)
                 .asSequence().filterNotNull().single()
 
-            assertEquals(listOf(PolynomialAtom(cube,
-                if (lowerStrict || upperStrict) PolynomialRelation.GT else PolynomialRelation.GE)), consequences)
+            assertEquals(
+                listOf(
+                    PolynomialAtom(
+                cube,
+                if (lowerStrict || upperStrict) PolynomialRelation.GT else PolynomialRelation.GE,
+            )
+                ),
+                consequences
+            )
+        }
         }
     }
 
@@ -39,9 +50,11 @@ class PolynomialAffineConsequencesTest {
         val arithmetic = PolynomialArithmetic()
         val x = Polynomial.variable(0)
         val y = Polynomial.variable(1)
-        val atoms = listOf(PolynomialAtom(y, PolynomialRelation.GE),
+        val atoms = listOf(
+            PolynomialAtom(y, PolynomialRelation.GE),
             PolynomialAtom(arithmetic.subtract(arithmetic.multiply(x, y), Polynomial.ONE), PolynomialRelation.LE),
-            PolynomialAtom(arithmetic.subtract(arithmetic.power(y, 2), Polynomial.ONE), PolynomialRelation.GE))
+            PolynomialAtom(arithmetic.subtract(arithmetic.power(y, 2), Polynomial.ONE), PolynomialRelation.GE),
+        )
 
         val consequences = preparePolynomialAffineConsequences(atoms, arithmetic)
             .asSequence().filterNotNull().single()
@@ -55,9 +68,11 @@ class PolynomialAffineConsequencesTest {
             val arithmetic = PolynomialArithmetic()
             val x = Polynomial.variable(0)
             val y = Polynomial.variable(1)
-            val atoms = listOf(PolynomialAtom(y, PolynomialRelation.GE),
+            val atoms = listOf(
+                PolynomialAtom(y, PolynomialRelation.GE),
                 PolynomialAtom(arithmetic.subtract(arithmetic.power(x, 3), y), relation),
-                PolynomialAtom(arithmetic.power(y, 2), PolynomialRelation.GE))
+                PolynomialAtom(arithmetic.power(y, 2), PolynomialRelation.GE),
+            )
 
             val consequences = preparePolynomialAffineConsequences(atoms, arithmetic)
                 .asSequence().filterNotNull().single()
@@ -93,11 +108,13 @@ class PolynomialAffineConsequencesTest {
         val y = Polynomial.variable(1)
         val z = Polynomial.variable(2)
         val cube = arithmetic.power(x, 3)
-        val atoms = listOf(PolynomialAtom(y, PolynomialRelation.GE),
+        val atoms = listOf(
+            PolynomialAtom(y, PolynomialRelation.GE),
             PolynomialAtom(arithmetic.subtract(cube, y), PolynomialRelation.GT),
             PolynomialAtom(z, PolynomialRelation.GE),
             PolynomialAtom(arithmetic.subtract(cube, z), PolynomialRelation.GT),
-            PolynomialAtom(arithmetic.add(arithmetic.power(y, 2), arithmetic.power(z, 2)), PolynomialRelation.GE))
+            PolynomialAtom(arithmetic.add(arithmetic.power(y, 2), arithmetic.power(z, 2)), PolynomialRelation.GE),
+        )
 
         val consequences = preparePolynomialAffineConsequences(atoms, arithmetic)
             .asSequence().filterNotNull().single()
@@ -110,9 +127,11 @@ class PolynomialAffineConsequencesTest {
         val arithmetic = PolynomialArithmetic()
         val y = Polynomial.variable(0)
         val shifted = arithmetic.subtract(y, Polynomial.ONE)
-        val atoms = listOf(PolynomialAtom(shifted, PolynomialRelation.GT),
+        val atoms = listOf(
+            PolynomialAtom(shifted, PolynomialRelation.GT),
             PolynomialAtom(shifted, PolynomialRelation.LE),
-            PolynomialAtom(arithmetic.power(y, 2), PolynomialRelation.GE))
+            PolynomialAtom(arithmetic.power(y, 2), PolynomialRelation.GE),
+        )
 
         val consequences = preparePolynomialAffineConsequences(atoms, arithmetic)
             .asSequence().filterNotNull().single()
@@ -126,9 +145,11 @@ class PolynomialAffineConsequencesTest {
         val arithmetic = PolynomialArithmetic(ExecutionControl { stopped })
         val x = Polynomial.variable(0)
         val y = Polynomial.variable(1)
-        val atoms = listOf(PolynomialAtom(y, PolynomialRelation.GE),
+        val atoms = listOf(
+            PolynomialAtom(y, PolynomialRelation.GE),
             PolynomialAtom(arithmetic.subtract(arithmetic.power(x, 3), y), PolynomialRelation.GT),
-            PolynomialAtom(arithmetic.power(y, 2), PolynomialRelation.GE))
+            PolynomialAtom(arithmetic.power(y, 2), PolynomialRelation.GE),
+        )
         val pending = preparePolynomialAffineConsequences(atoms, arithmetic)
         assertNull(pending.next())
         stopped = true

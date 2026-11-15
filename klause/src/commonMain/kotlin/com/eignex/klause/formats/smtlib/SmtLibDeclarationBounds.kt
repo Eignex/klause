@@ -15,13 +15,19 @@ import com.eignex.klause.util.ExecutionControl
 
 internal fun Compiler.Builder.retainDeclarationBounds() {
     visitSmtDeclarationBounds(
-        semantics, intNames.values, realNames.values, sourceCancellation,
+        semantics,
+        intNames.values,
+        realNames.values,
+        sourceCancellation,
     ) { id, real, lower, value ->
-        factors.add(ExactLinear.of(
+        factors.add(
+            ExactLinear.of(
             intArrayOf(if (real) Term.ofRealVar(id) else Term.ofIntVar(id)),
-            listOf(BigFraction.ONE), if (lower) LinearOp.GE else LinearOp.LE,
+            listOf(BigFraction.ONE),
+            if (lower) LinearOp.GE else LinearOp.LE,
             BigFraction.of(value.numerator, value.denominator),
-        ))
+        )
+        )
     }
 }
 
@@ -33,11 +39,13 @@ internal fun smtPolynomialDeclarationBounds(
 ): List<PolynomialRealFormula> {
     val formulas = ArrayList<PolynomialRealFormula>()
     visitSmtDeclarationBounds(semantics, integers, reals, cancellation) { id, _, lower, value ->
-        formulas.add(PolynomialRealFormula.Atom(
+        formulas.add(
+            PolynomialRealFormula.Atom(
             PolynomialExpression.Variable(SourceRealId(id)),
             if (lower) PolynomialRelation.GE else PolynomialRelation.LE,
             PolynomialExpression.Constant.of(value.numerator, value.denominator),
-        ))
+        )
+        )
     }
     return formulas
 }

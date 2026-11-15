@@ -31,7 +31,10 @@ internal class PseudoBooleanPayload(
     val op: PbOp,
     val coefficients: LongArray? = null,
     val bound: Long? = null,
-    val wideCoefficients: List<@Serializable(with = BigIntSerializer::class) BigInt>? = null,
+    val wideCoefficients: List<
+        @Serializable(with = BigIntSerializer::class)
+        BigInt,
+        >? = null,
     @Serializable(with = BigIntSerializer::class) val wideBound: BigInt? = null,
 )
 
@@ -45,7 +48,10 @@ internal class ReifiedPseudoBooleanPayload(
     val op: PbOp,
     val coefficients: LongArray? = null,
     val bound: Long? = null,
-    val wideCoefficients: List<@Serializable(with = BigIntSerializer::class) BigInt>? = null,
+    val wideCoefficients: List<
+        @Serializable(with = BigIntSerializer::class)
+        BigInt,
+        >? = null,
     @Serializable(with = BigIntSerializer::class) val wideBound: BigInt? = null,
 )
 
@@ -74,7 +80,10 @@ internal fun booleanFactorCodecs(): List<FactorCodec<*, *>> = listOf(
         },
         { p ->
             integralRow(
-                p.coefficients, p.bound, p.wideCoefficients, p.wideBound,
+                p.coefficients,
+                p.bound,
+                p.wideCoefficients,
+                p.wideBound,
                 { weights, bound -> PseudoBoolean(weights, p.literals, p.op, bound) },
                 { weights, bound -> PseudoBoolean(weights, p.literals, p.op, bound) },
             )
@@ -90,12 +99,21 @@ internal fun booleanFactorCodecs(): List<FactorCodec<*, *>> = listOf(
         { pb ->
             val c = pb.constants
             ReifiedPseudoBooleanPayload(
-                pb.auxBoolVar, pb.literals, pb.op, c.longCoefficients, c.longBound, c.wideCoefficients, c.wideBound,
+                pb.auxBoolVar,
+                pb.literals,
+                pb.op,
+                c.longCoefficients,
+                c.longBound,
+                c.wideCoefficients,
+                c.wideBound,
             )
         },
         { p ->
             integralRow(
-                p.coefficients, p.bound, p.wideCoefficients, p.wideBound,
+                p.coefficients,
+                p.bound,
+                p.wideCoefficients,
+                p.wideBound,
                 { weights, bound -> ReifiedPseudoBoolean(p.reified, weights, p.literals, p.op, bound) },
                 { weights, bound -> ReifiedPseudoBoolean(p.reified, weights, p.literals, p.op, bound) },
             )

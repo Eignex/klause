@@ -12,12 +12,22 @@ internal fun wideDivModEncoder(target: EncodingTarget): Encoder = when (target) 
         for (row in wideDivModRows(view as WideDivMod)) encoding.linear(row.linearForm)
         null
     }
+
     EncodingTarget.POLYNOMIAL -> Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
-        encoding.polynomial(PolynomialRealFormula.And(wideDivModRows(view as WideDivMod).map { row ->
-            polynomialRow(row, { encoding.integer(SourceIntId(it)) }, { encoding.real(SourceRealId(it)) },
-                encoding::conditional)
-        }))
+        encoding.polynomial(
+            PolynomialRealFormula.And(
+                wideDivModRows(view as WideDivMod).map { row ->
+            polynomialRow(
+                row,
+                { encoding.integer(SourceIntId(it)) },
+                { encoding.real(SourceRealId(it)) },
+                encoding::conditional,
+            )
+        }
+            )
+        )
         null
     }
+
     else -> Encoder(EncoderSupport.UNSUPPORTED)
 }

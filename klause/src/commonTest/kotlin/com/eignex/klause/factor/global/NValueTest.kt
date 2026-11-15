@@ -116,9 +116,15 @@ class NValueTest {
 
     @Test
     fun `remapping should preserve excluded values and paired presence roles`() {
-        val factor = NValue(2, intArrayOf(0, 1, 0), presents = intArrayOf(
-            Lit.make(0, true), Lit.make(1, false), Lit.make(0, true),
-        ), exceptSet = longArrayOf(Long.MIN_VALUE, 0))
+        val factor = NValue(
+            2, intArrayOf(0, 1, 0),
+            presents = intArrayOf(
+            Lit.make(0, true),
+            Lit.make(1, false),
+            Lit.make(0, true),
+        ),
+            exceptSet = longArrayOf(Long.MIN_VALUE, 0)
+        )
 
         val mapped = assertIs<NValue>(factor.remap(VarRemap(intArrayOf(1, 0), intArrayOf(2, 1, 0))))
 

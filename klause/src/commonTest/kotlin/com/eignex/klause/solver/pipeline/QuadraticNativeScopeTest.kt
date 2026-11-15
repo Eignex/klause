@@ -26,14 +26,19 @@ class QuadraticNativeScopeTest {
     @Test
     fun `large coefficient products should observe containing stops before the next batch`() {
         lateinit var scope: QuadraticNativeScope
-        scope = QuadraticNativeScope(PolynomialTheoryParams(
+        scope = QuadraticNativeScope(
+            PolynomialTheoryParams(
             maximumWork = 100,
             cancellation = ExecutionControl { scope.work >= 2L },
-        ), concurrent = false)
+        ),
+            concurrent = false
+        )
         val coefficient = BigFraction.of(parseBigInt("1" + "0".repeat(1300)), BIG_ONE)
-        val polynomial = Polynomial.of(List(8) {
+        val polynomial = Polynomial.of(
+            List(8) {
             PolynomialTerm(Monomial.of(mapOf(0 to it)), coefficient)
-        })
+        }
+        )
         val arithmetic = PolynomialArithmetic(scope.polynomial)
 
         assertFailsWith<PolynomialInterrupted> { arithmetic.multiply(polynomial, polynomial) }
@@ -80,10 +85,18 @@ class QuadraticNativeScopeTest {
     fun `native polling should preserve timeout and external predicate order`() {
         val visited = ArrayList<Int>()
         var expired = false
-        val scope = QuadraticNativeScope(PolynomialTheoryParams(
-            timeout = ExecutionControl { visited += 1; expired },
-            cancellation = ExecutionControl { visited += 2; false },
-        )).worker(0)
+        val scope = QuadraticNativeScope(
+            PolynomialTheoryParams(
+            timeout = ExecutionControl {
+                visited += 1;
+                expired
+            },
+            cancellation = ExecutionControl {
+                visited += 2;
+                false
+            },
+        )
+        ).worker(0)
 
         assertFalse(scope.polynomial())
         assertEquals(listOf(1, 2), visited)
@@ -97,10 +110,15 @@ class QuadraticNativeScopeTest {
     @Test
     fun `native allowance stops should precede containing predicates`() {
         var polls = 0
-        val scope = QuadraticNativeScope(PolynomialTheoryParams(
+        val scope = QuadraticNativeScope(
+            PolynomialTheoryParams(
             maximumWork = 3,
-            cancellation = ExecutionControl { polls++; false },
-        ))
+            cancellation = ExecutionControl {
+                polls++;
+                false
+            },
+        )
+        )
         val worker = scope.worker(0, maximumWork = 1)
 
         worker.polynomial.charge(1)
@@ -114,9 +132,11 @@ class QuadraticNativeScopeTest {
     @Test
     fun `a containing deadline should stop every native worker`() {
         val clock = TestTimeSource()
-        val scope = QuadraticNativeScope(PolynomialTheoryParams(
+        val scope = QuadraticNativeScope(
+            PolynomialTheoryParams(
             timeout = ExecutionControl.until(clock.markNow() + 1.seconds),
-        ))
+        )
+        )
         val first = scope.worker(0)
         val second = scope.worker(1)
         assertFalse(first.polynomial())

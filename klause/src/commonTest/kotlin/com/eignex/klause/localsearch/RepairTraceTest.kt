@@ -78,7 +78,9 @@ class RepairTraceTest {
             Triple(MinimizeResult.Infeasible(), "Infeasible", null),
             Triple(MinimizeResult.Unknown(TerminationReason.Cancelled), "Unknown", TerminationReason.Cancelled),
             Triple(
-                MinimizeResult.Unknown(TerminationReason.BudgetExhausted), "Unknown", TerminationReason.BudgetExhausted,
+                MinimizeResult.Unknown(TerminationReason.BudgetExhausted),
+                "Unknown",
+                TerminationReason.BudgetExhausted,
             ),
         )) {
             val attempt = assertNotNull(trace.begin("control", 7, sample, sample))
@@ -110,21 +112,41 @@ class RepairTraceTest {
 
     @Test
     fun `observed restart phases should preserve witnesses work and random draws`() {
-        val problem = Problem(0, 3, Array(3) { IntDomain(0, 2) },
-            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2))))
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
+            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2))),
+        )
         val results = mutableListOf<Triple<Sample?, Double, List<Long>>>()
         val trace = RepairTrace("empty strict move pool; seed 7")
         for (observed in listOf(false, true)) {
             val draws = mutableListOf<Long>()
-            val strategy = SourceDrivenStrategy(sources = emptyList(), acceptance = AcceptanceRule.GreedyDescent,
-                feasibleDescent = FeasibleDescent.SelfOwned, perturbation = { draws.add(it.rng.nextLong()); null })
-            val engine = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy,
+            val strategy = SourceDrivenStrategy(
+                sources = emptyList(),
+                acceptance = AcceptanceRule.GreedyDescent,
+                feasibleDescent = FeasibleDescent.SelfOwned,
+                perturbation = {
+                    draws.add(it.rng.nextLong());
+                    null
+                },
+            )
+            val engine = LocalSearchEngine(
+                LocalSearchModel.open(problem),
+                strategy = strategy,
                 restartPolicy = IteratedLocalSearchRestart(initialPerturbationStrength = 1),
-                seedImplicitOnRestart = true)
+                seedImplicitOnRestart = true,
+            )
             if (observed) engine.repairTrace = trace
 
-            val result = engine.resumable(LinearObjective(), LocalSearchParams(maxFlips = 4, randomSeed = 7,
-                initialAssignment = Sample(booleanArrayOf(), longArrayOf(0, 1, 2)))).use {
+            val result = engine.resumable(
+                LinearObjective(),
+                LocalSearchParams(
+                maxFlips = 4,
+                randomSeed = 7,
+                initialAssignment = Sample(booleanArrayOf(), longArrayOf(0, 1, 2)),
+            )
+            ).use {
                 assertNotNull(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {})
             }
 
@@ -133,26 +155,46 @@ class RepairTraceTest {
 
         assertEquals(results.first(), results.last())
         val restart = trace.attempts.first { it.owner == "restart" }
-        assertEquals(listOf("before", "perturbed", "prepared", "repaired", "endpoint"),
-            restart.frames.map { it.stage })
+        assertEquals(
+            listOf("before", "perturbed", "prepared", "repaired", "endpoint"),
+            restart.frames.map { it.stage },
+        )
     }
 
     @Test
     fun `a sliced repair should remain pending and close as censored`() {
-        val problem = Problem(0, 32, Array(32) { IntDomain(0, if (it < 2) 1 else 0) },
-            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1))))
+        val problem = Problem(
+            0,
+            32,
+            Array(32) { IntDomain(0, if (it < 2) 1 else 0) },
+            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1))),
+        )
         val policy = IteratedLocalSearchRestart(initialPerturbationStrength = 1)
-        val strategy = SourceDrivenStrategy(sources = emptyList(), acceptance = AcceptanceRule.GreedyDescent,
-            feasibleDescent = FeasibleDescent.SelfOwned)
+        val strategy = SourceDrivenStrategy(
+            sources = emptyList(),
+            acceptance = AcceptanceRule.GreedyDescent,
+            feasibleDescent = FeasibleDescent.SelfOwned,
+        )
         val trace = RepairTrace("empty strict move pool; seed 7")
         val engine = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy, restartPolicy = policy)
         engine.repairTrace = trace
         var polls = 0
-        val handle = engine.resumable(LinearObjective(), LocalSearchParams(maxFlips = 1, randomSeed = 7,
-            initialAssignment = Sample(booleanArrayOf(), LongArray(32) { if (it == 1) 1L else 0L })))
+        val handle = engine.resumable(
+            LinearObjective(),
+            LocalSearchParams(
+            maxFlips = 1,
+            randomSeed = 7,
+            initialAssignment = Sample(booleanArrayOf(), LongArray(32) { if (it == 1) 1L else 0L }),
+        )
+        )
 
-        assertNull(handle.runSlice(ExecutionControl { policy.incumbents.isNotEmpty() && ++polls >= 3 },
-            Long.MAX_VALUE, -1) {})
+        assertNull(
+            handle.runSlice(
+            ExecutionControl { policy.incumbents.isNotEmpty() && ++polls >= 3 },
+            Long.MAX_VALUE,
+            -1,
+        ) {}
+        )
         val pending = trace.attempts.last()
         assertNull(pending.endpoint)
         assertEquals("prepared", pending.frames.last().stage)
@@ -164,28 +206,48 @@ class RepairTraceTest {
 
     @Test
     fun `resuming a pending repair should retain its earlier phases`() {
-        val problem = Problem(0, 32, Array(32) { IntDomain(0, if (it < 2) 1 else 0) },
-            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1))))
+        val problem = Problem(
+            0,
+            32,
+            Array(32) { IntDomain(0, if (it < 2) 1 else 0) },
+            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1))),
+        )
         val policy = IteratedLocalSearchRestart(initialPerturbationStrength = 1)
-        val strategy = SourceDrivenStrategy(sources = emptyList(), acceptance = AcceptanceRule.GreedyDescent,
-            feasibleDescent = FeasibleDescent.SelfOwned)
+        val strategy = SourceDrivenStrategy(
+            sources = emptyList(),
+            acceptance = AcceptanceRule.GreedyDescent,
+            feasibleDescent = FeasibleDescent.SelfOwned,
+        )
         val trace = RepairTrace("empty strict move pool; seed 7")
         val engine = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy, restartPolicy = policy)
         engine.repairTrace = trace
         var polls = 0
 
-        engine.resumable(LinearObjective(), LocalSearchParams(maxFlips = 1, randomSeed = 7,
-            initialAssignment = Sample(booleanArrayOf(), LongArray(32) { if (it == 1) 1L else 0L }))).use { handle ->
-            assertNull(handle.runSlice(ExecutionControl { policy.incumbents.isNotEmpty() && ++polls >= 3 },
-                Long.MAX_VALUE, -1) {})
+        engine.resumable(
+            LinearObjective(),
+            LocalSearchParams(
+            maxFlips = 1,
+            randomSeed = 7,
+            initialAssignment = Sample(booleanArrayOf(), LongArray(32) { if (it == 1) 1L else 0L }),
+        )
+        ).use { handle ->
+            assertNull(
+                handle.runSlice(
+                ExecutionControl { policy.incumbents.isNotEmpty() && ++polls >= 3 },
+                Long.MAX_VALUE,
+                -1,
+            ) {}
+            )
             val pending = trace.attempts.last()
             val phases = pending.frames.toList()
 
             assertNotNull(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {})
 
             assertEquals(phases, pending.frames.take(phases.size))
-            assertEquals(listOf("before", "perturbed", "prepared", "repaired", "endpoint"),
-                pending.frames.map { it.stage })
+            assertEquals(
+                listOf("before", "perturbed", "prepared", "repaired", "endpoint"),
+                pending.frames.map { it.stage },
+            )
             assertEquals(RepairEndpoint.Censored, pending.endpoint)
         }
     }

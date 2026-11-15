@@ -31,8 +31,11 @@ internal data class NonlinearIntegerRootCounts(
     val excluded: Long = 0,
 ) {
     operator fun plus(other: NonlinearIntegerRootCounts): NonlinearIntegerRootCounts = NonlinearIntegerRootCounts(
-        admitted + other.admitted, declined + other.declined, reused + other.reused,
-        refuted + other.refuted, excluded + other.excluded,
+        admitted + other.admitted,
+        declined + other.declined,
+        reused + other.reused,
+        refuted + other.refuted,
+        excluded + other.excluded,
     )
 }
 
@@ -69,7 +72,8 @@ internal class NonlinearIntegerRootStore(val problem: NonlinearIntegerProblem) {
             }
             override fun deadline() = parent.deadline()
             override val accounting: WorkMeter get() = meter
-            override val admission get() = serialArithmeticSource(parent,
+            override val admission get() = serialArithmeticSource(
+                parent,
                 { minOf(MAX_EQUATION_WORK - equationWork, MAX_ADMISSION_WORK - totalWork) - pendingWork() },
                 {
                     equationWork += it

@@ -18,17 +18,27 @@ class LinearPrimalRefinementTest {
     fun `objective refinement should preserve a wide exact pin`() {
         val wide = BigFraction.ofLong(9007199254740993L)
         val rows = listOf(
-            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE },
-                (wide + BigFraction.ONE).negated()),
+            ExactRationalInequality(
+                intArrayOf(0, 1),
+                List(2) { BigFraction.MINUS_ONE },
+                (wide + BigFraction.ONE).negated(),
+            ),
         )
         val initial = listOf(BigFraction.ofLong(10), wide)
 
         val refined = LinearResidualCompletion(SourceLpBudget(), SparseSourceLpPolicy()).use { completion ->
-            refineLinearPrimal(listOf(real, integer), initial, rows, emptySet(),
-                listOf(BigFraction.ofLong(2), BigFraction.MINUS_ONE), ExecutionControl.Never,
+            refineLinearPrimal(
+                listOf(real, integer),
+                initial,
+                rows,
+                emptySet(),
+                listOf(BigFraction.ofLong(2), BigFraction.MINUS_ONE),
+                ExecutionControl.Never,
                 complete = { residual, costs, token ->
                     completion.complete(residual, costs.size, token, { _, _ -> }, costs, small = { null })
-                }, observe = { _, _ -> })
+                },
+                observe = { _, _ -> },
+            )
         }
 
         assertEquals(listOf(BigFraction.ONE, wide), refined)
@@ -38,9 +48,16 @@ class LinearPrimalRefinementTest {
     fun `inactive rows should not restrict objective refinement`() {
         val rows = listOf(ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.MINUS_ONE))
 
-        val refined = refineLinearPrimal(listOf(real), listOf(BigFraction.ONE), rows, setOf(0),
-            listOf(BigFraction.ONE), ExecutionControl.Never, complete = { _, _, _ -> listOf(BigFraction.ZERO) },
-            observe = { _, _ -> })
+        val refined = refineLinearPrimal(
+            listOf(real),
+            listOf(BigFraction.ONE),
+            rows,
+            setOf(0),
+            listOf(BigFraction.ONE),
+            ExecutionControl.Never,
+            complete = { _, _, _ -> listOf(BigFraction.ZERO) },
+            observe = { _, _ -> },
+        )
 
         assertEquals(listOf(BigFraction.ZERO), refined)
     }
@@ -50,10 +67,18 @@ class LinearPrimalRefinementTest {
         val rows = listOf(ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ofLong(3)))
 
         val refined = LinearResidualCompletion(SourceLpBudget(), SparseSourceLpPolicy()).use { completion ->
-            refineLinearPrimal(listOf(real), listOf(BigFraction.ONE), rows, emptySet(),
-                listOf(BigFraction.ofLong(-7)), ExecutionControl.Never, complete = { residual, costs, token ->
+            refineLinearPrimal(
+                listOf(real),
+                listOf(BigFraction.ONE),
+                rows,
+                emptySet(),
+                listOf(BigFraction.ofLong(-7)),
+                ExecutionControl.Never,
+                complete = { residual, costs, token ->
                     completion.complete(residual, costs.size, token, { _, _ -> }, costs, small = { null })
-                }, observe = { _, _ -> })
+                },
+                observe = { _, _ -> },
+            )
         }
 
         assertEquals(listOf(BigFraction.ofLong(3)), refined)
@@ -62,11 +87,25 @@ class LinearPrimalRefinementTest {
     @Test
     fun `a strict endpoint should leave the accepted point intact`() {
         val initial = listOf(BigFraction.ONE)
-        val rows = listOf(ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE),
-            BigFraction.ZERO, strict = true))
+        val rows = listOf(
+            ExactRationalInequality(
+            intArrayOf(0),
+            listOf(BigFraction.MINUS_ONE),
+            BigFraction.ZERO,
+            strict = true,
+        )
+        )
 
-        val refined = refineLinearPrimal(listOf(real), initial, rows, emptySet(), listOf(BigFraction.ONE),
-            ExecutionControl.Never, complete = { _, _, _ -> listOf(BigFraction.ZERO) }, observe = { _, _ -> })
+        val refined = refineLinearPrimal(
+            listOf(real),
+            initial,
+            rows,
+            emptySet(),
+            listOf(BigFraction.ONE),
+            ExecutionControl.Never,
+            complete = { _, _, _ -> listOf(BigFraction.ZERO) },
+            observe = { _, _ -> },
+        )
 
         assertNull(refined)
         assertEquals(listOf(BigFraction.ONE), initial)
@@ -76,17 +115,32 @@ class LinearPrimalRefinementTest {
     fun `an unchanged objective should not replace the accepted point`() {
         val initial = listOf(BigFraction.ONE)
 
-        val refined = refineLinearPrimal(listOf(real), initial, emptyList(), emptySet(), listOf(BigFraction.ONE),
-            ExecutionControl.Never, complete = { _, _, _ -> initial }, observe = { _, _ -> })
+        val refined = refineLinearPrimal(
+            listOf(real),
+            initial,
+            emptyList(),
+            emptySet(),
+            listOf(BigFraction.ONE),
+            ExecutionControl.Never,
+            complete = { _, _, _ -> initial },
+            observe = { _, _ -> },
+        )
 
         assertNull(refined)
     }
 
     @Test
     fun `a discrete objective should not request continuous refinement`() {
-        val refined = refineLinearPrimal(listOf(real, integer), List(2) { BigFraction.ONE }, emptyList(), emptySet(),
-            listOf(BigFraction.ZERO, BigFraction.ONE), ExecutionControl.Never,
-            complete = { _, _, _ -> error("constant residual objective") }, observe = { _, _ -> })
+        val refined = refineLinearPrimal(
+            listOf(real, integer),
+            List(2) { BigFraction.ONE },
+            emptyList(),
+            emptySet(),
+            listOf(BigFraction.ZERO, BigFraction.ONE),
+            ExecutionControl.Never,
+            complete = { _, _, _ -> error("constant residual objective") },
+            observe = { _, _ -> },
+        )
 
         assertNull(refined)
     }

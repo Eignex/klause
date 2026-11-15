@@ -79,9 +79,12 @@ internal fun bareissEchelon(
     // coefficients take, or the reduced rows end up paired with bounds that belong to other rows.
     val rhs = rhsIn?.copyOf()
     var entries = a.sumOf { it.index.size.toLong() }
-    if (limits != null && (entries > limits.maxTotalEntries || a.any { row ->
+    if (limits != null && (
+        entries > limits.maxTotalEntries || a.any { row ->
             row.index.size > limits.maxRowEntries || row.value.any { it.magnitudeBitLength() > limits.maxBits }
-        } || rhs?.any { it.magnitudeBitLength() > limits.maxBits } == true)) {
+        } || rhs?.any { it.magnitudeBitLength() > limits.maxBits } == true
+    )
+    ) {
         return BareissEchelon(emptyList(), IntArray(0))
     }
 
@@ -115,8 +118,11 @@ internal fun bareissEchelon(
             val g = pivotValue.gcd(factor)
             val scaleQ = pivotValue / g
             val scaleP = factor / g
-            if (limits != null && (!productFits(w[q], scaleQ, rhs?.get(q), limits.maxBits) ||
-                    !productFits(w[p], scaleP, rhs?.get(p), limits.maxBits))) {
+            if (limits != null && (
+                !productFits(w[q], scaleQ, rhs?.get(q), limits.maxBits) ||
+                    !productFits(w[p], scaleP, rhs?.get(p), limits.maxBits)
+            )
+            ) {
                 return BareissEchelon(emptyList(), IntArray(0))
             }
             val combined = combine(w[q], scaleQ, w[p], scaleP, cancellation)

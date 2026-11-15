@@ -59,10 +59,7 @@ class MpsCompiled(
     val sourceDifference: String?
         get() = if (sourceModel == null) "compiled model lacks source mapping" else sourceMismatch
 
-    internal fun withLinearSource(
-        source: LinearSourceProblem,
-        mismatch: String?,
-    ): MpsCompiled = apply {
+    internal fun withLinearSource(source: LinearSourceProblem, mismatch: String?): MpsCompiled = apply {
         check(sourceModel == null) { "MPS source model is already attached" }
         require(source.semantics == semantics) { "MPS source interpretation differs from the compiled model" }
         sourceModel = source
@@ -117,8 +114,11 @@ fun MpsModel.toProblem(
     semanticOverrides: SemanticOverrides = SemanticOverrides(),
 ): MpsCompiled {
     val source = checkNotNull(toLinearSourceProblem(semanticOverrides))
-    return compileMpsView(source, settings,
-        allowProjection = !checkNotNull(source.semantics.effective.feasibilityTolerance).isExact)
+    return compileMpsView(
+        source,
+        settings,
+        allowProjection = !checkNotNull(source.semantics.effective.feasibilityTolerance).isExact,
+    )
 }
 
 internal fun MpsModel.compileMpsView(
@@ -143,10 +143,14 @@ internal fun MpsModel.compileMpsView(
         val declaration = declarations[index]
         if (declaration.lower == SemanticRational.ZERO && literal.lower?.toRawBits() == (-0.0).toRawBits() &&
             view.model.realLower[column.id] == 0.0
-        ) view.model.realLower[column.id] = -0.0
+        ) {
+            view.model.realLower[column.id] = -0.0
+        }
         if (declaration.upper == SemanticRational.ZERO && literal.upper?.toRawBits() == (-0.0).toRawBits() &&
             view.model.realUpper[column.id] == 0.0
-        ) view.model.realUpper[column.id] = -0.0
+        ) {
+            view.model.realUpper[column.id] = -0.0
+        }
     }
     return MpsCompiled(
         view.model,

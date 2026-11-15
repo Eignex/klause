@@ -25,13 +25,18 @@ import kotlin.test.assertTrue
 class NonlinearIntegerTheoryRequestTest {
     @Test
     fun `integer residue exclusions should reach the surviving original source branch`() {
-        val source = assertIs<NonlinearIntegerProblem>(SmtLib.parse(
+        val source = assertIs<NonlinearIntegerProblem>(
+            SmtLib.parse(
             "(declare-const x Int) (declare-const y Int) " +
                 "(assert (or (= (+ (* x x) (* y y)) 3) (and (= x 1) (= y 1))))",
-        ).source.originalSource)
+        ).source.originalSource
+        )
 
-        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(),
-            NonlinearIntegerTheoryParams(residueRefutation = true), FiniteEngine.BACKTRACK)
+        val execution = OpenTheoryPipeline.execute(
+            source.pipelineRequest(),
+            NonlinearIntegerTheoryParams(residueRefutation = true),
+            FiniteEngine.BACKTRACK,
+        )
 
         val witness = assertIs<OpenTheoryResult.Sat>(execution.result).assignment
         assertEquals("1", witness.intValue(0))
@@ -41,13 +46,18 @@ class NonlinearIntegerTheoryRequestTest {
 
     @Test
     fun `residue refutations should close complete source search before polynomial completion`() {
-        val source = assertIs<NonlinearIntegerProblem>(SmtLib.parse(
+        val source = assertIs<NonlinearIntegerProblem>(
+            SmtLib.parse(
             "(declare-const x Int) (declare-const y Int) (declare-const z Int) " +
                 "(assert (= (+ (* x x) (* y y)) (+ (* 4 z) 3)))",
-        ).source.originalSource)
+        ).source.originalSource
+        )
 
-        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(),
-            NonlinearIntegerTheoryParams(residueRefutation = true), FiniteEngine.BACKTRACK)
+        val execution = OpenTheoryPipeline.execute(
+            source.pipelineRequest(),
+            NonlinearIntegerTheoryParams(residueRefutation = true),
+            FiniteEngine.BACKTRACK,
+        )
 
         assertIs<OpenTheoryResult.Unsat>(execution.result)
         val residues = assertNotNull(execution.integerResidues)
@@ -58,11 +68,14 @@ class NonlinearIntegerTheoryRequestTest {
 
     @Test
     fun `a nonlinear request should keep the prepared source declaration mapping`() {
-        val source = assertIs<NonlinearIntegerProblem>((
-            SmtLib.parse(
+        val source = assertIs<NonlinearIntegerProblem>(
+            (
+                SmtLib.parse(
                 "(declare-const x Real) (declare-const n Int) " +
                     "(assert (= (* n n) 4)) (assert (= (* x x) (to_real n)))",
-            )).source.originalSource)
+            )
+            ).source.originalSource
+        )
 
         val request = source.pipelineRequest()
 
@@ -74,10 +87,13 @@ class NonlinearIntegerTheoryRequestTest {
 
     @Test
     fun `every engine should find a checked open integer square witness`() {
-        val source = assertIs<NonlinearIntegerProblem>((
-            SmtLib.parse(
+        val source = assertIs<NonlinearIntegerProblem>(
+            (
+                SmtLib.parse(
                 "(declare-const n Int) (assert (= (* n n) 4))",
-            )).source.originalSource)
+            )
+            ).source.originalSource
+        )
 
         val engines = listOf(FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS, FiniteEngine.MIXED)
         for (engine in engines) {
@@ -92,11 +108,14 @@ class NonlinearIntegerTheoryRequestTest {
 
     @Test
     fun `heuristic neighborhoods should preserve arbitrary width integer output`() {
-        val source = assertIs<NonlinearIntegerProblem>((
-            SmtLib.parse(
+        val source = assertIs<NonlinearIntegerProblem>(
+            (
+                SmtLib.parse(
                 "(declare-const n Int) (assert (= n 100000000000000000000)) " +
                     "(assert (= (* n n) 10000000000000000000000000000000000000000))",
-            )).source.originalSource)
+            )
+            ).source.originalSource
+        )
 
         for (engine in listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
             val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = engine)
@@ -109,11 +128,14 @@ class NonlinearIntegerTheoryRequestTest {
 
     @Test
     fun `mixed output mapping should separate interleaved real and integer declarations`() {
-        val source = assertIs<NonlinearIntegerProblem>((
-            SmtLib.parse(
+        val source = assertIs<NonlinearIntegerProblem>(
+            (
+                SmtLib.parse(
                 "(declare-const x Real) (declare-const n Int) " +
                     "(assert (= (* n n) 4)) (assert (> n 0)) (assert (= (* x x) (to_real n)))",
-            )).source.originalSource)
+            )
+            ).source.originalSource
+        )
 
         val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK)
 
@@ -124,11 +146,14 @@ class NonlinearIntegerTheoryRequestTest {
 
     @Test
     fun `nonlinear neighborhoods should publish their source binding and coordinate mapping`() {
-        val source = assertIs<NonlinearIntegerProblem>((
-            SmtLib.parse(
+        val source = assertIs<NonlinearIntegerProblem>(
+            (
+                SmtLib.parse(
                 "(declare-const x Real) (declare-const n Int) " +
                     "(assert (= (* n n) 4)) (assert (= (* x x) (to_real n)))",
-            )).source.originalSource)
+            )
+            ).source.originalSource
+        )
         val request = source.pipelineRequest()
         val params = NonlinearIntegerTheoryParams(
             polynomial = PolynomialTheoryParams(
@@ -162,7 +187,8 @@ class NonlinearIntegerTheoryRequestTest {
             SmtLib.parse(
                 "(declare-const n Int) (declare-const x Real) " +
                     "(assert (and (<= 1 n 3) (<= 1.0 x 2.0) (= (* (to_real n) x) 6.0)))",
-            ))
+            )
+        )
         val route = assertIs<SourceProblemRoute.Finite>(source.model.pipelineRoute())
 
         val result = BacktrackSolver.source(route.problem).solve()
@@ -174,10 +200,13 @@ class NonlinearIntegerTheoryRequestTest {
 
     @Test
     fun `failed exact integer neighborhoods should keep unknown proof status`() {
-        val source = assertIs<NonlinearIntegerProblem>((
-            SmtLib.parse(
+        val source = assertIs<NonlinearIntegerProblem>(
+            (
+                SmtLib.parse(
                 "(declare-const n Int) (assert (= (* n n) 2))",
-            )).source.originalSource)
+            )
+            ).source.originalSource
+        )
 
         val execution = OpenTheoryPipeline.execute(
             source.pipelineRequest(),
@@ -194,10 +223,13 @@ class NonlinearIntegerTheoryRequestTest {
 
     @Test
     fun `Boolean invocation assumptions should stay local to the source call`() {
-        val source = assertIs<NonlinearIntegerProblem>((
-            SmtLib.parse(
+        val source = assertIs<NonlinearIntegerProblem>(
+            (
+                SmtLib.parse(
                 "(declare-const n Int) (declare-const p Bool) (assert (= (* n n) 4)) (assert p)",
-            )).source.originalSource)
+            )
+            ).source.originalSource
+        )
         val rejected = NonlinearIntegerTheoryParams(
             polynomial = PolynomialTheoryParams(
                 strategy = PolynomialStrategyParams(assumptions = Assumptions.None.withBool(0, false)),
@@ -213,10 +245,13 @@ class NonlinearIntegerTheoryRequestTest {
 
     @Test
     fun `native work charges should stay cumulative across heuristic callbacks`() {
-        val source = assertIs<NonlinearIntegerProblem>((
-            SmtLib.parse(
+        val source = assertIs<NonlinearIntegerProblem>(
+            (
+                SmtLib.parse(
                 "(declare-const n Int) (assert (= (* n n) 2))",
-            )).source.originalSource)
+            )
+            ).source.originalSource
+        )
         var charged = 0L
         val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
@@ -239,10 +274,13 @@ class NonlinearIntegerTheoryRequestTest {
 
     @Test
     fun `an exhausted solve wide node allowance should prevent nonlinear entry`() {
-        val source = assertIs<NonlinearIntegerProblem>((
-            SmtLib.parse(
+        val source = assertIs<NonlinearIntegerProblem>(
+            (
+                SmtLib.parse(
                 "(declare-const n Int) (assert (= (* n n) 4))",
-            )).source.originalSource)
+            )
+            ).source.originalSource
+        )
 
         val execution = OpenTheoryPipeline.execute(
             source.pipelineRequest(),
@@ -258,10 +296,13 @@ class NonlinearIntegerTheoryRequestTest {
 
     @Test
     fun `parallel nonlinear integer workers should preserve the source coordinates`() {
-        val input = assertIs<NonlinearIntegerProblem>((
-            SmtLib.parse(
+        val input = assertIs<NonlinearIntegerProblem>(
+            (
+                SmtLib.parse(
                 "(declare-const x Int) (declare-const y Int) (assert (= x 3)) (assert (= (* x y) 21))",
-            )).source.originalSource)
+            )
+            ).source.originalSource
+        )
         val request = input.pipelineRequest()
         val params = NonlinearIntegerTheoryParams(
             polynomial = PolynomialTheoryParams(
@@ -281,10 +322,13 @@ class NonlinearIntegerTheoryRequestTest {
 
     @Test
     fun `fixed nonlinear execution should ignore additional worker requests`() {
-        val source = assertIs<NonlinearIntegerProblem>((
-            SmtLib.parse(
+        val source = assertIs<NonlinearIntegerProblem>(
+            (
+                SmtLib.parse(
                 "(declare-const n Int) (assert (= (* n n) 4))",
-            )).source.originalSource)
+            )
+            ).source.originalSource
+        )
 
         val result = OpenTheoryPipeline.execute(
             source.pipelineRequest(),
@@ -299,10 +343,13 @@ class NonlinearIntegerTheoryRequestTest {
 
     @Test
     fun `admitted integer roots should refute a rootless square only through complete search`() {
-        val source = assertIs<NonlinearIntegerProblem>((
-            SmtLib.parse(
+        val source = assertIs<NonlinearIntegerProblem>(
+            (
+                SmtLib.parse(
                 "(declare-const n Int) (assert (= (* n n) 2))",
-            )).source.originalSource)
+            )
+            ).source.originalSource
+        )
         val params = NonlinearIntegerTheoryParams(maximumCandidates = 4, maximumMoves = 4, admitIntegerRoots = true)
 
         val complete = OpenTheoryPipeline.execute(source.pipelineRequest(), params, FiniteEngine.BACKTRACK)

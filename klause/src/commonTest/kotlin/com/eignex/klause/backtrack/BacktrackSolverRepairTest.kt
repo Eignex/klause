@@ -29,9 +29,13 @@ import kotlin.test.assertNull
 class BacktrackSolverRepairTest {
     @Test
     fun `exact repair should distinguish both sides of a rational cutoff from equality`() {
-        val problem = Problem(0, 0, emptyArray(), arrayOf(
+        val problem = Problem(
+            0, 0, emptyArray(),
+            arrayOf(
             Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0),
-        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        ),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)
+        ).bake()
         val third = BigFraction.ofLong(3L).reciprocal()
         val epsilon = BigFraction.ofLong(1L shl 60).reciprocal()
         val params = BacktrackParams(toleranceCheck = { true })
@@ -48,7 +52,9 @@ class BacktrackSolverRepairTest {
                     assertEquals(TerminationReason.SearchExhausted, result.reason)
                     if (offset > 0L) {
                         assertEquals(third, assertNotNull(result.sample).exactReals?.single())
-                    } else assertNull(result.sample)
+                    } else {
+                        assertNull(result.sample)
+                    }
                 }
             }
         }
@@ -102,8 +108,11 @@ class BacktrackSolverRepairTest {
             val first = if (compiled.maximize) 1L else 0L
             val second = 1L - first
             BacktrackSolver(compiled.model.bake()).openRepair(objective, BacktrackParams()).use { repair ->
-                val cutoff = if (compiled.maximize) BigFraction.ofLong(-2L) + epsilon
-                    else BigFraction.ofLong(3L) + epsilon
+                val cutoff = if (compiled.maximize) {
+                    BigFraction.ofLong(-2L) + epsilon
+                } else {
+                    BigFraction.ofLong(3L) + epsilon
+                }
                 repair.beginExact(Assumptions(ints = mapOf(0 to first)), 100L, cutoff, ExecutionControl.Never)
                 val a = assertNotNull(repair.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L).sample)
                 repair.beginExact(Assumptions(ints = mapOf(0 to second)), 100L, cutoff, ExecutionControl.Never)
@@ -114,18 +123,29 @@ class BacktrackSolverRepairTest {
                     compiled.columns.map { if (it.real) reals[it.id] else BigFraction.ofLong(sample.ints[it.id]) }
                 }
                 assertEquals(10L, compiled.objectiveScale)
-                assertEquals(if (compiled.maximize) "3/10" else "1/5",
-                    assertNotNull(source.checkMpsWitness(aValues)).objective.toString())
-                assertEquals(if (compiled.maximize) "1/5" else "3/10",
-                    assertNotNull(source.checkMpsWitness(bValues)).objective.toString())
+                assertEquals(
+                    if (compiled.maximize) "3/10" else "1/5",
+                    assertNotNull(source.checkMpsWitness(aValues)).objective.toString(),
+                )
+                assertEquals(
+                    if (compiled.maximize) "1/5" else "3/10",
+                    assertNotNull(source.checkMpsWitness(bValues)).objective.toString(),
+                )
             }
         }
     }
 
     @Test
     fun `repair should leave an unconsumed improving ray unavailable`() {
-        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY)).bake()
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        ).bake()
         val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
         BacktrackSolver(model).openRepair(objective, BacktrackParams()).use { repair ->
             val step = repair.repairStep(Assumptions.None, 100L, -1.0, ExecutionControl.Never)

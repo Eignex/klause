@@ -21,11 +21,7 @@ import com.eignex.klause.solver.search.BooleanTaskCheck
 import com.eignex.klause.solver.search.BooleanTaskLease
 import com.eignex.klause.util.ExecutionControl
 
-internal data class BooleanProofStep(
-    val task: Int?,
-    val sample: Sample? = null,
-    val reason: TerminationReason? = null,
-)
+internal data class BooleanProofStep(val task: Int?, val sample: Sample? = null, val reason: TerminationReason? = null)
 
 @Suppress("TooGenericExceptionCaught") // retire every owned handle while preserving primary engine failures
 internal class BooleanProofScheduler(
@@ -89,14 +85,18 @@ internal class BooleanProofScheduler(
         require(splitVariables.all { it in 0 until problem.numBoolVars })
         validate(context)
         for (params in parameters) {
-            require(params.assumptions.bools == context.scope.condition.bools && params.assumptions.numInts == 0 &&
-                params.assumptions.deductions.isEmpty)
-            require(params.componentFactory == null && params.objectiveBoundSupplier == null &&
+            require(
+                params.assumptions.bools == context.scope.condition.bools && params.assumptions.numInts == 0 &&
+                    params.assumptions.deductions.isEmpty,
+            )
+            require(
+                params.componentFactory == null && params.objectiveBoundSupplier == null &&
                 params.objectiveLowerBoundSupplier == null && params.globalVarLowerSupplier == null &&
                 params.globalVarUpperSupplier == null && params.toleranceCheck == null &&
                 params.cutExchange == null &&
                 (params.clauseExchange == null || params.clauseExchange is ConditionedClauseExchange) &&
-                params.improvedSolutionSink == null && params.pooledIncumbents == null)
+                params.improvedSolutionSink == null && params.pooledIncumbents == null
+            )
         }
     }
 
@@ -121,8 +121,12 @@ internal class BooleanProofScheduler(
             }
             val search = checkNotNull(slot.search)
             if (started[worker] !== lease) {
-                search.begin(assumptions(lease), parameters[worker].maxDecisions,
-                    Double.POSITIVE_INFINITY, cancellation)
+                search.begin(
+                    assumptions(lease),
+                    parameters[worker].maxDecisions,
+                    Double.POSITIVE_INFINITY,
+                    cancellation,
+                )
                 started[worker] = lease
             }
             val result = search.runSlice(cancellation, millis, offeredWork)
@@ -189,15 +193,16 @@ internal class BooleanProofScheduler(
         }
         return if (nativeCoverageComplete) {
             SolveResult.Unsat(
-            stats = stats,
-            assumptionCore = Assumptions(bools = context.scope.condition.bools),
-            semantics = problem.semantics,
-        )
+                stats = stats,
+                assumptionCore = Assumptions(bools = context.scope.condition.bools),
+                semantics = problem.semantics,
+            )
         } else {
             SolveResult.Unknown(
-            if (cancellation()) TerminationReason.Cancelled else TerminationReason.BudgetExhausted,
-            stats = stats, semantics = problem.semantics,
-        )
+                if (cancellation()) TerminationReason.Cancelled else TerminationReason.BudgetExhausted,
+                stats = stats,
+                semantics = problem.semantics,
+            )
         }
     }
 
@@ -249,9 +254,11 @@ internal class BooleanProofScheduler(
     }
 
     private fun validate(value: BooleanProofContext) {
-        require(value.scope.condition.bools.keys.none { id ->
+        require(
+            value.scope.condition.bools.keys.none { id ->
             id in splitVariablesForValidation
-        })
+        }
+        )
         require(value.scope.revision == sourceRevision && value.mapping == sourceMapping) {
             "a changed source or mapping requires a fresh scheduler"
         }

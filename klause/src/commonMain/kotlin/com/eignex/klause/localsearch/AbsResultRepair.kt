@@ -16,7 +16,9 @@ internal class AbsResultRepair(private val state: LocalSearchState, private val 
     private fun propose(variable: Int, value: Long, depth: Int) {
         if (depth >= MAX_DEPTH || value < 0L || value !in state.rootDomains[variable] ||
             !sink.allowsDefinedInt(variable)
-        ) return
+        ) {
+            return
+        }
         val definition = state.invariants?.intDefinition(variable) as? FunctionalObjective.Abs ?: return
         val input = definition.a.varId
         if (input < 0) return

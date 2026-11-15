@@ -227,8 +227,10 @@ class CoefficientStrengtheningTest {
             val problem = Problem(
                 numBoolVars = 0,
                 intBounds = IntBounds.fromModelBounds(
-                    longArrayOf(0, 0), longArrayOf(1, 1),
-                    if (openLower) open else null, if (openLower) null else open,
+                    longArrayOf(0, 0),
+                    longArrayOf(1, 1),
+                    if (openLower) open else null,
+                    if (openLower) null else open,
                 ),
                 factors = arrayOf(Linear(intArrayOf(7, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
             )
@@ -305,7 +307,10 @@ class CoefficientStrengtheningTest {
         for (op in listOf(LinearOp.LE, LinearOp.GE)) {
             val sign = if (op == LinearOp.LE) 1L else -1L
             val row = Linear(
-                longArrayOf(sign * Long.MAX_VALUE, sign), intArrayOf(0, 1), op, sign * (Long.MAX_VALUE - 1),
+                longArrayOf(sign * Long.MAX_VALUE, sign),
+                intArrayOf(0, 1),
+                op,
+                sign * (Long.MAX_VALUE - 1),
             )
 
             val rewritten = assertLinearEquivalent(arrayOf(0..1, 0..0), row)
@@ -334,7 +339,10 @@ class CoefficientStrengtheningTest {
         val problem = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(
-                longArrayOf(Long.MIN_VALUE, 0), longArrayOf(Long.MAX_VALUE, 0), null, null,
+                longArrayOf(Long.MIN_VALUE, 0),
+                longArrayOf(Long.MAX_VALUE, 0),
+                null,
+                null,
             ),
             factors = arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 0)),
         )

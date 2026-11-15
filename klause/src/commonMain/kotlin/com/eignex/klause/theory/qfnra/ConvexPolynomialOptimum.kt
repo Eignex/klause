@@ -56,7 +56,10 @@ internal fun tryConvexPolynomialOptimum(
         val bound = checker.bound(model, stationary) ?: continue
         val optimum = checker.optimum(bound) ?: continue
         val assignment = QfNraAssignment(
-            BooleanArray(boolCount) { arithmetic.step(); bools[it] ?: false },
+            BooleanArray(boolCount) {
+                arithmetic.step();
+                bools[it] ?: false
+            },
             optimum.point.map(algebraic::rational),
         )
         val coordinates = assignment.reals.withIndex().associate { it.index to it.value }
@@ -64,20 +67,31 @@ internal fun tryConvexPolynomialOptimum(
         val atoms = IntArray(source.atoms.size) { index ->
             arithmetic.step()
             val atom = source.atoms[index]
-            if (atom.holds(algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates)))) PolynomialFormula.TRUE
-            else PolynomialFormula.FALSE
+            if (atom.holds(algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates)))) {
+                PolynomialFormula.TRUE
+            } else {
+                PolynomialFormula.FALSE
+            }
         }
         val truth = IntArray(boolCount) {
             arithmetic.step()
             if (assignment.boolValue(it)) PolynomialFormula.TRUE else PolynomialFormula.FALSE
         }
         check(source.truth(truth, atoms, arithmetic) == PolynomialFormula.TRUE)
-        val originalObjective = PolynomialFormula.normalize(PolynomialRealFormula.Atom(
-            objective, PolynomialRelation.EQ, PolynomialExpression.Constant.of(BigFraction.ZERO.num),
-        ), arithmetic).atoms.single().polynomial
-        check(algebraic.compare(
-            algebraic.evaluate(originalObjective, coordinates), algebraic.rational(bound.value),
-        ) == 0)
+        val originalObjective = PolynomialFormula.normalize(
+            PolynomialRealFormula.Atom(
+            objective,
+            PolynomialRelation.EQ,
+            PolynomialExpression.Constant.of(BigFraction.ZERO.num),
+        ),
+            arithmetic
+        ).atoms.single().polynomial
+        check(
+            algebraic.compare(
+            algebraic.evaluate(originalObjective, coordinates),
+            algebraic.rational(bound.value),
+        ) == 0
+        )
         arithmetic.step()
         return ConvexPolynomialOptimum(formula, objective, assignment, optimum, bools)
     }
@@ -94,9 +108,14 @@ internal fun polynomialQuadraticModel(
 ): QuadraticModel? {
     control.matrix(dimension)
     val rows = affineRows(formula, dimension, bools, arithmetic) ?: return null
-    val polynomial = PolynomialFormula.normalize(PolynomialRealFormula.Atom(
-        objective, PolynomialRelation.EQ, PolynomialExpression.Constant.of(BigFraction.ZERO.num),
-    ), arithmetic).atoms.single().polynomial
+    val polynomial = PolynomialFormula.normalize(
+        PolynomialRealFormula.Atom(
+        objective,
+        PolynomialRelation.EQ,
+        PolynomialExpression.Constant.of(BigFraction.ZERO.num),
+    ),
+        arithmetic
+    ).atoms.single().polynomial
     val linear = MutableList(dimension) { BigFraction.ZERO }
     val hessian = List(dimension) { MutableList(dimension) { BigFraction.ZERO } }
     for (term in polynomial.terms) {
@@ -106,8 +125,10 @@ internal fun polynomialQuadraticModel(
         if (degree > 2 || variables.any { it >= dimension }) return null
         when {
             degree == 1L -> linear[variables.single()] += term.coefficient
+
             degree == 2L && variables.size == 1 -> hessian[variables.single()][variables.single()] +=
                 term.coefficient * BigFraction.ofLong(2)
+
             degree == 2L -> {
                 val (i, j) = variables
                 hessian[i][j] += term.coefficient
@@ -131,13 +152,18 @@ private fun affineRows(
         arithmetic.step()
         when (val node = pending.removeLast()) {
             is PolynomialRealFormula.And -> pending.addAll(node.operands)
+
             is PolynomialRealFormula.Constant -> if (!node.value) return null
+
             is PolynomialRealFormula.BooleanVariable -> if (bools[node.id.index] != true) return null
+
             is PolynomialRealFormula.Not -> {
                 val variable = node.operand as? PolynomialRealFormula.BooleanVariable ?: return null
                 if (bools[variable.id.index] != false) return null
             }
+
             is PolynomialRealFormula.Or, is PolynomialSelection, is PolynomialDistinct -> return null
+
             is PolynomialRealFormula.Atom -> {
                 val relation = when (node.relation) {
                     PolynomialRelation.EQ -> QuadraticRowRelation.EQ

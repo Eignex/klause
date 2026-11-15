@@ -22,8 +22,11 @@ internal fun integerRootStats(
 ): NonlinearIntegerRootStats? {
     if (!params.admitIntegerRoots) return null
     return NonlinearIntegerRootStats(
-        workers.sumOf { it.rootCounts.admitted }, workers.sumOf { it.rootCounts.declined },
-        workers.sumOf { it.rootCounts.reused }, workers.sumOf { it.rootCounts.refuted },
-        workers.sumOf { it.rootCounts.excluded }, workers.sumOf { it.completionChecks },
+        workers.sumOf { it.rootCounts.admitted },
+        workers.sumOf { it.rootCounts.declined },
+        workers.sumOf { it.rootCounts.reused },
+        workers.sumOf { it.rootCounts.refuted },
+        workers.sumOf { it.rootCounts.excluded },
+        workers.sumOf { it.completionChecks },
     )
 }

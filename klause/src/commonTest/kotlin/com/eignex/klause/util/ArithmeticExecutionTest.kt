@@ -242,11 +242,11 @@ class ArithmeticExecutionTest {
     fun `a prepared operation should settle before every pause`() {
         val pending = execution.iterator(
             sequence {
-            repeat(3) {
-                execution.step()
-                yield(it)
-            }
-        }.iterator()
+                repeat(3) {
+                    execution.step()
+                    yield(it)
+                }
+            }.iterator(),
         )
 
         assertEquals(0, pending.next())
@@ -275,7 +275,7 @@ class ArithmeticExecutionTest {
         val events = ArrayList<String>()
         val opaque = object : ExecutionControl() {
             override fun isCancelled(): Boolean {
-                events += "poll";
+                events += "poll"
                 return false
             }
             override val accounting: WorkMeter get() = WorkMeter { events += "charge:$it" }

@@ -21,8 +21,15 @@ class NativeMetadataContinuationTest(private val permanentCount: Int) {
     @Test
     fun `growing permanent floors should not delay funded metadata release`() {
         val base = Clause(intArrayOf(8, 10))
-        val session = PropagationSession(Problem(6, 0, emptyArray(),
-            arrayOf(base, Clause(intArrayOf(1)))), nativeSat = true)
+        val session = PropagationSession(
+            Problem(
+            6,
+            0,
+            emptyArray(),
+            arrayOf(base, Clause(intArrayOf(1))),
+        ),
+            nativeSat = true
+        )
         assertTrue(session.usesNativeSat)
         repeat(permanentCount) { session.addLearnedClause(base, 2, permanent = true) }
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
@@ -42,14 +49,18 @@ class NativeMetadataContinuationTest(private val permanentCount: Int) {
                 val work = session.work
                 session.compactLearnedClauses(40L, 256L, { false }) { _, _ -> true }
                 assertTrue(session.work - work <= 40L)
-                assertEquals((62L - released * 2L).coerceAtLeast(0L),
-                    session.learnedLifecycle().getValue("learnedMetadataPendingRows"))
+                assertEquals(
+                    (62L - released * 2L).coerceAtLeast(0L),
+                    session.learnedLifecycle().getValue("learnedMetadataPendingRows"),
+                )
             }
             val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
 
-            assertTrue(after.getValue("learnedMetadataCapacityBytes") <
+            assertTrue(
+                after.getValue("learnedMetadataCapacityBytes") <
 
-                before.getValue("learnedMetadataCapacityBytes"))
+                    before.getValue("learnedMetadataCapacityBytes"),
+            )
             assertEquals(permanentCount + batch + 2, session.activeLearnedClauseCount)
             assertEquals(generation, session.learnedRetirementGeneration)
             assertEquals(reason, assertNotNull(session.boolReasonClause(1)).toList())

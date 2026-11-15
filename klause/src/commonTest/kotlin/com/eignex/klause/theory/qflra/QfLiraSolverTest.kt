@@ -57,29 +57,56 @@ class QfLiraSolverTest {
     @Test
     fun `affine guard implications should use current bound premises after backtracking`() {
         for (strict in listOf(false, true)) {
-            val source = Problem(3, 0, emptyArray(), arrayOf(
-                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, -3.0),
-                    LinearOp.LE, 1.0, strict),
-                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(-4.0, 6.0),
-                    LinearOp.GE, -2.0, strict),
-            ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
-                realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+            val source = Problem(
+                3,
+                0,
+                emptyArray(),
+                arrayOf(
+                    ReifiedRealLinear(
+                        0,
+                        intArrayOf(),
+                        doubleArrayOf(),
+                        intArrayOf(0, 1),
+                        doubleArrayOf(2.0, -3.0),
+                        LinearOp.LE,
+                        1.0,
+                        strict,
+                    ),
+                    ReifiedRealLinear(
+                        1,
+                        intArrayOf(),
+                        doubleArrayOf(),
+                        intArrayOf(0, 1),
+                        doubleArrayOf(-4.0, 6.0),
+                        LinearOp.GE,
+                        -2.0,
+                        strict,
+                    ),
+                ),
+                numRealVars = 2,
+                realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+            )
             ExactLiraSearchComponent(source).use { component ->
                 component.useIncrementalLinearPropagation()
                 val session = SearchSession(listOf(component))
                 assertIs<ComponentResult.Consistent>(session.initialize())
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
                 assertEquals(true, session.boolValue(1))
-                assertEquals(setOf(Lit.make(0, false), Lit.make(1, true)),
-                    assertNotNull(session.reasonFor(1)).literals.toSet())
+                assertEquals(
+                    setOf(Lit.make(0, false), Lit.make(1, true)),
+                    assertNotNull(session.reasonFor(1)).literals.toSet(),
+                )
                 session.popTo(0)
 
                 for (truth in listOf(false, true)) {
                     assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, truth))))
 
                     assertEquals(truth, session.boolValue(0))
-                    assertEquals(setOf(Lit.make(1, !truth), Lit.make(0, truth)),
-                        assertNotNull(session.reasonFor(0)).literals.toSet())
+                    assertEquals(
+                        setOf(Lit.make(1, !truth), Lit.make(0, truth)),
+                        assertNotNull(session.reasonFor(0)).literals.toSet(),
+                    )
                     assertNull(session.boolValue(2))
                     session.popTo(0)
                 }
@@ -90,17 +117,48 @@ class QfLiraSolverTest {
     @Test
     fun `incremental root refresh should substitute a column fixed by a later source row`() {
         for (strict in listOf(false, true)) {
-            val source = Problem(3, 0, emptyArray(), arrayOf(
-                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
-                    listOf(BigFraction.ONE, BigFraction.ofLong(2)), LinearOp.LE, BigFraction.ONE, strict),
-                ExactLinear.of(intArrayOf(Term.ofRealVar(1)), listOf(BigFraction.ONE),
-                    LinearOp.EQ, BigFraction.ZERO),
-                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
-                    LinearOp.LE, 1.0, strict),
-                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(2), doubleArrayOf(1.0),
-                    LinearOp.LE, 3.0),
-            ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
-                realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+            val source = Problem(
+                3,
+                0,
+                emptyArray(),
+                arrayOf(
+                    ExactLinear.of(
+                        intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                        listOf(BigFraction.ONE, BigFraction.ofLong(2)),
+                        LinearOp.LE,
+                        BigFraction.ONE,
+                        strict,
+                    ),
+                    ExactLinear.of(
+                        intArrayOf(Term.ofRealVar(1)),
+                        listOf(BigFraction.ONE),
+                        LinearOp.EQ,
+                        BigFraction.ZERO,
+                    ),
+                    ReifiedRealLinear(
+                        0,
+                        intArrayOf(),
+                        doubleArrayOf(),
+                        intArrayOf(0),
+                        doubleArrayOf(1.0),
+                        LinearOp.LE,
+                        1.0,
+                        strict,
+                    ),
+                    ReifiedRealLinear(
+                        1,
+                        intArrayOf(),
+                        doubleArrayOf(),
+                        intArrayOf(2),
+                        doubleArrayOf(1.0),
+                        LinearOp.LE,
+                        3.0,
+                    ),
+                ),
+                numRealVars = 3,
+                realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
+            )
             val trigger = object : SearchComponent {
                 override fun propagate(context: SearchContext): ComponentResult {
                     if (context.boolValue(1) != null) return ComponentResult.Consistent
@@ -123,11 +181,14 @@ class QfLiraSolverTest {
 
     @Test
     fun `incremental nested siblings should preserve the surviving source scope`() {
-        val source = Problem(3, intBounds = openBounds(), factors = arrayOf(
+        val source = Problem(
+            3, intBounds = openBounds(),
+            factors = arrayOf(
             ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
             ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, -2),
             ReifiedLinear(2, intArrayOf(1), intArrayOf(0), LinearOp.LE, -4),
-        ))
+        )
+        )
         ExactLiraSearchComponent(source).use { component ->
             component.useIncrementalLinearPropagation()
             val session = SearchSession(listOf(component))
@@ -148,17 +209,54 @@ class QfLiraSolverTest {
 
     @Test
     fun `incremental prepared rows should consume a strict consequence before Boolean completion`() {
-        val source = Problem(5, 0, emptyArray(), arrayOf(
-            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
-                LinearOp.LE, 1.0),
-            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0),
-                LinearOp.GE, 2.0),
-            ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, -3.0),
-                LinearOp.LE, -4.0, strict = true),
-            ReifiedRealLinear(3, intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0),
-                LinearOp.GE, 2.0, strict = true),
-        ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+        val source = Problem(
+            5,
+            0,
+            emptyArray(),
+            arrayOf(
+                ReifiedRealLinear(
+                    0,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.LE,
+                    1.0,
+                ),
+                ReifiedRealLinear(
+                    1,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(1),
+                    doubleArrayOf(1.0),
+                    LinearOp.GE,
+                    2.0,
+                ),
+                ReifiedRealLinear(
+                    2,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0, 1),
+                    doubleArrayOf(2.0, -3.0),
+                    LinearOp.LE,
+                    -4.0,
+                    strict = true,
+                ),
+                ReifiedRealLinear(
+                    3,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(1),
+                    doubleArrayOf(1.0),
+                    LinearOp.GE,
+                    2.0,
+                    strict = true,
+                ),
+            ),
+            numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+        )
         val prepared = assertNotNull(prepareExactLiraSource(source, ExecutionControl.Never))
         prepared.open().use { component ->
             component.useIncrementalLinearPropagation()
@@ -172,17 +270,22 @@ class QfLiraSolverTest {
 
             assertEquals(true, session.boolValue(2))
             assertNull(session.boolValue(4))
-            assertEquals(setOf(Lit.make(0, false), Lit.make(3, false), Lit.make(2, true)),
-                assertNotNull(session.reasonFor(2)).literals.toSet())
+            assertEquals(
+                setOf(Lit.make(0, false), Lit.make(3, false), Lit.make(2, true)),
+                assertNotNull(session.reasonFor(2)).literals.toSet(),
+            )
         }
     }
 
     @Test
     fun `incremental prepared rows should reassert an opposite guard after backtracking`() {
-        val source = Problem(3, intBounds = openBounds(), factors = arrayOf(
+        val source = Problem(
+            3, intBounds = openBounds(),
+            factors = arrayOf(
             ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
             ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
-        ))
+        )
+        )
         val prepared = assertNotNull(prepareExactLiraSource(source, ExecutionControl.Never))
         prepared.open().use { component ->
             component.useIncrementalLinearPropagation()
@@ -195,25 +298,63 @@ class QfLiraSolverTest {
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
 
             assertEquals(false, session.boolValue(1))
-            assertEquals(setOf(Lit.make(0, true), Lit.make(1, false)),
-                assertNotNull(session.reasonFor(1)).literals.toSet())
+            assertEquals(
+                setOf(Lit.make(0, true), Lit.make(1, false)),
+                assertNotNull(session.reasonFor(1)).literals.toSet(),
+            )
             assertTrue(component.partialLinearPropagationStats.sourceRowInvalidations > 0)
         }
     }
 
     @Test
     fun `incremental prepared rows should reuse a compatible strict comparison decline`() {
-        val source = Problem(5, 0, emptyArray(), arrayOf(
-            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
-                LinearOp.LE, 1.0),
-            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0),
-                LinearOp.GE, 2.0),
-            ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, -3.0),
-                LinearOp.LE, -4.0, strict = true),
-            ReifiedRealLinear(3, intArrayOf(), doubleArrayOf(), intArrayOf(2), doubleArrayOf(1.0),
-                LinearOp.LE, 1.0),
-        ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val source = Problem(
+            5,
+            0,
+            emptyArray(),
+            arrayOf(
+                ReifiedRealLinear(
+                    0,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.LE,
+                    1.0,
+                ),
+                ReifiedRealLinear(
+                    1,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(1),
+                    doubleArrayOf(1.0),
+                    LinearOp.GE,
+                    2.0,
+                ),
+                ReifiedRealLinear(
+                    2,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0, 1),
+                    doubleArrayOf(2.0, -3.0),
+                    LinearOp.LE,
+                    -4.0,
+                    strict = true,
+                ),
+                ReifiedRealLinear(
+                    3,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(2),
+                    doubleArrayOf(1.0),
+                    LinearOp.LE,
+                    1.0,
+                ),
+            ),
+            numRealVars = 3,
+            realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
+        )
         val prepared = assertNotNull(prepareExactLiraSource(source, ExecutionControl.Never))
         prepared.open().use { component ->
             component.useIncrementalLinearPropagation()
@@ -232,17 +373,54 @@ class QfLiraSolverTest {
 
     @Test
     fun `a strict bound should enable a guard after a closed endpoint declined`() {
-        val model = Problem(4, 0, emptyArray(), arrayOf(
-            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
-                LinearOp.LE, 1.0),
-            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0),
-                LinearOp.GE, 2.0),
-            ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, -3.0),
-                LinearOp.LE, -4.0, strict = true),
-            ReifiedRealLinear(3, intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0),
-                LinearOp.GE, 2.0, strict = true),
-        ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+        val model = Problem(
+            4,
+            0,
+            emptyArray(),
+            arrayOf(
+                ReifiedRealLinear(
+                    0,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.LE,
+                    1.0,
+                ),
+                ReifiedRealLinear(
+                    1,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(1),
+                    doubleArrayOf(1.0),
+                    LinearOp.GE,
+                    2.0,
+                ),
+                ReifiedRealLinear(
+                    2,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0, 1),
+                    doubleArrayOf(2.0, -3.0),
+                    LinearOp.LE,
+                    -4.0,
+                    strict = true,
+                ),
+                ReifiedRealLinear(
+                    3,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(1),
+                    doubleArrayOf(1.0),
+                    LinearOp.GE,
+                    2.0,
+                    strict = true,
+                ),
+            ),
+            numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+        )
         ExactLiraSearchComponent(model).use { component ->
             component.usePartialLinearPropagation()
             component.reusePartialLinearDeclines()
@@ -260,15 +438,43 @@ class QfLiraSolverTest {
 
     @Test
     fun `automatic partial propagation should complete the sole component after its own implication`() {
-        val model = Problem(3, 0, emptyArray(), arrayOf(
-            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
-                LinearOp.LE, 1.0),
-            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0),
-                LinearOp.GE, 2.0),
-            ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, -3.0),
-                LinearOp.LE, -4.0),
-        ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+        val model = Problem(
+            3,
+            0,
+            emptyArray(),
+            arrayOf(
+                ReifiedRealLinear(
+                    0,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.LE,
+                    1.0,
+                ),
+                ReifiedRealLinear(
+                    1,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(1),
+                    doubleArrayOf(1.0),
+                    LinearOp.GE,
+                    2.0,
+                ),
+                ReifiedRealLinear(
+                    2,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0, 1),
+                    doubleArrayOf(2.0, -3.0),
+                    LinearOp.LE,
+                    -4.0,
+                ),
+            ),
+            numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+        )
         for (cached in listOf(false, true)) {
             ExactLiraSearchComponent(model).use { component ->
                 component.usePartialLinearPropagation()
@@ -287,10 +493,13 @@ class QfLiraSolverTest {
 
     @Test
     fun `automatic partial propagation should not retain a consequence in the opposite branch`() {
-        val model = Problem(2, intBounds = openBounds(), factors = arrayOf(
+        val model = Problem(
+            2, intBounds = openBounds(),
+            factors = arrayOf(
             ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
             ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
-        ))
+        )
+        )
         for (cached in listOf(false, true)) {
             ExactLiraSearchComponent(model).use { component ->
                 component.usePartialLinearPropagation()
@@ -310,15 +519,43 @@ class QfLiraSolverTest {
 
     @Test
     fun `partial interval propagation should publish a guard with both active bound premises`() {
-        val model = Problem(3, 0, emptyArray(), arrayOf(
-            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
-                LinearOp.LE, 1.0),
-            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0),
-                LinearOp.GE, 2.0),
-            ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, -3.0),
-                LinearOp.LE, -4.0),
-        ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+        val model = Problem(
+            3,
+            0,
+            emptyArray(),
+            arrayOf(
+                ReifiedRealLinear(
+                    0,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.LE,
+                    1.0,
+                ),
+                ReifiedRealLinear(
+                    1,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(1),
+                    doubleArrayOf(1.0),
+                    LinearOp.GE,
+                    2.0,
+                ),
+                ReifiedRealLinear(
+                    2,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0, 1),
+                    doubleArrayOf(2.0, -3.0),
+                    LinearOp.LE,
+                    -4.0,
+                ),
+            ),
+            numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+        )
         ExactLiraSearchComponent(model).use { component ->
             val session = SearchSession(listOf(component))
             assertIs<ComponentResult.Consistent>(session.initialize())
@@ -329,17 +566,22 @@ class QfLiraSolverTest {
 
             assertEquals(1, probe.deductions.size)
             assertEquals(true, session.boolValue(2))
-            assertEquals(setOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true)),
-                assertNotNull(session.reasonFor(2)).literals.toSet())
+            assertEquals(
+                setOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true)),
+                assertNotNull(session.reasonFor(2)).literals.toSet(),
+            )
         }
     }
 
     @Test
     fun `partial interval propagation should decline after a required bound retracts`() {
-        val model = Problem(2, intBounds = openBounds(), factors = arrayOf(
+        val model = Problem(
+            2, intBounds = openBounds(),
+            factors = arrayOf(
             ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
             ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
-        ))
+        )
+        )
         ExactLiraSearchComponent(model).use { component ->
             val session = SearchSession(listOf(component))
             assertIs<ComponentResult.Consistent>(session.initialize())
@@ -358,10 +600,24 @@ class QfLiraSolverTest {
     fun `wide Boolean source rows should retain both reification directions in exact arithmetic`() {
         val wide = parseBigInt("18446744073709551616")
         val factor = ReifiedPseudoBoolean(0, arrayOf(wide), intArrayOf(Lit.make(1, false)), PbOp.EQ, wide)
-        val real = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
-            LinearOp.LE, 0.0)
-        val problem = Problem(2, 0, emptyArray(), arrayOf(factor, real),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val real = ReifiedRealLinear(
+            0,
+            intArrayOf(),
+            doubleArrayOf(),
+            intArrayOf(0),
+            doubleArrayOf(1.0),
+            LinearOp.LE,
+            0.0,
+        )
+        val problem = Problem(
+            2,
+            0,
+            emptyArray(),
+            arrayOf(factor, real),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         for (indicator in listOf(false, true)) {
             val session = SearchSession(listOf(ExactLiraSearchComponent(problem)))
             assertIs<ComponentResult.Consistent>(session.initialize())
@@ -535,8 +791,11 @@ class QfLiraSolverTest {
                     .valueOf(component.assignmentKey),
             )
             assertEquals(BIG_ZERO, witness.intValue(0))
-            assertEquals(1L, stats.snapshot().phases.getValue("CLAIM_CONSUMPTION_STANDALONE")
-                .outcomes["FEASIBLE_COMPLETION"])
+            assertEquals(
+                1L,
+                stats.snapshot().phases.getValue("CLAIM_CONSUMPTION_STANDALONE")
+                .outcomes["FEASIBLE_COMPLETION"]
+            )
         }
     }
 
@@ -784,8 +1043,16 @@ class QfLiraSolverTest {
             realLower = doubleArrayOf(0.0, 0.0),
             realUpper = doubleArrayOf(0.0, 0.0),
             factors = arrayOf(
-                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
-                    doubleArrayOf(1.0, 2.0), LinearOp.LE, 0.0, strict = true),
+                ReifiedRealLinear(
+                    0,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 2.0),
+                    LinearOp.LE,
+                    0.0,
+                    strict = true,
+                ),
             ),
         )
         ExactLiraSearchComponent(source).use { component ->
@@ -832,9 +1099,12 @@ class QfLiraSolverTest {
 
     @Test
     fun `a private operation stop should withhold a Boolean leaf until a live operation`() {
-        val source = Problem(2, intBounds = openBounds(), factors = arrayOf(
+        val source = Problem(
+            2, intBounds = openBounds(),
+            factors = arrayOf(
             ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
-        ))
+        )
+        )
         for (incremental in listOf(false, true)) {
             var privateStopped = false
             val component = ExactLiraSearchComponent(source)

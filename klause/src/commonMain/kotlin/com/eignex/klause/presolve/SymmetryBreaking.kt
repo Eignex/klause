@@ -71,8 +71,12 @@ internal object SymmetryBreaking {
         val objectiveBools = bools.indices.filter { bools[it] != 0L }.toSet()
         if (objectiveInts.isEmpty() && objectiveBools.isEmpty()) return PassDelta()
         val extra = breakings(
-            problem, FiniteColumns(problem), objectiveInts, objectiveBools,
-            context.cancellation, objective,
+            problem,
+            FiniteColumns(problem),
+            objectiveInts,
+            objectiveBools,
+            context.cancellation,
+            objective,
         )
         return if (extra.isEmpty()) PassDelta() else PassDelta(addedFactors = extra)
     }
@@ -150,7 +154,12 @@ internal object SymmetryBreaking {
         // itself an automorphism — a scalar symmetric group, not a lockstep matrix), the full total
         // order is sound and strictly stronger than the generator lex, so post it too.
         val scalarLex = scalarTotalOrders(
-            problem, generators, variableHeldInts, variableHeldBools, objective, cancellation,
+            problem,
+            generators,
+            variableHeldInts,
+            variableHeldBools,
+            objective,
+            cancellation,
         )
         val valuePins = breakValueSymmetry(problem, active, heldInts, cancellation, chainPrecedence = true)
         val extra = ArrayList<Factor>()
@@ -872,7 +881,7 @@ internal object SymmetryBreaking {
                 objectiveSeed(SPACE_INT, v)
             } else {
                 columns.seed(v)
-                .withCoefficient(objective?.intCoefficientValues?.getOrElse(v) { 0L })
+                    .withCoefficient(objective?.intCoefficientValues?.getOrElse(v) { 0L })
             }
         }
         val seedBoolBase = Array(nBool) { v ->
@@ -880,7 +889,7 @@ internal object SymmetryBreaking {
                 objectiveSeed(SPACE_BOOL, v)
             } else {
                 columns.boolSeed(v)
-                .withCoefficient(objective?.boolWeightValues?.getOrElse(v) { 0L })
+                    .withCoefficient(objective?.boolWeightValues?.getOrElse(v) { 0L })
             }
         }
 

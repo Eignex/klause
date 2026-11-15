@@ -91,19 +91,33 @@ internal fun solvePolynomialObjectiveImage(
         PolynomialRealFormula.Atom(objective, PolynomialRelation.EQ, objective)
             .requireVariableCounts(boolCount, realCount, arithmetic::step)
         conditioned.requireVariableCounts(boolCount, realCount, arithmetic::step)
-        val originalObjective = PolynomialFormula.normalize(PolynomialRealFormula.Atom(
-            objective, PolynomialRelation.EQ, PolynomialExpression.Constant.of(BigFraction.ZERO.num),
-        ), arithmetic).atoms.single().polynomial
+        val originalObjective = PolynomialFormula.normalize(
+            PolynomialRealFormula.Atom(
+            objective,
+            PolynomialRelation.EQ,
+            PolynomialExpression.Constant.of(BigFraction.ZERO.num),
+        ),
+            arithmetic
+        ).atoms.single().polynomial
         val remap = VarRemap(
-            IntArray(boolCount) { arithmetic.step(); it }, intArrayOf(),
-            IntArray(realCount) { arithmetic.step(); it + 1 },
+            IntArray(boolCount) {
+                arithmetic.step();
+                it
+            },
+            intArrayOf(),
+            IntArray(realCount) {
+                arithmetic.step();
+                it + 1
+            },
         )
         val imageVariable = PolynomialExpression.Variable(SourceRealId(0))
         val shiftedObjective = objective.remap(remap)
-        val image = PolynomialRealFormula.And(listOf(
+        val image = PolynomialRealFormula.And(
+            listOf(
             conditioned.remap(remap),
             PolynomialRealFormula.Atom(imageVariable, PolynomialRelation.EQ, shiftedObjective),
-        ))
+        )
+        )
         arithmetic.step()
         val normalized = PolynomialFormula.normalize(image, arithmetic, fixed)
         val projection = PolynomialProjection.compute(normalized.atoms.map { it.polynomial }, realCount + 1, arithmetic)
@@ -117,21 +131,26 @@ internal fun solvePolynomialObjectiveImage(
                 roots[root]
             } else {
                 algebraic.rational(
-                algebraic.sampleBetween(roots.getOrNull(root - 1), roots.getOrNull(root)),
-            )
+                    algebraic.sampleBetween(roots.getOrNull(root - 1), roots.getOrNull(root)),
+                )
             }
             val query = PolynomialRealFormula.And(
                 listOf(
-                image,
-                algebraicFixing(imageVariable, value, arithmetic::step),
-            )
+                    image,
+                    algebraicFixing(imageVariable, value, arithmetic::step),
+                ),
             )
             val fixing = value.rational?.let {
                 PolynomialCondition(lower = fixed + (0 to it), upper = fixed + (0 to it))
             } ?: PolynomialCondition(lower = fixed, upper = fixed)
-            val checked = solveQfNra(query, boolCount, realCount + 1, params.copy(
-                cancellation = work, maximumWork = null,
-            ), fixing)
+            val checked = solveQfNra(
+                query, boolCount, realCount + 1,
+                params.copy(
+                cancellation = work,
+                maximumWork = null,
+            ),
+                fixing
+            )
             work.projected = sum(work.projected, checked.stats.projectedPolynomials)
             when (checked) {
                 is QfNraResult.Unknown -> {
@@ -167,18 +186,29 @@ internal fun solvePolynomialObjectiveImage(
                     check(original.truth(sourceBools, sourceAtoms, arithmetic) == PolynomialFormula.TRUE)
                     check(algebraic.compare(algebraic.evaluate(originalObjective, coordinates), value) == 0)
                     val evidence = PolynomialObjectiveEvidence(
-                        conditioned, objective, boolCount, realCount, roots, cell,
+                        conditioned,
+                        objective,
+                        boolCount,
+                        realCount,
+                        roots,
+                        cell,
                     )
                     arithmetic.step()
                     result = when {
                         cell and 1L != 0L -> PolynomialObjectiveResult.Optimum(
-                            value, assignment, evidence, work.snapshot(),
+                            value,
+                            assignment,
+                            evidence,
+                            work.snapshot(),
                         )
 
                         cell == 0L -> PolynomialObjectiveResult.Unbounded(assignment, evidence, work.snapshot())
 
                         else -> PolynomialObjectiveResult.Infimum(
-                            roots[root - 1], assignment, evidence, work.snapshot(),
+                            roots[root - 1],
+                            assignment,
+                            evidence,
+                            work.snapshot(),
                         )
                     }
                     break
@@ -196,7 +226,8 @@ internal fun solvePolynomialObjectiveImage(
         }
     } catch (_: PolynomialInterrupted) {
         PolynomialObjectiveResult.Unknown(
-            if (work.limitReached) QfNraReason.WorkLimit else QfNraReason.Interrupted, work.snapshot(),
+            if (work.limitReached) QfNraReason.WorkLimit else QfNraReason.Interrupted,
+            work.snapshot(),
         )
     } catch (stop: PolynomialResourceLimit) {
         PolynomialObjectiveResult.Unknown(QfNraReason.ResourceLimit, work.snapshot(), stop.resource)
@@ -233,14 +264,19 @@ internal fun algebraicFixing(
     fun atom(relation: PolynomialRelation, number: BigFraction): PolynomialRealFormula =
         PolynomialRealFormula.Atom(variable, relation, constant(number))
     value.rational?.let { return atom(PolynomialRelation.EQ, it) }
-    val polynomial = PolynomialExpression.Sum(value.definingCoefficients.mapIndexed { index, coefficient ->
+    val polynomial = PolynomialExpression.Sum(
+        value.definingCoefficients.mapIndexed { index, coefficient ->
         checkpoint()
         PolynomialExpression.Product(listOf(constant(coefficient), PolynomialExpression.Power(variable, index)))
-    })
-    return PolynomialRealFormula.And(listOf(
+    }
+    )
+    return PolynomialRealFormula.And(
+        listOf(
         PolynomialRealFormula.Atom(polynomial, PolynomialRelation.EQ, constant(BigFraction.ZERO)),
-        atom(PolynomialRelation.GT, value.lowerBound), atom(PolynomialRelation.LT, value.upperBound),
-    ))
+        atom(PolynomialRelation.GT, value.lowerBound),
+        atom(PolynomialRelation.LT, value.upperBound),
+    )
+    )
 }
 
 private class ObjectiveImageWork(private val params: QfNraParams) : ExecutionControl() {

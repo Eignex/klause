@@ -25,26 +25,45 @@ internal class QuadraticStrategyAdapters(
         }
         val plan = request.preparedPlan.withObjective(objective, sense)
         val invocation = request.preparedPlan.quadraticEngineInvocation(objective, sense, assumptions)
-        return QuadraticPortfolioInvocation(plan, objective, sense, params, native, engine, cores,
-            assumptions, invocation)
+        return QuadraticPortfolioInvocation(
+            plan, objective, sense, params, native, engine, cores,
+            assumptions, invocation,
+        )
             .execute(onAccepted = { publication?.accepted(it.objective, it.version) }) { arm, slot, scope, read ->
-                val controls = params.copy(maximumWork = null, cancellation = scope.polynomial,
+                val controls = params.copy(
+                    maximumWork = null,
+                    cancellation = scope.polynomial,
                     strategy = params.strategy.copy(
-                        backtrack = params.strategy.backtrack.copy(randomSeed = slot.seed,
+                        backtrack = params.strategy.backtrack.copy(
+                            randomSeed = slot.seed,
                             maxDecisions = slot.nativeAllowance(params.strategy.backtrack.maxDecisions),
-                            nodeBudget = slot.nodeBudget),
-                        localSearch = params.strategy.localSearch.copy(randomSeed = slot.seed,
+                            nodeBudget = slot.nodeBudget,
+                        ),
+                        localSearch = params.strategy.localSearch.copy(
+                            randomSeed = slot.seed,
                             maxFlips = slot.heuristicAllowance(params.strategy.localSearch.maxFlips),
                             maxInstructions = params.strategy.localSearch.maxInstructions
                                 ?.let(slot::heuristicAllowance),
-                            nodeBudget = slot.nodeBudget)))
+                            nodeBudget = slot.nodeBudget,
+                        ),
+                    ),
+                )
                 val selected = when (arm) {
                     0 -> FiniteEngine.BACKTRACK
                     1 -> FiniteEngine.LOCAL_SEARCH
                     else -> FiniteEngine.ALNS
                 }
-                val worker = slot.own(QuadraticWorkerAdapter(request, model, objective, sense, controls, scope,
-                    selected))
+                val worker = slot.own(
+                    QuadraticWorkerAdapter(
+                    request,
+                    model,
+                    objective,
+                    sense,
+                    controls,
+                    scope,
+                    selected,
+                )
+                )
                 worker.readIncumbent = read
                 worker.worker(arm, plan)
             }

@@ -39,32 +39,67 @@ internal fun LpScopedSolver.advanceRootGuidance(
     ) {
         val ray = attempt.first.infeasibleRay
         if (ray != null) {
-            val checked = certifyLpConflictOnly(requireNotNull(state.ownerWorkingModel()), ray,
-                certificateLimits, token, observer, policy)
+            val checked = certifyLpConflictOnly(
+                requireNotNull(state.ownerWorkingModel()),
+                ray,
+                certificateLimits,
+                token,
+                observer,
+                policy,
+            )
             val conflict = checked.conflict.takeUnless { token() }
-            return LpRootGuidance(null, null,
+            return LpRootGuidance(
+                null,
+                null,
                 if (conflict != null) LpRootGuidancePhase.COMPLETE else LpRootGuidancePhase.CERTIFICATE,
-                false, lastFloatTermination, checked.metrics, conflict = conflict,
-                conflictSupport = checked.conflictSupport.takeIf { conflict != null })
+                false,
+                lastFloatTermination,
+                checked.metrics,
+                conflict = conflict,
+                conflictSupport = checked.conflictSupport.takeIf { conflict != null },
+            )
         }
     }
     if (result == null || token()) {
-        return LpRootGuidance(null, null,
-            if (lastFloatTermination == null && !floatPaused) LpRootGuidancePhase.PREPARATION
-            else LpRootGuidancePhase.FLOAT, floatPaused && !floatFundingStopped, lastFloatTermination)
+        return LpRootGuidance(
+            null,
+            null,
+            if (lastFloatTermination == null && !floatPaused) {
+                LpRootGuidancePhase.PREPARATION
+            } else {
+                LpRootGuidancePhase.FLOAT
+            },
+            floatPaused && !floatFundingStopped,
+            lastFloatTermination,
+        )
     }
     val point = result.primal.takeIf { it.size == state.model.n && it.all(Double::isFinite) }
     val checked = certifyLpBoundOnly(
-        requireNotNull(state.ownerWorkingModel()), result.duals, certificateLimits, token, observer, policy,
+        requireNotNull(state.ownerWorkingModel()),
+        result.duals,
+        certificateLimits,
+        token,
+        observer,
+        policy,
         basis = result.basis,
     )
-    if (token()) return LpRootGuidance(null, null, LpRootGuidancePhase.CERTIFICATE, false,
-        lastFloatTermination, checked.metrics)
+    if (token()) {
+        return LpRootGuidance(
+        null,
+        null,
+        LpRootGuidancePhase.CERTIFICATE,
+        false,
+        lastFloatTermination,
+        checked.metrics,
+    )
+    }
     val phase = when {
         !result.optimal -> LpRootGuidancePhase.FLOAT
         checked.bound == null -> LpRootGuidancePhase.CERTIFICATE
         else -> LpRootGuidancePhase.COMPLETE
     }
-    return LpRootGuidance(point, checked.bound, phase, false, lastFloatTermination,
-        checked.metrics, result.luMaxFill, result.luMaxDensity, result.optimal)
+    return LpRootGuidance(
+        point, checked.bound, phase, false, lastFloatTermination,
+        checked.metrics, result.luMaxFill, result.luMaxDensity, result.optimal,
+    )
 }

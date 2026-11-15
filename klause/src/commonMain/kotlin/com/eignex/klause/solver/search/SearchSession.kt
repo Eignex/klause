@@ -76,8 +76,11 @@ class SearchSession(
     )
 
     private fun learningMemoryPosition(): LearningMemoryPosition = LearningMemoryPosition(
-        learning.ownershipRevision, learning.storeOwnershipRevision, learning.watchPosition,
-        trail.ownershipRevision, trail.pendingAssertions.ownershipRevision,
+        learning.ownershipRevision,
+        learning.storeOwnershipRevision,
+        learning.watchPosition,
+        trail.ownershipRevision,
+        trail.pendingAssertions.ownershipRevision,
     )
     internal fun retainedLearningPosition(): Any = learningMemoryPosition()
     private var selfPublicationsPending = false
@@ -937,8 +940,11 @@ class SearchSession(
         val values = reasons.completeValues
         val result = if (values == null) {
             SharedLearningReclamation(
-                if (cancelled()) SharedLearningReclamationStatus.Cancelled
-                else SharedLearningReclamationStatus.Deferred,
+                if (cancelled()) {
+                    SharedLearningReclamationStatus.Cancelled
+                } else {
+                    SharedLearningReclamationStatus.Deferred
+                },
                 work = reasons.work,
             )
         } else {

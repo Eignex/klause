@@ -68,7 +68,8 @@ internal fun recoverLinearPrimal(
             if (!row.strict && row.columns.size == 1) {
                 val column = row.columns.single()
                 if (coordinates[column].kind == SourceCoordinate.Kind.Real &&
-                    meter.subtractProduct(row.rhs, row.coefficients.single(), point[column]).isZero) {
+                    meter.subtractProduct(row.rhs, row.coefficients.single(), point[column]).isZero
+                ) {
                     endpoints[column] = true
                 }
             }
@@ -161,8 +162,14 @@ internal fun recoverLinearPrimal(
             componentRows.forEach { id ->
                 val row = residual[id]
                 meter.reserve(row.columns.size.toLong() + 1L, 64L + 32L * row.columns.size)
-                localRows.add(ExactRationalInequality(IntArray(row.columns.size) { local[row.columns[it]] },
-                    row.coefficients, row.rhs, row.strict))
+                localRows.add(
+                    ExactRationalInequality(
+                    IntArray(row.columns.size) { local[row.columns[it]] },
+                    row.coefficients,
+                    row.rhs,
+                    row.strict,
+                )
+                )
             }
             if (meter.satisfies(List(members.size) { recovered[members[it]] }, localRows)) continue
             observe("PrimalRecoveryComponents", 1L)

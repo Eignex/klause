@@ -55,8 +55,11 @@ internal fun LpEngine.prepareRootComponentTrial(objective: LinearObjective, canc
         return true
     } finally {
         if (!retained) session.releaseRetainedState()
-        sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ROUNDING", outcome,
-            started.elapsedNow().inWholeNanoseconds)
+        sink.lp.observePrimalPhase(
+            "PRIMAL_COMPONENT_ROUNDING",
+            outcome,
+            started.elapsedNow().inWholeNanoseconds,
+        )
     }
 }
 
@@ -66,8 +69,11 @@ private fun LpEngine.fractionalComponentTargets(targets: RootPrimalTargets, canc
         rootComponentPreparationWork(targets, 0L) < maximumWork
     ) {
         sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ROUNDING", "TARGET_SCAN_DECLINED", 0L)
-        sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ADMISSION",
-            rootComponentPreparationDecline(targets, 0L, maximumWork) ?: "SLICE_WORK", 0L)
+        sink.lp.observePrimalPhase(
+            "PRIMAL_COMPONENT_ADMISSION",
+            rootComponentPreparationDecline(targets, 0L, maximumWork) ?: "SLICE_WORK",
+            0L,
+        )
         return false
     }
     val meter = LpProjectionMeter(maximumWork, 0L, cancellation)
@@ -89,8 +95,12 @@ private fun LpEngine.fractionalComponentTargets(targets: RootPrimalTargets, canc
         return false
     } finally {
         noteNodeOverhead(meter.work)
-        sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ROUNDING", outcome,
-            started.elapsedNow().inWholeNanoseconds, meter.work)
+        sink.lp.observePrimalPhase(
+            "PRIMAL_COMPONENT_ROUNDING",
+            outcome,
+            started.elapsedNow().inWholeNanoseconds,
+            meter.work,
+        )
     }
 }
 
@@ -199,11 +209,11 @@ private fun LpEngine.retainCompletedRoundingComponents(
     val targets = rootPrimalTargets?.takeIf { it.components === pending.order }
     if (targets != null) {
         for (group in 0 until pending.group) {
-        session.chargeInprocessingWork(1L)
-        charge()
-        if (cancellation()) break
-        retainRootComponentValues(targets, pending.order, group, session, cancellation)
-    }
+            session.chargeInprocessingWork(1L)
+            charge()
+            if (cancellation()) break
+            retainRootComponentValues(targets, pending.order, group, session, cancellation)
+        }
     }
     sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ROUNDING", "GROUP_DECLINED", 0L)
 }

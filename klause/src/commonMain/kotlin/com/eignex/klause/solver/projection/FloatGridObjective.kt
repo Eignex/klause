@@ -20,7 +20,9 @@ internal class FloatGridObjective(
     val scale: BigFraction,
     val offset: BigFraction,
 ) {
-    init { require(scale.signum() > 0) }
+    init {
+        require(scale.signum() > 0)
+    }
 
     fun sourceValue(nativeValue: Long, maximize: Boolean): BigFraction {
         val value = BigFraction.ofLong(nativeValue)
@@ -93,8 +95,12 @@ internal fun FloatGridMapping.projectObjective(
     }
     if (!objectiveActivitiesFit(boolWeights, intWeights, stop)) return null
     if (stop()) return null
-    return FloatGridObjective(objective, LinearObjective(boolWeights, intWeights),
-        unit * BigFraction.of(denominator, BIG_ONE).reciprocal(), offset)
+    return FloatGridObjective(
+        objective,
+        LinearObjective(boolWeights, intWeights),
+        unit * BigFraction.of(denominator, BIG_ONE).reciprocal(),
+        offset,
+    )
 }
 
 private fun FloatGridMapping.objectiveActivitiesFit(

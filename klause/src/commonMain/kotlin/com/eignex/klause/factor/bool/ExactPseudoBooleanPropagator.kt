@@ -31,7 +31,9 @@ internal class ExactPseudoBooleanPropagator(
                     lo += coefficient
                     hi += coefficient
                 }
+
                 false -> Unit
+
                 null -> {
                     if (coefficient < BIG_ZERO) lo += coefficient else hi += coefficient
                 }
@@ -80,8 +82,11 @@ internal class ExactPseudoBooleanPropagator(
     }
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
-        val auxReason = if (auxBoolVar < 0) Lit.NONE else
+        val auxReason = if (auxBoolVar < 0) {
+            Lit.NONE
+        } else {
             state.boolValues[auxBoolVar]?.let { Lit.make(auxBoolVar, !it) } ?: Lit.NONE
+        }
         return pbFalseFormAntecedents(state, literals, -1, auxReason)
     }
 }

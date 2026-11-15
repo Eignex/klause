@@ -20,7 +20,8 @@ internal class LogicalBasisLayout private constructor(
             decline: (LogicalBasisLayoutDecline) -> Nothing,
         ): LogicalBasisLayout {
             if (structuralColumns < 0 || rows < 0 || headings.size != rows ||
-                structuralColumns.toLong() + rows > Int.MAX_VALUE) {
+                structuralColumns.toLong() + rows > Int.MAX_VALUE
+            ) {
                 decline(LogicalBasisLayoutDecline.INVALID_BASIS)
             }
             charge(rows.toLong() * 4L, 256L + rows * 128L)
@@ -62,13 +63,21 @@ internal class LogicalBasisCore private constructor(
         fun prepare(authority: ExactBasisAuthority, meter: ExactBasisMeter): LogicalBasisCore {
             val previousPhase = meter.phase
             meter.phase = ExactBasisPhase.ASSEMBLY
-            val layout = LogicalBasisLayout.prepare(authority.model.n, authority.model.m, authority.headings,
-                { authority.matrix[it] }, meter::charge, { reason ->
-                    meter.stop(when (reason) {
-                        LogicalBasisLayoutDecline.INVALID_BASIS -> ExactBasisDecline.INVALID_BASIS
-                        LogicalBasisLayoutDecline.SINGULAR -> ExactBasisDecline.SINGULAR
-                    })
-                })
+            val layout = LogicalBasisLayout.prepare(
+                authority.model.n,
+                authority.model.m,
+                authority.headings,
+                { authority.matrix[it] },
+                meter::charge,
+                { reason ->
+                    meter.stop(
+                        when (reason) {
+                            LogicalBasisLayoutDecline.INVALID_BASIS -> ExactBasisDecline.INVALID_BASIS
+                            LogicalBasisLayoutDecline.SINGULAR -> ExactBasisDecline.SINGULAR
+                        },
+                    )
+                },
+            )
             val structural = layout.structuralSlots
             val retained = layout.retainedRows
             meter.charge(authority.model.m.toLong(), authority.model.m * 4L)

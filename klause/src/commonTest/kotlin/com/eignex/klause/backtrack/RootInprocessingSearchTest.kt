@@ -31,18 +31,27 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RootInprocessingSearchTest {
-    private fun problem(): Problem = Problem(6, 0, emptyArray(), arrayOf<Factor>(
+    private fun problem(): Problem = Problem(
+        6, 0, emptyArray(),
+        arrayOf<Factor>(
         Clause(intArrayOf(9)),
         Clause(intArrayOf(0, 2, 8)),
         Clause(intArrayOf(4, 6)),
         Clause(intArrayOf(4, 7)),
         Clause(intArrayOf(2, 6, 10, 8)),
         Clause(intArrayOf(2, 6, 11, 8)),
-    ))
+    )
+    )
 
     private fun params(native: Boolean, exchange: ClauseExchange? = null): BacktrackParams = BacktrackParams(
-        nativeSat = native, variableSelector = InputOrder, valueSelector = IndomainMax, randomSeed = 1L,
-        lubyRestartBase = 1L, rootSimplification = true, rootProbeBatch = 10, clauseExchange = exchange,
+        nativeSat = native,
+        variableSelector = InputOrder,
+        valueSelector = IndomainMax,
+        randomSeed = 1L,
+        lubyRestartBase = 1L,
+        rootSimplification = true,
+        rootProbeBatch = 10,
+        clauseExchange = exchange,
     )
 
     @Test
@@ -50,12 +59,19 @@ class RootInprocessingSearchTest {
         for (native in listOf(false, true)) {
             var observedNative: Boolean? = null
             val exchange = object : ClauseExchange {
-                override fun onSearchStart(session: PropagationSession) { observedNative = session.usesNativeSat }
+                override fun onSearchStart(session: PropagationSession) {
+                    observedNative = session.usesNativeSat
+                }
                 override fun onRestart(session: PropagationSession) = Unit
             }
-            val configured = params(native, exchange).copy(lubyRestartBase = null, inprocessingInterval = 1L,
-                inprocessingWork = 4096L, inprocessingRootWork = 512L, inprocessingProbeWork = 512L,
-                rootRebuildCaptureVisits = 1024)
+            val configured = params(native, exchange).copy(
+                lubyRestartBase = null,
+                inprocessingInterval = 1L,
+                inprocessingWork = 4096L,
+                inprocessingRootWork = 512L,
+                inprocessingProbeWork = 512L,
+                rootRebuildCaptureVisits = 1024,
+            )
 
             val result = BacktrackSolver(problem().bake()).solve(configured)
 
@@ -65,18 +81,27 @@ class RootInprocessingSearchTest {
             assertTrue(result.stats.search.learning.getValue("inprocessProbeUnits") > 0L)
             assertTrue(result.stats.search.learning.getValue("inprocessRootRebuildComplete") > 0L)
             assertEquals(native, observedNative)
-            assertEquals(if (native) 1L else 0L,
-                result.stats.search.learning["propagationNativeSatSessions"] ?: 0L)
-            assertEquals(if (native) 0L else 1L,
-                result.stats.search.learning["propagationGeneralSessions"] ?: 0L)
+            assertEquals(
+                if (native) 1L else 0L,
+                result.stats.search.learning["propagationNativeSatSessions"] ?: 0L,
+            )
+            assertEquals(
+                if (native) 0L else 1L,
+                result.stats.search.learning["propagationGeneralSessions"] ?: 0L,
+            )
         }
     }
 
     @Test
     fun `resumed search should retain root work without a restart schedule`() {
         for (native in listOf(false, true)) {
-            val configured = params(native).copy(lubyRestartBase = null, inprocessingInterval = 1L,
-                inprocessingWork = 4096L, inprocessingRootWork = 512L, inprocessingProbeWork = 512L)
+            val configured = params(native).copy(
+                lubyRestartBase = null,
+                inprocessingInterval = 1L,
+                inprocessingWork = 4096L,
+                inprocessingRootWork = 512L,
+                inprocessingProbeWork = 512L,
+            )
             val search = BacktrackSolver(problem().bake()).resumableSolve(configured)
 
             val result = search.use { finish(it) }
@@ -84,22 +109,35 @@ class RootInprocessingSearchTest {
             assertIs<SolveResult.Sat>(result)
             assertEquals(0.0, result.stats.search.restarts.sum)
             assertTrue(result.stats.search.learning.getValue("inprocessProbeUnits") > 0L)
-            assertEquals(if (native) 1L else 0L,
-                result.stats.search.learning["propagationNativeSatSessions"] ?: 0L)
-            assertEquals(if (native) 0L else 1L,
-                result.stats.search.learning["propagationGeneralSessions"] ?: 0L)
+            assertEquals(
+                if (native) 1L else 0L,
+                result.stats.search.learning["propagationNativeSatSessions"] ?: 0L,
+            )
+            assertEquals(
+                if (native) 0L else 1L,
+                result.stats.search.learning["propagationGeneralSessions"] ?: 0L,
+            )
         }
     }
 
     @Test
     fun `ordinary integer search should consume endpoint probing without existing atoms`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf<Factor>(
+        val source = Problem(
+            0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            arrayOf<Factor>(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
             Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
-        ))
-        val configured = BacktrackParams(nativeSat = true, variableSelector = InputOrder,
-            valueSelector = IndomainMax, rootProbeBatch = 4, inprocessingInterval = 1L,
-            inprocessingWork = 4096L, inprocessingProbeWork = 512L)
+        )
+        )
+        val configured = BacktrackParams(
+            nativeSat = true,
+            variableSelector = InputOrder,
+            valueSelector = IndomainMax,
+            rootProbeBatch = 4,
+            inprocessingInterval = 1L,
+            inprocessingWork = 4096L,
+            inprocessingProbeWork = 512L,
+        )
 
         val result = BacktrackSolver(source.bake()).solve(configured)
 
@@ -113,8 +151,13 @@ class RootInprocessingSearchTest {
     fun `root publication should retain its scan across work slices`() {
         for (native in listOf(false, true)) {
             val source = Problem(5000, 0, emptyArray(), problem().factors)
-            val configured = params(native).copy(lubyRestartBase = null, inprocessingInterval = 1L,
-                inprocessingWork = 4096L, inprocessingRootWork = 512L, inprocessingProbeWork = 512L)
+            val configured = params(native).copy(
+                lubyRestartBase = null,
+                inprocessingInterval = 1L,
+                inprocessingWork = 4096L,
+                inprocessingRootWork = 512L,
+                inprocessingProbeWork = 512L,
+            )
             val search = BacktrackSolver(source.bake()).resumableSolve(configured)
 
             val result = search.use { finish(it) }
@@ -134,13 +177,20 @@ class RootInprocessingSearchTest {
                 }
                 override fun onRestart(session: PropagationSession) = Unit
             }
-            val configured = params(native, exchange).copy(lubyRestartBase = null, inprocessingGrowth = 1,
-                inprocessingWork = 4096L, inprocessingRootWork = 512L, inprocessingProbeWork = 512L,
-                lpConfig = LpConfig.OFF)
+            val configured = params(native, exchange).copy(
+                lubyRestartBase = null,
+                inprocessingGrowth = 1,
+                inprocessingWork = 4096L,
+                inprocessingRootWork = 512L,
+                inprocessingProbeWork = 512L,
+                lpConfig = LpConfig.OFF,
+            )
             val solver = BacktrackSolver(problem().bake())
             val objective = LinearObjective(boolWeights = LongArray(6) { 1L })
 
-            val result = if (!resumed) solver.minimize(objective, configured) else {
+            val result = if (!resumed) {
+                solver.minimize(objective, configured)
+            } else {
                 solver.resumable(objective, configured).use { search ->
                     var result: MinimizeResult? = null
                     repeat(100) {
@@ -194,8 +244,12 @@ class RootInprocessingSearchTest {
             var retained: PropagationSession? = null
             var rootValue: Boolean? = null
             val exchange = object : ClauseExchange {
-                override fun onRestart(session: PropagationSession) { retained = session }
-                override fun onSearchClose(session: PropagationSession) { rootValue = session.boolValue(2) }
+                override fun onRestart(session: PropagationSession) {
+                    retained = session
+                }
+                override fun onSearchClose(session: PropagationSession) {
+                    rootValue = session.boolValue(2)
+                }
             }
             val search = BacktrackSolver(problem().bake()).resumableSolve(params(native, exchange))
             val result = search.use {
@@ -217,7 +271,9 @@ class RootInprocessingSearchTest {
             var retained: PropagationSession? = null
             var observedLevel = -1
             val exchange = object : ClauseExchange {
-                override fun onSearchStart(session: PropagationSession) { retained = session }
+                override fun onSearchStart(session: PropagationSession) {
+                    retained = session
+                }
                 override fun onRestart(session: PropagationSession) = Unit
             }
             val peer = object : SearchComponent {
@@ -240,9 +296,14 @@ class RootInprocessingSearchTest {
     @Test
     fun `restarting assumption searches should keep root passes disabled`() {
         for (native in listOf(false, true)) {
-            val guarded = Problem(5, 0, emptyArray(), arrayOf<Factor>(
-                Clause(intArrayOf(0, 2)), Clause(intArrayOf(5, 6, 8)), Clause(intArrayOf(5, 6, 9)),
-            ))
+            val guarded = Problem(
+                5, 0, emptyArray(),
+                arrayOf<Factor>(
+                Clause(intArrayOf(0, 2)),
+                Clause(intArrayOf(5, 6, 8)),
+                Clause(intArrayOf(5, 6, 9)),
+            )
+            )
             val configured = params(native).copy(assumptions = Assumptions(bools = mapOf(2 to true)))
 
             val result = BacktrackSolver(guarded.bake()).solve(configured)
@@ -257,9 +318,14 @@ class RootInprocessingSearchTest {
     @Test
     fun `selected retirement should wait until its root premise reaches a peer`() {
         for (native in listOf(false, true)) {
-            val source = Problem(4, 0, emptyArray(), arrayOf<Factor>(
-                Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)), Clause(intArrayOf(4, 6)),
-            ))
+            val source = Problem(
+                4, 0, emptyArray(),
+                arrayOf<Factor>(
+                Clause(intArrayOf(0, 2)),
+                Clause(intArrayOf(0, 3)),
+                Clause(intArrayOf(4, 6)),
+            )
+            )
             var retained: PropagationSession? = null
             var target = -1
             var activeAtPublication: Boolean? = null
@@ -286,9 +352,15 @@ class RootInprocessingSearchTest {
                     return ComponentResult.Consistent
                 }
             }
-            val configured = params(native, exchange).copy(lubyRestartBase = null, rootProbeBatch = 2,
-                inprocessingInterval = 1L, inprocessingWork = 4096L, inprocessingRootWork = 256L,
-                inprocessingProbeWork = 512L, componentFactory = { listOf(peer) })
+            val configured = params(native, exchange).copy(
+                lubyRestartBase = null,
+                rootProbeBatch = 2,
+                inprocessingInterval = 1L,
+                inprocessingWork = 4096L,
+                inprocessingRootWork = 256L,
+                inprocessingProbeWork = 512L,
+                componentFactory = { listOf(peer) },
+            )
 
             val result = BacktrackSolver(source.bake()).solve(configured)
 
@@ -302,9 +374,14 @@ class RootInprocessingSearchTest {
     @Test
     fun `a paused peer publication should retain selected ownership until resumed`() {
         for (native in listOf(false, true)) {
-            val source = Problem(4, 0, emptyArray(), arrayOf<Factor>(
-                Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)), Clause(intArrayOf(4, 6)),
-            ))
+            val source = Problem(
+                4, 0, emptyArray(),
+                arrayOf<Factor>(
+                Clause(intArrayOf(0, 2)),
+                Clause(intArrayOf(0, 3)),
+                Clause(intArrayOf(4, 6)),
+            )
+            )
             var retained: PropagationSession? = null
             var target = -1
             var block = true
@@ -334,9 +411,15 @@ class RootInprocessingSearchTest {
                     return ComponentResult.Consistent
                 }
             }
-            val configured = params(native, exchange).copy(lubyRestartBase = null, rootProbeBatch = 2,
-                inprocessingInterval = 1L, inprocessingWork = 4096L, inprocessingRootWork = 256L,
-                inprocessingProbeWork = 512L, componentFactory = { listOf(peer) })
+            val configured = params(native, exchange).copy(
+                lubyRestartBase = null,
+                rootProbeBatch = 2,
+                inprocessingInterval = 1L,
+                inprocessingWork = 4096L,
+                inprocessingRootWork = 256L,
+                inprocessingProbeWork = 512L,
+                componentFactory = { listOf(peer) },
+            )
             val search = BacktrackSolver(source.bake()).resumableSolve(configured)
 
             val result = search.use {
@@ -358,13 +441,21 @@ class RootInprocessingSearchTest {
     @Test
     fun `a completed probing contradiction should close the real root`() {
         for (native in listOf(false, true)) {
-            val unsat = Problem(4, 0, emptyArray(), arrayOf<Factor>(
-                Clause(intArrayOf(0, 2)), Clause(intArrayOf(4, 6)), Clause(intArrayOf(4, 7)),
-                Clause(intArrayOf(5, 6)), Clause(intArrayOf(5, 7)),
-            ))
+            val unsat = Problem(
+                4, 0, emptyArray(),
+                arrayOf<Factor>(
+                Clause(intArrayOf(0, 2)),
+                Clause(intArrayOf(4, 6)),
+                Clause(intArrayOf(4, 7)),
+                Clause(intArrayOf(5, 6)),
+                Clause(intArrayOf(5, 7)),
+            )
+            )
             var retained: PropagationSession? = null
             val exchange = object : ClauseExchange {
-                override fun onRestart(session: PropagationSession) { retained = session }
+                override fun onRestart(session: PropagationSession) {
+                    retained = session
+                }
             }
 
             val result = BacktrackSolver(unsat.bake()).solve(params(native, exchange))

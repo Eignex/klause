@@ -16,8 +16,12 @@ import kotlin.test.assertNotEquals
 class AllDifferentTuplesTest {
     @Test
     fun `finite witnesses should require distinct complete tuples`() {
-        val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) },
-            arrayOf(AllDifferentTuples(listOf(intArrayOf(0, 0), intArrayOf(1, 2))))).bake()
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 1) },
+            arrayOf(AllDifferentTuples(listOf(intArrayOf(0, 0), intArrayOf(1, 2)))),
+        ).bake()
         val verifier = finiteWitnessVerifier(problem, null)
         val distinct = Candidate<Sample, Double?>(Sample(booleanArrayOf(), longArrayOf(0, 0, 1)), null)
         val repeated = Candidate<Sample, Double?>(Sample(booleanArrayOf(), longArrayOf(0, 0, 0)), null)

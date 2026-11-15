@@ -44,15 +44,25 @@ internal fun prepareLinearSource(
     val prepared = PreparedLinearSource(view, objective, covers, acceptedBound)
     // A row without a finite working projection has no LP authority or finite owner, so it declines at once.
     if (!view.model.finiteRowsSupported()) {
-        return PreparedSourceInvocation(request,
-            SourceProblemRoute.NativeFormula(null, TerminationReason.Unsupported), stop, prepared)
+        return PreparedSourceInvocation(
+            request,
+            SourceProblemRoute.NativeFormula(null, TerminationReason.Unsupported),
+            stop,
+            prepared,
+        )
     }
     val sense = source.objective?.sense ?: ObjectiveSense.MINIMIZE
     // The lowered view takes the same route as any factor source; the source overlay only qualifies its claims.
     // Purely continuous rows keep the finite LP lane, whose certified tolerance owns their decimal claims.
-    val route = view.model.pipelineRoute(request.providers.prepare(view.model), objective,
-        sense == ObjectiveSense.MAXIMIZE, request.boundCancellation or stop, stop, onLpStats = onLpStats,
-        routePureRealToTheory = false)
+    val route = view.model.pipelineRoute(
+        request.providers.prepare(view.model),
+        objective,
+        sense == ObjectiveSense.MAXIMIZE,
+        request.boundCancellation or stop,
+        stop,
+        onLpStats = onLpStats,
+        routePureRealToTheory = false,
+    )
     if (stop()) return interrupted()
     return PreparedSourceInvocation(request, prepared.bind(route), stop, prepared)
 }

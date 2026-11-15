@@ -135,17 +135,13 @@ internal class LpLayoutRemap(
         }
     }
 
-    fun matches(model: ExactLpModel, identities: LpScopedRows): Boolean =
-        n == model.n && rows.sameAuthority(identities)
+    fun matches(model: ExactLpModel, identities: LpScopedRows): Boolean = n == model.n && rows.sameAuthority(identities)
 
     fun row(previous: Int): Int = rowMap[previous]
     fun column(previous: Int): Int = columnMap[previous]
 }
 
-internal fun ExactLpModel.appendScopedRows(
-    columns: List<LpStructuralColumn>,
-    rows: List<LpScopedRow>,
-): ExactLpModel {
+internal fun ExactLpModel.appendScopedRows(columns: List<LpStructuralColumn>, rows: List<LpScopedRow>): ExactLpModel {
     val newEntries = Array(n + columns.size) { ArrayList<ExactLpEntry>() }
     for ((index, row) in rows.withIndex()) {
         for ((column, number) in row.coefficients()) newEntries[column].add(ExactLpEntry(m + index, number))

@@ -126,12 +126,22 @@ internal class FunctionalObjective internal constructor(
     )
 
     private val coneMemo = ConeMemo(
-        nodes, terms, termCoeffs, constant, boolNodes, boolTerms, boolTermCoeffs, definitions,
+        nodes,
+        terms,
+        termCoeffs,
+        constant,
+        boolNodes,
+        boolTerms,
+        boolTermCoeffs,
+        definitions,
     )
 
     internal fun prepareBooleanDelta(numBooleans: Int): Sequence<PreparedBooleanObjectiveDelta?> =
-        if (terms.isNotEmpty()) sequenceOf(PreparedBooleanObjectiveDelta(null)) else
+        if (terms.isNotEmpty()) {
+            sequenceOf(PreparedBooleanObjectiveDelta(null))
+        } else {
             BooleanObjectiveDelta.preparation(coneMemo.ordered, boolTerms, boolTermCoeffs, minimize, numBooleans)
+        }
 
     /** The objective as a "lower is better" linear form over its terms, or null when a combined
      *  coefficient leaves the `Long` range. It agrees with the cones wherever every cone variable
@@ -142,18 +152,17 @@ internal class FunctionalObjective internal constructor(
     internal fun conesMaintained(maintains: (DefinitionalSweep.SweepNode) -> Boolean): Boolean =
         coneMemo.ordered.all { definition -> definition.origin?.let(maintains) == true }
 
-    internal fun coneMaintenanceSteps(
-        maintains: (DefinitionalSweep.SweepNode) -> Boolean,
-    ): Sequence<Boolean?> = sequence {
-        for ((index, definition) in coneMemo.ordered.withIndex()) {
-            if (definition.origin?.let(maintains) != true) {
-                yield(false)
-                return@sequence
+    internal fun coneMaintenanceSteps(maintains: (DefinitionalSweep.SweepNode) -> Boolean): Sequence<Boolean?> =
+        sequence {
+            for ((index, definition) in coneMemo.ordered.withIndex()) {
+                if (definition.origin?.let(maintains) != true) {
+                    yield(false)
+                    return@sequence
+                }
+                if ((index + 1) % 256 == 0) yield(null)
             }
-            if ((index + 1) % 256 == 0) yield(null)
+            yield(true)
         }
-        yield(true)
-    }
 
     private fun termForm(
         terms: IntArray,
@@ -196,18 +205,23 @@ internal class FunctionalObjective internal constructor(
         private val boolTermCoeffs: LongArray,
         definitions: List<Definition>,
     ) {
-        val ordered = if (definitions.isNotEmpty()) definitions else
+        val ordered = if (definitions.isNotEmpty()) {
+            definitions
+        } else {
             nodes.map { node -> Definition(node.out, false) { intOf, _ -> node.compute(intOf) } } +
                 boolNodes.map { node ->
                     Definition(node.out, true) { _, boolOf -> if (node.compute(boolOf)) 1L else 0L }
                 }
+        }
         private val intSlots = slots(false)
         private val boolSlots = slots(true)
 
         private fun slots(isBool: Boolean): IntIntMap {
             val indices = ordered.indices.filter { ordered[it].outIsBool == isBool }
             return IntIntMap.build(
-                IntArray(indices.size) { ordered[indices[it]].out }, indices.toIntArray(), absent = -1,
+                IntArray(indices.size) { ordered[indices[it]].out },
+                indices.toIntArray(),
+                absent = -1,
             )
         }
 
@@ -226,7 +240,9 @@ internal class FunctionalObjective internal constructor(
                 val value = definition.compute(intOf, boolOf)
                 values[i] = if (definition.keepsOutputOnNoWrite && value == DefinitionalSweep.SweepNode.NO_WRITE) {
                     intBase(definition.out)
-                } else value
+                } else {
+                    value
+                }
             }
             try {
                 var total = constant

@@ -364,8 +364,10 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
         claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
     ): CertifiedLpResult {
         val observation = observer?.let { LpClaimObservation(claim, it) }
-        return certifyWithin(model, solver, result, cancellation, observation, counterResults,
-            refinementLimits, floatAccept, floatOffset, claim).also {
+        return certifyWithin(
+            model, solver, result, cancellation, observation, counterResults,
+            refinementLimits, floatAccept, floatOffset, claim,
+        ).also {
             observation?.finish(it, it.certificationReused)
         }
     }
@@ -543,8 +545,16 @@ private fun certifyLpResultWithin(
         }
         val remembered = counterResults?.read(model, policy)
         if (remembered != null && claim.satisfiedBy(remembered) && !stopped()) {
-            return CertifiedLpResult(result, remembered.bound, remembered.witness, null, null,
-                model.hasIntegralObjective(), { null }, certificationReused = true)
+            return CertifiedLpResult(
+                result,
+                remembered.bound,
+                remembered.witness,
+                null,
+                null,
+                model.hasIntegralObjective(),
+                { null },
+                certificationReused = true,
+            )
         }
         if (result != null && claim == LpClaim.BOUND) {
             val direct = certifyLpBound(model, result.duals, observer, policy)
@@ -775,10 +785,15 @@ private fun certifyLpResultWithin(
                 cancellation,
                 observer,
             )
-            observer?.observePhase(LpPhaseMetrics(
-                LpSolvePhase.EXACT_POINT_RECOVERY, recovered.decline?.name ?: "WITNESS",
-                recovered.elapsed.inWholeNanoseconds, work = recovered.work, steps = recovered.repairs,
-            ))
+            observer?.observePhase(
+                LpPhaseMetrics(
+                LpSolvePhase.EXACT_POINT_RECOVERY,
+                recovered.decline?.name ?: "WITNESS",
+                recovered.elapsed.inWholeNanoseconds,
+                work = recovered.work,
+                steps = recovered.repairs,
+            )
+            )
             pointRecovery = recovered
             recovered.witness
         }
@@ -881,11 +896,11 @@ private fun certifyLpResultWithin(
     if (result == null &&
         (
             if (claim == LpClaim.ATTAINED_OPTIMUM) {
-            numericalWitness == null || numericalBound == null
-        } else {
-            claim.needsMore(numericalBound, numericalWitness)
-        }
-        ) &&
+                numericalWitness == null || numericalBound == null
+            } else {
+                claim.needsMore(numericalBound, numericalWitness)
+            }
+            ) &&
         ray == null && numericalConflict == null && conflict == null && !stopped()
     ) {
         refine()

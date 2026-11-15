@@ -76,8 +76,8 @@ internal class ResumableSatisfaction(
             null
         } else {
             { session ->
-            retiredAffineStatistics = session.affineParityStatistics(affineFactorId)
-        }
+                retiredAffineStatistics = session.affineParityStatistics(affineFactorId)
+            }
         },
         slice = TraversalSlice(pauses = { !globalToken() }, atRoot = atRoot, beforeBranch = {
             slice.charge()
@@ -123,8 +123,10 @@ internal class ResumableSatisfaction(
 
     internal fun retainPartition(literal: Int): Boolean {
         check(rebindable && !closed && done == null)
-        val restricted = Assumptions(bools = assumptions.bools +
-            (Lit.variable(literal) to Lit.isPositive(literal)))
+        val restricted = Assumptions(
+            bools = assumptions.bools +
+                (Lit.variable(literal) to Lit.isPositive(literal)),
+        )
         if (!traversal.retainPartition(literal)) return false
         assumptions = restricted
         return true
@@ -159,7 +161,10 @@ internal class ResumableSatisfaction(
                 return null
             }
             return solver.verdictOf(
-                outcome, assumptions, sink, finish = !rebindable,
+                outcome,
+                assumptions,
+                sink,
+                finish = !rebindable,
             ).also {
                 done = it
                 if (!rebindable) close()

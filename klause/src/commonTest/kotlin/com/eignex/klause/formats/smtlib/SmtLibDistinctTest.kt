@@ -56,8 +56,10 @@ class SmtLibDistinctTest {
 
     @Test
     fun `a false distinct reifier should require an original affine collision`() {
-        val source = SmtLib.parse("(declare-const x Int) (declare-const y Int) " +
-            "(assert (<= 0 x 1)) (assert (<= 0 y 1)) (assert (not (distinct (+ x 1) y)))")
+        val source = SmtLib.parse(
+            "(declare-const x Int) (declare-const y Int) " +
+                "(assert (<= 0 x 1)) (assert (<= 0 y 1)) (assert (not (distinct (+ x 1) y)))",
+        )
 
         val points = BacktrackSolver(source.model.bake()).enumerate().map {
             it.intValue(source.intVarNames.getValue("x")) to it.intValue(source.intVarNames.getValue("y"))
@@ -69,8 +71,10 @@ class SmtLibDistinctTest {
 
     @Test
     fun `three Boolean distinct operands should refute the original pigeonhole constraint`() {
-        val source = SmtLib.parse("(declare-const a Bool) (declare-const b Bool) (declare-const c Bool) " +
-            "(assert (distinct a b c))")
+        val source = SmtLib.parse(
+            "(declare-const a Bool) (declare-const b Bool) (declare-const c Bool) " +
+                "(assert (distinct a b c))",
+        )
 
         val result = BacktrackSolver(source.model.bake()).solve()
 
@@ -85,42 +89,54 @@ class SmtLibDistinctTest {
         val result = BacktrackSolver.source(source.model).solve()
 
         val point = assertIs<OpenTheoryResult.Sat>(result).assignment
-        assertEquals(BigFraction.of(BIG_ONE, bigIntOf(3)),
-            TheoryCompletion.parseRational(point.realValue(source.realVarNames.getValue("x"))))
+        assertEquals(
+            BigFraction.of(BIG_ONE, bigIntOf(3)),
+            TheoryCompletion.parseRational(point.realValue(source.realVarNames.getValue("x"))),
+        )
     }
 
     @Test
     fun `mixed distinct operands should keep integer and real coordinate namespaces`() {
-        val source = SmtLib.parse("(declare-const i Int) (declare-const x Real) " +
-            "(assert (= i 0)) (assert (= x 1.0)) (assert (distinct i x))")
+        val source = SmtLib.parse(
+            "(declare-const i Int) (declare-const x Real) " +
+                "(assert (= i 0)) (assert (= x 1.0)) (assert (distinct i x))",
+        )
 
         val result = BacktrackSolver.source(source.model).solve()
 
         val point = assertIs<OpenTheoryResult.Sat>(result).assignment
         assertEquals("0", point.intValue(source.intVarNames.getValue("i")))
-        assertEquals(BigFraction.ONE,
-            TheoryCompletion.parseRational(point.realValue(source.realVarNames.getValue("x"))))
+        assertEquals(
+            BigFraction.ONE,
+            TheoryCompletion.parseRational(point.realValue(source.realVarNames.getValue("x"))),
+        )
     }
 
     @Test
     fun `wide affine distinct coefficients should retain their original integer coordinates`() {
         val coefficient = "100000000000000000000000000000000000001"
-        val source = SmtLib.parse("(declare-const x Int) (declare-const y Int) " +
-            "(assert (distinct (* $coefficient x) (* $coefficient y)))")
+        val source = SmtLib.parse(
+            "(declare-const x Int) (declare-const y Int) " +
+                "(assert (distinct (* $coefficient x) (* $coefficient y)))",
+        )
 
         val relation = source.model.factors.filterIsInstance<Distinct>().single()
 
         assertEquals(2, source.model.numIntVars)
-        assertEquals(List(2) { listOf(BigFraction.of(parseBigInt(coefficient), BIG_ONE)) },
-            relation.operands.map { it.coefficients })
+        assertEquals(
+            List(2) { listOf(BigFraction.of(parseBigInt(coefficient), BIG_ONE)) },
+            relation.operands.map { it.coefficients },
+        )
     }
 
     @Test
     fun `native polynomial distinct should reject a nonadjacent source collision`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (distinct x 1 x))")
 
-        val result = OpenTheoryPipeline.execute(source.realSource().pipelineRequest(),
-            engine = FiniteEngine.BACKTRACK).result
+        val result = OpenTheoryPipeline.execute(
+            source.realSource().pipelineRequest(),
+            engine = FiniteEngine.BACKTRACK,
+        ).result
 
         assertEquals(3, assertIs<PolynomialDistinct>(source.formula).operands.size)
         assertIs<OpenTheoryResult.Unsat>(result)
@@ -128,11 +144,15 @@ class SmtLibDistinctTest {
 
     @Test
     fun `native polynomial Boolean distinct should preserve original truth correlation`() {
-        val source = SmtLibPolynomial.parse("(declare-const a Bool) (declare-const b Bool) " +
-            "(assert (= a b)) (assert (distinct a b))")
+        val source = SmtLibPolynomial.parse(
+            "(declare-const a Bool) (declare-const b Bool) " +
+                "(assert (= a b)) (assert (distinct a b))",
+        )
 
-        val result = OpenTheoryPipeline.execute(source.realSource().pipelineRequest(),
-            engine = FiniteEngine.BACKTRACK).result
+        val result = OpenTheoryPipeline.execute(
+            source.realSource().pipelineRequest(),
+            engine = FiniteEngine.BACKTRACK,
+        ).result
 
         assertIs<OpenTheoryResult.Unsat>(result)
     }

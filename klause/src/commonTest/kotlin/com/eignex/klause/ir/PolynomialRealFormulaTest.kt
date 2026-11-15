@@ -9,7 +9,8 @@ class PolynomialRealFormulaTest {
     @Test
     fun `distinct formula should capture operands and preserve repeated roles when remapped`() {
         val operands = mutableListOf<PolynomialExpression>(
-            PolynomialExpression.Variable(SourceRealId(0)), PolynomialExpression.Variable(SourceRealId(1)),
+            PolynomialExpression.Variable(SourceRealId(0)),
+            PolynomialExpression.Variable(SourceRealId(1)),
         )
         val source = PolynomialDistinct(operands)
         operands.clear()

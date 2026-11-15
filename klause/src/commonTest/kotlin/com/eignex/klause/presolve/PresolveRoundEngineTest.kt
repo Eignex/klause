@@ -29,7 +29,9 @@ class PresolveRoundEngineTest {
                     changed += delta.droppedIndices.size
                     liveFactors -= delta.droppedIndices.size
                     PassOutcome.CHANGED
-                } else PassOutcome.SKIPPED
+                } else {
+                    PassOutcome.SKIPPED
+                }
                 outcomes.add(outcome)
                 return outcome
             }
@@ -39,8 +41,13 @@ class PresolveRoundEngineTest {
             override fun changedUnits(): Long = changed
         }
 
-        PresolveRoundEngine.run(listOf(PresolvePass.SUBSUME_CLAUSES, PresolvePass.REMOVE_REDUNDANT),
-            2, ExecutionControl.Never, null, host)
+        PresolveRoundEngine.run(
+            listOf(PresolvePass.SUBSUME_CLAUSES, PresolvePass.REMOVE_REDUNDANT),
+            2,
+            ExecutionControl.Never,
+            null,
+            host,
+        )
 
         assertEquals(listOf(PassOutcome.SKIPPED, PassOutcome.CHANGED), outcomes)
         assertEquals(1, host.liveFactors)
@@ -60,7 +67,9 @@ class PresolveRoundEngineTest {
         private var units = 0L
 
         override fun runPass(pass: PresolvePass, slice: ExecutionControl?): PassOutcome = budget.observe(
-            pass, PresolveLane.SOURCE, { PresolveSizeStats(size.toInt(), 0, 0, size) },
+            pass,
+            PresolveLane.SOURCE,
+            { PresolveSizeStats(size.toInt(), 0, 0, size) },
         ) { invocation ->
             val change = changes[pass]?.getOrNull(runs.count { it == pass }) ?: 0L
             runs.add(pass)
@@ -71,7 +80,9 @@ class PresolveRoundEngineTest {
                         it.fixedColumns = change.toInt()
                         it.outputOccurrences = size + change
                     }
+
                     narrowed -> it.narrowedColumns = change.toInt()
+
                     else -> it.outputOccurrences = size - change
                 }
                 it.interrupted = pass in interrupted
@@ -145,7 +156,9 @@ class PresolveRoundEngineTest {
         val cheap = PresolvePass.STRENGTHEN_COEFFICIENTS
         for ((work, expected) in listOf(11L to 2, 1_100L to 1)) {
             val host = ScriptedHost(
-                1_000, mapOf(cheap to listOf(10L)), budget = PresolveBudget(Long.MAX_VALUE),
+                1_000,
+                mapOf(cheap to listOf(10L)),
+                budget = PresolveBudget(Long.MAX_VALUE),
                 work = mapOf(expensive to work),
             )
 
@@ -162,8 +175,11 @@ class PresolveRoundEngineTest {
         for (narrowed in listOf(false, true)) {
             for ((yield, expected) in listOf(1L to 1, 50L to 2)) {
                 val host = ScriptedHost(
-                    1_000, mapOf(expensive to listOf(yield), cheap to listOf(10L)),
-                    budget = PresolveBudget(Long.MAX_VALUE), work = mapOf(expensive to 1_100L), narrowed = narrowed,
+                    1_000,
+                    mapOf(expensive to listOf(yield), cheap to listOf(10L)),
+                    budget = PresolveBudget(Long.MAX_VALUE),
+                    work = mapOf(expensive to 1_100L),
+                    narrowed = narrowed,
                 )
 
                 val runs = runs(listOf(expensive, cheap), host)
@@ -178,11 +194,17 @@ class PresolveRoundEngineTest {
         val expensive = PresolvePass.DUAL_FIX
         val cheap = PresolvePass.STRENGTHEN_COEFFICIENTS
         for ((pins, changes, expected) in listOf(
-            Triple(0L, 288L, 1), Triple(0L, 289L, 2), Triple(64L, 4L, 1), Triple(64L, 5L, 2),
+            Triple(0L, 288L, 1),
+            Triple(0L, 289L, 2),
+            Triple(64L, 4L, 1),
+            Triple(64L, 5L, 2),
         )) {
             val host = ScriptedHost(
-                100, mapOf(expensive to listOf(pins), cheap to listOf(changes)),
-                budget = PresolveBudget(Long.MAX_VALUE), work = mapOf(expensive to 2_881L), fixed = true,
+                100,
+                mapOf(expensive to listOf(pins), cheap to listOf(changes)),
+                budget = PresolveBudget(Long.MAX_VALUE),
+                work = mapOf(expensive to 2_881L),
+                fixed = true,
             )
 
             val runs = runs(listOf(expensive, cheap), host)
@@ -207,7 +229,9 @@ class PresolveRoundEngineTest {
         val parity = PresolvePass.DERIVE_XOR_UNITS
         val cheap = PresolvePass.STRENGTHEN_COEFFICIENTS
         val host = ScriptedHost(
-            1_000, mapOf(cheap to listOf(10L)), budget = PresolveBudget(Long.MAX_VALUE),
+            1_000,
+            mapOf(cheap to listOf(10L)),
+            budget = PresolveBudget(Long.MAX_VALUE),
             interrupted = setOf(parity),
         )
 
@@ -221,8 +245,11 @@ class PresolveRoundEngineTest {
         val expensive = PresolvePass.BREAK_SYMMETRIES
         val cheap = PresolvePass.STRENGTHEN_COEFFICIENTS
         val host = ScriptedHost(
-            1_000, mapOf(cheap to listOf(50L, 50L)), budget = PresolveBudget(Long.MAX_VALUE),
-            work = mapOf(expensive to 1_600L), interrupted = setOf(expensive),
+            1_000,
+            mapOf(cheap to listOf(50L, 50L)),
+            budget = PresolveBudget(Long.MAX_VALUE),
+            work = mapOf(expensive to 1_600L),
+            interrupted = setOf(expensive),
         )
 
         val runs = runs(listOf(expensive, cheap), host)

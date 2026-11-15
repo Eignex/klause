@@ -191,7 +191,8 @@ internal class CpSatisfactionTraversal(
     private val resources = SearchInvocationResources()
     private val lpResources = ArrayList<LpSearchResource>()
     private val cp = CpSearchComponent(
-        (preparedSession ?: PropagationSession(
+        (
+            preparedSession ?: PropagationSession(
             projection,
             propagationCancellation,
             params.propagationCancelFloor,
@@ -203,10 +204,15 @@ internal class CpSatisfactionTraversal(
             reasonPreflight = params.reasonPreflight,
             cumulativeUnarySubsets = problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
             onPropagationWork = onPropagationWork,
-        )).also {
+        )
+        ).also {
             if (params.integerRowLearning) it.enableIntegerRowLearning()
-            it.configureAttribution(params.propagationAttribution, params.historicalTableReasons,
-                params.costAwarePropagation, params.reasonPreflight)
+            it.configureAttribution(
+                params.propagationAttribution,
+                params.historicalTableReasons,
+                params.costAwarePropagation,
+                params.reasonPreflight,
+            )
         },
         branching = CpBranching.None,
     ).also {
@@ -214,7 +220,8 @@ internal class CpSatisfactionTraversal(
         it.conflictStats = sink?.ca
         sink?.search?.let { search ->
             search.noteInprocessing(
-                if (it.session.usesNativeSat) "propagationNativeSatSessions" else "propagationGeneralSessions", 1L,
+                if (it.session.usesNativeSat) "propagationNativeSatSessions" else "propagationGeneralSessions",
+                1L,
             )
             search.propagationWork = { it.session.work }
             search.learning = { it.session.learnedLifecycle() + it.session.preparationStatistics() }
@@ -251,10 +258,12 @@ internal class CpSatisfactionTraversal(
     init {
         try {
             if (rebindable) {
-                require(problem.numIntVars == 0 && problem.numRealVars == 0 &&
+                require(
+                    problem.numIntVars == 0 && problem.numRealVars == 0 &&
                     problem.factors.all { it is Clause } && !problem.hasSymmetryBreaking &&
                     !params.integerRowLearning && params.componentFactory == null &&
-                    params.lpConfig == null && params.lpPlan.hasDefaultNumericalSettings())
+                    params.lpConfig == null && params.lpPlan.hasDefaultNumericalSettings()
+                )
             }
             completion = BacktrackCompletion.of(problem, cp, params, sink, solveContext)
             completion.lpResource?.let {
@@ -276,26 +285,34 @@ internal class CpSatisfactionTraversal(
             lp?.let { components += it.component }
             components += params.componentFactory?.invoke().orEmpty()
             components.forEach(resources::ownComponent)
-            resources.own(AutoCloseable {
+            resources.own(
+                AutoCloseable {
                 try {
                     params.clauseExchange?.onSearchClose(cp.session)
                 } finally {
                     cp.session.sharedLearningMemory = null
                     cp.session.sharedLearningPosition = null
                 }
-            })
+            }
+            )
             onRelease?.let { capture -> resources.own(AutoCloseable { capture(cp.session) }) }
-            cp.useEnforcingPeers(components.filterIsInstance<FiniteFactorEnforcer>()
-                .flatMap { it.enforcingFiniteFactors(problem) }.toSet())
+            cp.useEnforcingPeers(
+                components.filterIsInstance<FiniteFactorEnforcer>()
+                .flatMap { it.enforcingFiniteFactors(problem) }.toSet()
+            )
             deferredRoot = deferredInitialization &&
                 (preparedSession != null || components.any { it is PreparingSearchComponent })
-            val sharedCancellation = if (deferredRoot) cancelledWhen({
+            val sharedCancellation = if (deferredRoot) {
+                cancelledWhen({
                 if (run == null) propagationCancellation.deadline() else params.cancellation.deadline()
             }, { params.cancellation.workScheduled() }, {
                 if (run == null) propagationCancellation.stopPolling else params.cancellation.stopPolling
             }) {
                 if (run == null) propagationCancellation() else params.cancellation()
-            } else params.cancellation
+            }
+            } else {
+                params.cancellation
+            }
             val session = SearchComponentSet(components, branchers = listOf(traversal.brancher)).session(
                 cancellation = sharedCancellation,
                 learnedDb = params.sharedLearnedDb(),
@@ -310,7 +327,9 @@ internal class CpSatisfactionTraversal(
             val seed = preparedSeed ?: cp.session.seed(params.assumptions)
             val seeded = if (projectAssumptionCore && seed is PropagationResult.Unsat) {
                 cp.session.projectSeedCore(params.assumptions, seed, propagationCancellation)
-            } else seed
+            } else {
+                seed
+            }
             cp.rebase()
             rootOutcome = if (seeded is PropagationResult.Unsat || cp.session.isUnsatAtRoot) {
                 val core = (problem.baked as? PropagationResult.Unsat)?.let(::coreOf)
@@ -330,7 +349,9 @@ internal class CpSatisfactionTraversal(
                             params.clauseExchange?.onSearchStart(cp.session)
                             null
                         }
+
                         is ComponentResult.Conflict -> SearchOutcome.Exhausted()
+
                         ComponentResult.Indeterminate -> SearchOutcome.BudgetCapped
                     }
                     if (rootOutcome == null) run = session.openRun(problem.numBoolVars, traversal)
@@ -378,8 +399,10 @@ internal class CpSatisfactionTraversal(
 
     fun rebind(assumptions: Assumptions) {
         check(rebindable && !closed)
-        require(assumptions.numInts == 0 && assumptions.deductions.isEmpty &&
-            assumptions.boolKeys.all { it in 0 until problem.numBoolVars })
+        require(
+            assumptions.numInts == 0 && assumptions.deductions.isEmpty &&
+                assumptions.boolKeys.all { it in 0 until problem.numBoolVars },
+        )
         check(sharedSession == null) { "conditioned search requires completed root preparation" }
         val session = checkNotNull(learningSession)
         session.popTo(0)
@@ -387,15 +410,21 @@ internal class CpSatisfactionTraversal(
         cp.rebase()
         session.resetRootFacts()
         currentAssumptions = assumptions
-        val exhausted = SearchOutcome.Exhausted(touchedAssumptionLevels =
-            IntArray(assumptions.numBools) { it + 1 })
-        rootOutcome = if (seeded is PropagationResult.Unsat || cp.session.isUnsatAtRoot) exhausted else {
+        val exhausted = SearchOutcome.Exhausted(
+            touchedAssumptionLevels =
+            IntArray(assumptions.numBools) { it + 1 }
+        )
+        rootOutcome = if (seeded is PropagationResult.Unsat || cp.session.isUnsatAtRoot) {
+            exhausted
+        } else {
             when (session.initialize()) {
                 ComponentResult.Consistent -> {
                     params.clauseExchange?.onSearchStart(cp.session)
                     null
                 }
+
                 is ComponentResult.Conflict -> exhausted
+
                 ComponentResult.Indeterminate -> SearchOutcome.BudgetCapped
             }
         }
@@ -435,13 +464,17 @@ internal class CpSatisfactionTraversal(
                     }
                     initialization = null
                     initialized
-                } else session.initialize()
+                } else {
+                    session.initialize()
+                }
                 rootOutcome = when (result) {
                     ComponentResult.Consistent -> {
                         params.clauseExchange?.onSearchStart(cp.session)
                         null
                     }
+
                     is ComponentResult.Conflict -> SearchOutcome.Exhausted()
+
                     ComponentResult.Indeterminate -> SearchOutcome.BudgetCapped
                 }
                 if (rootOutcome == null) {
@@ -470,10 +503,12 @@ internal class CpSatisfactionTraversal(
             SearchRunEvent.Exhausted -> {
                 finishQuery()
                 // Learned decision levels describe traversal, not every premise of the exhausted tree.
-                SearchOutcome.Exhausted(touchedAssumptionLevels = IntArray(
+                SearchOutcome.Exhausted(
+                    touchedAssumptionLevels = IntArray(
                     currentAssumptions.numBools + currentAssumptions.numInts +
                         (if (traversal.retainedRoot) 1 else 0),
-                ) { it + 1 })
+                ) { it + 1 }
+                )
             }
 
             SearchRunEvent.Indeterminate.Component -> {
@@ -570,7 +605,10 @@ private class CpSatisfactionTraversalPolicy(
 
     private val session: PropagationSession get() = cp.session
     val brancher = BacktrackBrancher(
-        session, params, sink, restart,
+        session,
+        params,
+        sink,
+        restart,
         nativeConflict = { cp.lastConflict },
         leafColumns = leafColumns,
     ).also {
@@ -580,7 +618,8 @@ private class CpSatisfactionTraversalPolicy(
 
     override val solveParams = SearchSolveParams(
         maxDecisions = minOf(
-            params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE,
+            params.maxDecisions,
+            params.maxInstructions ?: Long.MAX_VALUE,
             params.nodeBudget?.allowance?.decisionsLeft() ?: Long.MAX_VALUE,
         ),
         restart = restart,
@@ -604,8 +643,11 @@ private class CpSatisfactionTraversalPolicy(
         } ?: true
     }
     override val observer: SearchRunObserver = brancher
-    override val modelContinuation = if (rebindable) SearchModelContinuation.Chronological
-        else SearchModelContinuation.BlockAtRoot
+    override val modelContinuation = if (rebindable) {
+        SearchModelContinuation.Chronological
+    } else {
+        SearchModelContinuation.BlockAtRoot
+    }
     override val modelPolicy: SearchModelPolicy = SearchModelPolicy.SurfaceAll
     override val pauseBeforeDecision: () -> Boolean = slice?.beforeBranch ?: { false }
     override val nodePolicy: SearchNodePolicy = object : SearchNodePolicy {
@@ -624,9 +666,13 @@ private class CpSatisfactionTraversalPolicy(
     private val inprocessing = Inprocessing.from(params, sink?.search)
     private val learnedMemory = LearnedMemoryMaintenance()
 
-    init { session.retainedInprocessingMemory = inprocessing?.let { it::retainedMemory } }
+    init {
+        session.retainedInprocessingMemory = inprocessing?.let { it::retainedMemory }
+    }
 
-    fun releaseRetainedState() { inprocessing?.reset() }
+    fun releaseRetainedState() {
+        inprocessing?.reset()
+    }
 
     fun resetScope() {
         retainedRoot = false
@@ -654,8 +700,10 @@ private class CpSatisfactionTraversalPolicy(
         var seenHeap = heap
         var seenOperation = operation
         while (session.nativeCapWindowPending && slice?.pauses() == true &&
-            (session.nativeCapContinuationCursor != seenCursor || session.nativeCapContinuationHeap != seenHeap ||
-                session.nativeCapContinuationOperation != seenOperation)
+            (
+                session.nativeCapContinuationCursor != seenCursor || session.nativeCapContinuationHeap != seenHeap ||
+                session.nativeCapContinuationOperation != seenOperation
+            )
         ) {
             if (params.cancellation()) return SearchRunDisposition.Pause
             seenCursor = session.nativeCapContinuationCursor
@@ -689,8 +737,11 @@ private class CpSatisfactionTraversalPolicy(
 
     private fun rootDisposition(): SearchRunDisposition {
         val observer = slice?.atRoot ?: return SearchRunDisposition.Continue
-        return if (session.canSimplifyRoot && observer(session)) SearchRunDisposition.Pause
-        else SearchRunDisposition.Continue
+        return if (session.canSimplifyRoot && observer(session)) {
+            SearchRunDisposition.Pause
+        } else {
+            SearchRunDisposition.Continue
+        }
     }
 
     override fun onRestart(context: SearchContext): SearchRunDisposition {
@@ -724,8 +775,11 @@ internal fun BacktrackParams.leafColumns(
     objective: LinearObjective? = null,
 ): LeafColumns? {
     val unread = (if (componentFactory == null) session.projection.unreadColumns else null) ?: return null
-    return if (objective == null) unread
-    else unread.withoutTerms(objective.boolWeightValues, objective.intCoefficientValues)
+    return if (objective == null) {
+        unread
+    } else {
+        unread.withoutTerms(objective.boolWeightValues, objective.intCoefficientValues)
+    }
 }
 
 internal class BacktrackBrancher(
@@ -748,6 +802,7 @@ internal class BacktrackBrancher(
     private val onEvent = params.onEvent
     private val branchObserver = params.branchObserver
     private var restartCount = 0L
+
     // A replayed point leads every value order, restarts included, until a decision it led conflicts.
     private var hint: Sample? = null
     private val hinted = HashSet<SearchDecision>()
@@ -816,8 +871,12 @@ internal class BacktrackBrancher(
     override fun onAttempt(decision: SearchDecision, context: SearchContext) {
         branchObserver?.onAttempt(decision, context)
         branchObserver.observeGuidance(PooledGuidanceKind.ATTEMPT) {
-            PooledGuidanceObservation(PooledGuidanceKind.ATTEMPT, hint != null,
-                decision = decision.guidanceText(), level = context.decisionLevel)
+            PooledGuidanceObservation(
+                PooledGuidanceKind.ATTEMPT,
+                hint != null,
+                decision = decision.guidanceText(),
+                level = context.decisionLevel,
+            )
         }
     }
 
@@ -825,8 +884,12 @@ internal class BacktrackBrancher(
         branching.onCommit(decision, decisionLevel)
         branchObserver?.onCommit(decision, decisionLevel)
         branchObserver.observeGuidance(PooledGuidanceKind.COMMIT) {
-            PooledGuidanceObservation(PooledGuidanceKind.COMMIT, hint != null,
-                decision = decision.guidanceText(), level = decisionLevel)
+            PooledGuidanceObservation(
+                PooledGuidanceKind.COMMIT,
+                hint != null,
+                decision = decision.guidanceText(),
+                level = decisionLevel,
+            )
         }
         val (variable, value) = decision.asSelectorDecision() ?: return
         variables.onCommit(variable)
@@ -899,7 +962,6 @@ internal class BacktrackBrancher(
         }
         phase.onSolution(sample)
     }
-
 }
 
 internal fun splitIntAlternatives(
@@ -1009,7 +1071,8 @@ private class LpFeasibilityComponent(
 ) : LpSearchResource {
     private var preparationToken: ExecutionControl? = null
     private val cancellation = cancelledWhen(
-        { params.cancellation.deadline() }, { params.cancellation.workScheduled() },
+        { params.cancellation.deadline() },
+        { params.cancellation.workScheduled() },
         { params.cancellation.stopPolling },
     ) {
         params.cancellation() || preparationToken?.invoke() == true
@@ -1061,7 +1124,9 @@ private class LpFeasibilityComponent(
                 for (bound in engine.shaveVariableBounds(token)) {
                     if (cp.session.implyIntAtLeast(bound.varId, bound.lo) is PropagationResult.Unsat ||
                         cp.session.implyIntAtMost(bound.varId, bound.hi) is PropagationResult.Unsat
-                    ) return true
+                    ) {
+                        return true
+                    }
                 }
             }
             return false
@@ -1090,7 +1155,13 @@ private class ResidualRealComponent(
     private val absCompletion = if (problem.factors.any {
             it is RealAbs || it is RealFiniteDomain ||
                 (it is ContinuousProduct && it.finiteChoices != null && !it.finiteChoices.hasGuards)
-        }) AbsRealCompletion(problem) else null
+        }
+    ) {
+            AbsRealCompletion(problem)
+        } else {
+            null
+        }
+
     // A finite membership is the one exact-completion relation a float leaf point can satisfy within tolerance.
     private val floatMembership = toleranceCheck.permitsToleranceOptimum() &&
         problem.factors.none { it is RealAbs || it is ContinuousProduct }
@@ -1123,20 +1194,28 @@ private class ResidualRealComponent(
                 }
                 if (context.cancelled()) return ComponentCheck.Indeterminate
             }
-            val discrete = Sample(BooleanArray(problem.numBoolVars) { cp.session.boolValue(it) ?: false },
-                LongArray(problem.numIntVars) { cp.session.intDomain(it).min })
+            val discrete = Sample(
+                BooleanArray(problem.numBoolVars) { cp.session.boolValue(it) ?: false },
+                LongArray(problem.numIntVars) { cp.session.intDomain(it).min },
+            )
             val stop = context.executionControls.cancellation
             val checked = completion.complete(discrete, stop, context.executionControls, solveContext)
             absWork += checked.work
             return when (val result = checked.result) {
                 is AbsRealCompletion.Result.Witness -> {
-                    val sample = discrete.copy(reals = DoubleArray(result.reals.size) { result.reals[it].toDouble() },
-                        exactReals = result.reals)
+                    val sample = discrete.copy(
+                        reals = DoubleArray(result.reals.size) { result.reals[it].toDouble() },
+                        exactReals = result.reals,
+                    )
                     if (verifyRealCoordinates(problem, sample, stop) !is Verification.Accepted) {
                         ComponentCheck.Indeterminate
-                    } else ComponentCheck.Feasible.also { completed = sample }
+                    } else {
+                        ComponentCheck.Feasible.also { completed = sample }
+                    }
                 }
+
                 AbsRealCompletion.Result.Refuted -> ComponentCheck.Infeasible()
+
                 AbsRealCompletion.Result.Undecided -> ComponentCheck.Indeterminate
             }
         }
@@ -1156,8 +1235,11 @@ private class ResidualRealComponent(
                 val tolerated = result.verdict == LpVerdict.TOLERANCE_OPTIMUM && toleranceCheck?.invoke(sample) == true
                 if ((problem as? BakedProblem)?.factorProjections?.requiresRealSourceCheck == true && !tolerated &&
                     verifyRealCoordinates(problem, sample) !is Verification.Accepted
-                ) ComponentCheck.Indeterminate
-                else ComponentCheck.Feasible.also { completed = sample }
+                ) {
+                    ComponentCheck.Indeterminate
+                } else {
+                    ComponentCheck.Feasible.also { completed = sample }
+                }
             }
 
             LpVerdict.INFEASIBLE -> ComponentCheck.Infeasible()
@@ -1180,7 +1262,10 @@ private class ResidualRealComponent(
 }
 
 /** The shared learned-clause bound mirrors the CP database's own cap and glue threshold. */
-internal fun BacktrackParams.sharedLearnedDb(): SearchLearnedDbParams =
-    SearchLearnedDbParams(maxClauses = maxLearnedClauses, glueLbd = lbdGlueThreshold,
-        softLimitBytes = learnedMemoryBytes, reclamationWork = learnedMemoryWork,
-        reclamationScratchBytes = learnedMemoryScratchBytes)
+internal fun BacktrackParams.sharedLearnedDb(): SearchLearnedDbParams = SearchLearnedDbParams(
+    maxClauses = maxLearnedClauses,
+    glueLbd = lbdGlueThreshold,
+    softLimitBytes = learnedMemoryBytes,
+    reclamationWork = learnedMemoryWork,
+    reclamationScratchBytes = learnedMemoryScratchBytes,
+)

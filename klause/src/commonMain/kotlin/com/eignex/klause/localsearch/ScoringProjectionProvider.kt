@@ -32,8 +32,10 @@ class ScoringProjection internal constructor(
     ) : this(capability, assignmentCheck, inertReason, factory, false)
 
     init {
-        require(capability != ScoringCapability.INERT ||
-            (assignmentCheck != AssignmentCheckCapability.EXACT && !inertReason.isNullOrBlank())) {
+        require(
+            capability != ScoringCapability.INERT ||
+                (assignmentCheck != AssignmentCheckCapability.EXACT && !inertReason.isNullOrBlank()),
+        ) {
             "inert scoring requires an enforcing peer or source certification, with an explicit reason"
         }
     }
@@ -66,8 +68,11 @@ object BuiltInScoringProjectionProvider : ScoringProjectionProvider {
         val capabilities = factor.defaultExecutionCapabilities()
         if (capabilities.scoring == ScoringCapability.UNSUPPORTED) return null
         return ScoringProjection(
-            capabilities.scoring, capabilities.assignmentCheck, capabilities.inertReason,
-            { view, domains -> view.buildInvariantProjection(domains) }, true,
+            capabilities.scoring,
+            capabilities.assignmentCheck,
+            capabilities.inertReason,
+            { view, domains -> view.buildInvariantProjection(domains) },
+            true,
         )
     }
 }

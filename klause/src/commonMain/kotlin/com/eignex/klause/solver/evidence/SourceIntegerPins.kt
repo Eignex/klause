@@ -16,17 +16,17 @@ internal class SourceIntegerBounds(
                     upper[id]?.let { it < value } == true
             }
         ) {
-                return IntegerPinStatus.Inactive
-            }
+            return IntegerPinStatus.Inactive
+        }
         return if (pins.all { (id, value) ->
                 lower[id]?.let { it >= value } == true &&
                     upper[id]?.let { it <= value } == true
             }
         ) {
-                IntegerPinStatus.Established
-            } else {
-                IntegerPinStatus.Unresolved
-            }
+            IntegerPinStatus.Established
+        } else {
+            IntegerPinStatus.Unresolved
+        }
     }
 
     fun split(pins: Map<SourceCoordinate, BigFraction>): Pair<SourceCoordinate, BigFraction>? {
@@ -71,8 +71,8 @@ internal fun SourceProofContext.integerPinBounds(
         if (premise.integerPins.isNotEmpty() ||
             premise.guards.any { (id, value) -> condition.bools[id] != value }
         ) {
-                continue
-            }
+            continue
+        }
         val row = premise.inequality
         if (row.coefficients.size != 1) continue
         val (id, coefficient) = row.coefficients.entries.single()

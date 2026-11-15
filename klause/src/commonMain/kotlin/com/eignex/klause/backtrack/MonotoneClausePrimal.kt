@@ -44,8 +44,10 @@ internal class MonotoneClausePrimal private constructor(
     private val phaseToken = object : ExecutionControl() {
         override val workScheduled: Boolean get() = lifetime.workScheduled()
         override fun isCancelled(): Boolean = lifetime() || params.nodeBudget?.allowance?.exhausted() == true ||
-            (!lifetime.workScheduled() &&
-                activeMillis + (activeStart?.elapsedNow()?.inWholeMilliseconds ?: 0L) >= activeBudgetMillis)
+            (
+                !lifetime.workScheduled() &&
+                activeMillis + (activeStart?.elapsedNow()?.inWholeMilliseconds ?: 0L) >= activeBudgetMillis
+            )
         override fun deadline() = lifetime.deadline()
     }
     private var closed = false
@@ -137,7 +139,10 @@ internal class MonotoneClausePrimal private constructor(
                 retireRepair()
                 val scope = if (bootstrap) purePins(next).first else next
                 val prepared = ClausePrimalProjection.prepare(
-                    solver.problem, scope, params.nativeSat, phaseToken,
+                    solver.problem,
+                    scope,
+                    params.nativeSat,
+                    phaseToken,
                 ) { literalWork += it }
                 val reduced = prepared.projection
                 if (reduced == null) {
@@ -177,8 +182,13 @@ internal class MonotoneClausePrimal private constructor(
             if (bootstrap) {
                 bootstrap = false
                 walk = ClausePrimalWalk(
-                    sample, clauses, objective.boolWeightValues.indices.filter { objective.boolWeightValues[it] > 0L },
-                    params.assumptions, params.randomSeed, params.nodeBudget, phaseToken,
+                    sample,
+                    clauses,
+                    objective.boolWeightValues.indices.filter { objective.boolWeightValues[it] > 0L },
+                    params.assumptions,
+                    params.randomSeed,
+                    params.nodeBudget,
+                    phaseToken,
                 )
                 continue
             }
@@ -192,12 +202,19 @@ internal class MonotoneClausePrimal private constructor(
 
     private fun openRepair(model: BacktrackSolver, assumptions: Assumptions): ResumableMinimize? = try {
         ResumableMinimize(
-            model, LinearObjective(),
+            model,
+            LinearObjective(),
             BacktrackPresets.satOptimized(
-                params.randomSeed, inprocess = false, cancellation = phaseToken,
+                params.randomSeed,
+                inprocess = false,
+                cancellation = phaseToken,
             ).copy(
-                assumptions = assumptions, nativeSat = params.nativeSat, pbLearning = false,
-                nodeBudget = params.nodeBudget, targetPhasing = false, valueSelector = IndomainMin,
+                assumptions = assumptions,
+                nativeSat = params.nativeSat,
+                pbLearning = false,
+                nodeBudget = params.nodeBudget,
+                targetPhasing = false,
+                valueSelector = IndomainMin,
             ),
             rebindable = true,
             ownsWorkDebt = false,
@@ -251,7 +268,7 @@ internal class MonotoneClausePrimal private constructor(
                 val variable = Lit.variable(literal)
                 if (variable !in pins) {
                     polarity[variable] = polarity[variable] or
-                    if (Lit.isPositive(literal)) 1 else 2
+                        if (Lit.isPositive(literal)) 1 else 2
                 }
             }
         }
@@ -326,9 +343,9 @@ internal class MonotoneClausePrimal private constructor(
             val clauses = mutableListOf<Clause>()
             for (factor in problem.factors) {
                 if (lifetime() || (
-                    !lifetime.workScheduled() &&
-                        start.elapsedNow().inWholeMilliseconds >= activeBudgetMillis
-                )
+                        !lifetime.workScheduled() &&
+                            start.elapsedNow().inWholeMilliseconds >= activeBudgetMillis
+                        )
                 ) {
                     return null
                 }

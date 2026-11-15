@@ -44,7 +44,13 @@ internal class FloatGridRequest(
 }
 
 internal enum class FloatGridDecline {
-    POLICY, COORDINATES, OPEN_INTEGER, GEOMETRY, FACTOR, SCALING, RESOURCE,
+    POLICY,
+    COORDINATES,
+    OPEN_INTEGER,
+    GEOMETRY,
+    FACTOR,
+    SCALING,
+    RESOURCE,
 }
 
 internal sealed interface FloatGridPreparation {
@@ -87,7 +93,8 @@ internal fun prepareFloatGrid(request: FloatGridRequest, cancellation: Execution
     for ((id, factor) in source.factors.withIndex()) {
         if (!preflightFloatFactor(source, factor, selected, stop)) {
             return FloatGridPreparation.Declined(
-                if (stop()) FloatGridDecline.RESOURCE else FloatGridDecline.FACTOR, id,
+                if (stop()) FloatGridDecline.RESOURCE else FloatGridDecline.FACTOR,
+                id,
             )
         }
     }
@@ -121,13 +128,14 @@ internal fun prepareFloatGrid(request: FloatGridRequest, cancellation: Execution
             val pin = optional.pinRows[id]
             (
                 if (pin == null) {
-                lowerFloatGridFactor(factor, bySource, policy, stop, id in request.truncatedRows)
-            } else {
-                lowerGridPin(factor, pin.first, pin.second)
-            }
-            )
+                    lowerFloatGridFactor(factor, bySource, policy, stop, id in request.truncatedRows)
+                } else {
+                    lowerGridPin(factor, pin.first, pin.second)
+                }
+                )
                 ?: return FloatGridPreparation.Declined(
-                    if (stop()) FloatGridDecline.RESOURCE else FloatGridDecline.SCALING, id,
+                    if (stop()) FloatGridDecline.RESOURCE else FloatGridDecline.SCALING,
+                    id,
                 )
         }
         for (converted in output) {
@@ -196,8 +204,10 @@ private fun preflightFloatFactor(
         is Linear, is ReifiedRealLinear, is RealAbs, is RealArrayMinMax, is RealElement, is RealFiniteDomain -> true
 
         is ContinuousProduct -> factor.finiteChoices?.let { choices ->
-            !choices.hasGuards || (choices.size == 1 && source.realLower[choices.operand] == choices.valueAt(0) &&
-                source.realUpper[choices.operand] == choices.valueAt(0))
+            !choices.hasGuards || (
+                choices.size == 1 && source.realLower[choices.operand] == choices.valueAt(0) &&
+                source.realUpper[choices.operand] == choices.valueAt(0)
+            )
         } ?: true
 
         is Power -> factor.base is Power.Coordinate.Real
@@ -222,19 +232,22 @@ internal fun floatGridColumn(
     }
     val origin = (
         if (source.realLower[id].isFinite()) {
-        BigFraction.ofDouble(source.realLower[id])
-    } else if (image != null) {
-        BigFraction.ofDouble(image.lo)
-    } else {
-        policy.unrangedBounds.lower?.let { BigFraction.of(it.numerator, it.denominator) }
-    }) ?: return null
-    val upper = (if (source.realUpper[id].isFinite()) {
+            BigFraction.ofDouble(source.realLower[id])
+        } else if (image != null) {
+            BigFraction.ofDouble(image.lo)
+        } else {
+            policy.unrangedBounds.lower?.let { BigFraction.of(it.numerator, it.denominator) }
+        }
+    ) ?: return null
+    val upper = (
+        if (source.realUpper[id].isFinite()) {
         BigFraction.ofDouble(source.realUpper[id])
     } else if (image != null) {
         BigFraction.ofDouble(image.hi)
     } else {
         policy.unrangedBounds.upper?.let { BigFraction.of(it.numerator, it.denominator) }
-    }) ?: return null
+    }
+    ) ?: return null
     if (origin > upper) return null
     val buckets = if (origin == upper && !variable.preserveBuckets) {
         1
@@ -279,8 +292,12 @@ private fun lowerFloatGridFactor(
             val input = coordinate(factor.operand)
             val output = coordinate(factor.result)
             val image = prepareGridAbsImage(input, output, cancellation) ?: return null
-            listOf(GridAbs(input.variable, output.variable, input.lower, input.upper, input.buckets,
-                output.lower, output.upper, output.buckets, image))
+            listOf(
+                GridAbs(
+                    input.variable, output.variable, input.lower, input.upper, input.buckets,
+                output.lower, output.upper, output.buckets, image,
+                )
+            )
         }
 
         is ContinuousProduct -> {
@@ -290,16 +307,23 @@ private fun lowerFloatGridFactor(
                 emptyList()
             } else {
                 lowerGridFiniteValues(
-                choices.size,
-                choices::valueAt,
-                columns.getValue(choices.operand),
-                cancellation,
-            ) ?: return null
+                    choices.size,
+                    choices::valueAt,
+                    columns.getValue(choices.operand),
+                    cancellation,
+                ) ?: return null
             }
             listOf(product) + membership
         }
-        is Power -> listOf(GridPower(coordinate((factor.base as Power.Coordinate.Real).id.index), factor.exponent,
-            coordinate((factor.result as Power.Coordinate.Real).id.index)))
+
+        is Power -> listOf(
+            GridPower(
+            coordinate((factor.base as Power.Coordinate.Real).id.index),
+            factor.exponent,
+            coordinate((factor.result as Power.Coordinate.Real).id.index),
+        )
+        )
+
         is RealArrayMinMax -> listOf(lowerGridMinMax(factor, columns, policy.linearScale, cancellation) ?: return null)
 
         is RealElement -> lowerGridElement(factor, columns, cancellation)

@@ -53,19 +53,25 @@ class PortfolioWorkAccountingTest {
             clock += 7.milliseconds
             Verification.Accepted(candidate)
         })
-        val worker = trackingWorker("buffered", 0, TrackingResumableSearch(null, onRun = {
+        val worker = trackingWorker(
+            "buffered", 0,
+            TrackingResumableSearch(null, onRun = {
             clock += 2.milliseconds
             exchange.offerFromWorker(point, 3.0) { it() }
             exchange.offerFromWorker(point, 1.0) { it() }
             assertEquals(null, exchange.current())
-        })).also {
+        })
+        ).also {
             it.publicationExchange = exchange
             it.sharingMeter = SharingMeter()
         }
-        val sibling = trackingWorker("sibling", 1, TrackingResumableSearch(null, onRun = {
+        val sibling = trackingWorker(
+            "sibling", 1,
+            TrackingResumableSearch(null, onRun = {
             assertEquals(1.0, exchange.current()?.objective)
             finished = true
-        }))
+        })
+        )
 
         val result = Portfolio.thompson(listOf(worker, sibling)).apply { runTimeSource = clock }.use {
             it.minimize(ExecutionControl { finished })
@@ -74,8 +80,16 @@ class PortfolioWorkAccountingTest {
         val arm = result.stats.portfolio.arms.first()
         assertEquals(1, checks)
         assertEquals(9_000_000L, arm.lifecycle.activeNanos)
-        assertEquals(mapOf("segments" to 1L, "offered" to 2L, "coalesced" to 1L,
-            "checked" to 1L, "installed" to 1L), arm.sharing.incumbents.filterValues { it > 0L })
+        assertEquals(
+            mapOf(
+            "segments" to 1L,
+            "offered" to 2L,
+            "coalesced" to 1L,
+            "checked" to 1L,
+            "installed" to 1L,
+        ),
+            arm.sharing.incumbents.filterValues { it > 0L }
+        )
     }
 
     @Test
@@ -117,7 +131,11 @@ class PortfolioWorkAccountingTest {
                 override fun session() = StatelessSession(this)
             }
             val native = PortfolioWorker.of(
-                "priced", 0, solver.session(), BacktrackParams(), LinearObjective(),
+                "priced",
+                0,
+                solver.session(),
+                BacktrackParams(),
+                LinearObjective(),
                 withInstructionBudget = { params, _ -> params },
             )
             val worker = if (coordinates) {
@@ -131,7 +149,10 @@ class PortfolioWorkAccountingTest {
             )
 
             val result = Portfolio(
-                arms, fixedBandit(2, arm = 0), baseSliceWork = 7L, lsInstructionsPerWork = 1.5,
+                arms,
+                fixedBandit(2, arm = 0),
+                baseSliceWork = 7L,
+                lsInstructionsPerWork = 1.5,
             ).use { it.minimize(ExecutionControl { offers.isNotEmpty() }) }
 
             assertEquals(listOf(10L to 7L), offers)
@@ -174,14 +195,20 @@ class PortfolioWorkAccountingTest {
         }
         val arms = listOf(
             PortfolioWorker.of(
-                "priced", 0, solver.session(), BacktrackParams(),
+                "priced",
+                0,
+                solver.session(),
+                BacktrackParams(),
                 withInstructionBudget = { params, _ -> params },
             ),
             PortfolioWorker.ofSolve("done", 1) { _, _ -> SolveResult.Unsat() },
         )
 
         val result = Portfolio(
-            arms, fixedBandit(2, arm = 0), baseSliceWork = 7L, lsInstructionsPerWork = 1.5,
+            arms,
+            fixedBandit(2, arm = 0),
+            baseSliceWork = 7L,
+            lsInstructionsPerWork = 1.5,
         ).use { it.solve(ExecutionControl { offers.isNotEmpty() }) }
 
         assertEquals(listOf(10L to 7L), offers)

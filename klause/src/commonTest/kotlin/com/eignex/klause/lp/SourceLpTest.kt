@@ -22,19 +22,31 @@ class SourceLpTest {
     fun `small input admission should distinguish dimension entry and scalar bit declines`() {
         val cases = listOf(
             "Dimension" to SourceLpInput(emptyList(), 129, emptyList()),
-            "Entries" to SourceLpInput(List(9) {
+            "Entries" to SourceLpInput(
+                List(9) {
                 ExactRationalInequality(IntArray(64) { it }, List(64) { BigFraction.ONE }, BigFraction.ZERO)
-            }, 64, emptyList()),
-            "InputBits" to SourceLpInput(List(2) {
-                ExactRationalInequality(IntArray(65) { it }, List(65) { BigFraction.ofLong(Long.MAX_VALUE) },
-                    BigFraction.ZERO)
-            }, 65, emptyList()),
+            },
+                64, emptyList()
+            ),
+            "InputBits" to SourceLpInput(
+                List(2) {
+                ExactRationalInequality(
+                    IntArray(65) { it },
+                    List(65) { BigFraction.ofLong(Long.MAX_VALUE) },
+                    BigFraction.ZERO,
+                )
+            },
+                65, emptyList()
+            ),
         )
         for ((reason, input) in cases) {
             val declines = mutableListOf<String>()
 
-            val result = SourceLpBudget().runPrepared(ExecutionControl.Never, prepare = { input },
-                onDecline = { declines += it }) { error("declined input") }
+            val result = SourceLpBudget().runPrepared(
+                ExecutionControl.Never,
+                prepare = { input },
+                onDecline = { declines += it },
+            ) { error("declined input") }
 
             assertNull(result)
             assertEquals(listOf(reason), declines)

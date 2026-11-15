@@ -30,8 +30,14 @@ class ResumableMinimizeDirectionalTest {
         val factors = ArrayList<Factor>()
         repeat(blocks) { block ->
             repeat(3) { edge ->
-                factors.add(Linear(longArrayOf(1L, 1L),
-                    intArrayOf(block * 3 + edge, block * 3 + (edge + 1) % 3), LinearOp.GE, 1L))
+                factors.add(
+                    Linear(
+                    longArrayOf(1L, 1L),
+                    intArrayOf(block * 3 + edge, block * 3 + (edge + 1) % 3),
+                    LinearOp.GE,
+                    1L,
+                )
+                )
             }
         }
         val problem = Problem(0, variables, Array(variables) { IntDomain(0, 1) }, factors.toTypedArray()).bake()
@@ -40,12 +46,18 @@ class ResumableMinimizeDirectionalTest {
             valueSelector = IndomainMin,
             randomSeed = 3L,
             maxDecisions = 1000L,
-            lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
-                boundMaxOpsPerNode = 0L),
+            lpPlan = LpPlan(
+                bounding = true,
+                rootBudgetMillis = 0L,
+                rootCutHarvest = false,
+                boundMaxOpsPerNode = 0L,
+            ),
             lpDirectionalGains = true,
-            componentFactory = { listOf(object : SearchComponent {
-                override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Infeasible()
-            }) },
+            componentFactory = {
+                listOf(object : SearchComponent {
+                    override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Infeasible()
+                })
+            },
         )
 
         val objective = LinearObjective(intCoefficients = LongArray(variables) { 1L })
@@ -67,11 +79,17 @@ class ResumableMinimizeDirectionalTest {
 
     @Test
     fun `assumption reseeding clears the finite lp history scope`() {
-        val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(
+        val problem = Problem(
+            2, 0, emptyArray(),
+            arrayOf<Factor>(
             Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true)), min = 1, max = 2),
-        )).bake()
-        val params = BacktrackParams(randomSeed = 3L, lpDirectionalGains = true,
-            lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false))
+        )
+        ).bake()
+        val params = BacktrackParams(
+            randomSeed = 3L,
+            lpDirectionalGains = true,
+            lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false),
+        )
         val objective = LinearObjective(boolWeights = longArrayOf(1L, 1L))
         ResumableMinimize(BacktrackSolver(problem), objective, params, rebindable = true).use { search ->
             assertNotNull(search.runSlice(ExecutionControl.Never, 1000L, 1000L) {})

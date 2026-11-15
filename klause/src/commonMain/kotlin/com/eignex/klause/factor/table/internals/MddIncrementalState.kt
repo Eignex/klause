@@ -354,11 +354,15 @@ internal class MddIncrementalState(
         value: Long? = null,
     ): IntArray? = when {
         state.currentLevel == 0 -> null
+
         state.undoLogging -> state.lazyReason(
-            if (value == null) intArrayOf(kind, arg) else {
+            if (value == null) {
+                intArrayOf(kind, arg)
+            } else {
                 intArrayOf(kind, arg, (value ushr 32).toInt(), value.toInt())
             },
         )
+
         else -> coarse
     }
 
@@ -378,7 +382,14 @@ internal class MddIncrementalState(
         if (pos < 0) return null
         if (!pathWeightsAttempted && cost < 0) {
             pathWeights = MddPathWeights.build(
-                owner, seq, numStatesPerLayer, transitions, idx, initial, accepting, visit,
+                owner,
+                seq,
+                numStatesPerLayer,
+                transitions,
+                idx,
+                initial,
+                accepting,
+                visit,
             )
             pathWeightsAttempted = true
         }

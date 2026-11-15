@@ -7,10 +7,5 @@ internal interface BasisFactorCopy {
     val additionalWork: Long
     val sharesSource: Boolean get() = false
 
-    fun create(
-        columns: IntArray,
-        unitRows: IntArray,
-        policy: LuPivotPolicy,
-        work: Long,
-    ): BasisSolver?
+    fun create(columns: IntArray, unitRows: IntArray, policy: LuPivotPolicy, work: Long): BasisSolver?
 }

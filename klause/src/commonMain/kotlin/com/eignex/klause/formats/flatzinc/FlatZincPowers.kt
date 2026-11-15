@@ -21,14 +21,20 @@ internal fun FlatZincCompiler.emitFloatPower(c: FznConstraint) {
     val base = resolveFloatVarOrConst(c.args[0])
     val result = resolveFloatVarOrConst(c.args[2])
     if (listOf(base, result).filterIsInstance<FloatRef.Var>().any { !it.bk.lpOnly }) {
-        factors.add(GridPower(gridArithmeticCoordinate(base, "__grid_power"), value.value.toInt(),
-            gridArithmeticCoordinate(result, "__grid_power")))
+        factors.add(
+            GridPower(
+            gridArithmeticCoordinate(base, "__grid_power"),
+            value.value.toInt(),
+            gridArithmeticCoordinate(result, "__grid_power"),
+        )
+        )
         return
     }
     fun coordinate(expression: FznExpr): Power.Coordinate.Real {
         val ref = resolveFloatVarOrConst(expression)
         val id = when (ref) {
             is FloatRef.Const -> allocFloat("__power_const_${realLo.size}", ref.value, ref.value, lpOnly = true)
+
             is FloatRef.Var -> {
                 if (!ref.bk.lpOnly) unsupportedHere("float_pow requires exact continuous coordinates")
                 ref.bk.varId

@@ -97,7 +97,8 @@ internal class InnerLsRepair(val label: String = "standard", val flipsOverride: 
         val result = context.session?.minimize(context.objective, merged)
             ?: context.inner.minimize(context.objective, merged)
         context.recordInnerWork?.invoke(
-            result.stats.search.nodes.sum.toLong(), result.stats.ls.moves.sum.toLong(),
+            result.stats.search.nodes.sum.toLong(),
+            result.stats.ls.moves.sum.toLong(),
         )
         context.recordRepairResult?.invoke(result)
         return result.assignment
@@ -123,13 +124,22 @@ internal class BacktrackRepair(val label: String = "standard", val maxDecisions:
             val record = context.recordInnerWork
             val before = if (record != null) it.stats.search.nodes.sum.toLong() else 0L
             val step = it.repairStep(
-                context.pinAssumptions, maxDecisions, context.bestObjective, context.params.cancellation,
+                context.pinAssumptions,
+                maxDecisions,
+                context.bestObjective,
+                context.params.cancellation,
             )
             record?.invoke(it.stats.search.nodes.sum.toLong() - before, 0L)
-            context.recordRepairResult?.invoke(step.sample?.let { sample ->
-                MinimizeResult.BestFound(sample, context.objective.evaluate(sample),
-                    checkNotNull(step.reason), it.stats)
-            } ?: MinimizeResult.Unknown(checkNotNull(step.reason), it.stats))
+            context.recordRepairResult?.invoke(
+                step.sample?.let { sample ->
+                MinimizeResult.BestFound(
+                    sample,
+                    context.objective.evaluate(sample),
+                    checkNotNull(step.reason),
+                    it.stats,
+                )
+            } ?: MinimizeResult.Unknown(checkNotNull(step.reason), it.stats)
+            )
             return step.sample
         }
         val engine = context.backtrack ?: return null
@@ -144,7 +154,8 @@ internal class BacktrackRepair(val label: String = "standard", val maxDecisions:
             )
         val result = engine.minimize(context.objective, pinned)
         context.recordInnerWork?.invoke(
-            result.stats.search.nodes.sum.toLong(), result.stats.ls.moves.sum.toLong(),
+            result.stats.search.nodes.sum.toLong(),
+            result.stats.ls.moves.sum.toLong(),
         )
         context.recordRepairResult?.invoke(result)
         return result.assignment

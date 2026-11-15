@@ -97,16 +97,24 @@ internal object DependentEqualities {
             for (k in 0 until row.size) {
                 cancellation.charge(LATTICE_WORK_WEIGHT)
                 if (cancellation()) return null
-                val value = if (k < constants.intCoefficients.size) constants.intCoefficients.at(k)
-                else constants.realCoefficients.at(k - constants.intCoefficients.size)
+                val value = if (k < constants.intCoefficients.size) {
+                    constants.intCoefficients.at(k)
+                } else {
+                    constants.realCoefficients.at(k - constants.intCoefficients.size)
+                }
                 values.add(BigFraction.ofDouble(value) ?: return null)
             }
             values
-        } else null
+        } else {
+            null
+        }
         // Binary64 denominators are powers of two, so the largest clears the entire row.
         val denominator = realValues?.maxBy { it.den.magnitudeBitLength() }?.den ?: BIG_ONE
-        val bound = if (constants is IntegralConstants) constants.exactBound
-        else realValues!![0].num * (denominator / realValues[0].den)
+        val bound = if (constants is IntegralConstants) {
+            constants.exactBound
+        } else {
+            realValues!![0].num * (denominator / realValues[0].den)
+        }
         if (bound.magnitudeBitLength() > limits.maxBits) return null
         val merged = HashMap<Int, BigInt>(row.size)
         for (k in 0 until row.size) {
@@ -114,8 +122,11 @@ internal object DependentEqualities {
             if (cancellation()) return null
             val ref = row.ref(k)
             if (!Term.isInt(ref) && !Term.isReal(ref)) return null
-            val coefficient = if (constants is IntegralConstants) constants.exactCoeff(k)
-            else realValues!![k + 1].num * (denominator / realValues[k + 1].den)
+            val coefficient = if (constants is IntegralConstants) {
+                constants.exactCoeff(k)
+            } else {
+                realValues!![k + 1].num * (denominator / realValues[k + 1].den)
+            }
             if (coefficient.magnitudeBitLength() > limits.maxBits) return null
             val sum = (merged[ref] ?: BIG_ZERO) + coefficient
             if (sum.magnitudeBitLength() > limits.maxBits) return null

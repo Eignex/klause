@@ -30,22 +30,41 @@ class CutPoolTest {
             CutPremise.Excluded(source, BigFraction.ofLong(2)),
             CutPremise.ObjectiveCutoff(expression, BigFraction.ofLong(5)),
         )
-        val cut = SourceCut(expression, Relation.LE, BigFraction.ofLong(3),
-            CutProvenance(model, 0L, premises.map { CutProofFact(it, false) }, family = CutFamily.GOMORY))
-        for (prepared in listOf(false, true)) for (missing in premises) {
+        val cut = SourceCut(
+            expression,
+            Relation.LE,
+            BigFraction.ofLong(3),
+            CutProvenance(model, 0L, premises.map { CutProofFact(it, false) }, family = CutFamily.GOMORY),
+        )
+        for (prepared in listOf(false, true)) {
+            for (missing in premises) {
             val events = ArrayList<Triple<CutFamily, String, String>>()
-            val pool = CutPool(prepareSources = prepared,
-                observe = { family, stage, outcome -> events.add(Triple(family, stage, outcome)) })
+            val pool = CutPool(
+                prepareSources = prepared,
+                observe = { family, stage, outcome -> events.add(Triple(family, stage, outcome)) },
+            )
             val active = CutSourceMap(model, 0L, listOf(CutColumnSource(source)), activePremises = premises.toSet())
             assertTrue(pool.add(cut, active))
             repeat(2) { pool.remap(active) }
-            pool.remap(CutSourceMap(Any(), 0L, listOf(CutColumnSource(source)),
-                activePremises = premises.toSet()))
+            pool.remap(
+                CutSourceMap(
+                Any(),
+                0L,
+                listOf(CutColumnSource(source)),
+                activePremises = premises.toSet(),
+            )
+            )
             assertTrue(pool.cuts().isEmpty())
             pool.remap(active)
 
-            pool.remap(CutSourceMap(model, 1L, listOf(CutColumnSource(source)),
-                activePremises = (premises - missing).toSet()))
+            pool.remap(
+                CutSourceMap(
+                model,
+                1L,
+                listOf(CutColumnSource(source)),
+                activePremises = (premises - missing).toSet(),
+            )
+            )
 
             assertTrue(pool.cuts().isEmpty())
             assertTrue(Triple(CutFamily.GOMORY, "RETRACTION", "UNAVAILABLE") in events)
@@ -53,22 +72,34 @@ class CutPoolTest {
             assertEquals(CutFamily.GOMORY, pool.cuts().single().family)
             assertTrue(Triple(CutFamily.GOMORY, "RETRACTION", "REACTIVATED") in events)
         }
+        }
     }
-
 
     @Test
     fun `projected rows should follow layout changes and release their storage on retirement`() {
         val model = Any()
         val x = CutSource(CutSourceKind.INTEGER, 0)
         val expression = CutExpression(mapOf(x to BigFraction.ONE))
-        val facts = listOf(CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
-            CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true))
-        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(model, 0, facts,
-            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)))
+        val facts = listOf(
+            CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
+            CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true),
+        )
+        val source = SourceCut(
+            expression, Relation.LE, BigFraction.ONE,
+            CutProvenance(
+            model,
+            0,
+            facts,
+            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
+        )
+        )
         val first = CutSourceMap(model, 0, listOf(null, CutColumnSource(x)))
         val events = ArrayList<Pair<String, String>>()
-        val pool = CutPool(maxConsecutiveInactive = 1, prepareSources = true,
-            observe = { _, stage, outcome -> events.add(stage to outcome) })
+        val pool = CutPool(
+            maxConsecutiveInactive = 1,
+            prepareSources = true,
+            observe = { _, stage, outcome -> events.add(stage to outcome) },
+        )
         assertTrue(pool.add(source, first))
         repeat(4) { pool.remap(first) }
         assertTrue("PROJECTION" to "REUSED" in events)
@@ -87,21 +118,33 @@ class CutPoolTest {
         val model = Any()
         val x = CutSource(CutSourceKind.INTEGER, 0)
         val expression = CutExpression(mapOf(x to BigFraction.ONE))
-        val facts = listOf(CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
-            CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true))
-        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(model, 0, facts,
-            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)))
+        val facts = listOf(
+            CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
+            CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true),
+        )
+        val source = SourceCut(
+            expression, Relation.LE, BigFraction.ONE,
+            CutProvenance(
+            model,
+            0,
+            facts,
+            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
+        )
+        )
         val map = CutSourceMap(model, 0, listOf(CutColumnSource(x)))
         var cancelled = false
         var cancelProjection = false
         var work = 0L
         val events = ArrayList<Pair<String, String>>()
-        val pool = CutPool(prepareSources = true, cancellation = ExecutionControl { cancelled },
+        val pool = CutPool(
+            prepareSources = true,
+            cancellation = ExecutionControl { cancelled },
             onPreparationWork = {
                 work += it
                 if (cancelProjection && it >= source.projectedPreparationUnits) cancelled = true
             },
-            observe = { _, stage, outcome -> events.add(stage to outcome) })
+            observe = { _, stage, outcome -> events.add(stage to outcome) },
+        )
         assertTrue(pool.add(source, map))
         repeat(2) { pool.remap(map) }
         val before = work
@@ -143,15 +186,27 @@ class CutPoolTest {
         val model = Any()
         val x = CutSource(CutSourceKind.INTEGER, 0)
         val expression = CutExpression(mapOf(x to BigFraction.ONE))
-        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(model, 0,
+        val source = SourceCut(
+            expression, Relation.LE, BigFraction.ONE,
+            CutProvenance(
+            model,
+            0,
             listOf(CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true)),
-            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)))
+            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
+        )
+        )
         val map = CutSourceMap(model, 0, listOf(CutColumnSource(x)))
         var cancelled = false
         var cancelOnCharge = true
         var work = 0L
-        val pool = CutPool(prepareSources = true, cancellation = ExecutionControl { cancelled },
-            onPreparationWork = { work += it; if (cancelOnCharge) cancelled = true })
+        val pool = CutPool(
+            prepareSources = true,
+            cancellation = ExecutionControl { cancelled },
+            onPreparationWork = {
+                work += it;
+                if (cancelOnCharge) cancelled = true
+            },
+        )
         assertTrue(pool.add(source, map))
         pool.remap(map)
 
@@ -175,10 +230,22 @@ class CutPoolTest {
         val map = CutSourceMap(model, 0, listOf(CutColumnSource(x)))
         val pool = CutPool(maxCuts = 1, maxConsecutiveInactive = 1, prepareSources = true)
         for (rhs in listOf(5L, 6L)) {
-            assertTrue(pool.add(SourceCut(expression, Relation.LE, BigFraction.ofLong(rhs),
-                CutProvenance(model, 0,
+            assertTrue(
+                pool.add(
+                    SourceCut(
+                expression,
+                Relation.LE,
+                BigFraction.ofLong(rhs),
+                CutProvenance(
+                    model,
+                    0,
                     listOf(CutProofFact(CutPremise.Bound(expression, true, BigFraction.ofLong(rhs)), true)),
-                    conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ofLong(rhs)))), map))
+                    conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ofLong(rhs)),
+                ),
+            ),
+                map
+                )
+            )
         }
         repeat(2) { pool.remap(map) }
         val before = pool.preparationStorageUnits
@@ -302,8 +369,11 @@ class CutPoolTest {
             expression,
             Relation.LE,
             BigFraction.ofLong(5),
-            CutProvenance(token, 0,
-                listOf(CutProofFact(CutPremise.Bound(expression, true, BigFraction.ofLong(5)), true))),
+            CutProvenance(
+                token,
+                0,
+                listOf(CutProofFact(CutPremise.Bound(expression, true, BigFraction.ofLong(5)), true)),
+            ),
         )
         for (portableFirst in listOf(false, true)) {
             val pool = CutPool()

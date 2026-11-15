@@ -59,8 +59,11 @@ internal fun reginFilter(
     // the bounds-consistency filter for plain alldifferent. Excepted values may repeat, so that
     // variant uses fixed non-excepted values rather than mandatory Hall intervals.
     if (filteredVars.any { state.intDomains[it].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null }) {
-        return if (exceptSet.isEmpty()) boundsAllDifferentFilter(state, filteredVars, premises, tag)
-        else filterFixedDistinctness(state, filteredVars, exceptSet, premises)
+        return if (exceptSet.isEmpty()) {
+            boundsAllDifferentFilter(state, filteredVars, premises, tag)
+        } else {
+            filterFixedDistinctness(state, filteredVars, exceptSet, premises)
+        }
     }
 
     // Unchanged-domains fast path: if the previous fire on this var set succeeded (returned null,

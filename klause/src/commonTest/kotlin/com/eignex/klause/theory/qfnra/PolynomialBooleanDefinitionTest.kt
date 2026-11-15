@@ -43,11 +43,18 @@ class PolynomialBooleanDefinitionTest {
             val formula = PolynomialFormula.normalize(source.formula, arithmetic)
             val reduction = PolynomialFormulaReduction.prepare(formula, source.realCount, arithmetic)
                 .asSequence().filterNotNull().single()
-            val condition = PolynomialCondition(lower = mapOf(0 to BigFraction.ONE),
-                upper = mapOf(0 to BigFraction.ofLong(2)))
+            val condition = PolynomialCondition(
+                lower = mapOf(0 to BigFraction.ONE),
+                upper = mapOf(0 to BigFraction.ofLong(2)),
+            )
 
-            val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-                QfNraParams(maximumWork = 500_000), condition)
+            val result = solveQfNra(
+                source.formula,
+                source.boolCount,
+                source.realCount,
+                QfNraParams(maximumWork = 500_000),
+                condition,
+            )
 
             assertEquals(0, reduction.eliminatedCount)
             assertTrue(reduction.requiresOriginalCheck)
@@ -66,13 +73,19 @@ class PolynomialBooleanDefinitionTest {
 
         try {
             for (truth in listOf(true, false, true)) {
-                val condition = PolynomialCondition(bools = mapOf(0 to truth),
-                    lower = mapOf(0 to BigFraction.ONE), upper = mapOf(0 to BigFraction.ofLong(2)))
+                val condition = PolynomialCondition(
+                    bools = mapOf(0 to truth),
+                    lower = mapOf(0 to BigFraction.ONE),
+                    upper = mapOf(0 to BigFraction.ofLong(2)),
+                )
 
                 val result = invocation.check(condition)
 
-                if (truth) assertTrue(assertIs<QfNraResult.Satisfiable>(result).assignment.boolValue(0))
-                else assertIs<QfNraResult.Unsatisfiable>(result)
+                if (truth) {
+                    assertTrue(assertIs<QfNraResult.Satisfiable>(result).assignment.boolValue(0))
+                } else {
+                    assertIs<QfNraResult.Unsatisfiable>(result)
+                }
             }
         } finally {
             invocation.close()
@@ -88,8 +101,12 @@ class PolynomialBooleanDefinitionTest {
                     "(assert (and (= b (not (> x 0))) (= x $numeral)))",
             )
 
-            val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-                QfNraParams(maximumWork = 500_000))
+            val result = solveQfNra(
+                source.formula,
+                source.boolCount,
+                source.realCount,
+                QfNraParams(maximumWork = 500_000),
+            )
 
             val point = assertIs<QfNraResult.Satisfiable>(result).assignment
             assertEquals(BigFraction.ofLong(value), point.realValue(0).rational)
@@ -104,8 +121,13 @@ class PolynomialBooleanDefinitionTest {
                 "(assert (or (and c (= b (> x 0))) (and (not c) b (= x (- 1)))))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = 500_000), PolynomialCondition(bools = mapOf(1 to false)))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = 500_000),
+            PolynomialCondition(bools = mapOf(1 to false)),
+        )
 
         val point = assertIs<QfNraResult.Satisfiable>(result).assignment
         assertTrue(point.boolValue(0))
@@ -120,8 +142,12 @@ class PolynomialBooleanDefinitionTest {
                 "(assert (and (= b (> x 0)) (= b (< y 0)) (= x 1) (= y 1)))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = 500_000))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = 500_000),
+        )
 
         assertIs<QfNraResult.Unsatisfiable>(result)
     }
@@ -163,11 +189,21 @@ class PolynomialBooleanDefinitionTest {
             "(declare-const x Real) (declare-const b Bool) " +
                 "(assert (and (= b (> x 0)) (= x 1)))",
         )
-        val completed = assertIs<QfNraResult.Satisfiable>(solveQfNra(source.formula, source.boolCount,
-            source.realCount, QfNraParams(maximumWork = 500_000)))
+        val completed = assertIs<QfNraResult.Satisfiable>(
+            solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = 500_000),
+        )
+        )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = completed.stats.workSpent - 1))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = completed.stats.workSpent - 1),
+        )
 
         assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(result).reason)
     }

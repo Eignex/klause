@@ -84,9 +84,12 @@ class DifferenceSearchComponent private constructor(
         model: Problem,
         projections: PreparedFactorProjections,
         modelIntVars: IntArray = IntArray(model.numIntVars) { it },
-    ) : this(requireNotNull(projections.linearTheoryModel(EncodingTarget.DIFFERENCE)) {
+    ) : this(
+        requireNotNull(projections.linearTheoryModel(EncodingTarget.DIFFERENCE)) {
         "unsupported selected difference encoding"
-    }.also { projections.requireSource(model) }, modelIntVars, intArrayOf())
+    }.also { projections.requireSource(model) },
+        modelIntVars, intArrayOf()
+    )
 
     override fun initialize(context: SearchContext): ComponentResult {
         potentialSeed = null
@@ -214,8 +217,8 @@ class DifferenceSearchComponent private constructor(
                 } == true
             }
         ) {
-                return ComponentCheck.Indeterminate
-            }
+            return ComponentCheck.Indeterminate
+        }
         if (context.cancelled() || context.executionControls.exhausted) return ComponentCheck.Indeterminate
         assignment = Sample(bools, values)
         return ComponentCheck.Feasible

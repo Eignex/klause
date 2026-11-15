@@ -172,11 +172,10 @@ interface Solver<P : SolverParams> {
     fun openEnumerate(params: P): SearchStream<Sample> = enumerate(params).asSearchStream()
 
     /** Open a quality-tiered sample cursor; close when stopping early. */
-    fun openSamples(config: SamplingConfig, params: P): SearchStream<Sample> =
-        when (config.quality) {
-            SampleQuality.CHEAP -> openSamples(params)
-            SampleQuality.ACCURATE -> samples(config, params).asSearchStream()
-        }
+    fun openSamples(config: SamplingConfig, params: P): SearchStream<Sample> = when (config.quality) {
+        SampleQuality.CHEAP -> openSamples(params)
+        SampleQuality.ACCURATE -> samples(config, params).asSearchStream()
+    }
 
     /** Open an exact-count cursor; close when stopping early. */
     fun openExactCount(config: ExactCountConfig = ExactCountConfig()): SearchStream<Count> =

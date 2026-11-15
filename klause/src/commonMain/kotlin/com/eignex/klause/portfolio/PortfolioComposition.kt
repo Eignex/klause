@@ -173,8 +173,10 @@ data class PortfolioScenario(
         require(sharingMemoryWork >= 0L && sharingMemoryScratch >= 0) { "sharing memory limits must be nonnegative" }
         require(sharingMemoryBytes == null || sharingMemoryBytes >= 0L) { "sharing memory bytes must be nonnegative" }
         require(cores >= 1) { "cores must be ≥ 1" }
-        require(!earlyCoreAdmission ||
-            (cores == 1 && kind == Kind.COP && engine == EngineMix.MIXED && btPool == null)) {
+        require(
+            !earlyCoreAdmission ||
+                (cores == 1 && kind == Kind.COP && engine == EngineMix.MIXED && btPool == null),
+        ) {
             "core-early requires a mixed optimization pool with automatic backtrack workers on one core"
         }
         require(diagnosticWorkLimit == null || (cores == 1 && diagnosticWorkLimit > 0L)) {
@@ -287,8 +289,11 @@ internal object PortfolioComposition {
         val arms = when (scenario.engine) {
             EngineMix.LOCAL_SEARCH ->
                 lsArms(scenario.kind, count, scenario.lsPool, scenario.nodeBudget, facts).map(::declared)
+
             EngineMix.BACKTRACK -> btArms(scenario, count, facts).map(::declared)
+
             EngineMix.MIXED -> mixedArms(scenario, facts)
+
             EngineMix.ALNS -> alnsArms(count, scenario.nodeBudget).map(::declared)
         }
         val check = scenario.toleranceCheck
@@ -296,11 +301,15 @@ internal object PortfolioComposition {
             val numerical = arm.config.let {
                 if (scenario.numericalLp && it is BacktrackWorkerConfig) it.withNumericalLp() else it
             }
-            val checked = if (check == null) numerical else when (numerical) {
+            val checked = if (check == null) {
+                numerical
+            } else {
+                when (numerical) {
                 is BacktrackWorkerConfig -> numerical.withToleranceCheck(check)
                 is LocalSearchWorkerConfig -> numerical.withToleranceCheck(check)
                 is AlnsWorkerConfig -> numerical.withToleranceCheck(check)
                 else -> numerical
+            }
             }
             SeatedArm(checked, arm.role, arm.needed)
         }
@@ -312,8 +321,11 @@ internal object PortfolioComposition {
     private fun declaredRole(config: WorkerConfig): ArmRole? = when (config) {
         is BacktrackWorkerConfig ->
             if (config.label == ANNOTATION) ArmRole.SelectorDiversity else BacktrackCatalog.armOf(config.label)?.role
+
         is LocalSearchWorkerConfig -> LocalSearchCatalog.armOf(config.label)?.role
+
         is AlnsWorkerConfig -> ArmRole.NeighbourhoodImprovement
+
         is CoreGuidedWorkerConfig -> ArmRole.ObjectiveCores
     }
 
@@ -401,10 +413,7 @@ internal object PortfolioComposition {
         }
     }
 
-    private fun BacktrackParams.boundedRootMaintenance(
-        warmupWork: Long,
-        clausal: Boolean,
-    ): BacktrackParams = copy(
+    private fun BacktrackParams.boundedRootMaintenance(warmupWork: Long, clausal: Boolean): BacktrackParams = copy(
         rootSimplification = true,
         rootSimplifyBatch = 256,
         rootProbeBatch = 2,
@@ -448,15 +457,20 @@ internal object PortfolioComposition {
         val pool = scenario.lsPool
         val budget = scenario.nodeBudget
         if (pool != null) {
-            return RosterRank(pool.map { recipe ->
+            return RosterRank(
+                pool.map { recipe ->
                 RosterCandidate(LocalSearchCatalog.armOf(recipe().label)?.role) {
                     LocalSearchWorkerConfig(recipe(), budget)
                 }
-            }, pinned = true)
+            },
+                pinned = true
+            )
         }
-        return RosterRank(LocalSearchCatalog.rankedArms(scenario.kind, facts.profile).map { arm ->
+        return RosterRank(
+            LocalSearchCatalog.rankedArms(scenario.kind, facts.profile).map { arm ->
             RosterCandidate(arm.role) { LocalSearchWorkerConfig(LocalSearchCatalog.recipe(arm), budget) }
-        })
+        }
+        )
     }
 
     // The model's own search order leads the complete rank. It and the core worker hold private state, so
@@ -464,9 +478,12 @@ internal object PortfolioComposition {
     private fun completeRank(scenario: PortfolioScenario, facts: ProblemFacts): RosterRank {
         val pool = scenario.btPool
         if (pool != null) {
-            return RosterRank(pool.map { recipe ->
+            return RosterRank(
+                pool.map { recipe ->
                 RosterCandidate(BacktrackCatalog.armOf(recipe().label)?.role) { injected(scenario, recipe) }
-            }, pinned = true)
+            },
+                pinned = true
+            )
         }
         val edit = curatedEdit(scenario, facts)
         val catalog = BacktrackCatalog.rankedArms(scenario.kind, facts).map { arm ->

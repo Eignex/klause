@@ -22,7 +22,9 @@ internal class PreparingMinimize(
     private val solver: BacktrackSolver,
     private val objective: LinearObjective,
     private val params: BacktrackParams,
-) : ResumableSearch, ReseedGuard, SliceWorkAccounting {
+) : ResumableSearch,
+    ReseedGuard,
+    SliceWorkAccounting {
     override var repaidWork: Long = 0L
         private set
     private var globalToken = params.cancellation
@@ -134,8 +136,12 @@ internal class PreparingMinimize(
                 }
                 if (session != null) {
                     installing = ResumableMinimize(
-                        solver, objective, params.withCancellation(propagationToken),
-                        preparedSession = session, preparationBudget = budget, sink = sink,
+                        solver,
+                        objective,
+                        params.withCancellation(propagationToken),
+                        preparedSession = session,
+                        preparationBudget = budget,
+                        sink = sink,
                         deferredInstallation = true,
                     )
                 }

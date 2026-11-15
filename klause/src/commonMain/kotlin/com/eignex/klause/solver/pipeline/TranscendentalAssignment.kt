@@ -47,10 +47,15 @@ internal fun ExactRealExpression.exactRealText(): String {
         text[node] = when (node) {
             is ExactRealExpression.Algebraic -> node.value.rational?.toString()
                 ?: "root(${node.value.rootIndex};[${node.value.definingCoefficients.joinToString(",")}])"
+
             ExactRealExpression.Pi -> "pi"
+
             is ExactRealExpression.Function -> "${node.function.name.lowercase()}(${text.getValue(node.argument)})"
+
             is ExactRealExpression.Sum -> "sum(${children.joinToString(",") { text.getValue(it) }})"
+
             is ExactRealExpression.Product -> "product(${children.joinToString(",") { text.getValue(it) }})"
+
             is ExactRealExpression.Power -> "power(${text.getValue(node.base)},${node.exponent})"
         }
     }

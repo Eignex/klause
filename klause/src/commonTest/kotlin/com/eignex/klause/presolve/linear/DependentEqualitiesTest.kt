@@ -38,8 +38,12 @@ class DependentEqualitiesTest {
         ExactLinear.of(refs, coefficients, LinearOp.EQ, bound)
 
     private fun realProblem(factors: List<Factor>, integers: Int = 0) = Problem(
-        0, integers, Array(integers) { IntDomain(0, 10) }, factors,
-        numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+        0,
+        integers,
+        Array(integers) { IntDomain(0, 10) },
+        factors,
+        numRealVars = 3,
+        realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
         realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
     )
 
@@ -52,8 +56,11 @@ class DependentEqualitiesTest {
     @Test
     fun `pure real blocks should drop dependent equalities at exact fractional and wide scales`() {
         val refs = IntArray(3, Term::ofRealVar)
-        val scales = listOf(BigFraction.ONE, BigFraction.of(bigIntOf(1), bigIntOf(3)),
-            BigFraction.of(bigIntOf(1) shl 90, BIG_ONE))
+        val scales = listOf(
+            BigFraction.ONE,
+            BigFraction.of(bigIntOf(1), bigIntOf(3)),
+            BigFraction.of(bigIntOf(1) shl 90, BIG_ONE),
+        )
         for (scale in scales) {
             val rows = listOf(
                 exact(refs.copyOfRange(0, 2), listOf(scale, scale), scale),
@@ -83,8 +90,11 @@ class DependentEqualitiesTest {
     fun `integer and real coordinates with the same id should stay independent`() {
         val rows = listOf(
             exact(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)), List(2) { BigFraction.ONE }, BigFraction.ONE),
-            exact(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
-                listOf(BigFraction.ONE, BigFraction.ONE.negated()), BigFraction.ZERO),
+            exact(
+                intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+                listOf(BigFraction.ONE, BigFraction.ONE.negated()),
+                BigFraction.ZERO,
+            ),
         )
 
         assertTrue(dropped(realProblem(rows, integers = 1)).isEmpty)
@@ -107,8 +117,14 @@ class DependentEqualitiesTest {
         val rows = listOf(
             Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(0.5, 0.25), LinearOp.EQ, 0.75),
             Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1, 2), doubleArrayOf(0.25, 0.5), LinearOp.EQ, 1.25),
-            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
-                doubleArrayOf(0.5, 0.5, 0.5), LinearOp.EQ, 2.0),
+            Linear(
+                intArrayOf(),
+                doubleArrayOf(),
+                intArrayOf(0, 1, 2),
+                doubleArrayOf(0.5, 0.5, 0.5),
+                LinearOp.EQ,
+                2.0,
+            ),
         )
 
         assertEquals(listOf(2), dropped(realProblem(rows)).droppedIndices.toList())
@@ -117,8 +133,11 @@ class DependentEqualitiesTest {
     @Test
     fun `wide repeated coefficients should merge without signed word overflow`() {
         val wide = bigIntOf(1) shl 80
-        val row = TaggedLinearRow(intArrayOf(Term.ofIntVar(0), Term.ofIntVar(0)),
-            WideConstants(WideConsts(arrayOf(wide, wide)), wide shl 1), LinearOp.EQ)
+        val row = TaggedLinearRow(
+            intArrayOf(Term.ofIntVar(0), Term.ofIntVar(0)),
+            WideConstants(WideConsts(arrayOf(wide, wide)), wide shl 1),
+            LinearOp.EQ,
+        )
         val factor = object : Factor by eq(intArrayOf(1), intArrayOf(0), 1) {
             override val linearForm = LinearForm.Conjunction(listOf(row))
         }
@@ -128,8 +147,11 @@ class DependentEqualitiesTest {
 
     @Test
     fun `cancelled coordinates should expose a constant contradiction`() {
-        val row = TaggedLinearRow(intArrayOf(Term.ofIntVar(0), Term.ofIntVar(0)),
-            RealConstants(RealConsts(doubleArrayOf(0.5, -0.5)), RealConsts(doubleArrayOf()), 0.25, false), LinearOp.EQ)
+        val row = TaggedLinearRow(
+            intArrayOf(Term.ofIntVar(0), Term.ofIntVar(0)),
+            RealConstants(RealConsts(doubleArrayOf(0.5, -0.5)), RealConsts(doubleArrayOf()), 0.25, false),
+            LinearOp.EQ,
+        )
         val factor = object : Factor by eq(intArrayOf(1), intArrayOf(0), 1) {
             override val linearForm = LinearForm.Conjunction(listOf(row))
         }
@@ -139,20 +161,35 @@ class DependentEqualitiesTest {
 
     @Test
     fun `positive source tolerance should decline nominal row deductions`() {
-        val p = Problem(0, 3, Array(3) { IntDomain(0, 10) }, listOf(
-            eq(intArrayOf(1), intArrayOf(0), 1), eq(intArrayOf(1), intArrayOf(0), 2),
-        ), semantics = SourceSemantics(SourceFormat.IR,
-            feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1))).resolve())
+        val p = Problem(
+            0, 3, Array(3) { IntDomain(0, 10) },
+            listOf(
+            eq(intArrayOf(1), intArrayOf(0), 1),
+            eq(intArrayOf(1), intArrayOf(0), 2),
+        ),
+            semantics = SourceSemantics(
+            SourceFormat.IR,
+            feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1)),
+        ).resolve()
+        )
 
         assertTrue(dropped(p).isEmpty)
     }
 
     @Test
     fun `a typed float source without real coordinates should keep nominal row deductions`() {
-        val p = Problem(0, 3, Array(3) { IntDomain(0, 10) }, listOf(
-            eq(intArrayOf(1), intArrayOf(0), 1), eq(intArrayOf(1), intArrayOf(0), 2),
-        ), semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Continuous,
-            feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1))).resolve())
+        val p = Problem(
+            0, 3, Array(3) { IntDomain(0, 10) },
+            listOf(
+            eq(intArrayOf(1), intArrayOf(0), 1),
+            eq(intArrayOf(1), intArrayOf(0), 2),
+        ),
+            semantics = SourceSemantics(
+            SourceFormat.IR,
+            floats = FloatSemantics.Continuous,
+            feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1)),
+        ).resolve()
+        )
 
         assertTrue(dropped(p).infeasible)
     }

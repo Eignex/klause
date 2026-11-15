@@ -24,8 +24,14 @@ internal class ForrestTomlinFactors private constructor(
     upperEntries: Int,
     transformEntries: Int,
 ) {
-    constructor(factors: LuFactors) : this(BasisTriangularMatrix(factors.upper),
-        BasisTriangularMatrix(factors.upperTranspose), factors.upper.nnz, mutableListOf(), factors.upper.nnz, 0)
+    constructor(factors: LuFactors) : this(
+        BasisTriangularMatrix(factors.upper),
+        BasisTriangularMatrix(factors.upperTranspose),
+        factors.upper.nnz,
+        mutableListOf(),
+        factors.upper.nnz,
+        0,
+    )
 
     private val n = upper.columns.size
     private val column = BasisWorkspace(n)
@@ -59,8 +65,14 @@ internal class ForrestTomlinFactors private constructor(
                 copiedTransforms.add(ForrestTomlinRow(transform.pivot, transform.entries))
             }
             if (cancelled()) return null
-            ForrestTomlinFactors(copiedUpper, copiedTranspose, initialEntries,
-                copiedTransforms, upperEntries, transformEntries)
+            ForrestTomlinFactors(
+                copiedUpper,
+                copiedTranspose,
+                initialEntries,
+                copiedTransforms,
+                upperEntries,
+                transformEntries,
+            )
         } catch (_: CopyStopped) {
             null
         }

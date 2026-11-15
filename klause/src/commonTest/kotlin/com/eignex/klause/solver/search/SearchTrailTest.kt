@@ -14,8 +14,12 @@ class SearchTrailTest {
         repeat(384) { variable ->
             session.imply(variable * 2, SearchExplanation(intArrayOf(variable * 2)))
         }
-        val sample = SharingMemoryObservation(SharingMemoryObservation.DEFAULT_WORK,
-            SharingMemoryObservation.DEFAULT_SCRATCH_ENTRIES, { false }, {})
+        val sample = SharingMemoryObservation(
+            SharingMemoryObservation.DEFAULT_WORK,
+            SharingMemoryObservation.DEFAULT_SCRATCH_ENTRIES,
+            { false },
+            {},
+        )
 
         val memory = sample.snapshot { session.retainedLearningMemory(sample) }
 
@@ -31,9 +35,11 @@ class SearchTrailTest {
             session.imply(variable * 2, SearchExplanation(intArrayOf(variable * 2)))
         }
         val beforeSample = SharingMemoryObservation(100_000L, 1024, { false }, {})
-        val before = requireNotNull(beforeSample.snapshot {
+        val before = requireNotNull(
+            beforeSample.snapshot {
             session.retainedLearningMemory(beforeSample)
-        }.completeValues)
+        }.completeValues
+        )
 
         session.resetRootFacts()
 

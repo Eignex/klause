@@ -98,9 +98,11 @@ class PreparedFactorProjections internal constructor(
             if (token() || (earned && old == null && (demand == null || demand.paidUnits < demand.requiredUnits))) {
                 null
             } else {
-                val prepared = LpPreparationTemplates.prepare(this, lpTemplateNamespace, lpTemplateRows, objective,
+                val prepared = LpPreparationTemplates.prepare(
+                    this, lpTemplateNamespace, lpTemplateRows, objective,
                     old, token, { work += it }, reuseIndexes, reuseMetadata,
-                    if (earned && old == null) checkNotNull(demand).paidUnits else null, compileBoundRows)
+                    if (earned && old == null) checkNotNull(demand).paidUnits else null, compileBoundRows,
+                )
                 if (prepared == null && earned && demand != null && !token()) {
                     token.charge(LpPreparationAdmission.STORAGE_UNITS)
                     work += LpPreparationAdmission.STORAGE_UNITS
@@ -170,8 +172,16 @@ class PreparedFactorProjections internal constructor(
         onDecline: (EncoderDecline) -> Unit = {},
     ): SelectedEncoderRequest? {
         require(target in encoders) { "consumer target was not captured for this source" }
-        return SelectedEncoderRequest.prepare(this, target, indices, fixedIntegers, fixedBooleans,
-            cancellation, completeFiniteConditions, onDecline)
+        return SelectedEncoderRequest.prepare(
+            this,
+            target,
+            indices,
+            fixedIntegers,
+            fixedBooleans,
+            cancellation,
+            completeFiniteConditions,
+            onDecline,
+        )
     }
 
     private val declarations = Array(problem.numFactors) { id ->
@@ -195,18 +205,20 @@ class PreparedFactorProjections internal constructor(
                 problem.factors[id] !is ObjectiveBoundFactor
         }
     ) {
-            SelectedProjectionChecks(this)
-        } else {
-            null
-        }
+        SelectedProjectionChecks(this)
+    } else {
+        null
+    }
 
     internal val requiresRealSourceCheck: Boolean = problem.factors.indices.any { id ->
         problem.factors[id].variables.reals.isNotEmpty() &&
-            (problem.factors[id] is Distinct || problem.factors[id] is RealAbs ||
+            (
+                problem.factors[id] is Distinct || problem.factors[id] is RealAbs ||
                 problem.factors[id] is ContinuousProduct ||
                 problem.factors[id] is RealFiniteDomain ||
                 problem.factors[id] is ExactLinear || problem.factors[id] is LinearIndicator ||
-                propagation[id]?.builtIn != true || !usesBuiltInRelaxation(id))
+                propagation[id]?.builtIn != true || !usesBuiltInRelaxation(id)
+            )
     }
 
     /** Retain selection only for the identical canonical source; rewrites select against their own factors. */
@@ -221,8 +233,8 @@ class PreparedFactorProjections internal constructor(
         view.factors.indices.all { view.factors[it] === problem.factors[it] }
     ) {
         projected(view, IntArray(view.numFactors) { it }).also {
-        it.lpTemplateRows = lpTemplateRows
-    }
+            it.lpTemplateRows = lpTemplateRows
+        }
     } else {
         forProblem(view).inheritLpTemplates(this)
     }
@@ -231,14 +243,19 @@ class PreparedFactorProjections internal constructor(
         require(factorIndices.size == view.numFactors && factorIndices.all { it in problem.factors.indices }) {
             "projection factor mapping differs from its prepared source"
         }
-        return PreparedFactorProjections(view, providers,
+        return PreparedFactorProjections(
+            view,
+            providers,
             Array(factorIndices.size) { propagation[factorIndices[it]] },
             Array(factorIndices.size) { scoring[factorIndices[it]] },
             Array(factorIndices.size) { relaxation[factorIndices[it]] },
-            encoders.mapValues { (_, selected) -> Array(factorIndices.size) {
-                val encoder = selected[factorIndices[it]]
-                if (remap == null) encoder else encoder.remapped(remap)
-            } }).also { if (remap == null) it.inheritLpTemplates(this) }
+            encoders.mapValues { (_, selected) ->
+                Array(factorIndices.size) {
+                    val encoder = selected[factorIndices[it]]
+                    if (remap == null) encoder else encoder.remapped(remap)
+                }
+            },
+        ).also { if (remap == null) it.inheritLpTemplates(this) }
     }
 
     internal fun retained(mapping: RetainedFactors): PreparedFactorProjections {
@@ -247,11 +264,15 @@ class PreparedFactorProjections internal constructor(
     }
 
     internal fun withAppendedFactors(view: Problem): PreparedFactorProjections {
-        require(view.numFactors >= problem.numFactors &&
-            problem.factors.indices.all { view.factors[it] === problem.factors[it] }) {
+        require(
+            view.numFactors >= problem.numFactors &&
+                problem.factors.indices.all { view.factors[it] === problem.factors[it] },
+        ) {
             "augmented factors must retain their prepared source prefix"
         }
-        return PreparedFactorProjections(view, providers,
+        return PreparedFactorProjections(
+            view,
+            providers,
             Array(view.numFactors) {
                 if (it < problem.numFactors) propagation[it] else providers.propagation.select(view.factors[it])
             },
@@ -260,19 +281,26 @@ class PreparedFactorProjections internal constructor(
             },
             Array(view.numFactors) {
                 if (it < problem.numFactors) relaxation[it] else providers.relaxation.select(view.factors[it])
-            }, encoders.mapValues { (target, selected) -> Array(view.numFactors) {
-                if (it < problem.numFactors) selected[it] else providers.encoder.select(view.factors[it], target)
-            } })
+            },
+            encoders.mapValues { (target, selected) ->
+                Array(view.numFactors) {
+                    if (it < problem.numFactors) selected[it] else providers.encoder.select(view.factors[it], target)
+                }
+            },
+        )
     }
 
     internal fun appended(view: Problem): PreparedFactorProjections {
         require(view.numFactors == problem.numFactors + 1)
         val extra = view.factors.last()
-        return PreparedFactorProjections(view, providers,
+        return PreparedFactorProjections(
+            view,
+            providers,
             propagation + providers.propagation.select(extra),
             scoring + providers.scoring.select(extra),
             relaxation + providers.relaxation.select(extra),
-            encoders.mapValues { (target, selected) -> selected + providers.encoder.select(extra, target) })
+            encoders.mapValues { (target, selected) -> selected + providers.encoder.select(extra, target) },
+        )
     }
 
     internal fun requireSource(problem: Problem) {
@@ -288,7 +316,9 @@ class PreparedFactorProjections internal constructor(
     internal fun replacedLast(view: Problem): PreparedFactorProjections {
         require(view.numFactors == problem.numFactors && view.numFactors > 0)
         val last = view.numFactors - 1
-        return PreparedFactorProjections(view, providers,
+        return PreparedFactorProjections(
+            view,
+            providers,
             Array(view.numFactors) {
                 if (it == last) providers.propagation.select(view.factors[it]) else propagation[it]
             },
@@ -297,9 +327,13 @@ class PreparedFactorProjections internal constructor(
             },
             Array(view.numFactors) {
                 if (it == last) providers.relaxation.select(view.factors[it]) else relaxation[it]
-            }, encoders.mapValues { (target, selected) -> Array(view.numFactors) {
-                if (it == last) providers.encoder.select(view.factors[it], target) else selected[it]
-            } })
+            },
+            encoders.mapValues { (target, selected) ->
+                Array(view.numFactors) {
+                    if (it == last) providers.encoder.select(view.factors[it], target) else selected[it]
+                }
+            },
+        )
     }
 
     internal fun requiresOriginalScoringCheck(factorId: Int): Boolean = scoring[factorId]?.builtIn == false &&
@@ -318,8 +352,10 @@ class PreparedFactorProjections internal constructor(
             .create(problem.factors[factorId], domains)
 
     internal fun usesBuiltInRelaxation(factorId: Int): Boolean = relaxation[factorId]?.builtIn == true ||
-        (relaxation[factorId] == null &&
-            problem.factors[factorId].defaultExecutionCapabilities().relaxation == RelaxationCapability.NONE)
+        (
+            relaxation[factorId] == null &&
+            problem.factors[factorId].defaultExecutionCapabilities().relaxation == RelaxationCapability.NONE
+        )
 
     internal fun emitRelaxation(factorId: Int, builder: RelaxationBuilder, linear: LinearLpProjection?) {
         relaxation[factorId]?.emit(problem.factors[factorId], builder, linear)

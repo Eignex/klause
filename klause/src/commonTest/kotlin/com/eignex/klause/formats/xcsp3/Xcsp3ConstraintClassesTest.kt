@@ -36,7 +36,6 @@ class Xcsp3ConstraintClassesTest {
         assertContentEquals(BooleanArray(127) { it in 62..64 }, classes.mask(127))
     }
 
-
     private val adjacent = "<allDifferent>x[]</allDifferent>"
 
     private val carriers = listOf(

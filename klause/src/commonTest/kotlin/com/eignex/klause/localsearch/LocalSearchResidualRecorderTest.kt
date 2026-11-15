@@ -33,8 +33,12 @@ class LocalSearchResidualRecorderTest {
     @Test
     fun `exact row residuals should retain a bounded signed term prefix and root bounds`() {
         val coefficients = List(18) { BigFraction.ofLong(if (it % 2 == 0) 3L else -2L) }
-        val row = ExactLinear.of(IntArray(18) { Term.ofIntVar(it) }, coefficients,
-            LinearOp.EQ, BigFraction.ofLong(14))
+        val row = ExactLinear.of(
+            IntArray(18) { Term.ofIntVar(it) },
+            coefficients,
+            LinearOp.EQ,
+            BigFraction.ofLong(14),
+        )
         val problem = Problem(0, 18, Array(18) { IntDomain(0, 2) }, arrayOf<Factor>(row))
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
         repeat(18) { state.assignment.setInt(it, 1) }
@@ -49,8 +53,10 @@ class LocalSearchResidualRecorderTest {
         assertEquals("9", details["activity"])
         assertEquals("false", details["strict"])
         assertEquals("always", details["activator"])
-        assertEquals((0 until 16).map { "${if (it % 2 == 0) 3 else -2}:i$it" },
-            details.filterKeys { it.startsWith("term.") }.values.toList())
+        assertEquals(
+            (0 until 16).map { "${if (it % 2 == 0) 3 else -2}:i$it" },
+            details.filterKeys { it.startsWith("term.") }.values.toList(),
+        )
         assertEquals(List(16) { "0:2" }, details.filterKeys { it.endsWith(".domain") }.values.toList())
         assertEquals("2", details["omittedTerms"])
     }
@@ -58,8 +64,12 @@ class LocalSearchResidualRecorderTest {
     @Test
     fun `exact row activity should preserve the committed sum after a scoring probe`() {
         for (coefficient in listOf(bigIntOf(1), bigIntOf(Long.MAX_VALUE), parseBigInt("100000000000000000001"))) {
-            val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0)),
-                listOf(BigFraction.of(coefficient, BIG_ONE)), LinearOp.EQ, BigFraction.ofLong(-1))
+            val row = ExactLinear.of(
+                intArrayOf(Term.ofIntVar(0)),
+                listOf(BigFraction.of(coefficient, BIG_ONE)),
+                LinearOp.EQ,
+                BigFraction.ofLong(-1),
+            )
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), arrayOf<Factor>(row))
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
             state.assignment.setInt(0, 0)
@@ -78,11 +88,23 @@ class LocalSearchResidualRecorderTest {
 
     @Test
     fun `mixed exact row details should distinguish coordinate namespaces and guard semantics`() {
-        val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
-            listOf(BigFraction.ONE, BigFraction.ofLong(-2)), LinearOp.LE, BigFraction.ONE,
-            strict = true, activator = 0)
-        val problem = Problem(1, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(row),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val row = ExactLinear.of(
+            intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+            listOf(BigFraction.ONE, BigFraction.ofLong(-2)),
+            LinearOp.LE,
+            BigFraction.ONE,
+            strict = true,
+            activator = 0,
+        )
+        val problem = Problem(
+            1,
+            1,
+            arrayOf(IntDomain(0, 2)),
+            arrayOf<Factor>(row),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
+        )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
         state.assignment.setBool(0, true)
         state.assignment.setInt(0, 2)
@@ -104,9 +126,12 @@ class LocalSearchResidualRecorderTest {
     fun `exact residual scalars should be omitted beyond the bit limit`() {
         for (bits in listOf(256, 257)) {
             val coefficient = BIG_ONE shl (bits - 1)
-            val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0)),
-                listOf(BigFraction.of(coefficient, BIG_ONE)), LinearOp.EQ,
-                BigFraction.of(coefficient * bigIntOf(3), BIG_ONE))
+            val row = ExactLinear.of(
+                intArrayOf(Term.ofIntVar(0)),
+                listOf(BigFraction.of(coefficient, BIG_ONE)),
+                LinearOp.EQ,
+                BigFraction.of(coefficient * bigIntOf(3), BIG_ONE),
+            )
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 4)), arrayOf<Factor>(row))
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
             state.assignment.setInt(0, 1)

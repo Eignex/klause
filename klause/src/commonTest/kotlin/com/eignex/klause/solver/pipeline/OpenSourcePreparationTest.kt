@@ -38,16 +38,27 @@ class OpenSourcePreparationTest {
     @Test
     fun `certified deletion should retain immutable rows with reduced source attribution`() {
         val row = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0)
-        val model = Problem(0, 0, emptyArray(), arrayOf<Factor>(row, row, RealAbs(0, 1)),
-            numRealVars = 2, realLower = doubleArrayOf(-2.0, 0.0), realUpper = doubleArrayOf(2.0, 2.0))
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(row, row, RealAbs(0, 1)),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-2.0, 0.0),
+            realUpper = doubleArrayOf(2.0, 2.0),
+        )
         val projections = FactorProjectionProviders.Default.prepare(model)
         val captured = model.componentPlan(projections)
         val original = requireNotNull(captured.encodedTheoryFragment(model)).factors
             .filterIsInstance<EncodedTheoryFactor>().filter { it.attribution.sourceFactorIndex == 2 }
 
-        val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(
-            config = PresolveConfig.parse("off,+dependent-rows"), projections = projections, capturedPlan = captured,
-        ))
+        val planned = assertIs<OpenSourcePreparation.Planned>(
+            model.prepareOpenSource(
+            config = PresolveConfig.parse("off,+dependent-rows"),
+            projections = projections,
+            capturedPlan = captured,
+        )
+        )
 
         assertNotSame(captured, planned.plan)
         assertEquals(2, planned.model.numFactors)
@@ -72,19 +83,25 @@ class OpenSourcePreparationTest {
     @Test
     fun `certified deletion should rebuild arithmetic participation`() {
         val open = Bits(3).also { it.set(2) }
-        val model = Problem(numBoolVars = 0,
+        val model = Problem(
+            numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(LongArray(3), longArrayOf(3, 3, 0), open, open),
             factors = arrayOf<Factor>(
                 Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0L),
                 Linear(longArrayOf(0, 0), intArrayOf(0, 2), LinearOp.EQ, 0L),
-            ))
+            ),
+        )
         val projections = FactorProjectionProviders.Default.prepare(model)
         val captured = model.componentPlan(projections)
         assertTrue(captured.factorEncoded(0))
 
-        val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(
-            config = PresolveConfig.parse("off,+dependent-rows"), projections = projections, capturedPlan = captured,
-        ))
+        val planned = assertIs<OpenSourcePreparation.Planned>(
+            model.prepareOpenSource(
+            config = PresolveConfig.parse("off,+dependent-rows"),
+            projections = projections,
+            capturedPlan = captured,
+        )
+        )
 
         assertFalse(planned.plan.factorEncoded(0))
     }
@@ -92,22 +109,39 @@ class OpenSourcePreparationTest {
     @Test
     fun `certified deletion with custom providers should reinstall retained rows`() {
         val row = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0)
-        val model = Problem(0, 0, emptyArray(), arrayOf<Factor>(row, row), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(row, row),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
+        )
         var installations = 0
-        val projections = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+        val projections = FactorProjectionProviders(
+            encoder = EncoderProvider { factor, target ->
             val selected = BuiltInEncoderProvider.select(factor, target)
-            if (!selected.enforcesSource) selected else Encoder(selected.support) { view, encoding ->
+            if (!selected.enforcesSource) {
+                selected
+            } else {
+                Encoder(selected.support) { view, encoding ->
                 installations++
                 selected.install(view, encoding)
             }
-        }).prepare(model)
+            }
+        }
+        ).prepare(model)
         val captured = model.componentPlan(projections)
         installations = 0
 
-        val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(
-            config = PresolveConfig.parse("off,+dependent-rows"), projections = projections, capturedPlan = captured,
-        ))
+        val planned = assertIs<OpenSourcePreparation.Planned>(
+            model.prepareOpenSource(
+            config = PresolveConfig.parse("off,+dependent-rows"),
+            projections = projections,
+            capturedPlan = captured,
+        )
+        )
 
         assertEquals(1, planned.model.numFactors)
         assertEquals(1, installations)
@@ -116,15 +150,26 @@ class OpenSourcePreparationTest {
     @Test
     fun `trailing deletion should retain rows whose attribution remains valid`() {
         val row = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0)
-        val model = Problem(0, 0, emptyArray(), arrayOf<Factor>(row, row), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(row, row),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
+        )
         val projections = FactorProjectionProviders.Default.prepare(model)
         val captured = model.componentPlan(projections)
         val original = requireNotNull(captured.encodedTheoryFragment(model)).factors.first()
 
-        val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(
-            config = PresolveConfig.parse("off,+dependent-rows"), projections = projections, capturedPlan = captured,
-        ))
+        val planned = assertIs<OpenSourcePreparation.Planned>(
+            model.prepareOpenSource(
+            config = PresolveConfig.parse("off,+dependent-rows"),
+            projections = projections,
+            capturedPlan = captured,
+        )
+        )
 
         assertEquals(1, planned.model.numFactors)
         assertSame(original, requireNotNull(planned.plan.encodedTheoryFragment(planned.model)).factors.single())
@@ -133,8 +178,15 @@ class OpenSourcePreparationTest {
     @Test
     fun `uncertified deletion should prepare fresh rows`() {
         val row = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0)
-        val model = Problem(0, 0, emptyArray(), arrayOf<Factor>(row, row), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(row, row),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
+        )
         val reduced = model.withFactors(arrayOf(row))
         val projections = FactorProjectionProviders.Default.prepare(model)
         val captured = model.componentPlan(projections)
@@ -149,14 +201,25 @@ class OpenSourcePreparationTest {
     @Test
     fun `deletion after resource declined capture should prepare complete rows`() {
         val row = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0)
-        val model = Problem(0, 0, emptyArray(), arrayOf<Factor>(row, row), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(row, row),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
+        )
         val projections = FactorProjectionProviders.Default.prepare(model)
         val captured = model.componentPlan(projections, cancellation = ExecutionControl { true })
 
-        val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(
-            config = PresolveConfig.parse("off,+dependent-rows"), projections = projections, capturedPlan = captured,
-        ))
+        val planned = assertIs<OpenSourcePreparation.Planned>(
+            model.prepareOpenSource(
+            config = PresolveConfig.parse("off,+dependent-rows"),
+            projections = projections,
+            capturedPlan = captured,
+        )
+        )
 
         assertEquals(1, planned.model.numFactors)
         assertNull(planned.plan.encodingDecline)
@@ -175,10 +238,15 @@ class OpenSourcePreparationTest {
             override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
 
-        val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(
-            config = PresolveConfig.NONE, projections = projections, capturedPlan = captured,
-            budget = budget, cancellation = token,
-        ))
+        val planned = assertIs<OpenSourcePreparation.Planned>(
+            model.prepareOpenSource(
+            config = PresolveConfig.NONE,
+            projections = projections,
+            capturedPlan = captured,
+            budget = budget,
+            cancellation = token,
+        )
+        )
 
         assertSame(model, planned.model)
         assertSame(captured, planned.plan)
@@ -205,8 +273,11 @@ class OpenSourcePreparationTest {
         val model = refutable()
         val projections = FactorProjectionProviders.Default.prepare(model)
         val captured = model.componentPlan(projections)
-        val augmented = Problem(numBoolVars = 0, intBounds = model.intBounds,
-            factors = model.factors + Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1))
+        val augmented = Problem(
+            numBoolVars = 0,
+            intBounds = model.intBounds,
+            factors = model.factors + Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+        )
 
         val planned = PreparedSource.unchanged(model, null).planned(augmented, projections, capturedPlan = captured)
 
@@ -221,9 +292,13 @@ class OpenSourcePreparationTest {
         val captured = model.componentPlan(projections)
         val different = projections.providers.prepare(model)
 
-        val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(
-            config = PresolveConfig.NONE, projections = different, capturedPlan = captured,
-        ))
+        val planned = assertIs<OpenSourcePreparation.Planned>(
+            model.prepareOpenSource(
+            config = PresolveConfig.NONE,
+            projections = different,
+            capturedPlan = captured,
+        )
+        )
 
         assertNotSame(captured, planned.plan)
         assertSame(different, planned.plan.factorProjections)
@@ -236,9 +311,13 @@ class OpenSourcePreparationTest {
         val captured = model.componentPlan(projections, cancellation = ExecutionControl { true })
         assertEquals(EncoderDecline.RESOURCE, captured.encodingDecline)
 
-        val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(
-            config = PresolveConfig.NONE, projections = projections, capturedPlan = captured,
-        ))
+        val planned = assertIs<OpenSourcePreparation.Planned>(
+            model.prepareOpenSource(
+            config = PresolveConfig.NONE,
+            projections = projections,
+            capturedPlan = captured,
+        )
+        )
 
         assertNotSame(captured, planned.plan)
         assertNull(planned.plan.encodingDecline)
@@ -246,17 +325,27 @@ class OpenSourcePreparationTest {
 
     @Test
     fun `captured satisfaction plans should install once across independent executions`() {
-        val model = Problem(0, 0, emptyArray(), arrayOf<Factor>(
+        val model = Problem(
+            0, 0, emptyArray(),
+            arrayOf<Factor>(
             Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0),
-        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        ),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0)
+        )
         var installations = 0
-        val projections = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+        val projections = FactorProjectionProviders(
+            encoder = EncoderProvider { factor, target ->
             val selected = BuiltInEncoderProvider.select(factor, target)
-            if (!selected.enforcesSource) selected else Encoder(selected.support) { view, encoding ->
+            if (!selected.enforcesSource) {
+                selected
+            } else {
+                Encoder(selected.support) { view, encoding ->
                 installations++
                 selected.install(view, encoding)
             }
-        }).prepare(model)
+            }
+        }
+        ).prepare(model)
         val captured = model.componentPlan(projections)
         val request = OpenTheoryRequest(model, componentPlan = captured).withPresolve(PresolveConfig.NONE)
         val first = OpenTheoryPipeline.engineFor(request)
@@ -298,9 +387,13 @@ class OpenSourcePreparationTest {
         val model = aggregatable(openColumns = true)
         val declared = model.componentPlan()
 
-        val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(
-            config = aggregateOnly, projections = declared.factorProjections, capturedPlan = declared,
-        ))
+        val planned = assertIs<OpenSourcePreparation.Planned>(
+            model.prepareOpenSource(
+            config = aggregateOnly,
+            projections = declared.factorProjections,
+            capturedPlan = declared,
+        )
+        )
 
         assertNotSame(declared, planned.plan)
         assertEquals(FactorOwner.CP, planned.plan.factorOwner(1))

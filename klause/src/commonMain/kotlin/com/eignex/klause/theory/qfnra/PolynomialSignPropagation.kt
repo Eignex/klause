@@ -33,8 +33,14 @@ internal fun preparePolynomialSignPropagation(
 }.iterator()
 
 internal class PolynomialSignPropagation(realCount: Int, private val arithmetic: PolynomialArithmetic) {
-    private val domains = IntArray(realCount) { arithmetic.step(); ALL_SIGNS }
-    private val adjacent = Array(realCount) { arithmetic.step(); IntArrayList() }
+    private val domains = IntArray(realCount) {
+        arithmetic.step();
+        ALL_SIGNS
+    }
+    private val adjacent = Array(realCount) {
+        arithmetic.step();
+        IntArrayList()
+    }
     private val constraints = ArrayList<SignConstraint>()
     private val pending = IntArrayDeque()
     private var checking = false
@@ -80,7 +86,9 @@ internal class PolynomialSignPropagation(realCount: Int, private val arithmetic:
                     arithmetic.step()
                     if (previous and sign != 0 &&
                         possibleSigns(constraint.terms, domains, arithmetic, variable, sign) and constraint.allowed == 0
-                    ) restricted = restricted and sign.inv()
+                    ) {
+                        restricted = restricted and sign.inv()
+                    }
                 }
                 if (restricted == 0) {
                     arithmetic.step()

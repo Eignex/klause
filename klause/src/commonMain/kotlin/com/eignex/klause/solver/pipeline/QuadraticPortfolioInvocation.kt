@@ -65,7 +65,10 @@ internal class QuadraticPortfolioInvocation(
         valueOf = { candidate ->
             val value = objective.evaluateExact(candidate.sample, evaluation)
             Value(value, if (sense == ObjectiveSense.MINIMIZE) value else evaluation.negate(value))
-        }, exactValue = { it.minimized }, arithmetic = evaluation, onResource = native::decline,
+        },
+        exactValue = { it.minimized },
+        arithmetic = evaluation,
+        onResource = native::decline,
     )
     private var terminal: QuadraticOptimizationResult? = null
     private var attainingIncumbent: QuadraticIncumbent? = null
@@ -78,7 +81,11 @@ internal class QuadraticPortfolioInvocation(
         val admission = plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE)
         if (!admission.runnable || expected == null || !expected.matchesModel(identity) || expected.sense != sense) {
             return QuadraticOptimizationResult.Unknown(
-                null, TerminationReason.Unsupported, sense, SolveStats.EMPTY)
+                null,
+                TerminationReason.Unsupported,
+                sense,
+                SolveStats.EMPTY,
+            )
         }
         val factories = admission.arms.map { strategy ->
             val arm = when (strategy) {
@@ -87,43 +94,57 @@ internal class QuadraticPortfolioInvocation(
                 ExecutionStrategy.ALNS -> 2
                 ExecutionStrategy.MIXED -> error("admission supplies participating arms")
             }
-            val family = when (arm) { 0 -> ArmFamily.Backtrack; 1 -> ArmFamily.LocalSearch; else -> ArmFamily.Lns }
+            val family = when (arm) {
+                0 -> ArmFamily.Backtrack;
+                1 -> ArmFamily.LocalSearch;
+                else -> ArmFamily.Lns
+            }
             PortfolioArmFactory(plan, arm, family) { slot ->
                 val scope = native.worker(slot.index, params.maximumWork?.let(slot::nativeAllowance))
-                create(arm, slot, scope) { incumbents.exchange.current()?.let {
-                    QuadraticIncumbent(it.assignment, it.objective.source)
-                } }
+                create(arm, slot, scope) {
+                    incumbents.exchange.current()?.let {
+                        QuadraticIncumbent(it.assignment, it.objective.source)
+                    }
+                }
             }
         }
-        val invocation = PortfolioInvocation(plan, factories,
-            PortfolioInvocationControls(parallelism = if (engine == FiniteEngine.FIXED) 1 else cores,
+        val invocation = PortfolioInvocation(
+            plan,
+            factories,
+            PortfolioInvocationControls(
+                parallelism = if (engine == FiniteEngine.FIXED) 1 else cores,
                 seed = params.strategy.localSearch.randomSeed ?: 1L,
                 cancellation = native.polynomial,
                 nodeBudget = params.strategy.backtrack.nodeBudget ?: params.strategy.localSearch.nodeBudget,
-                reseedStaleThreshold = 0), PortfolioEvidence(identity, CandidateVerifier { candidate ->
-                val sample = candidate.assignment
-                val publication = sample.witnessCertificate?.quadraticPublication
-                if (publication == null) {
-                    Verification.Indeterminate("quadratic witness has no actual source publication")
-                } else {
-                    when (
-                        val checked = witness(
-                    QuadraticIncumbent(sample, publication.incumbent.value),
-                    AlgebraicArithmetic(PolynomialArithmetic(verification, limits)),
-                )
-                    ) {
-                    SourceEvidenceCheck.Checked -> Verification.Accepted(candidate)
-                    is SourceEvidenceCheck.Rejected -> Verification.Rejected(checked.reason)
-                    is SourceEvidenceCheck.Unavailable -> Verification.Indeterminate(checked.reason)
-                }
-                }
-            }
+                reseedStaleThreshold = 0,
+            ),
+            PortfolioEvidence(
+                identity,
+                CandidateVerifier { candidate ->
+                    val sample = candidate.assignment
+                    val publication = sample.witnessCertificate?.quadraticPublication
+                    if (publication == null) {
+                        Verification.Indeterminate("quadratic witness has no actual source publication")
+                    } else {
+                        when (
+                            val checked = witness(
+                                QuadraticIncumbent(sample, publication.incumbent.value),
+                                AlgebraicArithmetic(PolynomialArithmetic(verification, limits)),
+                            )
+                        ) {
+                            SourceEvidenceCheck.Checked -> Verification.Accepted(candidate)
+                            is SourceEvidenceCheck.Rejected -> Verification.Rejected(checked.reason)
+                            is SourceEvidenceCheck.Unavailable -> Verification.Indeterminate(checked.reason)
+                        }
+                    }
+                },
             ),
         ) { workers ->
             val complete = workers.indices.filter { workers[it].family == ArmFamily.Backtrack }
-            PortfolioInvocationPolicy(shares = DoubleArray(workers.size) {
-                if (it in complete) 0.5 / complete.size else 0.0
-            }
+            PortfolioInvocationPolicy(
+                shares = DoubleArray(workers.size) {
+                    if (it in complete) 0.5 / complete.size else 0.0
+                },
             )
         }
         val scalar = invocation.use {
@@ -141,10 +162,10 @@ internal class QuadraticPortfolioInvocation(
                 onAccepted = { accepted ->
                     onAccepted?.invoke(
                         AcceptedPortfolioIncumbent(
-                        accepted.version,
-                        accepted.assignment,
-                        QuadraticIncumbent(accepted.assignment, accepted.objective.source),
-                    )
+                            accepted.version,
+                            accepted.assignment,
+                            QuadraticIncumbent(accepted.assignment, accepted.objective.source),
+                        ),
                     )
                 },
             )
@@ -181,9 +202,7 @@ internal class QuadraticPortfolioInvocation(
         }
     }
 
-    private fun check(
-        worker: PortfolioWorker, result: QuadraticOptimizationResult,
-    ): Verification<Unit, Unit>? = try {
+    private fun check(worker: PortfolioWorker, result: QuadraticOptimizationResult): Verification<Unit, Unit>? = try {
         attainingIncumbent = null
         when (result) {
             is QuadraticOptimizationResult.Optimal -> checkOptimum(worker, result)
@@ -201,7 +220,8 @@ internal class QuadraticPortfolioInvocation(
     }
 
     private fun checkOptimum(
-        worker: PortfolioWorker, result: QuadraticOptimizationResult.Optimal,
+        worker: PortfolioWorker,
+        result: QuadraticOptimizationResult.Optimal,
     ): Verification<Unit, Unit> {
         common(worker, result.sense, result.incumbent)?.let { return it }
         certificate(result.certificate, QuadraticClaim.Optimal)?.let { return it }
@@ -223,7 +243,8 @@ internal class QuadraticPortfolioInvocation(
     }
 
     private fun checkLimit(
-        worker: PortfolioWorker, result: QuadraticOptimizationResult.UnattainedLimit,
+        worker: PortfolioWorker,
+        result: QuadraticOptimizationResult.UnattainedLimit,
     ): Verification<Unit, Unit> {
         common(worker, result.sense, result.incumbent)?.let { return it }
         certificate(result.certificate, QuadraticClaim.UnattainedLimit)?.let { return it }
@@ -235,7 +256,8 @@ internal class QuadraticPortfolioInvocation(
     }
 
     private fun checkUnbounded(
-        worker: PortfolioWorker, result: QuadraticOptimizationResult.Unbounded,
+        worker: PortfolioWorker,
+        result: QuadraticOptimizationResult.Unbounded,
     ): Verification<Unit, Unit> {
         common(worker, result.sense, result.incumbent)?.let { return it }
         certificate(result.certificate, QuadraticClaim.Unbounded)?.let { return it }
@@ -243,7 +265,8 @@ internal class QuadraticPortfolioInvocation(
     }
 
     private fun checkRefutation(
-        worker: PortfolioWorker, result: QuadraticOptimizationResult.Infeasible,
+        worker: PortfolioWorker,
+        result: QuadraticOptimizationResult.Infeasible,
     ): Verification<Unit, Unit> {
         common(worker, result.sense, null)?.let { return it }
         certificate(result.certificate, QuadraticClaim.Infeasible)?.let { return it }
@@ -253,9 +276,7 @@ internal class QuadraticPortfolioInvocation(
         return Verification.Accepted(Candidate(Unit, Unit))
     }
 
-    private fun partialBound(
-        worker: PortfolioWorker, candidate: QuadraticObjectiveBound?,
-    ): Verification<Unit, Unit>? {
+    private fun partialBound(worker: PortfolioWorker, candidate: QuadraticObjectiveBound?): Verification<Unit, Unit>? {
         if (candidate == null || !worker.permitsSourceProofs) return null
         certificate(candidate.certificate, QuadraticClaim.Bound)?.let { return it }
         val checked = bound(candidate.value, candidate.strict)
@@ -269,7 +290,9 @@ internal class QuadraticPortfolioInvocation(
     }
 
     private fun common(
-        worker: PortfolioWorker, direction: ObjectiveSense, point: QuadraticIncumbent?,
+        worker: PortfolioWorker,
+        direction: ObjectiveSense,
+        point: QuadraticIncumbent?,
     ): Verification<Unit, Unit>? {
         if (!worker.permitsSourceProofs || worker.evidenceModel?.matches(identity) != true || direction != sense ||
             worker.sourceBinding?.quadraticInvocation?.matches(requireNotNull(expected)) != true
@@ -325,10 +348,10 @@ internal class QuadraticPortfolioInvocation(
 
 internal fun QuadraticOptimizationResult.withPortfolioStats(stats: SolveStats): QuadraticOptimizationResult =
     when (this) {
-    is QuadraticOptimizationResult.Optimal -> copy(stats = stats)
-    is QuadraticOptimizationResult.UnattainedLimit -> copy(stats = stats)
-    is QuadraticOptimizationResult.Unbounded -> copy(stats = stats)
-    is QuadraticOptimizationResult.Infeasible -> copy(stats = stats)
-    is QuadraticOptimizationResult.BestFound -> copy(stats = stats)
-    is QuadraticOptimizationResult.Unknown -> copy(stats = stats)
-}
+        is QuadraticOptimizationResult.Optimal -> copy(stats = stats)
+        is QuadraticOptimizationResult.UnattainedLimit -> copy(stats = stats)
+        is QuadraticOptimizationResult.Unbounded -> copy(stats = stats)
+        is QuadraticOptimizationResult.Infeasible -> copy(stats = stats)
+        is QuadraticOptimizationResult.BestFound -> copy(stats = stats)
+        is QuadraticOptimizationResult.Unknown -> copy(stats = stats)
+    }

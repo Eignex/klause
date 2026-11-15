@@ -15,7 +15,11 @@ internal fun PropagationState.validateSelectedLearnedRetirement(index: Int): Lea
     return if (incremental || learned.store[index, GeneralLearnedRows.PERMANENT] == 1 ||
         learned.store[index] !is ClausePropagator ||
         learned.store[index, GeneralLearnedRows.STAGES] and 16 == 0
-    ) LearnedRetirementStatus.Unsupported else null
+    ) {
+        LearnedRetirementStatus.Unsupported
+    } else {
+        null
+    }
 }
 
 internal fun PropagationState.retireSelectedLearnedClause(
@@ -33,10 +37,19 @@ private fun PropagationState.retireSelectedGeneralClause(
     if (incremental || pendingFiniteMutation != null || rootFixpointPending || runCancelled) {
         return LearnedRetirementResult(LearnedRetirementStatus.Deferred)
     }
-    if (index !in 0 until learned.size) return LearnedRetirementResult(LearnedRetirementStatus.AlreadyGone,
-        payloadReleased = true, physicalReleased = true)
-    if (learned.retiredOf(index)) return LearnedRetirementResult(LearnedRetirementStatus.AlreadyGone,
-        payloadReleased = true)
+    if (index !in 0 until learned.size) {
+        return LearnedRetirementResult(
+        LearnedRetirementStatus.AlreadyGone,
+        payloadReleased = true,
+        physicalReleased = true,
+    )
+    }
+    if (learned.retiredOf(index)) {
+        return LearnedRetirementResult(
+        LearnedRetirementStatus.AlreadyGone,
+        payloadReleased = true,
+    )
+    }
     budget.visit(8L)
     val clause = learned.store[index] as? ClausePropagator
         ?: return LearnedRetirementResult(LearnedRetirementStatus.Unsupported)
@@ -47,7 +60,9 @@ private fun PropagationState.retireSelectedGeneralClause(
         learned.store[index, GeneralLearnedRows.BOOL_REASONS] > 0 ||
         learned.store[index, GeneralLearnedRows.STAGES] and 4 != 0 ||
         learned.store[index, GeneralLearnedRows.STAGES] and 1 == 0
-    ) return LearnedRetirementResult(LearnedRetirementStatus.ProtectedFloor)
+    ) {
+        return LearnedRetirementResult(LearnedRetirementStatus.ProtectedFloor)
+    }
     budget.visit(32L)
     budget.visit(0L)
     learned.retire(index, LearnedKind.Clause)

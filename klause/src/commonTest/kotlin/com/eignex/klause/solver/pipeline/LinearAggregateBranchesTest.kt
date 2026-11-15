@@ -36,15 +36,23 @@ import kotlin.test.assertTrue
 
 class LinearAggregateBranchesTest {
     private val integers = (0..1).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
-    private val scope = SourceScope(SourceRevision("thin-aggregate", "exact-affine"),
-        objective = SourceObjective("zero", ObjectiveSense.MINIMIZE))
+    private val scope = SourceScope(
+        SourceRevision("thin-aggregate", "exact-affine"),
+        objective = SourceObjective("zero", ObjectiveSense.MINIMIZE),
+    )
     private val weights = integers.mapIndexed { index, id -> id to BigFraction.ofLong(101L + index) }.toMap()
     private val rows = mapOf(
-        "lower" to SourcePremise(SourceInequality(weights.mapValues { it.value.negated() },
-            BigFraction.ofLong(-150))),
+        "lower" to SourcePremise(
+            SourceInequality(
+            weights.mapValues { it.value.negated() },
+            BigFraction.ofLong(-150),
+        )
+        ),
         "upper" to SourcePremise(SourceInequality(weights, BigFraction.ofLong(151))),
-    ) + integers.associate { id -> "lower/${id.id}" to
-        SourcePremise(SourceInequality(mapOf(id to BigFraction.MINUS_ONE), BigFraction.ZERO)) }
+    ) + integers.associate { id ->
+        "lower/${id.id}" to
+            SourcePremise(SourceInequality(mapOf(id to BigFraction.MINUS_ONE), BigFraction.ZERO))
+    }
     private val source = SourceProofContext(scope, integers.toSet(), rows, emptyMap())
 
     @Test
@@ -68,17 +76,28 @@ class LinearAggregateBranchesTest {
         val ids = (0..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val coefficients = ids.zip(listOf(101L, 102L, 201L, 202L).map(BigFraction::ofLong)).toMap()
         val premises = mapOf(
-            "lower" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() },
-                BigFraction.ofLong(-450))),
+            "lower" to SourcePremise(
+                SourceInequality(
+                coefficients.mapValues { it.value.negated() },
+                BigFraction.ofLong(-450),
+            )
+            ),
             "upper" to SourcePremise(SourceInequality(coefficients, BigFraction.ofLong(451))),
-        ) + ids.associate { id -> "lower/${id.id}" to
-            SourcePremise(SourceInequality(mapOf(id to BigFraction.MINUS_ONE), BigFraction.ZERO)) }
+        ) + ids.associate { id ->
+            "lower/${id.id}" to
+                SourcePremise(SourceInequality(mapOf(id to BigFraction.MINUS_ONE), BigFraction.ZERO))
+        }
         val context = SourceProofContext(scope, ids.toSet(), premises)
 
         val row = LinearAggregateBranches(SourceLpBudget()).propose(context, ExecutionControl.Never)
 
-        assertEquals(SourceInequality(ids.zip(listOf(1L, 1L, 2L, 2L).map(BigFraction::ofLong)).toMap(),
-            BigFraction.ofLong(4)), row)
+        assertEquals(
+            SourceInequality(
+            ids.zip(listOf(1L, 1L, 2L, 2L).map(BigFraction::ofLong)).toMap(),
+            BigFraction.ofLong(4),
+        ),
+            row
+        )
     }
 
     @Test
@@ -95,8 +114,11 @@ class LinearAggregateBranchesTest {
 
     @Test
     fun `open aggregate children should produce checked source coverage`() {
-        val result = LinearAuthorityInvocation(source, TheoryParams(sourceLpOperations = 16),
-            aggregateBranching = true).use { it.run { _, _ -> } }
+        val result = LinearAuthorityInvocation(
+            source,
+            TheoryParams(sourceLpOperations = 16),
+            aggregateBranching = true,
+        ).use { it.run { _, _ -> } }
 
         val evidence = assertNotNull(result.terminal)
         assertEquals(SourceClaim.Refutation, evidence.claim)
@@ -106,29 +128,48 @@ class LinearAggregateBranchesTest {
 
     @Test
     fun `declared finite coordinates should retain checked aggregate coverage`() {
-        val model = Problem(0, 2, Array(2) { IntDomain(0, 1) }, listOf(
+        val model = Problem(
+            0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(
             Linear(longArrayOf(101, 102), intArrayOf(0, 1), LinearOp.GE, 150L),
             Linear(longArrayOf(101, 102), intArrayOf(0, 1), LinearOp.LE, 151L),
-        ))
+        )
+        )
         val sourceScope = scope.copy(revision = SourceRevision("finite-aggregate", "klause-ir-exact-v1"))
-        val context = assertNotNull(model.sourceProofContext(sourceScope,
-            LinearObjective(intCoefficients = longArrayOf(0, 0))))
+        val context = assertNotNull(
+            model.sourceProofContext(
+            sourceScope,
+            LinearObjective(intCoefficients = longArrayOf(0, 0)),
+        )
+        )
 
-        val result = LinearAuthorityInvocation(context, TheoryParams(sourceLpOperations = 16),
-            aggregateBranching = true).use { it.run { _, _ -> } }
+        val result = LinearAuthorityInvocation(
+            context,
+            TheoryParams(sourceLpOperations = 16),
+            aggregateBranching = true,
+        ).use { it.run { _, _ -> } }
 
         val terminal = assertNotNull(result.terminal)
         assertEquals(SourceClaim.Refutation, terminal.claim)
-        assertEquals(SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(context.withLinearAuthority()).verify(terminal))
+        assertEquals(
+            SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(context.withLinearAuthority()).verify(terminal),
+        )
         assertEquals(1L, result.stats.smt.completeSearchStages?.get("numericalAggregateSplits"))
     }
 
     @Test
     fun `aggregate coverage should survive backjump replay and restart`() {
         val budget = SourceLpBudget(maxOperations = 16)
-        LinearAuthorityTraversal(source, budget, ExecutionControl.Never, { false }, {}, { null },
-            aggregateBranching = true).use { component ->
+        LinearAuthorityTraversal(
+            source,
+            budget,
+            ExecutionControl.Never,
+            { false },
+            {},
+            { null },
+            aggregateBranching = true,
+        ).use { component ->
             val session = SearchComponentSet(listOf(component)).session()
             assertEquals(ComponentResult.Consistent, session.initialize())
             assertEquals(SearchNodeDisposition.Expand, component.beforeBranch(session))
@@ -149,8 +190,10 @@ class LinearAggregateBranchesTest {
             assertEquals(SearchNodeDisposition.Prune, component.beforeBranch(session))
             session.popTo(0)
             val terminal = assertNotNull(component.completed())
-            assertEquals(SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+            assertEquals(
+                SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal),
+            )
         }
     }
 
@@ -162,21 +205,35 @@ class LinearAggregateBranchesTest {
         }
         val context = SourceProofContext(scope, source.coordinates + bool, guarded, mapOf(bool to BigFraction.ONE))
 
-        val result = LinearAuthorityInvocation(context, TheoryParams(sourceLpOperations = 16),
-            boundOrdered = true, aggregateBranching = true).use { it.run { _, _ -> } }
+        val result = LinearAuthorityInvocation(
+            context,
+            TheoryParams(sourceLpOperations = 16),
+            boundOrdered = true,
+            aggregateBranching = true,
+        ).use { it.run { _, _ -> } }
 
         val terminal = assertNotNull(result.terminal)
         assertTrue(assertIs<SourceClaim.Optimal>(terminal.claim).sample.boolValue(0))
-        assertEquals(SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(context.withLinearAuthority()).verify(terminal))
+        assertEquals(
+            SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(context.withLinearAuthority()).verify(terminal),
+        )
         assertEquals(1L, result.stats.smt.completeSearchStages?.get("numericalAggregateSplits"))
     }
 
     @Test
     fun `Boolean composition should retain coordinate coverage when aggregate branching is requested`() {
         val budget = SourceLpBudget(maxOperations = 64)
-        LinearAuthorityTraversal(source, budget, ExecutionControl.Never, { false }, {}, { null },
-            composeBooleanBranches = true, aggregateBranching = true).use { component ->
+        LinearAuthorityTraversal(
+            source,
+            budget,
+            ExecutionControl.Never,
+            { false },
+            {},
+            { null },
+            composeBooleanBranches = true,
+            aggregateBranching = true,
+        ).use { component ->
             val session = SearchComponentSet(listOf(component)).session()
 
             val result = session.openRun(0, nodePolicy = component).next()
@@ -184,8 +241,10 @@ class LinearAggregateBranchesTest {
             assertEquals(SearchRunEvent.Exhausted, result)
             val terminal = assertNotNull(component.completed())
             assertIs<SourceDerivation.IntegerSplit>(terminal.derivation)
-            assertEquals(SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+            assertEquals(
+                SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal),
+            )
             session.popTo(0)
         }
     }

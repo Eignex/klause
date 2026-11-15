@@ -22,14 +22,14 @@ internal data class LinearBooleanCutLimits(
     val allocation: Long = 1_048_576L,
 ) {
     init {
-        require(rows in 1..256 && booleans in 1..16 && support in 1..128 && scalarBits in 1..4096 &&
-            candidates in 1..64 && branchRows in 1..1024 && work >= 0L && allocation >= 0L)
+        require(
+            rows in 1..256 && booleans in 1..16 && support in 1..128 && scalarBits in 1..4096 &&
+            candidates in 1..64 && branchRows in 1..1024 && work >= 0L && allocation >= 0L
+        )
     }
 }
 
-internal class LinearBooleanCuts(
-    val consequences: List<SourceEvidence>, val complete: Boolean, val reason: String,
-)
+internal class LinearBooleanCuts(val consequences: List<SourceEvidence>, val complete: Boolean, val reason: String)
 
 internal object LinearBooleanCutPreparation {
     private data class Row(val id: String, val premise: SourcePremise)
@@ -60,8 +60,8 @@ internal object LinearBooleanCutPreparation {
             if (value.num.magnitudeBitLength() > limits.scalarBits ||
                 value.den.magnitudeBitLength() > limits.scalarBits
             ) {
-                    stop("width")
-                }
+                stop("width")
+            }
             return value
         }
         fun derive(terms: List<Pair<Row, BigFraction>>): Derived {
@@ -87,18 +87,25 @@ internal object LinearBooleanCutPreparation {
                 number((if (first < BigFraction.ZERO) first.negated() else first).reciprocal())
             }
             reserve(1L + nonzero.size, 128L + nonzero.size * 64L)
-            val row = SourceInequality(nonzero.mapValues { (_, value) -> number(value * scale) },
-                number(rhs * scale), strict)
-            val proof = SourceDerivation.Combination(terms.map { (entry, weight) ->
+            val row = SourceInequality(
+                nonzero.mapValues { (_, value) -> number(value * scale) },
+                number(rhs * scale),
+                strict,
+            )
+            val proof = SourceDerivation.Combination(
+                terms.map { (entry, weight) ->
                 SourceDerivation.Combination.Term(number(weight * scale), SourceDerivation.Premise(entry.id))
-            })
+            }
+            )
             return Derived(row, proof)
         }
         fun stronger(left: SourceInequality, right: SourceInequality): Boolean =
             left.rhs < right.rhs || (left.rhs == right.rhs && (left.strict || !right.strict))
         try {
-            reserve(source.coordinateCount.toLong() + source.premiseCount,
-                source.coordinateCount * 48L + source.premiseCount * 64L)
+            reserve(
+                source.coordinateCount.toLong() + source.premiseCount,
+                source.coordinateCount * 48L + source.premiseCount * 64L,
+            )
             val coordinates = source.coordinates
             val pinned = source.scope.condition.bools
             reserve(pinned.size.toLong(), pinned.size * 48L)
@@ -110,8 +117,8 @@ internal object LinearBooleanCutPreparation {
                 if (row.supportSize > limits.support || premise.guards.size > 1 ||
                     premise.integerPins.isNotEmpty()
                 ) {
-                        continue
-                    }
+                    continue
+                }
                 reserve(row.supportSize.toLong(), row.supportSize * 48L)
                 if (row.coefficients.keys.any { it.kind != SourceCoordinate.Kind.Real || it !in coordinates }) {
                     continue
@@ -163,12 +170,15 @@ internal object LinearBooleanCutPreparation {
                     if (unconditional.any { it.row.coefficients == key && stronger(it.row, common) } ||
                         retained.any { (it.claim as SourceClaim.Consequence).inequality == common }
                     ) {
-                            continue
-                        }
+                        continue
+                    }
                     if (retained.size >= limits.candidates) stop("candidates")
                     reserve(1L + key.size, 256L + key.size * 64L)
-                    retained += SourceEvidence(source.scope, SourceClaim.Consequence(common),
-                        SourceDerivation.BooleanSplit(bool, left.proof, right.proof))
+                    retained += SourceEvidence(
+                        source.scope,
+                        SourceClaim.Consequence(common),
+                        SourceDerivation.BooleanSplit(bool, left.proof, right.proof),
+                    )
                 }
             }
             return LinearBooleanCuts(retained.toList(), true, "complete")

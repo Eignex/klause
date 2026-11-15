@@ -68,21 +68,28 @@ class SearchRunTest {
 
     @Test
     fun `restarts and learned conflicts should preserve a retained Boolean root`() {
-        val session = SearchSession(listOf(object : SearchComponent {
+        val session = SearchSession(
+            listOf(object : SearchComponent {
             override fun check(context: SearchContext): ComponentCheck = if (context.boolValue(1) == false) {
                 ComponentCheck.Infeasible(SearchExplanation(intArrayOf(Lit.make(1, true))))
-            } else ComponentCheck.Feasible
-        }))
+            } else {
+                ComponentCheck.Feasible
+            }
+        })
+        )
         session.initialize()
         var pause = true
-        val run = session.openRun(2, SearchSolveParams(maxDecisions = 4, restart = SearchRestart.Every(1)),
+        val run = session.openRun(
+            2,
+            SearchSolveParams(maxDecisions = 4, restart = SearchRestart.Every(1)),
             modelContinuation = SearchModelContinuation.Chronological,
             nodePolicy = object : SearchNodePolicy {
                 override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
                     if (pause && context.decisionLevel >= 1) return SearchNodeDisposition.Pause
                     return SearchNodeDisposition.Expand
                 }
-            })
+            },
+        )
         assertIs<SearchRunEvent.Paused>(run.next())
 
         assertTrue(run.retainBooleanRoot(Lit.make(0, false)))
@@ -101,11 +108,14 @@ class SearchRunTest {
         var prune = false
         val session = SearchSession(emptyList())
         session.initialize()
-        val run = session.openRun(1, decisionBudget = SearchDecisionBudget { remaining-- > 0 },
+        val run = session.openRun(
+            1,
+            decisionBudget = SearchDecisionBudget { remaining-- > 0 },
             nodePolicy = object : SearchNodePolicy {
                 override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
                     if (prune) SearchNodeDisposition.Prune else SearchNodeDisposition.Expand
-            })
+            },
+        )
         assertIs<SearchRunEvent.Satisfied>(run.next())
         assertEquals(SearchRunEvent.Indeterminate.Budget, run.next())
         session.popTo(0)
@@ -139,9 +149,12 @@ class SearchRunTest {
             }
             val session = SearchSession(listOf(component), cancellation = ExecutionControl { cancelled })
             session.initialize()
-            val run = session.openRun(1, lifecycle = object : SearchRunLifecycle {
+            val run = session.openRun(
+                1,
+                lifecycle = object : SearchRunLifecycle {
                 override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
-            })
+            }
+            )
 
             assertIs<SearchRunEvent.Paused>(run.next())
             assertEquals(0, session.decisionLevel)
@@ -178,9 +191,12 @@ class SearchRunTest {
             }
             val session = SearchSession(listOf(cp, component), cancellation = ExecutionControl { cancelled })
             session.initialize()
-            val run = session.openRun(1, modelContinuation = continuation, lifecycle = object : SearchRunLifecycle {
+            val run = session.openRun(
+                1, modelContinuation = continuation,
+                lifecycle = object : SearchRunLifecycle {
                 override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
-            })
+            }
+            )
 
             assertIs<SearchRunEvent.Paused>(run.next())
             assertEquals(listOf(false), checks)
@@ -216,10 +232,13 @@ class SearchRunTest {
                 }
                 val session = SearchSession(listOf(cp, component), cancellation = ExecutionControl { cancelled })
                 session.initialize()
-                val run = session.openRun(1, modelContinuation = continuation, lifecycle = object : SearchRunLifecycle {
+                val run = session.openRun(
+                    1, modelContinuation = continuation,
+                    lifecycle = object : SearchRunLifecycle {
                     override fun onCancellation(context: SearchContext): SearchRunDisposition =
                         SearchRunDisposition.Pause
-                })
+                }
+                )
 
                 assertIs<SearchRunEvent.Paused>(run.next())
                 cancelled = false
@@ -241,9 +260,12 @@ class SearchRunTest {
         }
         val session = SearchSession(listOf(component), cancellation = ExecutionControl { cancelled })
         session.initialize()
-        val run = session.openRun(0, lifecycle = object : SearchRunLifecycle {
+        val run = session.openRun(
+            0,
+            lifecycle = object : SearchRunLifecycle {
             override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Exhausted
-        })
+        }
+        )
 
         val result = run.next()
 
@@ -386,8 +408,13 @@ class SearchRunTest {
                 assertEquals(SearchRunEvent.Indeterminate.Component, terminal)
                 if (record) {
                     assertEquals(
-                        SearchComponentStop(SearchComponentStop.Site.ModelBlock, SearchStopCause.Cancelled,
-                            cancelled = true, unresolvedCoverage = false, decisionLevel = 0),
+                        SearchComponentStop(
+                            SearchComponentStop.Site.ModelBlock,
+                            SearchStopCause.Cancelled,
+                            cancelled = true,
+                            unresolvedCoverage = false,
+                            decisionLevel = 0,
+                        ),
                         stop,
                     )
                 } else {
@@ -406,14 +433,19 @@ class SearchRunTest {
     @Test
     fun `component stop snapshots should reset with their traversal`() {
         var decline = true
-        val session = SearchSession(listOf(object : SearchComponent {
+        val session = SearchSession(
+            listOf(object : SearchComponent {
             override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
-        }))
+        })
+        )
         session.initialize()
-        val run = session.openRun(0, nodePolicy = object : SearchNodePolicy {
+        val run = session.openRun(
+            0,
+            nodePolicy = object : SearchNodePolicy {
             override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
                 if (decline) SearchNodeDisposition.Indeterminate else SearchNodeDisposition.Expand
-        }).also { it.recordComponentStops = true }
+        }
+        ).also { it.recordComponentStops = true }
         assertEquals(SearchRunEvent.Indeterminate.Component, run.next())
         assertEquals(SearchComponentStop.Site.NodePolicy, run.componentStop?.site)
         run.next()
@@ -432,9 +464,13 @@ class SearchRunTest {
 
     @Test
     fun `component stop sites should distinguish model and lifecycle boundaries`() {
-        val sites = listOf(SearchComponentStop.Site.Start, SearchComponentStop.Site.Resume,
+        val sites = listOf(
+            SearchComponentStop.Site.Start,
+            SearchComponentStop.Site.Resume,
             SearchComponentStop.Site.ModelBlocked,
-            SearchComponentStop.Site.ModelPolicy, SearchComponentStop.Site.ExecutionControl)
+            SearchComponentStop.Site.ModelPolicy,
+            SearchComponentStop.Site.ExecutionControl,
+        )
         for (site in sites) {
             var cancelled = false
             val cp = CpSearchComponent(
@@ -448,19 +484,31 @@ class SearchRunTest {
                 modelContinuation = SearchModelContinuation.BlockAtRoot,
                 modelPolicy = object : SearchModelPolicy {
                     override fun onModel(model: AssembledSearchModel, context: SearchContext): SearchModelDisposition =
-                        if (site == SearchComponentStop.Site.ModelPolicy) SearchModelDisposition.Indeterminate
-                        else SearchModelDisposition.Surface
+                        if (site == SearchComponentStop.Site.ModelPolicy) {
+                            SearchModelDisposition.Indeterminate
+                        } else {
+                            SearchModelDisposition.Surface
+                        }
                 },
                 lifecycle = object : SearchRunLifecycle {
                     override fun onStart(context: SearchContext): SearchRunDisposition =
-                        if (site == SearchComponentStop.Site.Start) SearchRunDisposition.Indeterminate
-                        else SearchRunDisposition.Continue
+                        if (site == SearchComponentStop.Site.Start) {
+                            SearchRunDisposition.Indeterminate
+                        } else {
+                            SearchRunDisposition.Continue
+                        }
                     override fun onResume(context: SearchContext): SearchRunDisposition =
-                        if (site == SearchComponentStop.Site.Resume) SearchRunDisposition.Indeterminate
-                        else SearchRunDisposition.Continue
+                        if (site == SearchComponentStop.Site.Resume) {
+                            SearchRunDisposition.Indeterminate
+                        } else {
+                            SearchRunDisposition.Continue
+                        }
                     override fun onModelBlocked(context: SearchContext): SearchRunDisposition =
-                        if (site == SearchComponentStop.Site.ModelBlocked) SearchRunDisposition.Indeterminate
-                        else SearchRunDisposition.Continue
+                        if (site == SearchComponentStop.Site.ModelBlocked) {
+                            SearchRunDisposition.Indeterminate
+                        } else {
+                            SearchRunDisposition.Continue
+                        }
                 },
             ).also { it.recordComponentStops = true }
 

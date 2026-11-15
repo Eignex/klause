@@ -24,21 +24,30 @@ import kotlin.test.assertNull
 class SourceHintMappingTest {
     @Test
     fun `comparison projection should preserve strict translated predicate truth`() {
-        val hint = DefinitionHint.Comparison(0, longArrayOf(2, -1, 1), arrayOf(
-            DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1),
+        val hint = DefinitionHint.Comparison(
+            0, longArrayOf(2, -1, 1),
+            arrayOf(
+            DefinitionHint.Operand.Variable(0),
+            DefinitionHint.Operand.Variable(1),
             DefinitionHint.Operand.Constant(5),
-        ), 10, LinearOp.LE, strict = true)
+        ),
+            10, LinearOp.LE, strict = true
+        )
         val reconstruction = AffineReconstruction(3, intArrayOf(1, 2), longArrayOf(2, -1), 1)
-        val projected = CapturedBooleanDefinition(assertNotNull(
+        val projected = CapturedBooleanDefinition(
+            assertNotNull(
             hint.reconstructed(mapOf(0 to reconstruction), ExecutionControl.Never),
-        ))
+        )
+        )
 
         for ((y, z) in listOf(1L to 2L, 0L to 1L, 1L to 1L)) {
-            val truth = projected.holds { id -> when (id) {
-                1 -> y
-                2 -> z
-                else -> error("a retained input is required")
-            } }
+            val truth = projected.holds { id ->
+                when (id) {
+                    1 -> y
+                    2 -> z
+                    else -> error("a retained input is required")
+                }
+            }
 
             assertEquals(2 * (3 + 2 * y - z) - y + 5 < 10, truth)
         }
@@ -46,8 +55,13 @@ class SourceHintMappingTest {
 
     @Test
     fun `comparison projection should decline overflowing reconstructed coefficients`() {
-        val hint = DefinitionHint.Comparison(0, longArrayOf(Long.MAX_VALUE),
-            arrayOf(DefinitionHint.Operand.Variable(0)), 0, LinearOp.LE)
+        val hint = DefinitionHint.Comparison(
+            0,
+            longArrayOf(Long.MAX_VALUE),
+            arrayOf(DefinitionHint.Operand.Variable(0)),
+            0,
+            LinearOp.LE,
+        )
         val reconstruction = AffineReconstruction(0, intArrayOf(1), longArrayOf(2), 1)
 
         val projected = hint.reconstructed(mapOf(0 to reconstruction), ExecutionControl.Never)
@@ -57,8 +71,13 @@ class SourceHintMappingTest {
 
     @Test
     fun `comparison projection should withhold an interrupted expansion`() {
-        val hint = DefinitionHint.Comparison(0, longArrayOf(1),
-            arrayOf(DefinitionHint.Operand.Variable(0)), 0, LinearOp.LE)
+        val hint = DefinitionHint.Comparison(
+            0,
+            longArrayOf(1),
+            arrayOf(DefinitionHint.Operand.Variable(0)),
+            0,
+            LinearOp.LE,
+        )
         val reconstruction = AffineReconstruction(0, intArrayOf(1, 2), longArrayOf(1, 1), 1)
         val budget = PresolveBudget(2)
 
@@ -69,8 +88,13 @@ class SourceHintMappingTest {
 
     @Test
     fun `comparison projection should withhold a divided input`() {
-        val hint = DefinitionHint.Comparison(0, longArrayOf(1),
-            arrayOf(DefinitionHint.Operand.Variable(0)), 0, LinearOp.LE)
+        val hint = DefinitionHint.Comparison(
+            0,
+            longArrayOf(1),
+            arrayOf(DefinitionHint.Operand.Variable(0)),
+            0,
+            LinearOp.LE,
+        )
         val reconstruction = AffineReconstruction(0, intArrayOf(1), longArrayOf(1), 2)
 
         val projected = hint.reconstructed(mapOf(0 to reconstruction), ExecutionControl.Never)
@@ -83,15 +107,26 @@ class SourceHintMappingTest {
         val source = Problem(0, 3, Array(3) { IntDomain(-10, 10) }, emptyArray())
         val middle = Problem(0, 3, source.finiteIntDomains(), emptyArray())
         val target = Problem(0, 3, source.finiteIntDomains(), emptyArray())
-        val first = SourceMapping(source, middle, TransformationGuarantees.IDENTITY,
-            SourceRebuilds(listOf(RebuildStep.AffineValue(0, 1, intArrayOf(1), longArrayOf(1), 1))))
-        val second = SourceMapping(middle, target, TransformationGuarantees.IDENTITY,
-            SourceRebuilds(listOf(RebuildStep.AffineValue(1, -2, intArrayOf(2), longArrayOf(-1), -1))))
+        val first = SourceMapping(
+            source,
+            middle,
+            TransformationGuarantees.IDENTITY,
+            SourceRebuilds(listOf(RebuildStep.AffineValue(0, 1, intArrayOf(1), longArrayOf(1), 1))),
+        )
+        val second = SourceMapping(
+            middle,
+            target,
+            TransformationGuarantees.IDENTITY,
+            SourceRebuilds(listOf(RebuildStep.AffineValue(1, -2, intArrayOf(2), longArrayOf(-1), -1))),
+        )
         val mapping = first.then(second)
-        val hints = SearchHints(listOf(
+        val hints = SearchHints(
+            listOf(
             SearchGroup(intArrayOf(), intArrayOf(0, 2, 1)),
             SearchGroup(intArrayOf(), intArrayOf(1), VariableSelection.InputOrder, ValueSelection.Maximum),
-        ), solutionGuided = true)
+        ),
+            solutionGuided = true
+        )
 
         val projected = assertNotNull(hints.remapped(mapping, ExecutionControl.Never))
 
@@ -114,8 +149,12 @@ class SourceHintMappingTest {
         )
         val hints = SearchHints(listOf(SearchGroup(intArrayOf(), intArrayOf(0, 2))))
         for (rebuild in rebuilds) {
-            val mapping = SourceMapping(source, source, TransformationGuarantees.IDENTITY,
-                SourceRebuilds(listOf(rebuild)))
+            val mapping = SourceMapping(
+                source,
+                source,
+                TransformationGuarantees.IDENTITY,
+                SourceRebuilds(listOf(rebuild)),
+            )
 
             val projected = assertNotNull(hints.remapped(mapping, ExecutionControl.Never))
 
@@ -126,8 +165,12 @@ class SourceHintMappingTest {
     @Test
     fun `source bound and midpoint preferences should keep only direct coordinates`() {
         val source = Problem(0, 2, Array(2) { IntDomain(-10, 10) }, emptyArray())
-        val mapping = SourceMapping(source, source, TransformationGuarantees.IDENTITY,
-            SourceRebuilds(listOf(RebuildStep.AffineValue(0, 1, intArrayOf(1), longArrayOf(1), 1))))
+        val mapping = SourceMapping(
+            source,
+            source,
+            TransformationGuarantees.IDENTITY,
+            SourceRebuilds(listOf(RebuildStep.AffineValue(0, 1, intArrayOf(1), longArrayOf(1), 1))),
+        )
         val tiers = listOf(
             SearchGroup(intArrayOf(), intArrayOf(0, 1), VariableSelection.SmallestLowerBound),
             SearchGroup(intArrayOf(), intArrayOf(0, 1), VariableSelection.LargestUpperBound),
@@ -143,11 +186,16 @@ class SourceHintMappingTest {
     @Test
     fun `linear definitions should substitute divided reconstructions and pass a rebuilt output to its partner`() {
         val source = Problem(0, 3, Array(3) { IntDomain(-10, 10) }, emptyArray())
-        val mapping = SourceMapping(source, source, TransformationGuarantees.IDENTITY,
-            SourceRebuilds(listOf(RebuildStep.AffineValue(1, 1, intArrayOf(2), longArrayOf(3), 2))))
+        val mapping = SourceMapping(
+            source,
+            source,
+            TransformationGuarantees.IDENTITY,
+            SourceRebuilds(listOf(RebuildStep.AffineValue(1, 1, intArrayOf(2), longArrayOf(3), 2))),
+        )
         val reconstructions = assertNotNull(mapping.affineReconstructions(ExecutionControl.Never))
         val row = arrayOf<DefinitionHint.Operand>(
-            DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1),
+            DefinitionHint.Operand.Variable(0),
+            DefinitionHint.Operand.Variable(1),
         )
         for ((output, expected) in listOf(0 to 0, 1 to 2)) {
             val hint = DefinitionHint.Linear(output, longArrayOf(1, -1), row, 3)
@@ -164,10 +212,15 @@ class SourceHintMappingTest {
     @Test
     fun `an integer rebuilt more than once should not expose an affine reconstruction`() {
         val source = Problem(0, 3, Array(3) { IntDomain(-10, 10) }, emptyArray())
-        val mapping = SourceMapping(source, source, TransformationGuarantees.IDENTITY, SourceRebuilds(listOf(
+        val mapping = SourceMapping(
+            source, source, TransformationGuarantees.IDENTITY,
+            SourceRebuilds(
+                listOf(
             RebuildStep.AffineValue(0, 0, intArrayOf(1), longArrayOf(1), 1),
             RebuildStep.AffineValue(0, 0, intArrayOf(2), longArrayOf(1), 1),
-        )))
+        )
+            )
+        )
 
         val reconstructions = assertNotNull(mapping.affineReconstructions(ExecutionControl.Never))
 
@@ -177,10 +230,18 @@ class SourceHintMappingTest {
     @Test
     fun `linear definitions should decline an output the reconstruction cancels`() {
         val source = Problem(0, 2, Array(2) { IntDomain(-10, 10) }, emptyArray())
-        val mapping = SourceMapping(source, source, TransformationGuarantees.IDENTITY,
-            SourceRebuilds(listOf(RebuildStep.AffineValue(1, 2, intArrayOf(0), longArrayOf(1), 1))))
-        val hint = DefinitionHint.Linear(0, longArrayOf(1, -1),
-            arrayOf(DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1)), -2)
+        val mapping = SourceMapping(
+            source,
+            source,
+            TransformationGuarantees.IDENTITY,
+            SourceRebuilds(listOf(RebuildStep.AffineValue(1, 2, intArrayOf(0), longArrayOf(1), 1))),
+        )
+        val hint = DefinitionHint.Linear(
+            0,
+            longArrayOf(1, -1),
+            arrayOf(DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1)),
+            -2,
+        )
 
         assertNull(hint.reconstructed(assertNotNull(mapping.affineReconstructions(ExecutionControl.Never))))
     }

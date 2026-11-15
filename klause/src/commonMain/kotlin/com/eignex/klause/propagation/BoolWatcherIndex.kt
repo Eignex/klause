@@ -68,10 +68,14 @@ internal class BoolWatcherIndex(
             val positions = BoolWatchPositionIndex(baseFactorCount)
             yield(null)
             @Suppress("UNCHECKED_CAST")
-            yield(BoolWatcherIndex(
-                numBoolVars, watches as Array<IntArrayList>, blockers as Array<IntArrayList>, positions,
-            ))
+            yield(
+                BoolWatcherIndex(
+                numBoolVars,
+                watches as Array<IntArrayList>,
+                blockers as Array<IntArrayList>,
+                positions,
+            )
+            )
         }
     }
-
 }

@@ -23,9 +23,9 @@ fun Sample.exactRealValue(id: Int): ExactRealValue = symbolicReals?.get(id)
     ?: algebraicReals?.get(id)?.toExactRealValue()
     ?: (
         exactReals?.get(id) ?: requireNotNull(BigFraction.ofDouble(approximateRealValue(id))) {
-        "real coordinate $id has no exact value"
-    }
-    ).toExactRealValue()
+            "real coordinate $id has no exact value"
+        }
+        ).toExactRealValue()
 
 /** Numerical view for display or learning features; NaN means an enclosure was unavailable. */
 fun ExactRealValue.approximate(): Double {

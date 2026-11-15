@@ -19,8 +19,14 @@ internal fun polynomialWitnessVerifier(
         if (certificate?.publication !is CompletedEnginePublication.Witness) {
             return@CandidateVerifier Verification.Indeterminate("polynomial witness has no native publication")
         }
-        when (val checked = verifier.verify(ModelEvidence.Witness(binding.model, candidate, certificate),
-            binding.scope, binding, cancellation)) {
+        when (
+            val checked = verifier.verify(
+            ModelEvidence.Witness(binding.model, candidate, certificate),
+            binding.scope,
+            binding,
+            cancellation,
+        )
+        ) {
             is Verification.Accepted -> Verification.Accepted(candidate)
             is Verification.Rejected -> checked
             is Verification.Indeterminate -> checked

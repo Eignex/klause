@@ -122,17 +122,31 @@ class ComponentPlanTest {
             val row = Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.EQ, 1)
             val global = AllDifferent(intArrayOf(0, 1), 0, 2)
             val factors = if (reverse) arrayOf<Factor>(global, row) else arrayOf<Factor>(row, global)
-            val source = Problem(0, 3, Array(3) { IntDomain(0, 1) }, factors,
-                openIntHi = booleanArrayOf(false, false, true))
+            val source = Problem(
+                0,
+                3,
+                Array(3) { IntDomain(0, 1) },
+                factors,
+                openIntHi = booleanArrayOf(false, false, true),
+            )
             val installations = mutableMapOf<EncodingTarget, Int>()
-            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-                val selected = if (factor === global) Encoder(EncoderSupport.UNSUPPORTED)
-                    else BuiltInEncoderProvider.select(factor, target)
-                if (!selected.enforcesSource) selected else Encoder(selected.support) { view, encoding ->
+            val providers = FactorProjectionProviders(
+                encoder = EncoderProvider { factor, target ->
+                val selected = if (factor === global) {
+                    Encoder(EncoderSupport.UNSUPPORTED)
+                } else {
+                    BuiltInEncoderProvider.select(factor, target)
+                }
+                if (!selected.enforcesSource) {
+                    selected
+                } else {
+                    Encoder(selected.support) { view, encoding ->
                     installations[target] = (installations[target] ?: 0) + 1
                     selected.install(view, encoding)
                 }
-            })
+                }
+            }
+            )
 
             val plan = source.componentPlan(providers.prepare(source))
             val result = plan.search(source, plan.cpSourceDomains(source)).use {
@@ -159,17 +173,29 @@ class ComponentPlanTest {
     @Test
     fun `a selected complete real candidate should not install an unused difference candidate`() {
         val row = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0)
-        val source = Problem(0, 0, emptyArray(), arrayOf<Factor>(row), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(row),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
+        )
         val installations = mutableMapOf<EncodingTarget, Int>()
-        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-            if (target == EncodingTarget.POLYNOMIAL) BuiltInEncoderProvider.select(factor, target)
-            else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+        val providers = FactorProjectionProviders(
+            encoder = EncoderProvider { factor, target ->
+            if (target == EncodingTarget.POLYNOMIAL) {
+                BuiltInEncoderProvider.select(factor, target)
+            } else {
+                Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
                 installations[target] = (installations[target] ?: 0) + 1
                 encoding.linear(assertNotNull(view.linearForm))
                 null
             }
-        })
+            }
+        }
+        )
 
         val plan = source.componentPlan(providers.prepare(source))
 

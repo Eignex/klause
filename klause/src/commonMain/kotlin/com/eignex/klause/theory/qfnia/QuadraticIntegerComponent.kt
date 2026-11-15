@@ -48,8 +48,11 @@ private data class QuadraticIntegerBound(
     val threshold: BigInt,
     val upper: Boolean,
 ) : SearchTheoryDecision {
-    fun complement() = if (upper) copy(threshold = threshold + BIG_ONE, upper = false)
-        else error("integer split registration starts with an upper bound")
+    fun complement() = if (upper) {
+        copy(threshold = threshold + BIG_ONE, upper = false)
+    } else {
+        error("integer split registration starts with an upper bound")
+    }
 }
 
 internal class QuadraticIntegerComponent(
@@ -57,7 +60,10 @@ internal class QuadraticIntegerComponent(
     private val root: PolynomialCondition,
     private val step: () -> Unit,
     private val complete: (PolynomialCondition, SearchContext) -> QuadraticIntegerNode,
-) : SearchComponent, SearchBrancher, SearchBranchProposal, SearchNodePolicy {
+) : SearchComponent,
+    SearchBrancher,
+    SearchBranchProposal,
+    SearchNodePolicy {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
     private val owner = Any()
@@ -75,14 +81,19 @@ internal class QuadraticIntegerComponent(
             if (bound != null && bound.owner === owner) assertions += context.decisionLevel to bound
             val integer = payload as? SearchIntegerBound
             if (integer != null) addBound(integer.variable, integer.exactThreshold(), integer.upper, context)
-        } else when (decision) {
+        } else {
+            when (decision) {
             is SearchDecision.IntAtMost -> addBound(decision.variable, bigIntOf(decision.upper), true, context)
+
             is SearchDecision.IntAtLeast -> addBound(decision.variable, bigIntOf(decision.lower), false, context)
+
             is SearchDecision.IntEqual -> {
                 addBound(decision.variable, bigIntOf(decision.value), true, context)
                 addBound(decision.variable, bigIntOf(decision.value), false, context)
             }
+
             else -> Unit
+        }
         }
         return ComponentResult.Consistent
     }
@@ -90,7 +101,10 @@ internal class QuadraticIntegerComponent(
     private fun addBound(id: Int, threshold: BigInt, upper: Boolean, context: SearchContext) {
         require(id in source.integerCoordinates.indices) { "quadratic integer decision id out of range" }
         assertions += context.decisionLevel to QuadraticIntegerBound(
-            owner, source.integerCoordinates[id], threshold, upper,
+            owner,
+            source.integerCoordinates[id],
+            threshold,
+            upper,
         )
     }
 
@@ -127,10 +141,18 @@ internal class QuadraticIntegerComponent(
                 step()
                 upper[id]?.let { value > it } == true
             }
-            (if (contradictory || boolConflict) QuadraticIntegerNode.Empty(QuadraticEngineDerivation.Both(
-                QuadraticEngineDerivation.Condition(root), QuadraticEngineDerivation.Condition(condition),
-            ))
-            else complete(condition, context)).also {
+            (
+                if (contradictory || boolConflict) {
+                QuadraticIntegerNode.Empty(
+                    QuadraticEngineDerivation.Both(
+                QuadraticEngineDerivation.Condition(root),
+                QuadraticEngineDerivation.Condition(condition),
+            )
+                )
+            } else {
+                complete(condition, context)
+            }
+            ).also {
                 current = it
             }
         }

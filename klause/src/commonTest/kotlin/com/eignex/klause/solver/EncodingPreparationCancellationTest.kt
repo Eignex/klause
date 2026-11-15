@@ -15,7 +15,9 @@ class EncodingPreparationCancellationTest {
         var nested = false
         lateinit var scope: ExecutionControl
         scope = ExecutionControl {
-            if (nested) true else {
+            if (nested) {
+                true
+            } else {
                 nested = true
                 assertTrue(scope())
                 false
@@ -43,8 +45,16 @@ class EncodingPreparationCancellationTest {
     fun `polling should preserve ordered parent predicates and short circuiting`() {
         val visited = ArrayList<Int>()
         var cancelled = false
-        val scope = (ExecutionControl { visited += 1; cancelled } or
-            ExecutionControl { visited += 2; false }).encodingPreparationScope()
+        val scope = (
+            ExecutionControl {
+            visited += 1;
+            cancelled
+        } or
+            ExecutionControl {
+                visited += 2;
+                false
+            }
+        ).encodingPreparationScope()
 
         assertFalse(scope())
         assertEquals(listOf(1, 2), visited)

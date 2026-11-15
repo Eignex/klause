@@ -151,19 +151,18 @@ class LocalSearchSolver(
         config: SamplingConfig,
         params: LocalSearchParams,
         warm: WarmState?,
-    ): SearchStream<Sample> =
-        when (config.quality) {
-            SampleQuality.CHEAP -> engine.openSamples(params, warm)
-            SampleQuality.ACCURATE -> engine.openSamples(params, warm) { fallback ->
-                problem.countingScope(params.assumptions).accurateSamples(config) { fallback }
-            }
+    ): SearchStream<Sample> = when (config.quality) {
+        SampleQuality.CHEAP -> engine.openSamples(params, warm)
+
+        SampleQuality.ACCURATE -> engine.openSamples(params, warm) { fallback ->
+            problem.countingScope(params.assumptions).accurateSamples(config) { fallback }
         }
+    }
 
     override fun openImprovements(
         objective: LinearObjective,
         params: LocalSearchParams,
-    ): SearchStream<MinimizeResult> =
-        engine.openImprovements(objective, params, warm = null)
+    ): SearchStream<MinimizeResult> = engine.openImprovements(objective, params, warm = null)
 
     /** Return a [LocalSearchSession] that persists learned factor weights across calls and maintains an
      *  assumption stack. */

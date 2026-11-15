@@ -55,8 +55,13 @@ internal class DenseBasisFactors(private val source: SparseMatrix) {
         val lower = triangular(lower = true)
         val upper = triangular(lower = false)
         val factors = LuFactors(
-            columns.copyOf(), IntArray(n) { -1 }, SymbolicLu(rowOrder.copyOf(), IntArray(n) { it }),
-            lower, upper, transpose(lower), transpose(upper),
+            columns.copyOf(),
+            IntArray(n) { -1 },
+            SymbolicLu(rowOrder.copyOf(), IntArray(n) { it }),
+            lower,
+            upper,
+            transpose(lower),
+            transpose(upper),
         )
         visits += 4L * n
         val work = work(lower.nnz + upper.nnz)

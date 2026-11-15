@@ -58,37 +58,32 @@ internal class AlnsWorkerConfig private constructor(
     private val sharingMemoryWork: Long = 32_768L,
     private val sharingMemoryScratch: Int = 4_096,
     private val sharingMemoryBytes: Long? = null,
-) :
-    WorkerConfig {
+) : WorkerConfig {
     constructor(
         profile: AlnsProfile = AlnsProfile.Default,
         nodeBudget: NodeBudget? = null,
         numericalCompletion: Boolean = false,
     ) : this(profile, nodeBudget, numericalCompletion, null)
 
-    fun withToleranceCheck(check: (Sample) -> Boolean): AlnsWorkerConfig =
-        AlnsWorkerConfig(
-            profile, nodeBudget, numericalCompletion, check,
-            workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
-        )
+    fun withToleranceCheck(check: (Sample) -> Boolean): AlnsWorkerConfig = AlnsWorkerConfig(
+        profile, nodeBudget, numericalCompletion, check,
+        workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
+    )
 
-    override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
-        AlnsWorkerConfig(
-            profile, budget, numericalCompletion, toleranceCheck,
-            workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
-        )
+    override fun withNodeBudget(budget: NodeBudget): WorkerConfig = AlnsWorkerConfig(
+        profile, budget, numericalCompletion, toleranceCheck,
+        workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
+    )
 
-    fun withNumericalCompletion(): AlnsWorkerConfig =
-        AlnsWorkerConfig(
-            profile, nodeBudget, true, toleranceCheck,
-            workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
-        )
+    fun withNumericalCompletion(): AlnsWorkerConfig = AlnsWorkerConfig(
+        profile, nodeBudget, true, toleranceCheck,
+        workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
+    )
 
-    fun withWorkScheduling(): AlnsWorkerConfig =
-        AlnsWorkerConfig(
-            profile, nodeBudget, numericalCompletion, toleranceCheck,
-            true, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
-        )
+    fun withWorkScheduling(): AlnsWorkerConfig = AlnsWorkerConfig(
+        profile, nodeBudget, numericalCompletion, toleranceCheck,
+        true, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
+    )
 
     fun withSharingMemory(enabled: Boolean, work: Long, scratch: Int, bytes: Long? = null): AlnsWorkerConfig =
         AlnsWorkerConfig(
@@ -110,8 +105,10 @@ internal class AlnsWorkerConfig private constructor(
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         pools: SharedPools?,
     ): PortfolioWorker {
-        if (!numericalCompletion && problem.numRealVars > 0) problem.fixedDiscreteSample()?.let { fixed ->
+        if (!numericalCompletion && problem.numRealVars > 0) {
+            problem.fixedDiscreteSample()?.let { fixed ->
             return finiteExactNeighborhoodWorker(problem, fixed, objective, nodeBudget, true, seed + index, armId)
+        }
         }
         val evidenceModel = ModelIdentity.of(problem, objective)
         val matchedPools = pools?.takeIf { it.identity?.matches(evidenceModel) != false }
@@ -119,17 +116,23 @@ internal class AlnsWorkerConfig private constructor(
         // One pool carries globally-valid learned clauses across repair fragments. A repair learns under
         // pins and an incumbent, so its permanent (objective-bound, blocking) clauses and LP Farkas nogoods
         // hold only under those pins and are not shared.
-        val repairClauses = SharedClausePool(measureMemory = sharingMemory,
-            memorySampleWork = sharingMemoryWork, memorySampleScratchEntries = sharingMemoryScratch,
-            softLimitBytes = sharingMemoryBytes)
+        val repairClauses = SharedClausePool(
+            measureMemory = sharingMemory,
+            memorySampleWork = sharingMemoryWork,
+            memorySampleScratchEntries = sharingMemoryScratch,
+            softLimitBytes = sharingMemoryBytes,
+        )
         val meter = SharingMeter()
         val alns = Alns(
             inner = LocalSearchSolver(
                 problem,
                 definitionalSweep = definitionalSweep,
                 perMoveInvariants = definitionalSweep != null,
-                completion = if (numericalCompletion && problem.numRealVars > 0)
-                    LeafRealCompletion(problem, objective, toleranceCheck) else null,
+                completion = if (numericalCompletion && problem.numRealVars > 0) {
+                    LeafRealCompletion(problem, objective, toleranceCheck)
+                } else {
+                    null
+                },
             ).apply {
                 matchedPools?.localSearchProjection?.let { engine.projection = it }
                 matchedPools?.localSearchInvariants?.let { engine.invariantNetwork = it }
@@ -138,8 +141,12 @@ internal class AlnsWorkerConfig private constructor(
             backtrack = BacktrackSolver(problem),
             backtrackParams = BacktrackParams(
                 randomSeed = seed + index,
-                clauseExchange = PoolClauseExchange(repairClauses, skipPermanent = true,
-                    shareGlobalNogoods = false, meter = meter),
+                clauseExchange = PoolClauseExchange(
+                    repairClauses,
+                    skipPermanent = true,
+                    shareGlobalNogoods = false,
+                    meter = meter,
+                ),
                 nodeBudget = nodeBudget,
                 toleranceCheck = toleranceCheck,
             ),

@@ -23,7 +23,9 @@ internal fun orderedDefinitions(
         val count = if (node.outIsBool) problem.numBoolVars else problem.numIntVars
         if (node.out !in 0 until count || node.intInputs.any { it !in 0 until problem.numIntVars } ||
             node.boolInputs.any { it !in 0 until problem.numBoolVars }
-        ) return emptyList()
+        ) {
+            return emptyList()
+        }
         val outputs = if (node.outIsBool) boolOutputs else intOutputs
         outputs.put(node.out, if (outputs.containsKey(node.out)) -2 else i)
     }

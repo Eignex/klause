@@ -10,8 +10,15 @@ import kotlin.test.assertTrue
 class NativeWatchReclamationTest {
     @Test
     fun `a completed cleanup scan should stay complete until another clause retires`() {
-        val session = PropagationSession(Problem(6, 0, emptyArray(),
-            arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = true)
+        val session = PropagationSession(
+            Problem(
+            6,
+            0,
+            emptyArray(),
+            arrayOf(Clause(intArrayOf(8, 10))),
+        ),
+            nativeSat = true
+        )
         assertTrue(session.usesNativeSat)
         repeat(64) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
         session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false }
@@ -30,8 +37,15 @@ class NativeWatchReclamationTest {
 
     @Test
     fun `cancelled watch cleanup should resume without changing its retained generation`() {
-        val session = PropagationSession(Problem(6, 0, emptyArray(),
-            arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = true)
+        val session = PropagationSession(
+            Problem(
+            6,
+            0,
+            emptyArray(),
+            arrayOf(Clause(intArrayOf(8, 10))),
+        ),
+            nativeSat = true
+        )
         assertTrue(session.usesNativeSat)
         repeat(64) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
         session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false }
@@ -51,8 +65,15 @@ class NativeWatchReclamationTest {
 
     @Test
     fun `small compaction grants should release watches without remapping learned handles`() {
-        val session = PropagationSession(Problem(6, 0, emptyArray(),
-            arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = true)
+        val session = PropagationSession(
+            Problem(
+            6,
+            0,
+            emptyArray(),
+            arrayOf(Clause(intArrayOf(8, 10))),
+        ),
+            nativeSat = true
+        )
         assertTrue(session.usesNativeSat)
         val baseline = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
         repeat(64) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
@@ -72,8 +93,15 @@ class NativeWatchReclamationTest {
 
     @Test
     fun `bounded watch reclamation should preserve a permanent clause`() {
-        val session = PropagationSession(Problem(6, 0, emptyArray(),
-            arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = true)
+        val session = PropagationSession(
+            Problem(
+            6,
+            0,
+            emptyArray(),
+            arrayOf(Clause(intArrayOf(8, 10))),
+        ),
+            nativeSat = true
+        )
         assertTrue(session.usesNativeSat)
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 9, permanent = true)
         repeat(64) { session.addLearnedClause(Clause(intArrayOf(4, 6)), 9) }
@@ -87,8 +115,15 @@ class NativeWatchReclamationTest {
 
     @Test
     fun `four thousand retired rows should release watch capacity under production grants`() {
-        val session = PropagationSession(Problem(6, 0, emptyArray(),
-            arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = true)
+        val session = PropagationSession(
+            Problem(
+            6,
+            0,
+            emptyArray(),
+            arrayOf(Clause(intArrayOf(8, 10))),
+        ),
+            nativeSat = true
+        )
         assertTrue(session.usesNativeSat)
         val baseline = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
         repeat(4000) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
@@ -107,8 +142,15 @@ class NativeWatchReclamationTest {
 
     @Test
     fun `twenty thousand retired rows should release watch capacity under production grants`() {
-        val session = PropagationSession(Problem(6, 0, emptyArray(),
-            arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = true)
+        val session = PropagationSession(
+            Problem(
+            6,
+            0,
+            emptyArray(),
+            arrayOf(Clause(intArrayOf(8, 10))),
+        ),
+            nativeSat = true
+        )
         assertTrue(session.usesNativeSat)
         val baseline = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
         repeat(20_000) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
@@ -124,6 +166,7 @@ class NativeWatchReclamationTest {
 
         assertEquals(baseline.getValue("sessionWatchCapacityBytes"), after.getValue("sessionWatchCapacityBytes"))
     }
+
     @Test
     fun `permanent floors should permit metadata page release within ordinary small grants`() {
         for (permanentCount in listOf(4000, 20_000)) {
@@ -143,8 +186,10 @@ class NativeWatchReclamationTest {
             val released = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
 
             assertEquals(permanentCount, session.activeLearnedClauseCount)
-            assertTrue(released.getValue("learnedMetadataCapacityBytes") <
-                retired.getValue("learnedMetadataCapacityBytes"))
+            assertTrue(
+                released.getValue("learnedMetadataCapacityBytes") <
+                    retired.getValue("learnedMetadataCapacityBytes"),
+            )
             assertEquals(generation, session.learnedRetirementGeneration)
             session.pinBool(4, false)
             assertEquals(true, session.boolValue(5))
@@ -154,8 +199,15 @@ class NativeWatchReclamationTest {
     @Test
     fun `appended retirements should resume metadata cleanup while retaining a live reason`() {
         val base = Clause(intArrayOf(8, 10))
-        val session = PropagationSession(Problem(6, 0, emptyArray(),
-            arrayOf(base, Clause(intArrayOf(1)))), nativeSat = true)
+        val session = PropagationSession(
+            Problem(
+            6,
+            0,
+            emptyArray(),
+            arrayOf(base, Clause(intArrayOf(1))),
+        ),
+            nativeSat = true
+        )
         repeat(16) { session.addLearnedClause(base, 2, permanent = true) }
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
         val reason = assertNotNull(session.boolReasonClause(1)).toList()
@@ -178,8 +230,10 @@ class NativeWatchReclamationTest {
         }
         val released = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
 
-        assertEquals(before.getValue("learnedMetadataCapacityBytes"),
-            cancelled.getValue("learnedMetadataCapacityBytes"))
+        assertEquals(
+            before.getValue("learnedMetadataCapacityBytes"),
+            cancelled.getValue("learnedMetadataCapacityBytes"),
+        )
         assertTrue(released.getValue("learnedMetadataCapacityBytes") < before.getValue("learnedMetadataCapacityBytes"))
         assertEquals(17, session.activeLearnedClauseCount)
         assertEquals(generation, session.learnedRetirementGeneration)
@@ -188,5 +242,4 @@ class NativeWatchReclamationTest {
         session.popLast()
         assertEquals(reason, assertNotNull(session.boolReasonClause(1)).toList())
     }
-
 }

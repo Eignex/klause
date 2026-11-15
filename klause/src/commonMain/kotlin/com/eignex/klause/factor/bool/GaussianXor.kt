@@ -62,7 +62,9 @@ class GaussianXor internal constructor(
 
     init {
         require(constraints.isNotEmpty()) { "GaussianXor needs at least one constraint" }
-        variables = if (affineSeed != null) BoolVars(affineSeed.variables) else {
+        variables = if (affineSeed != null) {
+            BoolVars(affineSeed.variables)
+        } else {
             val order = LinkedHashSet<Int>()
             for (c in constraints) for (lit in c.literals) order.add(Lit.variable(lit))
             BoolVars(order.toIntArray())

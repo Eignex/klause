@@ -28,8 +28,12 @@ class FactorProjectionProviders(
     encodingTargets: Set<EncodingTarget> = emptySet(),
 ) {
     /** Construct the built-in provider selection. */
-    constructor() : this(BuiltInPropagationProjectionProvider, BuiltInScoringProjectionProvider,
-        BuiltInRelaxationProjectionProvider, BuiltInEncoderProvider)
+    constructor() : this(
+        BuiltInPropagationProjectionProvider,
+        BuiltInScoringProjectionProvider,
+        BuiltInRelaxationProjectionProvider,
+        BuiltInEncoderProvider,
+    )
 
     /** Select custom projection providers with the built-in encoder provider. */
     constructor(
@@ -55,7 +59,9 @@ class FactorProjectionProviders(
     internal fun capabilities(factor: Factor): FactorExecutionCapabilities {
         if (propagation === BuiltInPropagationProjectionProvider && scoring === BuiltInScoringProjectionProvider &&
             relaxation === BuiltInRelaxationProjectionProvider
-        ) return factor.defaultExecutionCapabilities()
+        ) {
+            return factor.defaultExecutionCapabilities()
+        }
         val deduction = propagation.select(factor)
         val score = scoring.select(factor)
         val rows = relaxation.select(factor)

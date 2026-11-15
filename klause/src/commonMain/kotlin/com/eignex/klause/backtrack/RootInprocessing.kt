@@ -97,7 +97,8 @@ internal class RootSimplificationPass : InprocessingPass {
                 }
                 if (!retirement.prepare(session, params, budget)) return@run
                 if (!admitNewWork && !retirement.selectionPending && pending == null &&
-                    session.pendingRootSourceRetirement == null) {
+                    session.pendingRootSourceRetirement == null
+                ) {
                     retirement.advance(session, params, budget)
                     return@run
                 }
@@ -180,10 +181,19 @@ internal class RootSimplificationPass : InprocessingPass {
             }
             val source = factor < session.problem.numFactors
             if (!source && !retirement.hasCapture) {
-                when (retirement.capture(session, factor - session.problem.numFactors,
-                    session.learnedRetirementGeneration, params, budget)) {
+                when (
+                    retirement.capture(
+                    session,
+                    factor - session.problem.numFactors,
+                    session.learnedRetirementGeneration,
+                    params,
+                    budget,
+                )
+                ) {
                     LearnedRetirementStatus.Captured -> Unit
+
                     LearnedRetirementStatus.Deferred -> return
+
                     else -> {
                         pending = null
                         continue
@@ -199,8 +209,11 @@ internal class RootSimplificationPass : InprocessingPass {
                 val before = session.work
                 session.addRootDerivedClause(Clause(residual.toIntArray()), lbd, origin, source, ownedLiterals = true)
                 pending = null
-                if (source) session.retainRootSourceRetirement(factor, literals)
-                else retirement.markSelected()
+                if (source) {
+                    session.retainRootSourceRetirement(factor, literals)
+                } else {
+                    retirement.markSelected()
+                }
                 budget.note("AttachmentWork", session.work - before + residual.size * 2 + 1L)
                 budget.note("Shortened")
                 if (!session.canSimplifyRoot) break
@@ -210,7 +223,9 @@ internal class RootSimplificationPass : InprocessingPass {
                 if (!budget.visit(literals.size + 1)) break
                 session.retireRootSource(factor, literals)
                 budget.note("RetirementWork", literals.size + 1L)
-            } else if (satisfied) retirement.markSelected()
+            } else if (satisfied) {
+                retirement.markSelected()
+            }
             pending = null
             if (!source) break
         }
@@ -238,7 +253,8 @@ internal class RootSimplificationPass : InprocessingPass {
         if (nearbyFirst) neighborhoodFactor(session, budget)?.let { return it }
         if (budget.stopped()) return null
         if (sourceNeighborhoodAvailable && pinCursor == session.explanationState.boolPinOrder.size &&
-            cursor < session.problem.numFactors) {
+            cursor < session.problem.numFactors
+        ) {
             if (!budget.visit()) return null
             // Every source clause changed by a root pin belongs to its completed occurrence walk.
             budget.note("SourceSkipped", (session.problem.numFactors - cursor).toLong())
@@ -257,7 +273,9 @@ internal class RootSimplificationPass : InprocessingPass {
             val variable = pins[pinCursor]
             val occurrences = if (variable < session.problem.numBoolVars) {
                 session.projection.readyBoolOccurrences(variable)
-            } else null
+            } else {
+                null
+            }
             if (variable < session.problem.numBoolVars && occurrences == null) {
                 sourceNeighborhoodAvailable = false
                 pinCursor = pins.size
@@ -384,7 +402,8 @@ internal class RootProbingPass : InprocessingPass {
         while (!budget.stopped()) {
             val row = neighborhood
             if (row != null && (!binariesOnly || row.size == 2) &&
-                session.isLearnedClause(neighborhoodIndex) && neighborhoodPosition < row.size) {
+                session.isLearnedClause(neighborhoodIndex) && neighborhoodPosition < row.size
+            ) {
                 return Lit.negate(row[neighborhoodPosition])
             }
             neighborhood = null
@@ -395,8 +414,12 @@ internal class RootProbingPass : InprocessingPass {
             budget.note("NeighborhoodCandidates")
             val size = session.learnedClauseLiteralCount(index)
             if (size !in 2..PROBE_NEIGHBORHOOD_LITERALS || (binariesOnly && size != 2)) continue
-            val literals = session.rootClauseLiterals(session.problem.numFactors + index,
-                PROBE_NEIGHBORHOOD_LITERALS, includePermanent = true, includeAtoms = true) ?: continue
+            val literals = session.rootClauseLiterals(
+                session.problem.numFactors + index,
+                PROBE_NEIGHBORHOOD_LITERALS,
+                includePermanent = true,
+                includeAtoms = true,
+            ) ?: continue
             if (literals.size == 2 && literals[0] == Lit.negate(literals[1])) continue
             if (literals.any { budget.truth(it) == true }) continue
             if (literals.size == 2) learnedBinarySeen = true
@@ -415,8 +438,10 @@ internal class RootProbingPass : InprocessingPass {
         containingWork: Long,
     ) {
         if (!session.canSimplifyRoot || params.rootProbeWork <= 0L) return
-        val opportunityClock = params.rootProbeBinaryGate || (params.rootProbeGeneralGate &&
-            !session.usesNativeSat && session.problem.numIntVars == 0)
+        val opportunityClock = params.rootProbeBinaryGate || (
+            params.rootProbeGeneralGate &&
+            !session.usesNativeSat && session.problem.numIntVars == 0
+        )
         spending.run(session, params, stats, containingWork = containingWork) { budget ->
             if (implications.advance(session, params, budget) && !budget.stopped()) {
                 val before = session.work
@@ -451,16 +476,19 @@ internal class RootProbingPass : InprocessingPass {
             val neighborhoodOnly = binariesOnly || (generalGate && !exploreGeneral && withoutRootSignal)
             if (!generalGate || !neighborhoodOnly) mirroredLiteral = -1
             if (generalGate) {
-                budget.note(when {
-                    rootPins > 0 -> "GeneralRootFacts"
-                    withoutRootSignal && exploreGeneral -> "GeneralExploration"
-                    withoutRootSignal -> "GeneralNeighborhoodOnly"
-                    else -> "GeneralBinaryHint"
-                })
+                budget.note(
+                    when {
+                        rootPins > 0 -> "GeneralRootFacts"
+                        withoutRootSignal && exploreGeneral -> "GeneralExploration"
+                        withoutRootSignal -> "GeneralNeighborhoodOnly"
+                        else -> "GeneralBinaryHint"
+                    },
+                )
             }
             if (neighborhoodOnly && mirroredLiteral < 0 && neighborhood == null &&
                 revision == session.learnedRetirementGeneration &&
-                learnedCursor >= session.learnedClauseCount) {
+                learnedCursor >= session.learnedClauseCount
+            ) {
                 budget.note(if (binariesOnly) "NoPropagationOpportunity" else "GlobalDeferred")
                 break
             }
@@ -468,7 +496,9 @@ internal class RootProbingPass : InprocessingPass {
             val mirrored = mirroredLiteral.takeIf { it >= 0 }
             val nearby = mirrored ?: if (neighborhoodOnly || preferNeighborhood) {
                 neighborhoodLiteral(session, budget, binariesOnly)
-            } else null
+            } else {
+                null
+            }
             if (budget.stopped()) break
             if (neighborhoodOnly && nearby == null) {
                 budget.note(if (binariesOnly) "NoPropagationOpportunity" else "GlobalDeferred")
@@ -481,6 +511,7 @@ internal class RootProbingPass : InprocessingPass {
                     if (mirrored == null) neighborhoodPosition++
                     nearby.toLong()
                 }
+
                 endpoint -> {
                     val next = endpointCursor % endpointCandidates
                     endpointCursor = (next + 1L) % endpointCandidates
@@ -488,6 +519,7 @@ internal class RootProbingPass : InprocessingPass {
                     preferEndpoint = false
                     next
                 }
+
                 else -> {
                     val next = literalCursor % literalCandidates
                     literalCursor = (next + 1L) % literalCandidates
@@ -515,7 +547,9 @@ internal class RootProbingPass : InprocessingPass {
                         if (mirrored != null) mirroredLiteral = -1
                         continue
                     }
-                } else if (!session.canProbeRootAtom(variable) || budget.truth(literal) != null) continue
+                } else if (!session.canProbeRootAtom(variable) || budget.truth(literal) != null) {
+                    continue
+                }
                 0L
             }
             val capture = !endpoint && variable < session.problem.numBoolVars &&
@@ -554,6 +588,7 @@ internal class RootProbingPass : InprocessingPass {
                     if (mirrored != null) budget.note("MirrorIncomplete")
                     if (!params.cancellation()) session.probeCancelled = priorCancelled
                 }
+
                 is PropagationResult.Unsat -> {
                     budget.note("Refuted")
                     if (mirrored != null) budget.note("MirrorRefuted")
@@ -566,6 +601,7 @@ internal class RootProbingPass : InprocessingPass {
                     if (endpoint) budget.note("EndpointUnits")
                     if (nearby != null) neighborhood = null
                 }
+
                 else -> {
                     budget.note("Consistent")
                     if (emptyNeighborhood) mirroredLiteral = Lit.negate(literal)
@@ -584,8 +620,11 @@ internal class RootProbingPass : InprocessingPass {
     ): Int {
         if (integer < 0) return Lit.negate(literal)
         val atomSpace = session.rootProbeVariableCount
-        val unit = if (atMost) session.boundLeLit(integer, bound, false)
-            else session.boundGeLit(integer, bound, false)
+        val unit = if (atMost) {
+            session.boundLeLit(integer, bound, false)
+        } else {
+            session.boundGeLit(integer, bound, false)
+        }
         if (session.rootProbeVariableCount > atomSpace) {
             // Conservatively charge parallel registry buffers and threshold-index growth.
             val atoms = session.rootProbeVariableCount - session.problem.numBoolVars

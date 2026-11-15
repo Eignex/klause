@@ -199,8 +199,11 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         } finally {
             attribution?.let {
                 it.note(family, FactorAttribution.Metric.ReasonWork, state.work - before)
-                it.note(family, FactorAttribution.Metric.ReasonNanos,
-                    requireNotNull(start).elapsedNow().inWholeNanoseconds)
+                it.note(
+                    family,
+                    FactorAttribution.Metric.ReasonNanos,
+                    requireNotNull(start).elapsedNow().inWholeNanoseconds,
+                )
             }
         }
         if (seedReason == null) {
@@ -394,7 +397,9 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             selectedFamilies = state.factorAttribution?.analysisFamilies ?: 0
             if (fallback !is AnalysisResult.Learned || !fallback.asserting || state.runCancelled ||
                 fallback.literals.size > 64
-            ) return fallback
+            ) {
+                return fallback
+            }
             val prepared = choice.prepare(fallback.literals)
             state.finiteWork.checkNow()
             state.arithmeticLearningTrace?.record(if (prepared) "table.retry" else "table.decline")
@@ -412,8 +417,13 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             }
             if (!improves) return fallback
             state.factorAttribution?.note(1 shl FactorFamily.Table.ordinal, FactorAttribution.Metric.RefinementAccepted)
-            state.arithmeticLearningTrace?.record("table.accepted", fallback.backjumpLevel.toLong(),
-                alternate.backjumpLevel.toLong(), fallback.literals.size.toLong(), alternate.literals.size.toLong())
+            state.arithmeticLearningTrace?.record(
+                "table.accepted",
+                fallback.backjumpLevel.toLong(),
+                alternate.backjumpLevel.toLong(),
+                fallback.literals.size.toLong(),
+                alternate.literals.size.toLong(),
+            )
             lastResolvent = alternateResolvent
             selectedFamilies = state.factorAttribution?.analysisFamilies ?: 0
             return alternate

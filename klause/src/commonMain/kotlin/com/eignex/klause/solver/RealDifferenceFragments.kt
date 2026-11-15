@@ -172,8 +172,15 @@ private class RealDifferenceFragment(
             val numerator = edge.bound.num.toLongExact()
             if (numerator < -room / multiplier || numerator > room / multiplier) return null
             edge.selector?.let { selectors[result.size] = it }
-            result.add(DifferenceEdge(edge.source, edge.target,
-                numerator * multiplier - if (edge.strict) 1L else 0L, edge.guard, edge.domain))
+            result.add(
+                DifferenceEdge(
+                edge.source,
+                edge.target,
+                numerator * multiplier - if (edge.strict) 1L else 0L,
+                edge.guard,
+                edge.domain,
+            )
+            )
         }
         if (stop()) return null
         return DifferenceSystem(result, privateVertices = true, indexGuards = selectors)

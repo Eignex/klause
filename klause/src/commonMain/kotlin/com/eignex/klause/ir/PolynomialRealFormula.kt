@@ -4,14 +4,19 @@ package com.eignex.klause.ir
 enum class PolynomialRelation {
     /** Equality. */
     EQ,
+
     /** Disequality. */
     NE,
+
     /** Strictly less. */
     LT,
+
     /** Less or equal. */
     LE,
+
     /** Strictly greater. */
     GT,
+
     /** Greater or equal. */
     GE,
 }
@@ -23,11 +28,13 @@ sealed interface PolynomialRealFormula {
         /** Constant truth value. */
         val value: Boolean,
     ) : PolynomialRealFormula
+
     /** A Boolean coordinate in the owning scope. */
     data class BooleanVariable(
         /** Typed Boolean coordinate. */
         val id: SourceBoolId,
     ) : PolynomialRealFormula
+
     /** Exact polynomial comparison. */
     class Atom(
         /** Left expression. */
@@ -41,7 +48,6 @@ sealed interface PolynomialRealFormula {
         override fun hashCode(): Int = hash
         override fun equals(other: Any?): Boolean = other is Atom && polynomialFormulasEqual(this, other)
     }
-
 
     /** Logical complement of the complete operand. */
     class Not(
@@ -57,6 +63,7 @@ sealed interface PolynomialRealFormula {
     class And(operands: List<PolynomialRealFormula>) : PolynomialRealFormula {
         private val values = operands.toTypedArray()
         internal val operandCount: Int get() = values.size
+
         /** Captured operands in syntax order. */
         val operands: List<PolynomialRealFormula> get() = values.toList()
         override fun equals(other: Any?): Boolean = other is And && polynomialFormulasEqual(this, other)
@@ -68,6 +75,7 @@ sealed interface PolynomialRealFormula {
     class Or(operands: List<PolynomialRealFormula>) : PolynomialRealFormula {
         private val values = operands.toTypedArray()
         internal val operandCount: Int get() = values.size
+
         /** Captured operands in syntax order. */
         val operands: List<PolynomialRealFormula> get() = values.toList()
         override fun equals(other: Any?): Boolean = other is Or && polynomialFormulasEqual(this, other)
@@ -102,30 +110,40 @@ internal fun PolynomialRealFormula.remap(remap: VarRemap): PolynomialRealFormula
         }
         when (node) {
             is PolynomialRealFormula.Constant -> values.addLast(node)
+
             is PolynomialRealFormula.BooleanVariable -> values.addLast(
                 PolynomialRealFormula.BooleanVariable(
                     requireNotNull(remap.bool(node.id)) { "removed polynomial Boolean variable" },
                 ),
             )
+
             is PolynomialRealFormula.Atom -> values.addLast(
                 PolynomialRealFormula.Atom(node.left.remap(remap), node.relation, node.right.remap(remap)),
             )
+
             is PolynomialDistinct -> values.addLast(PolynomialDistinct(node.operands.map { it.remap(remap) }))
+
             is PolynomialSelection -> if (combine) {
-                values.addLast(PolynomialSelection(
+                values.addLast(
+                    PolynomialSelection(
                     requireNotNull(remap.real(node.result)) { "removed polynomial selection result" },
-                    values.removeLast(), node.whenTrue.remap(remap), node.whenFalse.remap(remap),
-                ))
+                    values.removeLast(),
+                    node.whenTrue.remap(remap),
+                    node.whenFalse.remap(remap),
+                )
+                )
             } else {
                 work.addLast(node to true)
                 work.addLast(node.condition to false)
             }
+
             is PolynomialRealFormula.Not -> if (combine) {
                 values.addLast(PolynomialRealFormula.Not(values.removeLast()))
             } else {
                 work.addLast(node to true)
                 work.addLast(node.operand to false)
             }
+
             is PolynomialRealFormula.And, is PolynomialRealFormula.Or -> {
                 val operands = when (node) {
                     is PolynomialRealFormula.And -> node.operands
@@ -134,8 +152,11 @@ internal fun PolynomialRealFormula.remap(remap: VarRemap): PolynomialRealFormula
                 if (combine) {
                     val args = List(operands.size) { values.removeLast() }.reversed()
                     values.addLast(
-                        if (node is PolynomialRealFormula.And) PolynomialRealFormula.And(args)
-                        else PolynomialRealFormula.Or(args),
+                        if (node is PolynomialRealFormula.And) {
+                            PolynomialRealFormula.And(args)
+                        } else {
+                            PolynomialRealFormula.Or(args)
+                        },
                     )
                 } else {
                     work.addLast(node to true)
@@ -153,11 +174,7 @@ internal fun PolynomialRealFormula.remap(remap: VarRemap): PolynomialRealFormula
     return values.single()
 }
 
-internal fun PolynomialRealFormula.requireVariableCounts(
-    boolCount: Int,
-    realCount: Int,
-    checkpoint: () -> Unit = {},
-) {
+internal fun PolynomialRealFormula.requireVariableCounts(boolCount: Int, realCount: Int, checkpoint: () -> Unit = {}) {
     require(boolCount >= 0 && realCount >= 0) { "negative polynomial variable count" }
     val formulas = ArrayDeque<PolynomialRealFormula>()
     val expressions = ArrayDeque<PolynomialExpression>()
@@ -170,22 +187,29 @@ internal fun PolynomialRealFormula.requireVariableCounts(
         if (!seenFormulas.add(node)) continue
         when (node) {
             is PolynomialRealFormula.Constant -> Unit
+
             is PolynomialRealFormula.BooleanVariable -> require(node.id.index < boolCount) {
                 "polynomial Boolean id out of range"
             }
+
             is PolynomialRealFormula.Atom -> {
                 expressions.addLast(node.left)
                 expressions.addLast(node.right)
             }
+
             is PolynomialDistinct -> expressions.addAll(node.operands)
+
             is PolynomialSelection -> {
                 require(node.result.index < realCount) { "polynomial selection result out of range" }
                 formulas.addLast(node.condition)
                 expressions.addLast(node.whenTrue)
                 expressions.addLast(node.whenFalse)
             }
+
             is PolynomialRealFormula.Not -> formulas.addLast(node.operand)
+
             is PolynomialRealFormula.And -> formulas.addAll(node.operands)
+
             is PolynomialRealFormula.Or -> formulas.addAll(node.operands)
         }
     }
@@ -214,29 +238,39 @@ private fun polynomialFormulasEqual(left: PolynomialRealFormula, right: Polynomi
             is PolynomialRealFormula.Constant -> {
                 if (second !is PolynomialRealFormula.Constant || first.value != second.value) return false
             }
+
             is PolynomialRealFormula.BooleanVariable -> {
                 if (second !is PolynomialRealFormula.BooleanVariable || first.id != second.id) return false
             }
+
             is PolynomialRealFormula.Atom -> {
                 if (second !is PolynomialRealFormula.Atom || first.relation != second.relation ||
                     !polynomialExpressionsEqual(first.left, second.left) ||
                     !polynomialExpressionsEqual(first.right, second.right)
-                ) return false
+                ) {
+                    return false
+                }
             }
+
             is PolynomialDistinct -> {
                 if (second !is PolynomialDistinct || first.operands != second.operands) return false
             }
+
             is PolynomialSelection -> {
                 if (second !is PolynomialSelection || first.result != second.result ||
                     !polynomialExpressionsEqual(first.whenTrue, second.whenTrue) ||
                     !polynomialExpressionsEqual(first.whenFalse, second.whenFalse)
-                ) return false
+                ) {
+                    return false
+                }
                 work.addLast(first.condition to second.condition)
             }
+
             is PolynomialRealFormula.Not -> {
                 if (second !is PolynomialRealFormula.Not) return false
                 work.addLast(first.operand to second.operand)
             }
+
             is PolynomialRealFormula.And, is PolynomialRealFormula.Or -> {
                 val firstOperands: List<PolynomialRealFormula>
                 val secondOperands: List<PolynomialRealFormula>
@@ -246,6 +280,7 @@ private fun polynomialFormulasEqual(left: PolynomialRealFormula, right: Polynomi
                         firstOperands = first.operands
                         secondOperands = second.operands
                     }
+
                     is PolynomialRealFormula.Or -> {
                         if (second !is PolynomialRealFormula.Or) return false
                         firstOperands = first.operands

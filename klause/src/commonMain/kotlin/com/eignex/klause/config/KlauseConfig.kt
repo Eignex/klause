@@ -193,8 +193,13 @@ data class KlauseConfig(
         }
 
         private val retiredSourceKnobs = listOf(
-            "pinAbsentOptVars", "unboundedIntLo", "unboundedIntHi", "floatBuckets", "floatScale",
-            "unboundedFloatLo", "unboundedFloatHi",
+            "pinAbsentOptVars",
+            "unboundedIntLo",
+            "unboundedIntHi",
+            "floatBuckets",
+            "floatScale",
+            "unboundedFloatLo",
+            "unboundedFloatHi",
         )
     }
 }

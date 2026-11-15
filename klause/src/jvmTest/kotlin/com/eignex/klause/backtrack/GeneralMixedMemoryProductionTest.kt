@@ -30,8 +30,12 @@ class GeneralMixedMemoryProductionTest(private val cap: Int) {
     @Test
     fun `production grants should release growing mixed tails while retaining every live owner`() {
         val floor = Clause(intArrayOf(8, 10))
-        val problem = Problem(6, 3, Array(3) { IntDomain(0, 10) },
-            arrayOf(floor, Clause(intArrayOf(1)), Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10)))
+        val problem = Problem(
+            6,
+            3,
+            Array(3) { IntDomain(0, 10) },
+            arrayOf(floor, Clause(intArrayOf(1)), Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10)),
+        )
         val session = PropagationSession(problem, nativeSat = false, pbLearning = true)
         val shared = SearchSession(emptyList())
         shared.learn(SearchExplanation(intArrayOf(8, 10)))
@@ -40,8 +44,19 @@ class GeneralMixedMemoryProductionTest(private val cap: Int) {
         repeat(cap - 3) { session.addLearnedClause(floor, 2, permanent = true) }
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
         for (bound in listOf(8L, 6L)) {
-            val row = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
-                longArrayOf(1), intArrayOf(0), LinearOp.LE, bound), useLo = true))
+            val row = assertNotNull(
+                IntegerConflictRow.source(
+                    LinearPropagator(
+                intArrayOf(),
+                intArrayOf(0),
+                longArrayOf(1),
+                intArrayOf(0),
+                LinearOp.LE,
+                bound,
+            ),
+                useLo = true
+                )
+            )
             session.addLearnedIntegerRow(row, 9)
         }
         val state = session.explanationState
@@ -55,8 +70,19 @@ class GeneralMixedMemoryProductionTest(private val cap: Int) {
         val integerReason = state.intMaxReason[0]
         val generation = session.learnedRetirementGeneration
         val params = BacktrackPresets.satOptimized(maxLearnedClauses = cap, inprocess = false)
-        val unused = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(1, 2),
-            longArrayOf(1, 1), intArrayOf(1, 2), LinearOp.LE, 20L), useLo = true))
+        val unused = assertNotNull(
+            IntegerConflictRow.source(
+                LinearPropagator(
+            intArrayOf(),
+            intArrayOf(1, 2),
+            longArrayOf(1, 1),
+            intArrayOf(1, 2),
+            LinearOp.LE,
+            20L,
+        ),
+            useLo = true
+            )
+        )
         repeat(3) {
             repeat(64) {
                 session.addLearnedClause(Clause(intArrayOf(4, 6)), 9)

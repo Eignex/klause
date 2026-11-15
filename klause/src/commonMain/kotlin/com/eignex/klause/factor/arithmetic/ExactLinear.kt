@@ -35,12 +35,15 @@ class ExactLinear private constructor(
     override val relation: LinearOp,
     override val strict: Boolean,
     override val activator: Int,
-) : Factor, LinearRow {
+) : Factor,
+    LinearRow {
     override val size: Int get() = references.size
     override fun ref(k: Int): Int = references[k]
     override val constants: IntegralConstants = if (rhs.fitsLong() && coefficients.all { it.fitsLong() }) {
         IntegerConstants(constsOf(LongArray(coefficients.size) { coefficients[it].toLongExact() }), rhs.toLongExact())
-    } else WideConstants(WideConsts(coefficients), rhs)
+    } else {
+        WideConstants(WideConsts(coefficients), rhs)
+    }
     override val linearForm: LinearForm = LinearForm.Conjunction(listOf(this))
     override val variables: MixedVars = MixedVars(
         boundInts = references.filter(Term::isInt).map(Term::intVar).toIntArray(),
@@ -51,12 +54,22 @@ class ExactLinear private constructor(
     override fun remap(mapping: VarRemap): ExactLinear = of(
         IntArray(size) { k ->
             val reference = ref(k)
-            if (Term.isInt(reference)) Term.ofIntVar(mapping.int(Term.intVar(reference)))
-            else Term.ofRealVar(mapping.real(Term.realVar(reference)))
+            if (Term.isInt(reference)) {
+                Term.ofIntVar(mapping.int(Term.intVar(reference)))
+            } else {
+                Term.ofRealVar(mapping.real(Term.realVar(reference)))
+            }
         },
-        coefficients.map { BigFraction.of(it, BIG_ONE) }, relation, BigFraction.of(rhs, BIG_ONE), strict,
-        if (activator == LinearRow.ALWAYS) activator else mapping.bool(activator).also {
+        coefficients.map { BigFraction.of(it, BIG_ONE) },
+        relation,
+        BigFraction.of(rhs, BIG_ONE),
+        strict,
+        if (activator == LinearRow.ALWAYS) {
+            activator
+        } else {
+            mapping.bool(activator).also {
             require(it >= 0) { "removed exact row activator" }
+        }
         },
     )
 
@@ -121,8 +134,14 @@ class ExactLinear private constructor(
             val multiplier = BigFraction.of(if (relation == LinearOp.GE) -denominator else denominator, BIG_ONE)
             val integerStrict = strict && kept.keys.none(Term::isReal)
             val bound = (rhs * multiplier).num - if (integerStrict) BIG_ONE else BIG_ZERO
-            return ExactLinear(kept.keys.toIntArray(), kept.values.map { (it * multiplier).num }.toTypedArray(),
-                bound, if (relation == LinearOp.GE) LinearOp.LE else relation, strict && !integerStrict, activator)
+            return ExactLinear(
+                kept.keys.toIntArray(),
+                kept.values.map { (it * multiplier).num }.toTypedArray(),
+                bound,
+                if (relation == LinearOp.GE) LinearOp.LE else relation,
+                strict && !integerStrict,
+                activator,
+            )
         }
     }
 }

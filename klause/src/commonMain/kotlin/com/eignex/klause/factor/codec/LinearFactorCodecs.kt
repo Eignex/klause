@@ -27,7 +27,10 @@ internal class LinearPayload(
     val op: LinearOp,
     val coefficients: LongArray? = null,
     val bound: Long? = null,
-    val wideCoefficients: List<@Serializable(with = BigIntSerializer::class) BigInt>? = null,
+    val wideCoefficients: List<
+        @Serializable(with = BigIntSerializer::class)
+        BigInt,
+        >? = null,
     @Serializable(with = BigIntSerializer::class) val wideBound: BigInt? = null,
     val realVars: IntArray? = null,
     val intCoefficients: DoubleArray? = null,
@@ -43,7 +46,10 @@ internal class ReifiedLinearPayload(
     val op: LinearOp,
     val coefficients: LongArray? = null,
     val bound: Long? = null,
-    val wideCoefficients: List<@Serializable(with = BigIntSerializer::class) BigInt>? = null,
+    val wideCoefficients: List<
+        @Serializable(with = BigIntSerializer::class)
+        BigInt,
+        >? = null,
     @Serializable(with = BigIntSerializer::class) val wideBound: BigInt? = null,
 )
 
@@ -51,7 +57,10 @@ internal class ReifiedLinearPayload(
 @Serializable
 internal class ExactLinearPayload(
     val terms: IntArray,
-    val coefficients: List<@Serializable(with = BigIntSerializer::class) BigInt>,
+    val coefficients: List<
+        @Serializable(with = BigIntSerializer::class)
+        BigInt,
+        >,
     @Serializable(with = BigIntSerializer::class) val bound: BigInt,
     val op: LinearOp,
     val strict: Boolean = false,
@@ -78,9 +87,14 @@ internal class ComparisonClausePayload(val vars: IntArray, val ops: List<LinearO
 
 private fun Linear.payload(): LinearPayload = when (val c = constants) {
     is IntegerConstants -> LinearPayload(vars, op, coefficients = c.coeffs, bound = c.bound)
+
     is WideConstants -> LinearPayload(
-        vars, op, wideCoefficients = c.coefficients.toTypedArray().toList(), wideBound = c.bound,
+        vars,
+        op,
+        wideCoefficients = c.coefficients.toTypedArray().toList(),
+        wideBound = c.bound,
     )
+
     is RealConstants -> LinearPayload(
         vars,
         op,
@@ -99,7 +113,10 @@ private fun LinearPayload.toLinear(): Linear {
             "real row fields need 'realVars'"
         }
         return integralRow(
-            coefficients, bound, wideCoefficients, wideBound,
+            coefficients,
+            bound,
+            wideCoefficients,
+            wideBound,
             { coeffs, bound -> Linear(coeffs, vars, op, bound) },
             { coeffs, bound -> Linear(vars, coeffs, op, bound) },
         )
@@ -150,12 +167,21 @@ internal fun linearFactorCodecs(): List<FactorCodec<*, *>> = listOf(
         { row ->
             val c = row.constants
             ReifiedLinearPayload(
-                row.auxBoolVar, row.vars, row.op, c.longCoefficients, c.longBound, c.wideCoefficients, c.wideBound,
+                row.auxBoolVar,
+                row.vars,
+                row.op,
+                c.longCoefficients,
+                c.longBound,
+                c.wideCoefficients,
+                c.wideBound,
             )
         },
         { p ->
             integralRow(
-                p.coefficients, p.bound, p.wideCoefficients, p.wideBound,
+                p.coefficients,
+                p.bound,
+                p.wideCoefficients,
+                p.wideBound,
                 { coeffs, bound -> ReifiedLinear(p.reified, coeffs, p.vars, p.op, bound) },
                 { coeffs, bound -> ReifiedLinear(p.reified, p.vars, coeffs, p.op, bound) },
             )
@@ -171,12 +197,26 @@ internal fun linearFactorCodecs(): List<FactorCodec<*, *>> = listOf(
         "reifiedRealLinear",
         {
             ReifiedRealLinearPayload(
-                it.aux, it.vars, it.intCoeffs, it.realVars, it.realCoeffs, it.op, it.bound, it.strict,
+                it.aux,
+                it.vars,
+                it.intCoeffs,
+                it.realVars,
+                it.realCoeffs,
+                it.op,
+                it.bound,
+                it.strict,
             )
         },
         {
             ReifiedRealLinear(
-                it.reified, it.vars, it.intCoefficients, it.realVars, it.realCoefficients, it.op, it.bound, it.strict,
+                it.reified,
+                it.vars,
+                it.intCoefficients,
+                it.realVars,
+                it.realCoefficients,
+                it.op,
+                it.bound,
+                it.strict,
             )
         },
     ),

@@ -53,8 +53,8 @@ internal class LinearInputRevision(
         }
         if (!work.stopped) {
             for (factor in added) {
-            if (!record(factor, 1, work)) break
-        }
+                if (!record(factor, 1, work)) break
+            }
         }
         dirty = dirty || deductionsChanged
         complete = work.check()

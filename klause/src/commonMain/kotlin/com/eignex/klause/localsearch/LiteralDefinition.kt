@@ -79,7 +79,9 @@ internal fun literalDefinitions(
         val bounds = problem.intBounds
         if (!bounds.hasLower(variable) || !bounds.hasUpper(variable) ||
             bounds.lower(variable) < 0L || bounds.upper(variable) > 1L
-        ) continue
+        ) {
+            continue
+        }
         val literal = Lit.make(row.auxBoolVar, constants.bound == 1L)
         channels.add(LiteralIntDefinition(row.vars[0], literal))
         channelRows[i] = true
@@ -99,9 +101,13 @@ internal fun literalDefinitions(
         if (row.vars.size != 1) continue
         val constants = row.integerConstants ?: continue
         if (constants.coeff(0) != 1L && constants.coeff(0) != -1L) continue
-        if (constants.coeff(0) == -1L && (constants.bound == Long.MIN_VALUE ||
-                !problem.intBounds.hasLower(row.vars[0]) || problem.intBounds.lower(row.vars[0]) == Long.MIN_VALUE)
-        ) continue
+        if (constants.coeff(0) == -1L && (
+            constants.bound == Long.MIN_VALUE ||
+                !problem.intBounds.hasLower(row.vars[0]) || problem.intBounds.lower(row.vars[0]) == Long.MIN_VALUE
+        )
+        ) {
+            continue
+        }
         sources[row.auxBoolVar] = row
     }
     val predicates = ArrayList<UnaryPredicateDefinition>()
@@ -114,15 +120,23 @@ internal fun literalDefinitions(
         val constants = checkNotNull(row.integerConstants)
         val reversed = constants.coeff(0) == -1L
         val value = if (reversed) -constants.bound else constants.bound
-        val op = if (reversed) when (row.op) {
+        val op = if (reversed) {
+            when (row.op) {
             LinearOp.LE -> LinearOp.GE
             LinearOp.GE -> LinearOp.LE
             else -> row.op
-        } else row.op
-        predicates.add(if (op == LinearOp.EQ) EqualityPredicateDefinition(b, row.vars[0], value)
-        else ComparisonPredicateDefinition(b, row.vars[0], value, op))
+        }
+        } else {
+            row.op
+        }
+        predicates.add(
+            if (op == LinearOp.EQ) {
+                EqualityPredicateDefinition(b, row.vars[0], value)
+            } else {
+                ComparisonPredicateDefinition(b, row.vars[0], value, op)
+            },
+        )
         claimed[b] = true
     }
     return orderedDefinitions(problem, nodes + predicates + channels, cancellation)
 }
-

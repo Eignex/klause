@@ -81,7 +81,11 @@ internal object OpbDecoder {
                     val relation = lowerRelation(builder, statement.relation)
                     if (statement.softCost == null) {
                         builder.factors += PseudoBoolean(
-                            relation.weights, relation.literals, relation.op, relation.bound)
+                            relation.weights,
+                            relation.literals,
+                            relation.op,
+                            relation.bound,
+                        )
                     } else {
                         val sat = builder.newBool()
                         builder.factors += ReifiedPseudoBoolean(
@@ -146,11 +150,8 @@ internal object OpbDecoder {
 
     private class Relation(val weights: Array<BigInt>, val literals: IntArray, val op: PbOp, val bound: BigInt)
 
-    private class Builder(
-        numDeclaredVars: Int,
-        settings: ProblemSettings,
-        semantics: EffectiveSourceSemantics,
-    ) : CnfLowering {
+    private class Builder(numDeclaredVars: Int, settings: ProblemSettings, semantics: EffectiveSourceSemantics) :
+        CnfLowering {
         private val problemBuilder = ProblemBuilder(settings, semantics)
 
         override val factors get() = problemBuilder.factors
@@ -171,7 +172,6 @@ internal object OpbDecoder {
         }
 
         override fun newBool(): Int = problemBuilder.newBool()
-
 
         fun literalFor(term: OpbTerm): Int {
             if (term.literals.size == 1) return term.literals[0]
@@ -212,8 +212,6 @@ internal object OpbDecoder {
         }
         return value.toLongExact()
     }
-
-
 }
 
 /** Lower this parsed OPB document to a solver problem. */

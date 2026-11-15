@@ -48,7 +48,8 @@ internal class TranscendentalWorkerAdapter(
     private val params: TranscendentalTheoryParams,
     private val engine: FiniteEngine,
     private val binding: EngineInvocation? = null,
-) : ExactNeighborhoodCompletion, AutoCloseable {
+) : ExactNeighborhoodCompletion,
+    AutoCloseable {
     private val started = TimeSource.Monotonic.markNow()
     private val external = params.timeout.withAccounting(params.cancellation) or params.cancellation
     private val nodeBudget = params.nodeBudget ?: params.strategy.backtrack.nodeBudget
@@ -58,8 +59,12 @@ internal class TranscendentalWorkerAdapter(
     private val service: TranscendentalTheoryService get() {
         check(!closed) { "transcendental worker is closed" }
         return nativeService ?: TranscendentalTheoryService(
-            source, external, params.maximumWork, params.maximumBits,
-            PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells)).also { nativeService = it }
+            source,
+            external,
+            params.maximumWork,
+            params.maximumBits,
+            PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells),
+        ).also { nativeService = it }
     }
     private var closedWork = 0L
     private var closedDecline = false
@@ -85,7 +90,9 @@ internal class TranscendentalWorkerAdapter(
         }
         return TranscendentalCondition(
             PolynomialCondition(
-                pins.bools, integers + realBounds(params.realLower), integers + realBounds(params.realUpper),
+                pins.bools,
+                integers + realBounds(params.realLower),
+                integers + realBounds(params.realUpper),
             ),
             params.strictRealLower.map { source.realCoordinates[it] }.toSet(),
             params.strictRealUpper.map { source.realCoordinates[it] }.toSet(),
@@ -130,14 +137,14 @@ internal class TranscendentalWorkerAdapter(
             }
         } else {
             exactNeighborhoodWorker(
-            if (arm == 2) "alns+exact-transcendental" else "ls+exact-transcendental",
-            arm,
-            objective = null,
-            lifetime = external or params.strategy.localSearch.cancellation,
-            timeout = params.timeout,
-            exhausted = { service.exhausted || nodeBudget?.allowance?.exhausted() == true },
-            open = { neighborhood(arm == 2) },
-        )
+                if (arm == 2) "alns+exact-transcendental" else "ls+exact-transcendental",
+                arm,
+                objective = null,
+                lifetime = external or params.strategy.localSearch.cancellation,
+                timeout = params.timeout,
+                exhausted = { service.exhausted || nodeBudget?.allowance?.exhausted() == true },
+                open = { neighborhood(arm == 2) },
+            )
         }
         return worker.bindEvidence(requireNotNull(binding).model, provesResults = arm == 0)
     }
@@ -158,12 +165,19 @@ internal class TranscendentalWorkerAdapter(
 
             private fun openTraversal(rootUnknown: Boolean = false) {
                 component = TranscendentalSearchComponent(source, service, root, params.maximumDepth, rootUnknown)
-                session = SearchSession(listOf(requireNotNull(component)),
-                    cancellation = lifetime, branchers = listOf(requireNotNull(component)))
+                session = SearchSession(
+                    listOf(requireNotNull(component)),
+                    cancellation = lifetime,
+                    branchers = listOf(requireNotNull(component)),
+                )
                 run = requireNotNull(session).openRun(
                     source.boolCount,
-                    SearchSolveParams(minOf(params.strategy.backtrack.maxDecisions,
-                        params.strategy.backtrack.maxInstructions ?: Long.MAX_VALUE)),
+                    SearchSolveParams(
+                        minOf(
+                        params.strategy.backtrack.maxDecisions,
+                        params.strategy.backtrack.maxInstructions ?: Long.MAX_VALUE,
+                    )
+                    ),
                     decisionBudget = SearchDecisionBudget {
                         if (nodeBudget?.allowance?.exhausted() == true) {
                             false
@@ -174,7 +188,8 @@ internal class TranscendentalWorkerAdapter(
                     },
                     observer = object : SearchRunObserver {
                         override fun onCommit(
-                            decision: com.eignex.klause.solver.search.SearchDecision, decisionLevel: Int,
+                            decision: com.eignex.klause.solver.search.SearchDecision,
+                            decisionLevel: Int,
                         ) {
                             decisions++
                         }
@@ -187,7 +202,8 @@ internal class TranscendentalWorkerAdapter(
             }
             override val isDone: Boolean get() = result != null
             override val stats: SolveStats get() = SolveStats.EMPTY.copy(
-                search = SearchStats(nodes = SumResult(decisions.toDouble())))
+                search = SearchStats(nodes = SumResult(decisions.toDouble())),
+            )
             override val work: Long get() = nativeWork + minOf(decisions, Long.MAX_VALUE - nativeWork)
 
             override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long): SolveResult? {
@@ -207,8 +223,13 @@ internal class TranscendentalWorkerAdapter(
                         if (source.boolCount == 0) {
                             val checked = service.check(root, lifetime)
                             when (checked) {
-                                is TranscendentalCheckResult.Witness -> return finish(SolveResult.Sat(
-                                    capture(checked.value), stats))
+                                is TranscendentalCheckResult.Witness -> return finish(
+                                    SolveResult.Sat(
+                                    capture(checked.value),
+                                    stats,
+                                )
+                                )
+
                                 TranscendentalCheckResult.Refuted -> return finish(SolveResult.Unsat(stats = stats))
 
                                 TranscendentalCheckResult.Unknown -> {
@@ -221,8 +242,13 @@ internal class TranscendentalWorkerAdapter(
                         }
                     }
                     when (val event = requireNotNull(run).next()) {
-                        is SearchRunEvent.Satisfied -> finish(SolveResult.Sat(
-                            capture(requireNotNull(event.model.valueOf(requireNotNull(component).witnessKey))), stats))
+                        is SearchRunEvent.Satisfied -> finish(
+                            SolveResult.Sat(
+                            capture(requireNotNull(event.model.valueOf(requireNotNull(component).witnessKey))),
+                            stats,
+                        )
+                        )
+
                         SearchRunEvent.Exhausted -> finish(SolveResult.Unsat(stats = stats))
 
                         SearchRunEvent.Paused -> null
@@ -265,10 +291,12 @@ internal class TranscendentalWorkerAdapter(
     private fun neighborhood(adaptive: Boolean): ExactNeighborhood {
         val local = params.strategy.localSearch
         val moves = if (adaptive) minOf(local.maxFlips, params.strategy.alnsIterations.toLong()) else local.maxFlips
-        return ExactNeighborhood(source.boolCount, initialCenters(), this,
+        return ExactNeighborhood(
+            source.boolCount, initialCenters(), this,
             coordinateValues = { sample -> centers(sample) }, adaptive = adaptive, seed = local.randomSeed ?: 0,
             nodeBudget = nodeBudget?.allowance, maximumMoves = moves,
-            maximumInstructions = local.maxInstructions ?: Long.MAX_VALUE, nativeWork = { service.work })
+            maximumInstructions = local.maxInstructions ?: Long.MAX_VALUE, nativeWork = { service.work },
+        )
     }
 
     private fun walk(adaptive: Boolean): OpenTheoryResult = neighborhood(adaptive).use { neighborhood ->
@@ -289,7 +317,9 @@ internal class TranscendentalWorkerAdapter(
             return ExactNeighborhoodResult.Refuted
         }
         fun intersection(
-            current: Map<Int, BigFraction>, fixed: Map<Int, BigFraction>, lower: Boolean,
+            current: Map<Int, BigFraction>,
+            fixed: Map<Int, BigFraction>,
+            lower: Boolean,
         ): Map<Int, BigFraction> {
             val result = current.toMutableMap()
             for ((id, value) in fixed) {
@@ -300,9 +330,11 @@ internal class TranscendentalWorkerAdapter(
         }
         val lower = intersection(condition.lower, pins.lower, true)
         val upper = intersection(condition.upper, pins.upper, false)
-        val scoped = TranscendentalCondition(PolynomialCondition(condition.bools + pins.bools, lower, upper),
+        val scoped = TranscendentalCondition(
+            PolynomialCondition(condition.bools + pins.bools, lower, upper),
             root.lowerStrict.filter { lower[it] == pins.lower[it] }.toSet(),
-            root.upperStrict.filter { upper[it] == pins.upper[it] }.toSet())
+            root.upperStrict.filter { upper[it] == pins.upper[it] }.toSet(),
+        )
         return when (val result = service.check(scoped, cancellation)) {
             is TranscendentalCheckResult.Witness -> ExactNeighborhoodResult.Witness(capture(result.value))
             TranscendentalCheckResult.Refuted -> ExactNeighborhoodResult.Refuted
@@ -328,10 +360,12 @@ internal class TranscendentalWorkerAdapter(
             exactInts = integers,
             symbolicReals = reals,
             exactReals = reals.mapNotNull { it.rational }.takeIf { it.size == reals.size },
-            algebraicReals = reals.mapNotNull { it.algebraic }.takeIf { it.size == reals.size }).also { sample ->
+            algebraicReals = reals.mapNotNull { it.algebraic }.takeIf { it.size == reals.size },
+        ).also { sample ->
             binding?.let {
                 sample.witnessCertificate = EvidenceCertificate.published(
-                    CompletedEnginePublication.Witness(it, sample, null))
+                    CompletedEnginePublication.Witness(it, sample, null),
+                )
             }
         }
     }

@@ -167,12 +167,7 @@ internal class ExtensionalSupportIndex private constructor(val columns: Array<Co
             return ExtensionalSupportIndex(columns.toTypedArray(), retained)
         }
 
-        fun buildColumn(
-            count: Int,
-            maxBytes: Long = MAX_BYTES,
-            poll: () -> Unit = {},
-            value: (Int) -> Long,
-        ): Column? {
+        fun buildColumn(count: Int, maxBytes: Long = MAX_BYTES, poll: () -> Unit = {}, value: (Int) -> Long): Column? {
             poll()
             if (count.toLong() * 8 > maxBytes) return null
             val order = argsortBy(count) { a, b ->

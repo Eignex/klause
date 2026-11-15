@@ -312,6 +312,7 @@ internal class OznEvaluator(items: List<OznItem>) {
 
     private fun indexRange(value: OznValue): OznValue.RangeV = when (value) {
         is OznValue.RangeV -> value
+
         is OznValue.SetV -> {
             val sorted = value.values.distinct().sorted()
             if (sorted.isEmpty()) {
@@ -324,6 +325,7 @@ internal class OznEvaluator(items: List<OznItem>) {
                 range
             }
         }
+
         else -> throw OznParseException("array index set must be an integer set or range")
     }
 
@@ -535,11 +537,13 @@ private fun stringify3d(v: OznValue): String {
 // Render a value in top-level `output [...]` context.
 private fun stringifyForOutput(v: OznValue): String = when (v) {
     is OznValue.StringV -> v.value
+
     is OznValue.ArrayV -> if (v.axes.size == 1) {
         v.elements.joinToString("") { stringifyForOutput(it) }
     } else {
         stringifyForShow(v)
     }
+
     else -> stringifyForShow(v)
 }
 

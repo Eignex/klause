@@ -92,6 +92,7 @@ internal class LpExactState internal constructor(
     private var projectionColumns = intArrayOf()
     private var projectionCosts = intArrayOf()
     private var projectionObjective = false
+
     // Tokens identify adjacent scalar revisions without retaining a predecessor's state or cached vectors.
     private val scalarIdentity = Any()
     private var scalarPredecessor: Any? = null
@@ -129,18 +130,25 @@ internal class LpExactState internal constructor(
         val square = words * words
         val construction = 8L * entries - 2L * model.numVars + 64L
         if (square > (Long.MAX_VALUE - construction) / comparisons) throw LpProjectionStop()
-        meter.reserve(construction + comparisons * square,
-            128L * entries + 1024L + 64L * words, matrix = false)
+        meter.reserve(
+            construction + comparisons * square,
+            128L * entries + 1024L + 64L * words,
+            matrix = false,
+        )
         var witness = 0L
-        for (assertion in activeAssertions) if (assertion.witness >= witness) {
+        for (assertion in activeAssertions) {
+            if (assertion.witness >= witness) {
             if (assertion.witness == Long.MAX_VALUE) return null
             witness = assertion.witness + 1L
         }
+        }
         val side = ExactLpSide(ExactLpNumber.of(BigFraction.ofLong(endpoint) - origin))
-        return LpExactState(baseModel,
+        return LpExactState(
+            baseModel,
             activeAssertions + LpBoundAssertion(column, upper, side, witness, depth), scopeMarks,
             matrixRevision, boundRevision + 1L, objectiveRevision, popRevision, listOf(column),
-            rows, rowRevision, previous = this).also { it.inheritProjection(this) }
+            rows, rowRevision, previous = this,
+        ).also { it.inheritProjection(this) }
             .takeIf { it.conflict == null }
     }
 
@@ -178,7 +186,11 @@ internal class LpExactState internal constructor(
             for (index in shared until activeAssertions.size) touched.add(activeAssertions[index].column)
             val appended = if (source.baseModel === baseModel && shared == source.activeAssertions.size &&
                 activeAssertions.size == shared + 1
-            ) activeAssertions.last() else null
+            ) {
+                activeAssertions.last()
+            } else {
+                null
+            }
             if (appended != null) {
                 lower = if (appended.upper) source.lower else source.lower.copyOf()
                 upper = if (appended.upper) source.upper.copyOf() else source.upper
@@ -202,12 +214,20 @@ internal class LpExactState internal constructor(
             if (appended != null) {
                 val column = appended.column
                 val invalid = !model.column(column).bounds.consistent
-                inconsistent = if (source.inconsistent[column] == invalid) source.inconsistent
-                    else source.inconsistent.copyOf().also { it[column] = invalid }
+                inconsistent = if (source.inconsistent[column] == invalid) {
+                    source.inconsistent
+                } else {
+                    source.inconsistent.copyOf().also { it[column] = invalid }
+                }
                 val previousConflict = source.conflict?.column ?: -1
                 // Tightening one side cannot repair an existing conflict elsewhere.
-                firstConflict = if (!invalid) previousConflict else if (previousConflict < 0) column
-                    else minOf(column, previousConflict)
+                firstConflict = if (!invalid) {
+                    previousConflict
+                } else if (previousConflict < 0) {
+                    column
+                } else {
+                    minOf(column, previousConflict)
+                }
             } else {
                 inconsistent = if (touched.isEmpty()) source.inconsistent else source.inconsistent.copyOf()
                 for (j in touched) inconsistent[j] = !model.column(j).bounds.consistent
@@ -350,9 +370,12 @@ internal class LpExactState internal constructor(
             val old = previous.model.column(j)
             if (column.origin != old.origin || column.tag != old.tag || column.integral != old.integral) return
         }
-        deriveVectors(previous, (0 until model.numVars).filter {
+        deriveVectors(
+            previous,
+            (0 until model.numVars).filter {
             model.column(it).bounds != previous.model.column(it).bounds
-        }.toIntArray())
+        }.toIntArray()
+        )
     }
 
     private fun deriveVectors(previous: LpExactState, columns: IntArray) {
@@ -454,11 +477,16 @@ internal class LpExactState internal constructor(
         meter.poll()
         vectors?.let { return it }
         inheritedVectors?.let { previous ->
-            val bounded = if (projectionColumns.isEmpty()) previous else {
+            val bounded = if (projectionColumns.isEmpty()) {
+                previous
+            } else {
                 previous.withBounds(model, projectionColumns, meter) ?: return null
             }
-            val next = if (projectionObjective) bounded.withObjective(model, projectionCosts, meter) ?: return null
-                else bounded
+            val next = if (projectionObjective) {
+                bounded.withObjective(model, projectionCosts, meter) ?: return null
+            } else {
+                bounded
+            }
             meter.poll()
             vectors = next
             scalarsProjectable = true
@@ -727,8 +755,16 @@ private class LpVectorProjection(
             return null
         }
         meter.poll()
-        return LpVectorProjection(rhs, nextCost, upper, hasUpper, nextConstant, origins, layout,
-            nonzero.withCosts(model, columns, meter))
+        return LpVectorProjection(
+            rhs,
+            nextCost,
+            upper,
+            hasUpper,
+            nextConstant,
+            origins,
+            layout,
+            nonzero.withCosts(model, columns, meter),
+        )
     }
 }
 

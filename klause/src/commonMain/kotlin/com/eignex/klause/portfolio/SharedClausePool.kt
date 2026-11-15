@@ -117,8 +117,11 @@ internal class SharedClausePool(
                     continue
                 }
                 if (store.size == store.capacity) grow(budget)
-                if (store.append(c, isGlobal, origin, budget, softLimitBytes ?: Long.MAX_VALUE)) published++
-                else declined++
+                if (store.append(c, isGlobal, origin, budget, softLimitBytes ?: Long.MAX_VALUE)) {
+                    published++
+                } else {
+                    declined++
+                }
             }
             budget.checkpoint()
         } catch (_: Stopped) {
@@ -160,8 +163,11 @@ internal class SharedClausePool(
         if (from >= size) {
             Drained(emptyList(), emptyIntArray(), advanced)
         } else {
-            Drained(List(size - from) { store.clause(from + it) },
-                IntArray(size - from) { store.origins[from + it] }, advanced)
+            Drained(
+                List(size - from) { store.clause(from + it) },
+                IntArray(size - from) { store.origins[from + it] },
+                advanced,
+            )
         }
     }
 
@@ -219,7 +225,10 @@ internal class SharedClausePool(
 
     private fun compact(budget: Budget) {
         budget.reserve(store.size * 2L)
-        val order = IntArray(store.size) { budget.step(); it }
+        val order = IntArray(store.size) {
+            budget.step();
+            it
+        }
         sort(order, budget)
         val limit = softLimitBytes?.div(2L) ?: Long.MAX_VALUE
         var target = minOf(cap / 2, store.size / 2)
@@ -349,14 +358,21 @@ internal class SharedClausePool(
         ): Boolean {
             val key = keySlot(clause.key, budget)
             val boolOwner = if (booleanOnly && clause.boolLits.isEmpty()) -1 else ownerSlot(clause.boolLits, budget)
-            val atomOwner = if (booleanOnly) -1 else
+            val atomOwner = if (booleanOnly) {
+                -1
+            } else {
                 ownerSlot(clause.atomQuads, budget, if (owners[boolOwner] == null) boolOwner else -1)
+            }
             val boolBytes = if (boolOwner >= 0 && owners[boolOwner] == null) {
                 clause.boolLits.size.toLong() * Int.SIZE_BYTES
-            } else 0L
+            } else {
+                0L
+            }
             val atomBytes = if (atomOwner >= 0 && owners[atomOwner] == null) {
                 clause.atomQuads.size.toLong() * Long.SIZE_BYTES
-            } else 0L
+            } else {
+                0L
+            }
             if (ownedBytes + boolBytes + atomBytes > limit) return false
             budget.step()
             keys[key] = clause.key
@@ -374,13 +390,19 @@ internal class SharedClausePool(
             private fun payloadOwnerCapacity(capacity: Int, booleanOnly: Boolean): Int =
                 hashTableCapacity(if (booleanOnly) capacity else capacity * 2)
 
-            fun indexBytes(capacity: Int, booleanOnly: Boolean): Long = if (capacity == 0) 0L else
+            fun indexBytes(capacity: Int, booleanOnly: Boolean): Long = if (capacity == 0) {
+                0L
+            } else {
                 capacity.toLong() * 13L + hashTableCapacity(capacity).toLong() * 9L +
                     payloadOwnerCapacity(capacity, booleanOnly).toLong() * 8L
+            }
 
-            fun scratchEntries(capacity: Int, booleanOnly: Boolean): Long = if (capacity == 0) 0L else
+            fun scratchEntries(capacity: Int, booleanOnly: Boolean): Long = if (capacity == 0) {
+                0L
+            } else {
                 capacity.toLong() * 3L + hashTableCapacity(capacity).toLong() * 2L +
                     payloadOwnerCapacity(capacity, booleanOnly).toLong()
+            }
         }
     }
 
@@ -394,7 +416,9 @@ internal class SharedClausePool(
         var scratchEntries = 0
         private var countdown = 0
 
-        init { require(maxWork >= 0L && maxScratchEntries >= 0) }
+        init {
+            require(maxWork >= 0L && maxScratchEntries >= 0)
+        }
 
         fun step() {
             if (work >= maxWork) throw Stopped()
@@ -477,8 +501,16 @@ internal class PoolClauseExchange(
     private var sessionIdentity: Any? = null
 
     internal fun conditioned(): ClauseExchange {
-        val exchange = PoolClauseExchange(pool, origin, tally, maxLbd, maxLen,
-            skipPermanent = true, shareGlobalNogoods = false, meter = meter)
+        val exchange = PoolClauseExchange(
+            pool,
+            origin,
+            tally,
+            maxLbd,
+            maxLen,
+            skipPermanent = true,
+            shareGlobalNogoods = false,
+            meter = meter,
+        )
         return object : ClauseExchange by exchange, ConditionedClauseExchange {}
     }
 
@@ -513,7 +545,10 @@ internal class PoolClauseExchange(
     private fun admit(key: Long, session: PropagationSession? = null): Boolean? {
         val limit = pool.softLimitBytes ?: return seen.add(key)
         val added = seen.tryAddBounded(
-            key, limit, pool.reclamationWork, pool.reclamationScratchEntries.toLong() * Long.SIZE_BYTES,
+            key,
+            limit,
+            pool.reclamationWork,
+            pool.reclamationScratchEntries.toLong() * Long.SIZE_BYTES,
             cancelled = { session?.cancelRequested == true },
             charge = { session?.chargeSharingWork(1L) },
         )
@@ -523,9 +558,15 @@ internal class PoolClauseExchange(
 
     override fun onRestart(session: PropagationSession) = metered {
         retainSession(session)
-        val drained = if (pool.softLimitBytes == null) pool.drainSince(cursor) else pool.drainSinceFunded(
-            cursor, { session.cancelRequested }, { session.chargeSharingWork(1L) },
+        val drained = if (pool.softLimitBytes == null) {
+            pool.drainSince(cursor)
+        } else {
+            pool.drainSinceFunded(
+            cursor,
+            { session.cancelRequested },
+            { session.chargeSharingWork(1L) },
         )
+        }
         if (drained == null) {
             meter?.clauseCount("drainPreparationDeclined", 1L)
             return@metered
@@ -551,8 +592,12 @@ internal class PoolClauseExchange(
         meter?.clauseCount("inspected", drained.clauses.size.toLong())
         meter?.clauseCount("translatedLiterals", literalVisits)
         meter?.clauseCount("importWork", session.work - before)
-        meter?.clauseMemory(mapOf("drainReferenceSlots" to drained.clauses.size.toLong(),
-            "drainOriginBytes" to drained.origins.size.toLong() * Int.SIZE_BYTES))
+        meter?.clauseMemory(
+            mapOf(
+            "drainReferenceSlots" to drained.clauses.size.toLong(),
+            "drainOriginBytes" to drained.origins.size.toLong() * Int.SIZE_BYTES,
+        )
+        )
         meter?.imported(SharingChannel.Clauses, imported, drained.cursor)
         meter?.duplicates(SharingChannel.Clauses, duplicates)
         countUses(session)
@@ -592,9 +637,11 @@ internal class PoolClauseExchange(
             countUses(session)
             export(session, retiring = true)
         }
-        if (pool.measureMemory) meter?.clauseMemorySample(
+        if (pool.measureMemory) {
+            meter?.clauseMemorySample(
             ownedMemory() + SharingMemorySnapshot(SharingMemoryStatus.STALE, emptyMap(), 0L, 0).telemetry(),
         )
+        }
         if (sessionIdentity == null || sessionIdentity === session.sharingIdentity) {
             session.retainedSharingMemory = null
             session.retainedSharingSize = null
@@ -632,7 +679,9 @@ internal class PoolClauseExchange(
         if (retiring && candidates.isNotEmpty() && pool.softLimitBytes == null &&
             !seen.canAddWithoutGrowing(candidates.size)
         ) {
-            val published = pool.publish(candidates, origin,
+            val published = pool.publish(
+                candidates,
+                origin,
                 isGlobal = false,
                 maxWork = pool.reclamationWork,
                 maxScratchEntries = pool.reclamationScratchEntries,
@@ -646,12 +695,16 @@ internal class PoolClauseExchange(
             }
         }
         val fresh = candidates.filter { admit(it.key, session) == true }
-        val published = if (fresh.isEmpty()) 0 else pool.publish(
+        val published = if (fresh.isEmpty()) {
+            0
+        } else {
+            pool.publish(
             fresh,
             origin,
             cancelled = { session.cancelRequested },
             charge = { session.chargeSharingWork(1L) },
         )
+        }
         meter?.exported(SharingChannel.Clauses, published)
     }
 
@@ -659,10 +712,19 @@ internal class PoolClauseExchange(
         if (seen.isEmpty()) return null
         var lookupWork = pool.reclamationWork
         return { key ->
-            val known = if (pool.softLimitBytes == null) key in seen else seen.containsBounded(
-                key, lookupWork, cancelled = { session.cancelRequested },
-                charge = { lookupWork--; session.chargeSharingWork(1L) },
+            val known = if (pool.softLimitBytes == null) {
+                key in seen
+            } else {
+                seen.containsBounded(
+                key,
+                lookupWork,
+                cancelled = { session.cancelRequested },
+                charge = {
+                    lookupWork--;
+                    session.chargeSharingWork(1L)
+                },
             )
+            }
             if (known == true) meter?.clauseCount("exportDuplicates", 1L)
             known
         }
@@ -670,9 +732,15 @@ internal class PoolClauseExchange(
 
     private fun exportCandidates(session: PropagationSession): List<SharedClause>? {
         val alreadyShared = exportLookup(session)
-        if (pool.softLimitBytes == null) return session.exportGlueClausesBounded(
-            maxLbd, maxLen, skipPermanent, alreadyShared = alreadyShared, cancelled = { false },
+        if (pool.softLimitBytes == null) {
+            return session.exportGlueClausesBounded(
+            maxLbd,
+            maxLen,
+            skipPermanent,
+            alreadyShared = alreadyShared,
+            cancelled = { false },
         )
+        }
         val count = session.learnedClauseCount.toLong()
         val width = maxLen.coerceAtLeast(0).toLong() + 1L
         val workLimit = pool.reclamationWork
@@ -689,7 +757,11 @@ internal class PoolClauseExchange(
             return null
         }
         val candidates = session.exportGlueClausesBounded(
-            maxLbd, maxLen, skipPermanent, alreadyShared = alreadyShared, cancelled = { session.cancelRequested },
+            maxLbd,
+            maxLen,
+            skipPermanent,
+            alreadyShared = alreadyShared,
+            cancelled = { session.cancelRequested },
         )
         if (candidates == null) meter?.clauseCount("exportPreparationDeclined", 1L)
         return candidates

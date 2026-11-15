@@ -640,10 +640,11 @@ retains completed sound reductions and discards unfinished analysis. The followi
 families describe the premises and preservation guarantees of those reductions.
 Both lanes poll after entry charging and meter factor, column, term, signature
 and rewrite visits. Bound fusion, duplicate-column and subsumption scans accumulate
-those charges and flush them and poll the pass token every 64 visits,
+those charges and poll the pass token every 1,024 visits,
 and immediately at entry and before publishing, so a stop overruns by at most one
 stride. Native allowance-backed scans reserve credit before advancing and settle
-used credit at boundaries; other work sinks accumulate completed debits without
+used credit at capacity, entry, publication and exit boundaries; cancellation polling
+retains their lease. Other work sinks flush completed debits at each poll without
 reservations. Work prices do not set the clock cadence.
 Duplicate-column aggregation, bound fusion and source duplicate/domination
 indexing discard unfinished transactions. Structural reduction

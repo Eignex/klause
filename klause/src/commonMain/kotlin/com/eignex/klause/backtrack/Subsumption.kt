@@ -125,8 +125,10 @@ private class SubsumptionSlice(session: PropagationSession, start: Int, batch: I
             budget.note("Candidates")
             val length = session.learnedClauseLiteralCount(id)
             if (length > ROOT_LITERAL_LIMIT - literalCount) budget.note("Oversized")
-            val row = session.rootClauseLiterals(session.problem.numFactors + id,
-                ROOT_LITERAL_LIMIT - literalCount)?.takeIf { it.size >= 2 }
+            val row = session.rootClauseLiterals(
+                session.problem.numFactors + id,
+                ROOT_LITERAL_LIMIT - literalCount,
+            )?.takeIf { it.size >= 2 }
             if (row != null) {
                 // Copying and sorting are bounded by the retained literal ceiling.
                 budget.charge(row.size * (2 + ceilLog2(row.size)))
@@ -152,7 +154,10 @@ private class SubsumptionSlice(session: PropagationSession, start: Int, batch: I
             val key = if (polarity == 0) c[literal] else Lit.negate(c[literal])
             val list = occurrences[key]
             if (list == null || occurrence >= list.size) {
-                if (polarity++ == 1) { literal++; polarity = 0 }
+                if (polarity++ == 1) {
+                    literal++;
+                    polarity = 0
+                }
                 occurrence = 0
                 continue
             }
@@ -161,7 +166,10 @@ private class SubsumptionSlice(session: PropagationSession, start: Int, batch: I
             if (other == target || ids[other] in dropped) continue
             val d = literals[other] ?: continue
             if (d.size > c.size || (signatures[other] and signatures[target].inv()) != 0L) continue
-            if (!budget.visit(d.size * (1 + ceilLog2(c.size)))) { occurrence--; return false }
+            if (!budget.visit(d.size * (1 + ceilLog2(c.size)))) {
+                occurrence--;
+                return false
+            }
             val flipped = subsetWithOneFlip(d, c) ?: continue
             if (flipped == NO_FLIP) {
                 dropped.add(ids[target])
@@ -211,7 +219,10 @@ private fun subsetWithOneFlip(d: IntArray, c: IntArray): Int? {
     for (lit in d) {
         if (c.binarySearchInt(lit) >= 0) continue
         val neg = Lit.negate(lit)
-        if (flipped == NO_FLIP && c.binarySearchInt(neg) >= 0) { flipped = neg; continue }
+        if (flipped == NO_FLIP && c.binarySearchInt(neg) >= 0) {
+            flipped = neg;
+            continue
+        }
         return null
     }
     return flipped

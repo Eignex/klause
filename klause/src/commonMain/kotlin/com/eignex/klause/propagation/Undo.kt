@@ -96,6 +96,7 @@ internal fun PropagationState.mark(): PropagationState.LevelMark {
 
 internal fun PropagationState.prepareMark(): Iterator<PropagationState.LevelMark?> = sequence {
     var visits = 0
+
     @Suppress("DoubleMutabilityForCollection") // lazily allocated when a snapshot is taken
     var payloads: MutableIntObjectMap<PropagationState.SnapshottablePayload>? = null
     // Only the tracked snapshottable slots need copying — no per-pin scan of every factor.
@@ -109,14 +110,16 @@ internal fun PropagationState.prepareMark(): Iterator<PropagationState.LevelMark
             m.put(i, p.snapshotCopy())
         }
     }
-    yield(PropagationState.LevelMark(
+    yield(
+        PropagationState.LevelMark(
         undoSize = undo.size,
         ltdvSize = levelToDecisionVar.size,
         pinOrderSize = boolPinOrder.size,
         snapshottablePayloads = payloads ?: emptyPayloads,
         revSize = undo.revTrail.size,
         atomUndoSize = atoms.undoAtomId.size,
-    ))
+    )
+    )
 }.iterator()
 
 /**

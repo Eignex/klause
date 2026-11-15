@@ -18,7 +18,10 @@ internal fun integralRowBounds(
         meter.step()
         if (term.integerCoefficient == null) return null
         if (state.model.column(term.column).integral &&
-            state.model.column(term.column).origin.exactLong() == null) return null
+            state.model.column(term.column).origin.exactLong() == null
+        ) {
+                return null
+            }
     }
     val minimum = integralEndpointSum(state, terms, true, meter) ?: return null
     val maximum = integralEndpointSum(state, terms, false, meter) ?: return null
@@ -34,8 +37,18 @@ internal fun integralRowBounds(
             val projection = integralRowProjection(state, rhs, term, sum, minimizing, meter, scratch) ?: return null
             val value = projection.value ?: continue
             meter.reserve(80L)
-            completed.add(LpRowBound(state, row, term.column, projection.upper, value,
-                projection.strict, minimizing, terms))
+            completed.add(
+                LpRowBound(
+                state,
+                row,
+                term.column,
+                projection.upper,
+                value,
+                projection.strict,
+                minimizing,
+                terms,
+            )
+            )
         }
     }
     return completed
@@ -124,11 +137,16 @@ private fun integralRowProjection(
         if (!tightens) return EMPTY_INTEGRAL_ROW_PROJECTION
     }
     meter.reserve(128L)
-    val exactResidual = meter.read(BigFraction.of(
-        (bigIntOf(residual.hi) shl 64) + bigIntOf(residual.lo.toULong()), bigIntOf(1L),
-    ))
-    val value = meter.read(meter.read(exactResidual * meter.read(term.coefficient.reciprocal())) +
-        meter.read(state.model.column(term.column).origin.value))
+    val exactResidual = meter.read(
+        BigFraction.of(
+        (bigIntOf(residual.hi) shl 64) + bigIntOf(residual.lo.toULong()),
+        bigIntOf(1L),
+    )
+    )
+    val value = meter.read(
+        meter.read(exactResidual * meter.read(term.coefficient.reciprocal())) +
+            meter.read(state.model.column(term.column).origin.value),
+    )
     meter.reserve(48L)
     return IntegralRowProjection(value, upper, strict)
 }

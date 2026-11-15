@@ -60,10 +60,22 @@ class ScopedCountingTest {
 
     @Test
     fun `count bounds from different interpretations should not combine`() {
-        val proven = Count(1L, 0L, 2L, exact = false, confidence = 1.0,
-            semantics = SourceSemantics(SourceFormat.DIMACS).resolve())
-        val approximate = Count(1L, 0L, 2L, exact = false, confidence = 0.8,
-            semantics = SourceSemantics(SourceFormat.WCNF).resolve())
+        val proven = Count(
+            1L,
+            0L,
+            2L,
+            exact = false,
+            confidence = 1.0,
+            semantics = SourceSemantics(SourceFormat.DIMACS).resolve(),
+        )
+        val approximate = Count(
+            1L,
+            0L,
+            2L,
+            exact = false,
+            confidence = 0.8,
+            semantics = SourceSemantics(SourceFormat.WCNF).resolve(),
+        )
 
         assertFailsWith<IllegalArgumentException> { combineCounts(proven) { approximate } }
     }

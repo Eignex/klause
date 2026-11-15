@@ -24,8 +24,12 @@ class BareissEchelonTest {
 
     @Test
     fun `product bit limits should decline before multiplying wide pivot scales`() {
-        val result = bareissEchelon(sparseRows(longArrayOf(15, 1, 0), longArrayOf(13, 0, 1)),
-            3, vec(1, 2), limits = EchelonLimits(4, 20, 8))
+        val result = bareissEchelon(
+            sparseRows(longArrayOf(15, 1, 0), longArrayOf(13, 0, 1)),
+            3,
+            vec(1, 2),
+            limits = EchelonLimits(4, 20, 8),
+        )
 
         assertTrue(result.rows.isEmpty())
         assertTrue(result.dependentRows.isEmpty())

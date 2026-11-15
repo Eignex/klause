@@ -9,16 +9,17 @@ import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
 
 internal fun ExactLinear.finiteRelaxationSupported(): Boolean = relation != LinearOp.NE &&
-    ((compactRelaxationSupported() && (activator == LinearRow.ALWAYS || relation != LinearOp.EQ)) ||
-        (!strict && activator == LinearRow.ALWAYS && numericalRow() != null))
+    (
+        (compactRelaxationSupported() && (activator == LinearRow.ALWAYS || relation != LinearOp.EQ)) ||
+        (!strict && activator == LinearRow.ALWAYS && numericalRow() != null)
+    )
 
-internal fun ExactLinear.compactRelaxationSupported(): Boolean =
-    constants.exactBound.fitsLong() &&
-        constants.exactBound.toLongExact() in -9007199254740992L..9007199254740992L &&
-        (0 until size).all {
-            constants.exactCoeff(it).fitsLong() &&
-                constants.exactCoeff(it).toLongExact() in -9007199254740992L..9007199254740992L
-        }
+internal fun ExactLinear.compactRelaxationSupported(): Boolean = constants.exactBound.fitsLong() &&
+    constants.exactBound.toLongExact() in -9007199254740992L..9007199254740992L &&
+    (0 until size).all {
+        constants.exactCoeff(it).fitsLong() &&
+            constants.exactCoeff(it).toLongExact() in -9007199254740992L..9007199254740992L
+    }
 
 internal fun ExactLinear.emitExactLpRelaxation(builder: RelaxationBuilder, indicator: Int = -1, value: Long = 0L) {
     if (relation == LinearOp.NE) return
@@ -31,8 +32,11 @@ internal fun ExactLinear.emitExactLpRelaxation(builder: RelaxationBuilder, indic
             val row = numericalRow() ?: return
             val columns = IntArray(size) { index ->
                 val reference = ref(index)
-                if (Term.isInt(reference)) builder.intColumn(Term.intVar(reference))
-                else builder.realColumn(Term.realVar(reference)).also { if (it < 0) return }
+                if (Term.isInt(reference)) {
+                    builder.intColumn(Term.intVar(reference))
+                } else {
+                    builder.realColumn(Term.realVar(reference)).also { if (it < 0) return }
+                }
             }
             builder.exactRow(columns, row, relation, indicator, value)
             return
@@ -42,12 +46,18 @@ internal fun ExactLinear.emitExactLpRelaxation(builder: RelaxationBuilder, indic
     }
     val columns = IntArray(size) { index ->
         val reference = ref(index)
-        if (Term.isInt(reference)) builder.intColumn(Term.intVar(reference))
-        else builder.realColumn(Term.realVar(reference)).also { if (it < 0) return }
+        if (Term.isInt(reference)) {
+            builder.intColumn(Term.intVar(reference))
+        } else {
+            builder.realColumn(Term.realVar(reference)).also { if (it < 0) return }
+        }
     }
     val coefficients = LongArray(size) { constants.exactCoeff(it).toLongExact() }
-    if (indicator < 0) builder.row(columns, coefficients, relation, constants.exactBound.toLongExact())
-    else builder.conditionedRow(columns, coefficients, relation, constants.exactBound.toLongExact(), indicator, value)
+    if (indicator < 0) {
+        builder.row(columns, coefficients, relation, constants.exactBound.toLongExact())
+    } else {
+        builder.conditionedRow(columns, coefficients, relation, constants.exactBound.toLongExact(), indicator, value)
+    }
 }
 
 internal fun LinearIndicator.emitExactLpRelaxation(builder: RelaxationBuilder) {

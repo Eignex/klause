@@ -31,8 +31,12 @@ import kotlin.test.assertTrue
 class PreparingMinimizeTest {
     @Test
     fun `pending root layout stays visible until the prepared worker can query`() {
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
-            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1))).bake()
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+        ).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
         var constructions = 0
         var queries = 0
@@ -47,8 +51,15 @@ class PreparingMinimizeTest {
                 pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 constructions++
-                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
-                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
                 return object : PersistentLpSolver by delegate {
                     private var preparationWork = 0L
                     override val lastMetrics get() = delegate.lastMetrics.copy(
@@ -65,8 +76,10 @@ class PreparingMinimizeTest {
                 }
             }
         }
-        val params = BacktrackParams(maxDecisions = 0L,
-            lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true, rootCutHarvest = false))
+        val params = BacktrackParams(
+            maxDecisions = 0L,
+            lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true, rootCutHarvest = false),
+        )
         val samples = mutableListOf<MinimizeResult.WithSample>()
         val stopAtWitness = ExecutionControl { samples.isNotEmpty() }
         PreparingMinimize(BacktrackSolver(problem, LpSolveContext(factory)), objective, params).use { search ->

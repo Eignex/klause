@@ -15,9 +15,11 @@ class SourceSamplesTest {
     fun `exact native equality should retain algebraic and symbolic coordinate authority`() {
         for (value in listOf(
             """{"root":{"coefficients":["-2","0","1"],"index":2}}""",
-            """{"exp":"1"}""", """{"pi":{}}""",
+            """{"exp":"1"}""",
+            """{"pi":{}}""",
         )) {
-            val problem = ProblemJson.default.decodeFromString("""
+            val problem = ProblemJson.default.decodeFromString(
+                """
                 {"bools":1,"reals":[{"lower":0,"upper":4}],
                  "factors":[{"exactRealEquality":{"real":0,"value":$value}}]}
                 """.trimIndent(),
@@ -31,13 +33,17 @@ class SourceSamplesTest {
 
     @Test
     fun `native exact sample checking should reject a different symbolic value`() {
-        val problem = ProblemJson.default.decodeFromString("""
+        val problem = ProblemJson.default.decodeFromString(
+            """
             {"reals":[{}],"factors":[{"exactRealEquality":{"real":0,"value":{"exp":"1"}}}]}
             """.trimIndent(),
         )
         val pi = ExactRealJson.decodeFromString("""{"pi":{}}""")
         val sample = Sample(
-            booleanArrayOf(), longArrayOf(), doubleArrayOf(3.141592653589793), symbolicReals = listOf(pi),
+            booleanArrayOf(),
+            longArrayOf(),
+            doubleArrayOf(3.141592653589793),
+            symbolicReals = listOf(pi),
         )
         assertEquals(false, problem.checkExactRealSample(sample))
         assertEquals(null, problem.checkExactRealSample(sample, com.eignex.klause.util.ExecutionControl { true }))
@@ -45,7 +51,8 @@ class SourceSamplesTest {
 
     @Test
     fun `symbolic pins should respect the original native real constraints`() {
-        val problem = ProblemJson.default.decodeFromString("""
+        val problem = ProblemJson.default.decodeFromString(
+            """
             {"reals":[{"upper":2}],"factors":[{"exactRealEquality":{"real":0,"value":{"exp":"1"}}}]}
             """.trimIndent(),
         )

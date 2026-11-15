@@ -52,8 +52,11 @@ internal class PolynomialAffineReduction private constructor(
             check(lower != null || upper != null)
             val comparison = if (lower != null && upper != null) algebraic.compare(lower.value, upper.value) else -1
             check(comparison < 0 || (comparison == 0 && !checkNotNull(lower).strict && !checkNotNull(upper).strict))
-            point[fibre.variable] = if (comparison == 0) checkNotNull(lower).value
-            else algebraic.rational(algebraic.sampleBetween(lower?.value, upper?.value))
+            point[fibre.variable] = if (comparison == 0) {
+                checkNotNull(lower).value
+            } else {
+                algebraic.rational(algebraic.sampleBetween(lower?.value, upper?.value))
+            }
         }
         arithmetic.step()
         return point
@@ -112,7 +115,14 @@ internal class PolynomialAffineReduction private constructor(
                     inconsistent = true
                     break
                 }
-                val graph = equationalSection(equations, current.map { arithmetic.step(); it.polynomial }, arithmetic)
+                val graph = equationalSection(
+                    equations,
+                    current.map {
+                    arithmetic.step();
+                    it.polynomial
+                },
+                    arithmetic
+                )
                 if (graph == null) {
                     if (!graphChanges) break
                     normalizeConjunction = true
@@ -123,7 +133,9 @@ internal class PolynomialAffineReduction private constructor(
                     arithmetic.step()
                     val polynomial = if (graph.variable in atom.polynomial.variables) {
                         arithmetic.substitute(atom.polynomial, graph.variable, graph.replacement)
-                    } else atom.polynomial
+                    } else {
+                        atom.polynomial
+                    }
                     if (polynomial.isZero && atom.holds(0)) continue
                     rewritten.add(PolynomialAtom(polynomial, atom.relation))
                     yield(null)
@@ -188,17 +200,25 @@ internal class PolynomialAffineReduction private constructor(
                         continue
                     }
                     val remainder = arithmetic.subtract(atom.polynomial, arithmetic.scale(coordinate, coefficient))
-                    val bound = AffineBound(arithmetic.scale(remainder, coefficient.reciprocal().negated()),
-                        atom.relation == PolynomialRelation.GT || atom.relation == PolynomialRelation.LT)
+                    val bound = AffineBound(
+                        arithmetic.scale(remainder, coefficient.reciprocal().negated()),
+                        atom.relation == PolynomialRelation.GT || atom.relation == PolynomialRelation.LT,
+                    )
                     val increasing = atom.relation == PolynomialRelation.GE || atom.relation == PolynomialRelation.GT
                     if ((coefficient.signum() > 0) == increasing) lower.add(bound) else upper.add(bound)
                 }
                 // Pairwise bounds characterize the fibre, including strict or coincident endpoints.
-                for (a in lower) for (b in upper) {
+                for (a in lower) {
+                    for (b in upper) {
                     arithmetic.step()
-                    next.add(PolynomialAtom(arithmetic.subtract(b.polynomial, a.polynomial),
-                        if (a.strict || b.strict) PolynomialRelation.GT else PolynomialRelation.GE))
+                    next.add(
+                        PolynomialAtom(
+                        arithmetic.subtract(b.polynomial, a.polynomial),
+                        if (a.strict || b.strict) PolynomialRelation.GT else PolynomialRelation.GE,
+                    )
+                    )
                     yield(null)
+                }
                 }
                 arithmetic.step()
                 fibres.add(AffineFibre(variable, null, lower.toList(), upper.toList()))
@@ -215,8 +235,14 @@ internal class PolynomialAffineReduction private constructor(
                 inconsistent = magnitudeConflict
             }
             arithmetic.step()
-            yield(PolynomialAffineReduction(current.toList(), fibres.toList(), inconsistent,
-                predicatesChanged || fibres.isNotEmpty()))
+            yield(
+                PolynomialAffineReduction(
+                current.toList(),
+                fibres.toList(),
+                inconsistent,
+                predicatesChanged || fibres.isNotEmpty(),
+            )
+            )
         }.iterator()
     }
 }
@@ -255,16 +281,28 @@ private fun endpoint(
             continue
         }
         val comparison = algebraic.compare(value, previous.value)
-        if (if (lower) comparison > 0 else comparison < 0) result = AffineEndpoint(value, bound.strict)
-        else if (comparison == 0) result = AffineEndpoint(previous.value, previous.strict || bound.strict)
+        if (if (lower) comparison > 0 else comparison < 0) {
+            result = AffineEndpoint(value, bound.strict)
+        } else if (comparison == 0) {
+            result = AffineEndpoint(previous.value, previous.strict || bound.strict)
+        }
     }
     return result
 }
 
 private fun affineCoordinate(atoms: List<PolynomialAtom>, realCount: Int, arithmetic: PolynomialArithmetic): Int {
-    val blocked = BooleanArray(realCount) { arithmetic.step(); false }
-    val lower = IntArray(realCount) { arithmetic.step(); 0 }
-    val upper = IntArray(realCount) { arithmetic.step(); 0 }
+    val blocked = BooleanArray(realCount) {
+        arithmetic.step();
+        false
+    }
+    val lower = IntArray(realCount) {
+        arithmetic.step();
+        0
+    }
+    val upper = IntArray(realCount) {
+        arithmetic.step();
+        0
+    }
     for (atom in atoms) {
         arithmetic.step()
         val inequality = atom.relation != PolynomialRelation.EQ && atom.relation != PolynomialRelation.NE
@@ -275,8 +313,13 @@ private fun affineCoordinate(atoms: List<PolynomialAtom>, realCount: Int, arithm
             val affine = inequality && variables.size == 1 && term.monomial.exponent(variables.single()) == 1
             for (variable in variables) {
                 arithmetic.step()
-                if (!affine) blocked[variable] = true
-                else if ((term.coefficient.signum() > 0) == increasing) lower[variable]++ else upper[variable]++
+                if (!affine) {
+                    blocked[variable] = true
+                } else if ((term.coefficient.signum() > 0) == increasing) {
+                    lower[variable]++
+                } else {
+                    upper[variable]++
+                }
             }
         }
     }

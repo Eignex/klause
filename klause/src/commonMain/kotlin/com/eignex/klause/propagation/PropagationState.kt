@@ -460,13 +460,17 @@ class PropagationState private constructor(
     /** Base and incremental factor payload references; General learned rows own their payload slots. */
     private class PayloadOwner(var values: ArrayList<Any?>)
     private val payloadOwner: PayloadOwner by lazy(LazyThreadSafetyMode.NONE) {
-        PayloadOwner(prepared?.refPayloadStore ?: ArrayList<Any?>(problem.numFactors).apply {
+        PayloadOwner(
+            prepared?.refPayloadStore ?: ArrayList<Any?>(problem.numFactors).apply {
             repeat(problem.numFactors) { add(null) }
-        })
+        }
+        )
     }
     internal var refPayloadStore: ArrayList<Any?>
         get() = payloadOwner.values
-        set(value) { payloadOwner.values = value }
+        set(value) {
+            payloadOwner.values = value
+        }
 
     /** Indices in [refPayloadStore] currently holding a [SnapshottablePayload]. Maintained on every
      *  write through [refPayload] so [mark] visits only these slots instead of scanning the whole
@@ -879,8 +883,12 @@ class PropagationState private constructor(
                 if (watchers != null) {
                     val blockers = propagator.initialBoolWatcherBlockers
                     for (i in watchers.indices) {
-                        state.installLitWatch(watchers[i], fid, blockers?.getOrNull(i) ?: NO_BLOCKER,
-                            preparation = true)
+                        state.installLitWatch(
+                            watchers[i],
+                            fid,
+                            blockers?.getOrNull(i) ?: NO_BLOCKER,
+                            preparation = true,
+                        )
                         if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
                     }
                 }
@@ -940,8 +948,10 @@ class PropagationState private constructor(
      */
     internal fun addMidlifeFactor(factor: Factor): Int {
         require(incremental) { "mid-life factors require an incremental PropagationState" }
-        val prop = factor.propagatorProjection(provider =
-            projection.selection?.providers?.propagation ?: BuiltInPropagationProjectionProvider)
+        val prop = factor.propagatorProjection(
+            provider =
+            projection.selection?.providers?.propagation ?: BuiltInPropagationProjectionProvider
+        )
         val fid = totalFactorCount
         midlife.store.add(prop)
         midlife.factors.add(factor)
@@ -1231,8 +1241,12 @@ class PropagationState private constructor(
         finiteWork.cancellation = cancellation
         try {
             return fireQueue(
-                cancellation !== ExecutionControl.Never, 0, cancellation, false,
-                maxFires = PROPAGATION_PREPARATION_BATCH_SIZE, cancelIsPause = true,
+                cancellation !== ExecutionControl.Never,
+                0,
+                cancellation,
+                false,
+                maxFires = PROPAGATION_PREPARATION_BATCH_SIZE,
+                cancelIsPause = true,
             )
         } finally {
             propagationNanos += start.elapsedNow().inWholeNanoseconds
@@ -1396,8 +1410,11 @@ class PropagationState private constructor(
                     it.note(family, FactorAttribution.Metric.Fires)
                     it.note(family, FactorAttribution.Metric.Work, work - before)
                     it.note(family, FactorAttribution.Metric.Deductions, propagations - pins)
-                    it.note(family, FactorAttribution.Metric.Nanos,
-                        requireNotNull(start).elapsedNow().inWholeNanoseconds)
+                    it.note(
+                        family,
+                        FactorAttribution.Metric.Nanos,
+                        requireNotNull(start).elapsedNow().inWholeNanoseconds,
+                    )
                 }
             }
             if (runCancelled) {

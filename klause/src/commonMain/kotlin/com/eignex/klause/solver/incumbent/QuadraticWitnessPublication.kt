@@ -24,10 +24,13 @@ internal class QuadraticWitnessPublication(
         when {
             !invocation.sameSourceObjective(expected) ->
                 SourceEvidenceCheck.Rejected("quadratic witness belongs to another source objective or direction")
+
             !incumbent.sample.equals(candidate.sample) ->
                 SourceEvidenceCheck.Rejected("quadratic witness differs from the actual published point")
+
             arithmetic.compare(incumbent.value, candidate.value) != 0 ->
                 SourceEvidenceCheck.Rejected("quadratic witness differs from the actual published value")
+
             else -> checkPoint(expected, candidate, arithmetic, sourceChecker)
         }.also { arithmetic.arithmetic.step() }
     } catch (_: PolynomialInterrupted) {
@@ -49,7 +52,10 @@ internal class QuadraticWitnessPublication(
         val checked = sourceChecker(candidate.sample)
         if (checked != SourceEvidenceCheck.Checked) return checked
         val value = expected.objective.evaluateExact(candidate.sample, arithmetic)
-        return if (arithmetic.compare(value, candidate.value) == 0) SourceEvidenceCheck.Checked
-            else SourceEvidenceCheck.Rejected("quadratic witness value differs from its original source objective")
+        return if (arithmetic.compare(value, candidate.value) == 0) {
+            SourceEvidenceCheck.Checked
+        } else {
+            SourceEvidenceCheck.Rejected("quadratic witness value differs from its original source objective")
+        }
     }
 }

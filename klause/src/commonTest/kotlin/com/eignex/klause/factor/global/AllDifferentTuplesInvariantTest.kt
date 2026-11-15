@@ -26,9 +26,11 @@ class AllDifferentTuplesInvariantTest {
             for (variable in 0 until 3) {
                 val value = 1 - state.assignment.intValue(variable)
                 val move = Move.IntSet(variable, value)
-                val after = rows.size - rows.map { row -> row.map {
-                    if (it == variable) value else state.assignment.intValue(it)
-                } }.distinct().size
+                val after = rows.size - rows.map { row ->
+                    row.map {
+                        if (it == variable) value else state.assignment.intValue(it)
+                    }
+                }.distinct().size
                 assertEquals((after - expected).toLong(), state.netDelta(move))
                 assertEquals(expected.toLong(), state.cost)
                 val old = state.assignment.intValue(variable)
@@ -42,8 +44,12 @@ class AllDifferentTuplesInvariantTest {
 
     @Test
     fun `compound exchanges should preserve tuple scores through rollback`() {
-        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) },
-            arrayOf(AllDifferentTuples(listOf(intArrayOf(0, 1), intArrayOf(2, 3)))))
+        val problem = Problem(
+            0,
+            4,
+            Array(4) { IntDomain(0, 1) },
+            arrayOf(AllDifferentTuples(listOf(intArrayOf(0, 1), intArrayOf(2, 3)))),
+        )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         for (variable in 0 until 4) state.assignment.setInt(variable, (variable / 2).toLong())
         state.recompute()
@@ -58,8 +64,12 @@ class AllDifferentTuplesInvariantTest {
 
     @Test
     fun `repairs should propose in-domain moves away from duplicate tuples`() {
-        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) },
-            arrayOf(AllDifferentTuples(listOf(intArrayOf(0, 1), intArrayOf(2, 3)))))
+        val problem = Problem(
+            0,
+            4,
+            Array(4) { IntDomain(0, 1) },
+            arrayOf(AllDifferentTuples(listOf(intArrayOf(0, 1), intArrayOf(2, 3)))),
+        )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         for (variable in 0 until 4) state.assignment.setInt(variable, 0)
         state.recompute()

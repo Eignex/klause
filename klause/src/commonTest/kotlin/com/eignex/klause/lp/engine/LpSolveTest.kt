@@ -29,13 +29,22 @@ class LpSolveTest {
         val limits = LpRefinementLimits(maxRounds = 0, maxAuxiliaries = 0)
 
         val ordinary = solveAndCertify(model, componentSplit = false, refinementLimits = limits)
-        val recovered = solveAndCertify(model, componentSplit = false, refinementLimits = limits,
-            context = LpSolveContext(sparsePointRecovery = true))
+        val recovered = solveAndCertify(
+            model,
+            componentSplit = false,
+            refinementLimits = limits,
+            context = LpSolveContext(sparsePointRecovery = true),
+        )
 
         assertNull(ordinary.witness)
         val point = assertNotNull(recovered.witness)
-        assertEquals(listOf(BigFraction.of(BIG_ONE, bigIntOf(2_000_003)),
-            BigFraction.of(BIG_ONE, bigIntOf(2_000_029))), point.primal)
+        assertEquals(
+            listOf(
+            BigFraction.of(BIG_ONE, bigIntOf(2_000_003)),
+            BigFraction.of(BIG_ONE, bigIntOf(2_000_029)),
+        ),
+            point.primal
+        )
         assertNotNull(checkedLpWitness(model, point.primal))
         assertTrue(assertNotNull(recovered.exactPoint).work > 0L)
     }

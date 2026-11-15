@@ -58,11 +58,17 @@ internal class SearchLearning(
     internal val watchPosition: Long get() = learned.watchVisits
 
     fun explanationOf(index: Int): SearchExplanation = learned.explanationOf(index)
-    fun onConflict(asserting: Boolean) { if (asserting) assertingConflicts++ else nonAssertingConflicts++ }
+    fun onConflict(asserting: Boolean) {
+        if (asserting) assertingConflicts++ else nonAssertingConflicts++
+    }
 
     fun onRestart(cancelled: () -> Boolean = { false }, charge: () -> Unit = {}) {
-        val budget = SharedReclamationBudget(learnedDb.reclamationWork, learnedDb.reclamationScratchBytes,
-            cancelled, charge)
+        val budget = SharedReclamationBudget(
+            learnedDb.reclamationWork,
+            learnedDb.reclamationScratchBytes,
+            cancelled,
+            charge,
+        )
         val started = TimeSource.Monotonic.markNow()
         try {
             learned.finishRetirement(budget)
@@ -80,11 +86,17 @@ internal class SearchLearning(
             while (capRemaining > 0) {
                 budget.pay(learned.readWork, learned.scratchBytes)
                 val row = learned.next(capCursor, ranked = true)
-                if (row == null) { capActive = false; return }
+                if (row == null) {
+                    capActive = false;
+                    return
+                }
                 budget.pay(16L, learned.scratchBytes)
                 if (row.index <= capBoundary && !protected(row) && row.usedEpoch < capUseEpoch) {
                     retire(row, budget)
-                    if (!capDropped) { reductions++; capDropped = true }
+                    if (!capDropped) {
+                        reductions++;
+                        capDropped = true
+                    }
                     capRemaining--
                 }
                 capCursor = row.rank
@@ -146,18 +158,22 @@ internal class SearchLearning(
     }
 
     private fun protected(row: SharedLearnedStore.Row): Boolean =
-        !row.retired && (row.literals?.size == 1 || row.lbd <= learnedDb.glueLbd ||
-            row.reasonCount > 0 || row.stages and 4 != 0)
+        !row.retired && (
+            row.literals?.size == 1 || row.lbd <= learnedDb.glueLbd ||
+            row.reasonCount > 0 || row.stages and 4 != 0
+        )
 
     internal fun retainedMemory(sample: SharingMemoryObservation) {
         val protected = learned.memory(sample, ::protected)
         reasons.memory(sample) { true }
         sample.ownedReferences(this, 6L, protected || pendingCount > 0)
-        sample.record(mapOf(
+        sample.record(
+            mapOf(
             "sharedLearnedStageCapacityBytes" to (learned.ownedRows.toLong() * Int.SIZE_BYTES),
             "sharedLearnedReasonIndexBytes" to reasons.size * 12L,
             "sharedLearnedPendingEntries" to (pendingCount + recheckCount).toLong(),
-        ))
+        )
+        )
     }
 
     internal fun reclaimMemory(
@@ -171,19 +187,34 @@ internal class SearchLearning(
         require(softLimitBytes >= 0L && workAllowance >= 0L && scratchAllowanceBytes >= 0L)
         val budget = SharedReclamationBudget(workAllowance, scratchAllowanceBytes, cancelled, charge)
         val before = ownedBytes() + protectedReasonBytes
-        fun result(status: SharedLearningReclamationStatus, complete: Boolean = false,
-            continuation: Boolean = false): SharedLearningReclamation {
+        fun result(
+            status: SharedLearningReclamationStatus,
+            complete: Boolean = false,
+            continuation: Boolean = false,
+        ): SharedLearningReclamation {
             val after = ownedBytes() + protectedReasonBytes
-            return SharedLearningReclamation(status, before, after,
-                if (complete) after else null, budget.work, budget.scratch, continuation)
+            return SharedLearningReclamation(
+                status,
+                before,
+                after,
+                if (complete) after else null,
+                budget.work,
+                budget.scratch,
+                continuation,
+            )
         }
         return try {
             budget.pay(1L)
             learned.finishRetirement(budget)
             if (ownedBytes() + protectedReasonBytes <= softLimitBytes) {
                 memoryActive = false
-                result(if (before <= softLimitBytes) SharedLearningReclamationStatus.WithinLimit
-                    else SharedLearningReclamationStatus.Reclaimed)
+                result(
+                    if (before <= softLimitBytes) {
+                        SharedLearningReclamationStatus.WithinLimit
+                    } else {
+                        SharedLearningReclamationStatus.Reclaimed
+                    },
+                )
             } else {
                 if (!memoryActive) {
                     budget.pay(16L, learned.scratchBytes)
@@ -208,7 +239,10 @@ internal class SearchLearning(
                     budget.pay(16L, learned.scratchBytes)
                     if (!protected(row)) {
                         retire(row, budget)
-                        if (!memoryDropped) { reductions++; memoryDropped = true }
+                        if (!memoryDropped) {
+                            reductions++;
+                            memoryDropped = true
+                        }
                     }
                     memoryCursor = row.index.toLong()
                     learned.finishRetirement(budget)
@@ -221,9 +255,14 @@ internal class SearchLearning(
                 result(SharedLearningReclamationStatus.Deferred)
             }
         } catch (stopped: SharedReclamationBudget.Stopped) {
-            result(if (stopped.cancelled) SharedLearningReclamationStatus.Cancelled
-                else SharedLearningReclamationStatus.Deferred,
-                continuation = budget.canResume && (memoryActive || learned.hasRetirement))
+            result(
+                if (stopped.cancelled) {
+                    SharedLearningReclamationStatus.Cancelled
+                } else {
+                    SharedLearningReclamationStatus.Deferred
+                },
+                continuation = budget.canResume && (memoryActive || learned.hasRetirement),
+            )
         }
     }
 
@@ -241,10 +280,16 @@ internal class SearchLearning(
         lifecycle.note(LearnedKind.Clause, LearnedStage.Constructed)
         if (literals.isEmpty()) return
         val levels = IntHashSet(literals.size)
-        for (literal in literals) { chargeOrdinary(1L); levels.add(host.levelOf(literal)) }
+        for (literal in literals) {
+            chargeOrdinary(1L);
+            levels.add(host.levelOf(literal))
+        }
         chargeOrdinary(literals.size.toLong() + 32L)
         val row = learned.add(literals.copyOf(), levels.size)
-        if (row == null) { relearnedClauses++; return }
+        if (row == null) {
+            relearnedClauses++;
+            return
+        }
         row.stages = row.stages or 4
         row.attachPrevious = lastAttach
         lastAttach?.attachNext = row
@@ -292,11 +337,17 @@ internal class SearchLearning(
         if (unitsPending) {
             unitsPending = false
             val result = learned.propagateUnits(host)
-            if (result !is ComponentResult.Consistent) { unitsPending = true; return result }
+            if (result !is ComponentResult.Consistent) {
+                unitsPending = true;
+                return result
+            }
         }
         while (propagatedTrail < boolTrail.size) {
             val result = learned.propagate(boolTrail[propagatedTrail++] xor 1, host)
-            if (result !is ComponentResult.Consistent) { propagatedTrail--; return result }
+            if (result !is ComponentResult.Consistent) {
+                propagatedTrail--;
+                return result
+            }
         }
         return ComponentResult.Consistent
     }

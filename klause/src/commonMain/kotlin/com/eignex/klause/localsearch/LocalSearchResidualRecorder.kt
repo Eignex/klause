@@ -59,7 +59,9 @@ internal class LocalSearchResidualRecorder {
                     else -> factor.intVars.distinct()
                 }
                 LocalSearchResidualFactor(
-                    fid, kind, state.factorDegree[fid].toLong(),
+                    fid,
+                    kind,
+                    state.factorDegree[fid].toLong(),
                     bools.take(MAX_COORDINATES).associateWith(state.assignment::boolValue),
                     ints.take(MAX_COORDINATES).associateWith(state.assignment::intValue),
                     (bools.size - MAX_COORDINATES).coerceAtLeast(0),
@@ -68,12 +70,15 @@ internal class LocalSearchResidualRecorder {
                 )
             }
         val definitions = definitionDetails(state, factors)
-        best = LocalSearchResidual(state.cost, byKind, factors.map { factor ->
+        best = LocalSearchResidual(
+            state.cost, byKind,
+            factors.map { factor ->
             val details = LinkedHashMap(factor.details)
             for (v in factor.ints.keys) details.putAll(definitions.getValue("i$v"))
             for (v in factor.bools.keys) details.putAll(definitions.getValue("b$v"))
             factor.copy(details = details)
-        })
+        }
+        )
     }
 
     private fun factorDetails(state: LocalSearchState, fid: Int): Map<String, String> {
@@ -85,10 +90,23 @@ internal class LocalSearchResidualRecorder {
                 }
                 details["omittedLiterals"] = (factor.vars.size - MAX_COORDINATES).coerceAtLeast(0).toString()
             }
-            is Linear -> rowDetails(details, factor.vars, factor.op, factor.integerConstants,
-                if (state.factors[fid] is LinearInvariant) state.longPayload[fid] else null)
-            is ReifiedLinear -> rowDetails(details, factor.vars, factor.op, factor.integerConstants,
-                if (state.factors[fid] is ReifiedLinearInvariant) state.longPayload[fid] else null)
+
+            is Linear -> rowDetails(
+                details,
+                factor.vars,
+                factor.op,
+                factor.integerConstants,
+                if (state.factors[fid] is LinearInvariant) state.longPayload[fid] else null,
+            )
+
+            is ReifiedLinear -> rowDetails(
+                details,
+                factor.vars,
+                factor.op,
+                factor.integerConstants,
+                if (state.factors[fid] is ReifiedLinearInvariant) state.longPayload[fid] else null,
+            )
+
             is ExactLinear -> exactRowDetails(details, state, fid, factor)
         }
         return details
@@ -187,15 +205,25 @@ internal class LocalSearchResidualRecorder {
             is FunctionalObjective.Lin -> "IntDef.Lin"
             is CapturedIntegerDefinition -> "IntDef.CapturedIntegerDefinition"
         }
+
         is DefinitionalSweep.SweepNode.CmpReif -> "CmpReif"
+
         is DefinitionalSweep.SweepNode.SetInReif -> "SetInReif"
+
         is DefinitionalSweep.SweepNode.Bool2Int -> "Bool2Int"
+
         is DefinitionalSweep.SweepNode.BoolFold -> "BoolFold"
+
         is DefinitionalSweep.SweepNode.ElementDef -> "ElementDef"
+
         is LiteralIntDefinition -> "LiteralIntDefinition"
+
         is EqualityPredicateDefinition -> "EqualityPredicateDefinition"
+
         is ComparisonPredicateDefinition -> "ComparisonPredicateDefinition"
+
         is ElementResultDefinition -> "ElementResultDefinition"
+
         else -> "unsupported-definition"
     }
 

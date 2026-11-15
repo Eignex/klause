@@ -14,15 +14,24 @@ class TranscendentalTheoryRequest internal constructor(
 ) : ExactTheorySatisfactionRequest {
     override fun execute(params: PolynomialTheoryParams, engine: FiniteEngine, cores: Int): PolynomialTheoryExecution {
         require(cores > 0)
-        val result = OpenTheoryPipeline.execute(this, TranscendentalTheoryParams(
+        val result = OpenTheoryPipeline.execute(
+            this,
+            TranscendentalTheoryParams(
             maximumWork = params.maximumWork,
             maximumDenseCoefficients = params.maximumDenseCoefficients,
             maximumMatrixCells = params.maximumMatrixCells,
-            timeout = params.timeout, cancellation = params.cancellation, strategy = params.strategy,
-        ), engine, cores)
-        return PolynomialTheoryExecution(result.result, PolynomialTheoryStats(workSpent = result.workSpent),
+            timeout = params.timeout,
+            cancellation = params.cancellation,
+            strategy = params.strategy,
+        ),
+            engine, cores
+        )
+        return PolynomialTheoryExecution(
+            result.result,
+            PolynomialTheoryStats(workSpent = result.workSpent),
             nativeWorkScope = "transcendental",
-            nativeResource = if (result.representationDeclined) "RepresentationLimit" else null)
+            nativeResource = if (result.representationDeclined) "RepresentationLimit" else null,
+        )
     }
 }
 
@@ -95,16 +104,19 @@ fun OpenTheoryPipeline.execute(
     cores: Int,
 ): TranscendentalTheoryExecution {
     require(cores > 0)
-    return (if (request.problem.hasObjective || !params.supportsInvocation(engine)) {
+    return (
+        if (request.problem.hasObjective || !params.supportsInvocation(engine)) {
         TranscendentalTheoryExecution(
-            OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY), 0, false,
+            OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY),
+            0,
+            false,
         )
     } else if (engine == FiniteEngine.MIXED || (engine != FiniteEngine.FIXED && cores > 1)) {
         TranscendentalPortfolioInvocation(request, params, engine, cores).execute()
     } else {
         TranscendentalWorkerAdapter(request.problem, params, engine).use { it.execute() }
     }
-    )
+        )
         .withSourceSemantics(request.problem.semantics)
 }
 
@@ -116,12 +128,12 @@ private fun TranscendentalTheoryParams.supportsInvocation(engine: FiniteEngine):
     if (complete.componentFactory != null || complete.toleranceCheck != null) return false
     if (traversal && complete.onEvent != null) return false
     if (heuristic && (
-        local.onEvent != null || local.initialAssignment != null ||
-            local.pooledIncumbents != null || local.lsObjective != null
-    )
+            local.onEvent != null || local.initialAssignment != null ||
+                local.pooledIncumbents != null || local.lsObjective != null
+            )
     ) {
-                return false
-            }
+        return false
+    }
     val scopes = listOf(strategy.assumptions, complete.assumptions, local.assumptions)
     if (scopes.any { !it.deductions.isEmpty }) return false
     if (engine == FiniteEngine.MIXED && (!complete.assumptions.isEmpty || !local.assumptions.isEmpty)) return false

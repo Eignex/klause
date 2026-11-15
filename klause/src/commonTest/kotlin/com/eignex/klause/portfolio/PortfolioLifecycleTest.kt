@@ -275,8 +275,12 @@ class PortfolioLifecycleTest {
             }) { _, _, _, _ -> error("the retained handle must resume") }
                 .also { it.restartingSearch = true }
 
-            val result = Portfolio(listOf(worker), fixedBandit(1, 0),
-                baseSliceWork = 1, maxSliceWork = 1, reseedStaleThreshold = 1,
+            val result = Portfolio(
+                listOf(worker),
+                fixedBandit(1, 0),
+                baseSliceWork = 1,
+                maxSliceWork = 1,
+                reseedStaleThreshold = 1,
                 diagnostics = PortfolioDiagnostics(10),
             ).use { it.minimize(ExecutionControl { slices >= 3 }) }
 

@@ -41,8 +41,14 @@ internal class FloatGridPublication(
             // The finite engine checks rounded grid relations, which can violate exact source equations.
             if (toleranceCheck?.invoke(sample) == false || cancellation()) return null
         } else {
-            val verdict = verifyProjectedSourceWitness(binding.projection.mapping.source, binding.sourceChecker, sample,
-                cancellation, sourcePoints, toleranceCheck)
+            val verdict = verifyProjectedSourceWitness(
+                binding.projection.mapping.source,
+                binding.sourceChecker,
+                sample,
+                cancellation,
+                sourcePoints,
+                toleranceCheck,
+            )
             if (verdict !is Verification.Accepted || cancellation()) return null
         }
         val objective = binding.objective?.let {
@@ -75,7 +81,7 @@ internal class FloatGridPublication(
         // A checked native best already stands or failed to improve, so checking it again publishes nothing.
         if (native is FiniteSolveOutcome.Completed) {
             native.bestSample
-            ?.takeUnless { it === lastChecked && binding.objective != null }?.let(::onSample)
+                ?.takeUnless { it === lastChecked && binding.objective != null }?.let(::onSample)
         }
         val qualified = if (native is FiniteSolveOutcome.Completed) {
             FiniteSolveOutcome.Completed(
@@ -95,7 +101,10 @@ internal class FloatGridPublication(
 
                     else -> FiniteSolveVerdict.SAT
                 },
-                native.stats, accepted, best, native.elapsedMs,
+                native.stats,
+                accepted,
+                best,
+                native.elapsedMs,
             )
         } else {
             native

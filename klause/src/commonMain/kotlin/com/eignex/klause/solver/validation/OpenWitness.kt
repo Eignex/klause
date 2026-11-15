@@ -26,7 +26,9 @@ internal fun refuteOpenWitness(model: Problem, sample: Sample): String? =
     }
 
 internal fun verifyOpenWitness(
-    model: Problem, sample: Sample, cancellation: ExecutionControl = ExecutionControl.Never,
+    model: Problem,
+    sample: Sample,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): Verification<Sample, Unit> = if (cancellation()) {
     Verification.Indeterminate("open witness check cancelled")
 } else {

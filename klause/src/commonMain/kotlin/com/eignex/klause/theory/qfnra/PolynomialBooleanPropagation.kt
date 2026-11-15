@@ -112,7 +112,9 @@ internal class PolynomialBooleanPropagation(
                     val value = values[index]
                     if (value != UNASSIGNED && !assign(node.child, TRUE - value)) return false
                 }
+
                 is FormulaNode.Junction -> if (!propagate(index, node)) return false
+
                 else -> Unit
             }
         }
@@ -129,6 +131,7 @@ internal class PolynomialBooleanPropagation(
             arithmetic.step()
             when (values[child]) {
                 decisive -> decided = true
+
                 UNASSIGNED -> {
                     unknowns++
                     lastUnknown = child

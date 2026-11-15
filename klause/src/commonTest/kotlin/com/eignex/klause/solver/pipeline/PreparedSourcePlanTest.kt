@@ -77,10 +77,15 @@ class PreparedSourcePlanTest {
             realUpper = doubleArrayOf(2.0, 2.0),
         )
 
-        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-            if (factor is AllDifferent && target == EncodingTarget.POLYNOMIAL) Encoder(EncoderSupport.UNSUPPORTED)
-            else BuiltInEncoderProvider.select(factor, target)
-        })
+        val providers = FactorProjectionProviders(
+            encoder = EncoderProvider { factor, target ->
+            if (factor is AllDifferent && target == EncodingTarget.POLYNOMIAL) {
+                Encoder(EncoderSupport.UNSUPPORTED)
+            } else {
+                BuiltInEncoderProvider.select(factor, target)
+            }
+        }
+        )
         val plan = source.prepareExecutionPlan(providers)
 
         val ownership = assertNotNull(plan.componentPlan)
@@ -331,10 +336,14 @@ class PreparedSourcePlanTest {
             0,
             1,
             arrayOf(IntDomain(0, 2)),
-            arrayOf(ExactLinear.of(
+            arrayOf(
+                ExactLinear.of(
                 intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
-                listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.GE, BigFraction.ONE,
-            )),
+                listOf(BigFraction.ONE, BigFraction.ONE),
+                LinearOp.GE,
+                BigFraction.ONE,
+            )
+            ),
             numRealVars = 1,
             realLower = doubleArrayOf(0.0),
             realUpper = doubleArrayOf(2.0),
@@ -346,7 +355,9 @@ class PreparedSourcePlanTest {
             if (boundsComplete) {
                 stopObserved = true
                 true
-            } else false
+            } else {
+                false
+            }
         }
 
         val route = assertIs<SourceProblemRoute.UnsupportedOpen>(
@@ -968,10 +979,13 @@ class PreparedSourcePlanTest {
 
     @Test
     fun `nonlinear source declarations should keep interleaved exact numeric coordinates`() {
-        val source = assertIs<NonlinearIntegerProblem>((
-            SmtLib.parse(
+        val source = assertIs<NonlinearIntegerProblem>(
+            (
+                SmtLib.parse(
                 "(declare-const x Int) (declare-const r Real) (declare-const z Int) (assert (= (* x z) r))",
-            )).source.originalSource)
+            )
+            ).source.originalSource
+        )
 
         val plan = source.prepareExecutionPlan()
 

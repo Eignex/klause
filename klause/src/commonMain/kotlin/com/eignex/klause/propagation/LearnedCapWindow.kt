@@ -26,8 +26,12 @@ internal fun PropagationState.maintainGeneralCapWindow(
     val retiredBefore = learned.retiredCount
     try {
         budget.visit(0L, 64L)
-        learned.capRanking.advance(cap, learned.permanentClauseCount + learned.permanentArithmeticCount, budget,
-            generalCapPolicy(budget, canDrop, keep))
+        learned.capRanking.advance(
+            cap,
+            learned.permanentClauseCount + learned.permanentArithmeticCount,
+            budget,
+            generalCapPolicy(budget, canDrop, keep),
+        )
     } catch (_: ReclamationPreparation.Deferred) {
         learned.capPreparationDefers++
         // Completed row transactions retain their handles; each resumed row rechecks its current owners.
@@ -74,7 +78,9 @@ private fun PropagationState.generalCapPolicy(
         return retained || protected || (prop is ClausePropagator && prop.literals.size <= 1) ||
             learned.store[index, GeneralLearnedRows.STAGES] and 1 == 0
     }
-    override fun visited() { learned.capVisits++ }
+    override fun visited() {
+        learned.capVisits++
+    }
     override fun retire(index: Int): Boolean {
         val prop = learned.store[index]
         val pinned = if (prepared == index) protected else retainedReason(index)
@@ -103,7 +109,9 @@ private fun PropagationState.generalCapPolicy(
 private fun PropagationState.hasLearnedReason(factor: Int, budget: ReclamationPreparation): Boolean {
     if (containsLearnedReason(boolReason, factor, budget) || containsLearnedReason(intMinReason, factor, budget) ||
         containsLearnedReason(intMaxReason, factor, budget)
-    ) return true
+    ) {
+        return true
+    }
     for (index in 0 until undo.size) {
         budget.visit()
         if (undo.tag[index] == 1) {

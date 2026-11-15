@@ -23,8 +23,16 @@ fun OpenTheoryPipeline.optimizeLinear(
     return LinearAuthorityInvocation(context, params).use { invocation ->
         val result = requireNotNull(invocation.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1, onIncumbent))
         invocation.close()
-        LinearOptimizationResult(context.scope, result.terminal, result.bound, result.incumbent,
-            result.value, result.reason, invocation.stats, context.semantics)
+        LinearOptimizationResult(
+            context.scope,
+            result.terminal,
+            result.bound,
+            result.incumbent,
+            result.value,
+            result.reason,
+            invocation.stats,
+            context.semantics,
+        )
     }
 }
 
@@ -33,11 +41,22 @@ internal fun LinearOptimizationResult.openOptimum(): OpenTheoryOptimum {
     val sampled = incumbent?.let { OpenTheoryAssignment.Sampled(it) }
     val score = value?.let { it * sign }
     return when (val claim = terminal?.claim) {
-        is SourceClaim.Optimal -> OpenTheoryOptimum.Optimal(OpenTheoryAssignment.Sampled(claim.sample),
-            (claim.value as SourceValue.Rational).value * sign, stats, this)
+        is SourceClaim.Optimal -> OpenTheoryOptimum.Optimal(
+            OpenTheoryAssignment.Sampled(claim.sample),
+            (claim.value as SourceValue.Rational).value * sign,
+            stats,
+            this,
+        )
+
         SourceClaim.Refutation -> OpenTheoryOptimum.Infeasible(stats, this)
-        is SourceClaim.Ray -> OpenTheoryOptimum.Unbounded(OpenTheoryAssignment.Sampled(claim.sample),
-            requireNotNull(score), stats, this)
+
+        is SourceClaim.Ray -> OpenTheoryOptimum.Unbounded(
+            OpenTheoryAssignment.Sampled(claim.sample),
+            requireNotNull(score),
+            stats,
+            this,
+        )
+
         else -> OpenTheoryOptimum.Bounded(sampled, score, reason, stats, this)
     }
 }

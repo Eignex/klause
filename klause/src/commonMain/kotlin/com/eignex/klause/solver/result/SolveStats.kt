@@ -177,8 +177,11 @@ internal class SolveStatsSink(var backend: String, lpProbeRoute: LpRoute = LpRou
             lp = lp.snapshot().let { live ->
                 val prepared = presolve?.lpStats
                 // Sparse summaries retain the merge's zero floor for recorded counters.
-                if (prepared == null && live.sparseTrial.isEmpty()) live
-                else live.mergedWith(prepared ?: LpStats())
+                if (prepared == null && live.sparseTrial.isEmpty()) {
+                    live
+                } else {
+                    live.mergedWith(prepared ?: LpStats())
+                }
             },
             scheduling = scheduling.snapshot(),
             ls = ls.snapshot(),

@@ -59,8 +59,10 @@ internal class AffineAbsPropagator(private val factor: AffineAbs) : Propagator {
     private fun possible(row: LinearRow, state: PropagationState): Boolean {
         val constants = row.constants as IntegralConstants
         val variables = IntArray(row.size) { Term.intVar(row.ref(it)) }
-        val value = AbsAffineValue(variables.indices.associate { variables[it] to constants.exactCoeff(it) },
-            -constants.exactBound)
+        val value = AbsAffineValue(
+            variables.indices.associate { variables[it] to constants.exactCoeff(it) },
+            -constants.exactBound,
+        )
         val (lo, hi) = range(value, state)
         return lo <= BIG_ZERO && hi >= BIG_ZERO
     }
@@ -92,12 +94,16 @@ internal class AffineAbsPropagator(private val factor: AffineAbs) : Propagator {
             val rhsUpper = bound - (totalLower - lower[index])
             if (coefficient > BIG_ZERO) {
                 if (!tightenUpper(state, variable, floorDiv(rhsUpper, coefficient))) return false
-            } else if (!tightenLower(state, variable, ceilDiv(rhsUpper, coefficient))) return false
+            } else if (!tightenLower(state, variable, ceilDiv(rhsUpper, coefficient))) {
+                return false
+            }
             if (row.relation == LinearOp.EQ) {
                 val rhsLower = bound - (totalUpper - upper[index])
                 if (coefficient > BIG_ZERO) {
                     if (!tightenLower(state, variable, ceilDiv(rhsLower, coefficient))) return false
-                } else if (!tightenUpper(state, variable, floorDiv(rhsLower, coefficient))) return false
+                } else if (!tightenUpper(state, variable, floorDiv(rhsLower, coefficient))) {
+                    return false
+                }
             }
         }
         return true

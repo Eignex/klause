@@ -135,7 +135,9 @@ internal class ResumableMinimize(
     preparationBudget: SliceBudget? = null,
     private val sink: SolveStatsSink = SolveStatsSink(backend = "backtrack"),
     private val deferredInstallation: Boolean = false,
-) : ResumableSearch, ReseedGuard, SliceWorkAccounting {
+) : ResumableSearch,
+    ReseedGuard,
+    SliceWorkAccounting {
     override var repaidWork: Long = 0L
         private set
     private val hasPreparation = preparationBudget != null
@@ -177,8 +179,10 @@ internal class ResumableMinimize(
     private var clausePrimalStarted = false
     private var clausePrimalCandidate: Sample? = null
     private val slice = SliceBudget(
-        { sink.search.searchWork + (clausePrimal?.work ?: 0L) +
-            (if (::lpEngine.isInitialized) lpEngine.primalSearchWork else 0L) },
+        {
+            sink.search.searchWork + (clausePrimal?.work ?: 0L) +
+                (if (::lpEngine.isInitialized) lpEngine.primalSearchWork else 0L)
+        },
         { (if (::lpEngine.isInitialized) lpEngine.totalSolveWork() else 0L) + sink.lp.standaloneWork },
         {
             (if (::cp.isInitialized) session.work else preparedSession?.work ?: 0L) +
@@ -287,16 +291,22 @@ internal class ResumableMinimize(
         if (exactObjectiveBoundSupplier?.invoke() != null) null else params.toleranceCheck
 
     private fun realLeafOwner(): LeafRealSolver = leafSolver ?: LeafRealSolver(
-        problem, objective, params.lpPlan.componentSplit, sink.lp, solver.lpSolveContext,
+        problem,
+        objective,
+        params.lpPlan.componentSplit,
+        sink.lp,
+        solver.lpSolveContext,
         LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L),
     ).also {
         resources.own(it)
-        resources.own(AutoCloseable {
+        resources.own(
+            AutoCloseable {
             val pending = pendingRealLeaf
             pendingRealLeaf = null
             pendingRealResult = null
             pending?.close()
-        })
+        }
+        )
         leafSolver = it
     }
 
@@ -319,7 +329,10 @@ internal class ResumableMinimize(
 
     private fun checkedLeafResult(sample: Sample, result: LeafRealResult): LeafRealResult {
         if (problem.factorProjections?.requiresRealSourceCheck != true || result.verdict !in setOf(
-                LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.TOLERANCE_OPTIMUM, LpVerdict.UNBOUNDED,
+                LpVerdict.FEASIBLE,
+                LpVerdict.ATTAINED_OPTIMUM,
+                LpVerdict.TOLERANCE_OPTIMUM,
+                LpVerdict.UNBOUNDED,
             )
         ) {
             return result
@@ -417,7 +430,8 @@ internal class ResumableMinimize(
             params = params.copy(valueSelector = SolutionGuided(IndomainBest(objective)))
         }
         cp = CpSearchComponent(
-            (preparedSession ?: PropagationSession(
+            (
+                preparedSession ?: PropagationSession(
                 solver.propagationProjection(params.nativeSat ?: true, problem),
                 runEndToken(),
                 params.propagationCancelFloor,
@@ -428,28 +442,37 @@ internal class ResumableMinimize(
                 costAware = params.costAwarePropagation,
                 reasonPreflight = params.reasonPreflight,
                 cumulativeUnarySubsets = problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
-            )).also {
+            )
+            ).also {
                 if (params.integerRowLearning) it.enableIntegerRowLearning()
-                it.configureAttribution(params.propagationAttribution, params.historicalTableReasons,
-                    params.costAwarePropagation, params.reasonPreflight)
+                it.configureAttribution(
+                    params.propagationAttribution,
+                    params.historicalTableReasons,
+                    params.costAwarePropagation,
+                    params.reasonPreflight,
+                )
             },
             branching = CpBranching.None,
         ).also {
             it.conflictStats = sink.ca
-            resources.own(AutoCloseable {
+            resources.own(
+                AutoCloseable {
                 if (this@ResumableMinimize::run.isInitialized) run.releasePendingPropagation()
                 inprocessing?.reset()
                 if (::searchSession.isInitialized) searchSession.releaseLearning()
                 it.releaseRetainedState()
-            })
-            resources.own(AutoCloseable {
+            }
+            )
+            resources.own(
+                AutoCloseable {
                 try {
                     params.clauseExchange?.onSearchClose(it.session)
                 } finally {
                     it.session.sharedLearningMemory = null
                     it.session.sharedLearningPosition = null
                 }
-            })
+            }
+            )
             sink.search.propagationWork = { it.session.work }
             sink.search.learning = { it.session.learnedLifecycle() + it.session.preparationStatistics() }
             sink.search.valueOrdering = { it.session.valueOrdering.snapshot() }
@@ -460,7 +483,12 @@ internal class ResumableMinimize(
         yield(Unit)
         lpEngine = resources.own(
             LpEngine(
-                problem, objective, params.lpParams(), sink, solver.lpSolveContext, deferred = true,
+                problem,
+                objective,
+                params.lpParams(),
+                sink,
+                solver.lpSolveContext,
+                deferred = true,
                 nodeWorkAllowance = {
                     if (pausable && !preparationPending && externalCutoff().isFinite()) {
                         slice.remainingLpWork()
@@ -474,7 +502,12 @@ internal class ResumableMinimize(
         lpEngine.lpHints = lpHints
         yield(Unit)
         brancher = BacktrackBrancher(
-            session, params, sink, restart, LpGuidedBranching(), nativeConflict = { cp.lastConflict },
+            session,
+            params,
+            sink,
+            restart,
+            LpGuidedBranching(),
+            nativeConflict = { cp.lastConflict },
             leafColumns = params.leafColumns(session, objective),
         ).also {
             cp.propagationObserver = it::onPropagation
@@ -484,11 +517,15 @@ internal class ResumableMinimize(
         searchSession = SearchComponentSet(
             buildList {
                 add(cp)
-                addAll(params.componentFactory?.invoke().orEmpty().also { components ->
+                addAll(
+                    params.componentFactory?.invoke().orEmpty().also { components ->
                     components.forEach(resources::ownComponent)
-                    cp.useEnforcingPeers(components.filterIsInstance<FiniteFactorEnforcer>()
-                        .flatMap { it.enforcingFiniteFactors(problem) }.toSet())
-                })
+                    cp.useEnforcingPeers(
+                        components.filterIsInstance<FiniteFactorEnforcer>()
+                        .flatMap { it.enforcingFiniteFactors(problem) }.toSet()
+                    )
+                }
+                )
                 if (lpEngine.lpRelaxer != null) {
                     lpEngine.cpAdapter.attach(session, feasibility = false)
                     add(lpEngine.propagator)
@@ -770,7 +807,11 @@ internal class ResumableMinimize(
                         (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds
                     } ?: params.solveBudgetMillis ?: 10_000L
                     clausePrimal = MonotoneClausePrimal.create(
-                        solver, objective, params, runEndToken(), minOf(remaining / 2L, 5_000L).coerceAtLeast(0L),
+                        solver,
+                        objective,
+                        params,
+                        runEndToken(),
+                        minOf(remaining / 2L, 5_000L).coerceAtLeast(0L),
                     )?.also { resources.own(it) }
                     if (clausePrimal != null) sink.search.clausalPrimalStarts++
                 }
@@ -975,7 +1016,11 @@ internal class ResumableMinimize(
         val cutoff = booleanObjectiveCutoff(problem, objective, best) ?: return false
         lastBoolCutoffValue = best
         return session.addLearnedPb(
-            cutoff.weights, cutoff.literals, cutoff.degree, lbd = 1, permanent = true,
+            cutoff.weights,
+            cutoff.literals,
+            cutoff.degree,
+            lbd = 1,
+            permanent = true,
         ) is PropagationResult.Unsat
     }
 
@@ -1109,8 +1154,10 @@ internal class ResumableMinimize(
             return it
         }
         if (unboundedLeaf != null) return null
-        rootLayoutPending = !lpEngine.prepareRootLayout(runEndToken(),
-            if (pausable) params.cancellation else ExecutionControl.Never)
+        rootLayoutPending = !lpEngine.prepareRootLayout(
+            runEndToken(),
+            if (pausable) params.cancellation else ExecutionControl.Never,
+        )
         if (rootLayoutPending) return null
         val rootToken = rootLpBudget()
         val admissionStarted = if (lpEngine.lpRelaxer != null || lpEngine.retainedRootEnabled) {
@@ -1169,8 +1216,14 @@ internal class ResumableMinimize(
         if (rootRoundingPending) return null
         if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null && params.componentFactory == null) {
             val before = lpEngine.primalSearchWork
-            val seed = lpEngine.lbTreeSearch(objective, rootToken, params.assumptions, params.toleranceCheck,
-                complete = ::completeLeaf, nodeBudget = params.nodeBudget)
+            val seed = lpEngine.lbTreeSearch(
+                objective,
+                rootToken,
+                params.assumptions,
+                params.toleranceCheck,
+                complete = ::completeLeaf,
+                nodeBudget = params.nodeBudget,
+            )
             treeBudgetExhausted = lpEngine.primalSearchWork > before && params.nodeBudget?.exhausted() == true
             if (seed != null && !params.cancellation()) {
                 recordIfImproving(seed.sample, objective.evaluate(seed.sample))?.let { return it }
@@ -1245,8 +1298,12 @@ internal class ResumableMinimize(
             !lpEngine.rootRoundingInterrupted -> "NOT_INTERRUPTED"
 
             solveCancelled() -> "RUN_CANCELLED"
-            !(plan.rootBudgetFraction <= 0.0 ||
-                !lpEngine.workSpentExceeds(plan.rootMaxWork, sink.lp.standaloneWork)) -> "ROOT_WORK_SPENT"
+
+            !(
+                plan.rootBudgetFraction <= 0.0 ||
+                !lpEngine.workSpentExceeds(plan.rootMaxWork, sink.lp.standaloneWork)
+            ) -> "ROOT_WORK_SPENT"
+
             lpEngine.lpWorkAllowanceSpent(sink.lp.standaloneWork) -> "LP_WORK_SPENT"
 
             else -> "PENDING"
@@ -1263,8 +1320,12 @@ internal class ResumableMinimize(
      */
     private fun initRootLp(token: ExecutionControl): Boolean {
         val relaxer = lpEngine.harvestRootRelaxation(token) ?: return false
-        val rootBound = lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, token,
-            preparationCancellation = rootLpPreparationBudget())
+        val rootBound = lpEngine.rootLpRelaxationBound(
+            relaxer,
+            lpEngine.lpGlobalCuts,
+            token,
+            preparationCancellation = rootLpPreparationBudget(),
+        )
         sink.lp.observeRootBound(0, rootBound)
         // Publish the root LP bound to the portfolio's shared lower-bound manager: a sound global lower
         // bound on the optimum, so a peer arm can pair it with its own incumbent to prove optimality. A
@@ -1307,8 +1368,10 @@ internal class ResumableMinimize(
         if (params.lpPlan.rootBudgetFraction <= 0.0) return params.cancellation
         val opsBudget = lpEngine.params.lpPlan.rootMaxWork
         return params.cancellation or
-            ExecutionControl { lpEngine.workSpentExceeds(opsBudget, sink.lp.standaloneWork) ||
-                lpEngine.lpWorkAllowanceSpent(sink.lp.standaloneWork) }
+            ExecutionControl {
+                lpEngine.workSpentExceeds(opsBudget, sink.lp.standaloneWork) ||
+                    lpEngine.lpWorkAllowanceSpent(sink.lp.standaloneWork)
+            }
     }
 
     /** Milliseconds left until the effective deadline: the armed slice end (pausable portfolio path),
@@ -1335,9 +1398,13 @@ internal class ResumableMinimize(
 
     /** LP guidance affects only branch order; the shared runner still owns every frame and retraction. */
     private inner class LpGuidedBranching : BacktrackBranching {
-        override fun onBranch(variable: VarRef) { lpHints?.branch(variable) }
+        override fun onBranch(variable: VarRef) {
+            lpHints?.branch(variable)
+        }
 
-        override fun onCommit(decision: SearchDecision, depth: Int) { lpHints?.commit(decision, depth) }
+        override fun onCommit(decision: SearchDecision, depth: Int) {
+            lpHints?.commit(decision, depth)
+        }
 
         override fun onRestart() {
             lpHints?.resetHistory()
@@ -1402,8 +1469,13 @@ internal class ResumableMinimize(
             if (deferSimplex) {
                 sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ORDER", "NODE_QUERY_DEFERRED", 0L)
             }
-            val pruned = lpEngine.pruneNode(session, lpBound, singleObj?.varId ?: -1,
-                singleObj?.ascending ?: true, deferSimplex = deferSimplex)
+            val pruned = lpEngine.pruneNode(
+                session,
+                lpBound,
+                singleObj?.varId ?: -1,
+                singleObj?.ascending ?: true,
+                deferSimplex = deferSimplex,
+            )
             lpHints?.finishNode(lpEngine.cpAdapter.currentModel?.exactState)
             if (!pruned) {
                 return SearchNodeDisposition.Expand
@@ -1450,9 +1522,9 @@ internal class ResumableMinimize(
                         if (pausable && params.cancellation()) return SearchModelDisposition.Pause
                         val published = if (accepted) {
                             recordIfImproving(
-                            checkNotNull(witness),
-                            objective.evaluate(witness),
-                        )
+                                checkNotNull(witness),
+                                objective.evaluate(witness),
+                            )
                         } else {
                             null
                         }
@@ -1507,7 +1579,8 @@ internal class ResumableMinimize(
         SearchRunLifecycle {
         override val solveParams: SearchSolveParams
             get() = SearchSolveParams(
-                maxDecisions = params.nodeBudget?.allowance?.decisionsLeft() ?: Long.MAX_VALUE, restart = restart,
+                maxDecisions = params.nodeBudget?.allowance?.decisionsLeft() ?: Long.MAX_VALUE,
+                restart = restart,
             )
         override val booleanBranching = BooleanBranching.None
 
@@ -1544,10 +1617,12 @@ internal class ResumableMinimize(
                 pooledIncumbents?.poll()?.takeIf { local == null || it.objective < local.objective.display }?.let {
                     brancher.importPooledSolution(it.assignment, guideValues = true, replay = local == null)
                     params.branchObserver.observeGuidance(PooledGuidanceKind.IMPORT) {
-                        PooledGuidanceObservation(PooledGuidanceKind.IMPORT, local == null, "resume",
+                        PooledGuidanceObservation(
+                            PooledGuidanceKind.IMPORT, local == null, "resume",
                             it.version, it.objective, local?.objective?.display,
                             local?.objective?.exact?.guidanceText(),
-                            observedExternalCutoff, rootRoundingPending || rootLayoutPending)
+                            observedExternalCutoff, rootRoundingPending || rootLayoutPending,
+                        )
                     }
                 }
             }

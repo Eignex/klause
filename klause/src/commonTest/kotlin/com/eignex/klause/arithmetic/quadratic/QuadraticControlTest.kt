@@ -40,10 +40,13 @@ class QuadraticControlTest {
     @Test
     fun `local work admission should precede the containing debit`() {
         var charged = 0L
-        val control = QuadraticControl(object : ExecutionControl() {
+        val control = QuadraticControl(
+            object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
             override val accounting: WorkMeter get() = WorkMeter { charged += it }
-        }, maximumWork = 0)
+        },
+            maximumWork = 0
+        )
 
         val stop = assertFailsWith<QuadraticInterrupted> { control.step() }
 

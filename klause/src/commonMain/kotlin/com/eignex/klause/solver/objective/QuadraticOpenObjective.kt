@@ -33,10 +33,12 @@ internal fun QuadraticObjectiveSpec.openPolynomial(
                     PolynomialRealLowering.constant(BigFraction.ZERO),
                 )
             }
+
             is QuadraticVariable.Int -> {
                 require(variable.id.index in source.integerCoordinates.indices) { "quadratic integer id out of range" }
                 PolynomialExpression.Variable(SourceRealId(source.integerCoordinates[variable.id.index]))
             }
+
             is QuadraticVariable.Real -> {
                 require(variable.id.index in source.realCoordinates.indices) { "quadratic real id out of range" }
                 PolynomialExpression.Variable(SourceRealId(source.realCoordinates[variable.id.index]))
@@ -46,11 +48,13 @@ internal fun QuadraticObjectiveSpec.openPolynomial(
     val expression = PolynomialExpression.Sum(
         listOf(PolynomialExpression.Constant.of(constant.numerator, constant.denominator)) + terms.map { term ->
             step()
-            PolynomialExpression.Product(buildList {
+            PolynomialExpression.Product(
+                buildList {
                 add(PolynomialExpression.Constant.of(term.coefficient.numerator, term.coefficient.denominator))
                 add(coordinate(term.first))
                 term.second?.let { add(coordinate(it)) }
-            })
+            }
+            )
         },
     )
     step()

@@ -54,12 +54,18 @@ internal class AffineIndexRepair(
     @Suppress("SwallowedException")
     private fun solve(i: Int, otherValue: Long, rhs: Long): Long? = try {
         val coefficient = definition.coeffs[i]
-        val numerator = if (definition.ins.size == 1) rhs else {
+        val numerator = if (definition.ins.size == 1) {
+            rhs
+        } else {
             subExact(rhs, mulExact(definition.coeffs[1 - i], otherValue))
         }
         if (coefficient == 0L || numerator % coefficient != 0L ||
             (numerator == Long.MIN_VALUE && coefficient == -1L)
-        ) null else numerator / coefficient
+        ) {
+            null
+        } else {
+            numerator / coefficient
+        }
     } catch (_: CheckedLongOverflowException) {
         null
     }
@@ -102,7 +108,9 @@ internal class AffineIndexRepair(
             if (value != state.assignment.intValue(varId) && !sink.allowsDefinedInt(varId)) return false
             if (alias.ins.size != 1 || alias.ins[0].varId < 0 ||
                 (alias.outCoeff != 1L && alias.outCoeff != -1L)
-            ) return false
+            ) {
+                return false
+            }
             val target = aliasInput(alias, value) ?: return false
             return coordinateTarget(alias.ins[0].varId, target, targets, depth + 1)
         }
@@ -118,7 +126,11 @@ internal class AffineIndexRepair(
         val coefficient = alias.coeffs[0]
         if (coefficient == 0L || numerator % coefficient != 0L ||
             (numerator == Long.MIN_VALUE && coefficient == -1L)
-        ) null else numerator / coefficient
+        ) {
+            null
+        } else {
+            numerator / coefficient
+        }
     } catch (_: CheckedLongOverflowException) {
         null
     }

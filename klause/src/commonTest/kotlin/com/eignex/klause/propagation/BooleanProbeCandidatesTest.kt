@@ -26,7 +26,9 @@ class BooleanProbeCandidatesTest {
     @Test
     fun `unused and root fixed columns should leave the cap for live candidates`() {
         val source = Problem(
-            8, 0, emptyArray(),
+            8,
+            0,
+            emptyArray(),
             listOf(
                 Clause(intArrayOf(Lit.make(4, true))),
                 Clause(intArrayOf(Lit.make(4, false), Lit.make(5, true))),

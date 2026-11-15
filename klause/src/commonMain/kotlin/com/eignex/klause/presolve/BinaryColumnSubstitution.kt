@@ -87,7 +87,9 @@ internal object BinaryColumnSubstitution {
         val view = objective?.let { BinaryObjectiveView.create(problem, it, allowMixedObjective) }
         val protected = when {
             view == null -> objectiveIntVars
+
             !allowMixedObjective -> emptySet()
+
             else -> buildSet {
                 for (v in view.objective.intCoefficientValues.indices) {
                     if (v % 256 == 0 && problem.cancellation()) return null
@@ -111,10 +113,17 @@ internal object BinaryColumnSubstitution {
         fun viewOnly(): Substitution? {
             if (view == null) return null
             val rebuilt = PresolveShared.rebuildProblem(
-                problem, view.factors, bakeConfig = bakeConfig, numBoolVars = numBools, seedDeductions = seeds,
+                problem,
+                view.factors,
+                bakeConfig = bakeConfig,
+                numBoolVars = numBools,
+                seedDeductions = seeds,
             )
             return Substitution(
-                rebuilt, SourceRebuilds(emptyList(), sourceBoolVars = problem.numBoolVars), 0, view.objective,
+                rebuilt,
+                SourceRebuilds(emptyList(), sourceBoolVars = problem.numBoolVars),
+                0,
+                view.objective,
             )
         }
         val ranges = ColumnRanges.of(problem.rootIntDomainsInPlace)
@@ -167,7 +176,12 @@ internal object BinaryColumnSubstitution {
         val domains = problem.rootIntDomains()
         for (k in 0 until columns.size) domains[columns[k]] = IntDomain(0, 0)
         val rebuilt = PresolveShared.rebuildProblem(
-            problem, out, domains, bakeConfig, numBoolVars = nextBool, seedDeductions = seeds,
+            problem,
+            out,
+            domains,
+            bakeConfig,
+            numBoolVars = nextBool,
+            seedDeductions = seeds,
         )
         val substituted = columns.toIntArray()
         val rebuild = SourceRebuilds(

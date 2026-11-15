@@ -146,7 +146,9 @@ object FinitePipeline {
         // model the engine is built from; an untouched model keeps the plan routing already built.
         val sourcePlan = if (prepared.changed) {
             request.presolveBudget.observePreparation(
-                PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.FINITE, prepared.problem,
+                PresolvePreparationStage.SOURCE_ENCODER,
+                PresolveLane.FINITE,
+                prepared.problem,
                 request.solveCancellation,
             ) { token, observation ->
                 prepared.problem.prepareExecutionPlan(
@@ -203,7 +205,10 @@ object FinitePipeline {
                 ?.takeIf { it.providers === plan.factorProjections.providers }
                 ?: plan.factorProjections.forEngineView(model)
             request.presolveBudget.observePreparation(
-                PresolvePreparationStage.ENGINE_BAKE, PresolveLane.FINITE, model, request.solveCancellation,
+                PresolvePreparationStage.ENGINE_BAKE,
+                PresolveLane.FINITE,
+                model,
+                request.solveCancellation,
                 output = { it },
             ) { token, observation ->
                 model.bake(projections, token).also {
@@ -213,19 +218,34 @@ object FinitePipeline {
         }
         val finiteModel = if (!outcome.stats.infeasible && bakedModel is BakedProblem) {
             request.presolveBudget.observePreparation(
-                PresolvePreparationStage.REAL_DIFFERENCE, PresolveLane.FINITE, bakedModel,
-                request.solveCancellation, output = { it },
+                PresolvePreparationStage.REAL_DIFFERENCE,
+                PresolveLane.FINITE,
+                bakedModel,
+                request.solveCancellation,
+                output = { it },
             ) { token, observation ->
                 bakedModel.withRealDifferenceSystem(token) { observation.preparationInterrupted() }.also {
-                    if (it === bakedModel) observation?.outcome = if (
+                    if (it === bakedModel) {
+                        observation?.outcome = if (
                         bakedModel.numRealVars !in 1..10000 || bakedModel.semantics.isApproximate
-                    ) PresolveInvocationOutcome.ELIGIBILITY_SKIP else PresolveInvocationOutcome.COMPLETE_MISS
+                    ) {
+                        PresolveInvocationOutcome.ELIGIBILITY_SKIP
+                    } else {
+                        PresolveInvocationOutcome.COMPLETE_MISS
+                    }
+                    }
                 }
             }
-        } else bakedModel
-        val mapping = if (finiteModel === bakedModel) outcome.mapping else outcome.mapping.then(
+        } else {
+            bakedModel
+        }
+        val mapping = if (finiteModel === bakedModel) {
+            outcome.mapping
+        } else {
+            outcome.mapping.then(
             SourceMapping(outcome.mapping.target, finiteModel, TransformationGuarantees.IDENTITY),
         )
+        }
         val sameCoordinatesAndFactors = finiteModel.numBoolVars == request.problem.numBoolVars &&
             finiteModel.numIntVars == request.problem.numIntVars &&
             finiteModel.numRealVars == request.problem.numRealVars &&
@@ -238,7 +258,10 @@ object FinitePipeline {
             val providers = request.preparedPlan.factorProjections?.providers ?: FactorProjectionProviders.Default
             val projections = model.factorProjections?.takeIf { it.providers === providers } ?: providers.prepare(model)
             request.presolveBudget.observePreparation(
-                PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.FINITE, model, request.solveCancellation,
+                PresolvePreparationStage.SOURCE_ENCODER,
+                PresolveLane.FINITE,
+                model,
+                request.solveCancellation,
             ) { token, observation ->
                 model.prepareExecutionPlan(
                     original = requireNotNull(request.preparedPlan.sourceModel),
@@ -260,8 +283,11 @@ object FinitePipeline {
         return FinitePipelinePreparation(
             problem = finiteModel,
             objective = outcome.objective ?: objective,
-            reconstruct = if (mapping === outcome.mapping) outcome.reconstruct
-                else { sample -> mapping.reconstructFrom(finiteModel, sample) },
+            reconstruct = if (mapping === outcome.mapping) {
+                outcome.reconstruct
+            } else {
+                { sample -> mapping.reconstructFrom(finiteModel, sample) }
+            },
             presolve = outcome.stats.copy(
                 effort = config.effortStats(request.presolveBudget, start.elapsedNow()),
             ),

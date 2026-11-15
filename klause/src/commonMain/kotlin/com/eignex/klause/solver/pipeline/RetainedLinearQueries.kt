@@ -46,7 +46,8 @@ internal class RetainedLinearQueries(
         SearchCandidateHints.None
     },
     private val open: (ExecutionControl, OpenTheorySolveState) -> PlannedSearch?,
-) : ExactNeighborhoodCompletion, AutoCloseable {
+) : ExactNeighborhoodCompletion,
+    AutoCloseable {
     private val state = OpenTheorySolveState(params)
     private val scope = ConditionedQueryScope(params.timeout.withAccounting(params.cancellation) or params.cancellation)
     private var planned: PlannedSearch? = null
@@ -56,9 +57,13 @@ internal class RetainedLinearQueries(
     private var closed = false
     private val marker = object : SearchTheoryDecision {}
     val work: Long get() = state.work.spent
-    val stats: SolveStats get() = SolveStats(openTheory = state.work.snapshot(), smt = state.smt.snapshot(),
-        openTheoryClauses = planned?.session?.learnedClauseStats() ?: state.clauses, openHints = state.hints,
-        search = state.progress(planned?.session))
+    val stats: SolveStats get() = SolveStats(
+        openTheory = state.work.snapshot(),
+        smt = state.smt.snapshot(),
+        openTheoryClauses = planned?.session?.learnedClauseStats() ?: state.clauses,
+        openHints = state.hints,
+        search = state.progress(planned?.session),
+    )
     val declined: Boolean get() = sourceDeclined
     val exhausted: Boolean get() = sourceDeclined || !state.work.hasAllowance() ||
         state.work.acceptedChecks >= params.maxLeaves
@@ -137,14 +142,22 @@ internal class RetainedLinearQueries(
                 OpenBranching.SourceOrder, OpenBranching.Automatic -> BooleanBranching.SourceOrder(model.numBoolVars)
                 OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
             }
-            val run = session.openConditionedRun(model.numBoolVars,
-                SearchSolveParams(maxDecisions = state.remainingDecisions().coerceAtLeast(0),
-                    restart = params.sharedRestart?.let(SearchRestart::Every) ?: SearchRestart.Never),
+            val run = session.openConditionedRun(
+                model.numBoolVars,
+                SearchSolveParams(
+                    maxDecisions = state.remainingDecisions().coerceAtLeast(0),
+                    restart = params.sharedRestart?.let(SearchRestart::Every) ?: SearchRestart.Never,
+                ),
                 decisionBudget = state.decisionBudget,
-                nodePolicy = policy, booleanBranching = branching,
-                candidateHints = observedCandidateHints(hints(scope.stop, state), search.candidateHints,
-                    state.smt.hintUsage),
-                observer = branching as? SearchRunObserver ?: SearchRunObserver.None)
+                nodePolicy = policy,
+                booleanBranching = branching,
+                candidateHints = observedCandidateHints(
+                    hints(scope.stop, state),
+                    search.candidateHints,
+                    state.smt.hintUsage,
+                ),
+                observer = branching as? SearchRunObserver ?: SearchRunObserver.None,
+            )
             when (val event = run.next()) {
                 is SearchRunEvent.Satisfied -> {
                     val sample = event.model.sample()
@@ -245,9 +258,9 @@ internal class RetainedLinearQueries(
             val coefficient = objective.realCoefficientValues[id]
             if (coefficient != 0.0) {
                 terms += SourceBoundTerm(
-                SearchRealValue(id),
-                requireNotNull(BigFraction.ofDouble(coefficient)),
-            )
+                    SearchRealValue(id),
+                    requireNotNull(BigFraction.ofDouble(coefficient)),
+                )
             }
         }
         return object : SearchNodePolicy {
@@ -287,7 +300,10 @@ internal class RetainedLinearQueries(
         return Sample(
             BooleanArray(model.numBoolVars) { requireNotNull(valueOf(SearchBoolValue(it))) },
             finite,
-            DoubleArray(reals.size) { reals[it].toDouble() }, exactReals = reals, exactInts = integers)
+            DoubleArray(reals.size) { reals[it].toDouble() },
+            exactReals = reals,
+            exactInts = integers,
+        )
     }
 
     private fun validate(condition: ExactNeighborhoodCondition) {

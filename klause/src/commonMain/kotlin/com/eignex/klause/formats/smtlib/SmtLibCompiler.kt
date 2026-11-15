@@ -37,8 +37,7 @@ internal object Compiler {
         internal val conditionalEqualities: SmtLibConditionalEquality = SmtLibConditionalEquality(),
         internal val sourceCancellation: ExecutionControl = ExecutionControl.Never,
         internal val semantics: EffectiveSourceSemantics = resolveSmtLibSemantics(unboundedIntLo, unboundedIntHi),
-    ) :
-        CnfLowering {
+    ) : CnfLowering {
         internal val boolNames = HashMap<String, Int>()
         internal val intNames = HashMap<String, Int>()
         internal val realNames = HashMap<String, Int>()
@@ -82,6 +81,7 @@ internal object Compiler {
         // by each active scope so it can be popped. A deeply nested formula unwinds its `let` chain
         // iteratively into these structures instead of recursing through the call stack.
         internal class ScopedBinding(val depth: Int, val binding: Binding)
+
         // Deferred Boolean values exclude their simultaneous peers and later caller-local shadows.
         internal class BindingSnapshot(val scope: BindingScope, val depth: Int)
         internal class BindingScope(val parent: BindingSnapshot? = null) {
@@ -148,7 +148,9 @@ internal object Compiler {
                             b.srcBool = expr
                             b.sourceScope = sourceScope
                         }
+
                         b.isReal -> b.real = realTerm(expr)
+
                         else -> b.lin = linearTerm(expr)
                     }
                     name to b
@@ -270,11 +272,13 @@ internal object Compiler {
                 val paramName = param.atomAt(0, "define-fun '$name' parameter")
                 val parameterSort = param.atomAt(1, "define-fun '$name' parameter sort")
                 requireSort(parameterSort, "define-fun '$name' parameter '$paramName'")
-                parameterSorts.add(when (parameterSort) {
-                    "Bool" -> Sort.BOOL
-                    "Real" -> Sort.REAL
-                    else -> Sort.INT
-                })
+                parameterSorts.add(
+                    when (parameterSort) {
+                        "Bool" -> Sort.BOOL
+                        "Real" -> Sort.REAL
+                        else -> Sort.INT
+                    },
+                )
                 paramName
             }
             val retSort = e.atomAt(3, "define-fun '$name' return sort")
@@ -325,22 +329,31 @@ internal object Compiler {
             if (hasOpenProductOperand()) closeProductBounds()
             for (a in asserts) assert(a)
             lowerOpenIteChains()
-            val compiledObjective = if (includeObjective) objectiveSpec?.let { (t, _) ->
+            val compiledObjective = if (includeObjective) {
+                objectiveSpec?.let { (t, _) ->
                 if (isRealExpr(t)) realObjective(t, false) else linearObjective(t, false)
-            } else null
+            }
+            } else {
+                null
+            }
             lowerOpenIteChains() // an objective term can open chains of its own
             conditionalEqualities.expandPending(this)
             val removed = conditionalEqualities.retainNeededDefinitions(
-                factors, intNames.values, boolNames.values, compiledObjective,
+                factors,
+                intNames.values,
+                boolNames.values,
+                compiledObjective,
             )
             val objective = compactConditionalColumns(removed, compiledObjective)
             factors.addAll(affineRealTables.infer())
             return sourceProblem(objective, factors.toTypedArray())
         }
 
-        internal fun refutedSource(premises: Problem): SmtLibProblem = sourceProblem(null,
+        internal fun refutedSource(premises: Problem): SmtLibProblem = sourceProblem(
+            null,
             // Open-bound routing reads rows with source coordinates.
-            premises.factors + ExactLinear.of(intArrayOf(), emptyList(), LinearOp.EQ, BigFraction.ONE))
+            premises.factors + ExactLinear.of(intArrayOf(), emptyList(), LinearOp.EQ, BigFraction.ONE),
+        )
 
         private fun sourceProblem(objective: LinearObjectiveSpec?, sourceFactors: Array<Factor>): SmtLibProblem {
             val model = Problem(

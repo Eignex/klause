@@ -24,31 +24,50 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class BooleanSatisfactionRepairTest {
-    private val problem = Problem(2, 0, emptyArray(), arrayOf(
+    private val problem = Problem(
+        2, 0, emptyArray(),
+        arrayOf(
         Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-    )).bake()
+    )
+    ).bake()
 
     @Test
     fun `sibling queries should preserve their scope across restarts`() {
-        val guarded = Problem(5, 0, emptyArray(), Array(8) { mask ->
-            Clause(intArrayOf(Lit.make(0, true)) +
-                IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
-        }).bake()
+        val guarded = Problem(
+            5, 0, emptyArray(),
+            Array(8) { mask ->
+            Clause(
+                intArrayOf(Lit.make(0, true)) +
+                    IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) },
+            )
+        }
+        ).bake()
         for (native in listOf(false, true)) {
-            val params = BacktrackParams(nativeSat = native, lubyRestartBase = 1L,
+            val params = BacktrackParams(
+                nativeSat = native,
+                lubyRestartBase = 1L,
                 variableSelector = InputOrder,
-                valueSelector = IndomainMin)
+                valueSelector = IndomainMin,
+            )
             BacktrackSolver(guarded).openBooleanProof(params).use { search ->
-                search.begin(Assumptions(bools = mapOf(0 to false)), Long.MAX_VALUE,
-                    Double.POSITIVE_INFINITY, ExecutionControl.Never)
+                search.begin(
+                    Assumptions(bools = mapOf(0 to false)),
+                    Long.MAX_VALUE,
+                    Double.POSITIVE_INFINITY,
+                    ExecutionControl.Never,
+                )
                 val refuted = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
                 assertNull(refuted.sample)
                 assertEquals(TerminationReason.SearchExhausted, refuted.reason)
                 assertTrue(search.stats.search.restarts.sum > 0.0)
 
                 for (value in listOf(false, true)) {
-                    search.begin(Assumptions(bools = mapOf(0 to true, 2 to value)), Long.MAX_VALUE,
-                        Double.POSITIVE_INFINITY, ExecutionControl.Never)
+                    search.begin(
+                        Assumptions(bools = mapOf(0 to true, 2 to value)),
+                        Long.MAX_VALUE,
+                        Double.POSITIVE_INFINITY,
+                        ExecutionControl.Never,
+                    )
                     val sibling = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
                     val sample = assertNotNull(sibling.sample)
@@ -61,16 +80,29 @@ class BooleanSatisfactionRepairTest {
 
     @Test
     fun `a retained task root should preserve a feasible sibling after scoped refutation`() {
-        val guarded = Problem(5, 0, emptyArray(), Array(8) { mask ->
-            Clause(intArrayOf(Lit.make(0, true)) +
-                IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
-        }).bake()
+        val guarded = Problem(
+            5, 0, emptyArray(),
+            Array(8) { mask ->
+            Clause(
+                intArrayOf(Lit.make(0, true)) +
+                    IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) },
+            )
+        }
+        ).bake()
         for (native in listOf(false, true)) {
-            val params = BacktrackParams(nativeSat = native, lubyRestartBase = 1L,
-                variableSelector = InputOrder, valueSelector = IndomainMin)
+            val params = BacktrackParams(
+                nativeSat = native,
+                lubyRestartBase = 1L,
+                variableSelector = InputOrder,
+                valueSelector = IndomainMin,
+            )
             BacktrackSolver(guarded).openBooleanProof(params).use { search ->
-                search.begin(Assumptions(bools = mapOf(1 to true)), Long.MAX_VALUE,
-                    Double.POSITIVE_INFINITY, ExecutionControl.Never)
+                search.begin(
+                    Assumptions(bools = mapOf(1 to true)),
+                    Long.MAX_VALUE,
+                    Double.POSITIVE_INFINITY,
+                    ExecutionControl.Never,
+                )
                 assertNull(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L).reason)
                 assertTrue(search.retainPartition(assertNotNull(search.splitLiteral())))
                 val refuted = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
@@ -78,8 +110,12 @@ class BooleanSatisfactionRepairTest {
                 assertEquals(TerminationReason.SearchExhausted, refuted.reason)
                 assertTrue(search.stats.search.restarts.sum > 0.0)
 
-                search.begin(Assumptions(bools = mapOf(0 to true, 1 to true, 2 to false)), Long.MAX_VALUE,
-                    Double.POSITIVE_INFINITY, ExecutionControl.Never)
+                search.begin(
+                    Assumptions(bools = mapOf(0 to true, 1 to true, 2 to false)),
+                    Long.MAX_VALUE,
+                    Double.POSITIVE_INFINITY,
+                    ExecutionControl.Never,
+                )
                 val sibling = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
                 val sample = assertNotNull(sibling.sample)
@@ -99,8 +135,12 @@ class BooleanSatisfactionRepairTest {
                 val sample = assertNotNull(first.sample)
                 assertTrue(sample.boolValue(0) || sample.boolValue(1))
 
-                search.begin(Assumptions(bools = mapOf(0 to false, 1 to false)), Long.MAX_VALUE,
-                    Double.POSITIVE_INFINITY, ExecutionControl.Never)
+                search.begin(
+                    Assumptions(bools = mapOf(0 to false, 1 to false)),
+                    Long.MAX_VALUE,
+                    Double.POSITIVE_INFINITY,
+                    ExecutionControl.Never,
+                )
                 val refuted = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
                 assertNull(refuted.sample)
@@ -115,8 +155,12 @@ class BooleanSatisfactionRepairTest {
             val budget = NodeBudget(0L)
             val params = BacktrackParams(nativeSat = native, nodeBudget = budget)
             BacktrackSolver(problem).openBooleanProof(params).use { search ->
-                search.begin(Assumptions(bools = mapOf(0 to true, 1 to false)), Long.MAX_VALUE,
-                    Double.POSITIVE_INFINITY, ExecutionControl.Never)
+                search.begin(
+                    Assumptions(bools = mapOf(0 to true, 1 to false)),
+                    Long.MAX_VALUE,
+                    Double.POSITIVE_INFINITY,
+                    ExecutionControl.Never,
+                )
                 val result = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
                 assertTrue(assertNotNull(result.sample).boolValue(0))
@@ -131,8 +175,12 @@ class BooleanSatisfactionRepairTest {
         for (native in listOf(false, true)) {
             BacktrackSolver(problem).openBooleanProof(BacktrackParams(nativeSat = native)).use { search ->
                 for (value in listOf(true, false)) {
-                    search.begin(Assumptions(bools = mapOf(0 to value, 1 to !value)), Long.MAX_VALUE,
-                        Double.POSITIVE_INFINITY, ExecutionControl.Never)
+                    search.begin(
+                        Assumptions(bools = mapOf(0 to value, 1 to !value)),
+                        Long.MAX_VALUE,
+                        Double.POSITIVE_INFINITY,
+                        ExecutionControl.Never,
+                    )
                     val result = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
                     val sample = assertNotNull(result.sample)
@@ -147,14 +195,22 @@ class BooleanSatisfactionRepairTest {
     fun `a scoped refutation should not poison a feasible sibling`() {
         for (native in listOf(false, true)) {
             BacktrackSolver(problem).openBooleanProof(BacktrackParams(nativeSat = native)).use { search ->
-                search.begin(Assumptions(bools = mapOf(0 to false, 1 to false)), Long.MAX_VALUE,
-                    Double.POSITIVE_INFINITY, ExecutionControl.Never)
+                search.begin(
+                    Assumptions(bools = mapOf(0 to false, 1 to false)),
+                    Long.MAX_VALUE,
+                    Double.POSITIVE_INFINITY,
+                    ExecutionControl.Never,
+                )
                 val refuted = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
                 assertNull(refuted.sample)
                 assertEquals(TerminationReason.SearchExhausted, refuted.reason)
 
-                search.begin(Assumptions(bools = mapOf(0 to true, 1 to false)), Long.MAX_VALUE,
-                    Double.POSITIVE_INFINITY, ExecutionControl.Never)
+                search.begin(
+                    Assumptions(bools = mapOf(0 to true, 1 to false)),
+                    Long.MAX_VALUE,
+                    Double.POSITIVE_INFINITY,
+                    ExecutionControl.Never,
+                )
                 val sibling = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
                 assertTrue(assertNotNull(sibling.sample).boolValue(0))
@@ -168,8 +224,12 @@ class BooleanSatisfactionRepairTest {
             val root = search.stats.search.rootPropagationWork.sum
             assertTrue(root > 0.0)
             for (value in listOf(false, true)) {
-                search.begin(Assumptions(bools = mapOf(0 to value)), Long.MAX_VALUE,
-                    Double.POSITIVE_INFINITY, ExecutionControl.Never)
+                search.begin(
+                    Assumptions(bools = mapOf(0 to value)),
+                    Long.MAX_VALUE,
+                    Double.POSITIVE_INFINITY,
+                    ExecutionControl.Never,
+                )
                 search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
             }
 
@@ -179,16 +239,23 @@ class BooleanSatisfactionRepairTest {
 
     @Test
     fun `an exhausted containing quota should not spend another decision after reseeding`() {
-        val contradiction = Problem(4, 0, emptyArray(), Array(8) { mask ->
+        val contradiction = Problem(
+            4, 0, emptyArray(),
+            Array(8) { mask ->
             Clause(IntArray(3) { bit -> Lit.make(bit + 1, mask and (1 shl bit) != 0) })
-        }).bake()
+        }
+        ).bake()
         for (native in listOf(false, true)) {
             val budget = NodeBudget(1L)
             val params = BacktrackParams(nativeSat = native, nodeBudget = budget)
             BacktrackSolver(contradiction).openBooleanProof(params).use { search ->
                 for (value in listOf(false, true)) {
-                    search.begin(Assumptions(bools = mapOf(0 to value)), Long.MAX_VALUE,
-                        Double.POSITIVE_INFINITY, ExecutionControl.Never)
+                    search.begin(
+                        Assumptions(bools = mapOf(0 to value)),
+                        Long.MAX_VALUE,
+                        Double.POSITIVE_INFINITY,
+                        ExecutionControl.Never,
+                    )
                     val result = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
                     assertNull(result.sample)
@@ -204,14 +271,22 @@ class BooleanSatisfactionRepairTest {
     fun `a cancelled condition should not prevent a later sibling query`() {
         for (native in listOf(false, true)) {
             BacktrackSolver(problem).openBooleanProof(BacktrackParams(nativeSat = native)).use { search ->
-                search.begin(Assumptions(bools = mapOf(0 to false)), Long.MAX_VALUE,
-                    Double.POSITIVE_INFINITY, ExecutionControl { true })
+                search.begin(
+                    Assumptions(bools = mapOf(0 to false)),
+                    Long.MAX_VALUE,
+                    Double.POSITIVE_INFINITY,
+                    ExecutionControl { true },
+                )
                 val cancelled = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
                 assertNull(cancelled.sample)
                 assertEquals(TerminationReason.BudgetExhausted, cancelled.reason)
 
-                search.begin(Assumptions(bools = mapOf(0 to true, 1 to false)), Long.MAX_VALUE,
-                    Double.POSITIVE_INFINITY, ExecutionControl.Never)
+                search.begin(
+                    Assumptions(bools = mapOf(0 to true, 1 to false)),
+                    Long.MAX_VALUE,
+                    Double.POSITIVE_INFINITY,
+                    ExecutionControl.Never,
+                )
                 val sibling = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
                 assertTrue(assertNotNull(sibling.sample).boolValue(0))
@@ -230,9 +305,12 @@ class BooleanSatisfactionRepairTest {
 
     @Test
     fun `direct satisfaction tasks should recover lost coverage before reporting source exhaustion`() {
-        val contradiction = Problem(5, 0, emptyArray(), Array(8) { mask ->
+        val contradiction = Problem(
+            5, 0, emptyArray(),
+            Array(8) { mask ->
             Clause(IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
-        }).bake()
+        }
+        ).bake()
         val context = BooleanProofContext(SourceScope(SourceRevision("fixture", "exact-cnf")), "identity:0")
         val params = List(2) { BacktrackParams(nativeSat = false) }
         BooleanProofScheduler(contradiction, context, listOf(0, 1), params, true).use { scheduler ->
@@ -252,8 +330,13 @@ class BooleanSatisfactionRepairTest {
     @Test
     fun `direct satisfaction tasks should retain caller pins and checked witnesses`() {
         val pins = mapOf(1 to false)
-        val context = BooleanProofContext(SourceScope(SourceRevision("fixture", "exact-cnf"),
-            SourceCondition(bools = pins)), "identity:0")
+        val context = BooleanProofContext(
+            SourceScope(
+            SourceRevision("fixture", "exact-cnf"),
+            SourceCondition(bools = pins),
+        ),
+            "identity:0"
+        )
         val params = BacktrackParams(assumptions = Assumptions(bools = pins))
         BooleanProofScheduler(problem, context, listOf(0), listOf(params), true).use { scheduler ->
             val result = scheduler.run(ExecutionControl.Never, 10000L)

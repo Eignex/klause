@@ -16,11 +16,17 @@ import kotlin.test.assertTrue
 class PrivateRebuildBinaryLearningTest {
     @Test
     fun `owned reciprocal implications should capture a source bound equivalence without root pins`() {
-        for (replacement in listOf(2, 3)) for (native in listOf(false, true)) {
-            val source = Problem(4, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(1, replacement, 4)), Clause(intArrayOf(1, replacement, 5)),
-                Clause(intArrayOf(0, Lit.negate(replacement), 6)), Clause(intArrayOf(0, Lit.negate(replacement), 7)),
-            )).bake()
+        for (replacement in listOf(2, 3)) {
+            for (native in listOf(false, true)) {
+            val source = Problem(
+                4, 0, emptyArray(),
+                arrayOf(
+                Clause(intArrayOf(1, replacement, 4)),
+                Clause(intArrayOf(1, replacement, 5)),
+                Clause(intArrayOf(0, Lit.negate(replacement), 6)),
+                Clause(intArrayOf(0, Lit.negate(replacement), 7)),
+            )
+            ).bake()
             val session = PropagationSession(source, nativeSat = native)
             session.addLearnedClause(Clause(intArrayOf(1, replacement)), 2)
             session.addLearnedClause(Clause(intArrayOf(0, Lit.negate(replacement))), 2)
@@ -35,22 +41,30 @@ class PrivateRebuildBinaryLearningTest {
                 val point = BooleanArray(4) { mask and (1 shl it) != 0 }
                 if (source.factors.all { factor ->
                         (factor as Clause).literals.any { Lit.evaluate(it, point[Lit.variable(it)]) }
-                    }) {
-                    assertTrue(captured.clauses.all { clause ->
+                    }
+                ) {
+                    assertTrue(
+                        captured.clauses.all { clause ->
                         clause.literals.any { Lit.evaluate(it, point[Lit.variable(it)]) }
-                    })
+                    }
+                    )
                 }
             }
+        }
         }
     }
 
     @Test
     fun `an owned binary should close a reciprocal source implication`() {
         for (replacement in listOf(2, 3)) {
-            val source = Problem(3, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(1, replacement)), Clause(intArrayOf(0, Lit.negate(replacement), 4)),
+            val source = Problem(
+                3, 0, emptyArray(),
+                arrayOf(
+                Clause(intArrayOf(1, replacement)),
+                Clause(intArrayOf(0, Lit.negate(replacement), 4)),
                 Clause(intArrayOf(0, Lit.negate(replacement), 5)),
-            )).bake()
+            )
+            ).bake()
             val session = PropagationSession(source)
             session.addLearnedClause(Clause(intArrayOf(0, Lit.negate(replacement))), 2)
 
@@ -63,16 +77,26 @@ class PrivateRebuildBinaryLearningTest {
     @Test
     fun `recent binaries should close a source implication within a linear scan grant`() {
         val learning = (2 until 82).map { Clause(intArrayOf(1, Lit.make(it, true))) }
-        val source = Problem(82, 0, emptyArray(), (listOf(
-            Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 3, 4)), Clause(intArrayOf(0, 3, 5)),
-        ) + learning).toTypedArray()).bake()
+        val source = Problem(
+            82, 0, emptyArray(),
+            (
+                listOf(
+            Clause(intArrayOf(1, 2)),
+            Clause(intArrayOf(0, 3, 4)),
+            Clause(intArrayOf(0, 3, 5)),
+        ) + learning
+            ).toTypedArray()
+        ).bake()
         val session = PropagationSession(source)
         session.addLearnedClause(Clause(intArrayOf(0, 3)), 2)
         for (clause in learning) session.addLearnedClause(clause, 2)
         var spent = 0L
 
         val captured = PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { work ->
-            if (work > 4096L - spent) false else { spent += work; true }
+            if (work > 4096L - spent) false else {
+                spent += work;
+                true
+            }
         }
 
         assertNotNull(captured)
@@ -81,29 +105,44 @@ class PrivateRebuildBinaryLearningTest {
 
     @Test
     fun `foreign and scoped learning should withhold an equivalence`() {
-        for (native in listOf(false, true)) for (permanent in listOf(false, true)) {
-            val source = Problem(4, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(1, 2, 4)), Clause(intArrayOf(1, 2, 5)),
-                Clause(intArrayOf(0, 3, 6)), Clause(intArrayOf(0, 3, 7)),
-            )).bake()
+        for (native in listOf(false, true)) {
+            for (permanent in listOf(false, true)) {
+            val source = Problem(
+                4, 0, emptyArray(),
+                arrayOf(
+                Clause(intArrayOf(1, 2, 4)),
+                Clause(intArrayOf(1, 2, 5)),
+                Clause(intArrayOf(0, 3, 6)),
+                Clause(intArrayOf(0, 3, 7)),
+            )
+            ).bake()
             val session = PropagationSession(source, nativeSat = native)
             session.addLearnedClause(Clause(intArrayOf(1, 2)), 2)
-            if (permanent) session.addLearnedClause(Clause(intArrayOf(0, 3)), 2, permanent = true)
-            else session.addLearnedClause(Clause(intArrayOf(0, 3)), 2, origin = 1)
+            if (permanent) {
+                session.addLearnedClause(Clause(intArrayOf(0, 3)), 2, permanent = true)
+            } else {
+                session.addLearnedClause(Clause(intArrayOf(0, 3)), 2, origin = 1)
+            }
 
             val captured = PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true }
 
             assertNull(captured)
+        }
         }
     }
 
     @Test
     fun `logically retired binaries should withhold a reciprocal capture`() {
         for (native in listOf(false, true)) {
-            val source = Problem(4, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(1, 2, 4)), Clause(intArrayOf(1, 2, 5)),
-                Clause(intArrayOf(0, 3, 6)), Clause(intArrayOf(0, 3, 7)),
-            )).bake()
+            val source = Problem(
+                4, 0, emptyArray(),
+                arrayOf(
+                Clause(intArrayOf(1, 2, 4)),
+                Clause(intArrayOf(1, 2, 5)),
+                Clause(intArrayOf(0, 3, 6)),
+                Clause(intArrayOf(0, 3, 7)),
+            )
+            ).bake()
             val session = PropagationSession(source, nativeSat = native)
             session.addLearnedClause(Clause(intArrayOf(1, 2)), 9)
             session.addLearnedClause(Clause(intArrayOf(0, 3)), 9)
@@ -119,9 +158,14 @@ class PrivateRebuildBinaryLearningTest {
 
     @Test
     fun `an attempted relation should not trigger another generation`() {
-        val source = Problem(3, 0, emptyArray(), arrayOf(
-            Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 3, 4)), Clause(intArrayOf(0, 3, 5)),
-        )).bake()
+        val source = Problem(
+            3, 0, emptyArray(),
+            arrayOf(
+            Clause(intArrayOf(1, 2)),
+            Clause(intArrayOf(0, 3, 4)),
+            Clause(intArrayOf(0, 3, 5)),
+        )
+        ).bake()
         val session = PropagationSession(source)
         session.addLearnedClause(Clause(intArrayOf(0, 3)), 2)
         val first = assertNotNull(PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true })
@@ -134,15 +178,23 @@ class PrivateRebuildBinaryLearningTest {
     @Test
     fun `exhausted scan work should preserve canonical learning`() {
         for (allowance in listOf(0L, 128L, 140L)) {
-            val source = Problem(3, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 3, 4)), Clause(intArrayOf(0, 3, 5)),
-            )).bake()
+            val source = Problem(
+                3, 0, emptyArray(),
+                arrayOf(
+                Clause(intArrayOf(1, 2)),
+                Clause(intArrayOf(0, 3, 4)),
+                Clause(intArrayOf(0, 3, 5)),
+            )
+            ).bake()
             val session = PropagationSession(source)
             session.addLearnedClause(Clause(intArrayOf(0, 3)), 2)
             var spent = 0L
 
             val captured = PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { work ->
-                if (work > allowance - spent) false else { spent += work; true }
+                if (work > allowance - spent) false else {
+                    spent += work;
+                    true
+                }
             }
 
             assertNull(captured)

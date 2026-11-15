@@ -175,8 +175,14 @@ class PolynomialBooleanRefutationTest {
             """.trimIndent(),
         )
 
-        assertIs<QfNraResult.Unsatisfiable>(solveQfNra(source.formula, 2, 0,
-            condition = PolynomialCondition(bools = mapOf(0 to true, 1 to false))))
+        assertIs<QfNraResult.Unsatisfiable>(
+            solveQfNra(
+            source.formula,
+            2,
+            0,
+            condition = PolynomialCondition(bools = mapOf(0 to true, 1 to false)),
+        )
+        )
         assertIs<QfNraResult.Satisfiable>(solveQfNra(source.formula, 2, 0))
     }
 
@@ -219,8 +225,12 @@ class PolynomialBooleanRefutationTest {
         )
         val completed = assertIs<QfNraResult.Unsatisfiable>(solveQfNra(source.formula, 2, 1))
 
-        val stopped = solveQfNra(source.formula, 2, 1,
-            QfNraParams(maximumWork = completed.stats.workSpent - 1))
+        val stopped = solveQfNra(
+            source.formula,
+            2,
+            1,
+            QfNraParams(maximumWork = completed.stats.workSpent - 1),
+        )
 
         assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(stopped).reason)
     }

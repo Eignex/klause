@@ -11,11 +11,15 @@ internal fun FlatZincCompiler.emitSetSelection(constraint: FznConstraint, variab
     val index = resolveIntVar(constraint.args[0])
     val result = resolveSetVar(constraint.args[2])
     val variableRows = if (variableArray) resolveSetVarArray(constraint.args[1]) else null
-    val constantRows = if (variableArray) null else {
+    val constantRows = if (variableArray) {
+        null
+    } else {
         when (val argument = constraint.args[1]) {
             is FznExpr.ArrayLit -> argument.elements.map { resolveSetLiteral(it) }
+
             is FznExpr.Ident -> (arrays[argument.name] as? FlatZincArray.IntSetParam)?.values
                 ?: failHere("array_set_element: expected array of set-of-int parameters")
+
             else -> failHere("array_set_element: expected a constant set array")
         }
     }
@@ -24,8 +28,12 @@ internal fun FlatZincCompiler.emitSetSelection(constraint: FznConstraint, variab
         factors.add(Clause(intArrayOf()))
         return
     }
-    val universe = (result.elements.toList() + (variableRows?.flatMap { it.elements.toList() }
-        ?: checkNotNull(constantRows).flatMap { it.toList() })).distinct().sorted()
+    val universe = (
+        result.elements.toList() + (
+            variableRows?.flatMap { it.elements.toList() }
+        ?: checkNotNull(constantRows).flatMap { it.toList() }
+        )
+    ).distinct().sorted()
     if (universe.isEmpty()) {
         val zero = allocInt("__set_selection_zero_${factors.size}", 0, 0)
         factors.add(Element(index, zero, LongArray(count), arrIsVars = false))

@@ -29,9 +29,17 @@ class PreparedSourceTest {
     fun `required source encoders should report cost under a spent elective allowance`() {
         val budget = PresolveBudget(0L)
         val problem = Problem(
-            0, 0, emptyArray(),
-            arrayOf(ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
-                LinearOp.LE, BigFraction.ONE)),
+            0,
+            0,
+            emptyArray(),
+            arrayOf(
+                ExactLinear.of(
+                intArrayOf(Term.ofRealVar(0)),
+                listOf(BigFraction.ONE),
+                LinearOp.LE,
+                BigFraction.ONE,
+            )
+            ),
             numRealVars = 1,
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),

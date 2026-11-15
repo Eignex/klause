@@ -14,11 +14,7 @@ import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.toLongExact
 
-internal class BinaryObjectiveView(
-    val factors: List<Factor>,
-    val objective: LinearObjective,
-    val numBoolVars: Int,
-) {
+internal class BinaryObjectiveView(val factors: List<Factor>, val objective: LinearObjective, val numBoolVars: Int) {
     companion object {
         fun create(
             problem: BakedProblem,
@@ -29,7 +25,9 @@ internal class BinaryObjectiveView(
                 objective.realCoefficientValues.any { it != 0.0 } ||
                 objective.boolWeightValues.size > problem.numBoolVars ||
                 objective.intCoefficientValues.none { it != 0L }
-            ) return null
+            ) {
+                return null
+            }
             val ranges = ColumnRanges.of(problem.rootIntDomainsInPlace)
             var hasBinaryCost = false
             var hasNonbinaryCost = false
@@ -65,7 +63,9 @@ internal class BinaryObjectiveView(
                 if (objective.intCoefficientValues[v] == 0L) continue
                 if (hasNonbinaryCost &&
                     (!ranges.isClosed(v) || ranges.min(v) < 0L || ranges.max(v) > 1L)
-                ) continue
+                ) {
+                    continue
+                }
                 if (ranges.max(v) == 0L) {
                     retainedCosts[v] = 0L
                     changed = true

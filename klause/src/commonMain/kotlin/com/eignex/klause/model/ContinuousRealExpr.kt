@@ -31,7 +31,9 @@ sealed interface ContinuousRealExpr {
         /** Fixed nonnegative integer exponent. */
         val exponent: Int,
     ) : ContinuousRealExpr {
-        init { require(exponent >= 0) }
+        init {
+            require(exponent >= 0)
+        }
     }
 
     /** Exact product without rounding or constant folding. */

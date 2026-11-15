@@ -139,8 +139,9 @@ class FiniteSolveRequest(
         onEvent = null,
         onPortfolioEvent = null,
     ) {
-        require(shape.sourceInvocation?.source?.originalSource is Problem &&
-            operation in setOf(ExecutionOperation.SATISFY, ExecutionOperation.OPTIMIZE)
+        require(
+            shape.sourceInvocation?.source?.originalSource is Problem &&
+                operation in setOf(ExecutionOperation.SATISFY, ExecutionOperation.OPTIMIZE),
         ) { "native finite controls require their captured factor-source operation" }
         capturedSourceControls = controls
     }
@@ -496,11 +497,11 @@ private fun FinitePipeline.execute(
     executeSourceFinite(request, callbacks).withCompleteSearch(request.sourceControls is SourceFiniteControls.Backtrack)
 } else {
     when (request.engine) {
-    FiniteEngine.FIXED -> executeFixed(request, callbacks).withCompleteSearch(true)
+        FiniteEngine.FIXED -> executeFixed(request, callbacks).withCompleteSearch(true)
 
-    FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH, FiniteEngine.MIXED, FiniteEngine.ALNS ->
-        executePortfolio(request, callbacks)
-}
+        FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH, FiniteEngine.MIXED, FiniteEngine.ALNS ->
+            executePortfolio(request, callbacks)
+    }
 }
 
 private fun FiniteExecutionResult.withCompleteSearch(value: Boolean): FiniteExecutionResult {
@@ -512,9 +513,11 @@ private fun FiniteExecutionResult.withCompleteSearch(value: Boolean): FiniteExec
 fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteSolveCallbacks): FiniteSolveResult =
     solve(request, callbacks, request.lpSolveContext)
 
-internal fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteSolveCallbacks,
-    numericalCompanions: TheoryParams): FiniteSolveResult =
-    solve(request, callbacks, request.lpSolveContext, numericalCompanions)
+internal fun FinitePipeline.solve(
+    request: FiniteSolveRequest,
+    callbacks: FiniteSolveCallbacks,
+    numericalCompanions: TheoryParams,
+): FiniteSolveResult = solve(request, callbacks, request.lpSolveContext, numericalCompanions)
 
 /** Execute the fixed finite route with per-invocation LP dependencies. */
 internal fun FinitePipeline.solve(
@@ -545,8 +548,10 @@ internal fun FinitePipeline.solve(
         completeSearchAdmitted: Boolean? = null,
         nativeObjectiveBound: FiniteObjectiveBound? = null,
     ): FiniteSolveResult =
-        (gridPublication?.result(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum)
-            ?: FiniteSolveResult(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum))
+        (
+            gridPublication?.result(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum)
+            ?: FiniteSolveResult(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum)
+        )
             .also {
                 it.bindCompleteSearchAdmission(completeSearchAdmitted)
                 if (gridPublication == null) it.nativeObjectiveBound = nativeObjectiveBound
@@ -605,7 +610,9 @@ internal fun FinitePipeline.solve(
         preparationElapsed = preparationStart.elapsedNow()
         val previous = preparation
         preparation = FinitePipelinePreparation(
-            previous.problem, previous.objective, previous.reconstruct,
+            previous.problem,
+            previous.objective,
+            previous.reconstruct,
             previous.presolve?.let { stats ->
                 stats.copy(
                     bakeElapsed = stats.bakeElapsed + (coordinates.presolve?.bakeElapsed ?: Duration.ZERO),
@@ -628,11 +635,16 @@ internal fun FinitePipeline.solve(
         it.source.semantics.effective.feasibilityTolerance?.isExact == false
     } ?: true
     val sourceCheck: ((Sample) -> Boolean)? = if (linearSource == null) {
-        (request.toleranceCheck ?: invocation?.takeIf { gridPublication == null }?.let {
+        (
+            request.toleranceCheck ?: invocation?.takeIf { gridPublication == null }?.let {
             capturedRealAcceptance(it.source.problem, stop)
-        })?.let { check ->
-            FiniteSourceAcceptance(check, permitsToleranceOptimum && check.permitsToleranceOptimum(),
-                (check as? FiniteSourceAcceptance)?.objective)
+        }
+        )?.let { check ->
+            FiniteSourceAcceptance(
+                check,
+                permitsToleranceOptimum && check.permitsToleranceOptimum(),
+                (check as? FiniteSourceAcceptance)?.objective,
+            )
         }
     } else {
         FiniteSourceAcceptance(
@@ -647,16 +659,16 @@ internal fun FinitePipeline.solve(
                 null
             } else {
                 { sample ->
-                val checked = linearSource.check(sample, stop) as? LinearSourceCheck.Accepted
-                checked?.witness?.objective?.let { value ->
-                    val scaled = value * linearSource.view.objectiveScale
-                    if (linearSource.view.source.objective.sense == ObjectiveSense.MAXIMIZE) {
-                        scaled.negated()
-                    } else {
-                        scaled
+                    val checked = linearSource.check(sample, stop) as? LinearSourceCheck.Accepted
+                    checked?.witness?.objective?.let { value ->
+                        val scaled = value * linearSource.view.objectiveScale
+                        if (linearSource.view.source.objective.sense == ObjectiveSense.MAXIMIZE) {
+                            scaled.negated()
+                        } else {
+                            scaled
+                        }
                     }
                 }
-            }
             },
         )
     }
@@ -700,10 +712,13 @@ internal fun FinitePipeline.solve(
             onPortfolioJointRepair = onPortfolioJointRepair,
             toleranceCheck = if (gridPublication == null) {
                 sourceCheck?.let { check ->
-                    FiniteSourceAcceptance({ check(preparation.reconstruct(it)) }, check.permitsToleranceOptimum(),
+                    FiniteSourceAcceptance(
+                        { check(preparation.reconstruct(it)) },
+                        check.permitsToleranceOptimum(),
                         (check as? FiniteSourceAcceptance)?.objective?.let { score ->
                             { sample -> score(preparation.reconstruct(sample)) }
-                        })
+                        },
+                    )
                 }
             } else {
                 null
@@ -728,13 +743,13 @@ internal fun FinitePipeline.solve(
                     )
                 } else {
                     callbacks.onImprovement(
-                    FiniteSolveImprovement(
-                        preparation.reconstruct(improvement.sample),
-                        improvement.workerLabel,
-                        improvement.elapsedMs,
-                        improvement.objective,
-                    ),
-                )
+                        FiniteSolveImprovement(
+                            preparation.reconstruct(improvement.sample),
+                            improvement.workerLabel,
+                            improvement.elapsedMs,
+                            improvement.objective,
+                        ),
+                    )
                 }
             },
         ),
@@ -789,11 +804,16 @@ private fun FiniteSolveRequest.objectiveCoordinateHints(
         return null
     }
     val invocation = shape.sourceInvocation ?: return PreparedSourceHints(
-        shape.definitionalSweep, shape.localSearchObjective,
+        shape.definitionalSweep,
+        shape.localSearchObjective,
     )
     return invocation.heuristicHints(
-        coordinates.problem, coordinates.objective, coordinates.sourceMapping, stop,
-        setOf(ExecutionStrategy.LOCAL_SEARCH), plan.capabilities,
+        coordinates.problem,
+        coordinates.objective,
+        coordinates.sourceMapping,
+        stop,
+        setOf(ExecutionStrategy.LOCAL_SEARCH),
+        plan.capabilities,
     )
 }
 
@@ -946,7 +966,8 @@ private fun executeSourceMinimum(
     val start = TimeSource.Monotonic.markNow()
     val result = when (val controls = requireNotNull(request.sourceControls)) {
         is SourceFiniteControls.Backtrack -> BacktrackSolver(request.problem, request.lpSolveContext).minimize(
-            objective, controls.params.copy(cancellation = controls.cancellation or request.cancellation),
+            objective,
+            controls.params.copy(cancellation = controls.cancellation or request.cancellation),
         )
 
         is SourceFiniteControls.LocalSearch -> LocalSearchSolver(
@@ -1165,14 +1186,18 @@ private fun executePortfolio(
     callbacks: FiniteExecutionCallbacks,
 ): FiniteExecutionResult {
     val admission = request.executionOptions.reader()[ExecutionOption.companionAdmission]
-    val adaptiveCompanionRepair = when (val repair =
-        request.executionOptions.reader()[ExecutionOption.companionRepair]) {
+    val adaptiveCompanionRepair = when (
+        val repair =
+        request.executionOptions.reader()[ExecutionOption.companionRepair]
+    ) {
         null, "fixed" -> false
         "adaptive" -> true
         else -> pipelineConfigError("companion-repair expects fixed|adaptive, got `$repair`")
     }
-    val bufferedPublications = when (val publications =
-        request.executionOptions.reader()[ExecutionOption.portfolioPublications]) {
+    val bufferedPublications = when (
+        val publications =
+        request.executionOptions.reader()[ExecutionOption.portfolioPublications]
+    ) {
         null, "immediate" -> false
         "segment" -> true
         else -> pipelineConfigError("portfolio-publications expects immediate|segment, got `$publications`")
@@ -1202,10 +1227,12 @@ private fun executePortfolio(
 
         else -> pipelineConfigError(
             "portfolio-probes expects ordinary|leader-half|lp-transfer|heuristic-second|family-work|" +
-                "heuristic-work|alns-work, got `$probes`")
+                "heuristic-work|alns-work, got `$probes`",
+        )
     }
     if (probePolicy != InitialProbePolicy.ORDINARY &&
-        (!request.optimize || request.cores != 1 || request.engine != FiniteEngine.MIXED)) {
+        (!request.optimize || request.cores != 1 || request.engine != FiniteEngine.MIXED)
+    ) {
         pipelineConfigError("portfolio-probes requires curated single-core mixed optimization")
     }
     val deferLpProbes = when (val start = request.executionOptions.reader()[ExecutionOption.portfolioLpStart]) {
@@ -1234,8 +1261,11 @@ private fun executePortfolio(
     if (proofShare != null && (!proofShare.isFinite() || proofShare !in 0.5..1.0)) {
         pipelineConfigError("portfolio-proof-share must be finite and in [0.5, 1]")
     }
-    if (proofCoverageConfigured && (!request.optimize || request.cores != 1 ||
-            request.engine !in setOf(FiniteEngine.MIXED, FiniteEngine.BACKTRACK))) {
+    if (proofCoverageConfigured && (
+        !request.optimize || request.cores != 1 ||
+            request.engine !in setOf(FiniteEngine.MIXED, FiniteEngine.BACKTRACK)
+    )
+    ) {
         pipelineConfigError("portfolio proof coverage requires curated single-core finite optimization")
     }
     val plan = FinitePipeline.planPortfolio(
@@ -1244,8 +1274,14 @@ private fun executePortfolio(
             optimize = request.optimize,
             cores = request.cores,
             executionOptions = request.executionOptions.without(
-                "portfolio-proof-share", "portfolio-proof-workers", "portfolio-lp-start", "portfolio-probes",
-                "boolean-proof-tasks", "companion-admission", "companion-repair", "portfolio-publications",
+                "portfolio-proof-share",
+                "portfolio-proof-workers",
+                "portfolio-lp-start",
+                "portfolio-probes",
+                "boolean-proof-tasks",
+                "companion-admission",
+                "companion-repair",
+                "portfolio-publications",
             ),
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
@@ -1259,23 +1295,35 @@ private fun executePortfolio(
             toleranceCheck = request.toleranceCheck,
         ),
     )
-    if (proofCoverageConfigured && (plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
-            plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null)) {
+    if (proofCoverageConfigured && (
+        plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
+            plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null
+    )
+    ) {
         pipelineConfigError("portfolio proof coverage requires a curated recipe pool")
     }
-    if (deferLpProbes && (plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
+    if (deferLpProbes && (
+        plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
             plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
-            plan.scenario.annotationArm != null)) {
+            plan.scenario.annotationArm != null
+    )
+    ) {
         pipelineConfigError("portfolio-lp-start requires a curated recipe pool")
     }
-    if (probePolicy != InitialProbePolicy.ORDINARY && (plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
+    if (probePolicy != InitialProbePolicy.ORDINARY && (
+        plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
             plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
-            (probePolicy != InitialProbePolicy.HEURISTIC_SECOND && plan.scenario.annotationArm != null))) {
+            (probePolicy != InitialProbePolicy.HEURISTIC_SECOND && plan.scenario.annotationArm != null)
+    )
+    ) {
         pipelineConfigError("portfolio-probes requires a curated recipe pool")
     }
-    if (bufferedPublications && (plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
+    if (bufferedPublications && (
+        plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
             plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
-            plan.scenario.annotationArm != null)) {
+            plan.scenario.annotationArm != null
+    )
+    ) {
         pipelineConfigError("portfolio-publications requires a curated recipe pool")
     }
     when (plan) {
@@ -1295,14 +1343,30 @@ private fun executePortfolio(
         privateRebuildBudgetOnly = request.executionOptions.privateRebuildBudgetOnly,
     )
     val privateScenario = privateRebuildDefaultScenario(
-        baseScenario, request.problem, profile, request.executionOptions,
-        enumerating = request.allSolutions || (request.solutionCap ?: 1L) > 1L)
-    val scenario = weightedCoreDefaultScenario(privateScenario, request.problem, request.objective,
-        request.executionOptions, request.cancellation)
+        baseScenario,
+        request.problem,
+        profile,
+        request.executionOptions,
+        enumerating = request.allSolutions || (request.solutionCap ?: 1L) > 1L,
+    )
+    val scenario = weightedCoreDefaultScenario(
+        privateScenario,
+        request.problem,
+        request.objective,
+        request.executionOptions,
+        request.cancellation,
+    )
     if (scenario !== privateScenario) {
-        request.onPortfolioEvent?.invoke("portfolio", SearchEvent.WorkerAdmission("core-guided/weighted-default",
-            admitted = true, requirements = "bounded early trial with historical-reason refinement",
-            declines = emptyList(), selected = true))
+        request.onPortfolioEvent?.invoke(
+            "portfolio",
+            SearchEvent.WorkerAdmission(
+            "core-guided/weighted-default",
+            admitted = true,
+            requirements = "bounded early trial with historical-reason refinement",
+            declines = emptyList(),
+            selected = true,
+        )
+        )
     }
     val executor = FinitePipeline.portfolioExecutor(
         request.problem,

@@ -22,21 +22,33 @@ import com.eignex.util.numbers.toLongExact
 
 internal class DivModInvariant(private val relation: DivMod) : Invariant {
     private fun grade(state: LocalSearchState, value: (Int) -> Long): Int {
-        val wordDivisor = relation.divisor?.let(value) ?:
-            relation.constantDivisor?.takeIf { it.fitsLong() }?.toLongExact()
+        val wordDivisor = relation.divisor?.let(value)
+            ?: relation.constantDivisor?.takeIf { it.fitsLong() }?.toLongExact()
         if (wordDivisor != null) {
             val outputs = relation.wordOutputs(value(relation.dividend), wordDivisor)
                 ?: return compressViolation(Long.MAX_VALUE, state.violationSoftCap)
-            return compressViolation(saturatedAdd(distance(outputs.first, value(relation.quotient)),
-                distance(outputs.second, value(relation.remainder))), state.violationSoftCap)
+            return compressViolation(
+                saturatedAdd(
+                distance(outputs.first, value(relation.quotient)),
+                distance(outputs.second, value(relation.remainder)),
+            ),
+                state.violationSoftCap
+            )
         }
-        val outputs = relation.outputs(bigIntOf(value(relation.dividend)),
-            relation.divisor?.let { bigIntOf(value(it)) } ?: checkNotNull(relation.constantDivisor))
+        val outputs = relation.outputs(
+            bigIntOf(value(relation.dividend)),
+            relation.divisor?.let { bigIntOf(value(it)) } ?: checkNotNull(relation.constantDivisor),
+        )
             ?: return compressViolation(Long.MAX_VALUE, state.violationSoftCap)
         fun error(expected: BigInt, actual: Long): Long =
             if (expected.fitsLong()) distance(expected.toLongExact(), actual) else Long.MAX_VALUE
-        return compressViolation(saturatedAdd(error(outputs.first, value(relation.quotient)),
-            error(outputs.second, value(relation.remainder))), state.violationSoftCap)
+        return compressViolation(
+            saturatedAdd(
+            error(outputs.first, value(relation.quotient)),
+            error(outputs.second, value(relation.remainder)),
+        ),
+            state.violationSoftCap
+        )
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
@@ -72,11 +84,13 @@ internal class DivModInvariant(private val relation: DivMod) : Invariant {
             candidate(relation.quotient, outputs.first)
             candidate(relation.remainder, outputs.second)
             if (outputs.first.fitsLong() && outputs.second.fitsLong() &&
-                (relation.quotient != relation.remainder || outputs.first == outputs.second)) {
+                (relation.quotient != relation.remainder || outputs.first == outputs.second)
+            ) {
                 changes[relation.quotient] = outputs.first.toLongExact()
                 changes[relation.remainder] = outputs.second.toLongExact()
                 if (changes.all { (v, value) -> value in state.rootDomains[v] } &&
-                    grade(state) { changes[it] ?: state.assignment.intValue(it) } <= current) {
+                    grade(state) { changes[it] ?: state.assignment.intValue(it) } <= current
+                ) {
                     val parts = changes.filter { (v, value) -> value != state.assignment.intValue(v) }
                         .map { (v, value) -> Move.IntSet(v, value) }
                     if (parts.isNotEmpty()) sink.addChannelingCompound(state, parts)

@@ -26,6 +26,7 @@ class Power(
             /** Source integer location. */
             val id: SourceIntId,
         ) : Coordinate
+
         /** Continuous source coordinate. */
         data class Real(
             /** Source real location. */
@@ -35,7 +36,9 @@ class Power(
 
     /** Finite or open integer source power. */
     constructor(base: Int, exponent: Int, result: Int) : this(
-        Coordinate.Integer(SourceIntId(base)), exponent, Coordinate.Integer(SourceIntId(result)),
+        Coordinate.Integer(SourceIntId(base)),
+        exponent,
+        Coordinate.Integer(SourceIntId(result)),
     )
 
     init {
@@ -47,6 +50,7 @@ class Power(
         is Coordinate.Integer -> IntVars(
             intArrayOf(base.id.index, (result as Coordinate.Integer).id.index).distinct().toIntArray(),
         )
+
         is Coordinate.Real -> RealVars(
             intArrayOf(base.id.index, (result as Coordinate.Real).id.index).distinct().toIntArray(),
         )
@@ -57,10 +61,12 @@ class Power(
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.POWER) {
         int(if (base is Coordinate.Integer) 0 else 1)
         int(variables.ints.firstOrNull() ?: variables.reals.first())
-        int(when (result) {
-            is Coordinate.Integer -> result.id.index
-            is Coordinate.Real -> result.id.index
-        })
+        int(
+            when (result) {
+                is Coordinate.Integer -> result.id.index
+                is Coordinate.Real -> result.id.index
+            },
+        )
         int(exponent)
     }
 

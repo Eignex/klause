@@ -71,7 +71,14 @@ internal class NonlinearIntegerCursor(
     private var residueStats = NonlinearIntegerResidueCounts()
 
     val stats: NonlinearIntegerStats get() = NonlinearIntegerStats(
-        candidates, moves, repairs, invocation.queries, polynomialStats(), cells.stats, rootStats, residueStats,
+        candidates,
+        moves,
+        repairs,
+        invocation.queries,
+        polynomialStats(),
+        cells.stats,
+        rootStats,
+        residueStats,
     )
     val isDone: Boolean get() = terminal != null
 
@@ -152,8 +159,10 @@ internal class NonlinearIntegerCursor(
             return QfNraResult.Unsatisfiable(polynomialStats())
         }
         current = current.mapIndexed(::bounded)
-        hints = (sourceIntegerHints(problem.formula, arithmetic) +
-            (condition.lower.values + condition.upper.values).map { it.ceilInteger() }).distinct()
+        hints = (
+            sourceIntegerHints(problem.formula, arithmetic) +
+            (condition.lower.values + condition.upper.values).map { it.ceilInteger() }
+        ).distinct()
         enumeration = (listOf(BIG_ZERO, BIG_ONE, -BIG_ONE) + hints).distinct()
         val fixedIntegers = coordinates.all {
             condition.lower[it] != null && condition.lower[it] == condition.upper[it]
@@ -265,7 +274,7 @@ internal class NonlinearIntegerCursor(
                 current = current.mapIndexed { index, value ->
                     if (index in released) {
                         hints.getOrNull(random.nextInt(hints.size.coerceAtLeast(1)))
-                        ?: (value + if (random.nextBoolean()) radius else -radius)
+                            ?: (value + if (random.nextBoolean()) radius else -radius)
                     } else {
                         value
                     }
@@ -371,9 +380,13 @@ internal class NonlinearIntegerCursor(
             }
             return merged
         }
-        return invocation.check(PolynomialCondition(
-            condition.bools, intersect(condition.lower, true), intersect(condition.upper, false),
-        ))
+        return invocation.check(
+            PolynomialCondition(
+            condition.bools,
+            intersect(condition.lower, true),
+            intersect(condition.upper, false),
+        )
+        )
     }
 
     private fun integral(assignment: QfNraAssignment): Boolean = coordinates.all {
@@ -460,19 +473,19 @@ private fun sourceIntegerHints(formula: PolynomialRealFormula, arithmetic: Polyn
                     expressions.addLast(node.right)
                 }
 
-            is PolynomialDistinct -> expressions.addAll(node.operands)
+                is PolynomialDistinct -> expressions.addAll(node.operands)
 
-            is PolynomialSelection -> {
-                formulas.addLast(node.condition)
-                expressions.addLast(node.whenTrue)
-                expressions.addLast(node.whenFalse)
-            }
+                is PolynomialSelection -> {
+                    formulas.addLast(node.condition)
+                    expressions.addLast(node.whenTrue)
+                    expressions.addLast(node.whenFalse)
+                }
 
-            is PolynomialRealFormula.And -> formulas.addAll(node.operands)
+                is PolynomialRealFormula.And -> formulas.addAll(node.operands)
 
-            is PolynomialRealFormula.Or -> formulas.addAll(node.operands)
+                is PolynomialRealFormula.Or -> formulas.addAll(node.operands)
 
-            is PolynomialRealFormula.Not -> formulas.addLast(node.operand)
+                is PolynomialRealFormula.Not -> formulas.addLast(node.operand)
 
                 else -> Unit
             }
@@ -490,14 +503,14 @@ private fun sourceIntegerHints(formula: PolynomialRealFormula, arithmetic: Polyn
                     hints.add(-value)
                 }
 
-            is PolynomialExpression.Sum -> expressions.addAll(node.operands)
+                is PolynomialExpression.Sum -> expressions.addAll(node.operands)
 
-            is PolynomialExpression.Product -> expressions.addAll(node.operands)
+                is PolynomialExpression.Product -> expressions.addAll(node.operands)
 
-            is PolynomialExpression.Power -> expressions.addLast(node.base)
+                is PolynomialExpression.Power -> expressions.addLast(node.base)
 
-            is PolynomialExpression.Variable -> Unit
-        }
+                is PolynomialExpression.Variable -> Unit
+            }
         }
         hints.toList()
     }

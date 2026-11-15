@@ -7,10 +7,8 @@ internal sealed interface TranscendentalExpression {
     data class Constant(val value: PolynomialExpression.Constant) : TranscendentalExpression
     data class Variable(val id: SourceRealId) : TranscendentalExpression
     data object Pi : TranscendentalExpression
-    data class Function(
-        val function: TranscendentalFunction,
-        val argument: TranscendentalExpression,
-    ) : TranscendentalExpression
+    data class Function(val function: TranscendentalFunction, val argument: TranscendentalExpression) :
+        TranscendentalExpression
     class Sum(operands: List<TranscendentalExpression>) : TranscendentalExpression {
         private val captured = operands.toList()
         val operands: List<TranscendentalExpression> get() = captured.toList()
@@ -20,7 +18,9 @@ internal sealed interface TranscendentalExpression {
         val operands: List<TranscendentalExpression> get() = captured.toList()
     }
     data class Power(val base: TranscendentalExpression, val exponent: Int) : TranscendentalExpression {
-        init { require(exponent >= 0) }
+        init {
+            require(exponent >= 0)
+        }
     }
     data class Conditional(
         val condition: TranscendentalFormula,

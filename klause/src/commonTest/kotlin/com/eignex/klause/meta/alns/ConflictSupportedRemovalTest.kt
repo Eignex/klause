@@ -41,22 +41,22 @@ class ConflictSupportedRemovalTest {
         val control = BacktrackSolver(problem).minimize(
             objective,
             base.copy(
-            objectiveBoundSupplier = {
-                plainCalls++;
-                2.0
-            },
-        )
+                objectiveBoundSupplier = {
+                    plainCalls++
+                    2.0
+                },
+            ),
         )
         val observed = BacktrackSolver(problem).minimize(
             objective,
             guidance.observe(
                 base.copy(
-            objectiveBoundSupplier = {
-                observedCalls++;
-                2.0
-            },
-        )
-            )
+                    objectiveBoundSupplier = {
+                        observedCalls++
+                        2.0
+                    },
+                ),
+            ),
         )
         guidance.end()
 
@@ -296,8 +296,15 @@ class ConflictSupportedRemovalTest {
         observer.onConflict(null, BranchingConflict(intArrayOf(1)))
         guidance.end()
 
-        guidance.destroy(Random(3), problem, center, objective, 0.5,
-            Assumptions.None.withBool(0, false), ExecutionControl.Never)
+        guidance.destroy(
+            Random(3),
+            problem,
+            center,
+            objective,
+            0.5,
+            Assumptions.None.withBool(0, false),
+            ExecutionControl.Never,
+        )
 
         assertEquals(ConflictGuidanceStatus.Incompatible, guidance.status)
         assertNull(guidance.originPins)

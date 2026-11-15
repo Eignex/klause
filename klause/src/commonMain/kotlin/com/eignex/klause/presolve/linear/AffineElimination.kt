@@ -645,8 +645,14 @@ internal object AffineSingletons {
             // Int space, so a scale or offset beyond Int range takes the Linear-fold path instead.
             val singlePartnerSubstitutable = !isAlias && termVars.size == 1 &&
                 termCoeffs[0] in INT_RANGE && constTerm in INT_RANGE &&
-                ws.otherOccurrencesAffineSubstitutable(di, x, termCoeffs[0].toInt(), constTerm.toInt(),
-                    termVars[0], cancellation)
+                ws.otherOccurrencesAffineSubstitutable(
+                    di,
+                    x,
+                    termCoeffs[0].toInt(),
+                    constTerm.toInt(),
+                    termVars[0],
+                    cancellation,
+                )
             if (isAlias || ws.otherOccurrencesAllLinear(di, x) || singlePartnerSubstitutable) {
                 return AffineCandidate(di, x, constTerm, termVars, termCoeffs, isAlias)
             }

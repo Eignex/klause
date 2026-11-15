@@ -95,8 +95,10 @@ class SmtLibAdmissionTest {
     fun `refuted integer premises should not admit unsupported nonlinear syntax`() {
         for (term in listOf("(/ x x)", "(^ x (- 1))", "(div (* x x) 2)")) {
             assertFailsWith<UnsupportedSmtException> {
-                SmtLib.parse("(declare-const x Int) (declare-const y Int) " +
-                    "(assert (= (* 2 x) (+ (* 2 y) 1))) (assert (= $term 0))")
+                SmtLib.parse(
+                    "(declare-const x Int) (declare-const y Int) " +
+                        "(assert (= (* 2 x) (+ (* 2 y) 1))) (assert (= $term 0))",
+                )
             }
         }
     }
@@ -147,7 +149,9 @@ class SmtLibAdmissionTest {
                 return null
             }
 
-            override fun close() { closes++ }
+            override fun close() {
+                closes++
+            }
         }
 
         assertFailsWith<CancellationException> { SmtLib.parse(source, cancellation = ExecutionControl { true }) }
@@ -434,19 +438,21 @@ class SmtLibAdmissionTest {
         var opens = 0
         val cancellation = ExecutionControl { exhausted }
 
-        val input = runCatching { SmtLib.parse(
-            {
-                opens++
-                val source = StringCharSource(
-                    "(define-fun f ((y Real)) Real (+ y 1)) " +
-                        "(declare-const x Real) (assert (= x 2)) (check-sat)",
-                )
-                object : CharSource {
-                    override fun next(): String? = source.next().also { if (it == null) exhausted = true }
-                }
-            },
-            cancellation = cancellation,
-        ) }
+        val input = runCatching {
+            SmtLib.parse(
+                {
+                    opens++
+                    val source = StringCharSource(
+                        "(define-fun f ((y Real)) Real (+ y 1)) " +
+                            "(declare-const x Real) (assert (= x 2)) (check-sat)",
+                    )
+                    object : CharSource {
+                        override fun next(): String? = source.next().also { if (it == null) exhausted = true }
+                    }
+                },
+                cancellation = cancellation,
+            )
+        }
 
         assertIs<CancellationException>(input.exceptionOrNull())
         assertEquals(1, opens)
@@ -500,10 +506,12 @@ class SmtLibAdmissionTest {
 
     @Test
     fun `pre cancelled admission should not open a source`() {
-        val input = runCatching { SmtLib.parse(
-            { error("cancelled admission must not open a source") },
-            cancellation = ExecutionControl { true },
-        ) }
+        val input = runCatching {
+            SmtLib.parse(
+                { error("cancelled admission must not open a source") },
+                cancellation = ExecutionControl { true },
+            )
+        }
 
         assertIs<CancellationException>(input.exceptionOrNull())
     }
@@ -605,11 +613,12 @@ class SmtLibAdmissionTest {
 
         val input = SmtLib.parse({
             opens++
-            StringCharSource(if (opens == 1) {
-                "(declare-const x Real) (assert (= (* x x) 2)) (check-sat)"
-            } else {
-                "(assert false) (check-sat)"
-            }
+            StringCharSource(
+                if (opens == 1) {
+                    "(declare-const x Real) (assert (= (* x x) 2)) (check-sat)"
+                } else {
+                    "(assert false) (check-sat)"
+                },
             )
         })
 

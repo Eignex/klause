@@ -39,8 +39,15 @@ class GeneralMetadataReclamationTest {
     @Test
     fun `growing retirement queues should release metadata while retaining a root reason`() {
         val clause = Clause(intArrayOf(8, 10))
-        val session = PropagationSession(Problem(6, 0, emptyArray(),
-            arrayOf(clause, Clause(intArrayOf(1)))), nativeSat = false)
+        val session = PropagationSession(
+            Problem(
+            6,
+            0,
+            emptyArray(),
+            arrayOf(clause, Clause(intArrayOf(1))),
+        ),
+            nativeSat = false
+        )
         repeat(16) { session.addLearnedClause(clause, 2, permanent = true) }
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
         val reason = assertNotNull(session.boolReasonClause(1)).toList()

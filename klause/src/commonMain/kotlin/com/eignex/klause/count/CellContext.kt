@@ -71,7 +71,9 @@ internal class CellContext private constructor(
                     representatives.add(decode(outcome.sample))
                     if (representatives.size > cap) break
                 }
+
                 is SearchOutcome.Exhausted -> complete = !outcome.indeterminate
+
                 SearchOutcome.BudgetCapped -> Unit
             }
         }

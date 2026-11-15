@@ -34,8 +34,13 @@ internal object LinearAuthorityReplay {
                 result = checker.check(query.context.scope.condition, stop, capture = capture)
             } while (result.paused && !stop() && !funding.exhausted)
         }
-        return LinearAuthorityReplayResult(capture.records.singleOrNull(), budget.operations,
-            funding.spent, funding.allocated, stop() || funding.exhausted)
+        return LinearAuthorityReplayResult(
+            capture.records.singleOrNull(),
+            budget.operations,
+            funding.spent,
+            funding.allocated,
+            stop() || funding.exhausted,
+        )
     }
 
     fun run(
@@ -99,19 +104,23 @@ internal object LinearAuthorityReplay {
         val budget = SourceLpBudget(maxOperations = 1, funding = funding)
         val supplied = if (capturedPool) {
             capturedCuts(query, mask, budget, stop) ?: return LinearAuthorityReplayResult(
-            null,
-            0,
-            funding.spent,
-            funding.allocated,
-            stop() || funding.exhausted,
-            decline = "captured cut pool unavailable",
-        )
+                null,
+                0,
+                funding.spent,
+                funding.allocated,
+                stop() || funding.exhausted,
+                decline = "captured cut pool unavailable",
+            )
         } else {
             null
         }
         val capture = LinearAuthorityCapture(1, 1_000_000L, 16_777_216L, stop)
-        val observations = LinearAuthority(budget, retainLp = true, additionalCuts = additional,
-            aggregateCuts = aggregate).use { authority ->
+        val observations = LinearAuthority(
+            budget,
+            retainLp = true,
+            additionalCuts = additional,
+            aggregateCuts = aggregate,
+        ).use { authority ->
             if (supplied != null) authority.useReplayCuts(supplied)
             authority.capture = capture
             var result: LinearAuthorityResult
@@ -120,8 +129,14 @@ internal object LinearAuthorityReplay {
             } while (result.paused && !stop() && !funding.exhausted)
             authority.cutObservations()
         }
-        return LinearAuthorityReplayResult(capture.records.singleOrNull(), budget.operations,
-            funding.spent, funding.allocated, stop() || funding.exhausted, observations = observations)
+        return LinearAuthorityReplayResult(
+            capture.records.singleOrNull(),
+            budget.operations,
+            funding.spent,
+            funding.allocated,
+            stop() || funding.exhausted,
+            observations = observations,
+        )
     }
 
     private fun capturedCuts(
@@ -140,8 +155,8 @@ internal object LinearAuthorityReplay {
         if (stop() || funding.exhausted || query.projection.cuts != LinearAuthorityFeedbackRequest.Cuts.All ||
             query.cuts.size > 64 || mask == null || mask.size > query.cuts.size
         ) {
-                return null
-            }
+            return null
+        }
         if (!charge(1L + query.cuts.size * 2L + mask.size, 128L + query.cuts.size * 16L)) return null
         if (stop() || funding.exhausted || mask.any { it !in query.cuts.indices }) return null
         val result = ArrayList<LinearAuthorityCut>(query.cuts.size)
@@ -149,8 +164,14 @@ internal object LinearAuthorityReplay {
             if (cut.id != id || cut.family == null) return null
             if (!charge(1L + cut.owners.size, 128L + cut.owners.size * 32L)) return null
             if (stop() || funding.exhausted) return null
-            result += LinearAuthorityCut(cut.owner, cut.inequality, cut.derivation,
-                cut.mixed, cut.owners, cut.family)
+            result += LinearAuthorityCut(
+                cut.owner,
+                cut.inequality,
+                cut.derivation,
+                cut.mixed,
+                cut.owners,
+                cut.family,
+            )
         }
         return result
     }

@@ -31,8 +31,11 @@ internal fun SourceMapping.captureSolve(
         is SolveResult.Sat -> {
             val point = sourcePoint(reduced, result.assignment)
             val captured = capture.solve(SolveResult.Sat(point, result.stats), producer)
-            SolveResult.Sat(point, result.stats,
-                requireNotNull(captured.evidence).withMappings(capture.context.scope, listOf(mapping)))
+            SolveResult.Sat(
+                point,
+                result.stats,
+                requireNotNull(captured.evidence).withMappings(capture.context.scope, listOf(mapping)),
+            )
         }
 
         is SolveResult.Unsat -> {
@@ -64,34 +67,65 @@ internal fun SourceMapping.captureMinimize(
     val mapping = SourceMappingEvidence(capture.context.scope, result.evidence, stages.map { it.justification })
     return when (result) {
         is MinimizeResult.Optimal -> captureOptimal(
-            reduced, result, capture, objective, producer, mapping, cancellation)
+            reduced,
+            result,
+            capture,
+            objective,
+            producer,
+            mapping,
+            cancellation,
+        )
+
         is MinimizeResult.BestFound -> {
             val point = sourcePoint(reduced, result.sample)
             val candidate = MinimizeResult.BestFound(
-                point, objective.minimizedTelemetry(point, capture), result.reason, result.stats)
+                point,
+                objective.minimizedTelemetry(point, capture),
+                result.reason,
+                result.stats,
+            )
             val captured = capture.minimize(candidate, objective, producer, cancellation = cancellation)
             val evidence = captured.evidence ?: SourceResultEvidence(capture.context.scope, emptyList())
-            MinimizeResult.BestFound(point, candidate.objective, result.reason, result.stats,
-                evidence.withMappings(capture.context.scope, listOf(mapping)))
+            MinimizeResult.BestFound(
+                point,
+                candidate.objective,
+                result.reason,
+                result.stats,
+                evidence.withMappings(capture.context.scope, listOf(mapping)),
+            )
         }
 
         is MinimizeResult.Infeasible -> {
-            val solved = captureSolve(reduced, SolveResult.Unsat(stats = result.stats, evidence = result.evidence),
-                capture, producer, cancellation)
+            val solved = captureSolve(
+                reduced,
+                SolveResult.Unsat(stats = result.stats, evidence = result.evidence),
+                capture,
+                producer,
+                cancellation,
+            )
             MinimizeResult.Infeasible(stats = result.stats, evidence = solved.evidence)
         }
 
         is MinimizeResult.Unbounded -> {
             val point = sourcePoint(reduced, result.sample)
             val candidate = MinimizeResult.Unbounded(
-                point, objective.minimizedTelemetry(point, capture), result.direction, result.stats)
+                point,
+                objective.minimizedTelemetry(point, capture),
+                result.direction,
+                result.stats,
+            )
             val captured = capture.minimize(candidate, objective, producer, cancellation = cancellation)
             val evidence = captured.evidence ?: SourceResultEvidence(capture.context.scope, emptyList())
             val ray = evidence.derivations.map { it.claim }.filterIsInstance<SourceClaim.Ray>().firstOrNull()
             val checked = ray?.let { evidence.verify(it, capture.context, cancellation) }
             val engineScope = admittedScope(capture, result.evidence, checked)
-            MinimizeResult.Unbounded(point, candidate.objective, result.direction, result.stats,
-                evidence.withMappings(engineScope, listOf(mapping)))
+            MinimizeResult.Unbounded(
+                point,
+                candidate.objective,
+                result.direction,
+                result.stats,
+                evidence.withMappings(engineScope, listOf(mapping)),
+            )
         }
 
         is MinimizeResult.Unknown -> {
@@ -112,8 +146,13 @@ private fun SourceMapping.captureOptimal(
 ): MinimizeResult.Optimal {
     val point = sourcePoint(reduced, result.sample)
     val candidate = MinimizeResult.Optimal(point, objective.minimizedTelemetry(point, capture), result.stats)
-    val provisional = capture.minimize(candidate, objective, producer,
-        SourceDerivation.Unavailable("mapped objective bound capture unavailable"), cancellation)
+    val provisional = capture.minimize(
+        candidate,
+        objective,
+        producer,
+        SourceDerivation.Unavailable("mapped objective bound capture unavailable"),
+        cancellation,
+    )
     val claim = provisional.evidence?.derivations?.map { it.claim }
         ?.filterIsInstance<SourceClaim.Optimal>()?.firstOrNull()
     val proof = claim?.let { mapping.project(SourceClaim.Bound(it.value), capture.context, cancellation).derivation }
@@ -121,27 +160,31 @@ private fun SourceMapping.captureOptimal(
         provisional
     } else {
         capture.minimize(
-        candidate,
-        objective,
-        producer,
-        SourceDerivation.Optimum(SourceDerivation.SourceWitness, proof),
-        cancellation,
-    )
+            candidate,
+            objective,
+            producer,
+            SourceDerivation.Optimum(SourceDerivation.SourceWitness, proof),
+            cancellation,
+        )
     }
     val evidence = captured.evidence ?: SourceResultEvidence(
         capture.context.scope,
         listOf(
-        SourceEvidence(
-            capture.context.scope,
-            SourceClaim.Witness(point),
-            SourceDerivation.SourceWitness,
+            SourceEvidence(
+                capture.context.scope,
+                SourceClaim.Witness(point),
+                SourceDerivation.SourceWitness,
+            ),
         ),
-    )
     )
     val checked = claim?.let { evidence.verify(it, capture.context, cancellation) }
     val engineScope = admittedScope(capture, result.evidence, checked)
-    return MinimizeResult.Optimal(point, candidate.objective, result.stats,
-        evidence.withMappings(engineScope, listOf(mapping)))
+    return MinimizeResult.Optimal(
+        point,
+        candidate.objective,
+        result.stats,
+        evidence.withMappings(engineScope, listOf(mapping)),
+    )
 }
 
 private fun LinearObjective.minimizedTelemetry(sample: Sample, capture: SourceResultCapture): Double {
@@ -186,9 +229,13 @@ private fun SourceMapping.sourcePoint(reduced: Problem, sample: Sample): Sample 
         exact.all { it.fitsLong() } -> LongArray(exact.size) { exact[it].toLongExact() }
         else -> longArrayOf()
     }
-    return point.copy(bools = BooleanArray(source.numBoolVars) { point.boolValue(it) }, ints = integers,
-        reals = DoubleArray(source.numRealVars) { point.approximateRealValue(it) }, exactInts = exact,
+    return point.copy(
+        bools = BooleanArray(source.numBoolVars) { point.boolValue(it) },
+        ints = integers,
+        reals = DoubleArray(source.numRealVars) { point.approximateRealValue(it) },
+        exactInts = exact,
         exactReals = point.exactReals?.take(source.numRealVars),
         algebraicReals = point.algebraicReals?.take(source.numRealVars),
-        symbolicReals = point.symbolicReals?.take(source.numRealVars))
+        symbolicReals = point.symbolicReals?.take(source.numRealVars),
+    )
 }

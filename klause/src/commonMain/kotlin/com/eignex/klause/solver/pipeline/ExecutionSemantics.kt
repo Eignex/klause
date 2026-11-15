@@ -8,8 +8,9 @@ internal val PreparedSourcePlan.sourceSemantics: EffectiveSourceSemantics?
     get() = (originalSource as? SourceSemanticsOwner)?.semantics
 
 private fun requireMatchingSemantics(previous: EffectiveSourceSemantics?, semantics: EffectiveSourceSemantics) {
-    require(previous == null ||
-        (previous.declared == semantics.declared && previous.effective == semantics.effective)
+    require(
+        previous == null ||
+            (previous.declared == semantics.declared && previous.effective == semantics.effective),
     ) {
         "execution belongs to a different source interpretation"
     }
@@ -23,10 +24,13 @@ internal fun OpenTheoryExecution.withSourceSemantics(semantics: EffectiveSourceS
             val qualified = result.withSourceSemantics(semantics)
             if (qualified === result) this else copy(result = qualified)
         }
+
         is OpenTheoryExecution.Optimize -> {
             requireMatchingSemantics(acceptedIncumbent?.sample?.semantics, semantics)
             val qualified = result.withSourceSemantics(semantics)
-            if (this.semantics === semantics && qualified === result) this else {
+            if (this.semantics === semantics && qualified === result) {
+                this
+            } else {
                 copy(result = qualified, semantics = semantics)
                     .also { it.retainPublication(acceptedIncumbent) }
             }

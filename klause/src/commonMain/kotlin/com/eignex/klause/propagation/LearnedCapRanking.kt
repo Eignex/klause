@@ -57,7 +57,9 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
         afterCleanup = Stage.Collect
     }
 
-    fun invalidateRetiredHandles() { retirementRevision++ }
+    fun invalidateRetiredHandles() {
+        retirementRevision++
+    }
 
     fun completedIndexedPass() {
         passes++
@@ -89,11 +91,17 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
                         reset()
                         passes++
                         return
-                    } else collect(budget, policy)
+                    } else {
+                        collect(budget, policy)
+                    }
                 }
+
                 Stage.Admit -> admit(limit, budget, policy)
+
                 Stage.Up -> siftUp(budget, policy)
+
                 Stage.Down -> siftDown(budget, policy)
+
                 Stage.Retire -> {
                     budget.visit(if (pending == prepared) 0L else 8L)
                     budget.visit(0L)
@@ -104,7 +112,9 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
                     pending = -1
                     stage = Stage.Trim
                 }
+
                 Stage.Trim -> trim(limit, budget)
+
                 Stage.Clean -> clean(budget, policy)
             }
         }
@@ -175,7 +185,9 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
         val parent = (sift - 1) / 2
         val move = better(candidates[parent], candidates[sift], policy)
         budget.visit(0L)
-        if (!move) stage = afterSift else {
+        if (!move) {
+            stage = afterSift
+        } else {
             swap(sift, parent)
             sift = parent
             if (afterSift == Stage.Clean) cleanupRead = minOf(cleanupRead, parent)
@@ -193,7 +205,9 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
         if (child + 1 < heapSize && better(candidates[child], candidates[child + 1], policy)) child++
         val move = better(candidates[sift], candidates[child], policy)
         budget.visit(0L)
-        if (!move) stage = afterSift else {
+        if (!move) {
+            stage = afterSift
+        } else {
             swap(sift, child)
             sift = child
         }

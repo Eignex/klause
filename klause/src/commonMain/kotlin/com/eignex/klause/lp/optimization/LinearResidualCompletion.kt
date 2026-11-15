@@ -84,8 +84,14 @@ internal class LinearResidualCompletion(
         if (admission == null) {
             val packed = LinearAuthorityModel.prepare(residual, variables, cancellation) ?: return null
             admission = budget.admitSparse(cancellation) { active ->
-                SparseSourceLp.prepare(packed.rows, packed.columns, costs ?: List(variables) { BigFraction.ZERO },
-                    BigFraction.ZERO, policy, active).also {
+                SparseSourceLp.prepare(
+                    packed.rows,
+                    packed.columns,
+                    costs ?: List(variables) { BigFraction.ZERO },
+                    BigFraction.ZERO,
+                    policy,
+                    active,
+                ).also {
                     observe("PrimalRecoverySparseInputEntries", it.metrics.inputEntries)
                     observe("PrimalRecoverySparseInputBits", it.metrics.scalarBits)
                     observe("PrimalRecoverySparsePreparationWork", it.metrics.work)
@@ -107,21 +113,29 @@ internal class LinearResidualCompletion(
                 currentToken = active
                 val funding = budget.funding
                 if (funding?.paused == true) return@resumeSparse null
-                val profile = lifetime ?: (lifetimeLimit ?: funding?.let { policy.funded(it.remainingWork) }
-                    ?: policy.floating)
+                val profile = lifetime ?: (
+                    lifetimeLimit ?: funding?.let { policy.funded(it.remainingWork) }
+                    ?: policy.floating
+                )
                     .also { lifetime = it }
                 val quantum = minOf(policy.quantum, funding?.availableWork ?: policy.quantum)
                 if (quantum <= 0L) return@resumeSparse null
-                val current = owner ?: LpScopedSolver(LpExactState(prepared.model), token,
-                    context = budget.context, iterationLimit = profile.iterations,
-                    workLimit = profile.work).also { owner = it }
+                val current = owner ?: LpScopedSolver(
+                    LpExactState(prepared.model),
+                    token,
+                    context = budget.context,
+                    iterationLimit = profile.iterations,
+                    workLimit = profile.work,
+                ).also { owner = it }
                 val result = floating ?: run {
                     val preparation = current.metrics.preparationWork
                     try {
                         current.advanceFloat(quantum, profile, token, retainFundingStop = true)?.second
                     } finally {
-                        budget.observe(preparation = current.metrics.preparationWork - preparation,
-                            floatWork = current.lastMetrics.workOps)
+                        budget.observe(
+                            preparation = current.metrics.preparationWork - preparation,
+                            floatWork = current.lastMetrics.workOps,
+                        )
                         observe("PrimalRecoverySparseFloatWork", current.lastMetrics.workOps)
                         observe("PrimalRecoverySparsePivots", current.lastMetrics.pivots.toLong())
                     }
@@ -143,24 +157,42 @@ internal class LinearResidualCompletion(
                 }
                 if (budget.funding?.paused == true) return@resumeSparse null
                 val model = checkNotNull(current.state.ownerWorkingModel())
-                val limits = ReconstructionLimits(maxWork = 2_000_000L,
-                    maxAllocation = 64L * 1024L * 1024L)
-                val reconstructed = reconstructCertificate(model, primal = result.primal, basis = result.basis,
-                    cancellation = token, limits = limits, claim = LpClaim.FEASIBLE_COMPLETION)
+                val limits = ReconstructionLimits(
+                    maxWork = 2_000_000L,
+                    maxAllocation = 64L * 1024L * 1024L,
+                )
+                val reconstructed = reconstructCertificate(
+                    model,
+                    primal = result.primal,
+                    basis = result.basis,
+                    cancellation = token,
+                    limits = limits,
+                    claim = LpClaim.FEASIBLE_COMPLETION,
+                )
                 budget.observe(refinement = reconstructed.metrics.work)
                 budget.funding?.charge(0L, reconstructed.metrics.allocation)
                 observe("PrimalRecoverySparsePointWork", reconstructed.metrics.work)
                 observe("PrimalRecoverySparsePointAllocation", reconstructed.metrics.allocation)
                 reconstructed.metrics.decline?.let { observe("PrimalRecoverySparsePoint${it.name}", 1L) }
-                point = budget.context.certificationPolicy.acceptNullable(LpCertifier.RATIONAL,
-                    reconstructed.witness)?.primal
+                point = budget.context.certificationPolicy.acceptNullable(
+                    LpCertifier.RATIONAL,
+                    reconstructed.witness,
+                )?.primal
                 if (point == null && !token()) {
-                    val checked = verifyExactBasis(model, result.basis, cancellation = token,
+                    val checked = verifyExactBasis(
+                        model,
+                        result.basis,
+                        cancellation = token,
                         limits = ExactBasisLimits(
-                            RationalBasisLimits(dimension = 512,
+                            RationalBasisLimits(
+                                dimension = 512,
                                 work = limits.maxWork - reconstructed.metrics.work,
-                                allocationBytes = limits.maxAllocation - reconstructed.metrics.allocation),
-                            limits), primalOnly = true)
+                                allocationBytes = limits.maxAllocation - reconstructed.metrics.allocation,
+                            ),
+                            limits,
+                        ),
+                        primalOnly = true,
+                    )
                     budget.observe(refinement = checked.metrics.work)
                     budget.funding?.charge(0L, checked.metrics.allocation)
                     observe("PrimalRecoverySparseBasisWork", checked.metrics.work)
@@ -169,8 +201,10 @@ internal class LinearResidualCompletion(
                     observe("PrimalRecoverySparseBasisMaxBits", checked.metrics.maxBits.toLong())
                     observe("PrimalRecoverySparseBasisPhase_${checked.metrics.phase.name}", 1L)
                     checked.metrics.decline?.let { observe("PrimalRecoverySparseBasis${it.name}", 1L) }
-                    point = budget.context.certificationPolicy.acceptNullable(LpCertifier.EXACT_BASIS,
-                        checked.witness)?.primal
+                    point = budget.context.certificationPolicy.acceptNullable(
+                        LpCertifier.EXACT_BASIS,
+                        checked.witness,
+                    )?.primal
                 }
                 finished = !token()
                 if (point != null) observe("PrimalRecoverySparseCompleted", 1L)

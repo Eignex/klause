@@ -59,7 +59,9 @@ class CoreGuidedSearchSliceTest(
     @Test
     fun `sliced stratification should retain scans with costs beyond scalar precision`() {
         val problem = Problem(
-            3, 0, emptyArray(),
+            3,
+            0,
+            emptyArray(),
             arrayOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         ).bake()
         val objective = LinearObjective(longArrayOf(9_007_199_254_740_993L, Long.MAX_VALUE, Long.MIN_VALUE))

@@ -32,8 +32,8 @@ internal class SeparableObjectiveView private constructor(
             cancellation.charge(
                 (
                     objective.boolWeightValues.size + objective.intCoefficientValues.size +
-                objective.realCoefficientValues.size
-                ).toLong()
+                        objective.realCoefficientValues.size
+                    ).toLong(),
             )
             if (cancellation() || objective.singleIntObjective() == null) return null
             return try {

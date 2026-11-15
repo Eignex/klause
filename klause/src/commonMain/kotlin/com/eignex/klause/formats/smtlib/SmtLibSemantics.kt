@@ -32,8 +32,12 @@ internal fun resolveSmtLibSemantics(
         lower = if (unboundedIntLo == Long.MIN_VALUE) BoundOverride.Open else BoundOverride.Value(unboundedIntLo),
         upper = if (unboundedIntHi == Long.MAX_VALUE) BoundOverride.Open else BoundOverride.Value(unboundedIntHi),
     )
-    return smtLibSemantics.resolve(overrides.copy(undeclaredIntegers = BoundsOverride(
+    return smtLibSemantics.resolve(
+        overrides.copy(
+            undeclaredIntegers = BoundsOverride(
         overrides.undeclaredIntegers?.lower ?: legacy.lower,
         overrides.undeclaredIntegers?.upper ?: legacy.upper,
-    )))
+    )
+        )
+    )
 }

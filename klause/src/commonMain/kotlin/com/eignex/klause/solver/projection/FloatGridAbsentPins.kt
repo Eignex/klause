@@ -25,11 +25,7 @@ import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact
 import com.eignex.util.numbers.unaryMinus
 
-internal class FloatGridAbsentPin(
-    val present: SourceBoolId,
-    val default: BigFraction,
-    factors: List<Int>,
-) {
+internal class FloatGridAbsentPin(val present: SourceBoolId, val default: BigFraction, factors: List<Int>) {
     private val capturedFactors = factors.toList()
     val factors: List<Int> get() = capturedFactors.toList()
 }
@@ -86,8 +82,13 @@ internal fun prepareFloatGridAbsentPins(
                     else -> rounded.toLongExact()
                 }
             }
-            factors += ReifiedLinear(booleans + 1, longArrayOf(1),
-                intArrayOf(selector.coordinate.variable), LinearOp.EQ, nearest)
+            factors += ReifiedLinear(
+                booleans + 1,
+                longArrayOf(1),
+                intArrayOf(selector.coordinate.variable),
+                LinearOp.EQ,
+                nearest,
+            )
             factors += Clause(intArrayOf(Lit.make(pin.present.index, true), Lit.make(booleans + 1, true)))
             repeat(4) { origins.add(pin.factors.first()) }
             booleans += 2
@@ -145,17 +146,17 @@ private fun absentValueColumn(primary: FloatGridColumn, default: BigFraction, va
     return FloatGridColumn(primary.source, GridCoordinate(variable.toInt(), lo, hi, buckets), origin, step, primary)
 }
 
-private fun presentChannel(
-    primary: FloatGridColumn,
-    value: FloatGridColumn,
-): Triple<LongArray, IntArray, Long>? {
+private fun presentChannel(primary: FloatGridColumn, value: FloatGridColumn): Triple<LongArray, IntArray, Long>? {
     val ratio = primary.step * value.step.reciprocal()
     val offset = (primary.origin - value.origin) * value.step.reciprocal()
     if (ratio.den != BIG_ONE || offset.den != BIG_ONE || !ratio.num.fitsLong() || !offset.num.fitsLong()) {
         return null
     }
-    return Triple(longArrayOf(1, -ratio.num.toLongExact()),
-        intArrayOf(value.coordinate.variable, primary.coordinate.variable), offset.num.toLongExact())
+    return Triple(
+        longArrayOf(1, -ratio.num.toLongExact()),
+        intArrayOf(value.coordinate.variable, primary.coordinate.variable),
+        offset.num.toLongExact(),
+    )
 }
 
 internal fun lowerGridPin(factor: Factor, column: FloatGridColumn, default: BigFraction): List<Factor>? {

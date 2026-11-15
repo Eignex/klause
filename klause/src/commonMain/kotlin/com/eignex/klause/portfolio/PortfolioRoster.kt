@@ -19,8 +19,12 @@ internal class RosterRank(
  *  it filled a slot by rank. */
 internal class SeatedArm(val config: WorkerConfig, val role: ArmRole?, val needed: Boolean = false) {
     /** How the record names the seat: the role it fills, or its rank fill and the role it declares. */
-    val report: String get() = if (needed) checkNotNull(role).label else listOfNotNull("rank", role?.label)
+    val report: String get() = if (needed) {
+        checkNotNull(role).label
+    } else {
+        listOfNotNull("rank", role?.label)
         .joinToString("/")
+    }
 }
 
 /**

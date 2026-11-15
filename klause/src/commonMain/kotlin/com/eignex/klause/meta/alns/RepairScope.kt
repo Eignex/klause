@@ -16,8 +16,10 @@ internal object RepairScope {
     ): FreedVars? {
         val bools = sweep?.expandUnitBooleanScope(requested.bools, cancellation)
             ?: if (sweep == null) requested.bools else return null
-        return FreedVars(bools.filterNot(assumptions::isFrozenBool).toIntArray(),
-            requested.ints.filterNot(assumptions::isFrozenInt).toIntArray())
+        return FreedVars(
+            bools.filterNot(assumptions::isFrozenBool).toIntArray(),
+            requested.ints.filterNot(assumptions::isFrozenInt).toIntArray(),
+        )
     }
 
     fun pins(problem: Problem, center: Sample, freed: FreedVars): Assumptions {

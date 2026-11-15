@@ -16,9 +16,12 @@ class LinearInputRevisionTest {
     @Test
     fun `only participating inequality endpoints should wake strengthening`() {
         for (column in 0..2) {
-            val source = Problem(0, 3, Array(3) { IntDomain(0, 3) }, listOf(
+            val source = Problem(
+                0, 3, Array(3) { IntDomain(0, 3) },
+                listOf(
                 Linear(intArrayOf(3, 2), intArrayOf(0, 1), LinearOp.LE, 7),
-            ))
+            )
+            )
             val inputs = LinearInputRevision(source, PresolvePass.STRENGTHEN_COEFFICIENTS, ExecutionControl.Never)
             val before = assertNotNull(inputs.current(source))
             inputs.recordDelta(source.factors, intArrayOf(), emptyList())
@@ -31,9 +34,12 @@ class LinearInputRevisionTest {
 
     @Test
     fun `sparsification should ignore domain changes`() {
-        val source = Problem(0, 2, Array(2) { IntDomain(0, 3) }, listOf(
+        val source = Problem(
+            0, 2, Array(2) { IntDomain(0, 3) },
+            listOf(
             Linear(intArrayOf(3, 2), intArrayOf(0, 1), LinearOp.EQ, 7),
-        ))
+        )
+        )
         val inputs = LinearInputRevision(source, PresolvePass.SPARSIFY_LINEAR_ROWS, ExecutionControl.Never)
         val before = assertNotNull(inputs.current(source))
         inputs.recordDelta(source.factors, intArrayOf(), emptyList())
@@ -61,9 +67,12 @@ class LinearInputRevisionTest {
     @Test
     fun `unrelated factor tracking should charge only the delta visit`() {
         for (pass in listOf(PresolvePass.STRENGTHEN_COEFFICIENTS, PresolvePass.SPARSIFY_LINEAR_ROWS)) {
-            val source = Problem(2, 2, Array(2) { IntDomain(0, 3) }, listOf(
+            val source = Problem(
+                2, 2, Array(2) { IntDomain(0, 3) },
+                listOf(
                 Linear(intArrayOf(3, 2), intArrayOf(0, 1), LinearOp.EQ, 7),
-            ))
+            )
+            )
             val budget = PresolveBudget(Long.MAX_VALUE)
             val inputs = LinearInputRevision(source, pass, budget.orSpent(ExecutionControl.Never))
             val before = assertNotNull(inputs.current(source))
@@ -79,9 +88,12 @@ class LinearInputRevisionTest {
     @Test
     fun `interrupted tracking should spend its containing allowance and publish no revision`() {
         for (pass in listOf(PresolvePass.STRENGTHEN_COEFFICIENTS, PresolvePass.SPARSIFY_LINEAR_ROWS)) {
-            val source = Problem(0, 2, Array(2) { IntDomain(0, 3) }, listOf(
+            val source = Problem(
+                0, 2, Array(2) { IntDomain(0, 3) },
+                listOf(
                 Linear(intArrayOf(3, 2), intArrayOf(0, 1), LinearOp.LE, 7),
-            ))
+            )
+            )
             val budget = PresolveBudget(1L)
 
             val inputs = LinearInputRevision(source, pass, budget.orSpent(ExecutionControl.Never))

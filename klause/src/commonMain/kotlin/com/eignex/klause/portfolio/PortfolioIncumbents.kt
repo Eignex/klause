@@ -66,15 +66,19 @@ internal class PortfolioIncumbents<V>(
             }
             return PortfolioIncumbents(
                 valueOf = { lock.withLock { checked { valueOf(it) } } },
-                improves = { candidate, standing -> lock.withLock {
-                    checked {
-                        arithmetic.compare(exactValue(candidate), exactValue(standing))
-                    }?.let { it < 0 } == true
-                } },
+                improves = { candidate, standing ->
+                    lock.withLock {
+                        checked {
+                            arithmetic.compare(exactValue(candidate), exactValue(standing))
+                        }?.let { it < 0 } == true
+                    }
+                },
                 approximateValue = { item ->
                     val value = exactValue(item)
-                    value.rational?.toDouble() ?: ((value.lowerBound + value.upperBound) *
-                        BigFraction.ofLong(2).reciprocal()).toDouble()
+                    value.rational?.toDouble() ?: (
+                        (value.lowerBound + value.upperBound) *
+                        BigFraction.ofLong(2).reciprocal()
+                    ).toDouble()
                 },
                 gain = { standing, candidate ->
                     (exactValue(standing).lowerBound - exactValue(candidate).upperBound).toDouble().coerceAtLeast(0.0)
@@ -96,9 +100,12 @@ internal fun roundedUpperBound(exact: BigFraction): Double {
     val approximate = exact.toDouble()
     return when {
         approximate == Double.NEGATIVE_INFINITY -> -Double.MAX_VALUE
+
         approximate == Double.POSITIVE_INFINITY -> approximate
+
         requireNotNull(BigFraction.ofDouble(approximate)) < exact ->
             Double.fromBits(approximate.toBits() + if (approximate >= 0) 1 else -1)
+
         else -> approximate
     }
 }

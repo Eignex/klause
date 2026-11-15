@@ -24,10 +24,12 @@ class ClauseMinimizerTest {
             override fun deferredReason(v: Int): Boolean = v == 2
             override fun antecedentsOf(v: Int): IntArray? = when (v) {
                 0 -> intArrayOf(Lit.make(2, false), Lit.make(3, false))
+
                 2 -> {
                     expensiveBuilds++
                     intArrayOf(Lit.make(4, false))
                 }
+
                 else -> null
             }
         }

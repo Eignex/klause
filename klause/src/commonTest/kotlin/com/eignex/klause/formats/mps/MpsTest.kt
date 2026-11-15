@@ -169,9 +169,11 @@ class MpsTest {
     fun `unchanged copies should retain exact sums with overflowing projections`() {
         val parsed = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1e308\n X COST 1e308\nENDATA")
 
-        val source = assertNotNull(parsed.copy(name = "copy").toLinearSourceProblem(
+        val source = assertNotNull(
+            parsed.copy(name = "copy").toLinearSourceProblem(
             SemanticOverrides(feasibilityTolerance = SourceTolerance()),
-        ))
+        )
+        )
 
         val witness = assertNotNull(source.checkMpsWitness(listOf(BigFraction.ONE)))
 

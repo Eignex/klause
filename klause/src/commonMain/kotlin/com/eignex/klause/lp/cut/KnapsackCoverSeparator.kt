@@ -43,7 +43,9 @@ internal class KnapsackCoverSeparator : CutSeparator {
         for (factor in ctx.problem.factors) {
             if (factor !is PseudoBoolean || !permitsLongPseudoBoolean(factor.constants) ||
                 factor.op != PbOp.LE
-            ) continue
+            ) {
+                continue
+            }
             if (factor.weights.any { it <= 0 } || factor.literals.any { !Lit.isPositive(it) }) continue
             val k = factor.literals.size
             if (k < 2) continue

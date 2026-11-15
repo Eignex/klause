@@ -146,8 +146,10 @@ class LocalSearchState private constructor(
 
     // Clause degrees are binary, so their maintained break/make counts sum the exact raw delta.
     internal val repairChainClauseOnly: Boolean by lazy(LazyThreadSafetyMode.NONE) {
-        (projection.selection == null ||
-            projection.selection.builtInScoring) &&
+        (
+            projection.selection == null ||
+            projection.selection.builtInScoring
+        ) &&
             problem.factors.all { it is Clause }
     }
 
@@ -287,7 +289,9 @@ class LocalSearchState private constructor(
         val polling = scoringPolling
         if (polling != null) {
             if (!polling.due(1)) return
-        } else if (scoringCountdown-- > 0) return
+        } else if (scoringCountdown-- > 0) {
+            return
+        }
         scoringCountdown = LOCAL_SEARCH_OPERATION_BATCH - 1
         if (scoringCancellation()) throw LocalSearchScoringInterrupted
     }
@@ -298,7 +302,9 @@ class LocalSearchState private constructor(
             val polling = scoringPolling
             if (polling != null) {
                 if (!polling.due(1)) return
-            } else if (scoringCountdown-- > 0) return
+            } else if (scoringCountdown-- > 0) {
+                return
+            }
             scoringCountdown = LOCAL_SEARCH_OPERATION_BATCH - 1
             if (scoringCancellation()) throw LocalSearchScoringInterrupted
         }
@@ -310,7 +316,9 @@ class LocalSearchState private constructor(
         val polling = scoringPolling
         if (polling != null) {
             if (!polling.due(1)) return
-        } else if (scoringCountdown-- > 0) return
+        } else if (scoringCountdown-- > 0) {
+            return
+        }
         scoringCountdown = LOCAL_SEARCH_OPERATION_BATCH - 1
         if (active && scoringCancellation()) throw LocalSearchScoringInterrupted
     }
@@ -807,8 +815,8 @@ class LocalSearchState private constructor(
                     }
                 } else {
                     scored.deltaIfApplied(assignment, move).also {
-                    phaseTimer?.recordObjectiveScoring("generic")
-                }
+                        phaseTimer?.recordObjectiveScoring("generic")
+                    }
                 }
             }
 
@@ -1014,8 +1022,11 @@ class LocalSearchState private constructor(
             for (id in violatedOrder) violated.add(id)
         }
         return LocalSearchMoveInspection(
-            checkNotNull(sample), checkNotNull(degrees), evaluation.netDelta,
-            evaluation.weightedNetDelta, evaluation.objectiveDelta,
+            checkNotNull(sample),
+            checkNotNull(degrees),
+            evaluation.netDelta,
+            evaluation.weightedNetDelta,
+            evaluation.objectiveDelta,
         )
     }
 
@@ -1513,7 +1524,13 @@ class LocalSearchState private constructor(
         moveActive = true
         try {
             return probeMove(
-                move, objective, refineCumulative, weightedResidual, elementEligibility, feasibleObjective, capture,
+                move,
+                objective,
+                refineCumulative,
+                weightedResidual,
+                elementEligibility,
+                feasibleObjective,
+                capture,
             )
         } finally {
             moveActive = false
@@ -1586,7 +1603,10 @@ class LocalSearchState private constructor(
                 objective is LinearObjective -> probeLinearObjectiveDelta(objective)
 
                 indexed != null -> indexed.difference(
-                    assignment, probeSlots, savedValuesScratch, ::checkObjectiveProbeWork,
+                    assignment,
+                    probeSlots,
+                    savedValuesScratch,
+                    ::checkObjectiveProbeWork,
                 ).also { phaseTimer?.recordObjectiveScoring("indexed") }
 
                 objective is FunctionalObjective ->

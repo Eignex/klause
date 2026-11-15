@@ -38,7 +38,9 @@ internal fun tryPolynomialIntegerRecession(
     val base = assignment.reals.map { value ->
         value.rational ?: if (value.definingCoefficients.size == 2) {
             value.definingCoefficients[0].negated() * value.definingCoefficients[1].reciprocal()
-        } else algebraic.exactInteger(value)?.let { BigFraction.of(it, BIG_ONE) } ?: return null
+        } else {
+            algebraic.exactInteger(value)?.let { BigFraction.of(it, BIG_ONE) } ?: return null
+        }
     }
     if (integers.any { base[it].den != BIG_ONE }) return null
     val bools = (0 until assignment.boolCount).associateWith(assignment::boolValue)
@@ -46,15 +48,24 @@ internal fun tryPolynomialIntegerRecession(
     val model = polynomialQuadraticModel(conditioned, objective, base.size, bools, arithmetic, control) ?: return null
     val rows = model.rows.map { row ->
         arithmetic.step()
-        QuadraticRow(row.coefficients, BigFraction.ZERO,
-            if (row.relation == QuadraticRowRelation.EQ) QuadraticRowRelation.EQ else QuadraticRowRelation.LE)
+        QuadraticRow(
+            row.coefficients,
+            BigFraction.ZERO,
+            if (row.relation == QuadraticRowRelation.EQ) QuadraticRowRelation.EQ else QuadraticRowRelation.LE,
+        )
     }
     val checker = QuadraticCertification(control)
     val candidates = QuadraticCandidates(control)
     fun certify(direction: List<BigFraction>): PolynomialIntegerRecession? {
         var scale = BIG_ONE
-        for (id in integers) { arithmetic.step(); scale *= direction[id].den }
-        val scaled = direction.map { arithmetic.step(); it * BigFraction.of(scale, BIG_ONE) }
+        for (id in integers) {
+            arithmetic.step();
+            scale *= direction[id].den
+        }
+        val scaled = direction.map {
+            arithmetic.step();
+            it * BigFraction.of(scale, BIG_ONE)
+        }
         val certificate = checker.unbounded(model, base, scaled) ?: return null
         check(integers.all { certificate.direction[it].den == BIG_ONE })
         arithmetic.step()
@@ -62,9 +73,11 @@ internal fun tryPolynomialIntegerRecession(
     }
     val targets = buildList {
         add(model.linear.map { it.negated() })
-        for (id in base.indices) for (sign in listOf(BigFraction.ONE, BigFraction.MINUS_ONE)) {
+        for (id in base.indices) {
+            for (sign in listOf(BigFraction.ONE, BigFraction.MINUS_ONE)) {
             arithmetic.step()
             add(List(base.size) { if (it == id) sign else BigFraction.ZERO })
+        }
         }
     }
     for (target in targets) {

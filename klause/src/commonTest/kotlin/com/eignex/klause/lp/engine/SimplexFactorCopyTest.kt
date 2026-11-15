@@ -22,8 +22,13 @@ class SimplexFactorCopyTest {
                     assertTrue(parent.refactorize(intArrayOf(2)))
                     null
                 }
-                val copy = SimplexFactorCopy(matrix, assertNotNull(parent.factorCopy), intArrayOf(2),
-                    repair?.columns ?: intArrayOf(2), repair?.unitRows ?: intArrayOf(-1))
+                val copy = SimplexFactorCopy(
+                    matrix,
+                    assertNotNull(parent.factorCopy),
+                    intArrayOf(2),
+                    repair?.columns ?: intArrayOf(2),
+                    repair?.unitRows ?: intArrayOf(-1),
+                )
                 val owner = SimplexBasisLifecycle(1, 3)
                 owner.basicVar[0] = 2
                 assertTrue(copy.install(owner, matrix, 2, 100L, 10_000L) { false })
@@ -41,16 +46,34 @@ class SimplexFactorCopyTest {
             for (mismatch in listOf("matrix", "headings", "column", "unit", "sentinel", "cancel", "storage")) {
                 val owner = SimplexBasisLifecycle(1, 2)
                 owner.basicVar[0] = if (mismatch == "headings") 1 else 0
-                val copy = SimplexFactorCopy(matrix, offer, intArrayOf(0),
+                val copy = SimplexFactorCopy(
+                    matrix,
+                    offer,
+                    intArrayOf(0),
                     intArrayOf(if (mismatch == "column") 1 else 0),
-                    intArrayOf(when (mismatch) { "unit" -> 0; "sentinel" -> -2; else -> -1 }))
+                    intArrayOf(
+                        when (mismatch) {
+                        "unit" -> 0;
+                        "sentinel" -> -2;
+                        else -> -1
+                    }
+                    ),
+                )
                 val target = if (mismatch == "matrix") {
                     SparseMatrix.ofColumns(1, 2, listOf(listOf(0 to 2.0), listOf(0 to 1.0)))
-                } else matrix
+                } else {
+                    matrix
+                }
 
-                assertFalse(copy.install(owner, target, 1,
+                assertFalse(
+                    copy.install(
+                    owner,
+                    target,
+                    1,
                     if (mismatch == "storage") offer.entries - 1L else offer.entries,
-                    10_000L) { mismatch == "cancel" })
+                    10_000L,
+                ) { mismatch == "cancel" }
+                )
 
                 assertNull(owner.current)
                 assertFalse(owner.factorized)

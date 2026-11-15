@@ -496,8 +496,14 @@ internal object Compiler {
             if (rhsVar == null) {
                 factors.add(Linear(LongArray(coeffs.size) { coeffs[it].toLong() }, vars, op, k))
             } else {
-                factors.add(Linear(LongArray(coeffs.size + 1) { if (it < coeffs.size) coeffs[it].toLong() else -1L },
-                    vars + rhsVar, op, k))
+                factors.add(
+                    Linear(
+                    LongArray(coeffs.size + 1) { if (it < coeffs.size) coeffs[it].toLong() else -1L },
+                    vars + rhsVar,
+                    op,
+                    k,
+                )
+                )
                 // `(eq, v)` makes v the sum's value: v = Σ coeffs·vars. Orienting a bare equality could
                 // pick a decision var as the output, so the front-end records the definition itself.
                 if (op == LinearOp.EQ) definedVars.add(rhsVar)
@@ -537,8 +543,8 @@ internal object Compiler {
             if (node is FExpr.Call && node.fn == "ne" && node.args.size == 2 &&
                 (
                     postDistanceDisequality(node.args[0], node.args[1]) ||
-                    postDistanceDisequality(node.args[1], node.args[0])
-                )
+                        postDistanceDisequality(node.args[1], node.args[0])
+                    )
             ) {
                 return
             }
@@ -1019,9 +1025,15 @@ internal object Compiler {
         }
 
         private fun retainedDivMod(a: Int, b: Int, mod: Boolean): IntComb {
-            val relation = divModRelations.retain(a, b, domains[a], domains[b],
-                quotient = null, remainder = null,
-                freshInt = { domain -> newAuxVar(domain.min, domain.max) })
+            val relation = divModRelations.retain(
+                a,
+                b,
+                domains[a],
+                domains[b],
+                quotient = null,
+                remainder = null,
+                freshInt = { domain -> newAuxVar(domain.min, domain.max) },
+            )
             val start = factors.size
             factors.addAll(relation.factors)
             classes.define(relation.quotient, start)

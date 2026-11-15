@@ -320,7 +320,10 @@ class LpBoundingReducedCostFixingTest {
     @Test
     fun `a fixing reason should keep the bound sides a row-implied open side reads`() {
         val problem = Problem(
-            0, 4, arrayOf(IntDomain(0, 10), IntDomain(0, 5), IntDomain(0, 100), IntDomain(0, 1)), arrayOf<Factor>(),
+            0,
+            4,
+            arrayOf(IntDomain(0, 10), IntDomain(0, 5), IntDomain(0, 100), IntDomain(0, 1)),
+            arrayOf<Factor>(),
         )
         val session = PropagationSession(problem)
         session.implyIntAtLeast(1, 1L)
@@ -333,7 +336,12 @@ class LpBoundingReducedCostFixingTest {
             addRow(intArrayOf(z, y, w), longArrayOf(1L, -1L, -1L), Relation.EQ, 2L)
         }.build(Sense.MINIMIZE)
         val relaxation = LpRelaxation(
-            model, intArrayOf(0, 1, 2, 3), BooleanArray(4), 0L, intArrayOf(0, 1, 2, 3), intArrayOf(),
+            model,
+            intArrayOf(0, 1, 2, 3),
+            BooleanArray(4),
+            0L,
+            intArrayOf(0, 1, 2, 3),
+            intArrayOf(),
         )
         val certificate = assertNotNull(FloatDeductionCertificate.of(model, doubleArrayOf(0.25)))
 

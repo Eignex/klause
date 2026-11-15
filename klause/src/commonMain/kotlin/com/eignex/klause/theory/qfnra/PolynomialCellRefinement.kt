@@ -18,10 +18,8 @@ import com.eignex.util.numbers.magnitudeBitLength
 internal sealed interface PolynomialCellScope {
     val source: PolynomialRealFormula
 
-    class Source private constructor(
-        override val source: PolynomialRealFormula,
-        predicates: List<PolynomialAtom>,
-    ) : PolynomialCellScope {
+    class Source private constructor(override val source: PolynomialRealFormula, predicates: List<PolynomialAtom>) :
+        PolynomialCellScope {
         private val mandatory = predicates.toTypedArray()
         val predicates: List<PolynomialAtom> get() = mandatory.toList()
 
@@ -32,8 +30,11 @@ internal sealed interface PolynomialCellScope {
 
         companion object {
             fun prepare(source: PolynomialRealFormula, arithmetic: PolynomialArithmetic): Source =
-                Source(source, PolynomialFormula.normalize(source, arithmetic).forcedAtoms(arithmetic)
-                    .orEmpty().take(MAX_CELL_PREMISES))
+                Source(
+                    source,
+                    PolynomialFormula.normalize(source, arithmetic).forcedAtoms(arithmetic)
+                    .orEmpty().take(MAX_CELL_PREMISES)
+                )
         }
     }
     class Query(
@@ -117,7 +118,9 @@ internal fun unaryCellPolynomial(polynomial: Polynomial, arithmetic: PolynomialA
         if (term.monomial.variableCount > 1 ||
             term.coefficient.num.magnitudeBitLength() > MAX_CELL_BITS ||
             term.coefficient.den.magnitudeBitLength() > MAX_CELL_BITS
-        ) return null
+        ) {
+            return null
+        }
         for (id in term.monomial.variables) {
             arithmetic.step()
             if (variable != null && variable != id) return null
@@ -141,7 +144,9 @@ internal fun fitsCellLimits(polynomial: Polynomial, arithmetic: PolynomialArithm
         arithmetic.step()
         if (term.coefficient.num.magnitudeBitLength() > MAX_CELL_BITS ||
             term.coefficient.den.magnitudeBitLength() > MAX_CELL_BITS
-        ) return false
+        ) {
+            return false
+        }
         for (id in term.monomial.variables) {
             arithmetic.step()
             if (term.monomial.exponent(id) > MAX_CELL_DEGREE) return false
@@ -176,7 +181,12 @@ internal class PolynomialCellRefinement(
     private var pendingWork: () -> Long = { 0L }
     private val spentWork get() = completedWork + pendingWork()
     val stats: PolynomialCellStats get() = PolynomialCellStats(
-        candidateCount, cellCount, repeatedCount, repairCount, declineCount, spentWork,
+        candidateCount,
+        cellCount,
+        repeatedCount,
+        repairCount,
+        declineCount,
+        spentWork,
     )
     private val retained = ArrayList<CheckedPolynomialCell>()
     val cells: List<CheckedPolynomialCell> get() = retained.toList()
@@ -245,18 +255,33 @@ internal class PolynomialCellRefinement(
     ): PolynomialCellRegion? = optional {
         if (premises.atoms.size + premises.bools.size > MAX_CELL_PREMISES ||
             reduction.atoms.size > MAX_CELL_PREMISES
-        ) return@optional null
-        val atoms = reduction.atoms.map { arithmetic.step(); it }
-        val scope = PolynomialCellScope.Region(source, condition, snapshot,
-            PolynomialBooleanRegion(premises.atoms.mapValues { arithmetic.step(); it.value },
-                premises.bools.mapValues { arithmetic.step(); it.value }), Any())
+        ) {
+            return@optional null
+        }
+        val atoms = reduction.atoms.map {
+            arithmetic.step();
+            it
+        }
+        val scope = PolynomialCellScope.Region(
+            source,
+            condition,
+            snapshot,
+            PolynomialBooleanRegion(
+                premises.atoms.mapValues {
+                    arithmetic.step();
+                    it.value
+                },
+                premises.bools.mapValues {
+                    arithmetic.step();
+                    it.value
+                },
+            ),
+            Any(),
+        )
         PolynomialCellRegion(scope, atoms)
     }
 
-    inner class PolynomialCellRegion(
-        val scope: PolynomialCellScope.Region,
-        private val atoms: List<PolynomialAtom>,
-    ) {
+    inner class PolynomialCellRegion(val scope: PolynomialCellScope.Region, private val atoms: List<PolynomialAtom>) {
         fun repair(variable: Int, value: AlgebraicReal): AlgebraicReal? = optional {
             repair(variable, value, atoms, scope)
         }
@@ -294,9 +319,15 @@ internal class PolynomialCellRefinement(
                 if (algebraic.compare(value, initial) != 0) repairCount++
                 return value
             }
-            val support = if (sourceAtoms.any { arithmetic.step(); it == rejected }) {
+            val support = if (sourceAtoms.any {
+                arithmetic.step();
+                it == rejected
+            }
+            ) {
                 checkNotNull(sourceScope)
-            } else scope
+            } else {
+                scope
+            }
             val known = reused
             val repeated = if (known != null && (known.scope === scope || known.scope === sourceScope)) {
                 true
@@ -305,7 +336,10 @@ internal class PolynomialCellRefinement(
                     arithmetic.step()
                     it.variable == variable && (it.scope === scope || it.scope === sourceScope)
                 }
-                existing.any { arithmetic.step(); it.contains(value, algebraic) }
+                existing.any {
+                    arithmetic.step();
+                    it.contains(value, algebraic)
+                }
             }
             if (repeated) {
                 repeatedCount++
@@ -348,13 +382,20 @@ internal class PolynomialCellRefinement(
             arithmetic.step()
             return (lower == null || algebraic.compare(value, lower) >= 0) &&
                 (upper == null || algebraic.compare(value, upper) <= 0) &&
-                cells.none { arithmetic.step(); it.contains(value, algebraic) }
+                cells.none {
+                    arithmetic.step();
+                    it.contains(value, algebraic)
+                }
         }
         for (boundary in distinct) if (accepted(boundary)) return boundary
         for (index in 0..distinct.size) {
             arithmetic.step()
-            val sample = algebraic.rational(algebraic.sampleBetween(distinct.getOrNull(index - 1),
-                distinct.getOrNull(index)))
+            val sample = algebraic.rational(
+                algebraic.sampleBetween(
+                distinct.getOrNull(index - 1),
+                distinct.getOrNull(index),
+            )
+            )
             if (accepted(sample)) return sample
         }
         return null

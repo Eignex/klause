@@ -65,9 +65,12 @@ class SessionOwnershipTest {
         }
         val owned = ownSolve(source) { releases++ }
 
-        assertSame(failure, assertFailsWith<IllegalArgumentException> {
+        assertSame(
+            failure,
+            assertFailsWith<IllegalArgumentException> {
             owned.runSlice(ExecutionControl.Never, 1L, 1L)
-        })
+        }
+        )
 
         assertTrue(failure.suppressedExceptions.isEmpty())
         assertEquals(1, releases)

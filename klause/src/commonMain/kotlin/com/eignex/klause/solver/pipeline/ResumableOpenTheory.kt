@@ -60,7 +60,9 @@ internal class ResumableOpenTheory(
 
     /** The verdict's stats once decided, else retained preparation and live work and progress counters. */
     val stats: SolveStats get() = verdict?.stats ?: SolveStats(
-        presolve = preparationStats, openTheory = state.work.snapshot(), search = progress,
+        presolve = preparationStats,
+        openTheory = state.work.snapshot(),
+        search = progress,
     )
 
     /**

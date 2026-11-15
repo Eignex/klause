@@ -27,8 +27,10 @@ import kotlin.test.assertTrue
 class SourceDefinitionProjectionTest {
     @Test
     fun `searched output inconsistency remains a source violation`() {
-        val program = parseFlatZinc("var bool: b; var 0..1: y; " +
-            "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
+        val program = parseFlatZinc(
+            "var bool: b; var 0..1: y; " +
+                "constraint bool2int(b, y) :: defines_var(y); solve satisfy;",
+        )
         val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
         val state = LocalSearchState(program.problem.bake(), Random(0))
         state.invariants = sweep.searchingChannels(true, false, ExecutionControl.Never)
@@ -43,9 +45,11 @@ class SourceDefinitionProjectionTest {
 
     @Test
     fun `searched predicates remain protected by source pins`() {
-        val program = parseFlatZinc("var 0..2: x; var bool: b; var 0..1: y; " +
-            "constraint int_eq_reif(x, 1, b) :: defines_var(b); " +
-            "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
+        val program = parseFlatZinc(
+            "var 0..2: x; var bool: b; var 0..1: y; " +
+                "constraint int_eq_reif(x, 1, b) :: defines_var(b); " +
+                "constraint bool2int(b, y) :: defines_var(y); solve satisfy;",
+        )
         val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
         val view = assertNotNull(sweep.searchingChannels(false, true, ExecutionControl.Never))
         val boolean = program.boolVarsByName.getValue("b")
@@ -60,9 +64,11 @@ class SourceDefinitionProjectionTest {
 
     @Test
     fun `searched predicates retain downstream value definitions`() {
-        val program = parseFlatZinc("var 0..2: x; var bool: b; var 0..1: y; " +
-            "constraint int_eq_reif(x, 1, b) :: defines_var(b); " +
-            "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
+        val program = parseFlatZinc(
+            "var 0..2: x; var bool: b; var 0..1: y; " +
+                "constraint int_eq_reif(x, 1, b) :: defines_var(b); " +
+                "constraint bool2int(b, y) :: defines_var(y); solve satisfy;",
+        )
         val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
 
         val view = assertNotNull(sweep.searchingChannels(false, true, ExecutionControl.Never))
@@ -74,9 +80,11 @@ class SourceDefinitionProjectionTest {
 
     @Test
     fun `searched values retain their predicate definition`() {
-        val program = parseFlatZinc("var 0..2: x; var bool: b; var 0..1: y; " +
-            "constraint int_eq_reif(x, 1, b) :: defines_var(b); " +
-            "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
+        val program = parseFlatZinc(
+            "var 0..2: x; var bool: b; var 0..1: y; " +
+                "constraint int_eq_reif(x, 1, b) :: defines_var(b); " +
+                "constraint bool2int(b, y) :: defines_var(y); solve satisfy;",
+        )
         val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
 
         val view = assertNotNull(sweep.searchingChannels(true, false, ExecutionControl.Never))
@@ -88,8 +96,10 @@ class SourceDefinitionProjectionTest {
 
     @Test
     fun `searching every channel can leave no maintained outputs`() {
-        val program = parseFlatZinc("var bool: b; var 0..1: y; " +
-            "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
+        val program = parseFlatZinc(
+            "var bool: b; var 0..1: y; " +
+                "constraint bool2int(b, y) :: defines_var(y); solve satisfy;",
+        )
         val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
 
         assertNull(sweep.searchingChannels(true, true, ExecutionControl.Never))
@@ -97,8 +107,10 @@ class SourceDefinitionProjectionTest {
 
     @Test
     fun `cancelled channel filtering publishes no partial view`() {
-        val program = parseFlatZinc("var bool: b; var 0..1: y; " +
-            "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
+        val program = parseFlatZinc(
+            "var bool: b; var 0..1: y; " +
+                "constraint bool2int(b, y) :: defines_var(y); solve satisfy;",
+        )
         val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
 
         assertNull(sweep.searchingChannels(true, false, ExecutionControl { true }))
@@ -142,13 +154,21 @@ class SourceDefinitionProjectionTest {
     fun `strict endpoint comparisons should not wrap their source bound`() {
         for ((endpoint, relation) in listOf(Long.MIN_VALUE to LinearOp.LE, Long.MAX_VALUE to LinearOp.GE)) {
             val problem = Problem(
-                numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(endpoint, endpoint)),
+                numBoolVars = 1,
+                numIntVars = 1,
+                intDomains = arrayOf(IntDomain(endpoint, endpoint)),
                 factors = arrayOf(Clause(intArrayOf(Lit.make(0, false)))),
             )
             val hint = DefinitionHint.Comparison(
-                0, longArrayOf(1, -1), arrayOf(
-                    DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Constant(endpoint),
-                ), 0, relation, strict = true,
+                0,
+                longArrayOf(1, -1),
+                arrayOf(
+                    DefinitionHint.Operand.Variable(0),
+                    DefinitionHint.Operand.Constant(endpoint),
+                ),
+                0,
+                relation,
+                strict = true,
             )
             val sweep = assertNotNull(DefinitionalSweep.fromSource(problem, listOf(hint)))
             val objective = assertNotNull(sweep.functionalObjective(LinearObjective(boolWeights = longArrayOf(1))))
@@ -184,7 +204,9 @@ class SourceDefinitionProjectionTest {
     @Test
     fun `Boolean literal polarity should survive native objective materialization`() {
         val problem = Problem(
-            1, 1, arrayOf(IntDomain(0, 1)),
+            1,
+            1,
+            arrayOf(IntDomain(0, 1)),
             arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0)),
         )
         val hint = DefinitionHint.BooleanValue(0, Lit.make(0, false))
@@ -235,7 +257,9 @@ class SourceDefinitionProjectionTest {
         var polls = 0
 
         val cancelled = DefinitionalSweep.fromSource(
-            program.problem, program.definitionHints, ExecutionControl { ++polls >= 2 },
+            program.problem,
+            program.definitionHints,
+            ExecutionControl { ++polls >= 2 },
         )
         val retry = DefinitionalSweep.fromSource(program.problem, program.definitionHints)
 
@@ -266,7 +290,9 @@ class SourceDefinitionProjectionTest {
         val hints = List(count) { k ->
             val output = count - k
             DefinitionHint.Plus(
-                output, DefinitionHint.Operand.Variable(output - 1), DefinitionHint.Operand.Constant(1),
+                output,
+                DefinitionHint.Operand.Variable(output - 1),
+                DefinitionHint.Operand.Constant(1),
             )
         }
         val sweep = assertNotNull(DefinitionalSweep.fromSource(problem, hints))

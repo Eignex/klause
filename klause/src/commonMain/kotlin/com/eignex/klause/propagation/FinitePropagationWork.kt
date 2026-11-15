@@ -100,11 +100,7 @@ internal class FiniteDomainCompletion(
     }
 }
 
-internal fun PropagationState.completeDomainMutation(
-    historyCount: Int,
-    history: (Int) -> Unit,
-    finish: () -> Unit,
-) {
+internal fun PropagationState.completeDomainMutation(historyCount: Int, history: (Int) -> Unit, finish: () -> Unit) {
     check(pendingFiniteMutation == null)
     if (!finiteMutationInterruptible) {
         repeat(historyCount, history)

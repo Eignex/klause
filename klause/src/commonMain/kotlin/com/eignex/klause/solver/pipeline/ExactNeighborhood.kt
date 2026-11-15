@@ -33,8 +33,12 @@ internal fun interface ExactNeighborhoodCompletion {
 
 internal fun interface ExactNeighborhoodProposal {
     fun propose(
-        centers: List<BigFraction>, bools: BooleanArray, count: Int, round: Long,
-        radius: BigFraction, cutoff: BigFraction?,
+        centers: List<BigFraction>,
+        bools: BooleanArray,
+        count: Int,
+        round: Long,
+        radius: BigFraction,
+        cutoff: BigFraction?,
     ): ExactNeighborhoodCondition
 }
 
@@ -60,8 +64,14 @@ internal class ExactNeighborhood(
     private val completionExhausted: () -> Boolean = { false },
     private val centerPreparationPending: () -> Boolean = { false },
     private val onProposalOperator: ((Int, Long) -> Unit)? = null,
-    private val reviseRefutedCenter: ((MutableList<BigFraction>, BooleanArray,
-        ExactNeighborhoodCondition, ExecutionControl) -> Unit)? = null,
+    private val reviseRefutedCenter: (
+        (
+            MutableList<BigFraction>,
+            BooleanArray,
+        ExactNeighborhoodCondition,
+            ExecutionControl,
+        ) -> Unit
+    )? = null,
 ) : AutoCloseable {
     private val random = Random(seed)
     private var centers = centers.toMutableList()
@@ -106,7 +116,8 @@ internal class ExactNeighborhood(
         check(!closed) { "neighborhood owner is closed" }
         val end = charged + minOf(allowance.coerceAtLeast(0), Long.MAX_VALUE - charged)
         while (!cancellation() && charged < end && moves < maximumMoves && charged < maximumInstructions &&
-            !improvementAllowanceSpent() && nodeBudget?.exhausted() != true && !completionExhausted()) {
+            !improvementAllowanceSpent() && nodeBudget?.exhausted() != true && !completionExhausted()
+        ) {
             if (!booleanCenterPrepared) {
                 val before = nativeWork()
                 val prepared = requireNotNull(prepareBooleanCenter)(cancellation)
@@ -127,8 +138,8 @@ internal class ExactNeighborhood(
                     if (cancellation() || charged >= end || charged >= maximumInstructions ||
                         nodeBudget?.exhausted() == true || completionExhausted()
                     ) {
-                            return searchAllowanceSpent()
-                        }
+                        return searchAllowanceSpent()
+                    }
                     rootBooleanValue(nextCenterBoolean)?.let { bools[nextCenterBoolean] = it }
                     nextCenterBoolean++
                     charge(1)
@@ -137,8 +148,8 @@ internal class ExactNeighborhood(
                     if (cancellation() || charged >= end || charged >= maximumInstructions ||
                         nodeBudget?.exhausted() == true || completionExhausted()
                     ) {
-                            return searchAllowanceSpent()
-                        }
+                        return searchAllowanceSpent()
+                    }
                     val coordinate = nextCenterCoordinate++
                     rootCoordinateValue.invoke(coordinate)?.let { centers[coordinate] = it }
                     charge(1)
@@ -148,11 +159,21 @@ internal class ExactNeighborhood(
             }
             val total = centers.size + boolCount
             val operator = pending?.first ?: operator()
-            val count = when (operator) { 0 -> 1; 1 -> maxOf(1, total / 2); else -> total }
+            val count = when (operator) {
+                0 -> 1;
+                1 -> maxOf(1, total / 2);
+                else -> total
+            }
             val before = nativeWork()
             if (pending == null) onProposalOperator?.invoke(operator, round)
-            val condition = pending?.second ?: proposal?.propose(centers, bools, count,
-                moves, radius, value) ?: run {
+            val condition = pending?.second ?: proposal?.propose(
+                centers,
+                bools,
+                count,
+                moves,
+                radius,
+                value,
+            ) ?: run {
                 val selected = if (moves == 0L) emptySet() else (0 until total).shuffled(random).take(count).toSet()
                 val lower = centers.indices.associateWith { if (it in selected) centers[it] - radius else centers[it] }
                 val upper = centers.indices.associateWith { if (it in selected) centers[it] + radius else centers[it] }
@@ -171,7 +192,8 @@ internal class ExactNeighborhood(
             if (incumbent != null) improvementMoves++
             moves++
             sink.ls.recordCompletion(
-                result is ExactNeighborhoodResult.Refuted, result is ExactNeighborhoodResult.Undecided,
+                result is ExactNeighborhoodResult.Refuted,
+                result is ExactNeighborhoodResult.Undecided,
             )
             val improved = result is ExactNeighborhoodResult.Witness && accept(result.sample, onIncumbent)
             if (adaptive) weights[operator] = weights[operator] * 0.8 + if (improved) 1.0 else 0.2

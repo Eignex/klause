@@ -47,7 +47,9 @@ private fun RootPrimalTargets.preferredValue(variable: VarRef): Long? {
     } ?: return null
     return if (variable is VarRef.Bool) {
         if (coordinate >= 0.5) 1L else 0L
-    } else round(coordinate).toLong()
+    } else {
+        round(coordinate).toLong()
+    }
 }
 
 private fun LpEngine.observeRootValuePreference(

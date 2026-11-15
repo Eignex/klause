@@ -64,8 +64,11 @@ internal fun prepareMixedEqualityRepair(
                 stop.charge(coefficients.size.toLong() * coefficients.size + 1L)
                 if (stop()) return null
                 val ordered = coefficients.keys.sorted()
-                pivots[pivot] = ExactRationalInequality(ordered.toIntArray(),
-                    ordered.map(coefficients::getValue), bound)
+                pivots[pivot] = ExactRationalInequality(
+                    ordered.toIntArray(),
+                    ordered.map(coefficients::getValue),
+                    bound,
+                )
                 onStage?.invoke("RECOVERY_EQUALITY_PIVOT")
                 break
             }
@@ -130,8 +133,11 @@ internal class MixedEqualityRepair(
                 bound = work.subtractProduct(bound, scale, equation.rhs) ?: return null
                 for (index in 1 until equation.columns.size) {
                     val column = equation.columns[index]
-                    val value = work.subtractProduct(coefficients[column] ?: BigFraction.ZERO,
-                        scale, equation.coefficients[index]) ?: return null
+                    val value = work.subtractProduct(
+                        coefficients[column] ?: BigFraction.ZERO,
+                        scale,
+                        equation.coefficients[index],
+                    ) ?: return null
                     if (value.isZero) coefficients.remove(column) else coefficients[column] = value
                 }
             }
@@ -151,8 +157,12 @@ internal class MixedEqualityRepair(
             stop.charge(coefficients.size.toLong() * coefficients.size + 1L)
             if (stop()) return null
             val ordered = coefficients.keys.sorted()
-            residual += ExactRationalInequality(ordered.toIntArray(), ordered.map(coefficients::getValue), bound,
-                row.strict)
+            residual += ExactRationalInequality(
+                ordered.toIntArray(),
+                ordered.map(coefficients::getValue),
+                bound,
+                row.strict,
+            )
         }
         val graph = RealDifferenceSystem.prepareRows(pivots.size, residual, stop)
         if (stop()) return null

@@ -29,23 +29,45 @@ class LpCutAttributionTest {
             addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 1L)
             addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
         }.build(Sense.MINIMIZE)
-        val map = CutSourceMap(problem, 0L, listOf(null), parentRows = mapOf(
+        val map = CutSourceMap(
+            problem, 0L, listOf(null),
+            parentRows = mapOf(
             0 to CutProvenance(problem, 0L, emptyList(), family = CutFamily.GOMORY),
             1 to CutProvenance(problem, 0L, emptyList(), family = CutFamily.MIR),
-        ))
-        val relaxation = LpRelaxation(model, intArrayOf(0), BooleanArray(1), 0L, intArrayOf(0), intArrayOf(),
-            sourceMap = map)
+        )
+        )
+        val relaxation = LpRelaxation(
+            model,
+            intArrayOf(0),
+            BooleanArray(1),
+            0L,
+            intArrayOf(0),
+            intArrayOf(),
+            sourceMap = map,
+        )
         val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(-1.0, 0.0)))
         assertEquals(BigFraction.ONE, certificate.exactObjectiveBound())
         val duals = doubleArrayOf(0.0, -1.0)
         val sink = SolveStatsSink(backend = "cut-attribution")
-        val lower = assertNotNull(certifiedTightObjectiveLowerBound(model, duals, certificate,
-            sink.lp.certificationObserver(), ProductionLpCertificationPolicy))
+        val lower = assertNotNull(
+            certifiedTightObjectiveLowerBound(
+            model,
+            duals,
+            certificate,
+            sink.lp.certificationObserver(),
+            ProductionLpCertificationPolicy,
+        )
+        )
         assertEquals(2.0, lower)
 
         LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)), LpParams(), sink).use { engine ->
-            engine.observeAcceptedCutBoundUse(relaxation, certificate, duals,
-                assertNotNull(BigFraction.ofDouble(lower)), "BOUND_PRUNE")
+            engine.observeAcceptedCutBoundUse(
+                relaxation,
+                certificate,
+                duals,
+                assertNotNull(BigFraction.ofDouble(lower)),
+                "BOUND_PRUNE",
+            )
         }
 
         val phases = sink.lp.snapshot().phases

@@ -86,7 +86,10 @@ internal class IntEventMachinery private constructor(
      *  so post-construction subscriptions go to the sparse [overflow]. */
     fun subscribeMidlife(packed: Int, fid: Int): Long {
         var work = 0L
-        val index = overflow ?: IntEventOverflow().also { overflow = it; work += 12L }
+        val index = overflow ?: IntEventOverflow().also {
+            overflow = it;
+            work += 12L
+        }
         return work + index.subscribe(packed, fid)
     }
 
@@ -183,7 +186,8 @@ internal class IntEventMachinery private constructor(
                 cursor[slot] = offsets[slot]
                 if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
             }
-            if (on) for (fid in projection.propagators.indices) {
+            if (on) {
+                for (fid in projection.propagators.indices) {
                 projection.propagators[fid].initialIntEventWatches?.let { watches ->
                     for (packed in watches) {
                         flat[cursor[packed]++] = fid
@@ -192,17 +196,19 @@ internal class IntEventMachinery private constructor(
                 }
                 if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
             }
+            }
             val dirtyVars = ArrayList<IntArrayList?>(if (deltaOn) problem.numFactors else 0)
             yield(null)
             val dirtyMark = ArrayList<IntHashSet?>(if (deltaOn) problem.numFactors else 0)
             yield(null)
-            if (deltaOn) repeat(problem.numFactors) {
+            if (deltaOn) {
+                repeat(problem.numFactors) {
                 dirtyVars.add(null)
                 dirtyMark.add(null)
                 if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
             }
+            }
             yield(IntEventMachinery(projection, false, offsets, flat, dirtyVars, dirtyMark))
         }
     }
-
 }

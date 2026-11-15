@@ -24,12 +24,22 @@ import kotlin.test.assertTrue
 class SourceExecutionControlsTest {
     @Test
     fun `incremental linear control should bind to ordinary source execution`() {
-        val parsed = SmtLib.parse("(declare-const x Real) (declare-const y Real) " +
-            "(assert (<= (+ (* 2 x) (* 3 y)) 1))")
-        val invocation = SourceSetup.prepare(SourceSetupRequest(parsed.source,
-            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
-        for ((options, expected) in listOf(emptyList<String>() to true,
-            listOf("open-linear-incremental=true") to true, listOf("open-linear-incremental=false") to false)) {
+        val parsed = SmtLib.parse(
+            "(declare-const x Real) (declare-const y Real) " +
+                "(assert (<= (+ (* 2 x) (* 3 y)) 1))",
+        )
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            parsed.source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
+        for ((options, expected) in listOf(
+            emptyList<String>() to true,
+            listOf("open-linear-incremental=true") to true,
+            listOf("open-linear-incremental=false") to false,
+        )) {
             val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
 
             assertEquals(expected, request.theory.openLinearIncremental)
@@ -38,35 +48,80 @@ class SourceExecutionControlsTest {
 
     @Test
     fun `ordinary source cut controls should configure companions without changing the finite recipe`() {
-        val source = LinearSourceProblem(listOf(
+        val source = LinearSourceProblem(
+            listOf(
             LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),
             LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
-        ), emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE))))
+        ),
+            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE)))
+        )
         for ((supplied, options, expected) in listOf(
             Triple(false, emptyList<String>(), listOf(true, false, false, false)),
             Triple(true, emptyList<String>(), listOf(true, false, false, false)),
-            Triple(false, listOf("source-cuts=false", "source-point-cuts=true", "source-aggregate-cuts=true",
-                "source-cut-branching=true"),
-                listOf(false, true, true, true)),
-            Triple(true, listOf("source-cuts=false", "source-point-cuts=true", "source-aggregate-cuts=true",
-                "source-cut-branching=true"),
-                listOf(false, true, true, true)),
+            Triple(
+                false,
+                listOf(
+                    "source-cuts=false",
+                    "source-point-cuts=true",
+                    "source-aggregate-cuts=true",
+                    "source-cut-branching=true",
+                ),
+                listOf(false, true, true, true),
+            ),
+            Triple(
+                true,
+                listOf(
+                    "source-cuts=false",
+                    "source-point-cuts=true",
+                    "source-aggregate-cuts=true",
+                    "source-cut-branching=true",
+                ),
+                listOf(false, true, true, true),
+            ),
         )) {
-            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-                ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
+            val invocation = SourceSetup.prepare(
+                SourceSetupRequest(
+                SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.MIXED,
+            )
+            )
             val executionOptions = ExecutionOptions.parse(options)
-            val request = SourceExecutionRequest(invocation, executionOptions, finiteRequest = if (supplied) {
-                { shape -> SourceExecutionPolicy().finiteRequest(shape, FiniteEngine.MIXED,
-                    executionOptions = executionOptions) }
-            } else null)
+            val request = SourceExecutionRequest(
+                invocation, executionOptions,
+                finiteRequest = if (supplied) {
+                { shape ->
+                    SourceExecutionPolicy().finiteRequest(
+                        shape,
+                        FiniteEngine.MIXED,
+                        executionOptions = executionOptions,
+                    )
+                }
+            } else {
+                null
+            }
+            )
             val finite = assertNotNull(request.finiteRequest).invoke(invocation.finiteShape())
 
-            val scenario = buildPortfolioScenario(finite.executionOptions.reader(), finite.randomSeed,
-                finite.cores, Kind.COP, EngineMix.MIXED, finite.defaultArms)
+            val scenario = buildPortfolioScenario(
+                finite.executionOptions.reader(),
+                finite.randomSeed,
+                finite.cores,
+                Kind.COP,
+                EngineMix.MIXED,
+                finite.defaultArms,
+            )
 
             assertTrue(invocation.requestsFiniteNumericalCompanions)
-            assertEquals(expected, listOf(request.theory.sourceCuts, request.theory.sourcePointCuts,
-                request.theory.sourceAggregateCuts, request.theory.sourceCutBranching))
+            assertEquals(
+                expected,
+                listOf(
+                request.theory.sourceCuts,
+                request.theory.sourcePointCuts,
+                request.theory.sourceAggregateCuts,
+                request.theory.sourceCutBranching,
+            )
+            )
             assertFalse(scenario.explicitArms)
             assertFalse(scenario.companionIntegers)
             assertEquals(4_000L, scenario.companionActiveMillis)
@@ -81,15 +136,24 @@ class SourceExecutionControlsTest {
                 for (applicationFactory in listOf(false, true)) {
                     val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY, engine))
                     val options = ExecutionOptions.parse(listOf("open-linear-incremental=$enabled"))
-                    val request = SourceExecutionRequest(invocation, options,
-                        finiteRequest = if (applicationFactory) { shape ->
+                    val request = SourceExecutionRequest(
+                        invocation,
+                        options,
+                        finiteRequest = if (applicationFactory) {
+                            { shape ->
                             SourceExecutionPolicy().finiteRequest(shape, engine, executionOptions = options)
-                        } else null)
+                        }
+                        } else {
+                            null
+                        },
+                    )
 
                     val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(request))
 
-                    assertEquals(FiniteSolveVerdict.SAT,
-                        assertIs<FiniteSolveOutcome.Completed>(result.result.outcome).verdict)
+                    assertEquals(
+                        FiniteSolveVerdict.SAT,
+                        assertIs<FiniteSolveOutcome.Completed>(result.result.outcome).verdict,
+                    )
                 }
             }
         }
@@ -97,10 +161,13 @@ class SourceExecutionControlsTest {
 
     @Test
     fun `finite source execution should reject malformed incremental linear controls`() {
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
             SmtLib.parse("(declare-const b Bool) (assert b)").source,
-            ExecutionOperation.SATISFY, FiniteEngine.MIXED,
-        ))
+            ExecutionOperation.SATISFY,
+            FiniteEngine.MIXED,
+        )
+        )
 
         val failure = assertFailsWith<PipelineConfigException> {
             SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf("open-linear-incremental=invalid")))
@@ -111,16 +178,28 @@ class SourceExecutionControlsTest {
 
     @Test
     fun `advisory center progress should require explicit source opt in`() {
-        val source = LinearSourceProblem(listOf(
+        val source = LinearSourceProblem(
+            listOf(
             LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),
             LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
-        ), emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE))))
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
+        ),
+            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE)))
+        )
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.MIXED,
+        )
+        )
 
         for (enabled in listOf(false, true)) {
-            val options = ExecutionOptions.parse(listOf("source-incumbent-completion=true",
-                "source-refutation-center-step=$enabled"))
+            val options = ExecutionOptions.parse(
+                listOf(
+                "source-incumbent-completion=true",
+                "source-refutation-center-step=$enabled",
+            )
+            )
             val request = SourceExecutionRequest(invocation, options)
             assertEquals(enabled, request.theory.sourceRefutationCenterStep)
         }
@@ -134,15 +213,25 @@ class SourceExecutionControlsTest {
 
     @Test
     fun `ordinary finite source execution should bind advisory completion to its companions`() {
-        val source = LinearSourceProblem(listOf(
+        val source = LinearSourceProblem(
+            listOf(
             LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),
             LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
-        ), emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE))))
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
+        ),
+            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE)))
+        )
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.MIXED,
+        )
+        )
 
-        val request = SourceExecutionRequest(invocation,
-            ExecutionOptions.parse(listOf("source-incumbent-completion=true")))
+        val request = SourceExecutionRequest(
+            invocation,
+            ExecutionOptions.parse(listOf("source-incumbent-completion=true")),
+        )
 
         assertTrue(invocation.requestsFiniteNumericalCompanions)
         assertTrue(request.theory.sourceIncumbentCompletion)
@@ -151,11 +240,14 @@ class SourceExecutionControlsTest {
     @Test
     fun `advisory incumbent completion should require explicit opt in`() {
         val source = SourceAttachment(
-            LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()), ProblemSettings(),
+            LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()),
+            ProblemSettings(),
         )
         val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY, FiniteEngine.FIXED))
-        for ((options, expected) in listOf(emptyList<String>() to false,
-            listOf("source-incumbent-completion=true") to true)) {
+        for ((options, expected) in listOf(
+            emptyList<String>() to false,
+            listOf("source-incumbent-completion=true") to true,
+        )) {
             val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
 
             assertEquals(expected, request.theory.sourceIncumbentCompletion)
@@ -164,15 +256,24 @@ class SourceExecutionControlsTest {
 
     @Test
     fun `pure real sources should reject integer residue authority`() {
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            SmtLib.parse("(declare-const x Real) (declare-const y Real) " +
-                "(assert (= (+ (* x x) (* y y)) 3))").source,
-            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SmtLib.parse(
+                "(declare-const x Real) (declare-const y Real) " +
+                    "(assert (= (+ (* x x) (* y y)) 3))",
+            ).source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
 
         val failure = assertFailsWith<PipelineConfigException> {
-            SourceSetup.execute(SourceExecutionRequest(invocation,
-                ExecutionOptions.parse(listOf("nia-residues=true"))))
+            SourceSetup.execute(
+                SourceExecutionRequest(
+                invocation,
+                ExecutionOptions.parse(listOf("nia-residues=true")),
+            )
+            )
         }
 
         assertTrue("nia-residues" in assertNotNull(failure.message))
@@ -181,13 +282,20 @@ class SourceExecutionControlsTest {
     @Test
     fun `numerical refutation resolution should require explicit opt in`() {
         val source = SourceAttachment(
-            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
+            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()),
+            ProblemSettings(),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
-        ))
-        for ((options, expected) in listOf(emptyList<String>() to false,
-            listOf("source-refutation-resolution=true") to true)) {
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.FIXED,
+        )
+        )
+        for ((options, expected) in listOf(
+            emptyList<String>() to false,
+            listOf("source-refutation-resolution=true") to true,
+        )) {
             val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
 
             assertEquals(expected, request.theory.sourceRefutationResolution)
@@ -197,13 +305,20 @@ class SourceExecutionControlsTest {
     @Test
     fun `numerical unit refutations should require explicit opt in`() {
         val source = SourceAttachment(
-            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
+            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()),
+            ProblemSettings(),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
-        ))
-        for ((options, expected) in listOf(emptyList<String>() to false,
-            listOf("source-refutation-propagation=true") to true)) {
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.FIXED,
+        )
+        )
+        for ((options, expected) in listOf(
+            emptyList<String>() to false,
+            listOf("source-refutation-propagation=true") to true,
+        )) {
             val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
 
             assertEquals(expected, request.theory.sourceRefutationPropagation)
@@ -213,7 +328,8 @@ class SourceExecutionControlsTest {
     @Test
     fun `point cut selection should bind to open linear execution`() {
         val source = SourceAttachment(
-            LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()), ProblemSettings(),
+            LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()),
+            ProblemSettings(),
         )
         val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY, FiniteEngine.FIXED))
 
@@ -225,13 +341,21 @@ class SourceExecutionControlsTest {
     @Test
     fun `cut support branching should bind to open linear execution only when enabled`() {
         val source = SourceAttachment(
-            LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()), ProblemSettings(),
+            LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()),
+            ProblemSettings(),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
-        ))
-        for ((options, expected) in listOf(emptyList<String>() to false,
-            listOf("source-cut-branching=true") to true, listOf("source-cut-branching=false") to false)) {
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.FIXED,
+        )
+        )
+        for ((options, expected) in listOf(
+            emptyList<String>() to false,
+            listOf("source-cut-branching=true") to true,
+            listOf("source-cut-branching=false") to false,
+        )) {
             val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
 
             assertEquals(expected, request.theory.sourceCutBranching)
@@ -241,13 +365,20 @@ class SourceExecutionControlsTest {
     @Test
     fun `bounded source aggregation should require explicit opt in`() {
         val source = SourceAttachment(
-            LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()), ProblemSettings(),
+            LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()),
+            ProblemSettings(),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
-        ))
-        for ((options, expected) in listOf(emptyList<String>() to false,
-            listOf("source-aggregate-cuts=true") to true)) {
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.FIXED,
+        )
+        )
+        for ((options, expected) in listOf(
+            emptyList<String>() to false,
+            listOf("source-aggregate-cuts=true") to true,
+        )) {
             val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
 
             assertEquals(expected, request.theory.sourceAggregateCuts)
@@ -257,11 +388,16 @@ class SourceExecutionControlsTest {
     @Test
     fun `source cut control should bind to open linear execution`() {
         val source = SourceAttachment(
-            LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()), ProblemSettings(),
+            LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()),
+            ProblemSettings(),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.FIXED,
+        )
+        )
 
         val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf("source-cuts=false")))
 
@@ -276,14 +412,19 @@ class SourceExecutionControlsTest {
             "(declare-const x Int) (assert (= (* x x) 2))",
             "(declare-const x Real) (assert (= (sin x) 0))",
         ).map { SmtLib.parse(it).source } + SourceAttachment(
-            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
+            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()),
+            ProblemSettings(),
         )
         val budget = NodeBudget(3)
         budget.spend()
         for (source in sources) {
-            val invocation = SourceSetup.prepare(SourceSetupRequest(
-                source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-            ))
+            val invocation = SourceSetup.prepare(
+                SourceSetupRequest(
+                source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            )
+            )
 
             val request = SourceExecutionRequest(invocation, ExecutionOptions(), nodeBudget = budget)
 
@@ -300,13 +441,23 @@ class SourceExecutionControlsTest {
     @Test
     fun `source options should keep node and native arithmetic allowances independent`() {
         val source = SmtLib.parse("(declare-const x Real) (assert (> x 0))").source
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
 
-        val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf(
-            "node-limit=0", "open-work-limit=unlimited",
-        )))
+        val request = SourceExecutionRequest(
+            invocation,
+            ExecutionOptions.parse(
+                listOf(
+            "node-limit=0",
+            "open-work-limit=unlimited",
+        )
+            )
+        )
         val result = assertIs<SourceExecutionResult.Linear>(SourceSetup.execute(request))
 
         assertEquals(0L, assertNotNull(request.nodeBudget).limit)
@@ -318,13 +469,25 @@ class SourceExecutionControlsTest {
     @Test
     fun `native source auto limits should use the parameter defaults`() {
         val source = SmtLib.parse("(declare-const x Int) (assert (= (* x x) 2))").source
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
 
-        val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf(
-            "nia-candidates=auto", "nia-moves=auto", "nra-dense-coefficients=auto", "nra-matrix-cells=auto",
-        )))
+        val request = SourceExecutionRequest(
+            invocation,
+            ExecutionOptions.parse(
+                listOf(
+            "nia-candidates=auto",
+            "nia-moves=auto",
+            "nra-dense-coefficients=auto",
+            "nra-matrix-cells=auto",
+        )
+            )
+        )
 
         val integer = assertNotNull(request.nonlinearInteger)
         assertEquals(NonlinearIntegerTheoryParams().maximumCandidates, integer.maximumCandidates)
@@ -336,14 +499,26 @@ class SourceExecutionControlsTest {
     @Test
     fun `native source unlimited limits should preserve their native sentinels`() {
         val source = SmtLib.parse("(declare-const x Int) (assert (= (* x x) 2))").source
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
 
-        val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf(
-            "nia-candidates=unlimited", "nia-moves=unlimited", "nra-work-limit=unlimited",
-            "nra-dense-coefficients=unlimited", "nra-matrix-cells=unlimited",
-        )))
+        val request = SourceExecutionRequest(
+            invocation,
+            ExecutionOptions.parse(
+                listOf(
+            "nia-candidates=unlimited",
+            "nia-moves=unlimited",
+            "nra-work-limit=unlimited",
+            "nra-dense-coefficients=unlimited",
+            "nra-matrix-cells=unlimited",
+        )
+            )
+        )
 
         assertEquals(Long.MAX_VALUE, assertNotNull(request.nonlinearInteger).maximumCandidates)
         assertEquals(Long.MAX_VALUE, request.nonlinearInteger.maximumMoves)
@@ -355,12 +530,20 @@ class SourceExecutionControlsTest {
     @Test
     fun `source native zero work should stop arithmetic without spending the node ledger`() {
         val source = SmtLib.parse("(declare-const x Real) (assert (= (* x x) 2))").source
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
-        val request = SourceExecutionRequest(invocation, ExecutionOptions(
-            ExecutionOption.nodeLimit(7L), ExecutionOption.nraWorkLimit(0L),
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
+        val request = SourceExecutionRequest(
+            invocation,
+            ExecutionOptions(
+            ExecutionOption.nodeLimit(7L),
+            ExecutionOption.nraWorkLimit(0L),
+        )
+        )
 
         val execution = assertIs<SourceExecutionResult.Polynomial>(SourceSetup.execute(request)).result
 
@@ -376,9 +559,13 @@ class SourceExecutionControlsTest {
             Triple(ExecutionOptions(), 19L, 19L),
             Triple(ExecutionOptions(ExecutionOption.seed(-7L)), 19L, -7L),
         )) {
-            val invocation = SourceSetup.prepare(SourceSetupRequest(
-                source, ExecutionOperation.SATISFY, FiniteEngine.MIXED,
-            ))
+            val invocation = SourceSetup.prepare(
+                SourceSetupRequest(
+                source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.MIXED,
+            )
+            )
 
             val request = SourceExecutionRequest(invocation, options, randomSeed = fallback)
 
@@ -391,9 +578,13 @@ class SourceExecutionControlsTest {
     @Test
     fun `source options should reject conflicting containing allowances`() {
         val source = SmtLib.parse("(declare-const x Real) (assert (> x 0))").source
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
         val budget = NodeBudget(3)
         for (options in listOf(
             ExecutionOptions(ExecutionOption.nodeLimit(2L)),
@@ -410,13 +601,20 @@ class SourceExecutionControlsTest {
     @Test
     fun `a finite application factory should not replace the containing node ledger`() {
         val source = SmtLib.parse("(declare-const b Bool) (assert b)").source
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
         val foreign = SourceExecutionRequest(invocation, ExecutionOptions(), nodeBudget = NodeBudget(4))
         val budget = NodeBudget(4)
         val request = SourceExecutionRequest(
-            invocation, ExecutionOptions(), nodeBudget = budget, finiteRequest = foreign.finiteRequest,
+            invocation,
+            ExecutionOptions(),
+            nodeBudget = budget,
+            finiteRequest = foreign.finiteRequest,
         )
 
         assertFailsWith<IllegalArgumentException> { SourceSetup.execute(request) }
@@ -427,9 +625,13 @@ class SourceExecutionControlsTest {
     fun `function source auto work should retain the function parameter default`() {
         val source = SmtLib.parse("(declare-const x Real) (assert (= (sin x) 0))").source
         for ((raw, expected) in listOf("auto" to TranscendentalTheoryParams().maximumWork, "unlimited" to null)) {
-            val invocation = SourceSetup.prepare(SourceSetupRequest(
-                source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-            ))
+            val invocation = SourceSetup.prepare(
+                SourceSetupRequest(
+                source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            )
+            )
 
             val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf("nra-work-limit=$raw")))
 
@@ -446,10 +648,13 @@ class SourceExecutionControlsTest {
             "(declare-const x Int) (assert (= (* x x) 2))",
             "(declare-const x Real) (assert (= (sin x) 0))",
         )) {
-            val invocation = SourceSetup.prepare(SourceSetupRequest(
+            val invocation = SourceSetup.prepare(
+                SourceSetupRequest(
                 SmtLib.parse(text).source,
-            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-            ))
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            )
+            )
 
             val failure = assertFailsWith<PipelineConfigException> {
                 SourceSetup.execute(SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf("unknown=1"))))
@@ -479,14 +684,22 @@ class SourceExecutionControlsTest {
 
     @Test
     fun `polynomial strategy controls should reach the finite workers`() {
-        val options = ExecutionOptions.parse(listOf(
-            "max-decisions=3", "max-flips=7", "max-instructions=11", "alns-iterations=2",
-        ))
+        val options = ExecutionOptions.parse(
+            listOf(
+            "max-decisions=3",
+            "max-flips=7",
+            "max-instructions=11",
+            "alns-iterations=2",
+        )
+        )
 
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
             SmtLib.parse("(declare-const x Real) (assert (= (* x x) 2))").source,
-            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
         val params = SourceExecutionRequest(invocation, options, randomSeed = 17).polynomial.strategy
 
         assertEquals(17L, params.backtrack.randomSeed)
@@ -501,10 +714,13 @@ class SourceExecutionControlsTest {
     fun `nonlinear source controls should retain explicit candidate and move allowances`() {
         val options = ExecutionOptions.parse(listOf("nia-candidates=7", "nia-moves=11", "nra-work-limit=128"))
 
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
             SmtLib.parse("(declare-const x Int) (assert (= (* x x) 2))").source,
-            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
         val params = assertNotNull(SourceExecutionRequest(invocation, options).nonlinearInteger)
 
         assertEquals(7L, params.maximumCandidates)
@@ -515,12 +731,20 @@ class SourceExecutionControlsTest {
     @Test
     fun `nonlinear cell controls should retain independent producer and consumer switches`() {
         for ((reuse, steering) in listOf(false to false, true to false, true to true)) {
-            val options = ExecutionOptions.parse(listOf("nia-cell-refinement=true", "nia-cell-reuse=$reuse",
-                "nia-cell-steering=$steering"))
-            val invocation = SourceSetup.prepare(SourceSetupRequest(
+            val options = ExecutionOptions.parse(
+                listOf(
+                "nia-cell-refinement=true",
+                "nia-cell-reuse=$reuse",
+                "nia-cell-steering=$steering",
+            )
+            )
+            val invocation = SourceSetup.prepare(
+                SourceSetupRequest(
                 SmtLib.parse("(declare-const x Int) (assert (= (* x x) 2))").source,
-                ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-            ))
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            )
+            )
 
             val params = assertNotNull(SourceExecutionRequest(invocation, options).nonlinearInteger)
 
@@ -533,10 +757,13 @@ class SourceExecutionControlsTest {
     @Test
     fun `nonlinear root admission should stay disabled unless requested`() {
         for ((arguments, expected) in listOf(emptyList<String>() to false, listOf("nia-integer-roots=true") to true)) {
-            val invocation = SourceSetup.prepare(SourceSetupRequest(
+            val invocation = SourceSetup.prepare(
+                SourceSetupRequest(
                 SmtLib.parse("(declare-const x Int) (assert (= (* x x) 2))").source,
-                ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-            ))
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            )
+            )
 
             val params = assertNotNull(
                 SourceExecutionRequest(invocation, ExecutionOptions.parse(arguments)).nonlinearInteger,
@@ -551,10 +778,13 @@ class SourceExecutionControlsTest {
     fun `polynomial finite workers should share one generic node allowance`() {
         val options = ExecutionOptions.parse(listOf("node-limit=7"))
 
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
             SmtLib.parse("(declare-const x Int) (assert (= (* x x) 2))").source,
-            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
         val request = SourceExecutionRequest(invocation, options)
 
         assertEquals(7L, request.nodeBudget?.limit)

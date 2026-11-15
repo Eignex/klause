@@ -14,15 +14,10 @@ import com.eignex.klause.model.IntCmpOp
 fun reifiedIntCompare(auxBoolVar: Int, intVar: Int, op: IntCmpOp, bound: Int): ReifiedLinear {
     val (linOp, adjustedBound) = when (op) {
         IntCmpOp.LE -> LinearOp.LE to bound
-
         IntCmpOp.LT -> LinearOp.LE to checkedBound(bound.toLong() - 1, op, bound)
-
         IntCmpOp.GE -> LinearOp.GE to bound
-
         IntCmpOp.GT -> LinearOp.GE to checkedBound(bound.toLong() + 1, op, bound)
-
         IntCmpOp.EQ -> LinearOp.EQ to bound
-
         IntCmpOp.NE -> LinearOp.NE to bound
     }
     return ReifiedLinear(auxBoolVar, intArrayOf(1), intArrayOf(intVar), linOp, adjustedBound)

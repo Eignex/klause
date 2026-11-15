@@ -37,7 +37,10 @@ class PartialLinearImplicationTest {
         session.push(SearchDecision.Bool(Lit.make(1, true)))
         val comparison = ExactComparison(
             mapOf(0 to BigFraction.ofLong(2), 1 to BigFraction.ofLong(-3)),
-            BigFraction.ofLong(-2), LinearOp.LE, strict = false, hasReals = true,
+            BigFraction.ofLong(-2),
+            LinearOp.LE,
+            strict = false,
+            hasReals = true,
         )
 
         val implication = partialLinearImplication(comparison, { column, upper ->
@@ -49,8 +52,10 @@ class PartialLinearImplicationTest {
         }, ExecutionControl.Never)
 
         assertTrue(assertNotNull(implication).truth)
-        assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)),
-            assertNotNull(session.explainAtoms(implication.premise)).literals.toSet())
+        assertEquals(
+            setOf(Lit.make(0, false), Lit.make(1, false)),
+            assertNotNull(session.explainAtoms(implication.premise)).literals.toSet(),
+        )
     }
 
     @Test
@@ -102,9 +107,11 @@ class PartialLinearImplicationTest {
         val session = SearchSession(emptyList())
         session.initialize()
         session.push(SearchDecision.Bool(Lit.make(0, true)))
-        val implication = assertNotNull(partialLinearImplication(unary(LinearOp.LE), { _, upper ->
+        val implication = assertNotNull(
+            partialLinearImplication(unary(LinearOp.LE), { _, upper ->
             if (upper) ExplainedLinearBound(BigFraction.ZERO, false, premise(0)) else null
-        }, ExecutionControl.Never))
+        }, ExecutionControl.Never)
+        )
         assertNotNull(session.explainAtoms(implication.premise))
 
         session.popTo(0)
@@ -126,8 +133,13 @@ class PartialLinearImplicationTest {
     @Test
     fun `rational coefficient products preserve an exact comparison endpoint`() {
         val half = BigFraction.ofLong(2).reciprocal()
-        val comparison = ExactComparison(mapOf(0 to BigFraction.ofLong(3).reciprocal()), half,
-            LinearOp.LE, strict = false, hasReals = true)
+        val comparison = ExactComparison(
+            mapOf(0 to BigFraction.ofLong(3).reciprocal()),
+            half,
+            LinearOp.LE,
+            strict = false,
+            hasReals = true,
+        )
 
         val implication = partialLinearImplication(comparison, { _, upper ->
             if (upper) ExplainedLinearBound(BigFraction.ofLong(3) * half, false, axiom) else null
@@ -137,7 +149,11 @@ class PartialLinearImplicationTest {
     }
 
     private fun unary(relation: LinearOp, strict: Boolean = false): ExactComparison = ExactComparison(
-        mapOf(0 to BigFraction.ONE), BigFraction.ONE, relation, strict, hasReals = true,
+        mapOf(0 to BigFraction.ONE),
+        BigFraction.ONE,
+        relation,
+        strict,
+        hasReals = true,
     )
 
     private fun premise(variable: Int): SearchAtomPremise =

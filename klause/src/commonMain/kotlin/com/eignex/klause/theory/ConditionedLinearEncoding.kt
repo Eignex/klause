@@ -84,19 +84,34 @@ internal fun PreparedFactorProjections.installConditionedLinearFactor(
             if (fixed == null) pins.remove(id) else pins[id] = fixed
             return true
         }
-        val relations = installLinearFactor(index, EncodingTarget.LINEAR, pins, booleanPins,
-            cancellation, allocator, onDecline) ?: return false
-        val guards = domains.map { (id, _) -> ExactSearchRow.of(intArrayOf(Term.ofIntVar(id.index)),
-            listOf(BigFraction.ONE), LinearOp.NE, BigFraction.of(checkNotNull(pins[id]), BIG_ONE)) }
+        val relations = installLinearFactor(
+            index,
+            EncodingTarget.LINEAR,
+            pins,
+            booleanPins,
+            cancellation,
+            allocator,
+            onDecline,
+        ) ?: return false
+        val guards = domains.map { (id, _) ->
+            ExactSearchRow.of(
+                intArrayOf(Term.ofIntVar(id.index)),
+                listOf(BigFraction.ONE),
+                LinearOp.NE,
+                BigFraction.of(checkNotNull(pins[id]), BIG_ONE),
+            )
+        }
         for (relation in relations) {
             lowering.checkpoint()
             val clauses = lowering.or(listOf(listOf(guards), lowering.relation(relation.linearForm)))
             val previous = relation.attribution
-            val attribution = EncodingAttribution(previous.sourceFactorIndex,
+            val attribution = EncodingAttribution(
+                previous.sourceFactorIndex,
                 previous.booleans, (previous.integers + domains.map { it.first }).distinct(), previous.reals,
                 auxiliaries = previous.auxiliaries, integerConditions = integerPins,
                 booleanConditions = booleanPins, affineAuxiliaries = previous.affineAuxiliaries,
-                linearGuards = previous.linearGuards)
+                linearGuards = previous.linearGuards,
+            )
             for (form in lowering.forms(clauses)) result += EncodedTheoryFactor(source, form, attribution)
         }
         return true

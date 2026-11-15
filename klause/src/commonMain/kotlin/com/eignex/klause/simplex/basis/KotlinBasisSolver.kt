@@ -41,8 +41,10 @@ internal class KotlinBasisSolver private constructor(
         denseDimensionLimit: Int = 6,
         denseMinimumDensity: Double = 0.5,
         initialOrder: SymbolicLu? = null,
-    ) : this(BasisSource(matrix), policy, updateLimit, fillFactor, densityThreshold, reusePivotOrder,
-        denseDimensionLimit, denseMinimumDensity, initialOrder)
+    ) : this(
+        BasisSource(matrix), policy, updateLimit, fillFactor, densityThreshold, reusePivotOrder,
+        denseDimensionLimit, denseMinimumDensity, initialOrder,
+    )
 
     private val sourcePointers = ownedSource.pointers
     private val sourceRows = ownedSource.rows
@@ -148,7 +150,8 @@ internal class KotlinBasisSolver private constructor(
         }
         var dense: LuBuildResult.Rejected? = null
         if (policy.maxEntries == Long.MAX_VALUE && policy.maxWork == Long.MAX_VALUE &&
-            n in 1..denseDimensionLimit && entries > n && entries.toDouble() >= denseMinimumDensity * n * n) {
+            n in 1..denseDimensionLimit && entries > n && entries.toDouble() >= denseMinimumDensity * n * n
+        ) {
             val owner = denseBuilder ?: DenseBasisFactors(source).also {
                 denseBuilder = it
                 selectionUnits += n.toLong() * n + 3L * n
@@ -156,14 +159,18 @@ internal class KotlinBasisSolver private constructor(
             val result = owner.build(basicIndex, policy)
             if (result is LuBuildResult.Built) {
                 return LuBuildResult.Built(
-                    result.factors, result.work, result.report.copy(selectionUnits = selectionUnits),
+                    result.factors,
+                    result.work,
+                    result.report.copy(selectionUnits = selectionUnits),
                 )
             }
             dense = result as LuBuildResult.Rejected
         }
         val sparse = builder.build(basicIndex, IntArray(n) { -1 }, policy, proposedOrder)
         val report = sparse.report.copy(
-            denseRejection = dense?.reason, denseRejectedWork = dense?.work, selectionUnits = selectionUnits,
+            denseRejection = dense?.reason,
+            denseRejectedWork = dense?.work,
+            selectionUnits = selectionUnits,
         )
         return when (sparse) {
             is LuBuildResult.Built -> LuBuildResult.Built(sparse.factors, sparse.work, report)
@@ -608,25 +615,25 @@ internal class KotlinBasisSolver private constructor(
             2L * (observed.factors.lower.nnz.toLong() + observed.factors.upper.nnz) +
             4L * observed.ft.updateCount + 64L
 
-        override fun create(
-            columns: IntArray,
-            unitRows: IntArray,
-            policy: LuPivotPolicy,
-            work: Long,
-        ): BasisSolver? {
+        override fun create(columns: IntArray, unitRows: IntArray, policy: LuPivotPolicy, work: Long): BasisSolver? {
             fun valid(): Boolean = !policy.cancelled() && !closed && !singular && !repairActive &&
                 generation == version && cache === observed
             if (work < additionalWork || policy.maxEntries < entries || !valid()) return null
             if (!columns.contentEquals(this@KotlinBasisSolver.columns) ||
                 !unitRows.contentEquals(this@KotlinBasisSolver.unitRows)
-            ) return null
-            val copied = KotlinBasisSolver(ownedSource,
+            ) {
+                return null
+            }
+            val copied = KotlinBasisSolver(
+                ownedSource,
                 this@KotlinBasisSolver.policy.copy(
                     maxEntries = minOf(this@KotlinBasisSolver.policy.maxEntries, policy.maxEntries),
                     maxWork = minOf(this@KotlinBasisSolver.policy.maxWork, policy.maxWork),
-                    cancelled = policy.cancelled),
+                    cancelled = policy.cancelled,
+                ),
                 updateLimit, fillFactor, densityThreshold, reusePivotOrder, denseDimensionLimit, denseMinimumDensity,
-                retainedBuilder = builder.fork())
+                retainedBuilder = builder.fork(),
+            )
             var published = false
             try {
                 val factors = observed.factors

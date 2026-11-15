@@ -112,7 +112,9 @@ class SymmetryBreakingTest {
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 2) }, listOf(AllDifferent(intArrayOf(0, 2)))).bake()
 
         val result = Presolver.run(
-            problem, PresolveConfig.parse("off,+symmetry,+value-precede"), PresolveContext(solutionSetSensitive = true),
+            problem,
+            PresolveConfig.parse("off,+symmetry,+value-precede"),
+            PresolveContext(solutionSetSensitive = true),
         )
 
         assertTrue(result.passesFired.isEmpty())
@@ -136,9 +138,11 @@ class SymmetryBreakingTest {
         assertTrue(delta.addedFactors.any { it is SymmetryHandling })
         assertTrue(delta.addedFactors.any { it is Linear })
         assertTrue(delta.addedFactors.any { it is Clause })
-        assertTrue(delta.addedFactors.all { factor ->
+        assertTrue(
+            delta.addedFactors.all { factor ->
             factor.intVars.all { it == 1 || it == 3 } && factor.boolVars.all { it == 1 || it == 3 }
-        })
+        }
+        )
     }
 
     @Test
@@ -173,7 +177,8 @@ class SymmetryBreakingTest {
             assertEquals(24, original.size)
             assertEquals(4, representatives.size)
             assertEquals(
-                original.map(objective::evaluateLong).toSet(), representatives.map(objective::evaluateLong).toSet(),
+                original.map(objective::evaluateLong).toSet(),
+                representatives.map(objective::evaluateLong).toSet(),
             )
             assertTrue(delta.addedFactors.none { it is ValuePrecede })
         }
@@ -181,10 +186,12 @@ class SymmetryBreakingTest {
 
     @Test
     fun `objective symmetry should admit the Latin transpose without scalar pair orders`() {
-        val factors = (0 until 4).flatMap { i -> listOf(
-            AllDifferent(IntArray(4) { j -> 4 * i + j }),
-            AllDifferent(IntArray(4) { j -> 4 * j + i }),
-        ) }
+        val factors = (0 until 4).flatMap { i ->
+            listOf(
+                AllDifferent(IntArray(4) { j -> 4 * i + j }),
+                AllDifferent(IntArray(4) { j -> 4 * j + i }),
+            )
+        }
         val problem = Problem(0, 16, Array(16) { IntDomain(0, 3) }, factors).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(8, 1, 1, 1, 1, 4, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1))
         val context = PresolveContext.of(objective, transformObjective = true)
@@ -197,7 +204,10 @@ class SymmetryBreakingTest {
         assertEquals(1, delta.addedFactors.size)
         val point = longArrayOf(0, 1, 2, 3, 2, 3, 0, 1, 1, 2, 3, 0, 3, 0, 1, 2)
         val image = LongArray(16) { point[transpose[it]] }
-        val singlePair = point.copyOf().apply { this[1] = point[4]; this[4] = point[1] }
+        val singlePair = point.copyOf().apply {
+            this[1] = point[4];
+            this[4] = point[1]
+        }
         assertFalse(isFeasible(problem, BooleanArray(0), singlePair))
         assertTrue(isFeasible(problem, BooleanArray(0), image))
         val reduced = problem.withPassDelta(delta, BakeConfig.NONE)
@@ -211,7 +221,8 @@ class SymmetryBreakingTest {
         for (weight in listOf(-3L, 3L)) {
             val objective = LinearObjective(boolWeights = LongArray(3) { weight }, constant = -5)
             val delta = PresolvePass.BREAK_OBJECTIVE_SYMMETRIES.applyFinite(
-                problem, PresolveContext.of(objective, transformObjective = true),
+                problem,
+                PresolveContext.of(objective, transformObjective = true),
             )
             val original = BacktrackSolver(problem).enumerate().toList()
             val representatives = BacktrackSolver(problem.withPassDelta(delta, BakeConfig.NONE)).enumerate().toList()
@@ -219,7 +230,8 @@ class SymmetryBreakingTest {
             assertEquals(7, original.size)
             assertEquals(3, representatives.size)
             assertEquals(
-                original.map(objective::evaluateLong).toSet(), representatives.map(objective::evaluateLong).toSet(),
+                original.map(objective::evaluateLong).toSet(),
+                representatives.map(objective::evaluateLong).toSet(),
             )
         }
     }
@@ -245,12 +257,17 @@ class SymmetryBreakingTest {
             PresolveContext.of(objective),
             exact.copy(solutionSetSensitive = true),
             exact.copy(modelBreaksSymmetry = true),
-        )) assertTrue(pass.applyFinite(problem, context).isEmpty)
+        )) {
+            assertTrue(pass.applyFinite(problem, context).isEmpty)
+        }
         assertFalse(PresolveConfig.DEFAULT.resolved(pass, exact))
         assertFalse(PresolveConfig.parse("default,+objective-symmetry").forLocalSearch().resolved(pass, exact))
-        assertFalse(PresolveConfig.parse("off,+objective-symmetry").resolved(
-            pass, exact.copy(solutionSetSensitive = true),
-        ))
+        assertFalse(
+            PresolveConfig.parse("off,+objective-symmetry").resolved(
+            pass,
+            exact.copy(solutionSetSensitive = true),
+        )
+        )
     }
 
     @Test
@@ -270,7 +287,9 @@ class SymmetryBreakingTest {
     @Test
     fun `value protection should follow the exact objective rather than stale support metadata`() {
         val problem = Problem(
-            0, 3, arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(5, 7)),
+            0,
+            3,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(5, 7)),
             listOf(AllDifferent(intArrayOf(0, 1)), Table(intArrayOf(2), longArrayOf(5, 6, 7))),
         ).bake()
         val context = PresolveContext(
@@ -288,7 +307,8 @@ class SymmetryBreakingTest {
     fun `objective symmetry should keep unread objective columns fixed`() {
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 3) }, listOf(AllDifferent(intArrayOf(0, 2)))).bake()
         val context = PresolveContext.of(
-            LinearObjective(intCoefficients = longArrayOf(1, 1, 1)), transformObjective = true,
+            LinearObjective(intCoefficients = longArrayOf(1, 1, 1)),
+            transformObjective = true,
         )
 
         val delta = PresolvePass.BREAK_OBJECTIVE_SYMMETRIES.applyFinite(problem, context)
@@ -302,7 +322,8 @@ class SymmetryBreakingTest {
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 3) }, listOf(AllDifferent(intArrayOf(0, 1, 2)))).bake()
         val budget = PresolveBudget(1)
         val context = PresolveContext.of(
-            LinearObjective(intCoefficients = longArrayOf(1, 1, 1)), transformObjective = true,
+            LinearObjective(intCoefficients = longArrayOf(1, 1, 1)),
+            transformObjective = true,
         )
             .withCancellation(budget.orSpent(ExecutionControl.Never))
 
@@ -350,7 +371,10 @@ class SymmetryBreakingTest {
     @Test
     fun `a value symmetry pin should select a live column`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 2) }, listOf(Table(intArrayOf(1), longArrayOf(0, 1, 2))),
+            0,
+            2,
+            Array(2) { IntDomain(0, 2) },
+            listOf(Table(intArrayOf(1), longArrayOf(0, 1, 2))),
         ).bake()
 
         val delta = Presolve.breakSymmetries(problem)
@@ -432,7 +456,10 @@ class SymmetryBreakingTest {
     fun `value precedence should keep one solution per value-symmetry class`() {
         // Bell(3) = 5 set partitions of three variables.
         val problem = Problem(
-            0, 3, Array(3) { IntDomain(0, 2) }, List(3) { Table(intArrayOf(it), longArrayOf(0, 1, 2)) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
+            List(3) { Table(intArrayOf(it), longArrayOf(0, 1, 2)) },
         )
         val broken = precedence(problem)
         val orig = countFeasible(problem)

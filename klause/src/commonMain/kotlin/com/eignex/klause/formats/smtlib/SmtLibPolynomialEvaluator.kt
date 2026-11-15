@@ -116,11 +116,8 @@ internal data class PolynomialMacro(
 private sealed interface PolynomialFrame {
     data class Evaluate(val expression: SExpr, val environment: PolynomialEnvironment) : PolynomialFrame
     data class Combine(val expression: SExpr.SList, val count: Int) : PolynomialFrame
-    data class Let(
-        val bindings: List<String>,
-        val body: SExpr,
-        val environment: PolynomialEnvironment,
-    ) : PolynomialFrame
+    data class Let(val bindings: List<String>, val body: SExpr, val environment: PolynomialEnvironment) :
+        PolynomialFrame
     data class Call(val macro: PolynomialMacro) : PolynomialFrame
     data class CheckSort(val sort: Sort) : PolynomialFrame
     data class DefinedArguments(val arguments: List<PolynomialValue>) : PolynomialFrame
@@ -153,7 +150,8 @@ internal class SmtLibPolynomialEvaluator(
                     if (functions != null) work.addLast(PolynomialFrame.DefinedArguments(arguments))
                     work.addLast(
                         PolynomialFrame.Evaluate(
-                            frame.body, frame.environment.withValues(bindings),
+                            frame.body,
+                            frame.environment.withValues(bindings),
                         ),
                     )
                 }
@@ -199,9 +197,9 @@ internal class SmtLibPolynomialEvaluator(
                 null
             } else {
                 when (argument) {
-                is PolynomialValue.Real -> relation(argument.expression, PolynomialRelation.EQ, argument.expression)
-                is PolynomialValue.Boolean -> disjunction(listOf(argument.formula, not(argument.formula)))
-            }
+                    is PolynomialValue.Real -> relation(argument.expression, PolynomialRelation.EQ, argument.expression)
+                    is PolynomialValue.Boolean -> disjunction(listOf(argument.formula, not(argument.formula)))
+                }
             }
         }
         if (domains.isEmpty()) return value
@@ -209,7 +207,8 @@ internal class SmtLibPolynomialEvaluator(
             is PolynomialValue.Boolean -> PolynomialValue.Boolean(conjunction(listOf(value.formula) + domains))
 
             is PolynomialValue.Real -> PolynomialValue.Real(
-                lowering.conditional(conjunction(domains), value.expression, value.expression), value.integer,
+                lowering.conditional(conjunction(domains), value.expression, value.expression),
+                value.integer,
             )
         }
     }
@@ -278,11 +277,7 @@ internal class SmtLibPolynomialEvaluator(
         }
     }
 
-    private fun scheduleLet(
-        node: SExpr.SList,
-        environment: PolynomialEnvironment,
-        work: ArrayDeque<PolynomialFrame>,
-    ) {
+    private fun scheduleLet(node: SExpr.SList, environment: PolynomialEnvironment, work: ArrayDeque<PolynomialFrame>) {
         node.polynomialSize(3)
         val list = node.items[1] as? SExpr.SList ?: smtUnsupported("malformed polynomial let bindings")
         val names = ArrayList<String>()
@@ -308,9 +303,9 @@ internal class SmtLibPolynomialEvaluator(
                     negate(args.single().real(), cancellation)
                 } else {
                     sum(
-                    listOf(args.first().real()) + args.drop(1).map { negate(it.real(), cancellation) },
-                    cancellation,
-                )
+                        listOf(args.first().real()) + args.drop(1).map { negate(it.real(), cancellation) },
+                        cancellation,
+                    )
                 },
                 args.all { it.integral() },
             )
@@ -433,13 +428,17 @@ internal class SmtLibPolynomialEvaluator(
         if (head == "distinct") {
             return PolynomialDistinct(
                 args.map { value ->
-            cancellation.polynomialSourceCheckpoint(1)
-            when (value) {
-                is PolynomialValue.Real -> value.expression
-                is PolynomialValue.Boolean -> lowering.conditional(value.formula,
-                    constant(BigFraction.ONE), constant(BigFraction.ZERO))
-            }
-        }
+                    cancellation.polynomialSourceCheckpoint(1)
+                    when (value) {
+                        is PolynomialValue.Real -> value.expression
+
+                        is PolynomialValue.Boolean -> lowering.conditional(
+                            value.formula,
+                            constant(BigFraction.ONE),
+                            constant(BigFraction.ZERO),
+                        )
+                    }
+                },
             )
         }
         val pairs = (0 until args.size - 1).map { it to it + 1 }
@@ -452,18 +451,19 @@ internal class SmtLibPolynomialEvaluator(
             ">=" -> PolynomialRelation.GE
             else -> error("unreachable")
         }
-        return conjunction(pairs.map { (left, right) ->
-            if (args[left] is PolynomialValue.Boolean) {
-                val equality = equivalence(args[left].boolean(), args[right].boolean())
-                when (op) {
-                    PolynomialRelation.EQ -> equality
-                    PolynomialRelation.NE -> not(equality)
-                    else -> smtUnsupported("ordered polynomial comparison requires real operands")
+        return conjunction(
+            pairs.map { (left, right) ->
+                if (args[left] is PolynomialValue.Boolean) {
+                    val equality = equivalence(args[left].boolean(), args[right].boolean())
+                    when (op) {
+                        PolynomialRelation.EQ -> equality
+                        PolynomialRelation.NE -> not(equality)
+                        else -> smtUnsupported("ordered polynomial comparison requires real operands")
+                    }
+                } else {
+                    relation(args[left].real(), op, args[right].real())
                 }
-            } else {
-                relation(args[left].real(), op, args[right].real())
-            }
-        }
+            },
         )
     }
 
@@ -509,9 +509,9 @@ internal class SmtLibPolynomialEvaluator(
         } else {
             conjunction(
                 listOf(
-            disjunction(listOf(not(left), right)),
-            disjunction(listOf(left, not(right))),
-        )
+                    disjunction(listOf(not(left), right)),
+                    disjunction(listOf(left, not(right))),
+                ),
             )
         }
 

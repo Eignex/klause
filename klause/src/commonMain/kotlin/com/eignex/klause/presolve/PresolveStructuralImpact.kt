@@ -62,8 +62,8 @@ internal fun PresolveInvocation?.recordStructuralImpact(
     }
     if (!view.stopped) {
         for (factor in added) {
-        if (!view.factor("Added", factor, problem)) break
-    }
+            if (!view.factor("Added", factor, problem)) break
+        }
     }
     if (!view.stopped) view.reconstruction(rebuild)
     structuralImpact = view.snapshot()

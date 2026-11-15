@@ -42,15 +42,19 @@ internal fun distinctLinearFormula(factor: Distinct, cancellation: ExecutionCont
     }
     val distinct = LinearEncodingFormula.And(differences)
     if (factor.activator == LinearRow.ALWAYS) return distinct
-    val activator = EncodingAffineExpression(listOf(
+    val activator = EncodingAffineExpression(
+        listOf(
         EncodingLinearTerm.source(Term.ofLit(Lit.make(factor.activator, true)), BigFraction.ONE),
-    ))
+    )
+    )
     val positive = LinearEncodingFormula.Comparison(activator, LinearOp.EQ, BigFraction.ONE)
     val negative = LinearEncodingFormula.Comparison(activator, LinearOp.EQ, BigFraction.ZERO)
-    return LinearEncodingFormula.And(listOf(
+    return LinearEncodingFormula.And(
+        listOf(
         LinearEncodingFormula.Or(listOf(negative, distinct)),
         LinearEncodingFormula.Or(listOf(positive, LinearEncodingFormula.Or(collisions))),
-    ))
+    )
+    )
 }
 
 internal fun distinctPolynomialFormula(
@@ -74,7 +78,8 @@ internal fun distinctPolynomialFormula(
 
                 else -> conditional(
                     PolynomialRealFormula.BooleanVariable(SourceBoolId(Lit.variable(Term.lit(reference)))),
-                    PolynomialRealLowering.constant(BigFraction.ONE), PolynomialRealLowering.constant(BigFraction.ZERO),
+                    PolynomialRealLowering.constant(BigFraction.ONE),
+                    PolynomialRealLowering.constant(BigFraction.ZERO),
                 )
             }
             terms += PolynomialExpression.Product(listOf(PolynomialRealLowering.constant(coefficient), coordinate))
@@ -87,8 +92,8 @@ internal fun distinctPolynomialFormula(
         formula
     } else {
         PolynomialRealLowering.equivalent(
-        PolynomialRealFormula.BooleanVariable(SourceBoolId(factor.activator)),
-        formula,
-    )
+            PolynomialRealFormula.BooleanVariable(SourceBoolId(factor.activator)),
+            formula,
+        )
     }
 }

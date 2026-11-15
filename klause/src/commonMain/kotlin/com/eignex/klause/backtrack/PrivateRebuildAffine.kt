@@ -64,11 +64,7 @@ internal class PrivateRebuildAffine(
         return result
     }
 
-    internal class RowPlan(
-        private val forward: BooleanArray,
-        val literals: Long,
-        val triangularRows: Int,
-    ) {
+    internal class RowPlan(private val forward: BooleanArray, val literals: Long, val triangularRows: Int) {
         fun usesTriangular(row: Int): Boolean = forward[row]
     }
 
@@ -96,7 +92,10 @@ internal class PrivateRebuildAffine(
             val useForward = forwardWidth != null && forwardWidth <= 64 &&
                 (expandedWidth > 64 || forwardWidth < expandedWidth)
             val width = if (useForward) checkNotNull(forwardWidth) else expandedWidth
-            if (width > 64) { onDecline("ParityRowWidth"); return null }
+            if (width > 64) {
+                onDecline("ParityRowWidth");
+                return null
+            }
             forward[row] = useForward
             if (useForward) triangularRows++
             literals += width
@@ -127,8 +126,13 @@ internal class PrivateRebuildAffine(
         val variables = IntArray(used.count { it })
         var next = 0
         for (variable in used.indices) if (used[variable]) variables[next++] = variable
-        val seed = AffineXorSeed(coordinates.copyOf(), rhs.copyOf(rank),
-            Array(rank) { dependencies[it].copyOf() }, freeColumns, variables)
+        val seed = AffineXorSeed(
+            coordinates.copyOf(),
+            rhs.copyOf(rank),
+            Array(rank) { dependencies[it].copyOf() },
+            freeColumns,
+            variables,
+        )
         val result = GaussianXor(constraints, seed)
         return result.takeUnless { cancellation() }
     }

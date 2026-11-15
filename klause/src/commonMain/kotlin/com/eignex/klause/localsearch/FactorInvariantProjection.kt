@@ -120,7 +120,11 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
     is Mdd -> MddInvariant(seq, numStatesPerLayer, layerStarts, transitions, initial, accepting, recordStride, cost)
 
     is NValue -> NValueInvariant(
-        n, xs, mode, presents, exceptSet.toSet(),
+        n,
+        xs,
+        mode,
+        presents,
+        exceptSet.toSet(),
         { state, idx -> OptionalPresence.isPresentInAssignment(presents, idx, state) },
     )
 
@@ -138,10 +142,17 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
     is Product -> ProductInvariant(a, b, result)
 
     is Power -> when (val coordinate = base) {
-        is Power.Coordinate.Integer -> PowerInvariant(coordinate.id.index, exponent,
-            (result as Power.Coordinate.Integer).id.index)
-        is Power.Coordinate.Real -> RealPowerInvariant(coordinate.id.index, exponent,
-            (result as Power.Coordinate.Real).id.index)
+        is Power.Coordinate.Integer -> PowerInvariant(
+            coordinate.id.index,
+            exponent,
+            (result as Power.Coordinate.Integer).id.index,
+        )
+
+        is Power.Coordinate.Real -> RealPowerInvariant(
+            coordinate.id.index,
+            exponent,
+            (result as Power.Coordinate.Real).id.index,
+        )
     }
 
     is PseudoBoolean -> if (permitsLongPseudoBoolean(constants)) {
@@ -151,7 +162,9 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
     }
 
     is RealAbs -> RealAbsInvariant(operand, result)
+
     is RealFiniteDomain -> NoInvariant
+
     is RealArrayMinMax -> RealArrayMinMaxInvariant(this)
 
     is RealProduct -> RealProductInvariant(intOperand, realOperand, result)
@@ -234,11 +247,16 @@ private fun AllDifferent.allDifferentInvariantProjection(): Invariant {
         values.add(count)
     }
     val occurrences = IntIntMap.build(keys.toIntArray(), values.toIntArray(), absent = 0)
-    val except = if (exceptSet.isEmpty()) AllDifferentInvariant.NO_EXCEPT else {
+    val except = if (exceptSet.isEmpty()) {
+        AllDifferentInvariant.NO_EXCEPT
+    } else {
         LongHashSet(exceptSet.size).also { set -> for (value in exceptSet) set.add(value) }
     }
     return AllDifferentInvariant(
-        vars, presents, except, occurrences,
+        vars,
+        presents,
+        except,
+        occurrences,
         { state, idx -> OptionalPresence.isPresentInAssignment(presents, idx, state) },
     )
 }

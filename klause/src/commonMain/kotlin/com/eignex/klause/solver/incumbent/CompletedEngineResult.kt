@@ -14,7 +14,8 @@ internal sealed interface CompletedEngineResult {
     fun attests(kind: EvidenceKind): Boolean
 
     data class Solve(
-        override val scope: SourceScope?, val result: SolveResult,
+        override val scope: SourceScope?,
+        val result: SolveResult,
         override val invocation: EngineInvocation? = null,
     ) : CompletedEngineResult {
         constructor(invocation: EngineInvocation, result: SolveResult) : this(invocation.scope, result, invocation)
@@ -41,8 +42,10 @@ internal sealed interface CompletedEngineResult {
         private val capturedResult = snapshot(result)
         val result: MinimizeResult get() = snapshot(capturedResult)
         constructor(
-            invocation: EngineInvocation, result: MinimizeResult,
-            executionCutoff: Double? = null, cutoff: SourceClaim.Bound? = null,
+            invocation: EngineInvocation,
+            result: MinimizeResult,
+            executionCutoff: Double? = null,
+            cutoff: SourceClaim.Bound? = null,
         ) : this(invocation.scope, result, cutoff, invocation, executionCutoff)
 
         init {
@@ -57,14 +60,20 @@ internal sealed interface CompletedEngineResult {
         }
         override fun attests(kind: EvidenceKind): Boolean = when (kind) {
             EvidenceKind.Witness -> result is MinimizeResult.WithSample
+
             EvidenceKind.Infeasible -> result is MinimizeResult.Infeasible
+
             EvidenceKind.Unbounded -> result is MinimizeResult.Unbounded
+
             EvidenceKind.Bound -> when (val actual = capturedResult) {
                 is MinimizeResult.Optimal -> true
+
                 is MinimizeResult.BestFound -> (cutoff != null || executionCutoff != null) &&
                     actual.reason == TerminationReason.SearchExhausted
+
                 is MinimizeResult.Unknown -> (cutoff != null || executionCutoff != null) &&
                     actual.reason == TerminationReason.SearchExhausted
+
                 else -> false
             }
         }

@@ -18,14 +18,18 @@ value class EncodingTarget(
     /** Stable semantic language identifier. */
     val id: String,
 ) {
-    init { require(id.isNotBlank()) }
+    init {
+        require(id.isNotBlank())
+    }
 
     /** Built-in consumer languages; extensions can declare their own identifiers. */
     companion object {
         /** Exact linear relations with Boolean structure and strictness. */
         val LINEAR: EncodingTarget = EncodingTarget("linear")
+
         /** Integer difference relations with combined graph safety admission. */
         val DIFFERENCE: EncodingTarget = EncodingTarget("difference")
+
         /** Exact polynomial relations with source integer and real identities. */
         val POLYNOMIAL: EncodingTarget = EncodingTarget("polynomial")
         internal val entries = listOf(LINEAR, DIFFERENCE, POLYNOMIAL)
@@ -36,12 +40,16 @@ value class EncodingTarget(
 enum class EncoderSupport {
     /** The consumer installs the relation directly. */
     DIRECT,
+
     /** A private encoding preserves the complete source relation. */
     EQUIVALENT,
+
     /** Equivalence requires the declared invocation conditions. */
     CONDITIONED,
+
     /** Only an outer relaxation is available; it cannot enforce the source. */
     RELAXATION_ONLY,
+
     /** No representation is available. */
     UNSUPPORTED,
 }
@@ -50,8 +58,10 @@ enum class EncoderSupport {
 enum class EncoderDecline {
     /** The consumer has no complete encoding. */
     UNSUPPORTED,
+
     /** Required captured source conditions are missing. */
     CONDITIONS,
+
     /** ExecutionControl or a containing resource allowance interrupted installation. */
     RESOURCE,
 }
@@ -88,7 +98,8 @@ class Encoder(
 
     internal fun remapped(mapping: VarRemap): Encoder {
         if (integerConditions.isEmpty() && booleanConditions.isEmpty()) return this
-        return Encoder(support,
+        return Encoder(
+            support,
             integerConditions.map { requireNotNull(mapping.int(it)) { "removed encoding condition" } },
             booleanConditions.mapKeys { requireNotNull(mapping.bool(it.key)) { "removed encoding condition" } },
             installer,
@@ -103,7 +114,9 @@ class Encoder(
         if (!enforcesSource && support != EncoderSupport.CONDITIONED) return EncoderDecline.UNSUPPORTED
         if (integerConditions.any { encoding.fixedInteger(it) == null } ||
             booleanConditions.any { (id, value) -> encoding.fixedBoolean(id) != value }
-        ) return EncoderDecline.CONDITIONS
+        ) {
+            return EncoderDecline.CONDITIONS
+        }
         if (encoding.cancellation()) return EncoderDecline.RESOURCE
         return installer(factor, encoding) ?: EncoderDecline.RESOURCE.takeIf { encoding.cancellation() }
     }
@@ -116,37 +129,50 @@ class Encoder(
 interface TheoryEncoding {
     /** Selected consumer language. */
     val target: EncodingTarget
+
     /** Original factor index in the retained canonical source. */
     val sourceFactorIndex: Int
+
     /** Containing invocation allowance; installation cannot create a fresh budget. */
     val cancellation: ExecutionControl
 
     /** Exact captured condition, absent when the source integer is not fixed in this scope. */
     fun fixedInteger(id: SourceIntId): BigInt?
+
     /** Captured source Boolean pin, absent when the scope does not require that truth value. */
     fun fixedBoolean(id: SourceBoolId): Boolean?
+
     /** Conjoin a complete linear relation with every other emission from this installation. */
     fun linear(form: LinearForm)
+
     /** Install a complete compound linear formula; private names belong to this receiving scope. */
     fun linearFormula(formula: LinearEncodingFormula): Unit = error("compound linear formulas unavailable")
+
     /** Allocate a private real constrained by this installation's complete formula. */
     fun realAuxiliary(): EncodingRealAuxiliary = error("private real coordinates unavailable")
+
     /** Allocate a private affine value, requiring exactly one acyclic definition before installation completes. */
     fun auxiliary(): EncodingAuxiliary = error("affine auxiliaries unavailable")
+
     /** Define a private affine value with exact source or scoped auxiliary terms. */
     fun define(auxiliary: EncodingAuxiliary, expression: EncodingAffineExpression): Unit =
         error("affine auxiliaries unavailable")
+
     /** Allocate a private Boolean formula name, requiring exactly one acyclic definition. */
     fun guard(): EncodingGuard = error("private linear guards unavailable")
+
     /** Define a private guard's complete relation, retained within this installation's lifetime. */
-    fun define(guard: EncodingGuard, formula: LinearEncodingFormula): Unit =
-        error("private linear guards unavailable")
+    fun define(guard: EncodingGuard, formula: LinearEncodingFormula): Unit = error("private linear guards unavailable")
+
     /** Install a neutral polynomial relation, preserving guards and original attribution. */
     fun polynomial(formula: PolynomialRealFormula)
+
     /** Map a source integer to its exact private polynomial coordinate. */
     fun integer(id: SourceIntId): PolynomialExpression
+
     /** Map a source real to its polynomial coordinate. */
     fun real(id: SourceRealId): PolynomialExpression
+
     /** Encode a Boolean choice with an attributed private auxiliary and both defining guards. */
     fun conditional(
         condition: PolynomialRealFormula,

@@ -57,8 +57,7 @@ fun factor(
     bools: List<BoolTerm> = emptyList(),
     ints: List<IntTerm> = emptyList(),
     reals: List<FloatHandle> = emptyList(),
-): BoolExpr =
-    FactorConstraint(node, bools.map { it.boolName() }, ints.map { it.intName() }, reals.map { it.name })
+): BoolExpr = FactorConstraint(node, bools.map { it.boolName() }, ints.map { it.intName() }, reals.map { it.name })
 
 private fun BoolTerm.boolName(): String {
     val ref = toExpr() as? BoolRef
@@ -195,12 +194,11 @@ fun realMax(result: FloatHandle, xs: List<FloatHandle>): BoolExpr =
     factor(RealArrayMinMax(0, IntArray(xs.size) { it + 1 }, max = true), reals = listOf(result) + xs)
 
 /** `result = items(index - indexOffset)` over real variables. */
-fun realElement(index: IntTerm, items: List<FloatHandle>, result: FloatHandle, indexOffset: Int = 0): BoolExpr =
-    factor(
-        RealElement(0, 0, IntArray(items.size) { it + 1 }, indexOffset),
-        ints = listOf(index),
-        reals = listOf(result) + items,
-    )
+fun realElement(index: IntTerm, items: List<FloatHandle>, result: FloatHandle, indexOffset: Int = 0): BoolExpr = factor(
+    RealElement(0, 0, IntArray(items.size) { it + 1 }, indexOffset),
+    ints = listOf(index),
+    reals = listOf(result) + items,
+)
 
 /** `result = values(index - indexOffset)` over binary64 constants. */
 @JvmName("realElementOfValues")

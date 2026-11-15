@@ -22,14 +22,22 @@ internal class LinearAuthorityTemplate private constructor(
         onCost: (Long, Long) -> Unit,
     ): LinearAuthorityTemplate? {
         val original = cuts ?: return null
-        val directed = LinearAuthorityCuts.prepareAtPoint(numeric, cancellation, point,
-            65_536L - original.work, onWork) ?: return null
+        val directed = LinearAuthorityCuts.prepareAtPoint(
+            numeric,
+            cancellation,
+            point,
+            65_536L - original.work,
+            onWork,
+        ) ?: return null
         if (cancellation() || (directed.rows.isEmpty() && original.rows.isNotEmpty())) return null
-        onCost(directed.rows.size.toLong(), 128L + directed.rows.sumOf {
+        onCost(
+            directed.rows.size.toLong(),
+            128L + directed.rows.sumOf {
             128L + it.owners.size * 32L + (it.inequality.coefficients.values + it.inequality.rhs).sumOf { value ->
                 64L + (value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() + 7L) / 8L
             }
-        })
+        }
+        )
         if (cancellation()) return null
         return LinearAuthorityTemplate(source, numeric, coordinates, indices, rows, directed)
     }
@@ -45,17 +53,27 @@ internal class LinearAuthorityTemplate private constructor(
         val prepared = cuts ?: return null
         require(additional.size <= 64)
         for (cut in additional) {
-            onCost(1L + cut.owners.size + cut.inequality.supportSize,
-                64L + cut.owners.size * 32L + cut.inequality.supportSize * 48L)
+            onCost(
+                1L + cut.owners.size + cut.inequality.supportSize,
+                64L + cut.owners.size * 32L + cut.inequality.supportSize * 48L,
+            )
             if (cancellation()) return null
             require(cut.owners.all { it in rows.indices })
             require(cut.inequality.coefficients.keys.all { it in indices })
         }
-        onCost(prepared.rows.size.toLong() + additional.size,
-            64L + (prepared.rows.size.toLong() + additional.size) * 8L)
+        onCost(
+            prepared.rows.size.toLong() + additional.size,
+            64L + (prepared.rows.size.toLong() + additional.size) * 8L,
+        )
         if (cancellation()) return null
-        return LinearAuthorityTemplate(source, numeric, coordinates, indices, rows,
-            prepared.withAdditional(additional, maximumCandidates))
+        return LinearAuthorityTemplate(
+            source,
+            numeric,
+            coordinates,
+            indices,
+            rows,
+            prepared.withAdditional(additional, maximumCandidates),
+        )
     }
 
     fun withReplayCuts(
@@ -72,8 +90,14 @@ internal class LinearAuthorityTemplate private constructor(
         }
         onCost(1L, 128L)
         if (cancellation()) return null
-        return LinearAuthorityTemplate(source, numeric, coordinates, indices, rows,
-            LinearAuthorityCuts.replay(supplied))
+        return LinearAuthorityTemplate(
+            source,
+            numeric,
+            coordinates,
+            indices,
+            rows,
+            LinearAuthorityCuts.replay(supplied),
+        )
     }
 
     fun matches(other: SourceProofContext): Boolean = source.scope.revision == other.scope.revision &&
@@ -108,6 +132,10 @@ internal class LinearAuthorityTemplate private constructor(
 
 internal fun SourceInequality.row(indices: Map<SourceCoordinate, Int>): ExactRationalInequality {
     val entries = coefficients.entries.sortedBy { indices.getValue(it.key) }
-    return ExactRationalInequality(entries.map { indices.getValue(it.key) }.toIntArray(),
-        entries.map { it.value }, rhs, strict)
+    return ExactRationalInequality(
+        entries.map { indices.getValue(it.key) }.toIntArray(),
+        entries.map { it.value },
+        rhs,
+        strict,
+    )
 }

@@ -53,15 +53,27 @@ internal object SmtLibQuadraticObjective {
                 whenFalse = swapped
             }
             if (condition !is PolynomialRealFormula.BooleanVariable || condition.id.index !in virtual) continue
-            replacements[conditional.coordinate] = PolynomialExpression.Sum(listOf(
-                whenFalse, PolynomialExpression.Product(listOf(
-                    virtual.getValue(condition.id.index), PolynomialExpression.Sum(listOf(
-                        whenTrue, PolynomialExpression.Product(listOf(
-                            PolynomialRealLowering.constant(BigFraction.MINUS_ONE), whenFalse,
-                        )),
-                    )),
-                )),
-            ))
+            replacements[conditional.coordinate] = PolynomialExpression.Sum(
+                listOf(
+                whenFalse,
+                PolynomialExpression.Product(
+                    listOf(
+                    virtual.getValue(condition.id.index),
+                    PolynomialExpression.Sum(
+                        listOf(
+                        whenTrue,
+                        PolynomialExpression.Product(
+                            listOf(
+                            PolynomialRealLowering.constant(BigFraction.MINUS_ONE),
+                            whenFalse,
+                        )
+                        ),
+                    )
+                    ),
+                )
+                ),
+            )
+            )
         }
         val values = mutableMapOf<PolynomialExpression, PolynomialExpression>()
         val work = ArrayDeque<Pair<PolynomialExpression, Boolean>>()

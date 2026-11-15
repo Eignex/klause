@@ -29,7 +29,8 @@ import kotlin.test.assertTrue
 class ComparisonClauseFoldTest {
     @Test
     fun `source and finite folding should restore every original comparison independently of clause polarity`() {
-        for (op in LinearOp.entries) for (positive in listOf(false, true)) {
+        for (op in LinearOp.entries) {
+            for (positive in listOf(false, true)) {
             val model = problemOf(
                 2,
                 Array(2) { IntDomain(0, 2) },
@@ -60,6 +61,7 @@ class ComparisonClauseFoldTest {
                 }
                 assertContentEquals(booleanArrayOf(!expected, false), sample.bools)
             }
+        }
         }
     }
 

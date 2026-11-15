@@ -107,8 +107,11 @@ internal class LeafRealSolver(
             }
             val result = relaxation.leafResult(certified, problem, objective, sample, sink)
                 .checkedEncoding(encoded, sample, cancellation)
-            if (cancellation()) LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
-            else result.also { it.observeConsumption(sink) }
+            if (cancellation()) {
+                LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
+            } else {
+                result.also { it.observeConsumption(sink) }
+            }
         }.also { activeSolve = it }
     }
 
@@ -135,8 +138,16 @@ internal class LeafRealSolver(
         }
         val assertions = edit.boundAssertions(nextWitness, cancellation) ?: return null
         val before = staged.state.assertions.size
-        if (!staged.replaceRows(edit.retired, edit.columns, edit.rows, false, cancellation,
-                edit.permanentRows, edit.objective, assertions) || !edit.isCurrent() || cancellation()
+        if (!staged.replaceRows(
+                edit.retired,
+                edit.columns,
+                edit.rows,
+                false,
+                cancellation,
+                edit.permanentRows,
+                edit.objective,
+                assertions,
+            ) || !edit.isCurrent() || cancellation()
         ) {
             return null
         }
@@ -166,7 +177,9 @@ internal class LeafRealSolver(
         try {
             if (close) solvers.close() else solvers.releaseSolvers()
         } catch (cleanup: Throwable) {
-            if (failure == null) failure = cleanup else if (failure !== cleanup) failure.addSuppressed(cleanup)
+            if (failure == null) failure = cleanup else if (failure !== cleanup) {
+                failure.addSuppressed(cleanup)
+            }
         }
         failure?.let { throw it }
     }

@@ -229,11 +229,15 @@ private fun LinearSourceProblem.canProjectToDouble(stop: ExecutionControl): Bool
         return projected.isFinite() && (fraction.isZero || projected != 0.0)
     }
     return variableValues.all { supported(it.lower) && supported(it.upper) } &&
-        rowValues.all { row -> supported(row.lower) && supported(row.upper) &&
-            row.termValues.all { supported(it.coefficient) } } &&
-        (objective?.let { objective ->
+        rowValues.all { row ->
+            supported(row.lower) && supported(row.upper) &&
+                row.termValues.all { supported(it.coefficient) }
+        } &&
+        (
+            objective?.let { objective ->
             supported(objective.constant) && objective.termValues.all { supported(it.coefficient) }
-        } != false)
+        } != false
+        )
 }
 
 private fun SemanticRational.fraction(): BigFraction = BigFraction.of(numerator, denominator)

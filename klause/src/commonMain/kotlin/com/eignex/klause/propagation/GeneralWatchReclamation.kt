@@ -6,8 +6,10 @@ internal fun PropagationState.sweepRetiredGeneralWatches(budget: ReclamationPrep
     if (incremental || nativeEngine != null || learned.retiredCount == 0) return
     if (learned.sweepingRetirements < 0) {
         if (learned.sweptRetirements == learned.retiredCount &&
-            (learned.deferredWatchTrimWork == 0L ||
-                !budget.supports(learned.deferredWatchTrimWork, learned.deferredWatchTrimScratch))
+            (
+                learned.deferredWatchTrimWork == 0L ||
+                !budget.supports(learned.deferredWatchTrimWork, learned.deferredWatchTrimScratch)
+            )
         ) {
             return
         }
@@ -30,16 +32,30 @@ internal fun PropagationState.sweepRetiredGeneralWatches(budget: ReclamationPrep
         budget.visit(4L)
         budget.visit(0L)
         val literal = learned.watchCleanupLiteral
-        val posting = if (literal < boolCount) index?.byLit?.get(literal)
-            else atoms.watchersByLit[literal - boolCount]
+        val posting = if (literal < boolCount) {
+            index?.byLit?.get(literal)
+        } else {
+            atoms.watchersByLit[literal - boolCount]
+        }
         if (posting == null || learned.watchCleanupIndex >= posting.size) {
-            posting?.let { trimWatchPosting(it, if (literal < boolCount) index?.blockersByLit?.get(literal)
-                else null, budget) }
+            posting?.let {
+                trimWatchPosting(
+                    it,
+                    if (literal < boolCount) {
+                        index?.blockersByLit?.get(literal)
+                    } else {
+                        null
+                    },
+                    budget,
+                )
+            }
             learned.watchCleanupLiteral++
             learned.watchCleanupIndex = 0
         } else if (retiredLearnedFactor(posting[learned.watchCleanupIndex])) {
             if (!removeRetiredWatch(literal, posting, budget)) return
-        } else learned.watchCleanupIndex++
+        } else {
+            learned.watchCleanupIndex++
+        }
         budget.advanced()
     }
     budget.visit(4L)
@@ -62,8 +78,13 @@ private fun PropagationState.removeRetiredWatch(
         val factor = posting[position]
         val moved = posting[posting.size - 1]
         val replacement = if (position != posting.size - 1 && factor != moved) packWatch(moved, literal) else null
-        val removed = watches.pos.removeAndUpdate(packWatch(factor, literal), replacement, position,
-            { budget.visit(it) }, { budget.visit(0L) })
+        val removed = watches.pos.removeAndUpdate(
+            packWatch(factor, literal),
+            replacement,
+            position,
+            { budget.visit(it) },
+            { budget.visit(0L) },
+        )
         if (!removed) return false
         swapPopWatch(posting, watches.blockersByLit[literal], position)
     } else {

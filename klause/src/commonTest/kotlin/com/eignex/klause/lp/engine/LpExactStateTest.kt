@@ -16,8 +16,10 @@ import kotlin.test.assertTrue
 class LpExactStateTest {
     @Test
     fun `single appended bounds match a fresh exact replay`() {
-        val source = assertNotNull(LpBuilder().apply { repeat(2) { addVar(0L, 10L) } }
-            .build(Sense.MINIMIZE).authoritativeModel())
+        val source = assertNotNull(
+            LpBuilder().apply { repeat(2) { addVar(0L, 10L) } }
+            .build(Sense.MINIMIZE).authoritativeModel()
+        )
         val root = LpExactState(source)
         val existing = LpBoundAssertion(1, false, ExactLpSide(ExactLpNumber.of(4L)), 1L, 0)
         val parent = LpExactState(source, listOf(existing), previous = root)
@@ -49,10 +51,12 @@ class LpExactStateTest {
     @Test
     fun `probe descendants preserve parent and sibling bounds`() {
         for (upper in listOf(false, true)) {
-            val source = assertNotNull(LpBuilder().apply {
+            val source = assertNotNull(
+                LpBuilder().apply {
                 addVar(3L, 9L)
                 addVar(0L, 10L)
-            }.build(Sense.MINIMIZE).authoritativeModel())
+            }.build(Sense.MINIMIZE).authoritativeModel()
+            )
             val parent = LpExactState(source)
             val parentView = assertNotNull(parent.ownerWorkingModel())
             val expectedParent = List(2) { parent.model.column(it) }
@@ -89,12 +93,19 @@ class LpExactStateTest {
     @Test
     fun `appended conflicts retain the first column and its exact witnesses`() {
         for (order in listOf(listOf(0, 1), listOf(1, 0))) {
-            val source = assertNotNull(LpBuilder().apply { repeat(2) { addVar(0L, 10L) } }
-                .build(Sense.MINIMIZE).authoritativeModel())
+            val source = assertNotNull(
+                LpBuilder().apply { repeat(2) { addVar(0L, 10L) } }
+                .build(Sense.MINIMIZE).authoritativeModel()
+            )
             var state = LpExactState(source)
             for (column in order) {
-                val assertion = LpBoundAssertion(column, false,
-                    ExactLpSide(ExactLpNumber.of(11L)), column.toLong(), 0)
+                val assertion = LpBoundAssertion(
+                    column,
+                    false,
+                    ExactLpSide(ExactLpNumber.of(11L)),
+                    column.toLong(),
+                    0,
+                )
                 state = LpExactState(source, state.assertions + assertion, previous = state)
             }
             val upper = LpBoundAssertion(0, true, ExactLpSide(ExactLpNumber.of(9L)), 2L, 0)

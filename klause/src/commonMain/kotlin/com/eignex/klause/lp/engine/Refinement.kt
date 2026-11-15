@@ -1382,14 +1382,18 @@ internal fun refineLp(
         val factors = preferredBasisCache?.takeIf { preferBasis && basis != null } ?: ExactBasisCache()
         val current = RefinementRun(request, meter, model, factors)
         run = current
-        current.run(primal, duals, basis, witness, needPoint, direction, reconstructInitial, preferBasis,
-            claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.CONTRADICTION)
+        current.run(
+            primal, duals, basis, witness, needPoint, direction, reconstructInitial, preferBasis,
+            claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.CONTRADICTION,
+        )
         diagnostic?.stage = LpRefinementStage.COMPLETION
         meter.poll()
         reason = if (current.candidate.attained || current.candidate.conflict != null ||
             current.unboundedness != null || meter.metrics.strictWitnesses > 0 ||
-            ((claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.CONTRADICTION) &&
-                current.candidate.point != null)
+            (
+                (claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.CONTRADICTION) &&
+                current.candidate.point != null
+            )
         ) {
             null
         } else {

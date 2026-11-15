@@ -97,7 +97,9 @@ internal class ScheduleRelocations(
         val shifted = origin + ownDuration(j)
         if (shifted < origin || state.rootDomains[second.start].ceilingOrNull(origin) != origin ||
             state.rootDomains[first.start].ceilingOrNull(shifted) != shifted
-        ) return
+        ) {
+            return
+        }
         offer(listOf(Placement(second, origin, NO_CHOICE, 0L), Placement(first, shifted, NO_CHOICE, 0L)))
     }
 
@@ -293,11 +295,13 @@ internal class ScheduleRelocations(
         for (part in parts) {
             when (part) {
                 is Move.BoolFlip -> if (cumulativeReads(state.projection.boolOccurrences[part.varId])) return null
+
                 is Move.IntSet -> {
                     if (!sink.allowsInt(part.varId) || cumulativeReads(state.projection.intOccurrences[part.varId])) {
                         return null
                     }
                 }
+
                 else -> return null
             }
         }

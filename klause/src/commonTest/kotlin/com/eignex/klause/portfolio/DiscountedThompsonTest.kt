@@ -24,8 +24,10 @@ class DiscountedThompsonTest {
                 val weight = weights[step % weights.size]
                 val retained = 2.0.pow(-weight / halfLife)
                 val evidence = reference.snapshot().map {
-                    BernoulliSumResult(1.0 + (it.successes - 1.0) * retained,
-                        2.0 + (it.trials - 2.0) * retained)
+                    BernoulliSumResult(
+                        1.0 + (it.successes - 1.0) * retained,
+                        2.0 + (it.trials - 2.0) * retained,
+                    )
                 }
                 reference.reset()
                 reference.merge(evidence)
@@ -36,8 +38,10 @@ class DiscountedThompsonTest {
                 if (step % 4 == 0) assertEquals(reference.choose(), bandit.choose())
                 val snapshot = reference.snapshot()
                 val expected = candidates.maxBy { candidate ->
-                    reference.random.nextBeta(snapshot[candidate].successes,
-                        snapshot[candidate].trials - snapshot[candidate].successes)
+                    reference.random.nextBeta(
+                        snapshot[candidate].successes,
+                        snapshot[candidate].trials - snapshot[candidate].successes,
+                    )
                 }
                 assertEquals(expected, bandit.chooseAmong(candidates))
             }
@@ -60,8 +64,10 @@ class DiscountedThompsonTest {
 
             bandit.fade(retained)
             val evidence = reference.snapshot().map {
-                BernoulliSumResult(1.0 + (it.successes - 1.0) * retained,
-                    2.0 + (it.trials - 2.0) * retained)
+                BernoulliSumResult(
+                    1.0 + (it.successes - 1.0) * retained,
+                    2.0 + (it.trials - 2.0) * retained,
+                )
             }
             reference.reset()
             reference.merge(evidence)
@@ -70,8 +76,10 @@ class DiscountedThompsonTest {
                 assertEquals(reference.choose(), bandit.choose())
                 val snapshot = reference.snapshot()
                 val expected = candidates.maxBy { arm ->
-                    reference.random.nextBeta(snapshot[arm].successes,
-                        snapshot[arm].trials - snapshot[arm].successes)
+                    reference.random.nextBeta(
+                        snapshot[arm].successes,
+                        snapshot[arm].trials - snapshot[arm].successes,
+                    )
                 }
                 assertEquals(expected, bandit.chooseAmong(candidates))
             }

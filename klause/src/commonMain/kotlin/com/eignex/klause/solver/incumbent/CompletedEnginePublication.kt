@@ -6,18 +6,12 @@ internal sealed interface CompletedEnginePublication {
     val invocation: EngineInvocation
     val model: ModelIdentity
 
-    class Witness(
-        override val invocation: EngineInvocation,
-        val sample: Sample,
-        val value: Double?,
-    ) : CompletedEnginePublication {
+    class Witness(override val invocation: EngineInvocation, val sample: Sample, val value: Double?) :
+        CompletedEnginePublication {
         override val model: ModelIdentity get() = invocation.model
     }
 
-    class ObjectiveBound(
-        override val invocation: EngineInvocation,
-        val value: Double,
-    ) : CompletedEnginePublication {
+    class ObjectiveBound(override val invocation: EngineInvocation, val value: Double) : CompletedEnginePublication {
         override val model: ModelIdentity get() = invocation.model
 
         init {

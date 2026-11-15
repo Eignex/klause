@@ -8,10 +8,10 @@ and charge work to the explicitly bound execution owner.
 `util.ArithmeticExecution` separates native work admission from cancellation
 checkpoints. An owned arithmetic operation uses a local cursor: floating proposal
 loops checkpoint after at most 256 admitted units, quadratic certification after at
-most 64, and polynomial and enclosure kernels after at most 2,048. Operand limbs
+most 64, and polynomial and enclosure kernels after at most 8,192. Operand limbs
 add checkpoint weight without changing the charged work currency. Coefficient
 operations whose combined operand size exceeds 4096 bits force a checkpoint before
-the exact primitive. Admission leases can cover eight checkpoint quanta;
+the exact primitive. Admission leases cover up to 32,768 native units independently of checkpoint cadence;
 cancellation polling does not settle a lease or allocate another reservation.
 Entry, allocation admission, callback handoff, prepared-cursor suspension and all
 exits settle spent work and check the live containing stop. Callback return rebinds

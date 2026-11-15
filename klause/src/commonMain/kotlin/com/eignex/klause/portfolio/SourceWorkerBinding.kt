@@ -1,6 +1,5 @@
 package com.eignex.klause.portfolio
 
-
 import com.eignex.klause.solver.evidence.QuadraticEngineInvocation
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.incumbent.EngineInvocation
@@ -31,8 +30,12 @@ internal class SourceWorkerBinding(
             require(quadratic.matchesModel(ModelIdentity.of(plan.originalSource, quadratic.objective))) {
                 "quadratic producer has another source plan"
             }
-            require(plan.quadraticObjective == null || (plan.quadraticObjective === quadratic.objective &&
-                plan.quadraticSense == quadratic.sense)) {
+            require(
+                plan.quadraticObjective == null || (
+                    plan.quadraticObjective === quadratic.objective &&
+                plan.quadraticSense == quadratic.sense
+                )
+            ) {
                 "quadratic producer has another source objective or direction"
             }
         }
@@ -51,8 +54,13 @@ internal class SourceWorkerBinding(
     fun matches(other: SourceWorkerBinding): Boolean = model.matches(other.model) &&
         preparedPlan === other.preparedPlan && scope == other.scope && provesResults == other.provesResults &&
         invocation.sameAs(other.invocation) && sharingInvocation.sameAs(other.sharingInvocation) &&
-        (if (quadraticInvocation == null) other.quadraticInvocation == null else
-            other.quadraticInvocation?.let(quadraticInvocation::matches) == true)
+        (
+            if (quadraticInvocation == null) {
+            other.quadraticInvocation == null
+        } else {
+            other.quadraticInvocation?.let(quadraticInvocation::matches) == true
+        }
+        )
 
     private fun EngineInvocation?.sameAs(other: EngineInvocation?): Boolean =
         if (this == null) other == null else other != null && matches(other)

@@ -27,7 +27,9 @@ internal fun NonlinearIntegerProblem.integerBounds(
     fun atom(variable: PolynomialExpression, relation: PolynomialRelation, constant: PolynomialExpression) {
         if (variable !is PolynomialExpression.Variable || variable.id.index !in integers ||
             constant !is PolynomialExpression.Constant
-        ) return
+        ) {
+            return
+        }
         val value = BigFraction.of(constant.numerator, constant.denominator)
         val ceiling = value.ceilInteger()
         val floor = -value.negated().ceilInteger()
@@ -36,10 +38,15 @@ internal fun NonlinearIntegerProblem.integerBounds(
                 bound(variable.id.index, BigFraction.of(ceiling, BIG_ONE), true)
                 bound(variable.id.index, BigFraction.of(floor, BIG_ONE), false)
             }
+
             PolynomialRelation.LE -> bound(variable.id.index, BigFraction.of(floor, BIG_ONE), false)
+
             PolynomialRelation.LT -> bound(variable.id.index, BigFraction.of(ceiling - BIG_ONE, BIG_ONE), false)
+
             PolynomialRelation.GE -> bound(variable.id.index, BigFraction.of(ceiling, BIG_ONE), true)
+
             PolynomialRelation.GT -> bound(variable.id.index, BigFraction.of(floor + BIG_ONE, BIG_ONE), true)
+
             PolynomialRelation.NE -> Unit
         }
     }
@@ -54,6 +61,7 @@ internal fun NonlinearIntegerProblem.integerBounds(
         arithmetic.step()
         when (val node = work.removeLast()) {
             is PolynomialRealFormula.And -> work.addAll(node.operands)
+
             is PolynomialRealFormula.Atom -> {
                 atom(node.left, node.relation, node.right)
                 val reversed = when (node.relation) {
@@ -65,6 +73,7 @@ internal fun NonlinearIntegerProblem.integerBounds(
                 }
                 atom(node.right, reversed, node.left)
             }
+
             else -> Unit
         }
     }

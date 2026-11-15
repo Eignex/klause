@@ -14,17 +14,24 @@ internal fun CompiledSourceBinding.bindResult(
     require(execution.invocation.source.originalSource === originalProblem)
     val stop = execution.invocation.cancellation
     val native = execution.result
-    fun interrupted(): QuadraticOptimizationExecution = native.copy(result = QuadraticOptimizationResult.Unknown(
-        null, stopped(), native.result.sense, native.result.stats,
-    ))
+    fun interrupted(): QuadraticOptimizationExecution = native.copy(
+        result = QuadraticOptimizationResult.Unknown(
+        null,
+        stopped(),
+        native.result.sense,
+        native.result.stats,
+    )
+    )
     if (stop()) return interrupted()
     fun sample(point: Sample): Sample {
         stop.charge(point.numBoolVars.toLong() + point.numIntVars + point.numRealVars)
         require(point.coordinateFrame == null || point.coordinateFrame === originalProblem) {
             "checked source incumbent retains a foreign coordinate frame"
         }
-        require(point.numBoolVars == originalProblem.numBoolVars && point.numIntVars == originalProblem.numIntVars &&
-            point.numRealVars == originalProblem.numRealVars) { "checked source incumbent has incomplete coordinates" }
+        require(
+            point.numBoolVars == originalProblem.numBoolVars && point.numIntVars == originalProblem.numIntVars &&
+                point.numRealVars == originalProblem.numRealVars,
+        ) { "checked source incumbent has incomplete coordinates" }
         return point.withCoordinateFrame(originalProblem)
     }
     fun incumbent(point: QuadraticIncumbent): QuadraticIncumbent = point.copy(sample = sample(point.sample))

@@ -77,8 +77,10 @@ class FactorWeightBook(private val problem: Problem) {
             if (i % INITIALIZATION_BATCH == 0) yield(Unit)
             w[i] = when {
                 implied != null && implied[i] -> IMPLIED_FACTOR_INITIAL_WEIGHT
+
                 counts.isNotEmpty() && counts.getValue(problem.factors[i]::class) > meanClassSize ->
                     meanClassSize / counts.getValue(problem.factors[i]::class)
+
                 else -> 1.0
             }
         }

@@ -99,8 +99,11 @@ internal class IntegerConflictRow private constructor(
             val next = addExact(terms[v] ?: 0L, mulExact(other.coefficients[i], right))
             if (next == 0L) terms.remove(v) else terms[v] = next
         }
-        return normalized(terms, addExact(mulExact(bound, left), mulExact(other.bound, right)),
-            if (guard != Lit.NONE) guard else other.guard)
+        return normalized(
+            terms,
+            addExact(mulExact(bound, left), mulExact(other.bound, right)),
+            if (guard != Lit.NONE) guard else other.guard,
+        )
     }
 
     companion object {
@@ -127,8 +130,12 @@ internal class IntegerConflictRow private constructor(
             }
             if (divisor == 0L) return null
             val variables = terms.keys.sorted().toIntArray()
-            return IntegerConflictRow(variables, LongArray(variables.size) { terms.getValue(variables[it]) / divisor },
-                floorDivide(bound, divisor), guard)
+            return IntegerConflictRow(
+                variables,
+                LongArray(variables.size) { terms.getValue(variables[it]) / divisor },
+                floorDivide(bound, divisor),
+                guard,
+            )
         }
 
         private fun domain(state: PropagationState, variable: Int, trail: Int?): IntDomain =

@@ -43,7 +43,9 @@ internal class RegularPropagator(
         for (variable in seq) {
             if (!state.tightenIntMin(variable, 1L, emptyIntArray()) ||
                 !state.tightenIntMax(variable, alphabetSize.toLong(), emptyIntArray())
-            ) return false
+            ) {
+                return false
+            }
         }
         val inc = (state.refPayload[factorId] as? RegularIncrementalState) ?: run {
             val fresh = RegularIncrementalState(state, seq, numStates, alphabetSize, transitions, q0, accepting)

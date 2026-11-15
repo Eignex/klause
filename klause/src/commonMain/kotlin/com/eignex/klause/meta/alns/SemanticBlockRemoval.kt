@@ -38,8 +38,12 @@ internal class SemanticBlockRemoval(
     var lastRequested: FreedVars? = null
         private set
 
-    override fun destroy(rng: Random, problem: BakedProblem, incumbent: Sample,
-        objective: LinearObjective, fraction: Double,
+    override fun destroy(
+        rng: Random,
+        problem: BakedProblem,
+        incumbent: Sample,
+        objective: LinearObjective,
+        fraction: Double,
     ): FreedVars = destroy(rng, problem, incumbent, objective, fraction, Assumptions.None, ExecutionControl.Never)
 
     override fun destroy(
@@ -91,8 +95,15 @@ internal class SemanticBlockRemoval(
             var closed: ClosedRepairBlock
             do {
                 val before = roles.size
-                closed = RepairBlockClosure.close(problem, roles.freed(), definitions, assumptions,
-                    maxInputs, maxVariables, work)
+                closed = RepairBlockClosure.close(
+                    problem,
+                    roles.freed(),
+                    definitions,
+                    assumptions,
+                    maxInputs,
+                    maxVariables,
+                    work,
+                )
                 expandPackets(problem, closed.freed, roles, work)
             } while (roles.size != before)
             if (closed.searchedInputs == 0) work.stop(RepairBlockDecline.Unavailable)
@@ -109,8 +120,15 @@ internal class SemanticBlockRemoval(
         assumptions: Assumptions,
         cancellation: ExecutionControl,
     ): FreedVars = observed(cancellation) { work ->
-        val closed = RepairBlockClosure.close(problem, requested, definitions, assumptions,
-            maxInputs, maxVariables, work)
+        val closed = RepairBlockClosure.close(
+            problem,
+            requested,
+            definitions,
+            assumptions,
+            maxInputs,
+            maxVariables,
+            work,
+        )
         if (closed.searchedInputs == 0) work.stop(RepairBlockDecline.Unavailable)
         lastSearchedInputs = closed.searchedInputs
         lastRequested = requested
@@ -170,12 +188,20 @@ internal class SemanticBlockRemoval(
         factor.heightVars?.let { roles.int(it[index]) }
     }
 
-    private fun resourceWindow(factor: Cumulative, center: Sample, nominal: Int, rng: Random,
-        roles: Roles, work: RepairBlockWork,
+    private fun resourceWindow(
+        factor: Cumulative,
+        center: Sample,
+        nominal: Int,
+        rng: Random,
+        roles: Roles,
+        work: RepairBlockWork,
     ) {
         val count = factor.starts.size
         if (count > maxVariables) work.stop(RepairBlockDecline.Oversized)
-        val starts = LongArray(count) { work.charge(); center.intValue(factor.starts[it]) }
+        val starts = LongArray(count) {
+            work.charge();
+            center.intValue(factor.starts[it])
+        }
         val order = (0 until count).sortedWith { left, right ->
             work.charge()
             starts[left].compareTo(starts[right]).takeIf { it != 0 } ?: left.compareTo(right)

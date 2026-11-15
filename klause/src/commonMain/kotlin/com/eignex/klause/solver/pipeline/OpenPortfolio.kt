@@ -110,9 +110,9 @@ internal class OpenPortfolio(
         val stop = lifetime or cancellation
         if (stop() || preparedPlan.decline == PreparedPlanDecline.RESOURCE) {
             return OpenTheoryResult.Unknown(
-            if (stop()) theoryParams.preparationStopReason(stop) else TerminationReason.BudgetExhausted,
-            SolveStats.EMPTY,
-        )
+                if (stop()) theoryParams.preparationStopReason(stop) else TerminationReason.BudgetExhausted,
+                SolveStats.EMPTY,
+            )
         }
         val firstLocalArm = if (request != null) 1 else 0
         val localSearch = localSearchFactories(firstLocalArm, lifetime or cancellation, objective = null)
@@ -175,11 +175,11 @@ internal class OpenPortfolio(
         val stop = lifetime or cancellation
         if (stop() || preparedPlan.decline == PreparedPlanDecline.RESOURCE) {
             return OpenTheoryOptimum.Bounded(
-            null,
-            null,
-            if (stop()) theoryParams.preparationStopReason(stop) else TerminationReason.BudgetExhausted,
-            SolveStats.EMPTY,
-        )
+                null,
+                null,
+                if (stop()) theoryParams.preparationStopReason(stop) else TerminationReason.BudgetExhausted,
+                SolveStats.EMPTY,
+            )
         }
         descentVerdict.store(null)
         require(minimizer == null || objective.realCoefficientValues.none { it != 0.0 }) {
@@ -344,10 +344,10 @@ internal class OpenPortfolio(
                 decide(
                     request,
                     workerParams(slot).copy(
-                cancellation = theoryParams.cancellation or slot.cancellation or slice,
-            )
+                        cancellation = theoryParams.cancellation or slot.cancellation or slice,
+                    ),
                 ),
-                worker.evidenceInvocation
+                worker.evidenceInvocation,
             )
         }
         return worker
@@ -462,12 +462,12 @@ internal class OpenPortfolio(
                     lateinit var worker: PortfolioWorker
                     val adapter = slot.own(
                         OpenExactNeighborhood(
-                        sourceModel,
-                        local,
-                        objective,
-                        preparedPlan,
-                        invocation = { worker.evidenceInvocation },
-                    )
+                            sourceModel,
+                            local,
+                            objective,
+                            preparedPlan,
+                            invocation = { worker.evidenceInvocation },
+                        ),
                     )
                     worker = exactNeighborhoodWorker(
                         if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood",

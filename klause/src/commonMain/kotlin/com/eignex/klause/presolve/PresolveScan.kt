@@ -3,7 +3,9 @@ package com.eignex.klause.presolve
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.withoutQuotaViews
 
-internal class PresolveScan(private val parent: ExecutionControl) : ExecutionControl(), AutoCloseable {
+internal class PresolveScan(private val parent: ExecutionControl) :
+    ExecutionControl(),
+    AutoCloseable {
     override val accounting = parent.accounting
     private val source = parent.admission
     private val physical = source?.withoutQuotaViews()

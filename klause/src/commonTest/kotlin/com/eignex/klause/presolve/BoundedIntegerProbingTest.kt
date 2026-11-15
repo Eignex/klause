@@ -21,7 +21,10 @@ class BoundedIntegerProbingTest {
     fun `unproductive sparse probing should retain the original model`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val source = Problem(
-            0, 1, arrayOf(intDomainFromSurvivors(longArrayOf(Long.MIN_VALUE, 0, Long.MAX_VALUE))), emptyList(),
+            0,
+            1,
+            arrayOf(intDomainFromSurvivors(longArrayOf(Long.MIN_VALUE, 0, Long.MAX_VALUE))),
+            emptyList(),
         ).bake(budget.orSpent(ExecutionControl.Never))
 
         val result = RootBaker.reseedBounded(source, BakeConfig())
@@ -33,7 +36,9 @@ class BoundedIntegerProbingTest {
     fun `interior probes should preserve both endpoints and exclude unsupported shared values`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val source = Problem(
-            0, 2, Array(2) { IntDomain(0, 2) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 2) },
             listOf(
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
                 Table(intArrayOf(0, 1), longArrayOf(0, 0, 0, 1, 0, 2, 1, 0, 1, 2, 2, 0, 2, 1, 2, 2)),
@@ -42,15 +47,20 @@ class BoundedIntegerProbingTest {
 
         val result = RootBaker.reseedBounded(source, BakeConfig())
 
-        assertEquals(List(2) { listOf(0L, 2L) }, (0..1).map { v ->
+        assertEquals(
+            List(2) { listOf(0L, 2L) },
+            (0..1).map { v ->
             (0L..2L).filter { it in result.rootIntDomain(v) }
-        })
+        }
+        )
     }
 
     @Test
     fun `unmetered preparation should leave the optional pilot unfunded`() {
         val source = Problem(
-            0, 3, Array(3) { IntDomain(0, 1) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 1) },
             listOf(
                 Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
                 Table(intArrayOf(1, 2), longArrayOf(0, 1, 1, 0)),
@@ -67,7 +77,9 @@ class BoundedIntegerProbingTest {
     fun `completed root refutation should remain terminal`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val source = Problem(
-            0, 3, Array(3) { IntDomain(0, 1) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 1) },
             listOf(
                 Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
                 Table(intArrayOf(1, 2), longArrayOf(0, 1, 1, 0)),
@@ -99,7 +111,9 @@ class BoundedIntegerProbingTest {
         for (cap in listOf(1, 2)) {
             val budget = PresolveBudget(Long.MAX_VALUE)
             val source = Problem(
-                0, 2, Array(2) { IntDomain(0, 3) },
+                0,
+                2,
+                Array(2) { IntDomain(0, 3) },
                 listOf(
                     Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
                     Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),

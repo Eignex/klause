@@ -300,8 +300,13 @@ private inline fun PropagationState.tightenBoundImpl(
     }
     intDomains[v] = newDomain
     noteLearnedUse(currentFactor)
-    arithmeticLearningTrace?.pin(currentFactor, v, if (isMin) newDomain.min else newDomain.max,
-        if (isMin) "lower" else "upper", currentLevel)
+    arithmeticLearningTrace?.pin(
+        currentFactor,
+        v,
+        if (isMin) newDomain.min else newDomain.max,
+        if (isMin) "lower" else "upper",
+        currentLevel,
+    )
     intLevel[v] = maxOf(intLevel[v], currentLevel)
     if (isMin) {
         intMinLevel[v] = currentLevel

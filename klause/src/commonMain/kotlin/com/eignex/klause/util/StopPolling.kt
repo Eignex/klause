@@ -6,9 +6,13 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 internal class StopPolling(private val quantum: Int = 1024) {
     private var remaining = 0
 
-    fun reset() { remaining = 0 }
+    fun reset() {
+        remaining = 0
+    }
 
-    fun rearm() { remaining = quantum }
+    fun rearm() {
+        remaining = quantum
+    }
 
     fun due(work: Int): Boolean {
         remaining -= work
@@ -28,8 +32,7 @@ internal inline fun ExecutionControl.pollStop(work: Int = 1): Boolean {
 internal fun ExecutionControl.bindStopControl(): ExecutionControl =
     if (this === ExecutionControl.Never) this else WorkerStopControl(unboundStopControl())
 
-internal fun ExecutionControl.unboundStopControl(): ExecutionControl =
-    if (this is WorkerStopControl) original else this
+internal fun ExecutionControl.unboundStopControl(): ExecutionControl = if (this is WorkerStopControl) original else this
 
 private class WorkerStopControl(val original: ExecutionControl) : ExecutionControl(original) {
     override val stopPolling = StopPolling()

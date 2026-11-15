@@ -18,7 +18,7 @@ class LinearOperationCancellationTest {
         assertFalse(token.poll())
         cancelled = true
 
-        repeat(2047) { assertFalse(token.poll()) }
+        repeat(8191) { assertFalse(token.poll()) }
 
         assertTrue(token.poll())
     }
@@ -39,7 +39,7 @@ class LinearOperationCancellationTest {
             assertFalse(token.poll())
         }
         token.charge(1L)
-        repeat(2046) { assertFalse(token.poll()) }
+        repeat(8190) { assertFalse(token.poll()) }
 
         assertTrue(token.poll())
         assertEquals(3L, charged)

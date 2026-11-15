@@ -42,7 +42,9 @@ class PresolveSessionTest {
             }
             val session = PresolveSession(
                 Problem(
-                    0, 1, arrayOf(original),
+                    0,
+                    1,
+                    arrayOf(original),
                     listOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, gap)),
                 ).bake(),
             )
@@ -90,7 +92,10 @@ class PresolveSessionTest {
                 }
             }
             val base = Problem(
-                1, 2, arrayOf(original, IntDomain(0, 10)), listOf(Clause(intArrayOf(Lit.make(0, true)))),
+                1,
+                2,
+                arrayOf(original, IntDomain(0, 10)),
+                listOf(Clause(intArrayOf(Lit.make(0, true)))),
             ).bake()
             val session = PresolveSession(base, cancellation = token)
             val spent = budget.spent()
@@ -131,7 +136,9 @@ class PresolveSessionTest {
     @Test
     fun `an interrupted installation should allow probing when cancellation is released`() {
         val base = Problem(
-            2, 1, arrayOf(IntDomain(0, 10)),
+            2,
+            1,
+            arrayOf(IntDomain(0, 10)),
             listOf(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
@@ -139,7 +146,9 @@ class PresolveSessionTest {
         ).bake()
         var stopped = false
         val session = PresolveSession(
-            base, BakeConfig(probeFailedLiterals = true), ExecutionControl { stopped },
+            base,
+            BakeConfig(probeFailedLiterals = true),
+            ExecutionControl { stopped },
         )
         stopped = true
         assertTrue(session.apply(PresolveDelta(domains = arrayOf(IntDomain(0, 10).excludeValue(3)))))
@@ -166,7 +175,9 @@ class PresolveSessionTest {
         for (size in listOf(1, 16, 64)) {
             val budget = PresolveBudget(Long.MAX_VALUE)
             val base = Problem(
-                0, size, Array(size) { IntDomain(0, 10) },
+                0,
+                size,
+                Array(size) { IntDomain(0, 10) },
                 List(size) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.LE, 5) },
             ).bake(budget.orSpent(ExecutionControl.Never))
             val session = PresolveSession(base)
@@ -190,7 +201,9 @@ class PresolveSessionTest {
     @Test
     fun `a domain delta should refresh captured Boolean deductions and retain holes`() {
         val source = Problem(
-            1, 1, arrayOf(IntDomain(0, 10)),
+            1,
+            1,
+            arrayOf(IntDomain(0, 10)),
             listOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 5)),
         ).bake()
         val session = PresolveSession(source)
@@ -209,7 +222,9 @@ class PresolveSessionTest {
     fun `root views should retain an established conflict after its factors drop`() {
         for (config in listOf(BakeConfig.NONE, BakeConfig(probeFailedLiterals = true))) {
             val source = Problem(
-                1, 1, arrayOf(IntDomain(0, 10)),
+                1,
+                1,
+                arrayOf(IntDomain(0, 10)),
                 listOf(Clause(intArrayOf(Lit.make(0, true))), Clause(intArrayOf(Lit.make(0, false)))),
             ).bake()
             val session = PresolveSession(source, config)
@@ -272,7 +287,9 @@ class PresolveSessionTest {
     @Test
     fun `probing enabled materialization should still derive failed literals`() {
         val base = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             listOf(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
@@ -302,7 +319,6 @@ class PresolveSessionTest {
         assertEquals(null, session.factorAt(2))
     }
 
-
     @Test
     fun `incremental and rebuilt complexity should agree across factor drops and domain narrowings`() {
         for (domains in listOf(
@@ -314,7 +330,9 @@ class PresolveSessionTest {
             Array(4) { IntDomain(0, 3_000_000_000_000_000_000L) },
         )) {
             val problem = Problem(
-                2, domains.size, domains,
+                2,
+                domains.size,
+                domains,
                 listOf(
                     Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                     Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
@@ -327,7 +345,8 @@ class PresolveSessionTest {
             )
             val narrowed = Array(domains.size) { domains[it].withMaxAtMost(domains[it].min) }
             val rebuilt = problem.withPassDelta(
-                PassDelta(droppedIndices = intArrayOf(0), domains = narrowed), BakeConfig.NONE,
+                PassDelta(droppedIndices = intArrayOf(0), domains = narrowed),
+                BakeConfig.NONE,
             )
 
             assertTrue(session.apply(PresolveDelta(droppedIds = intArrayOf(0), domains = narrowed)))

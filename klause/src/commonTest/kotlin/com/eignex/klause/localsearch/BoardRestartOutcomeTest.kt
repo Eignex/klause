@@ -89,7 +89,9 @@ class BoardRestartOutcomeTest {
     fun `frozen board inputs should be unavailable for diversification`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf<Factor>(AllDifferent(intArrayOf(0, 1))))
         val state = LocalSearchState(
-            LocalSearchModel.open(problem), Random(7), Assumptions(ints = mapOf(0 to 0L, 1 to 1L)),
+            LocalSearchModel.open(problem),
+            Random(7),
+            Assumptions(ints = mapOf(0 to 0L, 1 to 1L)),
         )
         state.randomizeAssignment()
         state.recompute()
@@ -101,7 +103,10 @@ class BoardRestartOutcomeTest {
     @Test
     fun `fixed root domains should be unavailable for diversification`() {
         val problem = Problem(
-            0, 2, arrayOf(IntDomain(0, 0), IntDomain(1, 1)), arrayOf<Factor>(AllDifferent(intArrayOf(0, 1))),
+            0,
+            2,
+            arrayOf(IntDomain(0, 0), IntDomain(1, 1)),
+            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1))),
         )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
         state.randomizeAssignment()
@@ -132,7 +137,9 @@ class BoardRestartOutcomeTest {
     @Test
     fun `foreign implicit owners should exclude board inputs from diversification`() {
         val problem = Problem(
-            0, 3, Array(3) { IntDomain(0, 2) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
             arrayOf<Factor>(Circuit(intArrayOf(0, 1, 2)), AllDifferent(intArrayOf(0, 1))),
         )
         val state = freshState(problem, 7L)
@@ -146,7 +153,9 @@ class BoardRestartOutcomeTest {
     @Test
     fun `maintained board outputs should not count as searched inputs`() {
         val problem = Problem(
-            0, 5, Array(5) { IntDomain(0, 1) },
+            0,
+            5,
+            Array(5) { IntDomain(0, 1) },
             arrayOf<Factor>(AllDifferent(intArrayOf(0, 1)), Product(2, 4, 0), Product(3, 4, 1)),
         )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
@@ -164,7 +173,10 @@ class BoardRestartOutcomeTest {
     @Test
     fun `values outside root domains should not count as admissible changes`() {
         val problem = Problem(
-            0, 2, arrayOf(IntDomain(0, 1), IntDomain(1, 1)), arrayOf<Factor>(AllDifferent(intArrayOf(0, 1))),
+            0,
+            2,
+            arrayOf(IntDomain(0, 1), IntDomain(1, 1)),
+            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1))),
         )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
         state.randomizeAssignment()
@@ -188,7 +200,9 @@ class BoardRestartOutcomeTest {
     @Test
     fun `greedy repair undoing a kick should not report changed board inputs`() {
         val problem = Problem(
-            0, 32, Array(32) { IntDomain(0, if (it < 2) 1 else 0) },
+            0,
+            32,
+            Array(32) { IntDomain(0, if (it < 2) 1 else 0) },
             arrayOf<Factor>(
                 AllDifferent(intArrayOf(0, 1)),
                 Linear(intArrayOf(2), intArrayOf(0), LinearOp.EQ, 0),
@@ -198,11 +212,13 @@ class BoardRestartOutcomeTest {
         val outcomes = mutableListOf<BoardRestartOutcome?>()
         for (seed in 0L..7L) {
             val policy = IteratedLocalSearchRestart(
-                initialPerturbationStrength = 1, adaptivePerturbation = false,
+                initialPerturbationStrength = 1,
+                adaptivePerturbation = false,
                 perturbationKind = PerturbationKind.BasinHopping,
             )
             val strategy = SourceDrivenStrategy(
-                sources = emptyList(), acceptance = AcceptanceRule.GreedyDescent,
+                sources = emptyList(),
+                acceptance = AcceptanceRule.GreedyDescent,
                 feasibleDescent = FeasibleDescent.SelfOwned,
                 perturbation = { state ->
                     if (policy.lastBoardRestartOutcome != null) {
@@ -215,43 +231,56 @@ class BoardRestartOutcomeTest {
             val engine = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy, restartPolicy = policy)
 
             engine.resumable(
-                LinearObjective(), LocalSearchParams(
-                    maxFlips = 2L, randomSeed = seed,
+                LinearObjective(),
+                LocalSearchParams(
+                    maxFlips = 2L,
+                    randomSeed = seed,
                     initialAssignment = Sample(BooleanArray(0), LongArray(32) { if (it == 1) 1L else 0L }),
                 ),
             ).use { handle -> handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
         }
 
         assertEquals(8, outcomes.size)
-        assertTrue(outcomes.all {
+        assertTrue(
+            outcomes.all {
             it == BoardRestartOutcome.DeclinedRepair || it == BoardRestartOutcome.DeclinedUnchanged
-        })
+        }
+        )
         assertTrue(BoardRestartOutcome.DeclinedRepair in outcomes)
     }
 
     @Test
     fun `suspended restart repair should keep its outcome pending until completion`() {
         val problem = Problem(
-            0, 32, Array(32) { IntDomain(0, if (it < 2) 1 else 0) },
+            0,
+            32,
+            Array(32) { IntDomain(0, if (it < 2) 1 else 0) },
             arrayOf<Factor>(AllDifferent(intArrayOf(0, 1))),
         )
         val policy = IteratedLocalSearchRestart(initialPerturbationStrength = 1)
         val strategy = SourceDrivenStrategy(
-            sources = emptyList(), acceptance = AcceptanceRule.GreedyDescent,
+            sources = emptyList(),
+            acceptance = AcceptanceRule.GreedyDescent,
             feasibleDescent = FeasibleDescent.SelfOwned,
         )
         val engine = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy, restartPolicy = policy)
         var polls = 0
 
         engine.resumable(
-            LinearObjective(), LocalSearchParams(
-                maxFlips = 1L, randomSeed = 7L,
+            LinearObjective(),
+            LocalSearchParams(
+                maxFlips = 1L,
+                randomSeed = 7L,
                 initialAssignment = Sample(BooleanArray(0), LongArray(32) { if (it == 1) 1L else 0L }),
             ),
         ).use { handle ->
-            assertNull(handle.runSlice(
-                ExecutionControl { policy.incumbents.isNotEmpty() && ++polls >= 3 }, Long.MAX_VALUE, -1L,
-            ) {})
+            assertNull(
+                handle.runSlice(
+                ExecutionControl { policy.incumbents.isNotEmpty() && ++polls >= 3 },
+                Long.MAX_VALUE,
+                -1L,
+            ) {}
+            )
             assertNull(policy.lastBoardRestartOutcome)
             assertEquals(0L, policy.changedBoardRestarts + policy.declinedBoardRestarts)
 
@@ -269,7 +298,8 @@ class BoardRestartOutcomeTest {
         for (seed in 0L..7L) {
             val policy = IteratedLocalSearchRestart(initialPerturbationStrength = 5, adaptivePerturbation = false)
             val strategy = SourceDrivenStrategy(
-                sources = emptyList(), acceptance = AcceptanceRule.GreedyDescent,
+                sources = emptyList(),
+                acceptance = AcceptanceRule.GreedyDescent,
                 feasibleDescent = FeasibleDescent.SelfOwned,
                 perturbation = {
                     if (policy.lastBoardRestartOutcome != null) outcomes.add(policy.lastBoardRestartOutcome)
@@ -277,21 +307,28 @@ class BoardRestartOutcomeTest {
                 },
             )
             val engine = LocalSearchEngine(
-                LocalSearchModel.open(problem), strategy = strategy,
-                restartPolicy = policy, seedImplicitOnRestart = true,
+                LocalSearchModel.open(problem),
+                strategy = strategy,
+                restartPolicy = policy,
+                seedImplicitOnRestart = true,
             )
 
             engine.resumable(
-                LinearObjective(), LocalSearchParams(
-                    maxFlips = 2L, randomSeed = seed, initialAssignment = Sample(BooleanArray(0), longArrayOf(0, 1, 2)),
+                LinearObjective(),
+                LocalSearchParams(
+                    maxFlips = 2L,
+                    randomSeed = seed,
+                    initialAssignment = Sample(BooleanArray(0), longArrayOf(0, 1, 2)),
                 ),
             ).use { handle -> handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
         }
 
         assertEquals(8, outcomes.size)
-        assertTrue(outcomes.all {
+        assertTrue(
+            outcomes.all {
             it == BoardRestartOutcome.DeclinedPreparation || it == BoardRestartOutcome.DeclinedUnchanged
-        })
+        }
+        )
         assertTrue(BoardRestartOutcome.DeclinedPreparation in outcomes)
     }
 
@@ -312,17 +349,24 @@ class BoardRestartOutcomeTest {
     fun `unchanged crossover boards should explicitly decline diversification`() {
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2))))
         val policy = IteratedLocalSearchRestart(
-            initialPerturbationStrength = 0, adaptivePerturbation = false, populationSize = 2, crossoverRate = 1.0,
+            initialPerturbationStrength = 0,
+            adaptivePerturbation = false,
+            populationSize = 2,
+            crossoverRate = 1.0,
         )
         val strategy = SourceDrivenStrategy(
-            sources = emptyList(), acceptance = AcceptanceRule.GreedyDescent,
+            sources = emptyList(),
+            acceptance = AcceptanceRule.GreedyDescent,
             feasibleDescent = FeasibleDescent.SelfOwned,
         )
         val engine = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy, restartPolicy = policy)
 
         engine.resumable(
-            LinearObjective(), LocalSearchParams(
-                maxFlips = 3L, randomSeed = 7L, initialAssignment = Sample(BooleanArray(0), longArrayOf(0, 1, 2)),
+            LinearObjective(),
+            LocalSearchParams(
+                maxFlips = 3L,
+                randomSeed = 7L,
+                initialAssignment = Sample(BooleanArray(0), longArrayOf(0, 1, 2)),
             ),
         ).use { handle ->
             val result = assertNotNull(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {})

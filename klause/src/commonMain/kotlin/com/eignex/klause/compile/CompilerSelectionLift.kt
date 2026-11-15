@@ -14,8 +14,13 @@ internal fun Lowering.liftElement(index: IntExpr, items: List<IntExpr>): IntExpr
     val idx = intVarOf(materializeIntVar(lift(index)).name)
     val entries = items.map { intVarOf(materializeIntVar(lift(it)).name) }
     val result = newAuxIntVar(IntDomain(entries.minOf { intDomains[it].min }, entries.maxOf { intDomains[it].max }))
-    factors += Element(idx, intVarOf(result), entries.map { it.toLong() }.toLongArray(),
-        arrIsVars = true, indexOffset = 0)
+    factors += Element(
+        idx,
+        intVarOf(result),
+        entries.map { it.toLong() }.toLongArray(),
+        arrIsVars = true,
+        indexOffset = 0,
+    )
     return IntRef(result)
 }
 
@@ -24,12 +29,26 @@ internal fun Lowering.liftIfThenElse(cond: BoolExpr, thenE: IntExpr, elseE: IntE
     val elseId = intVarOf(materializeIntVar(lift(elseE)).name)
     val literal = lowerToLit(cond)
     val index = intVarOf(newAuxIntVar(IntDomain(0, 1)))
-    factors += ReifiedLinear(Lit.variable(literal), intArrayOf(1), intArrayOf(index), LinearOp.EQ,
-        if (Lit.isPositive(literal)) 1 else 0)
-    val result = newAuxIntVar(IntDomain(minOf(intDomains[thenId].min, intDomains[elseId].min),
-        maxOf(intDomains[thenId].max, intDomains[elseId].max)))
-    factors += Element(index, intVarOf(result), longArrayOf(elseId.toLong(), thenId.toLong()),
-        arrIsVars = true, indexOffset = 0)
+    factors += ReifiedLinear(
+        Lit.variable(literal),
+        intArrayOf(1),
+        intArrayOf(index),
+        LinearOp.EQ,
+        if (Lit.isPositive(literal)) 1 else 0,
+    )
+    val result = newAuxIntVar(
+        IntDomain(
+        minOf(intDomains[thenId].min, intDomains[elseId].min),
+        maxOf(intDomains[thenId].max, intDomains[elseId].max),
+    )
+    )
+    factors += Element(
+        index,
+        intVarOf(result),
+        longArrayOf(elseId.toLong(), thenId.toLong()),
+        arrIsVars = true,
+        indexOffset = 0,
+    )
     return IntRef(result)
 }
 

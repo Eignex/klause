@@ -36,8 +36,10 @@ internal class PolynomialFormula private constructor(
         coupled: PolynomialCoupledSections? = null,
         onCoupledConflict: ((List<PolynomialAtom>) -> Unit)? = null,
         onConflict: ((List<PolynomialAtom>) -> Unit)? = null,
-    ): Iterator<PolynomialBooleanRegion?> = PolynomialBooleanRegions(nodes, root, atoms, arithmetic, progress,
-        onConflict, onPartialCheck, coupled, onCoupledConflict).prepare()
+    ): Iterator<PolynomialBooleanRegion?> = PolynomialBooleanRegions(
+        nodes, root, atoms, arithmetic, progress,
+        onConflict, onPartialCheck, coupled, onCoupledConflict,
+    ).prepare()
 
     fun withAtoms(replacements: List<PolynomialAtom>, arithmetic: PolynomialArithmetic): PolynomialFormula {
         require(replacements.size == atoms.size)
@@ -81,14 +83,23 @@ internal class PolynomialFormula private constructor(
             val value = state.value(index)
             if (value == UNASSIGNED) continue
             val atom = atoms[node.atom]
-            result.add(if (value == TRUE) atom else PolynomialAtom(atom.polynomial, when (atom.relation) {
-                PolynomialRelation.EQ -> PolynomialRelation.NE
-                PolynomialRelation.NE -> PolynomialRelation.EQ
-                PolynomialRelation.LT -> PolynomialRelation.GE
-                PolynomialRelation.LE -> PolynomialRelation.GT
-                PolynomialRelation.GT -> PolynomialRelation.LE
-                PolynomialRelation.GE -> PolynomialRelation.LT
-            }))
+            result.add(
+                if (value == TRUE) {
+                atom
+            } else {
+                PolynomialAtom(
+                atom.polynomial,
+                when (atom.relation) {
+                    PolynomialRelation.EQ -> PolynomialRelation.NE
+                    PolynomialRelation.NE -> PolynomialRelation.EQ
+                    PolynomialRelation.LT -> PolynomialRelation.GE
+                    PolynomialRelation.LE -> PolynomialRelation.GT
+                    PolynomialRelation.GT -> PolynomialRelation.LE
+                    PolynomialRelation.GE -> PolynomialRelation.LT
+                },
+            )
+            }
+            )
         }
         return result
     }
@@ -119,6 +130,7 @@ internal class PolynomialFormula private constructor(
             if (!visited.add(index)) continue
             when (val node = nodes[index]) {
                 is FormulaNode.Constant -> if (!node.value) return null
+
                 is FormulaNode.Atom -> {
                     result.add(atoms[node.atom])
                     if (indices != null) {
@@ -126,6 +138,7 @@ internal class PolynomialFormula private constructor(
                         indices.add(node.atom)
                     }
                 }
+
                 is FormulaNode.Not -> {
                     val child = nodes[node.child] as? FormulaNode.Atom ?: return null
                     val atom = atoms[child.atom]
@@ -133,15 +146,21 @@ internal class PolynomialFormula private constructor(
                         arithmetic.step()
                         indices.add(child.atom)
                     }
-                    result.add(PolynomialAtom(atom.polynomial, when (atom.relation) {
-                        PolynomialRelation.EQ -> PolynomialRelation.NE
-                        PolynomialRelation.NE -> PolynomialRelation.EQ
-                        PolynomialRelation.LT -> PolynomialRelation.GE
-                        PolynomialRelation.LE -> PolynomialRelation.GT
-                        PolynomialRelation.GT -> PolynomialRelation.LE
-                        PolynomialRelation.GE -> PolynomialRelation.LT
-                    }))
+                    result.add(
+                        PolynomialAtom(
+                        atom.polynomial,
+                        when (atom.relation) {
+                            PolynomialRelation.EQ -> PolynomialRelation.NE
+                            PolynomialRelation.NE -> PolynomialRelation.EQ
+                            PolynomialRelation.LT -> PolynomialRelation.GE
+                            PolynomialRelation.LE -> PolynomialRelation.GT
+                            PolynomialRelation.GT -> PolynomialRelation.LE
+                            PolynomialRelation.GE -> PolynomialRelation.LT
+                        },
+                    )
+                    )
                 }
+
                 is FormulaNode.Junction -> {
                     if (!node.conjunction) return null
                     for (child in node.children.indices.reversed()) {
@@ -149,6 +168,7 @@ internal class PolynomialFormula private constructor(
                         pending.addLast(node.children[child])
                     }
                 }
+
                 is FormulaNode.BooleanVariable -> return null
             }
             if (result.size > maximumAtoms) return null
@@ -171,25 +191,34 @@ internal class PolynomialFormula private constructor(
             if (!visited.add(index)) continue
             when (val node = nodes[index]) {
                 is FormulaNode.Constant -> if (!node.value) return null
+
                 is FormulaNode.Atom -> result.add(atoms[node.atom])
+
                 is FormulaNode.Not -> {
                     val child = nodes[node.child] as? FormulaNode.Atom ?: continue
                     val atom = atoms[child.atom]
-                    result.add(PolynomialAtom(atom.polynomial, when (atom.relation) {
-                        PolynomialRelation.EQ -> PolynomialRelation.NE
-                        PolynomialRelation.NE -> PolynomialRelation.EQ
-                        PolynomialRelation.LT -> PolynomialRelation.GE
-                        PolynomialRelation.LE -> PolynomialRelation.GT
-                        PolynomialRelation.GT -> PolynomialRelation.LE
-                        PolynomialRelation.GE -> PolynomialRelation.LT
-                    }))
+                    result.add(
+                        PolynomialAtom(
+                        atom.polynomial,
+                        when (atom.relation) {
+                            PolynomialRelation.EQ -> PolynomialRelation.NE
+                            PolynomialRelation.NE -> PolynomialRelation.EQ
+                            PolynomialRelation.LT -> PolynomialRelation.GE
+                            PolynomialRelation.LE -> PolynomialRelation.GT
+                            PolynomialRelation.GT -> PolynomialRelation.LE
+                            PolynomialRelation.GE -> PolynomialRelation.LT
+                        },
+                    )
+                    )
                 }
+
                 is FormulaNode.Junction -> if (node.conjunction) {
                     for (child in node.children.indices.reversed()) {
                         arithmetic.step()
                         pending.addLast(node.children[child])
                     }
                 }
+
                 is FormulaNode.BooleanVariable -> Unit
             }
             if (result.size > maximumAtoms) return null
@@ -203,13 +232,17 @@ internal class PolynomialFormula private constructor(
             arithmetic.step()
             values[index] = when (node) {
                 is FormulaNode.Constant -> if (node.value) TRUE else FALSE
+
                 is FormulaNode.BooleanVariable -> bools[node.variable]
+
                 is FormulaNode.Atom -> atomValues[node.atom]
+
                 is FormulaNode.Not -> when (values[node.child]) {
                     FALSE -> TRUE
                     TRUE -> FALSE
                     else -> UNASSIGNED
                 }
+
                 is FormulaNode.Junction -> {
                     val decisive = if (node.conjunction) FALSE else TRUE
                     var result = if (node.conjunction) TRUE else FALSE
@@ -265,14 +298,23 @@ internal class PolynomialFormula private constructor(
                 if (node in indices) continue
                 val children = when (node) {
                     is PolynomialRealFormula.Not -> listOf(node.operand)
+
                     is PolynomialRealFormula.And -> node.operands
+
                     is PolynomialRealFormula.Or -> node.operands
-                    is PolynomialDistinct -> listOf(expansions.getOrPut(node) {
+
+                    is PolynomialDistinct -> listOf(
+                        expansions.getOrPut(node) {
                         polynomialDistinctEncoding(node, arithmetic::step)
-                    })
-                    is PolynomialSelection -> listOf(expansions.getOrPut(node) {
+                    }
+                    )
+
+                    is PolynomialSelection -> listOf(
+                        expansions.getOrPut(node) {
                         polynomialSelectionEncoding(node, arithmetic::step)
-                    })
+                    }
+                    )
+
                     else -> emptyList()
                 }
                 if (!combine && children.isNotEmpty()) {
@@ -282,41 +324,53 @@ internal class PolynomialFormula private constructor(
                 }
                 val normalized = when (node) {
                     is PolynomialRealFormula.Constant -> FormulaNode.Constant(node.value)
+
                     is PolynomialRealFormula.BooleanVariable -> {
                         booleans.add(node.id.index)
                         FormulaNode.BooleanVariable(node.id.index)
                     }
+
                     is PolynomialRealFormula.Atom -> {
                         val polynomial = arithmetic.subtract(
-                            expressions.normalize(node.left), expressions.normalize(node.right),
+                            expressions.normalize(node.left),
+                            expressions.normalize(node.right),
                         )
                         atoms.add(PolynomialAtom(polynomial, node.relation))
                         FormulaNode.Atom(atoms.lastIndex)
                     }
+
                     is PolynomialRealFormula.Not -> FormulaNode.Not(indices.getValue(node.operand))
+
                     is PolynomialDistinct, is PolynomialSelection -> FormulaNode.Junction(
-                        intArrayOf(indices.getValue(children.single())), true,
+                        intArrayOf(indices.getValue(children.single())),
+                        true,
                     )
+
                     is PolynomialRealFormula.And -> FormulaNode.Junction(
                         children.map {
                             arithmetic.step()
                             indices.getValue(it)
-                        }.toIntArray(), true,
+                        }.toIntArray(),
+                        true,
                     )
+
                     is PolynomialRealFormula.Or -> FormulaNode.Junction(
                         children.map {
                             arithmetic.step()
                             indices.getValue(it)
-                        }.toIntArray(), false,
+                        }.toIntArray(),
+                        false,
                     )
                 }
                 indices[node] = nodes.size
                 nodes.add(normalized)
             }
-            val variables = booleans.sortedWith(Comparator { left, right ->
+            val variables = booleans.sortedWith(
+                Comparator { left, right ->
                 arithmetic.step()
                 left.compareTo(right)
-            })
+            }
+            )
             return PolynomialFormula(nodes, indices.getValue(formula), atoms, variables).sharePredicates(arithmetic)
         }
     }
@@ -362,14 +416,18 @@ private class PolynomialNormalizer(
                 is PolynomialExpression.Constant -> Polynomial.constant(
                     BigFraction.of(node.numerator, node.denominator),
                 )
+
                 is PolynomialExpression.Variable -> fixed[node.id.index]?.let(Polynomial::constant)
                     ?: Polynomial.variable(node.id.index)
+
                 is PolynomialExpression.Power -> arithmetic.power(normalized.getValue(node.base), node.exponent)
+
                 is PolynomialExpression.Sum -> {
                     var value = Polynomial.ZERO
                     for (child in children) value = arithmetic.add(value, normalized.getValue(child))
                     value
                 }
+
                 is PolynomialExpression.Product -> {
                     var value = Polynomial.ONE
                     for (child in children) value = arithmetic.multiply(value, normalized.getValue(child))

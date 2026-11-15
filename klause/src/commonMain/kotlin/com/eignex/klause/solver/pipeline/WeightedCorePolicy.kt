@@ -80,7 +80,9 @@ internal fun weightedCoreDefaultScenario(
         if (weight > remaining) return scenario
         remaining -= weight
         if (weight == 0L) continue
-        if (first == 0L) first = weight else if (weight != first) {
+        if (first == 0L) {
+            first = weight
+        } else if (weight != first) {
             varied = true
         }
     }

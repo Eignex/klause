@@ -18,8 +18,7 @@ internal class PrivateRebuildWarmClauses private constructor(
     val normalizationWork: Long,
 ) {
     companion object {
-        fun empty(): PrivateRebuildWarmClauses =
-            PrivateRebuildWarmClauses(emptyArray(), 0L, 0L, 0L, 0, 0L, 0L)
+        fun empty(): PrivateRebuildWarmClauses = PrivateRebuildWarmClauses(emptyArray(), 0L, 0L, 0L, 0, 0L, 0L)
 
         fun capture(
             session: PropagationSession,
@@ -62,8 +61,8 @@ internal class PrivateRebuildWarmClauses private constructor(
                 if (!session.isLearnedClause(index) || session.learnedClausePermanent(index) ||
                     session.learnedClauseOrigin(index) != OWN_ORIGIN
                 ) {
-                        continue
-                    }
+                    continue
+                }
                 val size = session.learnedClauseLiteralCount(index)
                 if ((size + 1L) * 512L > byteLimit - bytes - scratchBytes) continue
                 if (!visit(size * 3L + 1L)) break
@@ -72,7 +71,10 @@ internal class PrivateRebuildWarmClauses private constructor(
                 var supported = true
                 for (literal in source) {
                     val variable = Lit.variable(literal)
-                    if (variable >= fixed.size) { supported = false; break }
+                    if (variable >= fixed.size) {
+                        supported = false;
+                        break
+                    }
                     needsProjection = needsProjection || projection.eliminates(variable)
                 }
                 if (!supported) continue

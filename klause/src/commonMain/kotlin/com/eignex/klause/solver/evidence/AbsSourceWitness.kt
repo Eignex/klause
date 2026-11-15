@@ -30,8 +30,10 @@ internal fun Problem.absSourceWitnessContext(
 ): SourceProofContext? {
     if (cancellation() || !hasCompleteAbsSource()) return null
     val identity = Uuid.random().toString()
-    val scope = SourceScope(SourceRevision(identity, "klause-ir-exact-v1"),
-        objective = SourceObjective("$identity/objective", ObjectiveSense.MINIMIZE))
+    val scope = SourceScope(
+        SourceRevision(identity, "klause-ir-exact-v1"),
+        objective = SourceObjective("$identity/objective", ObjectiveSense.MINIMIZE),
+    )
     return sourceProofContext(scope, objective, cancellation)
 }
 
@@ -54,7 +56,9 @@ internal fun Problem.checkAbsSourceWitness(sample: Sample, cancellation: Executi
             return false
         }
         return row.exactComparison(
-            numRealVars, row.activator == LinearRow.ALWAYS || witness.truth(row.activator), witness::truth,
+            numRealVars,
+            row.activator == LinearRow.ALWAYS || witness.truth(row.activator),
+            witness::truth,
         ).holdsAt(witness)
     }
     for ((id, factor) in factors.withIndex()) {
@@ -70,7 +74,8 @@ internal fun Problem.checkAbsSourceWitness(sample: Sample, cancellation: Executi
                 is LinearForm.Disjunction -> form.rows.any(::holds)
 
                 is LinearForm.Relaxation, null -> return SourceEvidenceCheck.Unavailable(
-                    "original factor has no complete absolute value source checker")
+                    "original factor has no complete absolute value source checker",
+                )
             }
         }
         if (interrupted || cancellation()) return SourceEvidenceCheck.Unavailable("original-source check cancelled")

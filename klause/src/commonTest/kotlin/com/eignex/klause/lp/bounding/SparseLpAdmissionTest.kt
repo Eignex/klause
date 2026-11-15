@@ -47,14 +47,21 @@ import kotlin.test.assertTrue
 class SparseLpAdmissionTest {
     @Test
     fun `disabled source preparation should remain disabled during sparse admission`() {
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
-            settings = ProblemSettings(lpCeilingTableauCells = 1L)).bake()
+            settings = ProblemSettings(lpCeilingTableauCells = 1L),
+        ).bake()
         var admission: SparseLpAdmission? = null
 
         sequence<Unit> {
-            admission = prepareSparseLpAdmission(problem, LinearObjective(intCoefficients = longArrayOf(1, 2)),
-                sourcePreparation = LpSourcePreparation.DISABLED)
+            admission = prepareSparseLpAdmission(
+                problem,
+                LinearObjective(intCoefficients = longArrayOf(1, 2)),
+                sourcePreparation = LpSourcePreparation.DISABLED,
+            )
         }.forEach { }
 
         assertNull(requireNotNull(requireNotNull(admission).sourceLayout).preparationTemplates)
@@ -62,18 +69,28 @@ class SparseLpAdmissionTest {
 
     @Test
     fun `paid sparse source layout starts numerical preparation without another assembly slice`() {
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
-            settings = ProblemSettings(lpCeilingTableauCells = 1L)).bake()
+            settings = ProblemSettings(lpCeilingTableauCells = 1L),
+        ).bake()
         val factory = RecordingLpEngineFactory()
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 2), constant = 7L),
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1, 2), constant = 7L),
             LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
-            SolveStatsSink("paid-sparse-source-layout"), LpSolveContext(factory),
-            projections = FactorProjectionProviders.Default.prepare(problem)).use { engine ->
+            SolveStatsSink("paid-sparse-source-layout"),
+            LpSolveContext(factory),
+            projections = FactorProjectionProviders.Default.prepare(problem),
+        ).use { engine ->
             val paid = engine.totalSolveWork()
 
-            val readyInFirstSlice = engine.prepareRootLayout(ExecutionControl.Never,
-                ExecutionControl { engine.totalSolveWork() > paid })
+            val readyInFirstSlice = engine.prepareRootLayout(
+                ExecutionControl.Never,
+                ExecutionControl { engine.totalSolveWork() > paid },
+            )
 
             assertFalse(readyInFirstSlice)
             assertTrue(paid > 0L)
@@ -87,13 +104,21 @@ class SparseLpAdmissionTest {
 
     @Test
     fun `cancelled sparse source adoption retains its paid charge without constructing an owner`() {
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
-            settings = ProblemSettings(lpCeilingTableauCells = 1L)).bake()
+            settings = ProblemSettings(lpCeilingTableauCells = 1L),
+        ).bake()
         val factory = RecordingLpEngineFactory()
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 2)),
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1, 2)),
             LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
-            SolveStatsSink("cancelled-sparse-source-adoption"), LpSolveContext(factory)).use { engine ->
+            SolveStatsSink("cancelled-sparse-source-adoption"),
+            LpSolveContext(factory),
+        ).use { engine ->
             val paid = engine.totalSolveWork()
             val cancelled = ExecutionControl { true }
 
@@ -109,9 +134,13 @@ class SparseLpAdmissionTest {
 
     @Test
     fun `sparse admission measures source bounds before root propagation`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0, 64)),
+        val problem = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 64)),
             listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)),
-            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+            settings = ProblemSettings(lpCeilingTableauCells = 1L),
+        )
 
         val admission = LpAutoConfig.admission(problem, LpConfig.parse("default,+sparse-trial"), LpPlan())
 
@@ -122,11 +151,20 @@ class SparseLpAdmissionTest {
     @Test
     fun `cancelled sparse assembly retains its reserved construction charge`() {
         val row = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
             List(2 * CONSTRUCTION_BATCH_SIZE) { row },
-            settings = ProblemSettings(lpCeilingTableauCells = 1L))
-        val complete = requireNotNull(LpAutoConfig.admission(problem,
-            LpConfig.parse("default,+sparse-trial"), LpPlan()).sparseTrial)
+            settings = ProblemSettings(lpCeilingTableauCells = 1L),
+        )
+        val complete = requireNotNull(
+            LpAutoConfig.admission(
+            problem,
+            LpConfig.parse("default,+sparse-trial"),
+            LpPlan(),
+        ).sparseTrial
+        )
         assertTrue(complete.admitted)
         for (chunks in 1..2) {
             var cancelled = false
@@ -151,16 +189,25 @@ class SparseLpAdmissionTest {
 
     @Test
     fun `a sparse root bound does not admit the same model to dense exact continuation`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+        val problem = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 2)),
             List(256) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1) },
-            settings = ProblemSettings(lpCeilingTableauCells = 1L))
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L),
+        )
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1)),
             LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
-            SolveStatsSink("separate-exact-envelope")).use { engine ->
+            SolveStatsSink("separate-exact-envelope"),
+        ).use { engine ->
             val relaxer = requireNotNull(engine.lpRelaxer)
             val model = relaxer.build(PropagationSession(problem)).model
-            val basis = Basis(IntArray(model.m) { model.n + it },
-                Array(model.numVars) { if (it >= model.n) VarStatus.BASIC else VarStatus.AT_LOWER })
+            val basis = Basis(
+                IntArray(model.m) { model.n + it },
+                Array(model.numVars) { if (it >= model.n) VarStatus.BASIC else VarStatus.AT_LOWER },
+            )
 
             val declined = continueExactLp(model, basis)
             val bound = engine.rootLpRelaxationBound(relaxer, emptyList())
@@ -173,9 +220,13 @@ class SparseLpAdmissionTest {
 
     @Test
     fun `completed sparse root work leaves checking inside the same grant`() {
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
-            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+            settings = ProblemSettings(lpCeilingTableauCells = 1L),
+        )
         for (checkingWork in listOf(0L, 1L)) {
             lateinit var engine: LpEngine
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
@@ -189,7 +240,13 @@ class SparseLpAdmissionTest {
                     pricing: LpPricingOptions,
                 ): PersistentLpSolver {
                     val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                        model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                        model,
+                        cancellation,
+                        refactorUpdateLimit,
+                        iterationLimit,
+                        workLimit,
+                        trackDegeneracy,
+                        pricing,
                     )
                     return object : PersistentLpSolver by delegate {
                         private var completed: LpSolveMetrics? = null
@@ -203,9 +260,13 @@ class SparseLpAdmissionTest {
                     }
                 }
             }
-            engine = LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1)),
+            engine = LpEngine(
+                problem,
+                LinearObjective(intCoefficients = longArrayOf(1, 1)),
                 LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
-                SolveStatsSink("funded-sparse-root"), LpSolveContext(factory))
+                SolveStatsSink("funded-sparse-root"),
+                LpSolveContext(factory),
+            )
 
             val (bound, work) = engine.use {
                 it.rootLpRelaxationBound(requireNotNull(it.lpRelaxer), emptyList()) to it.totalSolveWork()
@@ -219,18 +280,26 @@ class SparseLpAdmissionTest {
 
     @Test
     fun `sparse root bounds honor bounded certificate refusal`() {
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
-            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+            settings = ProblemSettings(lpCeilingTableauCells = 1L),
+        )
         var refusals = 0
         val policy = LpCertificationPolicy { _, successful ->
             if (successful) refusals++
             false
         }
 
-        val bound = LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1)),
+        val bound = LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1, 1)),
             LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
-            SolveStatsSink("refused-sparse-root"), LpSolveContext(certificationPolicy = policy)).use {
+            SolveStatsSink("refused-sparse-root"),
+            LpSolveContext(certificationPolicy = policy),
+        ).use {
             it.rootLpRelaxationBound(requireNotNull(it.lpRelaxer), emptyList())
         }
 
@@ -241,9 +310,13 @@ class SparseLpAdmissionTest {
     @Test
     fun `admitted sparse roots retain primal consumers when the ordinary size proxy declines`() {
         for ((ceiling, ordinaryLp) in listOf(1L to false, 1_000_000L to true)) {
-            val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            val problem = Problem(
+                0,
+                2,
+                Array(2) { IntDomain(0, 1) },
                 listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
-                settings = ProblemSettings(lpCeilingTableauCells = ceiling))
+                settings = ProblemSettings(lpCeilingTableauCells = ceiling),
+            )
             val ordinary = LpAutoConfig.resolve(problem, LpConfig.AUTO)
 
             val trial = LpAutoConfig.resolve(problem, LpConfig.parse("default,+sparse-trial"))
@@ -257,13 +330,21 @@ class SparseLpAdmissionTest {
 
     @Test
     fun `sparse root consultations retain progress until a checked bound completes`() {
-        val problem = Problem(0, 96, Array(96) { IntDomain(0, 1) },
+        val problem = Problem(
+            0,
+            96,
+            Array(96) { IntDomain(0, 1) },
             List(95) { Linear(intArrayOf(1, 1), intArrayOf(it, it + 1), LinearOp.GE, 1) },
-            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+            settings = ProblemSettings(lpCeilingTableauCells = 1L),
+        )
         val sink = SolveStatsSink("continued-sparse-root")
 
-        val (lower, work) = LpEngine(problem, LinearObjective(intCoefficients = LongArray(96) { 1L }),
-            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink).use { engine ->
+        val (lower, work) = LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(96) { 1L }),
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
+            sink,
+        ).use { engine ->
             repeat(3) { engine.observeNodeWork(false, 96, 96, 1) }
             val bound = engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList())
             bound to engine.totalSolveWork()
@@ -278,14 +359,22 @@ class SparseLpAdmissionTest {
 
     @Test
     fun `checked paused bounds survive a later root consultation stop`() {
-        val problem = Problem(0, 96, Array(96) { IntDomain(0, 1) },
+        val problem = Problem(
+            0,
+            96,
+            Array(96) { IntDomain(0, 1) },
             List(95) { Linear(intArrayOf(1, 1), intArrayOf(it, it + 1), LinearOp.GE, 1) },
-            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+            settings = ProblemSettings(lpCeilingTableauCells = 1L),
+        )
         val sink = SolveStatsSink("checked-paused-sparse-root")
         val stop = ExecutionControl { (sink.lp.sparseTrial["PausedCertifiedBounds"] ?: 0L) > 0L }
 
-        val (lower, work) = LpEngine(problem, LinearObjective(intCoefficients = LongArray(96) { 1L }),
-            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink).use { engine ->
+        val (lower, work) = LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(96) { 1L }),
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
+            sink,
+        ).use { engine ->
             repeat(3) { engine.observeNodeWork(false, 96, 96, 1) }
             val bound = engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList(), stop)
             assertTrue(engine.propagator.floatPaused)
@@ -300,14 +389,22 @@ class SparseLpAdmissionTest {
 
     @Test
     fun `cancelled sparse root continuation publishes no partial bound`() {
-        val problem = Problem(0, 96, Array(96) { IntDomain(0, 1) },
+        val problem = Problem(
+            0,
+            96,
+            Array(96) { IntDomain(0, 1) },
             List(95) { Linear(intArrayOf(1, 1), intArrayOf(it, it + 1), LinearOp.GE, 1) },
-            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+            settings = ProblemSettings(lpCeilingTableauCells = 1L),
+        )
         val sink = SolveStatsSink("cancelled-sparse-root")
         val stop = ExecutionControl { (sink.lp.sparseTrial["RootPauses"] ?: 0L) > 0L }
 
-        val (lower, work) = LpEngine(problem, LinearObjective(intCoefficients = LongArray(96) { 1L }),
-            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink).use { engine ->
+        val (lower, work) = LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(96) { 1L }),
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
+            sink,
+        ).use { engine ->
             repeat(3) { engine.observeNodeWork(false, 96, 96, 1) }
             val bound = engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList(), stop)
             bound to engine.totalSolveWork()
@@ -323,10 +420,21 @@ class SparseLpAdmissionTest {
     @Test
     fun `strict source completion stays outside bounded root trial admission`() {
         val problem = Problem(
-            0, 0, emptyArray(),
-            listOf(ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
-                LinearOp.GE, BigFraction.ZERO, strict = true)),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            0,
+            0,
+            emptyArray(),
+            listOf(
+                ExactLinear.of(
+                intArrayOf(Term.ofRealVar(0)),
+                listOf(BigFraction.ONE),
+                LinearOp.GE,
+                BigFraction.ZERO,
+                strict = true,
+            )
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
             settings = ProblemSettings(lpCeilingTableauCells = 1L),
         )
 
@@ -339,18 +447,35 @@ class SparseLpAdmissionTest {
     @Test
     fun `mixed source root bounds preserve original objective units`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 1)),
-            listOf(ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
-                listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.GE, BigFraction.ONE)),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            0,
+            1,
+            arrayOf(IntDomain(0, 1)),
+            listOf(
+                ExactLinear.of(
+                intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+                listOf(BigFraction.ONE, BigFraction.ONE),
+                LinearOp.GE,
+                BigFraction.ONE,
+            )
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
             settings = ProblemSettings(lpCeilingTableauCells = 1L),
         )
-        val objective = LinearObjective(intCoefficients = longArrayOf(1),
-            realCoefficients = doubleArrayOf(1.0), constant = 7L)
+        val objective = LinearObjective(
+            intCoefficients = longArrayOf(1),
+            realCoefficients = doubleArrayOf(1.0),
+            constant = 7L,
+        )
         val sink = SolveStatsSink("mixed-root-units")
 
-        val lower = LpEngine(problem, objective,
-            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink).use { engine ->
+        val lower = LpEngine(
+            problem,
+            objective,
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
+            sink,
+        ).use { engine ->
             engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList())
         }
 
@@ -359,16 +484,23 @@ class SparseLpAdmissionTest {
 
     @Test
     fun `source preparation respects a smaller caller root allowance`() {
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
-            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+            settings = ProblemSettings(lpCeilingTableauCells = 1L),
+        )
         val sink = SolveStatsSink("small-root-allowance")
         val plan = LpAutoConfig.resolve(problem, LpConfig.parse("default,+sparse-trial"), LpPlan(rootMaxWork = 1L))
         assertFalse(plan.bounding)
 
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1)),
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1, 1)),
             LpParams(lpConfig = LpConfig.parse("default,+sparse-trial"), lpPlan = LpPlan(rootMaxWork = 1L)),
-            sink).use { engine -> assertFalse(engine.params.lpPlan.bounding) }
+            sink,
+        ).use { engine -> assertFalse(engine.params.lpPlan.bounding) }
 
         assertEquals(1L, sink.snapshot().lp.sparseTrial["DeclinePreparationWork"])
         assertEquals(0.0, sink.snapshot().lp.rootPasses.sum)
@@ -376,21 +508,31 @@ class SparseLpAdmissionTest {
 
     @Test
     fun `unreserved custom projections decline before emission`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+        val problem = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 2)),
             listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)),
-            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+            settings = ProblemSettings(lpCeilingTableauCells = 1L),
+        )
         var emitted = false
-        val projections = FactorProjectionProviders(relaxation = RelaxationProjectionProvider {
+        val projections = FactorProjectionProviders(
+            relaxation = RelaxationProjectionProvider {
             RelaxationProjection(RelaxationCapability.SOUND) { _, builder ->
                 emitted = true
                 builder.linearRow(LinearOp.LE, intArrayOf(0), longArrayOf(1), 1)
             }
-        }).prepare(problem)
+        }
+        ).prepare(problem)
         val sink = SolveStatsSink("custom-projection")
 
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
-            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink,
-            projections = projections).use { }
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
+            sink,
+            projections = projections,
+        ).use { }
 
         assertFalse(emitted)
         assertEquals(1L, sink.snapshot().lp.sparseTrial["DeclineProjection"])
@@ -437,20 +579,27 @@ class SparseLpAdmissionTest {
     @Test
     fun `ordinary root bounding consumes a sparse trial certificate beyond the size proxy`() {
         val problem = Problem(
-            0, 3, Array(3) { IntDomain(0, 1) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 1) },
             listOf(
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
                 Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
                 Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-            ), settings = ProblemSettings(lpCeilingTableauCells = 1L),
+            ),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L),
         )
         val session = PropagationSession(problem)
         val sink = SolveStatsSink("sparse-trial")
         val projections = FactorProjectionProviders.Default.prepare(problem)
 
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1, 1)),
-            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink,
-            projections = projections).use { engine ->
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1, 1, 1)),
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
+            sink,
+            projections = projections,
+        ).use { engine ->
             assertTrue(engine.sparseTrialActive)
             assertEquals(0, engine.params.lpPlan.boundMaxDepth)
             engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList())
@@ -466,9 +615,13 @@ class SparseLpAdmissionTest {
 
     @Test
     fun `default admission preserves the size refusal`() {
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
-            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+            settings = ProblemSettings(lpCeilingTableauCells = 1L),
+        )
 
         val plan = LpAutoConfig.resolve(problem, LpConfig.AUTO)
 
@@ -477,8 +630,12 @@ class SparseLpAdmissionTest {
 
     @Test
     fun `cancelled sparse admission supplies no bounding route`() {
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
-            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+        )
         var admission: SparseLpAdmission? = null
         sequence<Unit> {
             admission = prepareSparseLpAdmission(problem, null, ExecutionControl { true })
@@ -491,8 +648,13 @@ class SparseLpAdmissionTest {
     @Test
     fun `factor storage is bounded before source assembly`() {
         val row = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1)
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, List(66_000) { row },
-            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
+            List(66_000) { row },
+            settings = ProblemSettings(lpCeilingTableauCells = 1L),
+        )
 
         val admission = LpAutoConfig.admission(problem, LpConfig.parse("default,+sparse-trial"), LpPlan())
 

@@ -162,8 +162,11 @@ class SourceIntDomains internal constructor(
                 packedOpenLo = packedOpenLo,
                 packedOpenHi = packedOpenHi,
             )
-            return SourceIntDomains(bounds, if (shared) domains else domains.copyOf(),
-                stableEndpoints = !shared)
+            return SourceIntDomains(
+                bounds,
+                if (shared) domains else domains.copyOf(),
+                stableEndpoints = !shared,
+            )
         }
     }
 }

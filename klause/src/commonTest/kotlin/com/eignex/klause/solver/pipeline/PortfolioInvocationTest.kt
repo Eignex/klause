@@ -36,16 +36,23 @@ class PortfolioInvocationTest {
         val seeds = mutableListOf<Long>()
         val visits = mutableListOf<Int>()
         val factories = List(4) { arm ->
-            PortfolioArmFactory(plan, arm, if (arm < 2) ArmFamily.Backtrack else ArmFamily.LocalSearch,
-                binding = { SourceWorkerBinding(runtime) }) { slot ->
+            PortfolioArmFactory(
+                plan,
+                arm,
+                if (arm < 2) ArmFamily.Backtrack else ArmFamily.LocalSearch,
+                binding = { SourceWorkerBinding(runtime) },
+            ) { slot ->
                 seeds += slot.seed
                 trackingWorker("worker$arm", arm, ScriptedSearch({ false }) { visits += arm })
             }
         }
 
-        PortfolioInvocation(plan, factories,
+        PortfolioInvocation(
+            plan,
+            factories,
             PortfolioInvocationControls(seed = 17, cancellation = ExecutionControl { visits.size >= 4 }),
-            PortfolioEvidence(runtime.model, CandidateVerifier.trusting()), objective,
+            PortfolioEvidence(runtime.model, CandidateVerifier.trusting()),
+            objective,
         ) { workers ->
             PortfolioInvocationPolicy(probeRanks = heuristicSecondProbeRanks(workers))
         }.use { it.minimize(ExecutionControl.Never, null) }

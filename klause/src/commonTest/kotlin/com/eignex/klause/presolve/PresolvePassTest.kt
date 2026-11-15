@@ -19,21 +19,27 @@ class PresolvePassTest {
     @Test
     fun `finite passes should poll the supplied cancellation before making reductions`() {
         val probing = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             listOf(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
             ),
         ).bake()
         val implications = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             listOf(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
             ),
         ).bake()
         val precedence = Problem(
-            0, 3, Array(3) { IntDomain(0, 2) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
             listOf(AllDifferent(intArrayOf(0, 1, 2))),
         ).bake()
 
@@ -44,7 +50,12 @@ class PresolvePassTest {
         )) {
             assertFalse(pass.applyFinite(problem, PresolveContext.EMPTY).isEmpty, pass.id)
             var polls = 0
-            val context = PresolveContext(cancellation = ExecutionControl { polls++; true })
+            val context = PresolveContext(
+                cancellation = ExecutionControl {
+                polls++;
+                true
+            }
+            )
 
             val delta = pass.applyFinite(problem, context)
 
@@ -56,7 +67,9 @@ class PresolvePassTest {
     @Test
     fun `finite probing passes should bill native construction and propagation to the supplied budget`() {
         val problem = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             listOf(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
@@ -78,13 +91,16 @@ class PresolvePassTest {
     @Test
     fun `value precedence should stop when orbit discovery spends the supplied budget`() {
         val problem = Problem(
-            0, 3, Array(3) { IntDomain(0, 2) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
             listOf(AllDifferent(intArrayOf(0, 1, 2))),
         ).bake()
         val budget = PresolveBudget(3)
 
         val delta = PresolvePass.VALUE_PRECEDENCE.applyFinite(
-            problem, PresolveContext(cancellation = budget.orSpent(ExecutionControl.Never)),
+            problem,
+            PresolveContext(cancellation = budget.orSpent(ExecutionControl.Never)),
         )
 
         assertTrue(delta.isEmpty)
@@ -94,7 +110,9 @@ class PresolvePassTest {
     @Test
     fun `native work exhaustion should stop finite probing before the next candidate`() {
         val problem = Problem(
-            3, 0, emptyArray(),
+            3,
+            0,
+            emptyArray(),
             listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))),
         ).bake()
 
@@ -115,7 +133,9 @@ class PresolvePassTest {
     @Test
     fun `SAT passes should retain typed reconstruction under the same source and finite currency`() {
         val source = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             listOf(Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 3))),
         )
         val finite = source.bake()
@@ -124,10 +144,12 @@ class PresolvePassTest {
             val finiteBudget = PresolveBudget(10_000L)
 
             val sourceDelta = pass.applySource(
-                source, PresolveContext(cancellation = sourceBudget.orSpent(ExecutionControl.Never)),
+                source,
+                PresolveContext(cancellation = sourceBudget.orSpent(ExecutionControl.Never)),
             )
             val finiteDelta = pass.applyFinite(
-                finite, PresolveContext(cancellation = finiteBudget.orSpent(ExecutionControl.Never)),
+                finite,
+                PresolveContext(cancellation = finiteBudget.orSpent(ExecutionControl.Never)),
             )
 
             assertFalse(sourceDelta.isEmpty)
@@ -141,9 +163,11 @@ class PresolvePassTest {
                 for (rebuild in listOf(sourceDelta.rebuild, finiteDelta.rebuild)) {
                     val lifted = point.copyOf()
                     rebuild.rebuildInto(lifted)
-                    assertTrue(source.factors.filterIsInstance<Clause>().all { clause ->
+                    assertTrue(
+                        source.factors.filterIsInstance<Clause>().all { clause ->
                         clause.literals.any { Lit.evaluate(it, lifted[Lit.variable(it)]) }
-                    })
+                    }
+                    )
                 }
             }
         }
@@ -152,14 +176,20 @@ class PresolvePassTest {
     @Test
     fun `scheduled source probing should close an open integer side`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 10)),
+            0,
+            1,
+            arrayOf(IntDomain(0, 10)),
             listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7)),
             openIntHi = booleanArrayOf(true),
         )
         val budget = PresolveBudget(Long.MAX_VALUE)
 
-        val prepared = Presolver.runSource(problem, PresolveConfig.parse("off,+probe-open"),
-            PresolveContext(presolveBudget = budget), budget.orSpent(ExecutionControl.Never))
+        val prepared = Presolver.runSource(
+            problem,
+            PresolveConfig.parse("off,+probe-open"),
+            PresolveContext(presolveBudget = budget),
+            budget.orSpent(ExecutionControl.Never),
+        )
 
         assertEquals(listOf(PresolvePass.PROBE_OPEN_RANGES), prepared.passesFired)
         assertEquals(7L, prepared.problem.intBounds.upper(0))
@@ -170,14 +200,19 @@ class PresolvePassTest {
     fun `source probing should derive Boolean units beside real rows with no open integer`() {
         for (integers in 0..1) {
             val problem = Problem(
-                2, integers, Array(integers) { IntDomain(0, 2) },
+                2,
+                integers,
+                Array(integers) { IntDomain(0, 2) },
                 listOf(
                     Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                     Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
                     Linear(
-                        intVars = intArrayOf(), intCoeffs = doubleArrayOf(),
-                        realVars = intArrayOf(0), realCoeffs = doubleArrayOf(1.0),
-                        op = LinearOp.GE, bound = 0.0,
+                        intVars = intArrayOf(),
+                        intCoeffs = doubleArrayOf(),
+                        realVars = intArrayOf(0),
+                        realCoeffs = doubleArrayOf(1.0),
+                        op = LinearOp.GE,
+                        bound = 0.0,
                     ),
                 ),
                 numRealVars = 1,
@@ -188,9 +223,11 @@ class PresolvePassTest {
             val prepared = Presolver.runSource(problem, PresolveConfig.parse("off,+probe-open"))
 
             assertEquals(listOf(PresolvePass.PROBE_OPEN_RANGES), prepared.passesFired)
-            assertTrue(prepared.problem.factors.filterIsInstance<Clause>().any {
+            assertTrue(
+                prepared.problem.factors.filterIsInstance<Clause>().any {
                 it.literals.contentEquals(intArrayOf(Lit.make(0, true)))
-            })
+            }
+            )
         }
     }
 
@@ -198,13 +235,18 @@ class PresolvePassTest {
     fun `source symmetry should order Booleans beside real rows with no open integer`() {
         for (integers in 0..1) {
             val problem = Problem(
-                2, integers, Array(integers) { IntDomain(0, 2) },
+                2,
+                integers,
+                Array(integers) { IntDomain(0, 2) },
                 listOf(
                     Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                     Linear(
-                        intVars = intArrayOf(), intCoeffs = doubleArrayOf(),
-                        realVars = intArrayOf(0), realCoeffs = doubleArrayOf(1.0),
-                        op = LinearOp.GE, bound = 0.0,
+                        intVars = intArrayOf(),
+                        intCoeffs = doubleArrayOf(),
+                        realVars = intArrayOf(0),
+                        realCoeffs = doubleArrayOf(1.0),
+                        op = LinearOp.GE,
+                        bound = 0.0,
                     ),
                 ),
                 numRealVars = 1,
@@ -215,12 +257,16 @@ class PresolvePassTest {
             val prepared = Presolver.runSource(problem, PresolveConfig.parse("off,+symmetry"))
 
             assertEquals(listOf(PresolvePass.BREAK_SYMMETRIES), prepared.passesFired)
-            assertTrue(prepared.problem.factors.filterIsInstance<Clause>().any {
+            assertTrue(
+                prepared.problem.factors.filterIsInstance<Clause>().any {
                 it.literals.contentEquals(intArrayOf(Lit.make(0, false), Lit.make(1, true)))
-            })
+            }
+            )
 
             val sensitive = Presolver.runSource(
-                problem, PresolveConfig.parse("off,+symmetry"), PresolveContext(solutionSetSensitive = true),
+                problem,
+                PresolveConfig.parse("off,+symmetry"),
+                PresolveContext(solutionSetSensitive = true),
             )
             assertTrue(sensitive.passesFired.isEmpty())
         }

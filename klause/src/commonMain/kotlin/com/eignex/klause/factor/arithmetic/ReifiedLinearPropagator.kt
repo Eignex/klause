@@ -62,7 +62,11 @@ internal class ReifiedLinearPropagator(
             )
         } else {
             collectLinearTightenAntecedents(
-                state, vars, excludeIdx = -1, extraLit = extraLit, includeExtraLit = includeExtraLit,
+                state,
+                vars,
+                excludeIdx = -1,
+                extraLit = extraLit,
+                includeExtraLit = includeExtraLit,
             )
         }
     }
@@ -147,7 +151,9 @@ internal class ReifiedLinearPropagator(
             extraPin = {
                 if (singleEquality && eqTargetUnreachable(state)) {
                     state.pinBool(
-                        auxBoolVar, op == LinearOp.NE, unreachableEqualityReason(state, vars[0], equalityTarget),
+                        auxBoolVar,
+                        op == LinearOp.NE,
+                        unreachableEqualityReason(state, vars[0], equalityTarget),
                     )
                 } else {
                     null
@@ -190,7 +196,9 @@ internal class ReifiedLinearPropagator(
         val indicator = state.boolValues[auxBoolVar] ?: return true
         val value = if (indicator == (op == LinearOp.EQ)) target else 1L - target
         val reason = intArrayOf(Lit.make(auxBoolVar, !indicator))
-        return if (value == 1L) state.tightenIntMin(variable, value, reason) else {
+        return if (value == 1L) {
+            state.tightenIntMin(variable, value, reason)
+        } else {
             state.tightenIntMax(variable, value, reason)
         }
     }

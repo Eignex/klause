@@ -32,8 +32,11 @@ class FlatZincIntegerFloatImagesTest {
 
     @Test
     fun `rounded derived bounds should preserve exact source intake and a private grid view`() {
-        val program = parseFlatZinc(roundedBound, floatBuckets = 2,
-            semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()))
+        val program = parseFlatZinc(
+            roundedBound,
+            floatBuckets = 2,
+            semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+        )
 
         assertFalse(program.floatVarsByName.getValue("scaled").lpOnly)
         val exact = parseFlatZinc(roundedBound, exactFloats = true).sourceProgram

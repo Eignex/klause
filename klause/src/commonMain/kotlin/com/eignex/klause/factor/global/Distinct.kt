@@ -19,12 +19,9 @@ class Distinct(
     val activator: Int = LinearRow.ALWAYS,
 ) : Factor {
     /** Immutable exact affine operand over tagged integer, Boolean and real coordinates. */
-    class Operand(
-        references: IntArray,
-        coefficients: List<BigFraction>,
-        constant: BigFraction = BigFraction.ZERO,
-    ) {
+    class Operand(references: IntArray, coefficients: List<BigFraction>, constant: BigFraction = BigFraction.ZERO) {
         private val terms: Map<Int, BigFraction>
+
         /** Exact additive constant after Boolean literal normalization. */
         val constant: BigFraction
 
@@ -37,8 +34,11 @@ class Distinct(
                 require(reference >= 0 && (Term.isInt(reference) || Term.isReal(reference) || Term.isBool(reference)))
                 val coefficient = coefficients[index]
                 val complemented = Term.isBool(reference) && !Lit.isPositive(Term.lit(reference))
-                val normalized = if (complemented) Term.ofLit(Lit.make(Lit.variable(Term.lit(reference)), true))
-                    else reference
+                val normalized = if (complemented) {
+                    Term.ofLit(Lit.make(Lit.variable(Term.lit(reference)), true))
+                } else {
+                    reference
+                }
                 if (complemented) offset += coefficient
                 captured[normalized] = (captured[normalized] ?: BigFraction.ZERO) +
                     if (complemented) coefficient.negated() else coefficient
@@ -82,13 +82,17 @@ class Distinct(
                 }
                 require(target >= 0) { "removed distinct operand coordinate" }
                 target
-            }.toIntArray(), coefficients, constant,
+            }.toIntArray(),
+            coefficients,
+            constant,
         )
     }
 
     private val captured = operands.toList()
 
-    init { require(activator >= LinearRow.ALWAYS) }
+    init {
+        require(activator >= LinearRow.ALWAYS)
+    }
 
     /** Immutable source operands in their original order. */
     val operands: List<Operand> get() = captured.toList()
@@ -97,17 +101,15 @@ class Distinct(
         val references = captured.flatMap { it.references.toList() }.distinct()
         MixedVars(
             boundInts = references.filter(Term::isInt).map(Term::intVar).distinct().toIntArray(),
-            boolVars = (references.filter(Term::isBool).map { Lit.variable(Term.lit(it)) } +
-                if (activator == LinearRow.ALWAYS) emptyList() else listOf(activator)).distinct().toIntArray(),
+            boolVars = (
+                references.filter(Term::isBool).map { Lit.variable(Term.lit(it)) } +
+                if (activator == LinearRow.ALWAYS) emptyList() else listOf(activator)
+            ).distinct().toIntArray(),
             reals = references.filter(Term::isReal).map(Term::realVar).distinct().toIntArray(),
         )
     }
 
-    internal fun collisions(
-        integer: (Int) -> BigInt,
-        boolean: (Int) -> Boolean,
-        real: (Int) -> BigFraction,
-    ): Int {
+    internal fun collisions(integer: (Int) -> BigInt, boolean: (Int) -> Boolean, real: (Int) -> BigFraction): Int {
         val values = HashSet<BigFraction>()
         var collisions = 0
         for (operand in captured) if (!values.add(operand.value(integer, boolean, real))) collisions++
@@ -123,8 +125,12 @@ class Distinct(
 
     override fun remap(mapping: VarRemap): Distinct = Distinct(
         captured.map { it.remap(mapping) },
-        if (activator == LinearRow.ALWAYS) activator else mapping.bool(activator).also {
+        if (activator == LinearRow.ALWAYS) {
+            activator
+        } else {
+            mapping.bool(activator).also {
             require(it >= 0) { "removed distinct activator" }
+        }
         },
     )
 
@@ -142,10 +148,12 @@ class Distinct(
             for ((reference, coefficient) in operand.references.zip(operand.coefficients)) {
                 val coordinate = when {
                     Term.isInt(reference) -> 0 to (mapping?.int(Term.intVar(reference)) ?: Term.intVar(reference))
+
                     Term.isBool(reference) -> {
                         val id = Lit.variable(Term.lit(reference))
                         1 to (mapping?.bool(id) ?: id)
                     }
+
                     else -> 2 to (mapping?.real(Term.realVar(reference)) ?: Term.realVar(reference))
                 }
                 terms[coordinate] = (terms[coordinate] ?: BigFraction.ZERO) + coefficient

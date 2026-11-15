@@ -21,14 +21,25 @@ class LinearSourceIntegersTest {
         val source = LinearSourceProblem(
             listOf(
                 LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
-                LinearSourceVariable("y", false), LinearSourceVariable("z", false),
+                LinearSourceVariable("y", false),
+                LinearSourceVariable("z", false),
             ),
             listOf(
-                LinearSourceRow(listOf(LinearSourceTerm(2, SemanticRational.ONE),
-                    LinearSourceTerm(1, SemanticRational.ofLong(-2))), SemanticRational.ONE, SemanticRational.ONE),
-                LinearSourceRow(listOf(LinearSourceTerm(1, SemanticRational.ONE),
-                    LinearSourceTerm(0, SemanticRational.ofLong(-3))),
-                    SemanticRational.ofLong(2), SemanticRational.ofLong(2)),
+                LinearSourceRow(
+                    listOf(
+                    LinearSourceTerm(2, SemanticRational.ONE),
+                    LinearSourceTerm(1, SemanticRational.ofLong(-2)),
+                ),
+                    SemanticRational.ONE, SemanticRational.ONE
+                ),
+                LinearSourceRow(
+                    listOf(
+                        LinearSourceTerm(1, SemanticRational.ONE),
+                        LinearSourceTerm(0, SemanticRational.ofLong(-3)),
+                    ),
+                    SemanticRational.ofLong(2),
+                    SemanticRational.ofLong(2),
+                ),
             ),
         )
 
@@ -41,10 +52,19 @@ class LinearSourceIntegersTest {
     @Test
     fun `a fractional affine definition should retain its continuous column`() {
         val source = LinearSourceProblem(
-            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
-                LinearSourceVariable("z", false)),
-            listOf(LinearSourceRow(listOf(LinearSourceTerm(1, SemanticRational.ofLong(2)),
-                LinearSourceTerm(0, SemanticRational.ofLong(-1))), SemanticRational.ZERO, SemanticRational.ZERO)),
+            listOf(
+                LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
+                LinearSourceVariable("z", false),
+            ),
+            listOf(
+                LinearSourceRow(
+                    listOf(
+                LinearSourceTerm(1, SemanticRational.ofLong(2)),
+                LinearSourceTerm(0, SemanticRational.ofLong(-1)),
+            ),
+                SemanticRational.ZERO, SemanticRational.ZERO
+                )
+            ),
         )
 
         val bounds = assertNotNull(source.integralRealBounds(ExecutionControl.Never))
@@ -55,11 +75,21 @@ class LinearSourceIntegersTest {
     @Test
     fun `a guarded affine definition should retain its continuous column`() {
         val source = LinearSourceProblem(
-            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
-                LinearSourceVariable("z", false)),
-            listOf(LinearSourceRow(listOf(LinearSourceTerm(1, SemanticRational.ONE),
-                LinearSourceTerm(0, SemanticRational.ofLong(-3))),
-                SemanticRational.ofLong(2), SemanticRational.ofLong(2), LinearSourceIndicator(0, true))),
+            listOf(
+                LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
+                LinearSourceVariable("z", false),
+            ),
+            listOf(
+                LinearSourceRow(
+                listOf(
+                    LinearSourceTerm(1, SemanticRational.ONE),
+                    LinearSourceTerm(0, SemanticRational.ofLong(-3)),
+                ),
+                SemanticRational.ofLong(2),
+                SemanticRational.ofLong(2),
+                LinearSourceIndicator(0, true),
+            )
+            ),
         )
 
         val bounds = assertNotNull(source.integralRealBounds(ExecutionControl.Never))
@@ -70,10 +100,19 @@ class LinearSourceIntegersTest {
     @Test
     fun `an affine range outside signed word storage should retain its continuous column`() {
         val source = LinearSourceProblem(
-            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ofLong(Long.MAX_VALUE)),
-                LinearSourceVariable("z", false)),
-            listOf(LinearSourceRow(listOf(LinearSourceTerm(1, SemanticRational.ONE),
-                LinearSourceTerm(0, SemanticRational.ofLong(-2))), SemanticRational.ZERO, SemanticRational.ZERO)),
+            listOf(
+                LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ofLong(Long.MAX_VALUE)),
+                LinearSourceVariable("z", false),
+            ),
+            listOf(
+                LinearSourceRow(
+                    listOf(
+                LinearSourceTerm(1, SemanticRational.ONE),
+                LinearSourceTerm(0, SemanticRational.ofLong(-2)),
+            ),
+                SemanticRational.ZERO, SemanticRational.ZERO
+                )
+            ),
         )
 
         val bounds = assertNotNull(source.integralRealBounds(ExecutionControl.Never))
@@ -85,15 +124,26 @@ class LinearSourceIntegersTest {
     fun `integral affine bounds should retain integers beyond binary64 precision`() {
         val wide = SemanticRational.of(bigIntOf(10_000_000_000_000_001L), BIG_ONE)
         val source = LinearSourceProblem(
-            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
-                LinearSourceVariable("z", false)),
-            listOf(LinearSourceRow(listOf(LinearSourceTerm(1, SemanticRational.ONE),
-                LinearSourceTerm(0, SemanticRational.ofLong(-3))), wide, wide)),
+            listOf(
+                LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
+                LinearSourceVariable("z", false),
+            ),
+            listOf(
+                LinearSourceRow(
+                    listOf(
+                LinearSourceTerm(1, SemanticRational.ONE),
+                LinearSourceTerm(0, SemanticRational.ofLong(-3)),
+            ),
+                wide, wide
+                )
+            ),
         )
 
         val bounds = assertNotNull(source.integralRealBounds(ExecutionControl.Never))
 
-        assertEquals(BigFraction.ofLong(10_000_000_000_000_001L) to BigFraction.ofLong(10_000_000_000_000_004L),
-            bounds[1])
+        assertEquals(
+            BigFraction.ofLong(10_000_000_000_000_001L) to BigFraction.ofLong(10_000_000_000_000_004L),
+            bounds[1],
+        )
     }
 }

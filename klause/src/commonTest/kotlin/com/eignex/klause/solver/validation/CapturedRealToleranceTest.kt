@@ -25,10 +25,18 @@ class CapturedRealToleranceTest {
     private val tenth = SourceTolerance(SemanticRational.of(bigIntOf(1), bigIntOf(10)))
 
     private fun source(vararg factors: Factor, tolerance: SourceTolerance = tenth, reals: Int = 1) = Problem(
-        0, 0, emptyArray<IntDomain>(), arrayOf(*factors), numRealVars = reals,
-        realLower = DoubleArray(reals) { 0.0 }, realUpper = DoubleArray(reals) { 1.0 },
-        semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Continuous,
-            feasibilityTolerance = tolerance).resolve(),
+        0,
+        0,
+        emptyArray<IntDomain>(),
+        arrayOf(*factors),
+        numRealVars = reals,
+        realLower = DoubleArray(reals) { 0.0 },
+        realUpper = DoubleArray(reals) { 1.0 },
+        semantics = SourceSemantics(
+            SourceFormat.IR,
+            floats = FloatSemantics.Continuous,
+            feasibilityTolerance = tolerance,
+        ).resolve(),
     )
 
     private fun row(op: LinearOp, bound: Double, strict: Boolean = false) =

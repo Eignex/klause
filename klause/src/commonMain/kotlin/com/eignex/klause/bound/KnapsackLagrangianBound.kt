@@ -76,9 +76,11 @@ internal class KnapsackLagrangianBound(
     internal fun preparation(): Iterator<Unit> = sequence {
         var visits = 0
         val pbs = ArrayList<PseudoBoolean>()
-        if (objective != null) for (factor in problem.factors) {
+        if (objective != null) {
+            for (factor in problem.factors) {
             if (factor is PseudoBoolean && permitsLongPseudoBoolean(factor.constants)) pbs.add(factor)
             if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+        }
         }
         // The subproblem knapsack must be a clean capacity row: all positive literals, positive weights,
         // a DP-bounded capacity. The largest such row is kept; the rest are dualized.
@@ -128,9 +130,11 @@ internal class KnapsackLagrangianBound(
                 if (factor !== subProblem) others.add(factor)
                 if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
             }
-            for (f in others) for (lit in f.literals) {
+            for (f in others) {
+                for (lit in f.literals) {
                 local(Lit.variable(lit))
                 if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            }
             }
             for (b in objective.boolWeightValues.indices) {
                 if (objective.boolWeightValues[b] != 0L) local(b)

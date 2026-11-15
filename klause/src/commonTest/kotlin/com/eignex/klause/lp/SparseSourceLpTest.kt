@@ -28,11 +28,21 @@ class SparseSourceLpTest {
             ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
             ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
         )
-        val prepared = assertNotNull(SparseSourceLp.prepare(rows,
-            List(2) { ExactLpColumn(ExactLpBounds()) }, List(2) { BigFraction.ZERO }, BigFraction.ZERO, limits,
-            rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES).prepared)
-        for ((inactive, expected) in listOf(setOf(2) to setOf(1), setOf(0, 1) to setOf(0),
-            setOf(0, 1, 2) to setOf(0, 1))) {
+        val prepared = assertNotNull(
+            SparseSourceLp.prepare(
+            rows,
+            List(2) { ExactLpColumn(ExactLpBounds()) },
+            List(2) { BigFraction.ZERO },
+            BigFraction.ZERO,
+            limits,
+            rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES,
+        ).prepared
+        )
+        for ((inactive, expected) in listOf(
+            setOf(2) to setOf(1),
+            setOf(0, 1) to setOf(0),
+            setOf(0, 1, 2) to setOf(0, 1),
+        )) {
             val mapped = prepared.emittedInactiveRows(inactive, ExecutionControl.Never) { _, _ -> true }
 
             assertEquals(expected, mapped)
@@ -45,9 +55,16 @@ class SparseSourceLpTest {
             ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ONE),
             ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
         )
-        val prepared = assertNotNull(SparseSourceLp.prepare(rows,
-            listOf(ExactLpColumn(ExactLpBounds())), listOf(BigFraction.ZERO), BigFraction.ZERO, limits,
-            rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES).prepared)
+        val prepared = assertNotNull(
+            SparseSourceLp.prepare(
+            rows,
+            listOf(ExactLpColumn(ExactLpBounds())),
+            listOf(BigFraction.ZERO),
+            BigFraction.ZERO,
+            limits,
+            rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES,
+        ).prepared
+        )
         for (inactive in listOf(setOf(0), setOf(1))) {
             val mapped = prepared.emittedInactiveRows(inactive, ExecutionControl.Never) { _, _ -> true }
 
@@ -61,9 +78,16 @@ class SparseSourceLpTest {
             ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ONE),
             ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
         )
-        val prepared = assertNotNull(SparseSourceLp.prepare(rows,
-            listOf(ExactLpColumn(ExactLpBounds())), listOf(BigFraction.ZERO), BigFraction.ZERO, limits,
-            rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES).prepared)
+        val prepared = assertNotNull(
+            SparseSourceLp.prepare(
+            rows,
+            listOf(ExactLpColumn(ExactLpBounds())),
+            listOf(BigFraction.ZERO),
+            BigFraction.ZERO,
+            limits,
+            rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES,
+        ).prepared
+        )
         var charges = 0
 
         val mapped = prepared.emittedInactiveRows(setOf(0, 1), ExecutionControl.Never) { _, _ -> ++charges < 2 }
@@ -76,12 +100,22 @@ class SparseSourceLpTest {
     fun `unconditional equality compaction should retain both sides of the source equality`() {
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.ONE, BigFraction.ONE), BigFraction.ONE),
-            ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE),
-                BigFraction.MINUS_ONE),
+            ExactRationalInequality(
+                intArrayOf(0, 1),
+                listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE,
+            ),
         )
-        val prepared = assertNotNull(SparseSourceLp.prepare(rows,
-            List(2) { ExactLpColumn(ExactLpBounds()) }, List(2) { BigFraction.ZERO }, BigFraction.ZERO, limits,
-            rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES).prepared)
+        val prepared = assertNotNull(
+            SparseSourceLp.prepare(
+            rows,
+            List(2) { ExactLpColumn(ExactLpBounds()) },
+            List(2) { BigFraction.ZERO },
+            BigFraction.ZERO,
+            limits,
+            rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES,
+        ).prepared
+        )
         val model = assertNotNull(LpExactState(prepared.model).toWorkingModel())
         val points = listOf(
             listOf(BigFraction.ZERO, BigFraction.ONE),
@@ -101,19 +135,37 @@ class SparseSourceLpTest {
     fun `compacted equality bounds should lift either multiplier sign to original source rows`() {
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.ONE, BigFraction.ONE), BigFraction.ONE),
-            ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE),
-                BigFraction.MINUS_ONE),
+            ExactRationalInequality(
+                intArrayOf(0, 1),
+                listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE,
+            ),
         )
         for (sign in listOf(BigFraction.ONE, BigFraction.MINUS_ONE)) {
-            val prepared = assertNotNull(SparseSourceLp.prepare(rows,
-                List(2) { ExactLpColumn(ExactLpBounds()) }, List(2) { sign }, BigFraction.ZERO, limits,
-                rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES).prepared)
+            val prepared = assertNotNull(
+                SparseSourceLp.prepare(
+                rows,
+                List(2) { ExactLpColumn(ExactLpBounds()) },
+                List(2) { sign },
+                BigFraction.ZERO,
+                limits,
+                rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES,
+            ).prepared
+            )
             val model = assertNotNull(LpExactState(prepared.model).toWorkingModel())
 
-            val bound = assertNotNull(certifyLpBoundOnly(model, doubleArrayOf(sign.toDouble()),
-                ReconstructionLimits()).bound)
-            val weights = assertNotNull(prepared.sourceRowWeights(
-                assertNotNull(bound.dualMultipliers).map { it.negated() }))
+            val bound = assertNotNull(
+                certifyLpBoundOnly(
+                model,
+                doubleArrayOf(sign.toDouble()),
+                ReconstructionLimits(),
+            ).bound
+            )
+            val weights = assertNotNull(
+                prepared.sourceRowWeights(
+                assertNotNull(bound.dualMultipliers).map { it.negated() },
+            )
+            )
 
             assertEquals(sign, bound.value)
             val selected = if (sign == BigFraction.ONE) 1 else 0
@@ -136,8 +188,16 @@ class SparseSourceLpTest {
                 SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES,
         )
         for ((rows, policy) in cases) {
-            val prepared = assertNotNull(SparseSourceLp.prepare(rows, listOf(ExactLpColumn(ExactLpBounds())),
-                listOf(BigFraction.ZERO), BigFraction.ZERO, limits, rowPolicy = policy).prepared)
+            val prepared = assertNotNull(
+                SparseSourceLp.prepare(
+                rows,
+                listOf(ExactLpColumn(ExactLpBounds())),
+                listOf(BigFraction.ZERO),
+                BigFraction.ZERO,
+                limits,
+                rowPolicy = policy,
+            ).prepared
+            )
 
             assertEquals(2, prepared.emittedRowCount)
             assertNull(prepared.sourceRowWeights(listOf(BigFraction.MINUS_ONE, BigFraction.ZERO)))
@@ -199,8 +259,11 @@ class SparseSourceLpTest {
             Triple(listOf(row), limits.copy(work = 0L), SparseSourceLpDecline.WORK),
             Triple(listOf(row), limits.copy(allocation = 0L), SparseSourceLpDecline.ALLOCATION),
             Triple(listOf(row), limits.copy(scalarBits = 1), SparseSourceLpDecline.SCALAR_WIDTH),
-            Triple(listOf(ExactRationalInequality(intArrayOf(1), listOf(BigFraction.ONE), BigFraction.ONE)),
-                limits, SparseSourceLpDecline.SHAPE),
+            Triple(
+                listOf(ExactRationalInequality(intArrayOf(1), listOf(BigFraction.ONE), BigFraction.ONE)),
+                limits,
+                SparseSourceLpDecline.SHAPE,
+            ),
         )
         for ((rows, allowance, reason) in cases) {
             val result = prepare(rows, allowance, cost = BigFraction.ofLong(2L))
@@ -294,8 +357,14 @@ class SparseSourceLpTest {
         allowance: SparseSourceLpLimits,
         cost: BigFraction = BigFraction.ONE,
         cancellation: ExecutionControl = ExecutionControl.Never,
-    ) = SparseSourceLp.prepare(rows, listOf(ExactLpColumn(ExactLpBounds())), listOf(cost),
-        BigFraction.ZERO, allowance, cancellation)
+    ) = SparseSourceLp.prepare(
+        rows,
+        listOf(ExactLpColumn(ExactLpBounds())),
+        listOf(cost),
+        BigFraction.ZERO,
+        allowance,
+        cancellation,
+    )
 
     private val limits = SparseSourceLpLimits(100_000L, 4L * 1024L * 1024L)
 }

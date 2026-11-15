@@ -43,8 +43,15 @@ class KlauseConfigSchemaTest {
 
     @Test
     fun `global source policy keys should reject overrides with the typed migration path`() {
-        val names = listOf("pinAbsentOptVars", "unboundedIntLo", "unboundedIntHi", "floatBuckets", "floatScale",
-            "unboundedFloatLo", "unboundedFloatHi")
+        val names = listOf(
+            "pinAbsentOptVars",
+            "unboundedIntLo",
+            "unboundedIntHi",
+            "floatBuckets",
+            "floatScale",
+            "unboundedFloatLo",
+            "unboundedFloatHi",
+        )
         val keys = KlauseConfigSchema.keys.map { it.name }.toSet()
 
         for (name in names) {
@@ -58,5 +65,4 @@ class KlauseConfigSchemaTest {
             assertTrue("SemanticOverrides" in error.message.orEmpty())
         }
     }
-
 }

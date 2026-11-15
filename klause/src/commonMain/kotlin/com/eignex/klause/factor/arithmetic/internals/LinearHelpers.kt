@@ -723,7 +723,6 @@ private fun tightenLinearTerms(
     return true
 }
 
-
 /**
  * Range `[sumLo, sumHi]` reachable by `Σ coeffs(i)·vars(i)` given current domains.
  */

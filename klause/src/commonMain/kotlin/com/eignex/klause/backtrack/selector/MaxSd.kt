@@ -47,7 +47,12 @@ internal class MaxSd(
         return try {
             session.withWorkLimit(probeWorkLimit) {
                 probeAndOrder(
-                    session, varRef, rng, maxProbes, ascending = false, observations = observations,
+                    session,
+                    varRef,
+                    rng,
+                    maxProbes,
+                    ascending = false,
+                    observations = observations,
                     scoreVisit = if (probeWorkLimit == null) null else session::visitValueScore,
                 )
             }

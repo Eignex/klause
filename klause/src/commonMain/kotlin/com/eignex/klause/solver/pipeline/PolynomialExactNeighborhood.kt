@@ -43,10 +43,16 @@ internal class PolynomialExactNeighborhood(
             is Verification.Accepted -> Unit
         }
         fun remap(values: Map<Int, BigFraction>) = integerPins + values.mapKeys { (id, _) -> coordinates[id] }
-        return when (val result = invocation.check(PolynomialCondition(
+        return when (
+            val result = invocation.check(
+                PolynomialCondition(
             (0 until model.source.numBoolVars).associateWith(fixed::boolValue),
-            remap(condition.lower), remap(condition.upper),
-        ), cancellation)) {
+            remap(condition.lower),
+            remap(condition.upper),
+        ),
+            cancellation
+            )
+        ) {
             is QfNraResult.Satisfiable -> {
                 val sample = certify(model.capture(result.assignment, fixed.bools, fixed.ints))
                 ExactNeighborhoodResult.Witness(sample)
@@ -58,8 +64,14 @@ internal class PolynomialExactNeighborhood(
         }
     }
 
-    fun search(adaptive: Boolean, seed: Long, maximumMoves: Long, maximumInstructions: Long,
-        maximumImprovementMoves: Long?, nodeBudget: NodeBudget?): ExactNeighborhood = ExactNeighborhood(
+    fun search(
+        adaptive: Boolean,
+        seed: Long,
+        maximumMoves: Long,
+        maximumInstructions: Long,
+        maximumImprovementMoves: Long?,
+        nodeBudget: NodeBudget?,
+    ): ExactNeighborhood = ExactNeighborhood(
         0, List(coordinates.size) { BigFraction.ZERO }, this, objective,
         coordinateValues = { sample -> centers(sample) }, adaptive = adaptive, seed = seed,
         nodeBudget = nodeBudget?.allowance,

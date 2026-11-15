@@ -8,7 +8,15 @@ import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
 internal enum class RepairBlockDecline {
-    NoShape, Unavailable, UnsupportedShape, InvalidFrame, BlockedPin, Oversized, WorkLimit, Cancelled, Arithmetic,
+    NoShape,
+    Unavailable,
+    UnsupportedShape,
+    InvalidFrame,
+    BlockedPin,
+    Oversized,
+    WorkLimit,
+    Cancelled,
+    Arithmetic,
 }
 
 internal object RepairBlockInterrupted : RuntimeException()
@@ -118,7 +126,12 @@ internal object RepairBlockClosure {
             }
         }
         val slots = mutable.toIntArray().also { it.sort() }
-        return ClosedRepairBlock(FreedVars(slots.filter { it < bools }.toIntArray(),
-            slots.filter { it >= bools }.map { it - bools }.toIntArray()), leaves.size)
+        return ClosedRepairBlock(
+            FreedVars(
+            slots.filter { it < bools }.toIntArray(),
+            slots.filter { it >= bools }.map { it - bools }.toIntArray(),
+        ),
+            leaves.size
+        )
     }
 }

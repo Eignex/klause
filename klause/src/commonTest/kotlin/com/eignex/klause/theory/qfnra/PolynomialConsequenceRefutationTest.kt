@@ -30,8 +30,12 @@ class PolynomialConsequenceRefutationTest {
             """.trimIndent(),
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = 100_000))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = 100_000),
+        )
 
         val refuted = assertIs<QfNraResult.Unsatisfiable>(result)
         assertEquals(0L, refuted.stats.dyadicAttempts)
@@ -72,8 +76,12 @@ class PolynomialConsequenceRefutationTest {
             """.trimIndent(),
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = 100_000))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = 100_000),
+        )
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
         assertEquals(BigFraction.ONE, witness.realValue(1).rational)
@@ -124,11 +132,21 @@ class PolynomialConsequenceRefutationTest {
               (= (+ x0 (* x4 x4) (* (- 2) x4) 1 x3) 0)))
             """.trimIndent(),
         )
-        val completed = assertIs<QfNraResult.Unsatisfiable>(solveQfNra(source.formula, source.boolCount,
-            source.realCount, QfNraParams(maximumWork = 100_000)))
+        val completed = assertIs<QfNraResult.Unsatisfiable>(
+            solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = 100_000),
+        )
+        )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = completed.stats.workSpent - 1))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = completed.stats.workSpent - 1),
+        )
 
         assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(result).reason)
     }
@@ -154,8 +172,12 @@ class PolynomialConsequenceRefutationTest {
             """.trimIndent(),
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = 1_000_000))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = 1_000_000),
+        )
 
         val refuted = assertIs<QfNraResult.Unsatisfiable>(result)
         assertEquals(0L, refuted.stats.dyadicAttempts)
@@ -179,8 +201,14 @@ class PolynomialConsequenceRefutationTest {
         val refuted = refutePolynomialConsequences(formula, arithmetic, 128, 2048, 4096)
 
         assertTrue(refuted)
-        assertIs<QfNraResult.Unsatisfiable>(solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = 16_384)))
+        assertIs<QfNraResult.Unsatisfiable>(
+            solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = 16_384),
+        )
+        )
     }
 
     @Test
@@ -420,11 +448,21 @@ class PolynomialConsequenceRefutationTest {
               (= (+ a (* x x) (* (- 2) x) 1 u) 0)))
             """.trimIndent(),
         )
-        val completed = assertIs<QfNraResult.Unsatisfiable>(solveQfNra(source.formula, 0, 5,
-            QfNraParams(maximumWork = 16_384)))
+        val completed = assertIs<QfNraResult.Unsatisfiable>(
+            solveQfNra(
+            source.formula,
+            0,
+            5,
+            QfNraParams(maximumWork = 16_384),
+        )
+        )
 
-        val result = solveQfNra(source.formula, 0, 5,
-            QfNraParams(maximumWork = completed.stats.workSpent - 1))
+        val result = solveQfNra(
+            source.formula,
+            0,
+            5,
+            QfNraParams(maximumWork = completed.stats.workSpent - 1),
+        )
 
         assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(result).reason)
     }

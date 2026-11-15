@@ -31,10 +31,13 @@ internal class QuadraticTraversalCursor(
     }, { traversal.lpWork() }, { traversal.propagationWork() })
     private val traversal: CpSatisfactionTraversal = CpSatisfactionTraversal(
         problem,
-        params.copy(cancellation = cancelledWhen({
+        params.copy(
+            cancellation = cancelledWhen({
             listOfNotNull(global.deadline(), slice.deadline).minOrNull()
-        }) { global() || slice.expired() }),
-        sink, LpSolveContext.Production,
+        }) { global() || slice.expired() }
+        ),
+        sink,
+        LpSolveContext.Production,
         propagationCancellation = ExecutionControl { global() },
         slice = TraversalSlice(pauses = { !global() }, beforeBranch = {
             slice.charge()

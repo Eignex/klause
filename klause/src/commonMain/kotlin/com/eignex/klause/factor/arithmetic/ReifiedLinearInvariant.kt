@@ -127,7 +127,9 @@ internal class ReifiedLinearInvariant(
                 val rounded = snapLinearTarget(op, bound, c, sumWithout, wantHolds, domain) ?: continue
                 if (rounded == domain.clamp(target) || rounded == cur ||
                     wantHolds != linearHolds(sumWithout + c * rounded, op, bound)
-                ) continue
+                ) {
+                    continue
+                }
                 if (wantHolds == aux) {
                     sink.addChannelingIntSet(state, v, rounded)
                 } else {

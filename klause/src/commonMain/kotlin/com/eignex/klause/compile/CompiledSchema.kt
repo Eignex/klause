@@ -63,8 +63,12 @@ class CompiledSchema internal constructor(
     floatRepresentations: Map<String, FloatRepresentation> = emptyMap(),
     sourceBinding: CompiledSourceBinding? = null,
 ) {
-    internal val sourceBinding = sourceBinding ?: CompiledSourceBinding(problem, intVarIdByName, realVarIdByName,
-        representations = floatRepresentations)
+    internal val sourceBinding = sourceBinding ?: CompiledSourceBinding(
+        problem,
+        intVarIdByName,
+        realVarIdByName,
+        representations = floatRepresentations,
+    )
 
     /** Explicit finite compatibility view; source strategies retain the original declarations. */
     val problem: Problem get() = sourceBinding.legacyProblem

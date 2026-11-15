@@ -24,10 +24,21 @@ import kotlin.test.assertIs
 class RealWitnessVerificationTest {
     @Test
     fun `exact real point checks should stop on the containing work allowance`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(RealArrayMinMax(2, intArrayOf(0, 1), true)),
-            numRealVars = 3, realLower = doubleArrayOf(0.0, 1.0, 0.0), realUpper = doubleArrayOf(2.0, 3.0, 3.0))
-        val point = Sample(booleanArrayOf(), longArrayOf(), reals = doubleArrayOf(0.0, 1.0, 1.0),
-            exactReals = listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.ONE))
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(RealArrayMinMax(2, intArrayOf(0, 1), true)),
+            numRealVars = 3,
+            realLower = doubleArrayOf(0.0, 1.0, 0.0),
+            realUpper = doubleArrayOf(2.0, 3.0, 3.0),
+        )
+        val point = Sample(
+            booleanArrayOf(),
+            longArrayOf(),
+            reals = doubleArrayOf(0.0, 1.0, 1.0),
+            exactReals = listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.ONE),
+        )
         var work = 0L
         val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 7L
@@ -43,22 +54,43 @@ class RealWitnessVerificationTest {
     fun `power checking should retain exact rational and one bit boundary equalities`() {
         for ((base, exponent, result) in listOf(
             Triple(BigFraction.ofLong(2), 3, BigFraction.ofLong(8)),
-            Triple(BigFraction.of(bigIntOf(-2), bigIntOf(3)), 3,
-                BigFraction.of(bigIntOf(-8), bigIntOf(27))),
-            Triple(BigFraction.of(bigIntOf(-2), bigIntOf(3)), 2,
-                BigFraction.of(bigIntOf(4), bigIntOf(9))),
+            Triple(
+                BigFraction.of(bigIntOf(-2), bigIntOf(3)),
+                3,
+                BigFraction.of(bigIntOf(-8), bigIntOf(27)),
+            ),
+            Triple(
+                BigFraction.of(bigIntOf(-2), bigIntOf(3)),
+                2,
+                BigFraction.of(bigIntOf(4), bigIntOf(9)),
+            ),
             Triple(BigFraction.ZERO, 0, BigFraction.ONE),
             Triple(BigFraction.ZERO, Int.MAX_VALUE, BigFraction.ZERO),
             Triple(BigFraction.ONE, Int.MAX_VALUE, BigFraction.ONE),
             Triple(BigFraction.MINUS_ONE, Int.MAX_VALUE, BigFraction.MINUS_ONE),
             Triple(BigFraction.MINUS_ONE, Int.MAX_VALUE - 1, BigFraction.ONE),
         )) {
-            val source = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(Power(
-                Power.Coordinate.Real(SourceRealId(0)), exponent, Power.Coordinate.Real(SourceRealId(1)))),
-                numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
-                realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
-            val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(base.toDouble(), result.toDouble()),
-                exactReals = listOf(base, result))
+            val source = Problem(
+                0,
+                0,
+                emptyArray<IntDomain>(),
+                arrayOf(
+                    Power(
+                    Power.Coordinate.Real(SourceRealId(0)),
+                    exponent,
+                    Power.Coordinate.Real(SourceRealId(1)),
+                )
+                ),
+                numRealVars = 2,
+                realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+            )
+            val point = Sample(
+                booleanArrayOf(),
+                longArrayOf(),
+                doubleArrayOf(base.toDouble(), result.toDouble()),
+                exactReals = listOf(base, result),
+            )
 
             assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, point, ExecutionControl.Never))
         }
@@ -67,12 +99,27 @@ class RealWitnessVerificationTest {
     @Test
     fun `impossible huge power equality should be refuted without materializing the power`() {
         for (base in listOf(BigFraction.of(bigIntOf(1), bigIntOf(2)), BigFraction.ofLong(2))) {
-            val source = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(Power(
-                Power.Coordinate.Real(SourceRealId(0)), Int.MAX_VALUE, Power.Coordinate.Real(SourceRealId(1)))),
-                numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
-                realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
-            val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(base.toDouble(), base.toDouble()),
-                exactReals = listOf(base, base))
+            val source = Problem(
+                0,
+                0,
+                emptyArray<IntDomain>(),
+                arrayOf(
+                    Power(
+                    Power.Coordinate.Real(SourceRealId(0)),
+                    Int.MAX_VALUE,
+                    Power.Coordinate.Real(SourceRealId(1)),
+                )
+                ),
+                numRealVars = 2,
+                realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+            )
+            val point = Sample(
+                booleanArrayOf(),
+                longArrayOf(),
+                doubleArrayOf(base.toDouble(), base.toDouble()),
+                exactReals = listOf(base, base),
+            )
 
             assertIs<Verification.Rejected>(verifyRealCoordinates(source, point, ExecutionControl.Never))
         }
@@ -80,12 +127,27 @@ class RealWitnessVerificationTest {
 
     @Test
     fun `a power check should withhold its claim when the containing work allowance is spent`() {
-        val source = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(Power(
-            Power.Coordinate.Real(SourceRealId(0)), 3, Power.Coordinate.Real(SourceRealId(1)))), numRealVars = 2,
+        val source = Problem(
+            0,
+            0,
+            emptyArray<IntDomain>(),
+            arrayOf(
+                Power(
+                Power.Coordinate.Real(SourceRealId(0)),
+                3,
+                Power.Coordinate.Real(SourceRealId(1)),
+            )
+            ),
+            numRealVars = 2,
             realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
-        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0, 8.0),
-            exactReals = listOf(BigFraction.ofLong(2), BigFraction.ofLong(8)))
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+        )
+        val point = Sample(
+            booleanArrayOf(),
+            longArrayOf(),
+            doubleArrayOf(2.0, 8.0),
+            exactReals = listOf(BigFraction.ofLong(2), BigFraction.ofLong(8)),
+        )
         var work = 0L
         val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 4L
@@ -100,21 +162,35 @@ class RealWitnessVerificationTest {
     @Test
     fun `interruption while checking an active indicator row should remain indeterminate`() {
         val row = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.LE, BigFraction.ZERO)
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf(LinearIndicator(0, true, row)),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 1)),
+            arrayOf(LinearIndicator(0, true, row)),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
+        )
         for (active in listOf(false, true)) {
             var stopped = false
             val token = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = stopped
                 override val accounting: WorkMeter get() = WorkMeter { if (it > 1) stopped = true }
             }
-            val point = Sample(booleanArrayOf(), longArrayOf(if (active) 1 else 0), doubleArrayOf(1.0),
-                exactReals = listOf(BigFraction.ONE))
+            val point = Sample(
+                booleanArrayOf(),
+                longArrayOf(if (active) 1 else 0),
+                doubleArrayOf(1.0),
+                exactReals = listOf(BigFraction.ONE),
+            )
 
             val result = verifyRealCoordinates(source, point, token)
 
-            if (active) assertIs<Verification.Indeterminate>(result)
-            else assertIs<Verification.Accepted<*, *>>(result)
+            if (active) {
+                assertIs<Verification.Indeterminate>(result)
+            } else {
+                assertIs<Verification.Accepted<*, *>>(result)
+            }
         }
     }
 
@@ -122,12 +198,19 @@ class RealWitnessVerificationTest {
     fun `all different should reject wide collisions beside absent or certified real coordinates`() {
         val wide = parseBigInt("18446744073709551616")
         for (realCount in listOf(0, 1)) {
-            val source = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            val source = Problem(
+                0, 2, Array(2) { IntDomain(0, 1) },
                 arrayOf(AllDifferent(intArrayOf(0, 1))),
                 openIntLo = BooleanArray(2) { true }, openIntHi = BooleanArray(2) { true },
-                numRealVars = realCount, realLower = DoubleArray(realCount), realUpper = DoubleArray(realCount))
-            val point = Sample(booleanArrayOf(), longArrayOf(), DoubleArray(realCount),
-                exactInts = listOf(wide, wide), exactReals = List(realCount) { BigFraction.ZERO })
+                numRealVars = realCount, realLower = DoubleArray(realCount), realUpper = DoubleArray(realCount),
+            )
+            val point = Sample(
+                booleanArrayOf(),
+                longArrayOf(),
+                DoubleArray(realCount),
+                exactInts = listOf(wide, wide),
+                exactReals = List(realCount) { BigFraction.ZERO },
+            )
 
             val result = verifyRealCoordinates(source, point)
 
@@ -137,10 +220,19 @@ class RealWitnessVerificationTest {
 
     @Test
     fun `all different should retain distinct integers sharing the same signed word projection`() {
-        val source = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(AllDifferent(intArrayOf(0, 1))),
-            openIntLo = BooleanArray(2) { true }, openIntHi = BooleanArray(2) { true })
-        val point = Sample(booleanArrayOf(), longArrayOf(),
-            exactInts = listOf(parseBigInt("18446744073709551616"), bigIntOf(0)))
+        val source = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
+            arrayOf(AllDifferent(intArrayOf(0, 1))),
+            openIntLo = BooleanArray(2) { true },
+            openIntHi = BooleanArray(2) { true },
+        )
+        val point = Sample(
+            booleanArrayOf(),
+            longArrayOf(),
+            exactInts = listOf(parseBigInt("18446744073709551616"), bigIntOf(0)),
+        )
 
         val result = verifyRealCoordinates(source, point)
 
@@ -151,16 +243,25 @@ class RealWitnessVerificationTest {
     fun `optional all different should check the original presence literal polarities`() {
         val wide = parseBigInt("18446744073709551616")
         val relation = AllDifferent(intArrayOf(0, 1), presents = intArrayOf(Lit.make(0, true), Lit.make(1, false)))
-        val source = Problem(2, 2, Array(2) { IntDomain(0, 1) }, arrayOf(relation),
-            openIntLo = BooleanArray(2) { true }, openIntHi = BooleanArray(2) { true })
+        val source = Problem(
+            2,
+            2,
+            Array(2) { IntDomain(0, 1) },
+            arrayOf(relation),
+            openIntLo = BooleanArray(2) { true },
+            openIntHi = BooleanArray(2) { true },
+        )
         for (first in listOf(false, true)) {
             for (second in listOf(false, true)) {
                 val point = Sample(booleanArrayOf(first, second), longArrayOf(), exactInts = listOf(wide, wide))
 
                 val result = verifyRealCoordinates(source, point)
 
-                if (first && !second) assertIs<Verification.Rejected>(result)
-                else assertIs<Verification.Accepted<*, *>>(result)
+                if (first && !second) {
+                    assertIs<Verification.Rejected>(result)
+                } else {
+                    assertIs<Verification.Accepted<*, *>>(result)
+                }
             }
         }
     }
@@ -168,8 +269,12 @@ class RealWitnessVerificationTest {
     @Test
     fun `all different should preserve exact exempt values at both signed word extrema`() {
         for (exempt in listOf(Long.MIN_VALUE, Long.MAX_VALUE)) {
-            val source = Problem(0, 2, Array(2) { IntDomain(exempt, exempt) },
-                arrayOf(AllDifferent(intArrayOf(0, 1), exceptSet = longArrayOf(exempt))))
+            val source = Problem(
+                0,
+                2,
+                Array(2) { IntDomain(exempt, exempt) },
+                arrayOf(AllDifferent(intArrayOf(0, 1), exceptSet = longArrayOf(exempt))),
+            )
             val point = Sample(booleanArrayOf(), longArrayOf(exempt, exempt))
 
             val result = verifyRealCoordinates(source, point)
@@ -181,9 +286,14 @@ class RealWitnessVerificationTest {
     @Test
     fun `all different should not wrap a wide collision into an exempt value`() {
         val wide = parseBigInt("18446744073709551616")
-        val source = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+        val source = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
             arrayOf(AllDifferent(intArrayOf(0, 1), exceptSet = longArrayOf(0))),
-            openIntLo = BooleanArray(2) { true }, openIntHi = BooleanArray(2) { true })
+            openIntLo = BooleanArray(2) { true },
+            openIntHi = BooleanArray(2) { true },
+        )
         val point = Sample(booleanArrayOf(), longArrayOf(), exactInts = listOf(wide, wide))
 
         val result = verifyRealCoordinates(source, point)
@@ -193,8 +303,14 @@ class RealWitnessVerificationTest {
 
     @Test
     fun `all different should retain repeated source positions as a collision`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf(AllDifferent(intArrayOf(0, 0))),
-            openIntLo = booleanArrayOf(true), openIntHi = booleanArrayOf(true))
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 1)),
+            arrayOf(AllDifferent(intArrayOf(0, 0))),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
         val point = Sample(booleanArrayOf(), longArrayOf(), exactInts = listOf(parseBigInt("18446744073709551616")))
 
         val result = verifyRealCoordinates(source, point)
@@ -206,8 +322,14 @@ class RealWitnessVerificationTest {
     fun `all different should reject missing original integer or presence coordinates`() {
         val wide = parseBigInt("18446744073709551616")
         val relation = AllDifferent(intArrayOf(0, 1), presents = intArrayOf(Lit.make(0, true), Lit.make(0, false)))
-        val source = Problem(1, 2, Array(2) { IntDomain(0, 1) }, arrayOf(relation),
-            openIntLo = BooleanArray(2) { true }, openIntHi = BooleanArray(2) { true })
+        val source = Problem(
+            1,
+            2,
+            Array(2) { IntDomain(0, 1) },
+            arrayOf(relation),
+            openIntLo = BooleanArray(2) { true },
+            openIntHi = BooleanArray(2) { true },
+        )
         val incomplete = listOf(
             Sample(booleanArrayOf(), longArrayOf(), exactInts = listOf(wide, wide)),
             Sample(booleanArrayOf(true), longArrayOf(), exactInts = listOf(wide)),

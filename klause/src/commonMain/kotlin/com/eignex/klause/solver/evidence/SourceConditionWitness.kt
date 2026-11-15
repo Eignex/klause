@@ -11,7 +11,8 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 
 internal fun SourceCondition.checkWitness(
-    sample: Sample, cancellation: ExecutionControl = ExecutionControl.Never,
+    sample: Sample,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): SourceEvidenceCheck = try {
     val arithmetic = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
     arithmetic.arithmetic.step()
@@ -22,9 +23,7 @@ internal fun SourceCondition.checkWitness(
     SourceEvidenceCheck.Unavailable("source invocation arithmetic allowance exhausted")
 }
 
-internal fun SourceCondition.checkWitness(
-    sample: Sample, arithmetic: AlgebraicArithmetic,
-): SourceEvidenceCheck {
+internal fun SourceCondition.checkWitness(sample: Sample, arithmetic: AlgebraicArithmetic): SourceEvidenceCheck {
     for ((id, value) in bools) {
         arithmetic.arithmetic.step()
         if (id !in 0 until sample.numBoolVars || sample.boolValue(id) != value) {
@@ -76,9 +75,15 @@ private fun Sample.declares(coordinate: SourceCoordinate): Boolean = when (coord
 private fun Sample.at(coordinate: SourceCoordinate, arithmetic: AlgebraicArithmetic): AlgebraicReal? =
     when (coordinate.kind) {
         SourceCoordinate.Kind.Boolean -> arithmetic.rational(
-            if (boolValue(coordinate.id)) BigFraction.ONE
-            else BigFraction.ZERO)
+            if (boolValue(coordinate.id)) {
+                BigFraction.ONE
+            } else {
+                BigFraction.ZERO
+            },
+        )
+
         SourceCoordinate.Kind.Integer -> arithmetic.rational(BigFraction.of(exactIntValue(coordinate.id), BIG_ONE))
+
         SourceCoordinate.Kind.Real -> algebraicReals?.get(coordinate.id)
             ?: exactReals?.get(coordinate.id)?.let(arithmetic::rational)
     }

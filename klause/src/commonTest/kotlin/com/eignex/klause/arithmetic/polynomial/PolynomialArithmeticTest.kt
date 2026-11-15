@@ -128,10 +128,14 @@ class PolynomialArithmeticTest {
         for ((left, right) in listOf(
             arithmetic.add(arithmetic.multiply(y, x), Polynomial.ONE) to
                 arithmetic.add(arithmetic.multiply(y, x), constant(2)),
-            arithmetic.add(arithmetic.multiply(arithmetic.add(y, Polynomial.ONE), x),
-                arithmetic.subtract(arithmetic.power(z, 2), Polynomial.ONE)) to
-                arithmetic.add(arithmetic.multiply(arithmetic.subtract(y, Polynomial.ONE), x),
-                    arithmetic.add(z, constant(2))),
+            arithmetic.add(
+                arithmetic.multiply(arithmetic.add(y, Polynomial.ONE), x),
+                arithmetic.subtract(arithmetic.power(z, 2), Polynomial.ONE),
+            ) to
+                arithmetic.add(
+                    arithmetic.multiply(arithmetic.subtract(y, Polynomial.ONE), x),
+                    arithmetic.add(z, constant(2)),
+                ),
         )) {
             val expected = arithmetic.resultant(left, right, 0)
             val limited = PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0))
@@ -235,7 +239,9 @@ class PolynomialArithmeticTest {
                     do {
                         val step = pending.next()
                     } while (step == null)
-                } else limited.principalSubresultants(left, right, 0)
+                } else {
+                    limited.principalSubresultants(left, right, 0)
+                }
             }
 
             assertEquals(PolynomialResource.MATRIX_CELLS, stopped.resource)
@@ -292,9 +298,11 @@ class PolynomialArithmeticTest {
 
     @Test
     fun `unit division completes within the containing work allowance`() {
-        val dividend = Polynomial.of((0 until 128).map { exponent ->
+        val dividend = Polynomial.of(
+            (0 until 128).map { exponent ->
             PolynomialTerm(Monomial.of(mapOf(0 to exponent, 1 to 1)), fraction(exponent.toLong() + 1))
-        })
+        }
+        )
         var spent = 0L
         val meter = WorkMeter { spent += it }
         val counted = PolynomialArithmetic(object : ExecutionControl() {
@@ -330,18 +338,24 @@ class PolynomialArithmeticTest {
         val b = arithmetic.add(arithmetic.power(x, 2), constant(3))
         val c = arithmetic.add(x, constant(4))
         val d = arithmetic.add(arithmetic.power(x, 3), constant(5))
-        val quadratic = arithmetic.add(arithmetic.scale(arithmetic.power(y, 2), fraction(2)),
-            arithmetic.add(arithmetic.multiply(x, y), arithmetic.add(x, constant(1))))
+        val quadratic = arithmetic.add(
+            arithmetic.scale(arithmetic.power(y, 2), fraction(2)),
+            arithmetic.add(arithmetic.multiply(x, y), arithmetic.add(x, constant(1))),
+        )
         val linear = arithmetic.add(arithmetic.scale(y, fraction(3)), arithmetic.power(x, 2))
         val resultant = arithmetic.add(
-            arithmetic.subtract(arithmetic.scale(arithmetic.power(x, 4), fraction(2)),
-                arithmetic.scale(arithmetic.power(x, 3), fraction(3))),
+            arithmetic.subtract(
+                arithmetic.scale(arithmetic.power(x, 4), fraction(2)),
+                arithmetic.scale(arithmetic.power(x, 3), fraction(3)),
+            ),
             arithmetic.add(arithmetic.scale(x, fraction(9)), constant(9)),
         )
         for ((left, right, expected) in listOf(
-            Triple(arithmetic.add(arithmetic.multiply(a, y), b),
+            Triple(
+                arithmetic.add(arithmetic.multiply(a, y), b),
                 arithmetic.add(arithmetic.multiply(c, y), d),
-                arithmetic.subtract(arithmetic.multiply(a, d), arithmetic.multiply(b, c))),
+                arithmetic.subtract(arithmetic.multiply(a, d), arithmetic.multiply(b, c)),
+            ),
             Triple(quadratic, linear, resultant),
         )) {
             var eagerCharges = 0L

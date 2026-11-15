@@ -19,17 +19,22 @@ internal fun polynomialProposal(
         arithmetic.step()
         when (val node = pending.removeLast()) {
             is TranscendentalFormula.And -> pending.addAll(node.operands)
+
             is TranscendentalDistinct -> {
                 val values = node.operands.map { polynomial(it, arithmetic) }
                 if (values.all { it != null }) atoms.add(PolynomialDistinct(values.filterNotNull()))
             }
+
             is TranscendentalFormula.Atom -> {
                 val left = polynomial(node.left, arithmetic)
                 val right = polynomial(node.right, arithmetic)
                 if (left != null && right != null) atoms.add(PolynomialRealFormula.Atom(left, node.relation, right))
             }
+
             is TranscendentalFormula.BooleanVariable -> atoms.add(PolynomialRealFormula.BooleanVariable(node.id))
+
             is TranscendentalFormula.Constant -> atoms.add(PolynomialRealFormula.Constant(node.value))
+
             else -> Unit
         }
     }

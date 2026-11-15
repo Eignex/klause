@@ -52,8 +52,8 @@ class ExecutionCapabilitiesTest {
     @Test
     fun `native source completion should not invent a counting surface`() {
         val source = SmtLibPolynomial.parse(
-                "(declare-const x Real) (assert (= (* x x) 2))",
-            ).realSource()
+            "(declare-const x Real) (assert (= (* x x) 2))",
+        ).realSource()
         val plan = source.prepareExecutionPlan()
 
         val admission = plan.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.EXACT_COUNT)
@@ -69,20 +69,27 @@ class ExecutionCapabilitiesTest {
         val source = Problem(
             0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
-            factors = arrayOf(ContinuousProduct(0, 0, 0),
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0)),
+            factors = arrayOf(
+                ContinuousProduct(0, 0, 0),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+            ),
             numRealVars = 1,
             realLower = doubleArrayOf(1.0),
             realUpper = doubleArrayOf(1.0),
         )
         val supported = SmtLibPolynomial.parse(
-                "(declare-const x Real) (assert (= (* x x) 2))",
-            ).realSource().pipelineRequest()
+            "(declare-const x Real) (assert (= (* x x) 2))",
+        ).realSource().pipelineRequest()
 
-        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-            if (factor is Linear && target == EncodingTarget.POLYNOMIAL) Encoder(EncoderSupport.UNSUPPORTED)
-            else BuiltInEncoderProvider.select(factor, target)
-        })
+        val providers = FactorProjectionProviders(
+            encoder = EncoderProvider { factor, target ->
+            if (factor is Linear && target == EncodingTarget.POLYNOMIAL) {
+                Encoder(EncoderSupport.UNSUPPORTED)
+            } else {
+                BuiltInEncoderProvider.select(factor, target)
+            }
+        }
+        )
         val unsupported = source.prepareExecutionPlan(providers).capabilities.admission(FiniteEngine.BACKTRACK)
         val exhausted = OpenTheoryPipeline.execute(
             supported,
@@ -146,8 +153,8 @@ class ExecutionCapabilitiesTest {
     @Test
     fun `polynomial invocation pins should not change prepared source admission or later witnesses`() {
         val source = SmtLibPolynomial.parse(
-                "(declare-const x Real) (declare-const b Bool) (assert (= (* x x) 2)) (assert b)",
-            ).realSource()
+            "(declare-const x Real) (declare-const b Bool) (assert (= (* x x) 2)) (assert b)",
+        ).realSource()
         val request = source.pipelineRequest()
         val scoped = PolynomialTheoryParams(
             strategy = PolynomialStrategyParams(

@@ -85,8 +85,7 @@ fun ifThenElse(cond: BoolTerm, then: Int, otherwise: IntTerm): IntExpr = ifThenE
 fun ifThenElse(cond: BoolTerm, then: IntTerm, otherwise: Int): IntExpr = ifThenElse(cond, then, IntLit(otherwise))
 
 /** [then] when [cond] holds, else [otherwise], with constant branches. */
-fun ifThenElse(cond: BoolTerm, then: Int, otherwise: Int): IntExpr =
-    ifThenElse(cond, IntLit(then), IntLit(otherwise))
+fun ifThenElse(cond: BoolTerm, then: Int, otherwise: Int): IntExpr = ifThenElse(cond, IntLit(then), IntLit(otherwise))
 
 /** `items[index]` — array element selection (items must be non-empty). */
 fun element(index: IntTerm, items: List<IntTerm>): IntExpr {

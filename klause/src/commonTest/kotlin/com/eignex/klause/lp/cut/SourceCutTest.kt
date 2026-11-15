@@ -243,10 +243,19 @@ class SourceCutTest {
     @Test
     fun `projected rows should keep their coefficient buffers private`() {
         val expression = CutExpression(mapOf(x to BigFraction.ONE))
-        val facts = listOf(CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
-            CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true))
-        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0, facts,
-            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)))
+        val facts = listOf(
+            CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
+            CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true),
+        )
+        val source = SourceCut(
+            expression, Relation.LE, BigFraction.ONE,
+            CutProvenance(
+            modelToken,
+            0,
+            facts,
+            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
+        )
+        )
         val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)))
         val columns = assertNotNull(CutColumnLayout.capture(map, 64L, ExecutionControl.Never) {})
         var prepared: SourceCutPreparation? = null
@@ -260,17 +269,34 @@ class SourceCutTest {
         assertEquals(0, next.cols.single())
         assertEquals(1L, next.coeffs.single())
         next.coeffs[0] = 77L
-        assertEquals(1L, assertNotNull(source.toCut(map, preparation = prepared,
-            columnBinding = columns).orNull()).coeffs.single())
+        assertEquals(
+            1L,
+            assertNotNull(
+                source.toCut(
+            map,
+            preparation = prepared,
+            columnBinding = columns,
+        ).orNull()
+            ).coeffs.single()
+        )
     }
 
     @Test
     fun `changed layouts and affine columns should remap a prepared row`() {
         val expression = CutExpression(mapOf(x to BigFraction.ONE))
-        val facts = listOf(CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
-            CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true))
-        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0, facts,
-            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)))
+        val facts = listOf(
+            CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
+            CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true),
+        )
+        val source = SourceCut(
+            expression, Relation.LE, BigFraction.ONE,
+            CutProvenance(
+            modelToken,
+            0,
+            facts,
+            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
+        )
+        )
         val map = CutSourceMap(modelToken, 0, listOf(null, CutColumnSource(x)))
         val columns = assertNotNull(CutColumnLayout.capture(map, 64L, ExecutionControl.Never) {})
         var prepared: SourceCutPreparation? = null
@@ -295,13 +321,25 @@ class SourceCutTest {
     @Test
     fun `projected rows should require every current conditional premise`() {
         val expression = CutExpression(mapOf(x to BigFraction.ONE))
-        val guards = listOf(CutPremise.Bound(expression, true, BigFraction.ONE), CutPremise.Literal(1),
+        val guards = listOf(
+            CutPremise.Bound(expression, true, BigFraction.ONE),
+            CutPremise.Literal(1),
             CutPremise.Excluded(x, BigFraction.ofLong(2)),
-            CutPremise.ObjectiveCutoff(expression, BigFraction.ofLong(5)))
-        val facts = listOf(CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
-            CutProofFact(CutPremise.Integral(expression), true)) + guards.map { CutProofFact(it, false) }
-        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0, facts,
-            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)))
+            CutPremise.ObjectiveCutoff(expression, BigFraction.ofLong(5)),
+        )
+        val facts = listOf(
+            CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
+            CutProofFact(CutPremise.Integral(expression), true),
+        ) + guards.map { CutProofFact(it, false) }
+        val source = SourceCut(
+            expression, Relation.LE, BigFraction.ONE,
+            CutProvenance(
+            modelToken,
+            0,
+            facts,
+            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
+        )
+        )
         val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)), activePremises = guards.toSet())
         val columns = assertNotNull(CutColumnLayout.capture(map, 64L, ExecutionControl.Never) {})
         var prepared: SourceCutPreparation? = null
@@ -311,18 +349,29 @@ class SourceCutTest {
         for (missing in guards) {
             val current = CutSourceMap(modelToken, 1, map.columns, activePremises = (guards - missing).toSet())
             val binding = assertNotNull(assertNotNull(columns.layoutFor(map)).bind(current, ExecutionControl.Never) {})
-            assertEquals(CutMapping.Declined(CutMappingDecline.INACTIVE_GUARD),
-                source.toCut(current, preparation = prepared, columnBinding = binding))
+            assertEquals(
+                CutMapping.Declined(CutMappingDecline.INACTIVE_GUARD),
+                source.toCut(current, preparation = prepared, columnBinding = binding),
+            )
         }
     }
 
     @Test
     fun `projected rows should reject a foreign model namespace`() {
         val expression = CutExpression(mapOf(x to BigFraction.ONE))
-        val facts = listOf(CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
-            CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true))
-        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0, facts,
-            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)))
+        val facts = listOf(
+            CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
+            CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true),
+        )
+        val source = SourceCut(
+            expression, Relation.LE, BigFraction.ONE,
+            CutProvenance(
+            modelToken,
+            0,
+            facts,
+            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
+        )
+        )
         val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)))
         val columns = assertNotNull(CutColumnLayout.capture(map, 64L, ExecutionControl.Never) {})
         var prepared: SourceCutPreparation? = null
@@ -330,17 +379,29 @@ class SourceCutTest {
         val current = CutSourceMap(Any(), 0, map.columns)
         val binding = assertNotNull(assertNotNull(columns.layoutFor(map)).bind(current, ExecutionControl.Never) {})
 
-        assertEquals(CutMapping.Declined(CutMappingDecline.MODEL_SCOPE),
-            source.toCut(current, preparation = prepared, columnBinding = binding))
+        assertEquals(
+            CutMapping.Declined(CutMappingDecline.MODEL_SCOPE),
+            source.toCut(current, preparation = prepared, columnBinding = binding),
+        )
     }
 
     @Test
     fun `projected rows should reject a missing invocation assumption`() {
         val expression = CutExpression(mapOf(x to BigFraction.ONE))
-        val facts = listOf(CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
-            CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true))
-        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0, facts,
-            assumptions = setOf("region"), conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)))
+        val facts = listOf(
+            CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
+            CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true),
+        )
+        val source = SourceCut(
+            expression, Relation.LE, BigFraction.ONE,
+            CutProvenance(
+            modelToken,
+            0,
+            facts,
+            assumptions = setOf("region"),
+            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
+        )
+        )
         val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)), assumptions = setOf("region"))
         val columns = assertNotNull(CutColumnLayout.capture(map, 64L, ExecutionControl.Never) {})
         var prepared: SourceCutPreparation? = null
@@ -349,29 +410,47 @@ class SourceCutTest {
         val current = CutSourceMap(modelToken, 1, map.columns)
         val binding = assertNotNull(assertNotNull(columns.layoutFor(map)).bind(current, ExecutionControl.Never) {})
 
-        assertEquals(CutMapping.Declined(CutMappingDecline.MODEL_SCOPE),
-            source.toCut(current, preparation = prepared, columnBinding = binding))
+        assertEquals(
+            CutMapping.Declined(CutMappingDecline.MODEL_SCOPE),
+            source.toCut(current, preparation = prepared, columnBinding = binding),
+        )
     }
 
     @Test
     fun `projected rows should validate new fixed substitution proofs`() {
         val expression = CutExpression(mapOf(x to BigFraction.ONE))
-        val facts = listOf(CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
-            CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true))
-        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0, facts,
-            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)))
+        val facts = listOf(
+            CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
+            CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true),
+        )
+        val source = SourceCut(
+            expression, Relation.LE, BigFraction.ONE,
+            CutProvenance(
+            modelToken,
+            0,
+            facts,
+            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
+        )
+        )
         val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)))
         val columns = assertNotNull(CutColumnLayout.capture(map, 64L, ExecutionControl.Never) {})
         val limits = CutMappingLimits(terms = 8)
         var prepared: SourceCutPreparation? = null
         assertNotNull(source.toCut(map, limits, onPrepared = { prepared = it }, columnBinding = columns).orNull())
         assertTrue(assertNotNull(prepared).projection)
-        val fixed = CutSourceMap(modelToken, 1, emptyList(), fixed = mapOf(x to BigFraction.ONE),
-            activePremises = setOf(CutPremise.Fixed(x, BigFraction.ONE)))
+        val fixed = CutSourceMap(
+            modelToken,
+            1,
+            emptyList(),
+            fixed = mapOf(x to BigFraction.ONE),
+            activePremises = setOf(CutPremise.Fixed(x, BigFraction.ONE)),
+        )
         val binding = assertNotNull(CutColumnLayout.capture(fixed, 64L, ExecutionControl.Never) {})
 
-        assertEquals(CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT),
-            source.toCut(fixed, limits, prepared, columnBinding = binding))
+        assertEquals(
+            CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT),
+            source.toCut(fixed, limits, prepared, columnBinding = binding),
+        )
     }
 
     @Test
@@ -379,9 +458,13 @@ class SourceCutTest {
         val auxiliary = CutSource(CutSourceKind.AUXILIARY, 0)
         val definition = CutAuxiliaryDefinition(listOf(1L), emptyList(), 1L, true)
         val expression = CutExpression(mapOf(x to BigFraction.ONE))
-        val proof = CutProvenance(modelToken, 0, emptyList(),
+        val proof = CutProvenance(
+            modelToken,
+            0,
+            emptyList(),
             conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
-            auxiliaryDefinitions = mapOf(auxiliary to definition))
+            auxiliaryDefinitions = mapOf(auxiliary to definition),
+        )
         val source = SourceCut(expression, Relation.LE, BigFraction.ONE, proof)
         val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)))
         var prepared: SourceCutPreparation? = null
@@ -399,15 +482,30 @@ class SourceCutTest {
         val next = CutSource(CutSourceKind.AUXILIARY, 2)
         val definition = CutAuxiliaryDefinition(listOf(1L), emptyList(), 1L, true)
         val expression = CutExpression(mapOf(original to BigFraction.ONE))
-        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0, emptyList(),
+        val source = SourceCut(
+            expression, Relation.LE, BigFraction.ONE,
+            CutProvenance(
+            modelToken,
+            0,
+            emptyList(),
             conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
-            auxiliaryDefinitions = mapOf(original to definition)))
-        val firstMap = CutSourceMap(modelToken, 0, listOf(CutColumnSource(first)),
-            auxiliaryDefinitions = mapOf(first to definition))
+            auxiliaryDefinitions = mapOf(original to definition),
+        )
+        )
+        val firstMap = CutSourceMap(
+            modelToken,
+            0,
+            listOf(CutColumnSource(first)),
+            auxiliaryDefinitions = mapOf(first to definition),
+        )
         var prepared: SourceCutPreparation? = null
         assertNotNull(source.toCut(firstMap, onPrepared = { prepared = it }).orNull())
-        val nextMap = CutSourceMap(modelToken, 1, listOf(null, CutColumnSource(next)),
-            auxiliaryDefinitions = mapOf(next to definition))
+        val nextMap = CutSourceMap(
+            modelToken,
+            1,
+            listOf(null, CutColumnSource(next)),
+            auxiliaryDefinitions = mapOf(next to definition),
+        )
 
         val result = assertNotNull(source.toCut(nextMap, preparation = assertNotNull(prepared)).orNull())
 
@@ -418,9 +516,15 @@ class SourceCutTest {
     @Test
     fun `prepared input should respect a stricter proof budget`() {
         val expression = CutExpression(mapOf(x to BigFraction.ONE, y to BigFraction.ONE))
-        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(
-            modelToken, 0, emptyList(), conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
-        ))
+        val source = SourceCut(
+            expression, Relation.LE, BigFraction.ONE,
+            CutProvenance(
+            modelToken,
+            0,
+            emptyList(),
+            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
+        )
+        )
         val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x), CutColumnSource(y)))
         var prepared: SourceCutPreparation? = null
         assertNotNull(source.toCut(map, onPrepared = { prepared = it }).orNull())
@@ -435,15 +539,34 @@ class SourceCutTest {
     fun `prepared input should reject a different immutable proof`() {
         val expression = CutExpression(mapOf(x to BigFraction.ONE))
         val row = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)
-        val source = SourceCut(expression, Relation.LE, BigFraction.ONE,
-            CutProvenance(modelToken, 0, emptyList(), conclusion = row))
+        val source = SourceCut(
+            expression,
+            Relation.LE,
+            BigFraction.ONE,
+            CutProvenance(modelToken, 0, emptyList(), conclusion = row),
+        )
         val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)))
         val limits = CutMappingLimits(bits = 32)
         var prepared: SourceCutPreparation? = null
         assertNotNull(source.toCut(map, limits, onPrepared = { prepared = it }).orNull())
-        val other = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0,
-            listOf(CutProofFact(CutPremise.Bound(expression, true,
-                BigFraction.of(BIG_ONE, BIG_ONE.shl(80))), true)), conclusion = row))
+        val other = SourceCut(
+            expression, Relation.LE, BigFraction.ONE,
+            CutProvenance(
+            modelToken,
+            0,
+            listOf(
+                CutProofFact(
+                    CutPremise.Bound(
+                expression,
+                true,
+                BigFraction.of(BIG_ONE, BIG_ONE.shl(80)),
+            ),
+                true
+                )
+            ),
+            conclusion = row,
+        )
+        )
 
         val result = other.toCut(map, limits, assertNotNull(prepared))
 
@@ -453,15 +576,26 @@ class SourceCutTest {
     @Test
     fun `prepared input should still validate proof growth from fixed substitution`() {
         val expression = CutExpression(mapOf(x to BigFraction.ONE))
-        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(
-            modelToken, 0, emptyList(), conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
-        ))
+        val source = SourceCut(
+            expression, Relation.LE, BigFraction.ONE,
+            CutProvenance(
+            modelToken,
+            0,
+            emptyList(),
+            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
+        )
+        )
         val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)))
         val limits = CutMappingLimits(terms = 2)
         var prepared: SourceCutPreparation? = null
         assertNotNull(source.toCut(map, limits, onPrepared = { prepared = it }).orNull())
-        val fixed = CutSourceMap(modelToken, 1, emptyList(), fixed = mapOf(x to BigFraction.ONE),
-            activePremises = setOf(CutPremise.Fixed(x, BigFraction.ONE)))
+        val fixed = CutSourceMap(
+            modelToken,
+            1,
+            emptyList(),
+            fixed = mapOf(x to BigFraction.ONE),
+            activePremises = setOf(CutPremise.Fixed(x, BigFraction.ONE)),
+        )
 
         val result = source.toCut(fixed, limits, assertNotNull(prepared))
 

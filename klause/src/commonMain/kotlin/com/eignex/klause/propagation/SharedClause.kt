@@ -21,12 +21,16 @@ class SharedClause internal constructor(
     internal val boolLits: IntArray,
     internal val atomQuads: LongArray,
     internal val lbd: Int,
-    internal val key: Long = contentKey(LongArray(boolLits.size + atomQuads.size / QUAD) { i ->
-        if (i < boolLits.size) boolLits[i].toLong() else {
+    internal val key: Long = contentKey(
+        LongArray(boolLits.size + atomQuads.size / QUAD) { i ->
+        if (i < boolLits.size) {
+            boolLits[i].toLong()
+        } else {
             val q = (i - boolLits.size) * QUAD
             atomToken(atomQuads[q], atomQuads[q + 1], atomQuads[q + 2], atomQuads[q + 3])
         }
-    }),
+    }
+    ),
 ) {
     internal val payloadBytes: Long
         get() = boolLits.size.toLong() * Int.SIZE_BYTES + atomQuads.size.toLong() * Long.SIZE_BYTES

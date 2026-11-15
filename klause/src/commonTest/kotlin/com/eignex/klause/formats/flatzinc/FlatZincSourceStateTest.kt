@@ -37,11 +37,11 @@ class FlatZincSourceStateTest {
 
             val invocation = program.prepareSourceExecution(
                 SourceSetupRequest(
-                program.sourceAttachment(),
-                ExecutionOperation.SATISFY,
-                FiniteEngine.BACKTRACK,
-                cancellation = ExecutionControl { stopped },
-            )
+                    program.sourceAttachment(),
+                    ExecutionOperation.SATISFY,
+                    FiniteEngine.BACKTRACK,
+                    cancellation = ExecutionControl { stopped },
+                ),
             )
 
             assertSame(original, invocation.source.originalSource)
@@ -73,11 +73,12 @@ class FlatZincSourceStateTest {
     fun `finite declarations should not acquire an unrepresentable unrelated grid window`() {
         val lower = BIG_ONE shl 2048
         val policy = FloatSemantics.Grid(
-            3, 1000,
+            3,
+            1000,
             UndeclaredRealBounds(
-            SemanticRational.of(lower),
-            SemanticRational.of(lower + BIG_ONE),
-        )
+                SemanticRational.of(lower),
+                SemanticRational.of(lower + BIG_ONE),
+            ),
         )
 
         val program = parseFlatZinc(

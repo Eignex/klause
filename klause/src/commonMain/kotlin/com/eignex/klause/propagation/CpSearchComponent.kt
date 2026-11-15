@@ -89,8 +89,11 @@ class CpSearchComponent(
 
     private fun usableIntegerRow(learned: ConflictAnalyzer.AnalysisResult.LearnedIntegerRow): Boolean {
         val usable = checkIntegerRow(learned)
-        if (!usable) session.explanationState.arithmeticLearningTrace?.record(
-            "integer.decline.shared-assertion-or-premise")
+        if (!usable) {
+            session.explanationState.arithmeticLearningTrace?.record(
+            "integer.decline.shared-assertion-or-premise",
+        )
+        }
         return usable
     }
 
@@ -118,8 +121,12 @@ class CpSearchComponent(
                     val source = sourceIntId(state.atoms.intVar[atom])
                     val value = state.atoms.threshold[atom]
                     if (context.intLowerBound(source) != value || context.intUpperBound(source) != value) return false
-                    SearchAtomPremise.All(listOf(context.intLowerBoundPremise(source),
-                        context.intUpperBoundPremise(source)))
+                    SearchAtomPremise.All(
+                        listOf(
+                        context.intLowerBoundPremise(source),
+                        context.intUpperBoundPremise(source),
+                    )
+                    )
                 }
                 if (context.explainAtoms(premise, maxNodes = 128) == null) {
                     return false
@@ -377,12 +384,14 @@ class CpSearchComponent(
     }
 
     private fun conflict(result: PropagationResult.Unsat): ComponentResult.Conflict = ComponentResult.Conflict(
-        (when (val learned = result.learnedClause) {
+        (
+            when (val learned = result.learnedClause) {
             is ConflictAnalyzer.AnalysisResult.Learned -> learned
             is ConflictAnalyzer.AnalysisResult.LearnedPb -> learned.fallbackClause
             is ConflictAnalyzer.AnalysisResult.LearnedIntegerRow -> learned.fallbackClause
             else -> null
-        })
+        }
+        )
             ?.literals
             ?.takeIf { literals -> literals.all { Lit.variable(it) < session.problem.numBoolVars } }
             ?.let(::SearchExplanation),
@@ -439,7 +448,8 @@ class CpSearchComponent(
             checkPublication()
             if (variable != skippedVariable) {
                 val publication = publish(
-                    SearchDecision.Bool(Lit.make(variable, value)), SearchAtomPremise.Unavailable,
+                    SearchDecision.Bool(Lit.make(variable, value)),
+                    SearchAtomPremise.Unavailable,
                 )
                 if (publication !is ComponentResult.Consistent) return publication
             }
@@ -569,8 +579,10 @@ class CpSearchComponent(
     ): ConflictAnalyzer.AnalysisResult.LearnedConstraint? = when {
         session.problem.numIntVars > 0 && learned is ConflictAnalyzer.AnalysisResult.LearnedPb &&
             !usableMixedPb(learned) -> learned.fallbackClause
+
         learned is ConflictAnalyzer.AnalysisResult.LearnedIntegerRow && !usableIntegerRow(learned) ->
             learned.fallbackClause
+
         else -> learned
     }
 
@@ -598,8 +610,11 @@ class CpSearchComponent(
 
         override fun apply(session: SearchSession): SearchLearnedConflictResult {
             this@CpSearchComponent.session.explanationState.arithmeticLearningTrace?.record(
-                "analysis.mapped-target", learned.backjumpLevel.toLong(), decisionLevel.toLong(),
-                this@CpSearchComponent.session.decisionLevel.toLong())
+                "analysis.mapped-target",
+                learned.backjumpLevel.toLong(),
+                decisionLevel.toLong(),
+                this@CpSearchComponent.session.decisionLevel.toLong(),
+            )
             val result = this@CpSearchComponent.session.withAttribution(factorFamilies) {
                 when (learned) {
                     is ConflictAnalyzer.AnalysisResult.Learned -> this@CpSearchComponent.session.addLearnedClause(
@@ -640,7 +655,8 @@ class CpSearchComponent(
                 is PropagationResult.Unsat -> {
                     cascadeConflictObserver?.invoke(result)
                     val next = mappedLearnedConstraint(
-                        result.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedConstraint)
+                        result.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedConstraint,
+                    )
                     when {
                         next == null -> SearchLearnedConflictResult.Chronological
                         next.backjumpLevel == 0 && next.isContradiction -> SearchLearnedConflictResult.Exhausted

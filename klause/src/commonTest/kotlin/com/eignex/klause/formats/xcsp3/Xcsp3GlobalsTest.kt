@@ -122,8 +122,15 @@ class Xcsp3GlobalsTest {
 
         assertEquals(3, parsed.problem.numIntVars)
         assertEquals(0, parsed.problem.numBoolVars)
-        assertEquals(setOf(listOf(0L, 0L, 0L), listOf(0L, 1L, 1L),
-            listOf(1L, 0L, 2L), listOf(1L, 1L, 3L)), solutions(parsed, 3))
+        assertEquals(
+            setOf(
+            listOf(0L, 0L, 0L),
+            listOf(0L, 1L, 1L),
+            listOf(1L, 0L, 2L),
+            listOf(1L, 1L, 3L),
+        ),
+            solutions(parsed, 3)
+        )
     }
 
     @Test
@@ -181,7 +188,9 @@ class Xcsp3GlobalsTest {
             state.recompute()
 
             for ((variable, choice, expected) in listOf(
-                Triple(0, value.toLong(), 2L), Triple(1, value.toLong(), 3L), Triple(0, 0L, 1L),
+                Triple(0, value.toLong(), 2L),
+                Triple(1, value.toLong(), 3L),
+                Triple(0, 0L, 1L),
             )) {
                 val move = Move.IntSet(variable, choice)
                 val predicted = state.netDelta(move)
@@ -218,8 +227,11 @@ class Xcsp3GlobalsTest {
             """<var id="x">0..2</var><var id="y">0..2</var>""",
         )
 
-        assertEquals((0L..2L).flatMap { x -> (0L..2L).map { y -> listOf(x, y) } }
-            .filter { it != listOf(1L, 1L) }.toSet(), solutions(parsed, 2))
+        assertEquals(
+            (0L..2L).flatMap { x -> (0L..2L).map { y -> listOf(x, y) } }
+            .filter { it != listOf(1L, 1L) }.toSet(),
+                solutions(parsed, 2)
+        )
     }
 
     @Test
@@ -248,8 +260,15 @@ class Xcsp3GlobalsTest {
             """<var id="x">0..1</var><var id="y">0..1</var><var id="z">0..1</var>""",
         )
 
-        assertEquals(setOf(listOf(0L, 0L, 1L), listOf(0L, 1L, 1L),
-            listOf(1L, 0L, 0L), listOf(1L, 1L, 0L)), solutions(parsed, 3))
+        assertEquals(
+            setOf(
+            listOf(0L, 0L, 1L),
+            listOf(0L, 1L, 1L),
+            listOf(1L, 0L, 0L),
+            listOf(1L, 1L, 0L),
+        ),
+            solutions(parsed, 3)
+        )
     }
 
     @Test
@@ -268,8 +287,10 @@ class Xcsp3GlobalsTest {
     fun `tuple reification attributes should decline unsupported source semantics`() {
         for (attribute in listOf("reifiedBy", "hreifiedFrom", "hreifiedTo")) {
             assertFailsWith<UnsupportedXcsp3Exception> {
-                parse("<allDifferent $attribute=\"b\"><list>x x</list><list>y y</list></allDifferent>",
-                    """<var id="x">0..1</var><var id="y">0..1</var><var id="b">0..1</var>""")
+                parse(
+                    "<allDifferent $attribute=\"b\"><list>x x</list><list>y y</list></allDifferent>",
+                    """<var id="x">0..1</var><var id="y">0..1</var><var id="b">0..1</var>""",
+                )
             }
         }
     }
@@ -304,8 +325,17 @@ class Xcsp3GlobalsTest {
             """<var id="x">0..2</var><var id="y">0..2</var>""",
         )
 
-        assertEquals(setOf(listOf(0L, 1L), listOf(1L, 0L), listOf(1L, 1L),
-            listOf(0L, 2L), listOf(2L, 0L), listOf(2L, 2L)), solutions(parsed, 2))
+        assertEquals(
+            setOf(
+            listOf(0L, 1L),
+            listOf(1L, 0L),
+            listOf(1L, 1L),
+            listOf(0L, 2L),
+            listOf(2L, 0L),
+            listOf(2L, 2L),
+        ),
+            solutions(parsed, 2)
+        )
     }
 
     @Test
@@ -525,8 +555,12 @@ class Xcsp3GlobalsTest {
 
         assertEquals(4, parsed.problem.numBoolVars)
         assertEquals(
-            setOf(listOf(0L, 0L, 5L, 0L, 4L, 0L), listOf(0L, 1L, 2L, 3L, 4L, 0L),
-                listOf(1L, 0L, 3L, 2L, 0L, 4L), listOf(1L, 1L, 0L, 5L, 0L, 4L)),
+            setOf(
+                listOf(0L, 0L, 5L, 0L, 4L, 0L),
+                listOf(0L, 1L, 2L, 3L, 4L, 0L),
+                listOf(1L, 0L, 3L, 2L, 0L, 4L),
+                listOf(1L, 1L, 0L, 5L, 0L, 4L),
+            ),
             solutions(parsed, 6),
         )
     }

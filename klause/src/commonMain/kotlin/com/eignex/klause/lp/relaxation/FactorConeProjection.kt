@@ -18,12 +18,18 @@ import com.eignex.klause.solver.objective.LinearObjective
 
 private fun Factor.extendsLpObjectiveCone(): Boolean = when (this) {
     is ArrayMinMax, is Cardinality, is Clause -> true
+
     is PseudoBoolean -> permitsLongPseudoBoolean(constants)
+
     is Linear -> relation != LinearOp.NE
+
     is ExactLinear -> finiteRelaxationSupported() &&
         (activator == LinearRow.ALWAYS || variables.reals.isNotEmpty() || strict)
+
     is LinearIndicator -> row.finiteRelaxationSupported()
+
     is ReifiedRealLinear -> true
+
     else -> false
 }
 

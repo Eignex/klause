@@ -12,14 +12,14 @@ class CancellationTest {
     fun `predicate composition should preserve ordered short circuiting`() {
         val calls = ArrayList<Int>()
         val stop = Cancellation {
-            calls += 1;
+            calls += 1
             false
         } or Cancellation {
-            calls += 2;
+            calls += 2
             true
         } or
             Cancellation {
-                calls += 3;
+                calls += 3
                 false
             }
 

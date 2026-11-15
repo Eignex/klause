@@ -22,7 +22,9 @@ class MaxSdTest {
     @Test
     fun `bounded probing should rank by global propagation when counters decline`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 2) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 2) },
             arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2)),
         )
         val session = PropagationSession(problem)
@@ -39,7 +41,9 @@ class MaxSdTest {
     fun `a local probe cap should restore domains and retain every interrupted alternative`() {
         for (limit in listOf(0L, 1L, 3L)) {
             val problem = Problem(
-                0, 3, Array(3) { IntDomain(0, 2) },
+                0,
+                3,
+                Array(3) { IntDomain(0, 2) },
                 arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
             )
             val session = PropagationSession(problem)
@@ -59,7 +63,9 @@ class MaxSdTest {
     @Test
     fun `bounded completed refutations should remove only their infeasible alternatives`() {
         val problem = Problem(
-            0, 3, Array(3) { IntDomain(0, 1) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 1) },
             arrayOf<Factor>(
                 AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 2),
                 AllDifferent(intArrayOf(1, 2), domainMin = 0, domainSize = 2),
@@ -78,7 +84,9 @@ class MaxSdTest {
     @Test
     fun `capped ordering should leave subsequent decisions equivalent to a fresh session`() {
         val problem = Problem(
-            0, 3, Array(3) { IntDomain(0, 2) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
             arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
         )
         val session = PropagationSession(problem)
@@ -113,7 +121,11 @@ class MaxSdTest {
         var visits = 0
 
         val values = probeAndOrder(
-            session, VarRef.IntVar(0), Random(0L), maxProbes = 32, ascending = false,
+            session,
+            VarRef.IntVar(0),
+            Random(0L),
+            maxProbes = 32,
+            ascending = false,
             scoreVisit = { ++visits < 2 },
         ).toSet()
 
@@ -130,7 +142,9 @@ class MaxSdTest {
             override val accounting: WorkMeter get() = WorkMeter { }
         }
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 2) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 2) },
             arrayOf<Factor>(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 3)),
         )
         val session = PropagationSession(problem, cancellation = cancellation)
@@ -145,7 +159,9 @@ class MaxSdTest {
     @Test
     fun `a cheap fallback should preserve unsupported alternatives without probes`() {
         val problem = Problem(
-            0, 2, arrayOf(IntDomain(0, 3), IntDomain(2, 2)),
+            0,
+            2,
+            arrayOf(IntDomain(0, 3), IntDomain(2, 2)),
             arrayOf<Factor>(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 4)),
         )
         val session = PropagationSession(problem)
@@ -163,7 +179,9 @@ class MaxSdTest {
     @Test
     fun `a cheap fallback should avoid probes after the support visit allowance declines`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 1) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
             arrayOf<Factor>(Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1))),
         )
         val session = PropagationSession(problem)
@@ -187,7 +205,9 @@ class MaxSdTest {
         )
         val accepting = intArrayOf(0)
         val problem = Problem(
-            0, 6, Array(6) { IntDomain(0, 1) },
+            0,
+            6,
+            Array(6) { IntDomain(0, 1) },
             arrayOf<Factor>(
                 Mdd(intArrayOf(0, 1, 2), states, starts, transitions, 0, accepting, 3),
                 Mdd(intArrayOf(3, 4, 5), states, starts, transitions, 0, accepting, 3),
@@ -205,8 +225,13 @@ class MaxSdTest {
     @Test
     fun `MaxSd should rank equal residual domain products by live table supports without probing`() {
         val rows = listOf(
-            longArrayOf(0, 0, 0), longArrayOf(0, 0, 1), longArrayOf(0, 1, 0),
-            longArrayOf(1, 0, 0), longArrayOf(1, 0, 1), longArrayOf(1, 1, 0), longArrayOf(1, 1, 1),
+            longArrayOf(0, 0, 0),
+            longArrayOf(0, 0, 1),
+            longArrayOf(0, 1, 0),
+            longArrayOf(1, 0, 0),
+            longArrayOf(1, 0, 1),
+            longArrayOf(1, 1, 0),
+            longArrayOf(1, 1, 1),
         )
         val tuples = LongArray(rows.size * 32 * 3) { rows[(it / 3) % rows.size][it % 3] }
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf<Factor>(Table(intArrayOf(0, 1, 2), tuples)))

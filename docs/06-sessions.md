@@ -334,7 +334,7 @@ CLI's verbose stream tags the worker; the event changes no result or allowance.
 Tight loops poll cancellation at bounded checkpoints independently of accounting.
 Finite propagation contributes primitive visits to its worker's shared 1,024-unit
 countdown; unbound propagation polls within 64 visits. Reconstruction
-checks within 2,048 visits or 4,096 units of checkpoint cost, whichever comes
+checks within 8,192 visits or 4,096 units of checkpoint cost, whichever comes
 first. Integer limb counts contribute to that cost without changing work charges.
 Value-ordering probes enforce a scoped integer work limit directly against
 propagation work; that limit does not change the cancellation cadence. Public entry, bulk allocation, result

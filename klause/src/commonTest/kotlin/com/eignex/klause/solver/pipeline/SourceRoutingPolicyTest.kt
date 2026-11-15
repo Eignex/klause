@@ -22,8 +22,12 @@ import kotlin.test.assertTrue
 class SourceRoutingPolicyTest {
     @Test
     fun `native finite setup should avoid unselected arithmetic installation`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
-            arrayOf(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 4)))
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            arrayOf(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 4)),
+        )
         for (engine in FiniteEngine.entries) {
             var charged = 0L
             var installations = 0
@@ -31,19 +35,26 @@ class SourceRoutingPolicyTest {
                 override fun isCancelled(): Boolean = charged >= 1000
                 override val accounting: WorkMeter get() = WorkMeter { charged += it }
             }
-            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            val providers = FactorProjectionProviders(
+                encoder = EncoderProvider { factor, target ->
                 val selected = BuiltInEncoderProvider.select(factor, target)
                 Encoder(selected.support, selected.requiredIntegers, selected.requiredBooleans) { view, encoding ->
                     installations++
                     encoding.cancellation.charge(1000)
                     selected.install(view, encoding)
                 }
-            })
+            }
+            )
 
-            val invocation = SourceSetup.prepare(SourceSetupRequest(
-                SourceAttachment(source), ExecutionOperation.SATISFY, engine,
-                providers = providers, cancellation = stop,
-            ))
+            val invocation = SourceSetup.prepare(
+                SourceSetupRequest(
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                engine,
+                providers = providers,
+                cancellation = stop,
+            )
+            )
 
             val route = assertIs<SourceProblemRoute.Finite>(invocation.route)
             assertSame(source, route.preparedPlan.originalSource)
@@ -56,16 +67,24 @@ class SourceRoutingPolicyTest {
 
     @Test
     fun `native finite setup should retain LP observation cancellation`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
-            arrayOf(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 4)))
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            arrayOf(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 4)),
+        )
         var stopped = false
         var observations = 0
         val stop = ExecutionControl { stopped }
 
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            SourceAttachment(source), ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source),
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
             cancellation = stop,
-        )) {
+        )
+        ) {
             observations++
             stopped = true
         }
@@ -79,22 +98,34 @@ class SourceRoutingPolicyTest {
 
     @Test
     fun `an exact objective preference should retain required arithmetic installation`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(-1, 1), IntDomain(-1, 1)),
-            arrayOf(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 1)))
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(-1, 1), IntDomain(-1, 1)),
+            arrayOf(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 1)),
+        )
         val objective = LinearObjective(intCoefficients = longArrayOf((1L shl 53) + 1, 0), constant = 7)
         var installations = 0
-        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+        val providers = FactorProjectionProviders(
+            encoder = EncoderProvider { factor, target ->
             val selected = BuiltInEncoderProvider.select(factor, target)
             Encoder(selected.support, selected.requiredIntegers, selected.requiredBooleans) { view, encoding ->
                 installations++
                 selected.install(view, encoding)
             }
-        })
+        }
+        )
 
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            SourceAttachment(source), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK,
-            objective, maximize = true, providers = providers,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source),
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.BACKTRACK,
+            objective,
+            maximize = true,
+            providers = providers,
+        )
+        )
 
         val route = assertIs<SourceProblemRoute.OpenTheory>(invocation.route)
         assertEquals(ProblemPipeline.EXACT_LIRA, route.request.route)
@@ -112,10 +143,14 @@ class SourceRoutingPolicyTest {
             override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            SourceAttachment(source), ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source),
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
             cancellation = stop,
-        ))
+        )
+        )
 
         val route = assertIs<SourceProblemRoute.UnsupportedOpen>(invocation.route)
         assertTrue(charged > 0)
@@ -138,10 +173,10 @@ class SourceRoutingPolicyTest {
         for (engine in FiniteEngine.entries) {
             val invocation = SourceSetup.prepare(
                 SourceSetupRequest(
-                SourceAttachment(source),
-                ExecutionOperation.SATISFY,
-                engine,
-            )
+                    SourceAttachment(source),
+                    ExecutionOperation.SATISFY,
+                    engine,
+                ),
             )
 
             val route = assertIs<SourceProblemRoute.OpenTheory>(invocation.route)
@@ -164,12 +199,12 @@ class SourceRoutingPolicyTest {
         for (maximize in listOf(false, true)) {
             val invocation = SourceSetup.prepare(
                 SourceSetupRequest(
-                SourceAttachment(source),
-                ExecutionOperation.OPTIMIZE,
-                FiniteEngine.BACKTRACK,
-                objective,
-                maximize,
-            )
+                    SourceAttachment(source),
+                    ExecutionOperation.OPTIMIZE,
+                    FiniteEngine.BACKTRACK,
+                    objective,
+                    maximize,
+                ),
             )
 
             val route = assertIs<SourceProblemRoute.OpenTheory>(invocation.route)
@@ -192,11 +227,11 @@ class SourceRoutingPolicyTest {
 
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.BACKTRACK,
-            objective,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.BACKTRACK,
+                objective,
+            ),
         )
 
         assertIs<SourceProblemRoute.Finite>(invocation.route)
@@ -216,11 +251,11 @@ class SourceRoutingPolicyTest {
 
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.LOCAL_SEARCH,
-            objective,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.LOCAL_SEARCH,
+                objective,
+            ),
         )
 
         val route = assertIs<SourceProblemRoute.OpenTheory>(invocation.route)
@@ -245,12 +280,12 @@ class SourceRoutingPolicyTest {
 
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.BACKTRACK,
-            objective,
-            cancellation = stop,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.BACKTRACK,
+                objective,
+                cancellation = stop,
+            ),
         )
 
         val route = assertIs<SourceProblemRoute.UnsupportedOpen>(invocation.route)
@@ -275,11 +310,11 @@ class SourceRoutingPolicyTest {
 
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-            cancellation = stop,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+                cancellation = stop,
+            ),
         ) {
             observations++
             stopped = true

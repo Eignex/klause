@@ -23,7 +23,6 @@ import com.eignex.klause.propagation.propagatedImplicationGraph
 internal class ImpliedBoundSeparator(private val maxCandidates: Int = DEFAULT_MAX_CANDIDATES) : CutSeparator {
     override val family: CutFamily = CutFamily.IMPLIED_BOUND
 
-
     private var graph: Array<IntArray>? = null
 
     override fun separate(ctx: CutContext): List<Cut> {

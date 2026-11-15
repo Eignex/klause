@@ -21,9 +21,11 @@ internal fun Compiler.Builder.integerProduct(parts: List<IntComb>): IntComb {
     var result: IntComb = IntComb.Narrow(LinComb(emptyMap(), 1L))
     for (part in parts) {
         sourceCancellation.polynomialSourceCheckpoint(1)
-        result = if (result.isConstant()) scaleByConst(part, result)
-        else if (part.isConstant()) scaleByConst(result, part)
-        else {
+        result = if (result.isConstant()) {
+            scaleByConst(part, result)
+        } else if (part.isConstant()) {
+            scaleByConst(result, part)
+        } else {
             if (inferringBounds) smtUnsupported("nonlinear product requires source lowering")
             val left = (result as? IntComb.Narrow)?.lin ?: smtUnsupported("wide nonlinear product")
             val right = (part as? IntComb.Narrow)?.lin ?: smtUnsupported("wide nonlinear product")
@@ -67,7 +69,9 @@ internal fun Compiler.Builder.finiteProductRange(term: LinComb): Pair<Long, Long
     }
     if (!lo.fitsLong() || !hi.fitsLong() || lo == bigIntOf(Long.MIN_VALUE) || hi == bigIntOf(Long.MIN_VALUE) ||
         term.constant == Long.MIN_VALUE || term.coeffs.values.any { it == Long.MIN_VALUE }
-    ) smtUnsupported("nonlinear product requires representable operands")
+    ) {
+        smtUnsupported("nonlinear product requires representable operands")
+    }
     return lo.toLongExact() to hi.toLongExact()
 }
 
@@ -85,7 +89,9 @@ internal fun Compiler.Builder.realProduct(parts: List<RealComb>): Res.R {
         sourceCancellation.polynomialSourceCheckpoint(1)
         result = when {
             result.isConstant -> part.scaled(result.constant)
+
             part.isConstant -> result.scaled(part.constant)
+
             else -> {
                 if (inferringBounds) smtUnsupported("nonlinear product requires source lowering")
                 val leftInt = result.toLinCombOrNull()
@@ -99,11 +105,15 @@ internal fun Compiler.Builder.realProduct(parts: List<RealComb>): Res.R {
                     val value = nextReal++
                     val left = if (leftInt != null) mixedProductIntColumn(leftInt) else productRealColumn(result)
                     val right = if (rightInt != null) mixedProductIntColumn(rightInt) else productRealColumn(part)
-                    factors.add(if (leftInt != null) {
+                    factors.add(
+                        if (leftInt != null) {
                         RealProduct(left, right, value, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)
                     } else if (rightInt != null) {
                         RealProduct(right, left, value, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)
-                    } else ContinuousProduct(left, right, value))
+                    } else {
+                        ContinuousProduct(left, right, value)
+                    }
+                    )
                     RealComb(emptyMap(), mapOf(value to BigFraction.ONE), BigFraction.ZERO)
                 }
             }

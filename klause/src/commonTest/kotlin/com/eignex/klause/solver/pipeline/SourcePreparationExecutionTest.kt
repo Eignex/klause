@@ -14,15 +14,20 @@ import kotlin.test.assertTrue
 class SourcePreparationExecutionTest {
     @Test
     fun `finite diagnostic requests should stop before publishing a witness`() {
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
             SmtLib.parse("(declare-const b Bool) (assert b)").source,
-            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
         val request = SourceExecutionRequest(invocation, ExecutionOptions(ExecutionOption.dryRunPresolve(true)))
         var points = 0
 
-        val result = SourceSetup.execute(request,
-            SourceExecutionCallbacks(finite = FiniteSolveCallbacks({ points++ }, {})))
+        val result = SourceSetup.execute(
+            request,
+            SourceExecutionCallbacks(finite = FiniteSolveCallbacks({ points++ }, {})),
+        )
 
         assertIs<FiniteSolveOutcome.PreparedOnly>(assertIs<SourceExecutionResult.Finite>(result).result.outcome)
         assertTrue(request.prepareOnly)
@@ -31,18 +36,28 @@ class SourcePreparationExecutionTest {
 
     @Test
     fun `linear diagnostics should retain preparation without consuming the node allowance`() {
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
             SmtLib.parse("(declare-const x Real) (assert (> x 0))").source,
-            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
         val original = (invocation.engineRoute as SourceProblemRoute.OpenTheory).request.model
         val budget = NodeBudget(0)
-        val request = SourceExecutionRequest(invocation,
-            ExecutionOptions(ExecutionOption.dryRunPresolve(true)), nodeBudget = budget)
+        val request = SourceExecutionRequest(
+            invocation,
+            ExecutionOptions(ExecutionOption.dryRunPresolve(true)),
+            nodeBudget = budget,
+        )
         var points = 0
 
-        val result = assertIs<SourceExecutionResult.Prepared>(SourceSetup.execute(request,
-            SourceExecutionCallbacks(onLinearIncumbent = { points++ })))
+        val result = assertIs<SourceExecutionResult.Prepared>(
+            SourceSetup.execute(
+            request,
+            SourceExecutionCallbacks(onLinearIncumbent = { points++ }),
+        )
+        )
 
         assertSame(invocation, result.invocation)
         assertSame(original, result.originalProblem)
@@ -54,13 +69,19 @@ class SourcePreparationExecutionTest {
 
     @Test
     fun `linear diagnostics should retain the spent phase allowance`() {
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
             SmtLib.parse("(declare-const x Real) (assert (> x 0))").source,
-            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
         val budget = PresolveBudget(7).apply { charge(7) }
-        val request = SourceExecutionRequest(invocation,
-            ExecutionOptions(ExecutionOption.dryRunPresolve(true)), presolveBudget = budget)
+        val request = SourceExecutionRequest(
+            invocation,
+            ExecutionOptions(ExecutionOption.dryRunPresolve(true)),
+            presolveBudget = budget,
+        )
 
         assertIs<SourceExecutionResult.Prepared>(SourceSetup.execute(request))
 
@@ -71,18 +92,26 @@ class SourcePreparationExecutionTest {
 
     @Test
     fun `an application finite factory should retain the diagnostic stop`() {
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
             SmtLib.parse("(declare-const b Bool) (assert b)").source,
-            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
-        val request = SourceExecutionRequest(invocation,
-            ExecutionOptions(ExecutionOption.dryRunPresolve(true)), finiteRequest = { shape ->
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
+        val request = SourceExecutionRequest(
+            invocation,
+            ExecutionOptions(ExecutionOption.dryRunPresolve(true)),
+            finiteRequest = { shape ->
                 SourceExecutionPolicy().finiteRequest(shape, FiniteEngine.BACKTRACK)
-            })
+            },
+        )
         var points = 0
 
-        val result = SourceSetup.execute(request,
-            SourceExecutionCallbacks(finite = FiniteSolveCallbacks({ points++ }, {})))
+        val result = SourceSetup.execute(
+            request,
+            SourceExecutionCallbacks(finite = FiniteSolveCallbacks({ points++ }, {})),
+        )
 
         assertIs<FiniteSolveOutcome.PreparedOnly>(assertIs<SourceExecutionResult.Finite>(result).result.outcome)
         assertEquals(0, points)
@@ -90,15 +119,20 @@ class SourcePreparationExecutionTest {
 
     @Test
     fun `linear enumeration should decline before publishing a witness`() {
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
             SmtLib.parse("(declare-const x Real) (assert (> x 0))").source,
-            ExecutionOperation.ENUMERATE, FiniteEngine.BACKTRACK,
-        ))
+            ExecutionOperation.ENUMERATE,
+            FiniteEngine.BACKTRACK,
+        )
+        )
         var points = 0
 
         assertFailsWith<PipelineConfigException> {
-            SourceSetup.execute(SourceExecutionRequest(invocation, ExecutionOptions()),
-                SourceExecutionCallbacks(onLinearIncumbent = { points++ }))
+            SourceSetup.execute(
+                SourceExecutionRequest(invocation, ExecutionOptions()),
+                SourceExecutionCallbacks(onLinearIncumbent = { points++ }),
+            )
         }
 
         assertEquals(0, points)
@@ -106,14 +140,19 @@ class SourcePreparationExecutionTest {
 
     @Test
     fun `finite enumeration should retain both original Boolean assignments`() {
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
             SmtLib.parse("(declare-const b Bool)").source,
-            ExecutionOperation.ENUMERATE, FiniteEngine.FIXED,
-        ))
+            ExecutionOperation.ENUMERATE,
+            FiniteEngine.FIXED,
+        )
+        )
         val values = mutableSetOf<Boolean>()
 
-        val result = SourceSetup.execute(SourceExecutionRequest(invocation, ExecutionOptions()),
-            SourceExecutionCallbacks(finite = FiniteSolveCallbacks({ values += it.boolValue(0) }, {})))
+        val result = SourceSetup.execute(
+            SourceExecutionRequest(invocation, ExecutionOptions()),
+            SourceExecutionCallbacks(finite = FiniteSolveCallbacks({ values += it.boolValue(0) }, {})),
+        )
 
         assertIs<FiniteSolveOutcome.Completed>(assertIs<SourceExecutionResult.Finite>(result).result.outcome)
         assertEquals(setOf(false, true), values)

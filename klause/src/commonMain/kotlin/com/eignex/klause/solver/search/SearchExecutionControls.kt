@@ -105,9 +105,9 @@ class SearchExecutionControlAdapter(
 
     override fun reportStop(cause: SearchStopCause) {
         if ((
-            this.cause == SearchStopCause.WorkAllowance || this.cause == SearchStopCause.CheckAllowance ||
-                this.cause == SearchStopCause.DecisionAllowance
-        ) &&
+                this.cause == SearchStopCause.WorkAllowance || this.cause == SearchStopCause.CheckAllowance ||
+                    this.cause == SearchStopCause.DecisionAllowance
+                ) &&
             (cause == SearchStopCause.OperationAllowance || cause == SearchStopCause.RepresentationDecline)
         ) {
             return
@@ -127,6 +127,8 @@ class SearchExecutionControlAdapter(
 
 private val SearchStopCause?.isAllowance: Boolean get() = when (this) {
     SearchStopCause.WorkAllowance, SearchStopCause.CheckAllowance,
-    SearchStopCause.DecisionAllowance, SearchStopCause.OperationAllowance -> true
+    SearchStopCause.DecisionAllowance, SearchStopCause.OperationAllowance,
+    -> true
+
     else -> false
 }

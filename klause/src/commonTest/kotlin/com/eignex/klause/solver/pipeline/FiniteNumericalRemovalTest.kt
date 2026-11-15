@@ -31,12 +31,21 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FiniteNumericalRemovalTest {
-    private val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) },
-        listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 3), LinearOp.EQ, 1L))).bake()
+    private val problem = Problem(
+        0,
+        4,
+        Array(4) { IntDomain(0, 1) },
+        listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 3), LinearOp.EQ, 1L)),
+    ).bake()
     private val objective = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0))
     private val center = Sample(booleanArrayOf(), longArrayOf(1, 0, 0, 0))
-    private val source = requireNotNull(problem.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
-        ExecutionControl.Never))
+    private val source = requireNotNull(
+        problem.linearAuthorityContext(
+        objective,
+        ObjectiveSense.MINIMIZE,
+        ExecutionControl.Never,
+    )
+    )
 
     @Test
     fun `relaxation disagreement should free differing source inputs`() {
@@ -45,8 +54,13 @@ class FiniteNumericalRemovalTest {
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, source, cuts = false)
         }
-        val removal = FiniteNumericalRemoval(problem, objective, source, funding,
-            FiniteNumericalRemoval.Signal.Disagreement)
+        val removal = FiniteNumericalRemoval(
+            problem,
+            objective,
+            source,
+            funding,
+            FiniteNumericalRemoval.Signal.Disagreement,
+        )
 
         removal.accept(center, Assumptions.None, source, null, acquisition.feedback)
         val freed = removal.destroy(Random(17), problem, center, objective, 0.5)
@@ -63,8 +77,14 @@ class FiniteNumericalRemovalTest {
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, source, cuts = false)
         }
-        val removal = FiniteNumericalRemoval(problem, objective, source, funding,
-            FiniteNumericalRemoval.Signal.Disagreement, completion = FiniteNumericalRemoval.Completion.SourceRows)
+        val removal = FiniteNumericalRemoval(
+            problem,
+            objective,
+            source,
+            funding,
+            FiniteNumericalRemoval.Signal.Disagreement,
+            completion = FiniteNumericalRemoval.Completion.SourceRows,
+        )
 
         removal.accept(center, Assumptions.None, source, null, acquisition.feedback)
         val freed = removal.destroy(Random(17), problem, center, objective, 0.25)
@@ -81,8 +101,14 @@ class FiniteNumericalRemovalTest {
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, source, cuts = false)
         }
-        val removal = FiniteNumericalRemoval(problem, objective, source, funding,
-            FiniteNumericalRemoval.Signal.Disagreement, completion = FiniteNumericalRemoval.Completion.SourceRows)
+        val removal = FiniteNumericalRemoval(
+            problem,
+            objective,
+            source,
+            funding,
+            FiniteNumericalRemoval.Signal.Disagreement,
+            completion = FiniteNumericalRemoval.Completion.SourceRows,
+        )
 
         removal.accept(center, Assumptions.None, source, null, acquisition.feedback)
         val freed = removal.destroy(Random(17), problem, center, objective, 0.75)
@@ -101,8 +127,13 @@ class FiniteNumericalRemovalTest {
             publisher.acquire(it, source, cuts = false)
         }
         val optimum = assertNotNull(acquisition.result.incumbent)
-        val removal = FiniteNumericalRemoval(problem, objective, source, funding,
-            FiniteNumericalRemoval.Signal.Disagreement)
+        val removal = FiniteNumericalRemoval(
+            problem,
+            objective,
+            source,
+            funding,
+            FiniteNumericalRemoval.Signal.Disagreement,
+        )
 
         removal.accept(optimum, Assumptions.None, source, null, acquisition.feedback)
         val freed = removal.destroy(Random(17), problem, optimum, objective, 0.5)
@@ -113,18 +144,32 @@ class FiniteNumericalRemovalTest {
 
     @Test
     fun `a missing relaxation point should remain distinct from agreement`() {
-        val model = Problem(1, 4, Array(4) { IntDomain(0, 1) },
-            listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 3), LinearOp.EQ, 1L))).bake()
-        val original = requireNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
-            ExecutionControl.Never))
+        val model = Problem(
+            1,
+            4,
+            Array(4) { IntDomain(0, 1) },
+            listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 3), LinearOp.EQ, 1L)),
+        ).bake()
+        val original = requireNotNull(
+            model.linearAuthorityContext(
+            objective,
+            ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never,
+        )
+        )
         val incumbent = Sample(booleanArrayOf(false), longArrayOf(1, 0, 0, 0))
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
         val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, original, cuts = false)
         }
-        val removal = FiniteNumericalRemoval(model, objective, original, funding,
-            FiniteNumericalRemoval.Signal.Disagreement)
+        val removal = FiniteNumericalRemoval(
+            model,
+            objective,
+            original,
+            funding,
+            FiniteNumericalRemoval.Signal.Disagreement,
+        )
 
         removal.accept(incumbent, Assumptions.None, original, null, acquisition.feedback)
         val freed = removal.destroy(Random(17), model, incumbent, objective, 0.5)
@@ -136,8 +181,13 @@ class FiniteNumericalRemovalTest {
     @Test
     fun `a delivered point projection should rank like the full relaxation record`() {
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
-        val removal = FiniteNumericalRemoval(problem, objective, source, funding,
-            FiniteNumericalRemoval.Signal.Disagreement)
+        val removal = FiniteNumericalRemoval(
+            problem,
+            objective,
+            source,
+            funding,
+            FiniteNumericalRemoval.Signal.Disagreement,
+        )
         val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never, request = removal.request)
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             it.capture = LinearAuthorityCapture(0, 0L, 0L, ExecutionControl.Never)
@@ -147,8 +197,11 @@ class FiniteNumericalRemovalTest {
         removal.accept(center, Assumptions.None, source, null, acquisition.feedback)
         val freed = removal.destroy(Random(17), problem, center, objective, 0.5)
 
-        assertEquals(removal.request, assertIs<SourceNumericalFeedbackResult.Available>(acquisition.feedback)
-            .query.projection)
+        assertEquals(
+            removal.request,
+            assertIs<SourceNumericalFeedbackResult.Available>(acquisition.feedback)
+            .query.projection
+        )
         assertEquals(FiniteNumericalRemoval.Status.Supported, removal.status)
         assertEquals(setOf(0, 3), freed.ints.toSet())
     }
@@ -156,14 +209,22 @@ class FiniteNumericalRemovalTest {
     @Test
     fun `a delivered projection without the signal field should be unavailable rather than agreement`() {
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
-        val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never,
-            request = LinearAuthorityFeedbackRequest(refutation = true))
+        val publisher = SourceNumericalFeedback(
+            funding,
+            ExecutionControl.Never,
+            request = LinearAuthorityFeedbackRequest(refutation = true),
+        )
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             it.capture = LinearAuthorityCapture(0, 0L, 0L, ExecutionControl.Never)
             publisher.acquire(it, source, cuts = false)
         }
-        val removal = FiniteNumericalRemoval(problem, objective, source, funding,
-            FiniteNumericalRemoval.Signal.Disagreement)
+        val removal = FiniteNumericalRemoval(
+            problem,
+            objective,
+            source,
+            funding,
+            FiniteNumericalRemoval.Signal.Disagreement,
+        )
 
         removal.accept(center, Assumptions.None, source, null, acquisition.feedback)
 
@@ -184,8 +245,13 @@ class FiniteNumericalRemovalTest {
         }
         val feedback = assertIs<SourceNumericalFeedbackResult.Available>(acquisition.feedback)
         val support = publisher.refutationSupport(feedback)
-        val removal = FiniteNumericalRemoval(problem, objective, source, funding,
-            FiniteNumericalRemoval.Signal.Refutation)
+        val removal = FiniteNumericalRemoval(
+            problem,
+            objective,
+            source,
+            funding,
+            FiniteNumericalRemoval.Signal.Refutation,
+        )
 
         removal.accept(center, pins, query, cutoff, feedback, support)
         val freed = removal.destroy(Random(17), problem, center, objective, 0.5)
@@ -199,8 +265,13 @@ class FiniteNumericalRemovalTest {
     @Test
     fun `maximizing source cutoffs should retain original objective units`() {
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
-        val original = requireNotNull(problem.linearAuthorityContext(objective.negated(), ObjectiveSense.MAXIMIZE,
-            ExecutionControl.Never))
+        val original = requireNotNull(
+            problem.linearAuthorityContext(
+            objective.negated(),
+            ObjectiveSense.MAXIMIZE,
+            ExecutionControl.Never,
+        )
+        )
         val pins = Assumptions.None.withInt(3, 0)
         val pinned = original.atScope(original.scope.copy(condition = pins.sourceCondition()))
         val cutoff = SourceNumericalCutoff(BigFraction.MINUS_ONE, "repair-improvement")
@@ -211,8 +282,13 @@ class FiniteNumericalRemovalTest {
         }
         val feedback = assertIs<SourceNumericalFeedbackResult.Available>(acquisition.feedback)
         val support = publisher.refutationSupport(feedback)
-        val removal = FiniteNumericalRemoval(problem, objective, original, funding,
-            FiniteNumericalRemoval.Signal.Refutation)
+        val removal = FiniteNumericalRemoval(
+            problem,
+            objective,
+            original,
+            funding,
+            FiniteNumericalRemoval.Signal.Refutation,
+        )
 
         removal.accept(center, pins, query, cutoff, feedback, support)
         val freed = removal.destroy(Random(17), problem, center, objective, 0.5)
@@ -230,14 +306,22 @@ class FiniteNumericalRemovalTest {
             publisher.acquire(it, source, cuts = false)
         }
         for (edit in listOf("model", "objective", "center")) {
-            val removal = FiniteNumericalRemoval(problem, objective, source, funding,
-                FiniteNumericalRemoval.Signal.Disagreement)
+            val removal = FiniteNumericalRemoval(
+                problem,
+                objective,
+                source,
+                funding,
+                FiniteNumericalRemoval.Signal.Disagreement,
+            )
             removal.accept(center, Assumptions.None, source, null, acquisition.feedback)
 
-            removal.destroy(Random(17),
+            removal.destroy(
+                Random(17),
                 if (edit == "model") Problem(0, 4, Array(4) { IntDomain(0, 1) }, emptyList()).bake() else problem,
                 if (edit == "center") center.copy() else center,
-                if (edit == "objective") objective.copy() else objective, 0.5)
+                if (edit == "objective") objective.copy() else objective,
+                0.5,
+            )
 
             assertEquals(FiniteNumericalRemoval.Status.Incompatible, removal.status)
             assertNull(removal.originScope)
@@ -253,8 +337,14 @@ class FiniteNumericalRemovalTest {
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, original, cuts = false)
         }
-        val removal = FiniteNumericalRemoval(problem, objective, original, funding,
-            FiniteNumericalRemoval.Signal.Disagreement, pins)
+        val removal = FiniteNumericalRemoval(
+            problem,
+            objective,
+            original,
+            funding,
+            FiniteNumericalRemoval.Signal.Disagreement,
+            pins,
+        )
 
         removal.accept(center, pins, original, null, acquisition.feedback)
         val freed = removal.destroy(Random(17), problem, center, objective, 1.0, pins, ExecutionControl.Never)
@@ -270,11 +360,23 @@ class FiniteNumericalRemovalTest {
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, source, cuts = false)
         }
-        val network = InvariantNetwork(listOf(DefinitionalSweep.SweepNode.IntDef(
+        val network = InvariantNetwork(
+            listOf(
+                DefinitionalSweep.SweepNode.IntDef(
             FunctionalObjective.Lin(3, 1, longArrayOf(1), arrayOf(FunctionalObjective.Operand.v(0)), 1),
-            intArrayOf(0))), 4, 0)
-        val removal = FiniteNumericalRemoval(problem, objective, source, funding,
-            FiniteNumericalRemoval.Signal.Disagreement, definitions = network)
+            intArrayOf(0),
+        )
+            ),
+            4, 0
+        )
+        val removal = FiniteNumericalRemoval(
+            problem,
+            objective,
+            source,
+            funding,
+            FiniteNumericalRemoval.Signal.Disagreement,
+            definitions = network,
+        )
         removal.accept(center, Assumptions.None, source, null, acquisition.feedback)
 
         val freed = removal.destroy(Random(17), problem, center, objective, 0.25)
@@ -285,21 +387,48 @@ class FiniteNumericalRemovalTest {
 
     @Test
     fun `a pinned dependent output should decline the entire numerical selection`() {
-        val model = Problem(0, 4, Array(4) { IntDomain(0, 1) },
-            listOf(Linear(longArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0L))).bake()
+        val model = Problem(
+            0,
+            4,
+            Array(4) { IntDomain(0, 1) },
+            listOf(Linear(longArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0L)),
+        ).bake()
         val incumbent = Sample(booleanArrayOf(), longArrayOf(1, 0, 1, 0))
         val pins = Assumptions.None.withInt(2, 1)
-        val original = requireNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
-            ExecutionControl.Never)).let { it.atScope(it.scope.copy(condition = pins.sourceCondition())) }
+        val original = requireNotNull(
+            model.linearAuthorityContext(
+            objective,
+            ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never,
+        )
+        ).let { it.atScope(it.scope.copy(condition = pins.sourceCondition())) }
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
         val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, original, cuts = false)
         }
-        val network = InvariantNetwork(listOf(DefinitionalSweep.SweepNode.IntDef(FunctionalObjective.Plus(2,
-            FunctionalObjective.Operand.v(0), FunctionalObjective.Operand.v(1)), intArrayOf(0, 1))), 4, 0)
-        val removal = FiniteNumericalRemoval(model, objective, original, funding,
-            FiniteNumericalRemoval.Signal.Disagreement, pins, network)
+        val network = InvariantNetwork(
+            listOf(
+                DefinitionalSweep.SweepNode.IntDef(
+                    FunctionalObjective.Plus(
+            2,
+            FunctionalObjective.Operand.v(0),
+            FunctionalObjective.Operand.v(1),
+        ),
+            intArrayOf(0, 1)
+                )
+            ),
+            4, 0
+        )
+        val removal = FiniteNumericalRemoval(
+            model,
+            objective,
+            original,
+            funding,
+            FiniteNumericalRemoval.Signal.Disagreement,
+            pins,
+            network,
+        )
         removal.accept(incumbent, pins, original, null, acquisition.feedback)
         assertEquals(FiniteNumericalRemoval.Status.Supported, removal.status)
 
@@ -318,8 +447,13 @@ class FiniteNumericalRemovalTest {
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, source, cuts = false)
         }
-        val removal = FiniteNumericalRemoval(problem, objective, source, funding,
-            FiniteNumericalRemoval.Signal.Disagreement)
+        val removal = FiniteNumericalRemoval(
+            problem,
+            objective,
+            source,
+            funding,
+            FiniteNumericalRemoval.Signal.Disagreement,
+        )
         removal.accept(center, Assumptions.None, source, null, acquisition.feedback)
         funding.charge(1_000_000)
 
@@ -338,10 +472,21 @@ class FiniteNumericalRemovalTest {
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, source, cuts = false)
         }
-        val removal = FiniteNumericalRemoval(problem, objective, source, funding,
-            FiniteNumericalRemoval.Signal.Disagreement)
-        removal.accept(center, Assumptions.None, source, null, acquisition.feedback,
-            cancellation = ExecutionControl { cancelled })
+        val removal = FiniteNumericalRemoval(
+            problem,
+            objective,
+            source,
+            funding,
+            FiniteNumericalRemoval.Signal.Disagreement,
+        )
+        removal.accept(
+            center,
+            Assumptions.None,
+            source,
+            null,
+            acquisition.feedback,
+            cancellation = ExecutionControl { cancelled },
+        )
         cancelled = true
 
         val freed = removal.destroy(Random(17), problem, center, objective, 0.5)
@@ -358,13 +503,25 @@ class FiniteNumericalRemovalTest {
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, source, cuts = false)
         }
-        val removal = FiniteNumericalRemoval(problem, objective, source, funding,
-            FiniteNumericalRemoval.Signal.Disagreement)
+        val removal = FiniteNumericalRemoval(
+            problem,
+            objective,
+            source,
+            funding,
+            FiniteNumericalRemoval.Signal.Disagreement,
+        )
         removal.accept(center, Assumptions.None, source, null, acquisition.feedback)
         var polls = 0
 
-        val freed = removal.destroy(Random(17), problem, center, objective, 0.5,
-            Assumptions.None, ExecutionControl { ++polls >= 3 })
+        val freed = removal.destroy(
+            Random(17),
+            problem,
+            center,
+            objective,
+            0.5,
+            Assumptions.None,
+            ExecutionControl { ++polls >= 3 },
+        )
 
         assertTrue(freed.isEmpty)
         assertEquals(FiniteNumericalRemoval.Status.Cancelled, removal.status)

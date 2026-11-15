@@ -18,7 +18,10 @@ internal class LinearAuthorityPointCuts(
     private val onCut: (CutFamily, String, Long) -> Unit = { _, _, _ -> },
 ) {
     private data class Scored(
-        val id: Int, val values: Map<SourceCoordinate, Double>, val norm: Double, val score: Double,
+        val id: Int,
+        val values: Map<SourceCoordinate, Double>,
+        val norm: Double,
+        val score: Double,
     )
     private val counts = linkedMapOf<String, Long>()
     val observations: Map<String, Long> get() = counts.toMap()
@@ -33,8 +36,7 @@ internal class LinearAuthorityPointCuts(
     var adoptedCurrent: Boolean = false
         private set
 
-    fun candidatesRetired(rows: List<LinearAuthorityCut>?): Boolean =
-        rows != null && family === rows && retired
+    fun candidatesRetired(rows: List<LinearAuthorityCut>?): Boolean = rows != null && family === rows && retired
 
     fun managesCurrentRecipe(rows: List<LinearAuthorityCut>?): Boolean =
         rows != null && family === rows && managedCurrent
@@ -68,7 +70,8 @@ internal class LinearAuthorityPointCuts(
         var limited = false
         fun charge(amount: Long, bytes: Long = 0L): Boolean {
             if (cancellation() || amount > limit - work || bytes > 1_048_576L - allocation ||
-                budget.funding?.exhausted == true) {
+                budget.funding?.exhausted == true
+            ) {
                 limited = true
                 return false
             }
@@ -126,7 +129,8 @@ internal class LinearAuthorityPointCuts(
         try {
             val pointEntryBytes = if (retired) 64L else 128L
             if (point.size != coordinates.size || point.size > maximumSupport ||
-                !meter.charge(point.size.toLong(), 128L + point.size * pointEntryBytes)) {
+                !meter.charge(point.size.toLong(), 128L + point.size * pointEntryBytes)
+            ) {
                 observe("PointUnavailable")
                 return installed
             }
@@ -151,17 +155,20 @@ internal class LinearAuthorityPointCuts(
             if (aggregateOnly) {
                 for (row in rows) {
                     if (!meter.charge(1L)) return installed
-                    aggregateOnly = aggregateOnly && (row.family == CutFamily.SOURCE_AGGREGATION ||
-                        row.family == CutFamily.AGGREGATION_MIR)
+                    aggregateOnly = aggregateOnly && (
+                        row.family == CutFamily.SOURCE_AGGREGATION ||
+                        row.family == CutFamily.AGGREGATION_MIR
+                    )
                 }
             }
             if ((integerOnly || aggregateOnly) && installed.isEmpty() && rows.size <= maximumCuts &&
-                checked.size == rows.size) {
+                checked.size == rows.size
+            ) {
                 if (!meter.charge(rows.size.toLong(), 128L + rows.size * 64L) ||
                     rows.indices.any { it !in checked }
                 ) {
-                        return installed
-                    }
+                    return installed
+                }
                 for (row in rows) {
                     visitedFamilies.add(row.family)
                     onCut(row.family, "POINT_ADOPTED_INSTALLED", 1L)
@@ -182,8 +189,8 @@ internal class LinearAuthorityPointCuts(
                     128L + installed.size * 128L,
                 )
             ) {
-                    return installed
-                }
+                return installed
+            }
             val observedInactive = HashMap<Int, Int>()
             var support = 0
             for ((id, row) in rows.withIndex()) {
@@ -236,11 +243,15 @@ internal class LinearAuthorityPointCuts(
                     observe("ScoreUnavailable")
                     continue
                 }
-                onCut(row.family, when {
-                    id in installed -> "POINT_RETAINED"
-                    efficacy >= CutPool.MIN_EFFICACY -> "POINT_ELIGIBLE"
-                    else -> "POINT_LOW_EFFICACY"
-                }, 1L)
+                onCut(
+                    row.family,
+                    when {
+                        id in installed -> "POINT_RETAINED"
+                        efficacy >= CutPool.MIN_EFFICACY -> "POINT_ELIGIBLE"
+                        else -> "POINT_LOW_EFFICACY"
+                    },
+                    1L,
+                )
                 if (id in installed) {
                     if (projected != null) forced += Scored(id, projected, norm, score)
                     observedInactive[id] = if (activity - checkNotNull(rhs) >= -CutPool.ACTIVE_TOLERANCE) {

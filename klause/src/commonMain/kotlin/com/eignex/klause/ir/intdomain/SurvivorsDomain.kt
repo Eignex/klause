@@ -13,8 +13,7 @@ internal class SurvivorsDomain(
     override val max: Long,
     private val survivors: LongArray,
     storage: DomainStorageSettings = defaultDomainStorageSettings,
-) :
-    AbstractIntDomain(storage),
+) : AbstractIntDomain(storage),
     IntSpan {
     override fun withStorage(settings: DomainStorageSettings): IntDomain =
         if (storage == settings) this else SurvivorsDomain(min, max, survivors, settings)

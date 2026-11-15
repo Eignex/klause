@@ -26,26 +26,37 @@ internal fun sourceIntegerDefinition(problem: Problem, hint: DefinitionHint.Inte
     val outputSlot = if (hint is DefinitionHint.Linear) {
         if (hint.coefficients.size != inputs.size) return null
         inputs.indices.singleOrNull { inputs[it].variableOrNull() == hint.output } ?: return null
-    } else -1
+    } else {
+        -1
+    }
     if (hint is DefinitionHint.Linear && hint.coefficients[outputSlot] == 0L) return null
     val operands = inputs.map { it.nativeOperand() }.toTypedArray()
     val node = if (wordArithmeticPermitted(problem, hint, inputs, outputSlot)) {
         when (hint) {
             is DefinitionHint.Abs -> FunctionalObjective.Abs(hint.output, operands[0])
+
             is DefinitionHint.Extreme -> FunctionalObjective.Extreme(hint.output, operands, hint.maximum)
+
             is DefinitionHint.Product -> FunctionalObjective.Times(hint.output, operands[0], operands[1])
+
             is DefinitionHint.Power -> FunctionalObjective.Power(hint.output, operands[0], hint.exponent)
+
             is DefinitionHint.Plus -> FunctionalObjective.Plus(hint.output, operands[0], operands[1])
+
             is DefinitionHint.Linear -> {
                 val selected = inputs.indices.filter { it != outputSlot }
                 FunctionalObjective.Lin(
-                    hint.output, hint.coefficients[outputSlot],
+                    hint.output,
+                    hint.coefficients[outputSlot],
                     LongArray(selected.size) { hint.coefficients[selected[it]] },
-                    Array(selected.size) { operands[selected[it]] }, hint.bound,
+                    Array(selected.size) { operands[selected[it]] },
+                    hint.bound,
                 )
             }
         }
-    } else CapturedIntegerDefinition(hint, operands, outputSlot)
+    } else {
+        CapturedIntegerDefinition(hint, operands, outputSlot)
+    }
     val reads = inputs.indices.filter { it != outputSlot }.mapNotNull { inputs[it].variableOrNull() }
     return SweepNode.IntDef(node, reads.distinct().toIntArray())
 }
@@ -59,6 +70,7 @@ private fun wordArithmeticPermitted(
 ): Boolean {
     fun bounds(input: DefinitionHint.Operand): Pair<Long, Long>? = when (input) {
         is DefinitionHint.Operand.Constant -> input.value to input.value
+
         is DefinitionHint.Operand.Variable -> problem.intBounds.let {
             if (it.hasLower(input.id) && it.hasUpper(input.id)) it.lower(input.id) to it.upper(input.id) else null
         }
@@ -66,7 +78,9 @@ private fun wordArithmeticPermitted(
     return try {
         when (hint) {
             is DefinitionHint.Abs -> bounds(inputs[0])?.first?.let { it != Long.MIN_VALUE } ?: false
+
             is DefinitionHint.Extreme, is DefinitionHint.Power -> true
+
             is DefinitionHint.Product -> {
                 val a = bounds(inputs[0]) ?: return false
                 val b = bounds(inputs[1]) ?: return false
@@ -76,6 +90,7 @@ private fun wordArithmeticPermitted(
                 mulExact(a.second, b.second)
                 true
             }
+
             is DefinitionHint.Plus -> {
                 val a = bounds(inputs[0]) ?: return false
                 val b = bounds(inputs[1]) ?: return false
@@ -83,6 +98,7 @@ private fun wordArithmeticPermitted(
                 addExact(a.second, b.second)
                 true
             }
+
             is DefinitionHint.Linear -> {
                 var lo = 0L
                 var hi = 0L
@@ -98,10 +114,10 @@ private fun wordArithmeticPermitted(
                 subExact(hint.bound, lo)
                 hint.coefficients[outputSlot] != -1L || lower != Long.MIN_VALUE
             }
+
             else -> false
         }
     } catch (_: CheckedLongOverflowException) {
         false
     }
 }
-

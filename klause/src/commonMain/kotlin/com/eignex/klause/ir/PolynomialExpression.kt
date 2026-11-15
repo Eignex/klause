@@ -44,6 +44,7 @@ sealed interface PolynomialExpression {
     class Sum(operands: List<PolynomialExpression>) : PolynomialExpression {
         private val values = operands.toTypedArray()
         internal val operandCount: Int get() = values.size
+
         /** Captured operands in syntax order. */
         val operands: List<PolynomialExpression> get() = values.toList()
         override fun equals(other: Any?): Boolean = other is Sum && polynomialExpressionsEqual(this, other)
@@ -55,6 +56,7 @@ sealed interface PolynomialExpression {
     class Product(operands: List<PolynomialExpression>) : PolynomialExpression {
         private val values = operands.toTypedArray()
         internal val operandCount: Int get() = values.size
+
         /** Captured operands in syntax order. */
         val operands: List<PolynomialExpression> get() = values.toList()
         override fun equals(other: Any?): Boolean = other is Product && polynomialExpressionsEqual(this, other)
@@ -71,8 +73,7 @@ sealed interface PolynomialExpression {
     ) : PolynomialExpression {
         private val hash = 31 * base.hashCode() + exponent
         override fun hashCode(): Int = hash
-        override fun equals(other: Any?): Boolean =
-            other is Power && polynomialExpressionsEqual(this, other)
+        override fun equals(other: Any?): Boolean = other is Power && polynomialExpressionsEqual(this, other)
         init {
             require(exponent >= 0) { "negative polynomial exponent" }
         }
@@ -93,15 +94,18 @@ internal fun PolynomialExpression.remap(remap: VarRemap): PolynomialExpression {
         }
         when (node) {
             is PolynomialExpression.Constant -> values.addLast(node)
+
             is PolynomialExpression.Variable -> values.addLast(
                 PolynomialExpression.Variable(requireNotNull(remap.real(node.id)) { "removed polynomial variable" }),
             )
+
             is PolynomialExpression.Power -> if (combine) {
                 values.addLast(PolynomialExpression.Power(values.removeLast(), node.exponent))
             } else {
                 work.addLast(node to true)
                 work.addLast(node.base to false)
             }
+
             is PolynomialExpression.Sum, is PolynomialExpression.Product -> {
                 val operands = when (node) {
                     is PolynomialExpression.Sum -> node.operands
@@ -110,8 +114,11 @@ internal fun PolynomialExpression.remap(remap: VarRemap): PolynomialExpression {
                 if (combine) {
                     val args = List(operands.size) { values.removeLast() }.reversed()
                     values.addLast(
-                        if (node is PolynomialExpression.Sum) PolynomialExpression.Sum(args)
-                        else PolynomialExpression.Product(args),
+                        if (node is PolynomialExpression.Sum) {
+                            PolynomialExpression.Sum(args)
+                        } else {
+                            PolynomialExpression.Product(args)
+                        },
                     )
                 } else {
                     work.addLast(node to true)
@@ -137,13 +144,16 @@ internal fun polynomialExpressionsEqual(left: PolynomialExpression, right: Polyn
             is PolynomialExpression.Constant -> {
                 if (second !is PolynomialExpression.Constant || first != second) return false
             }
+
             is PolynomialExpression.Variable -> {
                 if (second !is PolynomialExpression.Variable || first.id != second.id) return false
             }
+
             is PolynomialExpression.Power -> {
                 if (second !is PolynomialExpression.Power || first.exponent != second.exponent) return false
                 work.addLast(first.base to second.base)
             }
+
             is PolynomialExpression.Sum, is PolynomialExpression.Product -> {
                 val firstOperands: List<PolynomialExpression>
                 val secondOperands: List<PolynomialExpression>
@@ -153,6 +163,7 @@ internal fun polynomialExpressionsEqual(left: PolynomialExpression, right: Polyn
                         firstOperands = first.operands
                         secondOperands = second.operands
                     }
+
                     is PolynomialExpression.Product -> {
                         if (second !is PolynomialExpression.Product) return false
                         firstOperands = first.operands

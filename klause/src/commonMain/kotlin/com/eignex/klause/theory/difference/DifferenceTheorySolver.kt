@@ -20,10 +20,7 @@ import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.util.ExecutionControl
 
 /** Complete open integer difference-logic solver. */
-class DifferenceTheorySolver(
-    override val model: Problem,
-    projections: PreparedFactorProjections,
-) : Theory<Sample> {
+class DifferenceTheorySolver(override val model: Problem, projections: PreparedFactorProjections) : Theory<Sample> {
     /** Encode through [model]'s own selected factor projections. */
     constructor(model: Problem) : this(model, model.selectedFactorProjections())
 
@@ -66,8 +63,8 @@ class DifferenceTheorySolver(
                     context.intUpperBound(variable)?.let { values[variable] > it } == true
             }
         ) {
-                return TheoryCheck.Cancelled
-            }
+            return TheoryCheck.Cancelled
+        }
         return TheoryCheck.Sat(Sample(bools.copyOf(), values))
     }
 

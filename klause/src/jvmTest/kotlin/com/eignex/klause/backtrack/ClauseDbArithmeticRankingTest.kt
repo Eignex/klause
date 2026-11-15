@@ -23,8 +23,10 @@ class ClauseDbArithmeticRankingTest(private val cap: Int, private val integer: B
         @JvmStatic
         @Parameterized.Parameters(name = "cap={0}, integer={1}")
         fun parameters(): List<Array<Any>> = listOf(
-            arrayOf<Any>(4_000, false), arrayOf<Any>(4_000, true),
-            arrayOf<Any>(20_000, false), arrayOf<Any>(20_000, true),
+            arrayOf<Any>(4_000, false),
+            arrayOf<Any>(4_000, true),
+            arrayOf<Any>(20_000, false),
+            arrayOf<Any>(20_000, true),
         )
     }
 
@@ -32,20 +34,37 @@ class ClauseDbArithmeticRankingTest(private val cap: Int, private val integer: B
     fun `production caps should rank arithmetic rows with local clauses`() {
         val floor = Clause(intArrayOf(1, 2))
         val boolFactors = arrayOf<Factor>(
-            floor, Clause(intArrayOf(3, 4)),
+            floor,
+            Clause(intArrayOf(3, 4)),
         )
-        val problem = Problem(3, if (integer) 1 else 0,
+        val problem = Problem(
+            3,
+            if (integer) 1 else 0,
             if (integer) arrayOf(IntDomain(0, 10)) else emptyArray(),
-            if (integer) boolFactors + Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10) else boolFactors)
+            if (integer) boolFactors + Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10) else boolFactors,
+        )
         val session = PropagationSession(problem, nativeSat = false)
         val clause = Clause(intArrayOf(1, 3, 4))
         repeat(cap - 4) { session.addLearnedClause(floor, 9, permanent = true) }
         repeat(4) { session.addLearnedClause(clause, 9) }
         if (integer) {
-            val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
-                longArrayOf(1), intArrayOf(0), LinearOp.LE, 10), useLo = true))
+            val row = requireNotNull(
+                IntegerConflictRow.source(
+                    LinearPropagator(
+                intArrayOf(),
+                intArrayOf(0),
+                longArrayOf(1),
+                intArrayOf(0),
+                LinearOp.LE,
+                10,
+            ),
+                useLo = true
+                )
+            )
             session.addLearnedIntegerRow(row, 10)
-        } else session.addLearnedPb(longArrayOf(1, 1, 1), clause.literals, 1, 10)
+        } else {
+            session.addLearnedPb(longArrayOf(1, 1, 1), clause.literals, 1, 10)
+        }
         val params = BacktrackParams(maxLearnedClauses = cap, tieredLearnedDb = true)
 
         repeat(64) {

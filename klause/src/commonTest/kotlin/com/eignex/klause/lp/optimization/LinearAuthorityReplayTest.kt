@@ -30,30 +30,68 @@ class LinearAuthorityReplayTest {
     private val s = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
     private val half = BigFraction.ofLong(2).reciprocal()
     private val source = SourceProofContext(
-        SourceScope(SourceRevision("captured-replay", "exact-affine"),
-            objective = SourceObjective("x+2y", ObjectiveSense.MINIMIZE)),
-        setOf(x, y, r, s), mapOf(
-            "x-plus" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE, r to BigFraction.ONE),
-                half.negated())),
-            "x-minus" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE, r to BigFraction.MINUS_ONE),
-                half.negated())),
-            "y-plus" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE, s to BigFraction.ONE),
-                half.negated())),
-            "y-minus" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE, s to BigFraction.MINUS_ONE),
-                half.negated())),
-        ), mapOf(x to BigFraction.ONE, y to BigFraction.ofLong(2)),
+        SourceScope(
+            SourceRevision("captured-replay", "exact-affine"),
+            objective = SourceObjective("x+2y", ObjectiveSense.MINIMIZE),
+        ),
+        setOf(x, y, r, s),
+        mapOf(
+            "x-plus" to SourcePremise(
+                SourceInequality(
+                mapOf(x to BigFraction.MINUS_ONE, r to BigFraction.ONE),
+                half.negated(),
+            )
+            ),
+            "x-minus" to SourcePremise(
+                SourceInequality(
+                mapOf(x to BigFraction.MINUS_ONE, r to BigFraction.MINUS_ONE),
+                half.negated(),
+            )
+            ),
+            "y-plus" to SourcePremise(
+                SourceInequality(
+                mapOf(y to BigFraction.MINUS_ONE, s to BigFraction.ONE),
+                half.negated(),
+            )
+            ),
+            "y-minus" to SourcePremise(
+                SourceInequality(
+                mapOf(y to BigFraction.MINUS_ONE, s to BigFraction.MINUS_ONE),
+                half.negated(),
+            )
+            ),
+        ),
+        mapOf(x to BigFraction.ONE, y to BigFraction.ofLong(2)),
     )
     private val cuts = listOf(
-        LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
-            SourceDerivation.IntegerRounding(SourceDerivation.Combination(listOf(
+        LinearAuthorityCut(
+            0,
+            SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+            SourceDerivation.IntegerRounding(
+                SourceDerivation.Combination(
+                    listOf(
                 SourceDerivation.Combination.Term(half, SourceDerivation.Premise("x-plus")),
                 SourceDerivation.Combination.Term(half, SourceDerivation.Premise("x-minus")),
-            ))), owners = setOf(0, 1), family = CutFamily.SOURCE_AGGREGATION),
-        LinearAuthorityCut(2, SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
-            SourceDerivation.IntegerRounding(SourceDerivation.Combination(listOf(
+            )
+                )
+            ),
+            owners = setOf(0, 1),
+            family = CutFamily.SOURCE_AGGREGATION,
+        ),
+        LinearAuthorityCut(
+            2,
+            SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+            SourceDerivation.IntegerRounding(
+                SourceDerivation.Combination(
+                    listOf(
                 SourceDerivation.Combination.Term(half, SourceDerivation.Premise("y-plus")),
                 SourceDerivation.Combination.Term(half, SourceDerivation.Premise("y-minus")),
-            ))), owners = setOf(2, 3), family = CutFamily.SOURCE_AGGREGATION),
+            )
+                )
+            ),
+            owners = setOf(2, 3),
+            family = CutFamily.SOURCE_AGGREGATION,
+        ),
     )
 
     @Test
@@ -80,8 +118,10 @@ class LinearAuthorityReplayTest {
             assertEquals(1, replay.operations)
             assertEquals(mask, replayed.cuts.filter { it.installed }.mapTo(HashSet()) { it.id })
             assertTrue(replayed.cuts.all { it.family == CutFamily.SOURCE_AGGREGATION })
-            assertEquals(SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(source.withLinearAuthority()).verify(bound))
+            assertEquals(
+                SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(bound),
+            )
         }
     }
 
@@ -94,8 +134,13 @@ class LinearAuthorityReplayTest {
         }
 
         for (mask in listOf(setOf(-1), setOf(2))) {
-            val replay = LinearAuthorityReplay.run(capture.records.single(), mask,
-                1_000_000L, 4_000_000L, ExecutionControl.Never)
+            val replay = LinearAuthorityReplay.run(
+                capture.records.single(),
+                mask,
+                1_000_000L,
+                4_000_000L,
+                ExecutionControl.Never,
+            )
 
             assertNotNull(replay.decline)
             assertNull(replay.query)
@@ -113,12 +158,20 @@ class LinearAuthorityReplayTest {
         val original = capture.records.single()
 
         for (incomplete in listOf(
-            original.copy(projection = LinearAuthorityFeedbackRequest(
-                cuts = LinearAuthorityFeedbackRequest.Cuts.Installed)),
+            original.copy(
+                projection = LinearAuthorityFeedbackRequest(
+                cuts = LinearAuthorityFeedbackRequest.Cuts.Installed,
+            )
+            ),
             original.copy(cuts = original.cuts.map { it.copy(family = null) }),
         )) {
-            val replay = LinearAuthorityReplay.run(incomplete, emptySet(),
-                1_000_000L, 4_000_000L, ExecutionControl.Never)
+            val replay = LinearAuthorityReplay.run(
+                incomplete,
+                emptySet(),
+                1_000_000L,
+                4_000_000L,
+                ExecutionControl.Never,
+            )
 
             assertNotNull(replay.decline)
             assertNull(replay.query)
@@ -135,8 +188,13 @@ class LinearAuthorityReplayTest {
         }
 
         for ((work, allocation) in listOf(1L to 4_000_000L, 1_000_000L to 1L)) {
-            val replay = LinearAuthorityReplay.run(capture.records.single(), setOf(0), work, allocation,
-                ExecutionControl.Never)
+            val replay = LinearAuthorityReplay.run(
+                capture.records.single(),
+                setOf(0),
+                work,
+                allocation,
+                ExecutionControl.Never,
+            )
 
             assertNotNull(replay.decline)
             assertNull(replay.query)
@@ -153,17 +211,21 @@ class LinearAuthorityReplayTest {
             it.advance(source, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
         }
         val original = capture.records.single()
-        val invalid = original.copy(cuts = original.cuts.map {
+        val invalid = original.copy(
+            cuts = original.cuts.map {
             if (it.id == 0) it.copy(derivation = SourceDerivation.Premise("missing"), checked = true) else it
-        })
+        }
+        )
 
         val replay = LinearAuthorityReplay.run(invalid, setOf(0), 1_000_000L, 4_000_000L, ExecutionControl.Never)
 
         val bound = replay.strongestBound
         if (bound != null) {
             assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * half), (bound.claim as SourceClaim.Bound).value)
-            assertEquals(SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(source.withLinearAuthority()).verify(bound))
+            assertEquals(
+                SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(bound),
+            )
         }
         assertTrue(replay.query?.cuts?.none { it.id == 0 && it.installed } != false)
     }

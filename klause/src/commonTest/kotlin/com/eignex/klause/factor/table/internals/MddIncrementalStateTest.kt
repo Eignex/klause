@@ -16,25 +16,31 @@ import kotlin.test.assertNull
 
 class MddIncrementalStateTest {
     private val diagram = Mdd(
-        intArrayOf(0, 1, 2, 3), intArrayOf(1, 2, 3, 1, 1), intArrayOf(0, 6, 15, 30, 36),
+        intArrayOf(0, 1, 2, 3),
+        intArrayOf(1, 2, 3, 1, 1),
+        intArrayOf(0, 6, 15, 30, 36),
         longArrayOf(
             0, 0, 0, 0, 1, 1,
             0, 0, 0, 1, 0, 1, 1, 1, 2,
             0, 0, 0, 1, 0, 0, 1, 1, 0, 2, 0, 0, 2, 1, 0,
             0, 0, 0, 0, 1, 0,
         ),
-        0, intArrayOf(0), 3,
+        0,
+        intArrayOf(0),
+        3,
     )
 
     @Test
     fun `path weights should count assignments through branching suffixes and merged prefixes`() {
         val state = PropagationState(
-            Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf<Factor>(diagram)), Assumptions.None,
+            Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf<Factor>(diagram)),
+            Assumptions.None,
         )
         assertNull(state.runToFixpoint(allFactors = true))
         val payload = state.refPayload[0] as MddIncrementalState
 
-        for ((position, expected) in listOf(intArrayOf(2, 8), intArrayOf(6, 4), intArrayOf(6, 4), intArrayOf(5, 5))
+        for (
+            (position, expected) in listOf(intArrayOf(2, 8), intArrayOf(6, 4), intArrayOf(6, 4), intArrayOf(5, 5))
             .withIndex()
         ) {
             val counts = assertNotNull(payload.supportCounts(position, longArrayOf(0, 1)) { true })
@@ -46,7 +52,8 @@ class MddIncrementalStateTest {
     @Test
     fun `path weights should restore root and sibling counts after a domain removal`() {
         val state = PropagationState(
-            Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf<Factor>(diagram)), Assumptions.None,
+            Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf<Factor>(diagram)),
+            Assumptions.None,
         )
         assertNull(state.runToFixpoint(allFactors = true))
         val payload = state.refPayload[0] as MddIncrementalState
@@ -57,30 +64,39 @@ class MddIncrementalStateTest {
         check(state.excludeIntValue(2, 1))
         assertNull(state.runToFixpoint(allFactors = false))
         assertContentEquals(
-            intArrayOf(2, 4), assertNotNull(payload.supportCounts(0, longArrayOf(0, 1)) { true }).supporting,
+            intArrayOf(2, 4),
+            assertNotNull(payload.supportCounts(0, longArrayOf(0, 1)) { true }).supporting,
         )
 
         state.undoTo(root)
 
         assertContentEquals(
-            intArrayOf(2, 8), assertNotNull(payload.supportCounts(0, longArrayOf(0, 1)) { true }).supporting,
+            intArrayOf(2, 8),
+            assertNotNull(payload.supportCounts(0, longArrayOf(0, 1)) { true }).supporting,
         )
         state.currentLevel = 1
         check(state.excludeIntValue(1, 0))
         assertNull(state.runToFixpoint(allFactors = false))
         assertContentEquals(
-            intArrayOf(0, 4), assertNotNull(payload.supportCounts(0, longArrayOf(0, 1)) { true }).supporting,
+            intArrayOf(0, 4),
+            assertNotNull(payload.supportCounts(0, longArrayOf(0, 1)) { true }).supporting,
         )
     }
 
     @Test
     fun `path weights should count interior holes and their undo`() {
         val ternary = Mdd(
-            intArrayOf(0), intArrayOf(1, 1), intArrayOf(0, 9),
-            longArrayOf(0, 0, 0, 0, 1, 0, 0, 2, 0), 0, intArrayOf(0), 3,
+            intArrayOf(0),
+            intArrayOf(1, 1),
+            intArrayOf(0, 9),
+            longArrayOf(0, 0, 0, 0, 1, 0, 0, 2, 0),
+            0,
+            intArrayOf(0),
+            3,
         )
         val state = PropagationState(
-            Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(ternary)), Assumptions.None,
+            Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(ternary)),
+            Assumptions.None,
         )
         assertNull(state.runToFixpoint(allFactors = true))
         val payload = state.refPayload[0] as MddIncrementalState
@@ -105,7 +121,8 @@ class MddIncrementalStateTest {
     @Test
     fun `interrupted path counting should publish no partial counts and retry`() {
         val state = PropagationState(
-            Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf<Factor>(diagram)), Assumptions.None,
+            Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf<Factor>(diagram)),
+            Assumptions.None,
         )
         assertNull(state.runToFixpoint(allFactors = true))
         val payload = state.refPayload[0] as MddIncrementalState
@@ -117,18 +134,25 @@ class MddIncrementalStateTest {
         assertNull(payload.supportCounts(0, longArrayOf(0, 1)) { ++visits < 12 })
 
         assertContentEquals(
-            intArrayOf(1, 4), assertNotNull(payload.supportCounts(0, longArrayOf(0, 1)) { true }).supporting,
+            intArrayOf(1, 4),
+            assertNotNull(payload.supportCounts(0, longArrayOf(0, 1)) { true }).supporting,
         )
     }
 
     @Test
     fun `ambiguous diagrams should retain edge count fallback`() {
         val ambiguous = Mdd(
-            intArrayOf(0, 1), intArrayOf(1, 2, 1), intArrayOf(0, 9, 15),
-            longArrayOf(0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0), 0, intArrayOf(0), 3,
+            intArrayOf(0, 1),
+            intArrayOf(1, 2, 1),
+            intArrayOf(0, 9, 15),
+            longArrayOf(0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0),
+            0,
+            intArrayOf(0),
+            3,
         )
         val state = PropagationState(
-            Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf<Factor>(ambiguous)), Assumptions.None,
+            Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf<Factor>(ambiguous)),
+            Assumptions.None,
         )
         assertNull(state.runToFixpoint(allFactors = true))
         val payload = state.refPayload[0] as MddIncrementalState
@@ -142,11 +166,17 @@ class MddIncrementalStateTest {
     @Test
     fun `aliased diagrams should retain edge count fallback`() {
         val aliased = Mdd(
-            intArrayOf(0, 0), intArrayOf(1, 2, 1), intArrayOf(0, 6, 12),
-            longArrayOf(0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0), 0, intArrayOf(0), 3,
+            intArrayOf(0, 0),
+            intArrayOf(1, 2, 1),
+            intArrayOf(0, 6, 12),
+            longArrayOf(0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0),
+            0,
+            intArrayOf(0),
+            3,
         )
         val state = PropagationState(
-            Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(aliased)), Assumptions.None,
+            Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(aliased)),
+            Assumptions.None,
         )
         assertNull(state.runToFixpoint(allFactors = true))
         val payload = state.refPayload[0] as MddIncrementalState
@@ -160,7 +190,8 @@ class MddIncrementalStateTest {
     @Test
     fun `storage declines should retain edge counts without allocating path weights`() {
         val state = PropagationState(
-            Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf<Factor>(diagram)), Assumptions.None,
+            Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf<Factor>(diagram)),
+            Assumptions.None,
         )
         assertNull(state.runToFixpoint(allFactors = true))
         state.mddPathWeightCells = 1_048_576
@@ -176,11 +207,17 @@ class MddIncrementalStateTest {
     fun `overflowing path counts should retain edge counts without wrapping`() {
         val layers = 32
         val large = Mdd(
-            IntArray(layers) { it }, IntArray(layers + 1) { 1 }, IntArray(layers + 1) { it * 6 },
-            LongArray(layers * 6) { if (it % 6 == 4) 1 else 0 }, 0, intArrayOf(0), 3,
+            IntArray(layers) { it },
+            IntArray(layers + 1) { 1 },
+            IntArray(layers + 1) { it * 6 },
+            LongArray(layers * 6) { if (it % 6 == 4) 1 else 0 },
+            0,
+            intArrayOf(0),
+            3,
         )
         val state = PropagationState(
-            Problem(0, layers, Array(layers) { IntDomain(0, 1) }, arrayOf<Factor>(large)), Assumptions.None,
+            Problem(0, layers, Array(layers) { IntDomain(0, 1) }, arrayOf<Factor>(large)),
+            Assumptions.None,
         )
         assertNull(state.runToFixpoint(allFactors = true))
         val payload = state.refPayload[0] as MddIncrementalState

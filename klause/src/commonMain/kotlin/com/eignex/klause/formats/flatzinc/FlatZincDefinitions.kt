@@ -28,10 +28,13 @@ internal fun FlatZincCompiler.collectDefinitionHints(): List<DefinitionHint> {
 private fun FlatZincCompiler.integerDefinition(c: FznConstraint, output: Int): DefinitionHint.Integer? {
     val position = when (c.name) {
         "int_abs", "bool2int" -> 1
+
         "int_min", "int_max", "int_times", "int_plus", "int_pow", "int_pow_fixed", "klause_int_pow",
         "array_int_element", "array_var_int_element",
         -> 2
+
         "array_int_minimum", "array_int_maximum" -> 0
+
         else -> null
     }
     if (position != null && definitionIntId(c.args[position]) != output) return null
@@ -51,8 +54,11 @@ private fun FlatZincCompiler.integerDefinition(c: FznConstraint, output: Int): D
         "int_pow", "int_pow_fixed", "klause_int_pow" -> {
             val exponent = evalIntConstOrNull(c.args[1])
             val base = definitionOperand(c.args[0])
-            if (base == null || exponent == null || exponent !in 0L..Int.MAX_VALUE.toLong()) null
-            else DefinitionHint.Power(output, base, exponent.toInt())
+            if (base == null || exponent == null || exponent !in 0L..Int.MAX_VALUE.toLong()) {
+                null
+            } else {
+                DefinitionHint.Power(output, base, exponent.toInt())
+            }
         }
 
         "int_times", "int_plus" -> {
@@ -69,10 +75,16 @@ private fun FlatZincCompiler.integerDefinition(c: FznConstraint, output: Int): D
             val coefficients = runCatching { evalIntConstArrayLong(c.args[0]) }.getOrNull()
             val inputs = definitionOperands(c.args[1])
             val bound = evalIntConstOrNull(c.args[2])
-            if (coefficients == null || inputs == null || bound == null) null
-            else DefinitionHint.Linear(
-                output, coefficients, inputs, bound,
+            if (coefficients == null || inputs == null || bound == null) {
+                null
+            } else {
+                DefinitionHint.Linear(
+                output,
+                coefficients,
+                inputs,
+                bound,
             )
+            }
         }
 
         "bool2int" -> runCatching { resolveBoolLit(c.args[0]) }.getOrNull()?.let {
@@ -81,7 +93,9 @@ private fun FlatZincCompiler.integerDefinition(c: FznConstraint, output: Int): D
 
         "array_int_element", "array_var_int_element" -> {
             val index = definitionIntId(c.args[0])
-            if (index == null) null else if (c.name == "array_int_element") {
+            if (index == null) {
+                null
+            } else if (c.name == "array_int_element") {
                 runCatching { evalIntConstArrayLong(c.args[1]) }.getOrNull()?.let {
                     DefinitionHint.Element(output, index, null, it, 1)
                 }
@@ -120,7 +134,8 @@ private fun FlatZincCompiler.booleanDefinition(c: FznConstraint, output: Int): D
         } else {
             coefficients = longArrayOf(1L, -1L)
             inputs = arrayOf(
-                definitionOperand(c.args[0]) ?: return null, definitionOperand(c.args[1]) ?: return null,
+                definitionOperand(c.args[0]) ?: return null,
+                definitionOperand(c.args[1]) ?: return null,
             )
             bound = 0L
         }

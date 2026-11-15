@@ -20,15 +20,28 @@ class NativeCapGrowthTest(private val cap: Int) {
 
     @Test
     fun `growing an initialized native window should rank admissions under tiny grants`() {
-        val session = PropagationSession(Problem(3, 0, emptyArray(), arrayOf(
-            Clause(intArrayOf(1, 2)), Clause(intArrayOf(3, 4)),
-        )), nativeSat = true)
+        val session = PropagationSession(
+            Problem(
+                3, 0, emptyArray(),
+                arrayOf(
+            Clause(intArrayOf(1, 2)),
+            Clause(intArrayOf(3, 4)),
+        )
+            ),
+            nativeSat = true
+        )
         val clause = Clause(intArrayOf(1, 3, 4))
         val classifications = IntArray(cap + 1)
         val configuration = NativeCapConfiguration(false, 2, 6)
         repeat(32) { session.addLearnedClause(clause, cap + 9) }
-        session.maintainCapWindow(31, 65_536L, 1_048_576L, { false },
-            canDrop = { false }, nativePolicy = configuration) { index ->
+        session.maintainCapWindow(
+            31,
+            65_536L,
+            1_048_576L,
+            { false },
+            canDrop = { false },
+            nativePolicy = configuration,
+        ) { index ->
             classifications[index]++
             false
         }

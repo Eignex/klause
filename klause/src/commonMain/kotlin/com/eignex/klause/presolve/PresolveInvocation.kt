@@ -53,11 +53,7 @@ internal class PresolveBooleanPins {
     }
 }
 
-internal class PresolveInvocation(
-    val pass: String,
-    val lane: PresolveLane,
-    var input: PresolveSizeStats,
-) {
+internal class PresolveInvocation(val pass: String, val lane: PresolveLane, var input: PresolveSizeStats) {
     val start = TimeSource.Monotonic.markNow()
     var work = 0L
     var rebuildWork = 0L
@@ -112,32 +108,32 @@ internal fun <T> PresolveBudget?.observe(
         if (preparationStage != null) {
             recordPreparation(
                 PresolvePreparationStats(
-                preparationStage,
-                lane,
-                outcome,
-                elapsed - invocation.childrenElapsed,
-                invocation.work,
-                invocation.nativeWork,
-                invocation.input,
-                output,
-            )
+                    preparationStage,
+                    lane,
+                    outcome,
+                    elapsed - invocation.childrenElapsed,
+                    invocation.work,
+                    invocation.nativeWork,
+                    invocation.input,
+                    output,
+                ),
             )
         } else {
             recordInvocation(
                 PresolveInvocationStats(
-            pass = invocation.pass,
-            lane = invocation.lane,
-            outcome = outcome,
-            elapsed = elapsed - invocation.childrenElapsed,
-            work = invocation.work,
-            rebuildWork = invocation.rebuildWork,
-            input = invocation.input,
-            output = output,
-            narrowedColumns = invocation.narrowedColumns,
-            fixedColumns = invocation.fixedColumns,
-            nativeWork = invocation.nativeWork,
-            structuralImpact = invocation.structuralImpact,
-        )
+                    pass = invocation.pass,
+                    lane = invocation.lane,
+                    outcome = outcome,
+                    elapsed = elapsed - invocation.childrenElapsed,
+                    work = invocation.work,
+                    rebuildWork = invocation.rebuildWork,
+                    input = invocation.input,
+                    output = output,
+                    narrowedColumns = invocation.narrowedColumns,
+                    fixedColumns = invocation.fixedColumns,
+                    nativeWork = invocation.nativeWork,
+                    structuralImpact = invocation.structuralImpact,
+                ),
             )
         }
     }

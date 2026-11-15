@@ -31,26 +31,51 @@ class LinearSourceOutcomeTest(private val exact: Boolean) {
         fun policies(): List<Boolean> = listOf(false, true)
     }
 
-    private val tolerance = if (exact) SourceTolerance() else SourceTolerance(
+    private val tolerance = if (exact) {
+        SourceTolerance()
+    } else {
+        SourceTolerance(
         absolute = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000)),
     )
+    }
 
     @Test
     fun `a checked terminal optimum should retain its source units under the selected policy`() {
         val tenth = BigFraction.ofLong(10).reciprocal()
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", false, SemanticRational.ONE, SemanticRational.ofLong(2))),
-            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0,
-                SemanticRational.of(tenth.num, tenth.den)))),
+            emptyList(),
+            LinearSourceObjective(
+                listOf(
+                    LinearSourceTerm(
+                0,
+                SemanticRational.of(tenth.num, tenth.den),
+            )
+                )
+            ),
             SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance).resolve(),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.FIXED,
+        )
+        )
         val cost = if (exact) tenth else assertNotNull(BigFraction.ofDouble(0.1))
-        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0, 0.1),
-            exactReals = listOf(BigFraction.ONE, cost))
-        val native = OpenTheoryExecution.Optimize(OpenTheoryOptimum.Optimal(
-            OpenTheoryAssignment.Sampled(point), cost, SolveStats.EMPTY))
+        val point = Sample(
+            booleanArrayOf(),
+            longArrayOf(),
+            doubleArrayOf(1.0, 0.1),
+            exactReals = listOf(BigFraction.ONE, cost),
+        )
+        val native = OpenTheoryExecution.Optimize(
+            OpenTheoryOptimum.Optimal(
+            OpenTheoryAssignment.Sampled(point),
+            cost,
+            SolveStats.EMPTY,
+        )
+        )
 
         val result = executeLinearSource(SourceExecutionRequest(invocation), SourceExecutionCallbacks()) { _, _, _ ->
             SourceExecutionResult.Linear(invocation, native)
@@ -66,22 +91,43 @@ class LinearSourceOutcomeTest(private val exact: Boolean) {
     fun `a rejected terminal optimum should retain only an earlier accepted incumbent`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", false, SemanticRational.ONE, SemanticRational.ofLong(2))),
-            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
+            emptyList(),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
             SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance).resolve(),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED))
-        val rejected = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0, 0.0),
-            exactReals = listOf(BigFraction.ZERO, BigFraction.ZERO))
-        val native = OpenTheoryExecution.Optimize(OpenTheoryOptimum.Optimal(
-            OpenTheoryAssignment.Sampled(rejected), BigFraction.ZERO, SolveStats.EMPTY))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.FIXED,
+        )
+        )
+        val rejected = Sample(
+            booleanArrayOf(),
+            longArrayOf(),
+            doubleArrayOf(0.0, 0.0),
+            exactReals = listOf(BigFraction.ZERO, BigFraction.ZERO),
+        )
+        val native = OpenTheoryExecution.Optimize(
+            OpenTheoryOptimum.Optimal(
+            OpenTheoryAssignment.Sampled(rejected),
+            BigFraction.ZERO,
+            SolveStats.EMPTY,
+        )
+        )
 
         val result = executeLinearSource(
             SourceExecutionRequest(invocation),
             SourceExecutionCallbacks(),
         ) { _, hooks, _ ->
-            hooks.finite.onSample(Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0, 2.0),
-                exactReals = listOf(BigFraction.ofLong(2), BigFraction.ofLong(2))))
+            hooks.finite.onSample(
+                Sample(
+                booleanArrayOf(),
+                longArrayOf(),
+                doubleArrayOf(2.0, 2.0),
+                exactReals = listOf(BigFraction.ofLong(2), BigFraction.ofLong(2)),
+            )
+            )
             SourceExecutionResult.Linear(invocation, native)
         }
 
@@ -94,15 +140,30 @@ class LinearSourceOutcomeTest(private val exact: Boolean) {
     fun `an inconsistent terminal cost should withhold source optimality under either policy`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", false, SemanticRational.ONE, SemanticRational.ofLong(2))),
-            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
+            emptyList(),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
             SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance).resolve(),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED))
-        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0, 0.0),
-            exactReals = listOf(BigFraction.ONE, BigFraction.ZERO))
-        val native = OpenTheoryExecution.Optimize(OpenTheoryOptimum.Optimal(
-            OpenTheoryAssignment.Sampled(point), BigFraction.ZERO, SolveStats.EMPTY))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.FIXED,
+        )
+        )
+        val point = Sample(
+            booleanArrayOf(),
+            longArrayOf(),
+            doubleArrayOf(1.0, 0.0),
+            exactReals = listOf(BigFraction.ONE, BigFraction.ZERO),
+        )
+        val native = OpenTheoryExecution.Optimize(
+            OpenTheoryOptimum.Optimal(
+            OpenTheoryAssignment.Sampled(point),
+            BigFraction.ZERO,
+            SolveStats.EMPTY,
+        )
+        )
 
         val result = executeLinearSource(SourceExecutionRequest(invocation), SourceExecutionCallbacks()) { _, _, _ ->
             SourceExecutionResult.Linear(invocation, native)
@@ -115,23 +176,44 @@ class LinearSourceOutcomeTest(private val exact: Boolean) {
     fun `a source better incumbent should retain numerical optimality at a tied native cost`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", false, SemanticRational.ONE, SemanticRational.ofLong(2))),
-            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
+            emptyList(),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
             SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance).resolve(),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.FIXED,
+        )
+        )
         val value = BigFraction.ONE + BigFraction.ofLong(100_000_000).reciprocal()
-        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(value.toDouble(), 1.0),
-            exactReals = listOf(value, BigFraction.ONE))
-        val native = OpenTheoryExecution.Optimize(OpenTheoryOptimum.Optimal(
-            OpenTheoryAssignment.Sampled(point), BigFraction.ONE, SolveStats.EMPTY))
+        val point = Sample(
+            booleanArrayOf(),
+            longArrayOf(),
+            doubleArrayOf(value.toDouble(), 1.0),
+            exactReals = listOf(value, BigFraction.ONE),
+        )
+        val native = OpenTheoryExecution.Optimize(
+            OpenTheoryOptimum.Optimal(
+            OpenTheoryAssignment.Sampled(point),
+            BigFraction.ONE,
+            SolveStats.EMPTY,
+        )
+        )
 
         val result = executeLinearSource(
             SourceExecutionRequest(invocation),
             SourceExecutionCallbacks(),
         ) { _, hooks, _ ->
-            hooks.finite.onSample(Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0, 1.0),
-                exactReals = listOf(BigFraction.ONE, BigFraction.ONE)))
+            hooks.finite.onSample(
+                Sample(
+                booleanArrayOf(),
+                longArrayOf(),
+                doubleArrayOf(1.0, 1.0),
+                exactReals = listOf(BigFraction.ONE, BigFraction.ONE),
+            )
+            )
             SourceExecutionResult.Linear(invocation, native)
         }
 
@@ -144,11 +226,17 @@ class LinearSourceOutcomeTest(private val exact: Boolean) {
     @Test
     fun `a restricted native refutation should withhold an original source refutation`() {
         val source = LinearSourceProblem(
-            listOf(LinearSourceVariable("x", false, SemanticRational.ZERO, SemanticRational.ONE)), emptyList(),
+            listOf(LinearSourceVariable("x", false, SemanticRational.ZERO, SemanticRational.ONE)),
+            emptyList(),
             semantics = SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance).resolve(),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.SATISFY, FiniteEngine.FIXED))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.SATISFY,
+            FiniteEngine.FIXED,
+        )
+        )
 
         val result = executeLinearSource(SourceExecutionRequest(invocation), SourceExecutionCallbacks()) { _, _, bind ->
             assertNotNull(bind).invoke(ExecutionControl.Never, false)
@@ -167,8 +255,13 @@ class LinearSourceOutcomeTest(private val exact: Boolean) {
             listOf(LinearSourceRow(emptyList(), lower = SemanticRational.of(BIG_ONE, bigIntOf(100_000_000)))),
             semantics = SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance).resolve(),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.SATISFY, FiniteEngine.FIXED))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.SATISFY,
+            FiniteEngine.FIXED,
+        )
+        )
 
         val result = executeLinearSource(SourceExecutionRequest(invocation), SourceExecutionCallbacks()) { _, _, _ ->
             SourceExecutionResult.Refuted(invocation)

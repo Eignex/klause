@@ -18,11 +18,15 @@ class AllDifferentInvariantTest {
 
     @Test
     fun `sparse matching should seed domains spanning the signed word range`() {
-        val problem = Problem(0, 3, arrayOf(
+        val problem = Problem(
+            0, 3,
+            arrayOf(
             IntDomain(Long.MIN_VALUE, Long.MAX_VALUE),
             IntDomain(Long.MIN_VALUE, Long.MIN_VALUE),
             IntDomain(Long.MIN_VALUE + 1, Long.MAX_VALUE),
-        ), arrayOf(AllDifferent(intArrayOf(0, 1, 2))))
+        ),
+            arrayOf(AllDifferent(intArrayOf(0, 1, 2)))
+        )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
 
         assertTrue(state.factors[0].seedFeasible(state, 0))
@@ -34,8 +38,12 @@ class AllDifferentInvariantTest {
 
     @Test
     fun `wide excepted moves should grade repeated nonzero values and ignore repeated zeroes`() {
-        val problem = Problem(0, 3, Array(3) { IntDomain(0, 3000000000) },
-            arrayOf(AllDifferent(intArrayOf(0, 1, 2), exceptSet = longArrayOf(0))))
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 3000000000) },
+            arrayOf(AllDifferent(intArrayOf(0, 1, 2), exceptSet = longArrayOf(0))),
+        )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         state.assignment.setInt(0, 3000000000)
         state.assignment.setInt(1, 3000000000)
@@ -51,8 +59,12 @@ class AllDifferentInvariantTest {
 
     @Test
     fun `wide domain repairs should propose unused values without walking the interval`() {
-        val problem = Problem(0, 3, Array(3) { IntDomain(0, 1000000000) },
-            arrayOf(AllDifferent(intArrayOf(0, 1, 2))))
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 1000000000) },
+            arrayOf(AllDifferent(intArrayOf(0, 1, 2))),
+        )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         state.assignment.setInt(0, 5)
         state.assignment.setInt(1, 5)

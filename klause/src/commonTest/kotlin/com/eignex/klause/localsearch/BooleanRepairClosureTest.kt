@@ -29,19 +29,27 @@ class BooleanRepairClosureTest {
         val factors = Array<Factor>(count + 3) { index ->
             when {
                 index < count -> Clause(intArrayOf(Lit.make(0, false), Lit.make(index + 1, true)))
-                index == count -> Clause(IntArray(count + 1) {
+
+                index == count -> Clause(
+                    IntArray(count + 1) {
                     if (it < count) Lit.make(it + 1, false) else Lit.make(count + 1, true)
-                })
+                }
+                )
+
                 index == count + 1 -> Clause(intArrayOf(Lit.make(0, true), Lit.make(output, true)))
+
                 else -> Clause(intArrayOf(Lit.make(0, false), Lit.make(output, false)))
             }
         }
         val problem = Problem(output + 1, 0, emptyArray(), factors)
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         state.assignment.setBool(output, true)
-        state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
+        state.invariants = DefinitionalSweep.infer(
+            problem,
+            boolFolds = listOf(
             BoolFoldDefinition(output, intArrayOf(Lit.make(0, false)), true),
-        ))?.network(0, output + 1)
+        )
+        )?.network(0, output + 1)
         state.recompute()
         val control = LocalSearchRunControl(ExecutionControl.Never)
         state.inspectionWork = control
@@ -61,19 +69,25 @@ class BooleanRepairClosureTest {
 
     @Test
     fun `queued mandatory clauses should settle before replacement support choices`() {
-        val problem = Problem(6, 0, emptyArray(), arrayOf<Factor>(
+        val problem = Problem(
+            6, 0, emptyArray(),
+            arrayOf<Factor>(
             Clause(intArrayOf(Lit.make(0, false), Lit.make(3, true), Lit.make(4, true))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
             Clause(intArrayOf(Lit.make(2, false), Lit.make(3, false))),
             Clause(intArrayOf(Lit.make(0, true), Lit.make(5, true))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(5, false))),
-        ))
+        )
+        )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         state.assignment.setBool(5, true)
-        state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
+        state.invariants = DefinitionalSweep.infer(
+            problem,
+            boolFolds = listOf(
             BoolFoldDefinition(5, intArrayOf(Lit.make(0, false)), true),
-        ))?.network(0, 6)
+        )
+        )?.network(0, 6)
         state.shaping.objective = LinearObjective(boolWeights = longArrayOf(0, 0, 0, 1, 2, 10))
         state.recompute()
         val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)

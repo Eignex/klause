@@ -18,10 +18,25 @@ internal fun prepareCoupledSupport(
     var current = input
     var changed = false
     while (true) {
-        coupledEqualities(current, arithmetic)?.let { current = it; changed = true }
-        val equations = current.filter { arithmetic.step(); it.atom.relation == PolynomialRelation.EQ }
-        val graph = equationalSection(equations.map { arithmetic.step(); it.atom.polynomial },
-            current.map { arithmetic.step(); it.atom.polynomial }, arithmetic) ?: break
+        coupledEqualities(current, arithmetic)?.let {
+            current = it;
+            changed = true
+        }
+        val equations = current.filter {
+            arithmetic.step();
+            it.atom.relation == PolynomialRelation.EQ
+        }
+        val graph = equationalSection(
+            equations.map {
+                arithmetic.step();
+                it.atom.polynomial
+            },
+            current.map {
+                arithmetic.step();
+                it.atom.polynomial
+            },
+            arithmetic,
+        ) ?: break
         val definition = equations.first {
             arithmetic.step()
             it.atom.polynomial == graph.equation
@@ -30,8 +45,9 @@ internal fun prepareCoupledSupport(
         for (entry in current) {
             arithmetic.step()
             if (entry === definition) continue
-            if (graph.variable !in entry.atom.polynomial.variables) updated.add(entry)
-            else {
+            if (graph.variable !in entry.atom.polynomial.variables) {
+                updated.add(entry)
+            } else {
                 val polynomial = arithmetic.substitute(entry.atom.polynomial, graph.variable, graph.replacement)
                 if (!fitsCellLimits(polynomial, arithmetic)) return null
                 val premises = LinkedHashSet<Int>()
@@ -73,11 +89,17 @@ private fun coupledEqualities(
             signs = signs and if (positive) allowed else negateSigns(allowed)
         }
         if (entries.size < 2 || signs != ZERO_SIGN) {
-            for (entry in entries) { arithmetic.step(); result.add(entry) }
+            for (entry in entries) {
+                arithmetic.step();
+                result.add(entry)
+            }
             continue
         }
         val premises = LinkedHashSet<Int>()
-        for (entry in entries) for (premise in entry.premises) { arithmetic.step(); premises.add(premise) }
+        for (entry in entries) for (premise in entry.premises) {
+            arithmetic.step();
+            premises.add(premise)
+        }
         result.add(PolynomialCoupledSupport(PolynomialAtom(polynomial, PolynomialRelation.EQ), premises))
         changed = true
     }

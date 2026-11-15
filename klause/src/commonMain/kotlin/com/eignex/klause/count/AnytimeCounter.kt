@@ -184,6 +184,5 @@ internal data class ExactCountInterval(val lower: BigInt, val upper: BigInt) {
         )
     }
 
-    private fun clampToLong(mass: BigInt): Long =
-        if (mass.fitsLong()) mass.toLongExact() else Long.MAX_VALUE
+    private fun clampToLong(mass: BigInt): Long = if (mass.fitsLong()) mass.toLongExact() else Long.MAX_VALUE
 }

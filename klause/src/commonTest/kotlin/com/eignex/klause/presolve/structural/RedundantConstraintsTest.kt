@@ -112,7 +112,8 @@ class RedundantConstraintsTest {
                 for (y in values) {
                     val ints = longArrayOf(x, y)
                     assertEquals(
-                        isFeasible(problem, ints, mask), isFeasible(reduced, ints, mask),
+                        isFeasible(problem, ints, mask),
+                        isFeasible(reduced, ints, mask),
                         "mask=$mask ints=${ints.toList()}",
                     )
                 }
@@ -128,14 +129,19 @@ class RedundantConstraintsTest {
             val loose = le(2, 0, 1, 1, 1)
             val tight = le(1, 0, 1, 1, 1)
             val memo = SubsumeMemo()
-            val original = Problem(2, 2, dom(2, 2), listOf(
-                clause, loose,
+            val original = Problem(
+                2, 2, dom(2, 2),
+                listOf(
+                clause,
+                loose,
                 if (shared) clause else Clause(intArrayOf(pos(0), pos(1))),
                 if (shared) loose else le(2, 0, 1, 1, 1),
                 tight,
-            ))
+            )
+            )
             checkIncrementalAssignments(
-                original, SubsumeIncremental(true, intArrayOf(0, 1, 2, 3, 4), emptyList(), intArrayOf(), memo),
+                original,
+                SubsumeIncremental(true, intArrayOf(0, 1, 2, 3, 4), emptyList(), intArrayOf(), memo),
             )
             val replaced = Problem(2, 2, dom(2, 2), listOf(clause, loose))
             checkIncrementalAssignments(
@@ -143,21 +149,29 @@ class RedundantConstraintsTest {
                 SubsumeIncremental(false, intArrayOf(0, 5), listOf(SubsumeFactor(5, loose)), intArrayOf(4), memo),
             )
             checkIncrementalAssignments(
-                replaced, SubsumeIncremental(false, intArrayOf(0, 5), emptyList(), intArrayOf(6), memo),
+                replaced,
+                SubsumeIncremental(false, intArrayOf(0, 5), emptyList(), intArrayOf(6), memo),
             )
             val added = Problem(2, 2, dom(2, 2), listOf(clause, loose, loose, tight))
             checkIncrementalAssignments(
                 added,
                 SubsumeIncremental(
-                    false, intArrayOf(0, 5, 7, 8), listOf(SubsumeFactor(7, loose), SubsumeFactor(8, tight)),
-                    intArrayOf(), memo,
+                    false,
+                    intArrayOf(0, 5, 7, 8),
+                    listOf(SubsumeFactor(7, loose), SubsumeFactor(8, tight)),
+                    intArrayOf(),
+                    memo,
                 ),
             )
             val restored = Problem(2, 2, dom(2, 2), listOf(clause, loose))
             checkIncrementalAssignments(
                 restored,
                 SubsumeIncremental(
-                    false, intArrayOf(0, 9), listOf(SubsumeFactor(9, loose)), intArrayOf(8), memo,
+                    false,
+                    intArrayOf(0, 9),
+                    listOf(SubsumeFactor(9, loose)),
+                    intArrayOf(8),
+                    memo,
                 ),
             )
         }
@@ -171,12 +185,16 @@ class RedundantConstraintsTest {
         val incremental = SubsumeIncremental(true, intArrayOf(0, 1), emptyList(), intArrayOf(), memo)
         val ranges = ColumnRanges.of(problem.intBounds)
         val stopped = RedundantConstraints.removeRedundantConstraints(
-            problem, ranges, incremental, ExecutionControl { true },
+            problem,
+            ranges,
+            incremental,
+            ExecutionControl { true },
         )
         assertTrue(stopped.isEmpty)
 
         val recovered = checkIncrementalAssignments(
-            problem, SubsumeIncremental(false, intArrayOf(0, 1), emptyList(), intArrayOf(), memo),
+            problem,
+            SubsumeIncremental(false, intArrayOf(0, 1), emptyList(), intArrayOf(), memo),
         )
 
         assertEquals(1, recovered.factors.size)
@@ -191,13 +209,19 @@ class RedundantConstraintsTest {
         val token = budget.orSpent(ExecutionControl.Never)
         val ranges = ColumnRanges.of(problem.intBounds)
         RedundantConstraints.removeRedundantConstraints(
-            problem, ranges, SubsumeIncremental(true, intArrayOf(0, 1), emptyList(), intArrayOf(), memo), token,
+            problem,
+            ranges,
+            SubsumeIncremental(true, intArrayOf(0, 1), emptyList(), intArrayOf(), memo),
+            token,
         )
         val firstWork = budget.spent()
         val reduced = Problem(2, 0, emptyArray(), listOf(clause))
 
         val delta = RedundantConstraints.removeRedundantConstraints(
-            reduced, ranges, SubsumeIncremental(false, intArrayOf(0), emptyList(), intArrayOf(), memo), token,
+            reduced,
+            ranges,
+            SubsumeIncremental(false, intArrayOf(0), emptyList(), intArrayOf(), memo),
+            token,
         )
 
         assertTrue(delta.isEmpty)
@@ -326,30 +350,70 @@ class RedundantConstraintsTest {
     fun `unsafe subset activity arithmetic should preserve every source assignment`() {
         val large = 1L shl 62
         val cases = listOf(
-            Triple(arrayOf(IntDomain(0, 1), IntDomain(0, 4)),
-                listOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 0L),
-                    Linear(longArrayOf(1, large), intArrayOf(0, 1), LinearOp.LE, 0L)), 1),
-            Triple(arrayOf(IntDomain(0, 2), IntDomain(0, 1)),
-                listOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, large),
-                    Linear(longArrayOf(4, 1), intArrayOf(0, 1), LinearOp.LE, 1L)), 2),
-            Triple(arrayOf(IntDomain(0, 1), IntDomain(-4, 0)),
-                listOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 0L),
-                    Linear(longArrayOf(1, -large), intArrayOf(0, 1), LinearOp.LE, 0L)), 1),
-            Triple(arrayOf(IntDomain(0, 1), IntDomain(Long.MIN_VALUE, Long.MIN_VALUE + 1)),
-                listOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 0L),
-                    Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0L)), 0),
-            Triple(arrayOf(IntDomain(0, 1), IntDomain(0, 4)),
-                listOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, Long.MAX_VALUE - 2),
-                    Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1L)), 3),
-            Triple(arrayOf(IntDomain(-2, 0), IntDomain(0, 1)),
-                listOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, -large),
-                    Linear(longArrayOf(4, 1), intArrayOf(0, 1), LinearOp.LE, 1L)), 0),
-            Triple(arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)),
-                listOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 0L),
-                    Linear(longArrayOf(1, large, large), intArrayOf(0, 1, 2), LinearOp.LE, 0L)), 1),
-            Triple(arrayOf(IntDomain(0, 1), IntDomain(1, 1), IntDomain(1, 1)),
-                listOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 0L),
-                    Linear(longArrayOf(1, -large - 1, -large - 1), intArrayOf(0, 1, 2), LinearOp.LE, 0L)), 1),
+            Triple(
+                arrayOf(IntDomain(0, 1), IntDomain(0, 4)),
+                listOf(
+                    Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 0L),
+                    Linear(longArrayOf(1, large), intArrayOf(0, 1), LinearOp.LE, 0L),
+                ),
+                1,
+            ),
+            Triple(
+                arrayOf(IntDomain(0, 2), IntDomain(0, 1)),
+                listOf(
+                    Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, large),
+                    Linear(longArrayOf(4, 1), intArrayOf(0, 1), LinearOp.LE, 1L),
+                ),
+                2,
+            ),
+            Triple(
+                arrayOf(IntDomain(0, 1), IntDomain(-4, 0)),
+                listOf(
+                    Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 0L),
+                    Linear(longArrayOf(1, -large), intArrayOf(0, 1), LinearOp.LE, 0L),
+                ),
+                1,
+            ),
+            Triple(
+                arrayOf(IntDomain(0, 1), IntDomain(Long.MIN_VALUE, Long.MIN_VALUE + 1)),
+                listOf(
+                    Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 0L),
+                    Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0L),
+                ),
+                0,
+            ),
+            Triple(
+                arrayOf(IntDomain(0, 1), IntDomain(0, 4)),
+                listOf(
+                    Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, Long.MAX_VALUE - 2),
+                    Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1L),
+                ),
+                3,
+            ),
+            Triple(
+                arrayOf(IntDomain(-2, 0), IntDomain(0, 1)),
+                listOf(
+                    Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, -large),
+                    Linear(longArrayOf(4, 1), intArrayOf(0, 1), LinearOp.LE, 1L),
+                ),
+                0,
+            ),
+            Triple(
+                arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)),
+                listOf(
+                    Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 0L),
+                    Linear(longArrayOf(1, large, large), intArrayOf(0, 1, 2), LinearOp.LE, 0L),
+                ),
+                1,
+            ),
+            Triple(
+                arrayOf(IntDomain(0, 1), IntDomain(1, 1), IntDomain(1, 1)),
+                listOf(
+                    Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 0L),
+                    Linear(longArrayOf(1, -large - 1, -large - 1), intArrayOf(0, 1, 2), LinearOp.LE, 0L),
+                ),
+                1,
+            ),
         )
         for ((domains, factors, expectedCount) in cases) {
             val problem = Problem(0, domains.size, domains, factors)
@@ -367,10 +431,13 @@ class RedundantConstraintsTest {
         val large = 1L shl 62
         for (coefficient in listOf(large, -large)) {
             val domains = arrayOf(IntDomain(0, 1), if (coefficient > 0) IntDomain(-2, -1) else IntDomain(1, 2))
-            val problem = Problem(0, 2, domains, listOf(
+            val problem = Problem(
+                0, 2, domains,
+                listOf(
                 Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 0L),
                 Linear(longArrayOf(1, coefficient), intArrayOf(0, 1), LinearOp.LE, 0L),
-            ))
+            )
+            )
 
             val delta = Presolve.removeRedundantSourceConstraints(problem, ExecutionControl.Never)
             val reduced = Presolver.runSource(problem, PresolveConfig.parse("off,+subsume")).problem

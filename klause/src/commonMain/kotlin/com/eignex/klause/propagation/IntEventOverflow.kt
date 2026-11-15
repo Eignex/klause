@@ -42,10 +42,17 @@ internal class IntEventOverflow {
             for (index in 0 until posting.size) {
                 work += 3L
                 val factor = posting[index]
-                val next = if (factor < base) factor else remap.getOrNull(factor - base)?.let {
+                val next = if (factor < base) {
+                    factor
+                } else {
+                    remap.getOrNull(factor - base)?.let {
                     if (it < 0) null else base + it
                 }
-                if (next != null) { posting[write++] = next; work += 2L }
+                }
+                if (next != null) {
+                    posting[write++] = next;
+                    work += 2L
+                }
             }
             posting.truncateTo(write)
             work++
@@ -89,7 +96,9 @@ internal class IntEventOverflow {
                     budget.visit(8L)
                     budget.visit(0L)
                     posting.removeAt(position)
-                } else position++
+                } else {
+                    position++
+                }
                 budget.advanced()
             } else if (posting.size == 0) {
                 check(entries.remove(slot, { budget.visit(it + 4L) }, { budget.visit(0L) }))
@@ -113,7 +122,10 @@ internal class IntEventOverflow {
                 val record = deferredWork == 0L || work < deferredWork
                 budget.visit(if (record) 8L else 4L)
                 budget.visit(0L)
-                if (record) { deferredWork = work; deferredScratch = scratch }
+                if (record) {
+                    deferredWork = work;
+                    deferredScratch = scratch
+                }
             }
         } else {
             budget.visit(4L)

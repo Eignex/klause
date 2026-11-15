@@ -13,9 +13,7 @@ data class SourceIncumbentPublication(
     val value: SourceValue,
 )
 
-internal class SourcePublicationObserver(
-    private val callback: ((SourceIncumbentPublication) -> Unit)?,
-) {
+internal class SourcePublicationObserver(private val callback: ((SourceIncumbentPublication) -> Unit)?) {
     var latest: SourceIncumbentPublication? = null
         private set
     private var failure: Throwable? = null

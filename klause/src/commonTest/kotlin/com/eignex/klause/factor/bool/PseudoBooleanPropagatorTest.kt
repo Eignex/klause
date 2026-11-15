@@ -21,8 +21,12 @@ import kotlin.test.assertTrue
 class PseudoBooleanPropagatorTest {
     @Test
     fun `signed word activity overflow should retain Boolean deductions`() {
-        val factor = PseudoBoolean(longArrayOf(Long.MAX_VALUE, 1), IntArray(2) { Lit.make(it, true) },
-            PbOp.LE, Long.MAX_VALUE)
+        val factor = PseudoBoolean(
+            longArrayOf(Long.MAX_VALUE, 1),
+            IntArray(2) { Lit.make(it, true) },
+            PbOp.LE,
+            Long.MAX_VALUE,
+        )
         val problem = Problem(2, 0, emptyArray(), arrayOf(factor))
         val state = PropagationState(problem, Assumptions.None)
         state.currentFactor = 0
@@ -35,8 +39,12 @@ class PseudoBooleanPropagatorTest {
 
     @Test
     fun `minimum signed coefficient should retain its negated literal semantics`() {
-        val factor = PseudoBoolean(longArrayOf(Long.MIN_VALUE), intArrayOf(Lit.make(0, false)),
-            PbOp.EQ, Long.MIN_VALUE)
+        val factor = PseudoBoolean(
+            longArrayOf(Long.MIN_VALUE),
+            intArrayOf(Lit.make(0, false)),
+            PbOp.EQ,
+            Long.MIN_VALUE,
+        )
         val problem = Problem(1, 0, emptyArray(), arrayOf(factor))
         val state = PropagationState(problem, Assumptions.None)
         state.currentFactor = 0
@@ -60,7 +68,8 @@ class PseudoBooleanPropagatorTest {
     @Test
     fun `wide reification should enforce each comparison in both indicator directions`() {
         val wide = parseBigInt("18446744073709551616")
-        for (op in PbOp.entries) for (indicator in listOf(false, true)) {
+        for (op in PbOp.entries) {
+            for (indicator in listOf(false, true)) {
             val bound = if (op == PbOp.LE) BIG_ZERO else wide
             val factor = ReifiedPseudoBoolean(0, arrayOf(wide), intArrayOf(Lit.make(1, true)), op, bound)
             val problem = Problem(2, 0, emptyArray(), arrayOf(factor))
@@ -72,6 +81,7 @@ class PseudoBooleanPropagatorTest {
 
             assertEquals(if (op == PbOp.LE) !indicator else indicator, state.boolValues[1], "$op $indicator")
         }
+        }
     }
 
     @Test
@@ -79,8 +89,13 @@ class PseudoBooleanPropagatorTest {
         val wide = parseBigInt("18446744073709551616")
         val rng = Random(0x3042)
         repeat(24) { trial ->
-            val factor = ReifiedPseudoBoolean(0, arrayOf(wide, -wide, wide),
-                IntArray(3) { Lit.make(it + 1, rng.nextBoolean()) }, PbOp.entries[trial % 3], BIG_ZERO)
+            val factor = ReifiedPseudoBoolean(
+                0,
+                arrayOf(wide, -wide, wide),
+                IntArray(3) { Lit.make(it + 1, rng.nextBoolean()) },
+                PbOp.entries[trial % 3],
+                BIG_ZERO,
+            )
             val problem = Problem(4, 0, emptyArray(), arrayOf(factor))
 
             PropagationReasonOracle.assertReasonsImply(problem, "wide-pb-$trial") { state ->

@@ -84,10 +84,12 @@ internal class AllDifferentTuplesInvariant(private val tuples: List<IntArray>) :
     }
 
     private fun key(state: LocalSearchState, row: Int, variable: Int = -1, value: Long = 0): TupleValues =
-        TupleValues(LongArray(tuples[row].size) {
+        TupleValues(
+            LongArray(tuples[row].size) {
             val coordinate = tuples[row][it]
             if (coordinate == variable) value else state.assignment.intValue(coordinate)
-        })
+        }
+        )
 
     private fun adjust(counts: MutableMap<TupleValues, Int>, key: TupleValues, change: Int): Int {
         val before = counts[key] ?: 0

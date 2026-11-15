@@ -104,7 +104,8 @@ class BlockedClauseEliminationTest {
             assertNotNull(SatClauseDb.build(problem, emptySet(), setup.orSpent(ExecutionControl.Never)))
 
             val delta = BlockedClauseElimination.eliminateSource(
-                problem, cancellation = budget.orSpent(ExecutionControl.Never),
+                problem,
+                cancellation = budget.orSpent(ExecutionControl.Never),
             )
 
             assertEquals(width == 257, delta.isEmpty)

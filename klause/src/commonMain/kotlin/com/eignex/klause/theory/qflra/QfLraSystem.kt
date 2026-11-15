@@ -256,8 +256,14 @@ internal class LiveQfLraSystem(
             for ((side, row) in rows.withIndex()) {
                 if (stop()) return false
                 val negated = comparison.op == LinearOp.GE || (comparison.op == LinearOp.EQ && side == 1)
-                val bound = prepareBound(if (negated) keys.negative else keys.positive,
-                    true, row.rhs, row.strict, input.premise, { !stop() && batch.flush() })
+                val bound = prepareBound(
+                    if (negated) keys.negative else keys.positive,
+                    true,
+                    row.rhs,
+                    row.strict,
+                    input.premise,
+                    { !stop() && batch.flush() },
+                )
                     ?: return batch.conflict
                 val consistent = batch.add(bound)
                 if (!consistent) {

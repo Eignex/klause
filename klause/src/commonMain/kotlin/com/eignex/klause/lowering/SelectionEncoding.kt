@@ -32,8 +32,14 @@ internal fun <T> minMaxEncoding(
     for (operand in factor.xs) {
         selectionCheckpoint(cancellation)
         val variables = intArrayOf(factor.result, operand)
-        bounds += row(LinearRow.ofInts(variables, longArrayOf(1, -1),
-            if (factor.max) LinearOp.GE else LinearOp.LE, 0))
+        bounds += row(
+            LinearRow.ofInts(
+            variables,
+            longArrayOf(1, -1),
+            if (factor.max) LinearOp.GE else LinearOp.LE,
+            0,
+        )
+        )
         equalities += row(LinearRow.ofInts(variables, longArrayOf(1, -1), LinearOp.EQ, 0))
     }
     return all(bounds + any(equalities))
@@ -51,10 +57,20 @@ internal fun <T> realMinMaxEncoding(
     for (operand in factor.xs) {
         selectionCheckpoint(cancellation)
         val variables = intArrayOf(factor.result, operand)
-        val constants = RealConstants(RealConsts(doubleArrayOf()), RealConsts(doubleArrayOf(1.0, -1.0)),
-            0.0, strict = false)
-        bounds += row(LinearRow.ofColumns(intArrayOf(), variables, constants,
-            if (factor.max) LinearOp.GE else LinearOp.LE))
+        val constants = RealConstants(
+            RealConsts(doubleArrayOf()),
+            RealConsts(doubleArrayOf(1.0, -1.0)),
+            0.0,
+            strict = false,
+        )
+        bounds += row(
+            LinearRow.ofColumns(
+            intArrayOf(),
+            variables,
+            constants,
+            if (factor.max) LinearOp.GE else LinearOp.LE,
+        )
+        )
         equalities += row(LinearRow.ofColumns(intArrayOf(), variables, constants, LinearOp.EQ))
     }
     return all(bounds + any(equalities))
@@ -153,8 +169,12 @@ internal fun <T> realElementEncoding(
         }
         val coefficients = if (factor.arrIsVars) doubleArrayOf(1.0, -1.0) else doubleArrayOf(1.0)
         val bound = if (factor.arrIsVars) 0.0 else factor.constants[position]
-        val equality = LinearRow.ofColumns(intArrayOf(), variables,
-            RealConstants(RealConsts(doubleArrayOf()), RealConsts(coefficients), bound, strict = false), LinearOp.EQ)
+        val equality = LinearRow.ofColumns(
+            intArrayOf(),
+            variables,
+            RealConstants(RealConsts(doubleArrayOf()), RealConsts(coefficients), bound, strict = false),
+            LinearOp.EQ,
+        )
         relations += any(listOf(guard, row(equality)))
     }
     return all(relations)

@@ -29,8 +29,14 @@ internal class InprocessingSpending(private val kind: InprocessingKind) {
         val repaid = minOf(debt, limit)
         debt -= repaid
         if (repaid > 0L) stats?.noteInprocessing("inprocess${kind.name}DebtRepaid", repaid)
-        val budget = InprocessingBudget(session, params, stats, kind,
-            if (resumingRoot) 0L else limit - repaid, containingWork)
+        val budget = InprocessingBudget(
+            session,
+            params,
+            stats,
+            kind,
+            if (resumingRoot) 0L else limit - repaid,
+            containingWork,
+        )
         if (!resumingRoot && budget.checkpoint()) return
         budget.note("Runs")
         val start = TimeSource.Monotonic.markNow()
@@ -79,8 +85,11 @@ internal class InprocessingBudget(
     }
 
     fun pollStopped(count: Int = 1): Boolean = remaining == 0L || session.fixpointCancelled || session.isUnsatAtRoot ||
-        if (params.cancellation.stopPolling != null) params.cancellation.pollStop(count)
-        else (stride.due(count.toLong()) && stopped())
+        if (params.cancellation.stopPolling != null) {
+            params.cancellation.pollStop(count)
+        } else {
+            (stride.due(count.toLong()) && stopped())
+        }
 
     fun charge(count: Int) {
         session.chargeInprocessingWork(count.toLong())

@@ -29,13 +29,16 @@ class PresolveStructuralImpactTest {
     fun `structure control should retain table coordinates through every host and reconstruct source solutions`() {
         for (lane in listOf("source", "incremental", "rebuilt")) {
             for (preserve in listOf(false, true)) {
-                val source = Problem(0, 4,
+                val source = Problem(
+                    0,
+                    4,
                     arrayOf(IntDomain(1, 3), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
                     listOf(
                         Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
                         Table(intArrayOf(0, 2), longArrayOf(1, 0, 2, 1, 3, 2)),
                         Table(intArrayOf(1, 3), longArrayOf(0, 0, 1, 1, 2, 2)),
-                    ))
+                    ),
+                )
                 val budget = PresolveBudget(1_000_000)
                 val token = budget.orSpent(ExecutionControl.Never)
                 val config = PresolveConfig.parse(if (lane == "rebuilt") "off,+affine,+bce" else "off,+affine")
@@ -71,12 +74,15 @@ class PresolveStructuralImpactTest {
 
     @Test
     fun `structure control should preserve binary partitions without suppressing unrelated affine rows`() {
-        val source = Problem(0, 4,
+        val source = Problem(
+            0,
+            4,
             arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(2, 4), IntDomain(1, 3)),
             listOf(
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1),
                 Linear(intArrayOf(1, -1), intArrayOf(2, 3), LinearOp.EQ, 1),
-            ))
+            ),
+        )
         val config = PresolveConfig.parse("off,+affine").withEffort(preserveStructure = true)
 
         val result = Presolver.runSource(source, config)
@@ -87,15 +93,24 @@ class PresolveStructuralImpactTest {
 
     @Test
     fun `structural control should retain a table that ordinary reduction rewrites`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(0, 0), IntDomain(0, 2)),
-            listOf(Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 2))))
-        for (lane in PresolveLane.entries) for (preserve in listOf(false, true)) {
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 0), IntDomain(0, 2)),
+            listOf(Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 2))),
+        )
+        for (lane in PresolveLane.entries) {
+            for (preserve in listOf(false, true)) {
             val config = PresolveConfig.parse("off,+structural").withEffort(preserveStructure = preserve)
 
-            val result = if (lane == PresolveLane.SOURCE) Presolver.runSource(source, config).problem
-            else Presolver.run(source.bake(), config).problem
+            val result = if (lane == PresolveLane.SOURCE) {
+                Presolver.runSource(source, config).problem
+            } else {
+                Presolver.run(source.bake(), config).problem
+            }
 
             assertEquals(preserve, result.factors.any { it is Table }, "$lane $preserve")
+        }
         }
     }
 
@@ -106,8 +121,14 @@ class PresolveStructuralImpactTest {
         val invocation = PresolveInvocation("affine", PresolveLane.SOURCE, PresolveSizeStats(1, 0, 32))
         val budget = PresolveBudget(1000)
 
-        invocation.recordStructuralImpact(source, intArrayOf(0), emptyList(), SourceRebuilds.NONE,
-            5, budget.orSpent(ExecutionControl.Never))
+        invocation.recordStructuralImpact(
+            source,
+            intArrayOf(0),
+            emptyList(),
+            SourceRebuilds.NONE,
+            5,
+            budget.orSpent(ExecutionControl.Never),
+        )
 
         assertEquals(5L, budget.spent())
         assertEquals(5L, invocation.structuralImpact["Visits"])
@@ -116,12 +137,16 @@ class PresolveStructuralImpactTest {
 
     @Test
     fun `structure protection should include exactly substitutable objective coordinates`() {
-        val source = Problem(0, 3, arrayOf(IntDomain(1, 3), IntDomain(0, 2), IntDomain(0, 2)),
+        val source = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(1, 3), IntDomain(0, 2), IntDomain(0, 2)),
             listOf(
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
                 Table(intArrayOf(0, 2), longArrayOf(1, 0, 2, 1, 3, 2)),
                 Table(intArrayOf(1, 2), longArrayOf(0, 0, 1, 1, 2, 2)),
-            ))
+            ),
+        )
         val objective = LinearObjective(
             intCoefficients = longArrayOf(1, 0, 0),
         )
@@ -136,12 +161,18 @@ class PresolveStructuralImpactTest {
 
     @Test
     fun `interrupted protection discovery should publish no affine elimination`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(1, 3), IntDomain(0, 2)),
-            listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1)))
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(1, 3), IntDomain(0, 2)),
+            listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1)),
+        )
         val budget = PresolveBudget(1)
 
         val delta = AffineSingletons.eliminateSourceAffineSingletons(
-            source, cancellation = budget.orSpent(ExecutionControl.Never), preserveStructure = true,
+            source,
+            cancellation = budget.orSpent(ExecutionControl.Never),
+            preserveStructure = true,
         )
 
         assertTrue(delta.isEmpty)
@@ -155,8 +186,14 @@ class PresolveStructuralImpactTest {
         val invocation = PresolveInvocation("affine", PresolveLane.SOURCE, PresolveSizeStats(1, 0, 2))
         val budget = PresolveBudget(2)
 
-        invocation.recordStructuralImpact(source, intArrayOf(0), emptyList(), SourceRebuilds.NONE,
-            100, budget.orSpent(ExecutionControl.Never))
+        invocation.recordStructuralImpact(
+            source,
+            intArrayOf(0),
+            emptyList(),
+            SourceRebuilds.NONE,
+            100,
+            budget.orSpent(ExecutionControl.Never),
+        )
 
         assertEquals(2L, budget.spent())
         assertEquals(0L, invocation.structuralImpact["Complete"])
@@ -168,8 +205,14 @@ class PresolveStructuralImpactTest {
         val invocation = PresolveInvocation("structural", PresolveLane.SOURCE, PresolveSizeStats(0, 0, 0))
         val budget = PresolveBudget(1000)
 
-        invocation.recordStructuralImpact(source, intArrayOf(), emptyList(), SourceRebuilds.NONE,
-            0, budget.orSpent(ExecutionControl.Never))
+        invocation.recordStructuralImpact(
+            source,
+            intArrayOf(),
+            emptyList(),
+            SourceRebuilds.NONE,
+            0,
+            budget.orSpent(ExecutionControl.Never),
+        )
 
         assertEquals(0L, budget.spent())
         assertTrue(invocation.structuralImpact.isEmpty())

@@ -78,8 +78,10 @@ class BoolWatchPositionIndexTest {
 
         for (factor in listOf(0, 16, 4096, Int.MAX_VALUE)) {
             for (literal in 0..7) {
-                assertEquals(literal + 1,
-                    index.getOrDefault((factor.toLong() shl 32) or literal.toLong(), -1))
+                assertEquals(
+                    literal + 1,
+                    index.getOrDefault((factor.toLong() shl 32) or literal.toLong(), -1),
+                )
             }
         }
         assertEquals(32, index.size)

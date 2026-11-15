@@ -40,8 +40,10 @@ class PolynomialFormulaReductionTest {
                 }
                 val point = snapshot.reconstruct(QfNraAssignment(booleanArrayOf(), values), arithmetic, algebraic)
                 for (id in 0 until length) {
-                    assertEquals(BigFraction.ONE,
-                        point.getValue(id).rational!! - point.getValue(id + 1).rational!!)
+                    assertEquals(
+                        BigFraction.ONE,
+                        point.getValue(id).rational!! - point.getValue(id + 1).rational!!,
+                    )
                 }
             }
         }
@@ -74,8 +76,12 @@ class PolynomialFormulaReductionTest {
                 "(assert (and (= x (+ (* y y) 1)) (= y 2) (= b (> x 4))))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = 500_000))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = 500_000),
+        )
 
         val point = assertIs<QfNraResult.Satisfiable>(result).assignment
         assertEquals(2, point.realCount)
@@ -201,8 +207,12 @@ class PolynomialFormulaReductionTest {
                 "(and (not b) (= x0 1) (= x1 0))))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = 500_000))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = 500_000),
+        )
 
         val point = assertIs<QfNraResult.Satisfiable>(result).assignment
         assertEquals(false, point.boolValue(0))
@@ -218,8 +228,12 @@ class PolynomialFormulaReductionTest {
                 "$declarations (assert (and (= (* x0 x1) 0) (= x$zero 0) (> x$positive 2)))",
             )
 
-            val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-                QfNraParams(maximumWork = 500_000))
+            val result = solveQfNra(
+                source.formula,
+                source.boolCount,
+                source.realCount,
+                QfNraParams(maximumWork = 500_000),
+            )
 
             val point = assertIs<QfNraResult.Satisfiable>(result).assignment
             assertEquals(BigFraction.ZERO, point.realValue(zero).rational)
@@ -236,8 +250,12 @@ class PolynomialFormulaReductionTest {
                 "(< x0 0) (or b (not b))))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = 500_000))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = 500_000),
+        )
 
         assertIs<QfNraResult.Unsatisfiable>(result)
     }
@@ -250,8 +268,12 @@ class PolynomialFormulaReductionTest {
                 "(assert (and (= x0 0) (= (* x1 x1) 0) (or b (> x0 0))))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = 500_000))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = 500_000),
+        )
 
         val point = assertIs<QfNraResult.Satisfiable>(result).assignment
         assertTrue(point.boolValue(0))
@@ -266,8 +288,12 @@ class PolynomialFormulaReductionTest {
                 "(= (* x1 x1) 2) (> x1 0)))",
         )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = 500_000))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = 500_000),
+        )
 
         val point = assertIs<QfNraResult.Satisfiable>(result).assignment
         assertEquals(BigFraction.ofLong(3), point.realValue(0).rational)
@@ -285,8 +311,13 @@ class PolynomialFormulaReductionTest {
         for ((truth, expected) in listOf(true to 4L, false to 7L)) {
             val condition = PolynomialCondition(bools = mapOf(0 to truth))
 
-            val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-                QfNraParams(maximumWork = 500_000), condition)
+            val result = solveQfNra(
+                source.formula,
+                source.boolCount,
+                source.realCount,
+                QfNraParams(maximumWork = 500_000),
+                condition,
+            )
 
             val point = assertIs<QfNraResult.Satisfiable>(result).assignment
             assertEquals(BigFraction.ofLong(expected), point.realValue(0).rational)
@@ -336,11 +367,21 @@ class PolynomialFormulaReductionTest {
         val source = SmtLibPolynomial.parse(
             "$declarations (declare-const b Bool) (assert (and (= x0 0) (or b (> x0 0)) (not b)))",
         )
-        val completed = assertIs<QfNraResult.Unsatisfiable>(solveQfNra(source.formula, source.boolCount,
-            source.realCount, QfNraParams(maximumWork = 500_000)))
+        val completed = assertIs<QfNraResult.Unsatisfiable>(
+            solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = 500_000),
+        )
+        )
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            QfNraParams(maximumWork = completed.stats.workSpent - 1))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(maximumWork = completed.stats.workSpent - 1),
+        )
 
         assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(result).reason)
     }

@@ -70,7 +70,9 @@ private fun FlatZincCompiler.booleanZeroSumLiterals(
 ): List<Int>? {
     if (coeffs.size != vars.size || bound > 0L || (op != LinearOp.LE && op != LinearOp.EQ) ||
         coeffs.any { it < 0L }
-    ) return null
+    ) {
+        return null
+    }
     val literals = LinkedHashSet<Int>()
     for (i in vars.indices) {
         if (coeffs[i] == 0L) continue
@@ -86,12 +88,15 @@ private fun FlatZincCompiler.existingZeroSumColumns(expr: FznExpr, coeffs: LongA
             ?: if (coeffs.all { it == 0L }) IntArray(coeffs.size) else null
 
         is FznExpr.ArrayLit -> {
-            if (expr.elements.size != coeffs.size) null else {
+            if (expr.elements.size != coeffs.size) {
+                null
+            } else {
                 val columns = IntArray(coeffs.size)
                 for (i in columns.indices) {
                     if (coeffs[i] == 0L) continue
                     columns[i] = when (val element = expr.elements[i]) {
                         is FznExpr.Ident -> intVars[element.name]
+
                         is FznExpr.ArrayAccess -> (arrays[element.name] as? FlatZincArray.Vars)
                             ?.varIds?.getOrNull(element.index - 1)
 

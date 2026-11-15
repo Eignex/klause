@@ -96,9 +96,13 @@ fun WcnfDocument.toProblem(
         for (literal in soft.literals) {
             factors.add(Clause(intArrayOf(Lit.make(relax, positive = false), Lit.negate(literal))))
         }
-        boolFolds.add(BoolFoldDefinition(
-            relax, soft.literals.map { Lit.negate(it) }.distinct().toIntArray(), isAnd = true,
-        ))
+        boolFolds.add(
+            BoolFoldDefinition(
+            relax,
+            soft.literals.map { Lit.negate(it) }.distinct().toIntArray(),
+            isAnd = true,
+        )
+        )
         weights[relax++] = soft.weight
     }
     if (triviallyUnsat) {

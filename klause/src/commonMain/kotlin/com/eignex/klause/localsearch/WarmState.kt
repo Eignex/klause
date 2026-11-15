@@ -2,7 +2,6 @@ package com.eignex.klause.localsearch
 
 import com.eignex.util.arrays.emptyIntArray
 
-
 /**
  * Mutable container for per-strategy state that survives a [LocalSearchSolver] call boundary. Owned
  * by [LocalSearchSession]; never created directly by callers.

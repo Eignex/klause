@@ -29,14 +29,19 @@ internal class RetainedLinearEncoding(
             if (attribution.integerConditions.isNotEmpty() || attribution.booleanConditions.isNotEmpty() ||
                 attribution.auxiliaries.isNotEmpty() || attribution.integerEmbeddings.isNotEmpty() ||
                 attribution.realEmbeddings.isNotEmpty()
-            ) return null
+            ) {
+                return null
+            }
             factors += row.atFactorIndex(index)
             origins += index
             covered[index] = true
         }
         if (indices.any { !covered[it] }) return null
-        return EncodedTheoryModel(mapping.target, factors.toTypedArray(),
+        return EncodedTheoryModel(
+            mapping.target,
+            factors.toTypedArray(),
             mapping.target.impliedFactorMask?.let { mask -> BooleanArray(factors.size) { mask[origins[it]] } },
-            mapping.target.numRealVars)
+            mapping.target.numRealVars,
+        )
     }
 }

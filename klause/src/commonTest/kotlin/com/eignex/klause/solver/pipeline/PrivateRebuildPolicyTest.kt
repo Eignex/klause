@@ -30,8 +30,15 @@ class PrivateRebuildPolicyTest {
         assertEquals(4_194_304L, params.privateRebuildBytes)
         assertEquals(1_048_576L, params.learnedMemoryScratchBytes)
         assertEquals(2, selected.arms)
-        assertEquals(listOf(0.0, 0.98), clausalProofShares(selected, profile,
-            listOf("ls/probsat/plain", "bt/clausal-balanced"), privateRebuildBudgetOnly = true).toList())
+        assertEquals(
+            listOf(0.0, 0.98),
+            clausalProofShares(
+            selected,
+            profile,
+            listOf("ls/probsat/plain", "bt/clausal-balanced"),
+            privateRebuildBudgetOnly = true,
+        ).toList()
+        )
     }
 
     @Test
@@ -64,16 +71,22 @@ class PrivateRebuildPolicyTest {
         val profile = ProblemProfile.of(problem, false)
         val scenario = PortfolioScenario.sequential(Kind.CSP).copy(arms = 2)
         for (work in listOf(0L, -1L, 65_536L)) {
-            for (options in listOf(ExecutionOptions(ExecutionOption.privateRebuildWork(work)),
-                ExecutionOptions.parse(listOf("private-rebuild-work=$work")))) {
+            for (options in listOf(
+                ExecutionOptions(ExecutionOption.privateRebuildWork(work)),
+                ExecutionOptions.parse(listOf("private-rebuild-work=$work")),
+            )) {
                 val edit = assertNotNull(backtrackOverride(options.reader(), allowSelectors = true))
                 val configured = scenario.copy(btEdit = edit)
 
                 val selected = privateRebuildDefaultScenario(configured, problem, profile, options, false)
 
                 assertSame(configured, selected)
-                assertEquals(work, assertNotNull(selected.btEdit).invoke(
-                    BacktrackParams(privateRebuildWork = -1L)).privateRebuildWork)
+                assertEquals(
+                    work,
+                    assertNotNull(selected.btEdit).invoke(
+                    BacktrackParams(privateRebuildWork = -1L),
+                ).privateRebuildWork
+                )
             }
         }
     }
@@ -83,19 +96,37 @@ class PrivateRebuildPolicyTest {
         val problem = Problem(130, 0, emptyArray(), Array(512) { Clause(intArrayOf(Lit.make(0, true))) })
         val profile = ProblemProfile.of(problem, false)
         val scenario = PortfolioScenario.sequential(Kind.CSP).copy(arms = 2)
-        for (control in listOf(scenario.copy(cores = 2), scenario.copy(kind = Kind.COP),
+        for (control in listOf(
+            scenario.copy(cores = 2), scenario.copy(kind = Kind.COP),
             scenario.copy(engine = EngineMix.BACKTRACK), scenario.copy(explicitArms = true),
             scenario.copy(arms = 6), scenario.copy(btEdit = { it }),
             scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("clausal-balanced") }),
             scenario.copy(lsPool = listOf { LocalSearchCatalog.byLabel("probsat/plain") }),
-            scenario.copy(annotationArm = BacktrackParams()))) {
+            scenario.copy(annotationArm = BacktrackParams()),
+        )) {
             assertSame(control, privateRebuildDefaultScenario(control, problem, profile, ExecutionOptions(), false))
         }
         assertSame(scenario, privateRebuildDefaultScenario(scenario, problem, profile, ExecutionOptions(), true))
-        assertSame(scenario, privateRebuildDefaultScenario(scenario, problem, profile,
-            ExecutionOptions(ExecutionOption.booleanProofTasks(true)), false))
-        assertSame(scenario, privateRebuildDefaultScenario(scenario, problem,
-            profile.copy(problemClass = ProblemClass.PseudoBoolean), ExecutionOptions(), false))
+        assertSame(
+            scenario,
+            privateRebuildDefaultScenario(
+            scenario,
+            problem,
+            profile,
+            ExecutionOptions(ExecutionOption.booleanProofTasks(true)),
+            false,
+        )
+        )
+        assertSame(
+            scenario,
+            privateRebuildDefaultScenario(
+            scenario,
+            problem,
+            profile.copy(problemClass = ProblemClass.PseudoBoolean),
+            ExecutionOptions(),
+            false,
+        )
+        )
         for (columns in listOf(127, 2_001)) {
             val outside = Problem(columns, 0, emptyArray(), problem.factors)
             assertSame(scenario, privateRebuildDefaultScenario(scenario, outside, profile, ExecutionOptions(), false))

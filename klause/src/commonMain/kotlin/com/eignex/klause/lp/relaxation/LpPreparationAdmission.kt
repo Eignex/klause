@@ -24,7 +24,10 @@ internal class LpPreparationAdmission(
         integers == problem.numIntVars && booleans == problem.numBoolVars && reals == problem.numRealVars
 
     fun afterFailure(namespace: Any, problem: Problem): LpPreparationAdmission = LpPreparationAdmission(
-        namespace, problem, paidUnits, paidUnits + minOf(paidUnits.coerceAtLeast(1L), Long.MAX_VALUE - paidUnits),
+        namespace,
+        problem,
+        paidUnits,
+        paidUnits + minOf(paidUnits.coerceAtLeast(1L), Long.MAX_VALUE - paidUnits),
     )
 
     companion object {

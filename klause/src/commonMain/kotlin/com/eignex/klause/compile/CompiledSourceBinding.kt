@@ -55,14 +55,22 @@ internal class CompiledSourceBinding(
         require(invocation.source.originalSource === originalProblem)
         if (SourceSetup.preservesOriginalCompleteArm(invocation)) return
         val selected = selectedVariables(invocation.cancellation) ?: return
-        if (selected.isNotEmpty()) SourceSetup.prepareSelectedFloatGrid(invocation, selected,
-            FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY, truncatedRows)
+        if (selected.isNotEmpty()) {
+            SourceSetup.prepareSelectedFloatGrid(
+            invocation,
+            selected,
+            FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY,
+            truncatedRows,
+        )
+        }
     }
 
     fun floatRepresentations(): Map<String, FloatRepresentation> =
         if (originalProblem.semantics.effective.floats == FloatSemantics.Continuous) {
             legacyRepresentations.mapValues { FloatRepresentation(it.value.component) }
-        } else legacyRepresentations.toMap()
+        } else {
+            legacyRepresentations.toMap()
+        }
 
     fun legacyColumn(name: String): FloatGridColumn? {
         val source = realNames[name] ?: return null
@@ -123,9 +131,11 @@ internal class CompiledSourceBinding(
             require(pairing.owner === this) { "objective belongs to a different compiled source" }
             return pairing.original(objective)
         }
-        require(objective.boolWeightValues.size <= originalProblem.numBoolVars &&
-            objective.intCoefficientValues.size <= originalProblem.numIntVars &&
-            objective.realCoefficientValues.size <= originalProblem.numRealVars) {
+        require(
+            objective.boolWeightValues.size <= originalProblem.numBoolVars &&
+                objective.intCoefficientValues.size <= originalProblem.numIntVars &&
+                objective.realCoefficientValues.size <= originalProblem.numRealVars,
+        ) {
             "unbound objective does not use original source coordinates"
         }
         return objective.toQuadraticObjectiveSpec()

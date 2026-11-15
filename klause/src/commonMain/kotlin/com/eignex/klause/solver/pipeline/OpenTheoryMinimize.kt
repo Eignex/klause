@@ -165,8 +165,10 @@ class OpenTheoryMinimizer internal constructor(
     // The route the descent plans under, which the objective row may leave outside every complete open theory.
     private val plannedRoute: ProblemPipeline by lazy {
         val planning = source.boundedForPlanning()
-        (projections?.forEngineView(planning)?.let { planning.componentPlan(it) }
-            ?: planning.componentPlan()).theoryPipeline
+        (
+            projections?.forEngineView(planning)?.let { planning.componentPlan(it) }
+            ?: planning.componentPlan()
+        ).theoryPipeline
     }
 
     private val route: ProblemPipeline by lazy {
@@ -315,8 +317,10 @@ class OpenTheoryMinimizer internal constructor(
             val stop = presolveCancellation or params.cancellation or params.timeout or global
             if (stop()) {
                 sink.stop()
-                verdict = standing(if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled,
-                    sink.snapshot())
+                verdict = standing(
+                    if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled,
+                    sink.snapshot(),
+                )
                 return null
             }
             sink.backend = route.backendName()
@@ -401,8 +405,11 @@ class OpenTheoryMinimizer internal constructor(
                 bound == null -> opened.base to opened.boundedPlan.withoutAppendedFactor(opened.base)
 
                 else -> opened.base.boundedBy(bound - BIG_ONE).let { spec ->
-                    spec to opened.boundedPlan.forObjectiveRound(spec, appended = true,
-                        cancellation = presolveCancellation or params.cancellation or params.timeout or global)
+                    spec to opened.boundedPlan.forObjectiveRound(
+                        spec,
+                        appended = true,
+                        cancellation = presolveCancellation or params.cancellation or params.timeout or global,
+                    )
                 }
             }
             val engine = OpenTheoryEngine(

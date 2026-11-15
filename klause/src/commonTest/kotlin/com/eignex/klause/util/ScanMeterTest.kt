@@ -10,9 +10,14 @@ class ScanMeterTest {
     @Test
     fun `scan prices should not multiply cancellation polls`() {
         var polls = 0
-        val scan = ScanMeter(ExecutionControl { polls++; false })
+        val scan = ScanMeter(
+            ExecutionControl {
+            polls++;
+            false
+        }
+        )
 
-        repeat(64) { assertTrue(scan.visit(5000L)) }
+        repeat(1024) { assertTrue(scan.visit(5000L)) }
         assertEquals(1, polls)
         assertTrue(scan.visit(1L))
 

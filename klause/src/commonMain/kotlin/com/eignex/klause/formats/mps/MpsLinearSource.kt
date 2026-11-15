@@ -52,8 +52,12 @@ internal fun MpsModel.captureLinearSource(
         cancellation.charge(1L)
         if (cancellation()) return null
         val (lower, upper) = bounds[index]
-        declarations += LinearSourceVariable(variable.name, variable.integer,
-            lower.finiteMps()?.toSemanticRational(), upper.finiteMps()?.toSemanticRational())
+        declarations += LinearSourceVariable(
+            variable.name,
+            variable.integer,
+            lower.finiteMps()?.toSemanticRational(),
+            upper.finiteMps()?.toSemanticRational(),
+        )
     }
     val rows = ArrayList<LinearSourceRow>(constraints.size)
     for ((index, row) in constraints.withIndex()) {
@@ -63,12 +67,18 @@ internal fun MpsModel.captureLinearSource(
         for (entry in row.indices.indices) {
             cancellation.charge(1L)
             if (cancellation()) return null
-            terms += LinearSourceTerm(row.indices[entry],
-                numbers.constraintCoefficients[index][entry].toSemanticRational())
+            terms += LinearSourceTerm(
+                row.indices[entry],
+                numbers.constraintCoefficients[index][entry].toSemanticRational(),
+            )
         }
         val (lower, upper) = numbers.constraintBounds[index]
-        rows += LinearSourceRow(terms, lower.finiteMps()?.toSemanticRational(), upper.finiteMps()?.toSemanticRational(),
-            row.indicator?.let { LinearSourceIndicator(it.column, it.whenOne) })
+        rows += LinearSourceRow(
+            terms,
+            lower.finiteMps()?.toSemanticRational(),
+            upper.finiteMps()?.toSemanticRational(),
+            row.indicator?.let { LinearSourceIndicator(it.column, it.whenOne) },
+        )
     }
     val original = objective
     val objective = if (original.name.isEmpty() && original.indices.isEmpty()) {
@@ -78,8 +88,10 @@ internal fun MpsModel.captureLinearSource(
         for (entry in original.indices.indices) {
             cancellation.charge(1L)
             if (cancellation()) return null
-            terms += LinearSourceTerm(original.indices[entry],
-                numbers.objectiveCoefficients[entry].toSemanticRational())
+            terms += LinearSourceTerm(
+                original.indices[entry],
+                numbers.objectiveCoefficients[entry].toSemanticRational(),
+            )
         }
         LinearSourceObjective(terms, numbers.objectiveConstant.toSemanticRational(), sense)
     }

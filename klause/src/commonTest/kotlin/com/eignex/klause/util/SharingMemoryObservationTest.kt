@@ -83,11 +83,16 @@ class SharingMemoryObservationTest {
 
         assertFailsWith<IllegalArgumentException> { sample.ownedPool(pool, 120L, 40L) }
     }
+
     @Test
     fun `many distinct owners and protection upgrades should fit the default observation grant`() {
         val owners = Array(384) { Any() }
-        val sample = SharingMemoryObservation(SharingMemoryObservation.DEFAULT_WORK,
-            SharingMemoryObservation.DEFAULT_SCRATCH_ENTRIES, { false }, {})
+        val sample = SharingMemoryObservation(
+            SharingMemoryObservation.DEFAULT_WORK,
+            SharingMemoryObservation.DEFAULT_SCRATCH_ENTRIES,
+            { false },
+            {},
+        )
 
         val memory = sample.snapshot {
             for (owner in owners) sample.owned(owner, 8L)
@@ -156,10 +161,15 @@ class SharingMemoryObservationTest {
         assertEquals(1, memory.scratchEntries)
         assertNull(memory.completeValues)
     }
+
     @Test
     fun `protected ids with long shared hash prefixes should fit the default grant`() {
-        val sample = SharingMemoryObservation(SharingMemoryObservation.DEFAULT_WORK,
-            SharingMemoryObservation.DEFAULT_SCRATCH_ENTRIES, { false }, {})
+        val sample = SharingMemoryObservation(
+            SharingMemoryObservation.DEFAULT_WORK,
+            SharingMemoryObservation.DEFAULT_SCRATCH_ENTRIES,
+            { false },
+            {},
+        )
         val ids = sample.seenIds()
 
         val memory = sample.snapshot {
@@ -198,11 +208,13 @@ class SharingMemoryObservationTest {
         val sample = SharingMemoryObservation(1024L, 128, { false }, {})
         val pool = Any()
 
-        val values = assertNotNull(sample.snapshot {
+        val values = assertNotNull(
+            sample.snapshot {
             sample.ownedReferencesPool(pool, 100L, 40L)
             sample.ownedReferencesPool(pool, 100L, 70L)
             sample.ownedReferencesPool(pool, 100L, 20L)
-        }.completeValues)
+        }.completeValues
+        )
 
         assertEquals(100L, values["ownedReferenceSlots"])
         assertEquals(70L, values["protectedReferenceSlots"])
@@ -216,5 +228,4 @@ class SharingMemoryObservationTest {
 
         assertFailsWith<IllegalArgumentException> { sample.ownedReferencesPool(pool, 120L, 40L) }
     }
-
 }

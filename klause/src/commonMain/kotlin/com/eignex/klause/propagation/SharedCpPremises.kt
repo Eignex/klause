@@ -27,8 +27,14 @@ internal class CpPublicationPremises(
         if (!state.undoLogging || position != nativePosition || level != sharedLevel) memo.clear()
         nativePosition = position
         sharedLevel = level
-        return state.sharedBoundPremise(variable, upper, context, sourceIntId, rootLevel,
-            if (state.undoLogging) memo else null)
+        return state.sharedBoundPremise(
+            variable,
+            upper,
+            context,
+            sourceIntId,
+            rootLevel,
+            if (state.undoLogging) memo else null,
+        )
     }
 }
 
@@ -65,8 +71,13 @@ private fun PropagationState.sharedBoundPremise(
     if (runCancelled) return SearchAtomPremise.Unavailable
     if (endpointLevel(variable, upper) <= rootLevel) return SearchAtomPremise.All(emptyList())
     endpointReason(variable, upper)?.let { antecedents ->
-        return sharedPremise(IntArray(antecedents.size) { antecedents[it] xor 1 }, context, sourceIntId, rootLevel,
-            memo)
+        return sharedPremise(
+            IntArray(antecedents.size) { antecedents[it] xor 1 },
+            context,
+            sourceIntId,
+            rootLevel,
+            memo,
+        )
     }
     if (runCancelled) return SearchAtomPremise.Unavailable
     val domain = intDomains[variable]
@@ -175,6 +186,7 @@ private fun PropagationState.namedIntegerLeaf(premise: SearchAtomPremise, contex
                 val literal = context.atomLiteral(next.decision) ?: return false
                 if (context.boolValue(Lit.variable(literal)) != Lit.isPositive(literal)) return false
             }
+
             is SearchAtomPremise.All -> {
                 if (expanded?.add(next) != false) {
                     val children = next.premises
@@ -190,6 +202,7 @@ private fun PropagationState.namedIntegerLeaf(premise: SearchAtomPremise, contex
                     }
                 }
             }
+
             SearchAtomPremise.Unavailable -> return false
         }
         current = pending?.removeLastOrNull()

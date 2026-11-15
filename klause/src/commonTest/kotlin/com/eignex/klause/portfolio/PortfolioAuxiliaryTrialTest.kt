@@ -119,8 +119,13 @@ class PortfolioAuxiliaryTrialTest {
                 trackingWorker("probe", 1, search),
             )
 
-            Portfolio.thompson(workers, baseSliceWork = 7, maxSliceWork = maximum, reseedStaleThreshold = 0,
-                onProgress = events::add).use {
+            Portfolio.thompson(
+                workers,
+                baseSliceWork = 7,
+                maxSliceWork = maximum,
+                reseedStaleThreshold = 0,
+                onProgress = events::add,
+            ).use {
                 it.incumbentProbeArms = setOf(1)
                 it.minimize(ExecutionControl { reached.size >= expectedSlices + 3 })
             }
@@ -157,8 +162,11 @@ class PortfolioAuxiliaryTrialTest {
         portfolio.use { it.minimize(ExecutionControl { reached.size >= 6 }) }
 
         assertEquals(listOf(0, 1, 1, 1, 0, 0), reached)
-        assertEquals("trial-search-time", events.filterIsInstance<PortfolioEvent.WorkerExit>()
-            .single { it.arm == 1 }.cause)
+        assertEquals(
+            "trial-search-time",
+            events.filterIsInstance<PortfolioEvent.WorkerExit>()
+            .single { it.arm == 1 }.cause
+        )
     }
 
     @Test
@@ -223,8 +231,11 @@ class PortfolioAuxiliaryTrialTest {
 
         assertEquals(8, reached.count { it == 1 })
         assertEquals(listOf(0, 0), reached.takeLast(2))
-        assertEquals("trial-preparation-time", events.filterIsInstance<PortfolioEvent.WorkerExit>()
-            .single { it.arm == 1 }.cause)
+        assertEquals(
+            "trial-preparation-time",
+            events.filterIsInstance<PortfolioEvent.WorkerExit>()
+            .single { it.arm == 1 }.cause
+        )
     }
 
     @Test

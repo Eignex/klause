@@ -46,8 +46,8 @@ class PortfolioSchedulingTest {
             }
             val observed = if (arm in 1..2) {
                 object : ResumableSearch by search {
-                override val work: Long get() = sampleWork[arm]
-            }
+                    override val work: Long get() = sampleWork[arm]
+                }
             } else {
                 search
             }
@@ -57,8 +57,14 @@ class PortfolioSchedulingTest {
             }
         }
 
-        val result = Portfolio(workers, fixedBandit(4, 2), baseSliceWork = 5L, maxSliceWork = 5L,
-            sliceGrowth = 1.0, reseedStaleThreshold = 0).also {
+        val result = Portfolio(
+            workers,
+            fixedBandit(4, 2),
+            baseSliceWork = 5L,
+            maxSliceWork = 5L,
+            sliceGrowth = 1.0,
+            reseedStaleThreshold = 0,
+        ).also {
             it.runTimeSource = clock
             it.initialHeuristicArms = setOf(1, 2)
             it.initialHeuristicTargets = setOf(3)
@@ -82,8 +88,8 @@ class PortfolioSchedulingTest {
             }
             val observed = if (arm in 2..3) {
                 object : ResumableSearch by search {
-                override val work: Long get() = sampleWork[arm]
-            }
+                    override val work: Long get() = sampleWork[arm]
+                }
             } else {
                 search
             }
@@ -117,17 +123,28 @@ class PortfolioSchedulingTest {
         }
         val workers = listOf(
             trackingWorker("complete", 0, ScriptedSearch({ false }) { slices++ }),
-            trackingWorker("provider", 1, object : ResumableSearch by provider {
+            trackingWorker(
+                "provider", 1,
+                object : ResumableSearch by provider {
                 override val work: Long get() = providerWork
-            }).also { it.family = ArmFamily.LocalSearch },
-            trackingWorker("target", 2, ScriptedSearch({ false }) {
+            }
+            ).also { it.family = ArmFamily.LocalSearch },
+            trackingWorker(
+                "target", 2,
+                ScriptedSearch({ false }) {
                 slices++
                 targetSlices++
-            }).also { it.family = ArmFamily.Lns },
+            }
+            ).also { it.family = ArmFamily.Lns },
         )
 
-        val result = Portfolio(workers, fixedBandit(3, 0), baseSliceWork = 5L, maxSliceWork = 5L,
-            reseedStaleThreshold = 0).also {
+        val result = Portfolio(
+            workers,
+            fixedBandit(3, 0),
+            baseSliceWork = 5L,
+            maxSliceWork = 5L,
+            reseedStaleThreshold = 0,
+        ).also {
             it.initialHeuristicArms = setOf(1)
             it.initialHeuristicTargets = setOf(2)
         }.use { it.minimize(ExecutionControl { targetSlices > 0 || slices >= 128 }) }
@@ -151,8 +168,8 @@ class PortfolioSchedulingTest {
             }
             val observed = if (arm == 2) {
                 object : ResumableSearch by search {
-                override val work: Long get() = leaderWork
-            }
+                    override val work: Long get() = leaderWork
+                }
             } else {
                 search
             }
@@ -162,8 +179,14 @@ class PortfolioSchedulingTest {
             }
         }
 
-        val result = Portfolio(workers, fixedBandit(5, 2), baseSliceWork = 5L, maxSliceWork = 5L,
-            sliceGrowth = 1.0, reseedStaleThreshold = 0).also {
+        val result = Portfolio(
+            workers,
+            fixedBandit(5, 2),
+            baseSliceWork = 5L,
+            maxSliceWork = 5L,
+            sliceGrowth = 1.0,
+            reseedStaleThreshold = 0,
+        ).also {
             it.runTimeSource = clock
             it.initialHeuristicArms = setOf(2, 3, 4)
         }.use { it.minimize(ExecutionControl { lnsStartWork != null || visits.size >= 128 }) }
@@ -186,8 +209,8 @@ class PortfolioSchedulingTest {
             }
             val observed = if (arm == 2) {
                 object : ResumableSearch by search {
-                override val work: Long get() = leaderWork
-            }
+                    override val work: Long get() = leaderWork
+                }
             } else {
                 search
             }
@@ -231,30 +254,45 @@ class PortfolioSchedulingTest {
             exchange.offerFromWorker(point, 11.0 - leaderSlices) { it() }
             exchange.offerFromWorker(point, 10.0 - leaderSlices) { it() }
         }
-        val leader = trackingWorker("leader", 1, object : ResumableSearch by scripted {
+        val leader = trackingWorker(
+            "leader", 1,
+            object : ResumableSearch by scripted {
             override val work: Long get() = leaderWork
-        }).also {
+        }
+        ).also {
             it.family = ArmFamily.LocalSearch
             it.publicationExchange = exchange
             it.sharingMeter = SharingMeter()
         }
         val workers = listOf(
-            trackingWorker("complete", 0, ScriptedSearch({ false }) {
+            trackingWorker(
+                "complete", 0,
+                ScriptedSearch({ false }) {
                 totalSlices++
                 completeSlices++
                 clock += 1.milliseconds
-            }),
+            }
+            ),
             leader,
-            trackingWorker("sibling", 2, ScriptedSearch({ false }) {
+            trackingWorker(
+                "sibling", 2,
+                ScriptedSearch({ false }) {
                 totalSlices++
                 clock += 1.milliseconds
                 siblingStartWork = leaderWork
                 assertEquals(7.0, exchange.current()?.objective)
-            }).also { it.family = ArmFamily.LocalSearch },
+            }
+            ).also { it.family = ArmFamily.LocalSearch },
         )
 
-        val result = Portfolio(workers, fixedBandit(3, 1), baseSliceWork = 5L, maxSliceWork = 5L,
-            sliceGrowth = 1.0, reseedStaleThreshold = 0).also {
+        val result = Portfolio(
+            workers,
+            fixedBandit(3, 1),
+            baseSliceWork = 5L,
+            maxSliceWork = 5L,
+            sliceGrowth = 1.0,
+            reseedStaleThreshold = 0,
+        ).also {
             it.runTimeSource = clock
             it.initialHeuristicArms = setOf(1, 2)
         }.use { it.minimize(ExecutionControl { siblingStartWork != null || totalSlices >= 128 }) }
@@ -288,15 +326,21 @@ class PortfolioSchedulingTest {
                 leader
             } else {
                 ScriptedSearch({ false }) {
-                visits += arm
-                if (arm == 3) siblingStartWork = leaderWork
-            }
+                    visits += arm
+                    if (arm == 3) siblingStartWork = leaderWork
+                }
             }
             trackingWorker("worker$arm", arm, search).also { if (arm >= 2) it.family = ArmFamily.LocalSearch }
         }
 
-        Portfolio(workers, fixedBandit(4, 2), baseSliceWork = 5L, maxSliceWork = 5L,
-            sliceGrowth = 1.0, reseedStaleThreshold = 0).also {
+        Portfolio(
+            workers,
+            fixedBandit(4, 2),
+            baseSliceWork = 5L,
+            maxSliceWork = 5L,
+            sliceGrowth = 1.0,
+            reseedStaleThreshold = 0,
+        ).also {
             it.initialHeuristicArms = setOf(2, 3)
         }.use { it.minimize(ExecutionControl { siblingStartWork != null || visits.size >= 128 }) }
 
@@ -317,8 +361,13 @@ class PortfolioSchedulingTest {
             trackingWorker("second", 1, ScriptedSearch({ false }) { siblingSlices++ }),
         ).onEach { it.family = ArmFamily.LocalSearch }
 
-        val result = Portfolio(workers, fixedBandit(2, 0), baseSliceWork = 5L, maxSliceWork = 5L,
-            reseedStaleThreshold = 0).also {
+        val result = Portfolio(
+            workers,
+            fixedBandit(2, 0),
+            baseSliceWork = 5L,
+            maxSliceWork = 5L,
+            reseedStaleThreshold = 0,
+        ).also {
             it.initialHeuristicArms = setOf(0, 1)
         }.use { it.minimize(ExecutionControl { leaderWork >= 2L }) }
 
@@ -349,16 +398,24 @@ class PortfolioSchedulingTest {
         val next = object : ResumableSearch by nextSearch {
             override val work: Long get() = nextWork
         }
-        val workers = listOf(failed, next, ScriptedSearch({ false }) {
+        val workers = listOf(
+            failed, next,
+            ScriptedSearch({ false }) {
             slices++
             thirdStartWork = nextWork
-        })
+        }
+        )
             .mapIndexed { arm, search ->
                 trackingWorker("worker$arm", arm, search).also { it.family = ArmFamily.LocalSearch }
             }
 
-        val result = Portfolio(workers, fixedBandit(3, 1), baseSliceWork = 5L, maxSliceWork = 5L,
-            reseedStaleThreshold = 0).also {
+        val result = Portfolio(
+            workers,
+            fixedBandit(3, 1),
+            baseSliceWork = 5L,
+            maxSliceWork = 5L,
+            reseedStaleThreshold = 0,
+        ).also {
             it.initialHeuristicArms = setOf(0, 1, 2)
         }.use { it.minimize(ExecutionControl { thirdStartWork != null || slices >= 128 }) }
 
@@ -381,16 +438,21 @@ class PortfolioSchedulingTest {
             }
             val observed = if (arm == 2) {
                 object : ResumableSearch by search {
-                override val work: Long get() = leaderWork
-            }
+                    override val work: Long get() = leaderWork
+                }
             } else {
                 search
             }
             trackingWorker("worker$arm", arm, observed).also { if (arm >= 2) it.family = ArmFamily.LocalSearch }
         }
 
-        Portfolio(workers, fixedBandit(4, 2), baseSliceWork = 5L, maxSliceWork = 5L,
-            reseedStaleThreshold = 0).also {
+        Portfolio(
+            workers,
+            fixedBandit(4, 2),
+            baseSliceWork = 5L,
+            maxSliceWork = 5L,
+            reseedStaleThreshold = 0,
+        ).also {
             it.runTimeSource = clock
             it.initialHeuristicArms = setOf(2, 3)
         }.use { it.minimize(ExecutionControl { elapsed.sum() >= 8_000L }) }
@@ -404,10 +466,16 @@ class PortfolioSchedulingTest {
         for (helperFindsFirst in listOf(false, true)) {
             var helperSlices = 0
             var siblingSlices = 0
-            val point = MinimizeResult.BestFound(Sample(BooleanArray(0), LongArray(0)), 0.0,
-                TerminationReason.BudgetExhausted)
-            val helper = TrackingResumableSearch(null, point.takeIf { helperFindsFirst },
-                onRun = { helperSlices++ })
+            val point = MinimizeResult.BestFound(
+                Sample(BooleanArray(0), LongArray(0)),
+                0.0,
+                TerminationReason.BudgetExhausted,
+            )
+            val helper = TrackingResumableSearch(
+                null,
+                point.takeIf { helperFindsFirst },
+                onRun = { helperSlices++ },
+            )
             val sibling = TrackingResumableSearch(null, point, onRun = { siblingSlices++ })
             val workers = listOf(
                 trackingWorker("helper", 0, helper).also { it.firstWitnessOnly = true },
@@ -670,10 +738,13 @@ class PortfolioSchedulingTest {
         val clock = TestTimeSource()
         val slices = IntArray(5)
         val workers = List(5) { arm ->
-            trackingWorker("arm$arm", arm, ScriptedSearch({ arm == 0 && it == 0 }) {
+            trackingWorker(
+                "arm$arm", arm,
+                ScriptedSearch({ arm == 0 && it == 0 }) {
                 slices[arm]++
                 clock += 1.milliseconds
-            })
+            }
+            )
                 .also { if (arm > 0) it.family = ArmFamily.LocalSearch }
         }
 
@@ -1103,14 +1174,20 @@ class PortfolioSchedulingTest {
             val clock = TestTimeSource()
             val reached = ArrayList<Int>()
             val workers = listOf(
-                trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) {
+                trackingWorker(
+                    "finder", 0,
+                    ScriptedSearch({ it == 0 }) {
                     reached += 0
                     clock += 1.milliseconds
-                }),
-                trackingWorker("improver", 1, TrackingResumableSearch(null, onRun = {
+                }
+                ),
+                trackingWorker(
+                    "improver", 1,
+                    TrackingResumableSearch(null, onRun = {
                     reached += 1
                     clock += 1.milliseconds
-                })),
+                })
+                ),
             ).onEach { it.restartingSearch = true }
             val bandit = fixedBandit(2, arm = 1)
 

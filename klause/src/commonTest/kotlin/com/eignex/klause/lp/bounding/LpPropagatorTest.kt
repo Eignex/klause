@@ -75,8 +75,10 @@ class LpPropagatorTest {
             .build(PropagationSession(problem))
         val exact = assertNotNull(base.model.authoritativeModel())
         for ((storedStopped, requested, expected) in listOf(
-            Triple(true, null, false), Triple(false, null, true),
-            Triple(true, false, true), Triple(false, true, false),
+            Triple(true, null, false),
+            Triple(false, null, true),
+            Triple(true, false, true),
+            Triple(false, true, false),
         )) {
             LpPropagator(
                 object : LpSearchPolicy {},
@@ -107,7 +109,8 @@ class LpPropagatorTest {
             Triple(0L, null, 0L),
         )) {
             val factory = RecordingLpEngineFactory()
-            LpPropagator(object : LpSearchPolicy {},
+            LpPropagator(
+                object : LpSearchPolicy {},
                 effort = { LpEffortProfile(work = 100_000L) },
                 solveContext = LpSolveContext(factory),
                 queryWorkAllowance = { containing },
@@ -126,7 +129,8 @@ class LpPropagatorTest {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)))
             .build(PropagationSession(problem))
-        LpPropagator(object : LpSearchPolicy {},
+        LpPropagator(
+            object : LpSearchPolicy {},
             effort = { LpEffortProfile(work = 100_000L) },
             queryWorkAllowance = { 100_000L },
         ).use { lp ->
@@ -183,7 +187,10 @@ class LpPropagatorTest {
         LpPropagator(
             object : LpSearchPolicy {},
             cancellation = ExecutionControl { stopped },
-            queryWorkAllowance = { queries++; 100_000L },
+            queryWorkAllowance = {
+                queries++;
+                100_000L
+            },
             onPreparation = { reported += it.workOps },
         ).use { lp ->
             assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
@@ -201,9 +208,12 @@ class LpPropagatorTest {
 
     @Test
     fun `declined source preparation should report its spent work`() {
-        val problem = Problem(0, 8, Array(8) { IntDomain(0, 3) }, arrayOf(
+        val problem = Problem(
+            0, 8, Array(8) { IntDomain(0, 3) },
+            arrayOf(
             Linear(IntArray(8) { 1 }, IntArray(8) { it }, LinearOp.GE, 1),
-        ))
+        )
+        )
         val sources = LpRetainedSources(problem, CpToLpRelaxation(problem, LinearObjective()))
         var reported = 0L
         LpPropagator(
@@ -224,9 +234,13 @@ class LpPropagatorTest {
     @Test
     fun `reported source preparation should not be charged again with the float solve`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
-        val sources = LpRetainedSources(problem, CpToLpRelaxation(
-            problem, LinearObjective(intCoefficients = longArrayOf(1L)),
-        ))
+        val sources = LpRetainedSources(
+            problem,
+            CpToLpRelaxation(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1L)),
+        )
+        )
         var reported = 0L
         LpPropagator(object : LpSearchPolicy {}, onPreparation = { reported += it.workOps }).use { lp ->
             assertTrue(lp.install(sources, LpRetainedSources.emptyModel()))

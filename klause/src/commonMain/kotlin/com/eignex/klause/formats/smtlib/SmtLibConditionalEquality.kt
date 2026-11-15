@@ -74,8 +74,12 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     ) {
         check(!definitionsClosed)
         definitions[variable] = Definition(
-            guards.toList(), arms.toList(), default, factors.toList(),
-            constantImage(arms, default, guardTests), guardTests.toList(),
+            guards.toList(),
+            arms.toList(),
+            default,
+            factors.toList(),
+            constantImage(arms, default, guardTests),
+            guardTests.toList(),
         )
     }
 
@@ -99,11 +103,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         if (variable !in definitions) equalities.getOrPut(Key(variable, value)) { literal }
     }
 
-    private fun constantImage(
-        arms: List<LinComb>,
-        default: LinComb,
-        guardTests: List<GuardEquality?>,
-    ): Set<Long>? {
+    private fun constantImage(arms: List<LinComb>, default: LinComb, guardTests: List<GuardEquality?>): Set<Long>? {
         val values = HashSet<Long>()
         fun include(term: LinComb, coverage: GuardCoverage? = null): Boolean {
             if (term.coeffs.isEmpty()) {
@@ -111,8 +111,11 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
             } else {
                 val source = term.asSimpleVar() ?: return false
                 val image = definitions[source]?.image ?: return false
-                if (coverage == null) values += image
-                else image.filterTo(values) { coverage.allowsDefault(it) }
+                if (coverage == null) {
+                    values += image
+                } else {
+                    image.filterTo(values) { coverage.allowsDefault(it) }
+                }
             }
             return values.size <= IMAGE_LIMIT
         }
@@ -251,6 +254,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                     if (++work > workLimit) return null
                     literals.addLast(frame.literal)
                 }
+
                 is Frame.Eval -> {
                     if (++work > workLimit) return null
                     val term = frame.term
@@ -259,27 +263,34 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                     val definition = source?.let { definitions[it] }
                     when {
                         cached != null -> literals.addLast(cached)
+
                         term.coeffs.isEmpty() -> literals.addLast(
                             if (term.constant == value) builder.trueLit() else Lit.negate(builder.trueLit()),
                         )
+
                         source != null && definition?.image?.contains(value) == false -> {
                             val literal = Lit.negate(builder.trueLit())
                             equalities[Key(source, value)] = literal
                             literals.addLast(literal)
                         }
+
                         source != null && definition != null -> {
                             pending.addLast(Frame.Join(source, definition))
                             scheduleBranches(definition, value, builder, pending)
                         }
+
                         else -> {
                             val literal = builder.reifyRelation(
-                                "=", IntComb.Narrow(term), IntComb.Narrow(LinComb(emptyMap(), value)),
+                                "=",
+                                IntComb.Narrow(term),
+                                IntComb.Narrow(LinComb(emptyMap(), value)),
                             )
                             literals.addLast(literal)
                             if (source != null) equalities[Key(source, value)] = literal
                         }
                     }
                 }
+
                 is Frame.Join -> {
                     val definition = frame.definition
                     val default = literals.removeLast()
@@ -288,7 +299,8 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                     val alternatives = ArrayList<Int>()
                     for (index in arms.indices) {
                         val guard = definition.guardTests[index]?.truthWhen(
-                            definition.arms[index].asSimpleVar(), value,
+                            definition.arms[index].asSimpleVar(),
+                            value,
                         )
                         alternatives += when (guard) {
                             true -> arms[index]
@@ -329,7 +341,9 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                     val definition = definitions.getValue(frame.variable)
                     when {
                         frame.variable in active -> cyclic.addAll(active)
+
                         definition.image != null || !preparedImages.add(frame.variable) -> Unit
+
                         else -> {
                             active.add(frame.variable)
                             pending.addLast(ImageFrame.Complete(frame.variable, definition))
@@ -343,6 +357,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                         }
                     }
                 }
+
                 is ImageFrame.Complete -> {
                     active.remove(frame.variable)
                     if (frame.variable !in cyclic && frame.definition.image == null) {
@@ -376,8 +391,11 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         pending: ArrayDeque<Frame>,
     ) {
         pending.addLast(
-            if (definition.excludesDefault(value)) Frame.Known(Lit.negate(builder.trueLit()))
-            else Frame.Eval(definition.default),
+            if (definition.excludesDefault(value)) {
+                Frame.Known(Lit.negate(builder.trueLit()))
+            } else {
+                Frame.Eval(definition.default)
+            },
         )
         for (index in definition.arms.indices.reversed()) {
             val arm = definition.arms[index]
@@ -386,12 +404,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         }
     }
 
-    private fun defaultAlternative(
-        definition: Definition,
-        literal: Int,
-        value: Long,
-        builder: Compiler.Builder,
-    ): Int {
+    private fun defaultAlternative(definition: Definition, literal: Int, value: Long, builder: Compiler.Builder): Int {
         val source = definition.default.asSimpleVar()
         if (source != null && source in definition.guardColumns) {
             var simplified = false
