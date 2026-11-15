@@ -2,9 +2,6 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.boundsMidpoint
-import com.eignex.klause.factor.arithmetic.ContinuousProduct
-import com.eignex.klause.factor.arithmetic.RealAbs
-import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -71,6 +68,8 @@ import com.eignex.klause.solver.search.completedSearchSample
 import com.eignex.klause.solver.validation.permitsToleranceOptimum
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.AbsRealCompletion
+import com.eignex.klause.theory.completionTolerance
+import com.eignex.klause.theory.requiresRealCompletionSearch
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.workScheduled
@@ -1084,10 +1083,9 @@ private class ResidualRealComponent(
 ) : SearchComponent,
     LpSearchResource {
     private val toleranceCheck = params.toleranceCheck
-    private val absCompletion = if (problem.factors.any {
-            it is RealAbs || it is RealFiniteDomain ||
-                (it is ContinuousProduct && it.finiteChoices != null && !it.finiteChoices.hasGuards)
-        }) AbsRealCompletion(problem) else null
+    private val absCompletion = if (problem.requiresRealCompletionSearch()) {
+        AbsRealCompletion(problem, problem.completionTolerance(toleranceCheck))
+    } else null
     // A source that accepts points within its slack judges each real component on its own, holding a component with
     // an absolute value or product exactly, so a float leaf point may complete these models before the exact search.
     private val floatCompletion = toleranceCheck.permitsToleranceOptimum()
@@ -1129,9 +1127,9 @@ private class ResidualRealComponent(
                 is AbsRealCompletion.Result.Witness -> {
                     val sample = discrete.copy(reals = DoubleArray(result.reals.size) { result.reals[it].toDouble() },
                         exactReals = result.reals)
-                    if (verifyRealCoordinates(problem, sample, stop) !is Verification.Accepted) {
-                        ComponentCheck.Indeterminate
-                    } else ComponentCheck.Feasible.also { completed = sample }
+                    val accepted = if (result.withinTolerance) toleranceCheck?.invoke(sample) == true
+                        else verifyRealCoordinates(problem, sample, stop) is Verification.Accepted
+                    if (!accepted) ComponentCheck.Indeterminate else ComponentCheck.Feasible.also { completed = sample }
                 }
                 AbsRealCompletion.Result.Refuted -> ComponentCheck.Infeasible()
                 AbsRealCompletion.Result.Undecided -> ComponentCheck.Indeterminate

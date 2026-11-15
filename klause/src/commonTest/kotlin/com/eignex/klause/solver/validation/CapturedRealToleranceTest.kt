@@ -2,20 +2,31 @@ package com.eignex.klause.solver.validation
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.Power
+import com.eignex.klause.factor.arithmetic.RealAbs
+import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealFiniteDomain
+import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.RealConstants
+import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -88,77 +99,147 @@ class CapturedRealToleranceTest {
         assertFalse(accepts(point(0.5)))
     }
 
-    @Test
-    fun `a nonlinear relation in every real component should leave completion exact`() {
-        val product = source(ContinuousProduct(0, 0, 1), reals = 2)
+    // `abs(x(a)) = abs(x(b))`: a disjunction of two equalities, which has no tolerance reading.
+    private fun unread(a: Int, b: Int): Factor = object : Factor by Linear(
+        intArrayOf(), doubleArrayOf(), intArrayOf(a, b), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0,
+    ) {
+        override val linearForm: LinearForm = LinearForm.Disjunction(listOf(1.0, -1.0).map { sign ->
+            LinearRow.ofColumns(intArrayOf(), intArrayOf(a, b),
+                RealConstants(RealConsts(doubleArrayOf()), RealConsts(doubleArrayOf(1.0, sign)), 0.0, false),
+                LinearOp.EQ)
+        })
+    }
 
-        assertNull(capturedRealAcceptance(product, Cancellation.Never))
+    private val residuals = mapOf(
+        "abs" to (source(RealAbs(0, 1), reals = 2) to doubleArrayOf(0.5, 0.58, 0.65)),
+        "max" to (source(RealArrayMinMax(2, intArrayOf(0, 1), max = true), reals = 3) to
+            doubleArrayOf(0.5, 0.25, 0.58, 0.65)),
+        "min" to (source(RealArrayMinMax(2, intArrayOf(0, 1), max = false), reals = 3) to
+            doubleArrayOf(0.5, 0.25, 0.33, 0.4)),
+        "variable selection" to (source(RealElement(0, 2, intArrayOf(0, 1)), reals = 3, ints = 1) to
+            doubleArrayOf(0.5, 0.25, 0.58, 0.65)),
+        "constant selection" to (source(RealElement(0, 0, doubleArrayOf(0.5, 0.75)), ints = 1) to
+            doubleArrayOf(0.58, 0.65)),
+        "integer product" to (source(RealProduct(0, 0, 1, 0.0, 1.0), reals = 2, ints = 1) to
+            doubleArrayOf(0.5, 0.58, 0.65)),
+        "real product" to (source(ContinuousProduct(0, 1, 2), reals = 3) to doubleArrayOf(0.5, 0.5, 0.33, 0.4)),
+        "power" to (source(Power(Power.Coordinate.Real(SourceRealId(0)), 2, Power.Coordinate.Real(SourceRealId(1))),
+            reals = 2) to doubleArrayOf(0.5, 0.33, 0.4)),
+    )
+
+    // Each point puts its last coordinate, the relation's result, at the given value.
+    private fun residualAccepted(relation: Pair<Problem, DoubleArray>, result: Double): Boolean {
+        val (problem, values) = relation
+        val accepts = assertNotNull(capturedRealAcceptance(problem, Cancellation.Never))
+        val reals = values.copyOf(problem.numRealVars).also { it[problem.numRealVars - 1] = result }
+        return accepts(point(*reals, ints = LongArray(problem.numIntVars) { 1L }))
     }
 
     @Test
-    fun `a nonlinear relation in another component should leave a row within the slack accepted`() {
+    fun `a nonlinear relation should accept a result within the slack of its residual`() {
+        val accepted = residuals.mapValues { (_, relation) ->
+            residualAccepted(relation, relation.second[relation.second.size - 2])
+        }
+
+        assertEquals(residuals.mapValues { true }, accepted)
+    }
+
+    @Test
+    fun `a nonlinear relation should refuse a result beyond the slack of its residual`() {
+        val accepted = residuals.mapValues { (_, relation) -> residualAccepted(relation, relation.second.last()) }
+
+        assertEquals(residuals.mapValues { false }, accepted)
+    }
+
+    @Test
+    fun `a residual should read the slack relative to its terms`() {
+        val relative = SourceTolerance(relative = SemanticRational.of(bigIntOf(1), bigIntOf(10)))
+        val accepts = assertNotNull(capturedRealAcceptance(source(RealAbs(0, 1), tolerance = relative, reals = 2),
+            Cancellation.Never))
+
+        assertTrue(accepts(point(0.5, 0.58)))
+    }
+
+    @Test
+    fun `a product with finite choices should refuse an operand beyond the slack of every member`() {
+        val product = ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.5, 1.0))
+        val accepts = assertNotNull(capturedRealAcceptance(source(product, reals = 3), Cancellation.Never))
+
+        assertFalse(accepts(point(0.75, 0.5, 0.375)))
+    }
+
+    @Test
+    fun `a product with finite choices should accept an operand within the slack of a member`() {
+        val product = ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.5, 1.0))
+        val accepts = assertNotNull(capturedRealAcceptance(source(product, reals = 3), Cancellation.Never))
+
+        assertTrue(accepts(point(0.55, 0.5, 0.25)))
+    }
+
+    @Test
+    fun `a relation without a tolerance reading in every real component should leave completion exact`() {
+        assertNull(capturedRealAcceptance(source(unread(0, 1), reals = 2), Cancellation.Never))
+    }
+
+    @Test
+    fun `a relation without a tolerance reading in another component should leave a row within the slack accepted`() {
         val accepts = assertNotNull(
-            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), ContinuousProduct(1, 1, 2), reals = 3),
-                Cancellation.Never),
+            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), unread(1, 2), reals = 3), Cancellation.Never),
         )
 
-        assertTrue(accepts(point(0.3, 0.5, 0.25)))
+        assertTrue(accepts(point(0.3, 0.5, 0.5)))
     }
 
     @Test
-    fun `a nonlinear relation should hold exactly in its own component`() {
+    fun `a relation without a tolerance reading should hold exactly in its own component`() {
         val accepts = assertNotNull(
-            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), ContinuousProduct(1, 1, 2), reals = 3),
-                Cancellation.Never),
+            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), unread(1, 2), reals = 3), Cancellation.Never),
         )
 
-        assertFalse(accepts(point(0.25, 0.5, 0.3)))
+        assertFalse(accepts(point(0.25, 0.5, 0.45)))
     }
 
     @Test
-    fun `a row sharing a component with a nonlinear relation should hold exactly`() {
+    fun `a row sharing a component with a relation without a tolerance reading should hold exactly`() {
         val accepts = assertNotNull(
             capturedRealAcceptance(
-                source(row(LinearOp.EQ, 0.45), ContinuousProduct(0, 0, 1), row(LinearOp.EQ, 0.25, real = 2),
-                    reals = 3),
+                source(row(LinearOp.EQ, 0.45), unread(0, 1), row(LinearOp.EQ, 0.25, real = 2), reals = 3),
                 Cancellation.Never,
             ),
         )
 
-        assertFalse(accepts(point(0.5, 0.25, 0.25)))
+        assertFalse(accepts(point(0.5, 0.5, 0.25)))
     }
 
     @Test
-    fun `a nonlinear relation that holds exactly should be accepted in its own component`() {
+    fun `a relation without a tolerance reading that holds exactly should be accepted in its own component`() {
         val accepts = assertNotNull(
-            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), ContinuousProduct(1, 1, 2), reals = 3),
-                Cancellation.Never),
+            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), unread(1, 2), reals = 3), Cancellation.Never),
         )
 
-        assertTrue(accepts(point(0.25, 0.5, 0.25)))
+        assertTrue(accepts(point(0.25, 0.5, 0.5)))
     }
 
     @Test
-    fun `a row that holds exactly in a component with a nonlinear relation should be accepted`() {
+    fun `a row that holds exactly in a component without a tolerance reading should be accepted`() {
         val accepts = assertNotNull(
             capturedRealAcceptance(
-                source(row(LinearOp.EQ, 0.5), ContinuousProduct(0, 0, 1), row(LinearOp.EQ, 0.25, real = 2),
-                    reals = 3),
+                source(row(LinearOp.EQ, 0.5), unread(0, 1), row(LinearOp.EQ, 0.25, real = 2), reals = 3),
                 Cancellation.Never,
             ),
         )
 
-        assertTrue(accepts(point(0.5, 0.25, 0.3)))
+        assertTrue(accepts(point(0.5, 0.5, 0.3)))
     }
 
     @Test
-    fun `a declaration should hold exactly in a component with a nonlinear relation`() {
+    fun `a declaration should hold exactly in a component without a tolerance reading`() {
         val accepts = assertNotNull(
-            capturedRealAcceptance(source(ContinuousProduct(0, 1, 2), row(LinearOp.EQ, 0.25, real = 3), reals = 4),
+            capturedRealAcceptance(source(unread(0, 1), row(LinearOp.EQ, 0.25, real = 2), reals = 3),
                 Cancellation.Never),
         )
 
-        assertFalse(accepts(point(1.05, 0.5, 0.525, 0.25)))
+        assertFalse(accepts(point(1.05, 1.05, 0.25)))
     }
 
     @Test
@@ -166,13 +247,12 @@ class CapturedRealToleranceTest {
         val link = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0)
         val accepts = assertNotNull(
             capturedRealAcceptance(
-                source(row(LinearOp.EQ, 0.45), link, ContinuousProduct(1, 1, 2), row(LinearOp.EQ, 0.25, real = 3),
-                    reals = 4),
+                source(row(LinearOp.EQ, 0.45), link, unread(1, 2), row(LinearOp.EQ, 0.25, real = 3), reals = 4),
                 Cancellation.Never,
             ),
         )
 
-        assertFalse(accepts(point(0.5, 0.5, 0.25, 0.25)))
+        assertFalse(accepts(point(0.5, 0.5, 0.5, 0.25)))
     }
 
     @Test
@@ -180,8 +260,7 @@ class CapturedRealToleranceTest {
         val tolerant = Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.25)
         val exact = Linear(intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(1), doubleArrayOf(1.0), LinearOp.EQ, 0.0)
         val accepts = assertNotNull(
-            capturedRealAcceptance(source(tolerant, exact, ContinuousProduct(1, 1, 2), reals = 3, ints = 1),
-                Cancellation.Never),
+            capturedRealAcceptance(source(tolerant, exact, unread(1, 2), reals = 3, ints = 1), Cancellation.Never),
         )
 
         assertTrue(accepts(point(0.3, 0.0, 0.0, ints = longArrayOf(0))))
@@ -189,9 +268,7 @@ class CapturedRealToleranceTest {
 
     @Test
     fun `a real in no relation should leave an otherwise exact source without acceptance`() {
-        val product = source(ContinuousProduct(0, 0, 1), reals = 3)
-
-        assertNull(capturedRealAcceptance(product, Cancellation.Never))
+        assertNull(capturedRealAcceptance(source(unread(0, 1), reals = 3), Cancellation.Never))
     }
 
     @Test

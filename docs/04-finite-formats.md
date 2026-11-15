@@ -352,25 +352,36 @@ refutation. Grid relations (`GridArrayMinMax`, `GridAbs`,
 
 The original arm is numerical under the declared tolerance. Finite LP deductions are
 [numerical](17-linear-programming.md#numerical-and-exact-deductions), and a real
-completion needs no exact certificate when every real declaration, every linear row
-over a real coordinate and every finite membership holds within the slack, which rows
-measure as [MPS rows do](05-arithmetic-formats.md#tolerance-publication). Strict
-rows, disequalities and rows whose reifying Boolean is false hold exactly at the
-accepted point, and relations over integers and Booleans alone never read the slack.
-`capturedRealAcceptance` owns this check. A backtrack leaf offers its float completion
-first, including on models with an absolute value or product over reals, whose exact
-completion is a search. Local-search and ALNS workers
-[complete candidates](11-neighborhoods.md#continuous-candidate-completion) through the
-same acceptance, so every engine accepts the same points. Real coordinates that share
-a relation form a component, and acceptance judges each component on its own. A
-component with any real relation other than linear rows and finite memberships, such
-as a product, power, absolute value, extremum, selection or distinctness, must hold
-exactly at the accepted point, its declarations, rows and memberships included, while
-the other components read the slack. A refused point completes the whole leaf exactly,
-every component included. A source with no row or membership outside such components
-has no acceptance, so its completions stay exact, and sources routed to a
-[linear theory](15-linear-arithmetic.md) are decided exactly. Completed search
-reports its optimum or refutation under this numerical policy.
+completion needs no exact certificate when every real declaration and every relation
+over a real coordinate holds within the slack. Rows measure it as
+[MPS rows do](05-arithmetic-formats.md#tolerance-publication); strict rows,
+disequalities and rows whose reifying Boolean is false hold exactly. A finite
+membership admits a value within the slack of a member, measured as a bound. Absolute
+value, minimum, maximum, selection, an integer times a real, a real product and a power
+state `r = f(x)` and read the slack as the row `r - f(x) = 0`: the residual
+`abs(r - f(x))` stays within `max(absolute, relative * (abs(r) + abs(f(x))))`, the
+violation a MIP solver measures on a nonlinear constraint. Selection from constants is
+the row `r = c`. A product whose operand has finite choices selects one member: the
+operand lies within the slack of it and the product row holds within the slack, with
+choice guards naming the member. Relations over integers and Booleans alone never read
+the slack. `capturedRealAcceptance` owns this check and `RealToleranceScope` defines
+each reading. Real coordinates that share a relation form a component, and a component
+with a relation that has no reading, such as a disjunction of several equalities, holds
+exactly, its declarations included.
+
+A backtrack leaf offers its float completion first. A refused point on a model with an
+absolute value, finite membership or choice product completes through the exact search
+of the leaf; when that search refutes the point, it searches again with every relation
+of the tolerance components within the slack its bound alone admits:
+`max(absolute, relative * abs(bound))` for a row, declaration or member, and the
+absolute slack for a residual row. Such a witness lies within what acceptance admits,
+and a refutation shows that no point holds every relation within that slack, so the
+leaf verdict stays feasible or infeasible. Local-search and ALNS workers
+[complete candidates](11-neighborhoods.md#continuous-candidate-completion) the same way,
+float point first, so every engine accepts the same points. Projected grid witnesses
+are checked against the same readings. Sources routed to a
+[linear theory](15-linear-arithmetic.md) are decided exactly. Completed search reports
+its optimum or refutation under this numerical policy.
 
 `--exact` zeroes the tolerance, so completion and LP certification are exact. It
 preserves continuous variables and open bounds, routes linear
