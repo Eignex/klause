@@ -1,6 +1,10 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.global.Distinct
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.FactorProjectionProviders
@@ -170,7 +174,18 @@ object SourceSetup {
             preparationCancellation = stop,
             polynomialCancellation = polynomialCancellation or stop,
             onLpStats = onLpStats,
+            routePureRealToTheory = problem.semantics.effective.feasibilityTolerance?.isExact != false ||
+                request.operation == ExecutionOperation.ENUMERATE || problem.statesOpenRealComparison(),
         )
         return SourceRouteSelection(request, route, stop)
     }
+}
+
+// Whether a relation over reals states an open set: a strict row, a disequality, or a reified row whose false side
+// is a strict complement. The finite lane completes leaves over closed sets only, so a supremum such a relation
+// leaves unattained is the linear theory's to report.
+private fun Problem.statesOpenRealComparison(): Boolean = factors.any { factor ->
+    factor.variables.reals.isNotEmpty() && (factor is Distinct || factor.linearForm?.rows?.any { row ->
+        row.strict || row.relation == LinearOp.NE || row.activator != LinearRow.ALWAYS
+    } == true)
 }

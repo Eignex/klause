@@ -390,9 +390,20 @@ is completed by the exact search. Local-search and ALNS workers
 [complete candidates](11-neighborhoods.md#continuous-candidate-completion) the same way.
 A leaf whose objective reads a real coordinate completes through the leaf LP alone, so
 its refusals and refutations are those of the float point and the exact LP. Projected
-grid witnesses are checked against the same readings. Sources routed to a
-[linear theory](15-linear-arithmetic.md) are decided exactly. Completed search reports
-its optimum or refutation under this numerical policy.
+grid witnesses are checked against the same readings.
+
+A source without integer columns takes the finite lane under a positive tolerance and
+the [linear theory](15-linear-arithmetic.md) at zero tolerance; an MPS source takes the
+finite lane in both modes. On the finite lane its Booleans and clauses are searched by
+Boolean backtracking with a real completion at each leaf. Such a source stays with the
+linear theory when it states an open set over reals (a strict row, a disequality or a
+reified row, whose false side is a strict complement), since leaf completion attains
+no supremum, and when all solutions are requested. A source the finite lane cannot
+complete, such as one with an extremum, an open integer, or a real product without
+finite choices or a power, routes to the linear or
+[polynomial](16-nonlinear-arithmetic.md#polynomial-real-arithmetic) theory and is
+decided exactly. Completed search reports its optimum or refutation under this
+numerical policy.
 
 `--exact` zeroes the tolerance, so completion and LP certification are exact. It
 preserves continuous variables and open bounds, routes linear
