@@ -10,7 +10,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -22,7 +22,7 @@ class BoundedIntegerProbingTest {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val source = Problem(
             0, 1, arrayOf(intDomainFromSurvivors(longArrayOf(Long.MIN_VALUE, 0, Long.MAX_VALUE))), emptyList(),
-        ).bake(budget.orSpent(Cancellation.Never))
+        ).bake(budget.orSpent(ExecutionControl.Never))
 
         val result = RootBaker.reseedBounded(source, BakeConfig())
 
@@ -38,7 +38,7 @@ class BoundedIntegerProbingTest {
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
                 Table(intArrayOf(0, 1), longArrayOf(0, 0, 0, 1, 0, 2, 1, 0, 1, 2, 2, 0, 2, 1, 2, 2)),
             ),
-        ).bake(budget.orSpent(Cancellation.Never))
+        ).bake(budget.orSpent(ExecutionControl.Never))
 
         val result = RootBaker.reseedBounded(source, BakeConfig())
 
@@ -73,7 +73,7 @@ class BoundedIntegerProbingTest {
                 Table(intArrayOf(1, 2), longArrayOf(0, 1, 1, 0)),
                 Table(intArrayOf(2, 0), longArrayOf(0, 1, 1, 0)),
             ),
-        ).bake(budget.orSpent(Cancellation.Never))
+        ).bake(budget.orSpent(ExecutionControl.Never))
 
         val result = RootBaker.reseedBounded(source, BakeConfig())
 
@@ -85,7 +85,7 @@ class BoundedIntegerProbingTest {
     fun `unproductive probing should stop without publishing hypothetical pins`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val source = Problem(0, 100, Array(100) { IntDomain(0, 3) }, emptyList())
-            .bake(budget.orSpent(Cancellation.Never))
+            .bake(budget.orSpent(ExecutionControl.Never))
 
         val result = RootBaker.reseedBounded(source, BakeConfig())
 
@@ -104,7 +104,7 @@ class BoundedIntegerProbingTest {
                     Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
                     Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
                 ),
-            ).bake(budget.orSpent(Cancellation.Never))
+            ).bake(budget.orSpent(ExecutionControl.Never))
 
             val result = RootBaker.reseedBounded(source, BakeConfig(probeTotalBudget = cap))
 

@@ -20,11 +20,11 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /**
  * One configured engine instance in a `Portfolio`: a [Session] together with the base
- * params it runs under. The param type is **erased** behind plain `(Cancellation) -> …`
+ * params it runs under. The param type is **erased** behind plain `(ExecutionControl) -> …`
  * closures, so a single portfolio can hold a *heterogeneous* mix of workers — e.g. several
  * local-search workers racing alongside a backtrack worker — even though their param types
  * ([com.eignex.klause.localsearch.LocalSearchParams] vs
@@ -38,17 +38,17 @@ class PortfolioWorker private constructor(
     /** Index of this worker's arm in the composed pool; replicas of the same arm — extra lanes when
      *  arms < cores — share it, so per-arm credit pools across them. */
     val armId: Int,
-    private val solveFn: (Cancellation, Long?) -> SolveResult,
-    private val improvementsFn: (() -> Double, Sample?, Cancellation, Long?) -> Sequence<MinimizeResult>,
-    private val samplesFn: (Cancellation) -> Sequence<Sample>,
-    private val resumableFn: ((() -> Double, Cancellation?, Sample?) -> ResumableSearch?)?,
-    private val resumableSolveFn: ((Cancellation?) -> ResumableSolve?)?,
+    private val solveFn: (ExecutionControl, Long?) -> SolveResult,
+    private val improvementsFn: (() -> Double, Sample?, ExecutionControl, Long?) -> Sequence<MinimizeResult>,
+    private val samplesFn: (ExecutionControl) -> Sequence<Sample>,
+    private val resumableFn: ((() -> Double, ExecutionControl?, Sample?) -> ResumableSearch?)?,
+    private val resumableSolveFn: ((ExecutionControl?) -> ResumableSolve?)?,
     private val withInstructions: Boolean,
     private val closeFn: () -> Unit,
 ) : AutoCloseable {
 
     /** Solve once, honouring [cancel] (set when a sibling wins the race). */
-    fun solve(cancel: Cancellation, maxInstructions: Long? = null): SolveResult = solveFn(cancel, maxInstructions)
+    fun solve(cancel: ExecutionControl, maxInstructions: Long? = null): SolveResult = solveFn(cancel, maxInstructions)
 
     /** The cross-arm channels this worker shares with the rest of its pool, or null when it shares none. */
     internal var sharedPools: SharedPools? = null
@@ -61,7 +61,7 @@ class PortfolioWorker private constructor(
 
     internal var publicationExchange: IncumbentExchange<Sample, Double>? = null
 
-    internal fun <T> withPublicationBatch(cancellation: Cancellation, action: () -> T): T {
+    internal fun <T> withPublicationBatch(cancellation: ExecutionControl, action: () -> T): T {
         val exchange = publicationExchange ?: return action()
         val meter = checkNotNull(sharingMeter)
         return exchange.withBufferedOffers(cancellation, meter::incumbentEvent,
@@ -161,7 +161,7 @@ class PortfolioWorker private constructor(
 
     internal fun newResumableSearch(
         readBound: () -> Double,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         warmStart: Sample? = null,
     ): ResumableSearch? = resumableFn?.invoke(readBound, cancellation, warmStart)
 
@@ -172,7 +172,7 @@ class PortfolioWorker private constructor(
      */
     fun newResumableSolve(): ResumableSolve? = resumableSolveFn?.invoke(null)
 
-    internal fun newResumableSolve(cancellation: Cancellation): ResumableSolve? =
+    internal fun newResumableSolve(cancellation: ExecutionControl): ResumableSolve? =
         resumableSolveFn?.invoke(cancellation)
 
     /** Stream improving incumbents against this worker's *own* objective representation (the one
@@ -188,13 +188,13 @@ class PortfolioWorker private constructor(
      *  segment descends from it rather than a random restart. */
     fun improvements(
         readBound: () -> Double,
-        cancel: Cancellation,
+        cancel: ExecutionControl,
         warmStart: Sample? = null,
         maxInstructions: Long? = null,
     ): Sequence<MinimizeResult> = improvementsFn(readBound, warmStart, cancel, maxInstructions)
 
     /** Stream diverse samples, honouring [cancel] (set when the collector stops). */
-    fun samples(cancel: Cancellation): Sequence<Sample> = samplesFn(cancel)
+    fun samples(cancel: ExecutionControl): Sequence<Sample> = samplesFn(cancel)
 
     override fun close() {
         closeFn()
@@ -239,13 +239,13 @@ class PortfolioWorker private constructor(
                             get() = (child as? ReseedGuard)?.incumbentTrialPending == true
 
                         override fun runSlice(
-                            global: Cancellation,
+                            global: ExecutionControl,
                             sliceMillis: Long,
                             onIncumbent: (MinimizeResult.WithSample) -> Unit,
                         ): MinimizeResult? = runSlice(global, sliceMillis, -1L, onIncumbent)
 
                         override fun runSlice(
-                            global: Cancellation,
+                            global: ExecutionControl,
                             sliceMillis: Long,
                             sliceNodes: Long,
                             onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -254,7 +254,7 @@ class PortfolioWorker private constructor(
                         }?.let(::checked)
 
                         override fun runInstructionSlice(
-                            global: Cancellation,
+                            global: ExecutionControl,
                             sliceMillis: Long,
                             sliceInstructions: Long,
                             onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -264,12 +264,14 @@ class PortfolioWorker private constructor(
                             }
                             val terminal = if (child is InstructionSlicedSearch) {
                                 child.runInstructionSlice(global, sliceMillis, sliceInstructions, accept)
-                            } else child.runSlice(global, sliceMillis, sliceInstructions, accept)
+                            } else {
+                                child.runSlice(global, sliceMillis, sliceInstructions, accept)
+                            }
                             return terminal?.let(::checked)
                         }
 
                         override fun runScheduledSlice(
-                            global: Cancellation,
+                            global: ExecutionControl,
                             sliceMillis: Long,
                             sliceInstructions: Long,
                             sliceWork: Long,
@@ -283,7 +285,9 @@ class PortfolioWorker private constructor(
                                 child.runScheduledSlice(
                                     global, sliceMillis, sliceInstructions, sliceWork, instructionsPerWork, accept,
                                 )
-                            } else child.runSlice(global, sliceMillis, sliceWork, accept)
+                            } else {
+                                child.runSlice(global, sliceMillis, sliceWork, accept)
+                            }
                             return terminal?.let(::checked)
                         }
                     }
@@ -333,7 +337,7 @@ class PortfolioWorker private constructor(
             // withCancellation declares a SolverParams return on the interface but every
             // backend overrides it covariantly to return its own P; the cast is sound.
             @Suppress("UNCHECKED_CAST")
-            fun withCancel(c: Cancellation): P = params.withCancellation(c) as P
+            fun withCancel(c: ExecutionControl): P = params.withCancellation(c) as P
 
             // Apply the counted-segment allowance when both the caller supplied one and this engine
             // exposes the seam for it; a no-op otherwise (engines without a deterministic segment
@@ -342,7 +346,7 @@ class PortfolioWorker private constructor(
                 val budget = withInstructionBudget
                 return if (maxInstructions != null && budget != null) budget(p, maxInstructions) else p
             }
-            val resumableFn: ((() -> Double, Cancellation?, Sample?) -> ResumableSearch?)? =
+            val resumableFn: ((() -> Double, ExecutionControl?, Sample?) -> ResumableSearch?)? =
                 if (objective != null) {
                     { readBound, cancellation, warmStart ->
                         val base = cancellation?.let(::withCancel) ?: params
@@ -388,7 +392,7 @@ class PortfolioWorker private constructor(
             armId: Int,
             countsInstructions: Boolean = false,
             resumable: (() -> ResumableSolve)? = null,
-            solve: (Cancellation, Long?) -> SolveResult,
+            solve: (ExecutionControl, Long?) -> SolveResult,
         ): PortfolioWorker = PortfolioWorker(
             label = label,
             armId = armId,
@@ -412,7 +416,7 @@ class PortfolioWorker private constructor(
             armId: Int,
             countsInstructions: Boolean = false,
             resumable: ((readBound: () -> Double) -> ResumableSearch)? = null,
-            improvements: (() -> Double, Sample?, Cancellation, Long?) -> Sequence<MinimizeResult>,
+            improvements: (() -> Double, Sample?, ExecutionControl, Long?) -> Sequence<MinimizeResult>,
         ): PortfolioWorker = PortfolioWorker(
             label = label,
             armId = armId,

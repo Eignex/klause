@@ -4,7 +4,7 @@ import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.satisfiesSourceRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -26,7 +26,7 @@ class MixedRealCompletionTest {
             ),
         )
 
-        val point = assertNotNull(completeMixedRealComponents(4, rows, SourceLpBudget(), Cancellation.Never))
+        val point = assertNotNull(completeMixedRealComponents(4, rows, SourceLpBudget(), ExecutionControl.Never))
 
         assertTrue(point.satisfiesSourceRows(rows))
     }
@@ -46,7 +46,7 @@ class MixedRealCompletionTest {
             ),
         )
 
-        val point = completeMixedRealComponents(4, rows, SourceLpBudget(maxOperations = 1), Cancellation.Never)
+        val point = completeMixedRealComponents(4, rows, SourceLpBudget(maxOperations = 1), ExecutionControl.Never)
 
         assertNull(point)
     }

@@ -15,7 +15,7 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -48,7 +48,7 @@ internal object SymmetryAdmissionProfile {
             val booleanSource = source.getValue("suite").jsonPrimitive.content == "wcnf-core"
             directory.resolve(if (booleanSource) "source.wcnf" else "source.xml").writeBytes(bytes)
             for (mode in listOf("default", "default,+objective-symmetry")) {
-                val stop = Cancellation.after(8.seconds)
+                val stop = ExecutionControl.after(8.seconds)
                 val (problem, objective) = if (booleanSource) {
                     val parsed = Dimacs.parseWcnf(bytes.decodeToString()).toProblem()
                     parsed.problem to parsed.objective.toLinearObjective()

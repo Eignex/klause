@@ -10,7 +10,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.FunctionalObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import kotlin.random.Random
 import kotlin.test.Test
@@ -29,11 +29,19 @@ class DefinitionalSweepNetworkTest {
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
         state.invariants = InvariantNetwork(
             List(129) { i ->
-                if (i == 128) DefinitionalSweep.SweepNode.IntDef(
-                    FunctionalObjective.Plus(128, FunctionalObjective.Operand.v(0), FunctionalObjective.Operand.c(1)),
-                    intArrayOf(0),
-                )
-                else DefinitionalSweep.SweepNode.Bool2Int(i, if (i == 0) 0 else 1)
+                if (i == 128) {
+                    DefinitionalSweep.SweepNode.IntDef(
+                        FunctionalObjective.Plus(
+                            128,
+                            FunctionalObjective.Operand.v(0),
+                            FunctionalObjective
+                                .Operand.c(1),
+                        ),
+                        intArrayOf(0),
+                    )
+                } else {
+                    DefinitionalSweep.SweepNode.Bool2Int(i, if (i == 0) 0 else 1)
+                }
             },
             129,
             2,
@@ -51,11 +59,19 @@ class DefinitionalSweepNetworkTest {
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
         state.invariants = InvariantNetwork(
             List(71) { i ->
-                if (i == 0) DefinitionalSweep.SweepNode.Bool2Int(0, 0)
-                else DefinitionalSweep.SweepNode.IntDef(
-                    FunctionalObjective.Plus(i, FunctionalObjective.Operand.v(i - 1), FunctionalObjective.Operand.c(1)),
-                    intArrayOf(i - 1),
-                )
+                if (i == 0) {
+                    DefinitionalSweep.SweepNode.Bool2Int(0, 0)
+                } else {
+                    DefinitionalSweep.SweepNode.IntDef(
+                        FunctionalObjective.Plus(
+                            i,
+                            FunctionalObjective.Operand.v(i - 1),
+                            FunctionalObjective
+                                .Operand.c(1),
+                        ),
+                        intArrayOf(i - 1),
+                    )
+                }
             },
             71,
             1,
@@ -130,8 +146,11 @@ class DefinitionalSweepNetworkTest {
                 0,
             )
             state.apply(Move.IntSet(0, 2))
-            if (block == "pin") state.moveSink.setAssumptions(Assumptions(ints = mapOf(1 to 3L)))
-            else state.moveSink.setOwners(intArrayOf(-1, 7, -1))
+            if (block == "pin") {
+                state.moveSink.setAssumptions(Assumptions(ints = mapOf(1 to 3L)))
+            } else {
+                state.moveSink.setOwners(intArrayOf(-1, 7, -1))
+            }
             state.apply(Move.IntSet(0, 5))
             assertEquals(3L, state.assignment.intValue(1))
             assertEquals(4L, state.assignment.intValue(2))
@@ -182,12 +201,12 @@ class DefinitionalSweepNetworkTest {
         val preparation = InvariantNetworkPreparation(sweep, 515, 0)
         var polls = 0
 
-        assertFalse(preparation.get(Cancellation { ++polls >= 12 }))
+        assertFalse(preparation.get(ExecutionControl { ++polls >= 12 }))
         assertFailsWith<IllegalStateException> { preparation.value }
-        assertFalse(preparation.get(Cancellation { true }))
-        assertTrue(preparation.get(Cancellation.Never))
+        assertFalse(preparation.get(ExecutionControl { true }))
+        assertTrue(preparation.get(ExecutionControl.Never))
         val network = assertNotNull(preparation.value)
-        assertTrue(preparation.get(Cancellation { true }))
+        assertTrue(preparation.get(ExecutionControl { true }))
 
         assertSame(network, preparation.value)
         assertContentEquals(

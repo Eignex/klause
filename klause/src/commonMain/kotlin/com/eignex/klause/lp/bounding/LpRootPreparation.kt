@@ -2,9 +2,9 @@ package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
-internal fun LpEngine.harvestRootRelaxation(token: Cancellation): CpToLpRelaxation? {
+internal fun LpEngine.harvestRootRelaxation(token: ExecutionControl): CpToLpRelaxation? {
     if (params.lpPlan.pruneHulls) pruneIneffectiveHulls(token)
     val relaxer = lpRelaxer ?: return null
     val gomory = params.lpPlan.gomoryEnabled

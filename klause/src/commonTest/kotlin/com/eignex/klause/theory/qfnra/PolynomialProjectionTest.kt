@@ -7,7 +7,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -63,15 +63,15 @@ class PolynomialProjectionTest {
         val inputs = listOf(equation, arithmetic.subtract(y, x))
         var plainCharges = 0L
         val plainMeter = WorkMeter { plainCharges += it }
-        val plain = PolynomialArithmetic(object : Cancellation {
+        val plain = PolynomialArithmetic(object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = plainMeter
+            override val accounting: WorkMeter get() = plainMeter
         })
         var observedCharges = 0L
         val observedMeter = WorkMeter { observedCharges += it }
-        val observed = PolynomialArithmetic(object : Cancellation {
+        val observed = PolynomialArithmetic(object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = observedMeter
+            override val accounting: WorkMeter get() = observedMeter
         })
         val events = ArrayList<Pair<Int, List<Polynomial>>>()
         val equations = ArrayList<Polynomial?>()
@@ -250,7 +250,7 @@ class PolynomialProjectionTest {
     @Test
     fun `interrupted projection should publish no partial family`() {
         var polls = 0
-        val interrupted = PolynomialArithmetic(Cancellation { ++polls > 15 })
+        val interrupted = PolynomialArithmetic(ExecutionControl { ++polls > 15 })
         val polynomial = arithmetic.subtract(arithmetic.power(y, 3), x)
 
         assertFailsWith<PolynomialInterrupted> {

@@ -10,7 +10,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertNull
@@ -103,7 +103,7 @@ class RealFiniteDomainWitnessTest {
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.5),
             exactReals = listOf(BigFraction.ofLong(2).reciprocal()))
 
-        val verdict = verifyRealCoordinates(source, point, Cancellation { true })
+        val verdict = verifyRealCoordinates(source, point, ExecutionControl { true })
 
         assertIs<Verification.Indeterminate>(verdict)
     }

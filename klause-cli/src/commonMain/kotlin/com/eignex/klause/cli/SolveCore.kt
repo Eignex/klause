@@ -34,12 +34,11 @@ import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.platform.sampleHeap
 import com.eignex.util.process.printErrorLine
 import com.eignex.util.process.processProperty
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * The unified, mode-agnostic solve driver. Every CLI mode (MiniZinc, XCSP3, SMT-LIB) feeds a
@@ -128,7 +127,7 @@ internal object SolveCore {
             }
         }
         val nodeBudget = takeNodeBudget(common).also { common.nodeBudget = it }
-        val cancel = nodeBudget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
+        val cancel = nodeBudget?.let { deadlineCancel or ExecutionControl { it.exhausted() } } ?: deadlineCancel
         // `-p N` is MiniZinc-standard parallelism = the **core** count. The portfolio engines
         // (cp/mixed/ls) run sequentially at `-p1` and as a parallel pool at `-pN`. The one naked
         // engine (fixed) is inherently single-core.
@@ -177,18 +176,15 @@ internal object SolveCore {
             is AllowanceSetting.Remaining -> setting.units
         }
 
-    private fun deadlineCancellation(common: CommonOptions): Pair<Long?, Cancellation> {
+    private fun deadlineCancellation(common: CommonOptions): Pair<Long?, ExecutionControl> {
         // Anchored once at process start (see CommonOptions.deadlineAtMs) so the bake and the
         // solve share one budget; fall back to a fresh anchor if it was never set.
         val deadline = common.deadlineAtMs ?: common.timeLimitMs?.let { nowMillis() + it }
         // Deadline-backed (Monotonic) rather than a bare `nowMillis()` predicate, so budget-relative tokens
-        // like [Cancellation.shorten] can be computed from it downstream (the ALNS bootstrap). Fires at the
+        // like [ExecutionControl.shorten] can be computed from it downstream (the ALNS bootstrap). Fires at the
         // same absolute instant as the epoch deadline.
-        val cancel = if (deadline != null) {
-            Cancellation.after((deadline - nowMillis()).coerceAtLeast(0L).milliseconds)
-        } else {
-            Cancellation.Never
-        }
+        if (common.deadlineAtMs == null) common.deadlineAtMs = deadline
+        val cancel = common.invocationCancellation()
         return deadline to cancel
     }
 
@@ -206,15 +202,15 @@ internal object SolveCore {
     }
 
     /**
-     * The presolve phase's allowance, as a [Cancellation] for the phase and a [PresolveBudget] the round
+     * The presolve phase's allowance, as a [ExecutionControl] for the phase and a [PresolveBudget] the round
      * engine slices per pass. Derived by [derivedPresolveBudgetMs] as a share of the run's own `-t`
      * budget rather than a flat figure, and counted in work. An explicit `klause.presolve.budget.ms` takes
      * precedence. A shared elapsed ceiling also reserves time for search when work underprices preparation.
      */
     internal fun presolveAllowance(
         common: CommonOptions,
-        solveCancel: Cancellation,
-    ): Pair<Cancellation, PresolveBudget?> {
+        solveCancel: ExecutionControl,
+    ): Pair<ExecutionControl, PresolveBudget?> {
         val budget = common.sharedPresolveBudget()
         val phaseStop = common.presolveTimeCancellation or solveCancel
         return (budget?.orSpent(phaseStop) ?: phaseStop) to budget
@@ -228,9 +224,9 @@ internal object SolveCore {
         output: OutputProtocol,
         presolveConfig: PresolveConfig,
         solutionSetSensitive: Boolean,
-        presolveCancellation: Cancellation,
+        presolveCancellation: ExecutionControl,
         presolveBudget: PresolveBudget?,
-        cancel: Cancellation,
+        cancel: ExecutionControl,
         deadline: Long?,
         nodeBudget: NodeBudget?,
         policy: SourceExecutionPolicy,
@@ -406,9 +402,9 @@ internal object SolveCore {
         engine: FiniteEngine,
         presolveConfig: PresolveConfig,
         solutionSetSensitive: Boolean,
-        presolveCancellation: Cancellation,
+        presolveCancellation: ExecutionControl,
         presolveBudget: PresolveBudget?,
-        cancel: Cancellation,
+        cancel: ExecutionControl,
         nodeBudget: NodeBudget?,
         policy: SourceExecutionPolicy,
     ) {
@@ -445,9 +441,9 @@ internal object SolveCore {
         cores: Int,
         presolveConfig: PresolveConfig,
         solutionSetSensitive: Boolean,
-        presolveCancellation: Cancellation,
+        presolveCancellation: ExecutionControl,
         presolveBudget: PresolveBudget?,
-        cancel: Cancellation,
+        cancel: ExecutionControl,
         deadline: Long?,
         nodeBudget: NodeBudget?,
         policy: SourceExecutionPolicy,

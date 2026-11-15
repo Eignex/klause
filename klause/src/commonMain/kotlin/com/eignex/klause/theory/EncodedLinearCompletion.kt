@@ -14,10 +14,10 @@ import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 
-internal fun privateLinearCompletion(encoded: Problem, sample: Sample, cancellation: Cancellation): Boolean? {
+internal fun privateLinearCompletion(encoded: Problem, sample: Sample, cancellation: ExecutionControl): Boolean? {
     if (cancellation()) return null
     val values = sample.exactReals ?: return null
     if (values.size != encoded.encodingSourceRealCount || sample.numIntVars != encoded.numIntVars ||

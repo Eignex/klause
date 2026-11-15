@@ -28,7 +28,7 @@ import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.theory.qflra.supportsExactLira
 import com.eignex.klause.theory.qflra.supportsExactLra
 import com.eignex.klause.theory.rebindEncoding
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Ownership of an integer column selected once before a search begins. */
 enum class IntVariableOwner {
@@ -226,7 +226,7 @@ class ComponentPlan internal constructor(
     internal fun forObjectiveRound(
         spec: Problem,
         appended: Boolean,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): ComponentPlan {
         val prefix = factorOwners.size - if (appended) 1 else 0
         requireSamePrefix(spec, prefix)
@@ -244,17 +244,32 @@ class ComponentPlan internal constructor(
                 }
             ) { "objective round must retain the planned row's columns and coefficients" }
         }
-        val selection = if (appended) factorProjections.replacedLast(spec)
-        else factorProjections.projected(spec, IntArray(spec.numFactors) { it })
+        val selection = if (appended) {
+            factorProjections.replacedLast(spec)
+        } else {
+            factorProjections.projected(spec, IntArray(spec.numFactors) { it })
+        }
         var decline: EncoderDecline? = null
         val fragment = if (appended) {
-            selection.linearTheoryModel(encodingTarget(), selectedTheoryFactorIndices(), cancellation = cancellation,
-                onDecline = { decline = it }, completeFiniteConditions = true)
-        } else installedFragment?.let { it.rebindEncoding(spec, it.factors, it.impliedFactorMask) }
-        return ComponentPlan(spec, intOwners, factorOwners,
-            if (appended && hasTheoryComponent && fragment == null) ProblemPipeline.UNSUPPORTED_OPEN
-            else theoryPipeline,
-            unplaceable, selection, encodingFactors, fragment, decline)
+            selection.linearTheoryModel(
+                encodingTarget(),
+                selectedTheoryFactorIndices(),
+                cancellation = cancellation,
+                onDecline = { decline = it },
+                completeFiniteConditions = true,
+            )
+        } else {
+            installedFragment?.let { it.rebindEncoding(spec, it.factors, it.impliedFactorMask) }
+        }
+        return ComponentPlan(
+            spec, intOwners, factorOwners,
+            if (appended && hasTheoryComponent && fragment == null) {
+                ProblemPipeline.UNSUPPORTED_OPEN
+            } else {
+                theoryPipeline
+            },
+            unplaceable, selection, encodingFactors, fragment, decline,
+        )
     }
 
     private fun requireSamePrefix(spec: Problem, count: Int) {
@@ -291,13 +306,15 @@ class ComponentPlan internal constructor(
     internal fun forLinearConditions(
         spec: Problem,
         retainEmptyTheory: Boolean = false,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): ComponentPlan? {
         requireBelongsTo(spec)
         if (unplaceable != null || cancellation()) return null
         if ((theoryPipeline == ProblemPipeline.EXACT_LRA || theoryPipeline == ProblemPipeline.EXACT_LIRA) &&
             installedFragment != null
-        ) return this
+        ) {
+            return this
+        }
         if (spec.numIntVars == 0 && spec.numRealVars == 0 && !retainEmptyTheory) return this
         val selected = spec.componentPlan(factorProjections, cancellation = cancellation)
         if (selected.theoryPipeline == ProblemPipeline.UNSUPPORTED_OPEN) return null
@@ -322,11 +339,14 @@ class ComponentPlan internal constructor(
     internal fun retainedEncoding(
         mapping: RetainedFactors,
         projections: PreparedFactorProjections?,
-    ): RetainedLinearEncoding? =
-        if (source === mapping.source && factorProjections === projections &&
-            projections.providers === FactorProjectionProviders.Default && encodingDecline == null &&
-            hasTheoryComponent && installedFragment != null
-        ) RetainedLinearEncoding(mapping, encodingTarget(), installedFragment) else null
+    ): RetainedLinearEncoding? = if (source === mapping.source && factorProjections === projections &&
+        projections.providers === FactorProjectionProviders.Default && encodingDecline == null &&
+        hasTheoryComponent && installedFragment != null
+    ) {
+        RetainedLinearEncoding(mapping, encodingTarget(), installedFragment)
+    } else {
+        null
+    }
 
     private fun requireBelongsTo(spec: Problem) {
         require(spec === source) {
@@ -358,32 +378,31 @@ class CpProblemProjection internal constructor(
 
 /** Select component ownership from the source model. */
 fun Problem.componentPlan(preferFinite: Boolean = false): ComponentPlan =
-    componentPlan(preferFinite, Cancellation.Never)
+    componentPlan(preferFinite, ExecutionControl.Never)
 
 /** Select component ownership using the descriptors captured for this canonical source. */
 fun Problem.componentPlan(projections: PreparedFactorProjections, preferFinite: Boolean = false): ComponentPlan =
-    componentPlan(projections, preferFinite, Cancellation.Never)
+    componentPlan(projections, preferFinite, ExecutionControl.Never)
 
 /** Select component ownership from the source model. */
-fun Problem.componentPlan(
-    preferFinite: Boolean = false,
-    cancellation: Cancellation,
-): ComponentPlan = componentPlan(
-    (this as? BakedProblem)?.factorProjections ?: FactorProjectionProviders.Default.prepare(this),
-    preferFinite, cancellation,
-)
+fun Problem.componentPlan(preferFinite: Boolean = false, cancellation: ExecutionControl): ComponentPlan =
+    componentPlan(
+        (this as? BakedProblem)?.factorProjections ?: FactorProjectionProviders.Default.prepare(this),
+        preferFinite,
+        cancellation,
+    )
 
 /** Select component ownership using the descriptors captured for this canonical source. */
 fun Problem.componentPlan(
     projections: PreparedFactorProjections,
     preferFinite: Boolean = false,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): ComponentPlan = buildComponentPlan(projections, preferFinite, cancellation)
 
 internal fun Problem.buildComponentPlan(
     projections: PreparedFactorProjections,
     preferFinite: Boolean = false,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     retained: RetainedLinearEncoding? = null,
     preparationBudget: PresolveBudget? = null,
 ): ComponentPlan {
@@ -393,16 +412,22 @@ internal fun Problem.buildComponentPlan(
             source = this,
             intOwners = Array(numIntVars) { IntVariableOwner.CP },
             factorOwners = Array(factors.size) { factor ->
-                if (factors[factor] is Clause && projections.usesBuiltInPropagation(factor)) FactorOwner.SHARED
-                else FactorOwner.CP
+                if (factors[factor] is Clause && projections.usesBuiltInPropagation(factor)) {
+                    FactorOwner.SHARED
+                } else {
+                    FactorOwner.CP
+                }
             },
             theoryPipeline = ProblemPipeline.FINITE_CP,
             factorProjections = projections,
         )
     }
     val intOwners = Array(numIntVars) { variable ->
-        if (intBounds.hasLower(variable) && intBounds.hasUpper(variable)) IntVariableOwner.CP
-        else IntVariableOwner.THEORY
+        if (intBounds.hasLower(variable) && intBounds.hasUpper(variable)) {
+            IntVariableOwner.CP
+        } else {
+            IntVariableOwner.THEORY
+        }
     }
     val stop = cancellation.encodingPreparationScope()
     fun install(target: EncodingTarget, indices: List<Int>, onDecline: (EncoderDecline) -> Unit): Problem? =
@@ -422,15 +447,21 @@ internal fun Problem.buildComponentPlan(
         fullLinearDecline = it
         if (it == EncoderDecline.RESOURCE) initialResourceDecline = true
     }
-    val difference = if (linear?.supportsExactLra() == true) null else install(EncodingTarget.DIFFERENCE, allFactors) {
+    val difference = if (linear?.supportsExactLra() == true) {
+        null
+    } else {
+        install(EncodingTarget.DIFFERENCE, allFactors) {
         fullDifferenceDecline = it
         if (it == EncoderDecline.RESOURCE) initialResourceDecline = true
     }
+    }
     val completeTheory = when {
         linear?.supportsExactLra() == true -> ProblemPipeline.EXACT_LRA
+
         difference != null && numRealVars == 0 && supportsCompleteDifferenceTheory(
             difference.factors, numIntVars, intBounds) -> ProblemPipeline.DIFFERENCE_THEORY
         linear?.supportsExactLira() == true -> ProblemPipeline.EXACT_LIRA
+
         else -> null
     }
     val requiresDifference = numRealVars == 0 && factors.indices.any { index ->
@@ -440,17 +471,22 @@ internal fun Problem.buildComponentPlan(
     }
     val target = if (completeTheory == ProblemPipeline.DIFFERENCE_THEORY || requiresDifference) {
         EncodingTarget.DIFFERENCE
-    } else EncodingTarget.LINEAR
+    } else {
+        EncodingTarget.LINEAR
+    }
     fun enforcesSource(index: Int): Boolean = projections.encoder(index, target).enforcesSource ||
         (target == EncodingTarget.LINEAR && projections.conditionedLinearSupported(index, stop))
     val factorOwners = Array(factors.size) { index ->
         val factor = factors[index]
         when {
             factor is Clause && projections.usesBuiltInPropagation(index) -> FactorOwner.SHARED
+
             factor.variables.reals.isEmpty() && factor.intVars.all { intOwners[it] == IntVariableOwner.CP } &&
                 projections.capabilities(index).propagation != PropagationCapability.UNSUPPORTED ->
                 FactorOwner.CP
+
             enforcesSource(index) -> FactorOwner.THEORY
+
             else -> FactorOwner.CP
         }
     }
@@ -464,23 +500,34 @@ internal fun Problem.buildComponentPlan(
         changed = false
         for ((index, factor) in factors.withIndex()) {
             if (!enforcesSource(index) ||
-                (!encoded[index] && factor.intVars.none { relevantIntegers[it] } &&
-                    factor.variables.reals.none { relevantReals[it] })
-            ) continue
+                (
+                    !encoded[index] && factor.intVars.none { relevantIntegers[it] } &&
+                    factor.variables.reals.none { relevantReals[it] }
+                )
+            ) {
+                continue
+            }
             encoded[index] = true
-            for (variable in factor.intVars) if (!relevantIntegers[variable]) {
+            for (variable in factor.intVars) {
+                if (!relevantIntegers[variable]) {
                 relevantIntegers[variable] = true
                 changed = true
             }
-            for (variable in factor.variables.reals) if (!relevantReals[variable]) {
+            }
+            for (variable in factor.variables.reals) {
+                if (!relevantReals[variable]) {
                 relevantReals[variable] = true
                 changed = true
+            }
             }
         }
     }
     val unownedOpenColumn = factors.indices.firstNotNullOfOrNull { index ->
-        if (factorOwners[index] != FactorOwner.CP) null
-        else factors[index].intVars.firstOrNull { intOwners[it] == IntVariableOwner.THEORY }
+        if (factorOwners[index] != FactorOwner.CP) {
+            null
+        } else {
+            factors[index].intVars.firstOrNull { intOwners[it] == IntVariableOwner.THEORY }
+        }
     }
     val unownedRealFactor = factors.indices.any { index ->
         factorOwners[index] == FactorOwner.CP && factors[index].variables.reals.isNotEmpty()
@@ -498,8 +545,11 @@ internal fun Problem.buildComponentPlan(
                 preparationStopped = true
                 linearDecline = EncoderDecline.RESOURCE
                 null
-            } else linear
+            } else {
+                linear
+            }
         }
+
         else -> install(EncodingTarget.LINEAR, kept) { linearDecline = it }
     }
     val differenceFragment = when {
@@ -507,26 +557,36 @@ internal fun Problem.buildComponentPlan(
             differenceDecline = EncoderDecline.RESOURCE
             null
         }
+
         fragment?.supportsExactLra() == true -> null
+
         !initialResourceDecline && difference != null && kept.size == factors.size -> {
             stop.charge(1)
             if (stop()) {
                 preparationStopped = true
                 differenceDecline = EncoderDecline.RESOURCE
                 null
-            } else difference
+            } else {
+                difference
+            }
         }
+
         else -> install(EncodingTarget.DIFFERENCE, differenceKept) { differenceDecline = it }
     }
     val needsArithmetic = intOwners.any { it == IntVariableOwner.THEORY } || encoded.any { it } || numRealVars != 0
     val route = when {
         preparationStopped || stop() -> ProblemPipeline.UNSUPPORTED_OPEN
+
         unownedOpenColumn != null || unownedRealFactor -> ProblemPipeline.UNSUPPORTED_OPEN
+
         !needsArithmetic -> ProblemPipeline.FINITE_CP
+
         fragment?.supportsExactLra() == true -> ProblemPipeline.EXACT_LRA
+
         differenceFragment != null && numRealVars == 0 && supportsCompleteDifferenceTheory(
             differenceFragment.factors, numIntVars, intBounds) -> ProblemPipeline.DIFFERENCE_THEORY
         fragment?.supportsExactLira() == true -> ProblemPipeline.EXACT_LIRA
+
         else -> ProblemPipeline.UNSUPPORTED_OPEN
     }
     return ComponentPlan(this, intOwners, factorOwners, route,
@@ -536,10 +596,16 @@ internal fun Problem.buildComponentPlan(
             route == ProblemPipeline.DIFFERENCE_THEORY -> differenceFragment
             else -> fragment
         },
-        if (route != ProblemPipeline.UNSUPPORTED_OPEN) null
-        else if (preparationStopped || stop() || linearDecline == EncoderDecline.RESOURCE ||
-            differenceDecline == EncoderDecline.RESOURCE) EncoderDecline.RESOURCE
-        else linearDecline ?: differenceDecline ?: fullLinearDecline ?: fullDifferenceDecline)
+        if (route != ProblemPipeline.UNSUPPORTED_OPEN) {
+            null
+        } else if (preparationStopped || stop() || linearDecline == EncoderDecline.RESOURCE ||
+            differenceDecline == EncoderDecline.RESOURCE
+        ) {
+                EncoderDecline.RESOURCE
+            } else {
+                linearDecline ?: differenceDecline ?: fullLinearDecline ?: fullDifferenceDecline
+            },
+                )
 }
 
 /**

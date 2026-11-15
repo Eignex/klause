@@ -12,7 +12,7 @@ import com.eignex.klause.solver.pipeline.ExactNeighborhoodResult
 import com.eignex.klause.solver.pipeline.OpenExactNeighborhood
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -31,11 +31,11 @@ class AllDifferentTest {
         queries.use {
             val duplicate = mapOf(0 to BigFraction.ZERO, 1 to BigFraction.ZERO, 2 to BigFraction.ofLong(2))
             assertIs<ExactNeighborhoodResult.Refuted>(it.check(
-                ExactNeighborhoodCondition(emptyMap(), duplicate, duplicate), Cancellation.Never))
+                ExactNeighborhoodCondition(emptyMap(), duplicate, duplicate), ExecutionControl.Never))
             val distinct = mapOf(0 to BigFraction.ONE, 1 to BigFraction.ZERO, 2 to BigFraction.ofLong(2))
 
             val sample = assertIs<ExactNeighborhoodResult.Witness>(it.check(
-                ExactNeighborhoodCondition(emptyMap(), distinct, distinct), Cancellation.Never)).sample
+                ExactNeighborhoodCondition(emptyMap(), distinct, distinct), ExecutionControl.Never)).sample
 
             assertEquals(BigFraction.ONE, sample.exactReals?.single())
         }

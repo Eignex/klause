@@ -13,7 +13,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.Test
@@ -77,7 +77,7 @@ class PolynomialStrategyAdaptersEngineTest(private val engine: FiniteEngine) {
             shared,
             scope,
             params.strategy,
-            Cancellation.Never,
+            ExecutionControl.Never,
             parallelism = 1,
         ).solve(engine)
 

@@ -9,7 +9,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.*
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -216,7 +216,7 @@ class PropagationSessionTest {
         var cancelled = false
         val session = PropagationSession(
             Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray()),
-            Cancellation { cancelled },
+            ExecutionControl { cancelled },
         )
         val assumptions = Assumptions.None.withTightenedMin(0, 2L)
         cancelled = true
@@ -300,7 +300,7 @@ class PropagationSessionTest {
     fun `interrupted reseeding should retract an incomplete equality before retrying`() {
         var armed = false
         lateinit var session: PropagationSession
-        val token = Cancellation {
+        val token = ExecutionControl {
             armed && session.litTruth(session.boundGeLit(0, 16, true)) == true
         }
         session = PropagationSession(Problem(0, 2, Array(2) { IntDomain(0, 255) }, emptyArray()), token)
@@ -326,7 +326,7 @@ class PropagationSessionTest {
         for (boolean in listOf(false, true)) {
             var armed = false
             lateinit var session: PropagationSession
-            val token = Cancellation {
+            val token = ExecutionControl {
                 armed && if (boolean) session.boolValue(0) == true else session.intDomain(0).isFixed
             }
             session = PropagationSession(Problem(2, 2, Array(2) { IntDomain(0, 1) }, emptyArray()), token)
@@ -363,7 +363,7 @@ class PropagationSessionTest {
                 )
             }
             var polls = 0
-            val session = PropagationSession(problem, Cancellation { ++polls >= 3 }, propagationCancelFloor = 0)
+            val session = PropagationSession(problem, ExecutionControl { ++polls >= 3 }, propagationCancelFloor = 0)
             val assumptions = if (boolean) {
                 Assumptions.None.withBool(0, true).withBool(1, true)
             } else {
@@ -602,7 +602,7 @@ class PropagationSessionTest {
         // cancelFloor 0 makes the poll engage from the first fire.
         val p = Problem(2, 0, emptyArray(), listOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))))
         var armed = false
-        val s = PropagationSession(p, Cancellation { armed }, propagationCancelFloor = 0)
+        val s = PropagationSession(p, ExecutionControl { armed }, propagationCancelFloor = 0)
         s.seed(Assumptions.None)
         assertTrue(!s.fixpointCancelled)
         armed = true

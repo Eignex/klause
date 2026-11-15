@@ -30,12 +30,11 @@ import com.eignex.klause.solver.result.CompletionRefutationStage
 import com.eignex.klause.solver.result.LocalSearchStatsSink
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
-import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.FiniteFactorEnforcer
 import com.eignex.klause.solver.withSourceSemantics
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.random.Random
@@ -111,6 +110,7 @@ internal class LocalSearchEngine(
 
     // A finite projection may require theory-owned completion before publication.
     private val completion: CandidateCompletion? = completion
+
     // An exact rational completion need not have a zero-violation floating representation.
     private val continuousCompletion = completion != null && problem.numRealVars > 0 &&
         problem.numBoolVars == 0 && problem.numIntVars == 0
@@ -142,8 +142,14 @@ internal class LocalSearchEngine(
     }
 
     private fun traceStage(stage: String, state: LocalSearchState) {
-        if (tracedRestart != null) repairTrace?.record(tracedRestart, stage, state.assignment.snapshot(),
-            state.cost.takeUnless { stage == "perturbed" })
+        if (tracedRestart != null) {
+            repairTrace?.record(
+            tracedRestart,
+            stage,
+            state.assignment.snapshot(),
+            state.cost.takeUnless { stage == "perturbed" },
+        )
+        }
     }
 
     private fun traceEnd(endpoint: RepairEndpoint, state: LocalSearchState) {
@@ -229,7 +235,7 @@ internal class LocalSearchEngine(
         params: LocalSearchParams,
         checkpoint: LocalSearchCheckpoint?,
     ): LocalSearchProblem {
-        if (checkpoint == null) return checkNotNull(projection.get(Cancellation.Never))
+        if (checkpoint == null) return checkNotNull(projection.get(ExecutionControl.Never))
         while (true) {
             projection.get(params.cancellation)?.let { return it }
             yield(null)
@@ -242,7 +248,7 @@ internal class LocalSearchEngine(
         checkpoint: LocalSearchCheckpoint?,
     ) {
         if (!perMoveInvariants) return
-        val cancellation = if (checkpoint == null) Cancellation.Never else params.cancellation
+        val cancellation = if (checkpoint == null) ExecutionControl.Never else params.cancellation
         while (!invariantNetwork.get(cancellation)) yield(null)
         state.invariants = invariantNetwork.value
     }
@@ -351,17 +357,21 @@ internal class LocalSearchEngine(
         if (sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) return false
         if (checkpoint == null) {
             seedFrom(state, sample, recompute = false)
-            if (reconcile) definitionalSweep?.let {
+            if (reconcile) {
+                definitionalSweep?.let {
                 it.sweepPinned(state.assignment, state.rootDomains, problem.factors, state.assumptions)
+            }
             }
             state.recompute()
         } else {
             prepareSteps(state.initialAssignmentSteps(sample), params, checkpoint)
-            if (reconcile) definitionalSweep?.let {
+            if (reconcile) {
+                definitionalSweep?.let {
                 prepareSteps(
                     it.pinnedSteps(state.assignment, state.rootDomains, problem.factors, state.assumptions),
                     params, checkpoint,
                 )
+            }
             }
             recomputeInitial(state, params, checkpoint)
         }
@@ -440,8 +450,11 @@ internal class LocalSearchEngine(
         return runCatching {
             val supported = localSearchSupports(model, completion != null)
             val effective = if (supported) model.pinsUnder(params.assumptions) else null
-            val sequence = if (effective == null) emptySequence()
-            else streamImpl(params, effective, warm).filterNotNull()
+            val sequence = if (effective == null) {
+                emptySequence()
+            } else {
+                streamImpl(params, effective, warm).filterNotNull()
+            }
             transform(sequence).map { it.withSourceSemantics(problem.semantics) }
                 .asSearchStream(release = ownership::release)
         }.getOrElse {
@@ -676,7 +689,9 @@ internal class LocalSearchEngine(
                     val continuousCandidate = if (checkContinuousStart) {
                         checkContinuousStart = false
                         state.completionCandidate()
-                    } else null
+                    } else {
+                        null
+                    }
                     if ((state.cost == 0L || continuousCandidate != null) && state.intValuesInDomain()) {
                         if (completion != null && continuousCandidate == null) state.refreshRealRows()
                         if (state.cost != 0L && continuousCandidate == null) continue
@@ -872,8 +887,11 @@ internal class LocalSearchEngine(
         val completedMoves = if (completion != null && problem.numRealVars > 0 && objective is LinearObjective &&
             objective.realCoefficientValues.any { it != 0.0 } && problem.numBoolVars + problem.numIntVars > 0 &&
             feasibleMode == FeasibleDescent.SelfOwned
-        ) CompletedMoveEvaluation(
-            state, objective, params.cancellation,
+        ) {
+            CompletedMoveEvaluation(
+            state,
+            objective,
+            params.cancellation,
             mayAttempt = {
                 totalFlips >= nextMoveCompletion && totalFlips < maxFlips &&
                     params.nodeBudget?.allowance?.movesLeft() != 0L &&
@@ -887,7 +905,10 @@ internal class LocalSearchEngine(
                 }
             },
             current = { (liveCompletion as? Completion.Witness)?.sample ?: state.assignment.snapshot() },
-        ) else null
+        )
+        } else {
+            null
+        }
         val completesStarts = completion != null && problem.numRealVars > 0
         var checkInitialCompletion = completesStarts
         // Before an incumbent, the model, assumptions and objective bound stay fixed within this run.
@@ -945,7 +966,9 @@ internal class LocalSearchEngine(
                 checkInitialCompletion = false
                 val candidate = if (state.cost != 0L && state.intValuesInDomain(checkpoint)) {
                     state.completionCandidate(checkpoint)
-                } else null
+                } else {
+                    null
+                }
                 if (candidate != null) {
                     val repeated = lastInitialCompletion?.let {
                         checkpoint?.charge(problem.numBoolVars.toLong() + problem.numIntVars)
@@ -1044,7 +1067,11 @@ internal class LocalSearchEngine(
                     val improves = if (completion != null && objective is LinearObjective && previous != null &&
                         solution.symbolicReals == null && solution.algebraicReals == null &&
                         previous.symbolicReals == null && previous.algebraicReals == null
-                    ) objective.evaluateExact(solution) < objective.evaluateExact(previous) else solved < bestObj
+                    ) {
+                        objective.evaluateExact(solution) < objective.evaluateExact(previous)
+                    } else {
+                        solved < bestObj
+                    }
                     if (improves) {
                         bestObj = solved
                         bestSample = solution
@@ -1182,8 +1209,11 @@ internal class LocalSearchEngine(
             // satisfy-mode strategy.
             val costBefore = state.cost
             val move = timing.inPhase("selection") {
-                if (unified) descentStrategy.pickMove(state, params.cancellation)
-                else strategy.pickMove(state, params.cancellation)
+                if (unified) {
+                    descentStrategy.pickMove(state, params.cancellation)
+                } else {
+                    strategy.pickMove(state, params.cancellation)
+                }
             }
             if (move == null) {
                 if (params.cancellation()) {
@@ -1319,7 +1349,7 @@ internal class LocalSearchEngine(
     private fun decide(
         state: LocalSearchState,
         candidate: Sample,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         stats: LocalSearchStatsSink?,
         charge: (Long) -> Unit,
     ): Completion {
@@ -1327,25 +1357,38 @@ internal class LocalSearchEngine(
         val checkBefore = unscoredCandidateCheck?.requiresReals == false
         val preliminary = if (checkBefore) {
             checkNotNull(unscoredCandidateCheck).check(candidate, state.assumptions, cancellation)
-        } else Completion.Witness(candidate)
+        } else {
+            Completion.Witness(candidate)
+        }
         val real = if (preliminary is Completion.Witness) {
             completion?.complete(candidate, cancellation) ?: preliminary
-        } else preliminary
+        } else {
+            preliminary
+        }
         val compatible = if (real is Completion.Witness &&
             (real.sample.numBoolVars != candidate.numBoolVars || real.sample.numIntVars != candidate.numIntVars ||
                 (problem.numRealVars > 0 && real.sample.numRealVars != candidate.numRealVars) ||
-                candidate.hammingDistanceTo(real.sample) != 0)
-        ) Completion.Undecided(real.work) else real
+                candidate.hammingDistanceTo(real.sample) != 0
+            )
+        ) {
+            Completion.Undecided(real.work)
+        } else {
+            real
+        }
         val sourceChecked = if (!checkBefore && compatible is Completion.Witness) {
             when (val checked = unscoredCandidateCheck?.check(compatible.sample, state.assumptions, cancellation)) {
                 null, is Completion.Witness -> compatible
                 is Completion.Refuted -> Completion.Refuted(checked.factors, compatible.work + checked.work)
                 is Completion.Undecided -> Completion.Undecided(compatible.work + checked.work)
             }
-        } else compatible
+        } else {
+            compatible
+        }
         val decided = if (sourceChecked is Completion.Witness && cancellation()) {
             Completion.Undecided(sourceChecked.work)
-        } else sourceChecked
+        } else {
+            sourceChecked
+        }
         charge(decided.work)
         val refutationStage = when {
             preliminary is Completion.Refuted -> CompletionRefutationStage.PRECHECK
@@ -1384,7 +1427,9 @@ internal class LocalSearchEngine(
         val policy = configuredRestart as? IteratedLocalSearchRestart
         val observation = if (policy != null && (anchor != null || policy.incumbents.isNotEmpty())) {
             PreparedBoardRestart.capture(state)
-        } else null
+        } else {
+            null
+        }
         preparedBoardRestart = observation
         try {
             state.boardCoverage.invalidate()
@@ -1560,7 +1605,9 @@ internal fun localSearchSupports(model: LocalSearchModel, completes: Boolean = f
                 (capabilities.assignmentCheck == AssignmentCheckCapability.UNSUPPORTED &&
                     problem.factors[id].variables.reals.isNotEmpty())
         }
-    ) return false
+    ) {
+        return false
+    }
     val domains = model.domains
     if (domains.all(::isNarrow)) return true
     return problem.factors.indices.none { id ->

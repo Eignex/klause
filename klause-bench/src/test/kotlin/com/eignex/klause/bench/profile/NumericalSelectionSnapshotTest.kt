@@ -11,7 +11,7 @@ import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -31,7 +31,7 @@ class NumericalSelectionSnapshotTest {
     fun `imported consequence capture should preserve its scope row and derivation`() {
         val imported = SourceDerivation.Import(SourceEvidence(generation, SourceClaim.Consequence(row), premise))
 
-        val captured = NumericalSelectionSnapshot(Cancellation.Never).proof(imported)
+        val captured = NumericalSelectionSnapshot(ExecutionControl.Never).proof(imported)
 
         assertEquals("Import", captured.getValue("kind").jsonPrimitive.content)
         assertEquals(NumericalFrontierSnapshot.scope(generation), captured.getValue("scope"))
@@ -48,7 +48,7 @@ class NumericalSelectionSnapshotTest {
         val imported = SourceDerivation.Import(SourceEvidence(generation, SourceClaim.Bound(BigFraction.ONE,
             strict = true), premise))
 
-        val captured = NumericalSelectionSnapshot(Cancellation.Never).proof(imported)
+        val captured = NumericalSelectionSnapshot(ExecutionControl.Never).proof(imported)
 
         assertEquals("Bound", captured.getValue("claim").jsonPrimitive.content)
         assertEquals("1", captured.getValue("value").jsonPrimitive.content)
@@ -60,7 +60,7 @@ class NumericalSelectionSnapshotTest {
     fun `imported refutation capture should preserve its claim and derivation`() {
         val imported = SourceDerivation.Import(SourceEvidence(generation, SourceClaim.Refutation, premise))
 
-        val captured = NumericalSelectionSnapshot(Cancellation.Never).proof(imported)
+        val captured = NumericalSelectionSnapshot(ExecutionControl.Never).proof(imported)
 
         assertEquals("Refutation", captured.getValue("claim").jsonPrimitive.content)
         assertEquals("row", captured.getValue("derivation").jsonObject.getValue("id").jsonPrimitive.content)
@@ -72,7 +72,7 @@ class NumericalSelectionSnapshotTest {
     fun `imported proof capture should withhold a nested derivation at its depth limit`() {
         val imported = SourceDerivation.Import(SourceEvidence(generation, SourceClaim.Consequence(row), premise))
 
-        val captured = NumericalSelectionSnapshot(Cancellation.Never).proof(imported, depth = 63)
+        val captured = NumericalSelectionSnapshot(ExecutionControl.Never).proof(imported, depth = 63)
 
         assertEquals("Import", captured.getValue("kind").jsonPrimitive.content)
         assertEquals("Unavailable", captured.getValue("derivation").jsonObject.getValue("kind").jsonPrimitive.content)
@@ -82,7 +82,7 @@ class NumericalSelectionSnapshotTest {
     fun `cancelled imported proof capture should publish no imported claim`() {
         val imported = SourceDerivation.Import(SourceEvidence(generation, SourceClaim.Consequence(row), premise))
 
-        val captured = NumericalSelectionSnapshot(Cancellation { true }).proof(imported)
+        val captured = NumericalSelectionSnapshot(ExecutionControl { true }).proof(imported)
 
         assertEquals("Unavailable", captured.getValue("kind").jsonPrimitive.content)
         assertFalse("claim" in captured)

@@ -7,7 +7,7 @@ import com.eignex.klause.lp.lattice.mixedEchelonHermite
 import com.eignex.klause.lp.lattice.originalBounds
 import com.eignex.klause.lp.lattice.sparseIntRow
 import com.eignex.klause.lp.lattice.triangularBounds
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.fitsLong
@@ -33,7 +33,7 @@ import com.eignex.util.numbers.toLong
 internal fun structuralIntBounds(
     numVars: Int,
     constraints: List<Linear>,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): TriangularBounds? {
     if (numVars == 0) return null
     val eqRows = constraints.filter { it.op == LinearOp.EQ && it.integralConstants != null }

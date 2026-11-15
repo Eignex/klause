@@ -4,7 +4,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 
 /**
@@ -135,7 +135,7 @@ internal class SatClauseDb private constructor(
         fun build(
             problem: Problem,
             objectiveBoolVars: Set<Int>,
-            cancellation: Cancellation = Cancellation.Never,
+            cancellation: ExecutionControl = ExecutionControl.Never,
         ): SatClauseDb? {
             if (cancellation()) return null
             val nb = problem.numBoolVars
@@ -186,7 +186,7 @@ internal class SatClauseDb private constructor(
             return SatClauseDb(nb, eligible, slotLits, slotOrig, litOcc, vacuous.toIntArray())
         }
 
-        private fun visit(cancellation: Cancellation): Boolean {
+        private fun visit(cancellation: ExecutionControl): Boolean {
             cancellation.charge(SAT_PREPARATION_WORK_WEIGHT)
             return !cancellation()
         }

@@ -11,7 +11,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -38,18 +38,14 @@ class ResumableMinimizeNodeSliceTest {
 
     private fun handle() = BacktrackSolver(problem().bake()).resumable(objective(), BacktrackParams(randomSeed = 0L))
 
-    private fun fullSearchNodes(): Double {
-        return handle().use { search ->
-            search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = -1L) { }
-            search.stats.search.nodes.sum
-        }
+    private fun fullSearchNodes(): Double = handle().use { search ->
+        search.runSlice(ExecutionControl.Never, sliceMillis = 60_000, sliceNodes = -1L) { }
+        search.stats.search.nodes.sum
     }
 
-    private fun nodesAfterOneSlice(budget: Long): Double {
-        return handle().use { search ->
-            search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = budget) { }
-            search.stats.search.nodes.sum
-        }
+    private fun nodesAfterOneSlice(budget: Long): Double = handle().use { search ->
+        search.runSlice(ExecutionControl.Never, sliceMillis = 60_000, sliceNodes = budget) { }
+        search.stats.search.nodes.sum
     }
 
     @Test
@@ -64,7 +60,7 @@ class ResumableMinimizeNodeSliceTest {
             objective(), BacktrackParams(randomSeed = 0L, clauseExchange = exchange),
         )
 
-        search.use { it.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = 8L) { } }
+        search.use { it.runSlice(ExecutionControl.Never, sliceMillis = 60_000, sliceNodes = 8L) { } }
 
         assertEquals(listOf("end"), events)
     }
@@ -94,9 +90,9 @@ class ResumableMinimizeNodeSliceTest {
     fun `successive node budgeted slices should resume instead of restart`() {
         val budget = 8L
         handle().use { search ->
-            search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = budget) { }
+            search.runSlice(ExecutionControl.Never, sliceMillis = 60_000, sliceNodes = budget) { }
             val afterFirst = search.stats.search.nodes.sum
-            search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = budget) { }
+            search.runSlice(ExecutionControl.Never, sliceMillis = 60_000, sliceNodes = budget) { }
             val afterSecond = search.stats.search.nodes.sum
 
             assertTrue(afterFirst > 0.0)
@@ -127,7 +123,7 @@ class ResumableMinimizeNodeSliceTest {
         var terminal: MinimizeResult? = null
         var slices = 0
         while (terminal == null && slices < 1000) {
-            terminal = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = 1L) { }
+            terminal = search.runSlice(ExecutionControl.Never, sliceMillis = 60_000, sliceNodes = 1L) { }
             slices++
         }
         search.close()
@@ -158,7 +154,7 @@ class ResumableMinimizeNodeSliceTest {
         knapsackLp(n = 10, rows = 2).use { search ->
             val budget = 8L
 
-            val terminal = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = budget) { }
+            val terminal = search.runSlice(ExecutionControl.Never, sliceMillis = 60_000, sliceNodes = budget) { }
 
             assertTrue(search.stats.lp.workOps.sum > 0.0)
             assertTrue(
@@ -174,7 +170,7 @@ class ResumableMinimizeNodeSliceTest {
 
         val idle = (1..50).count {
             val before = search.stats.search.nodes.sum
-            search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = 1L) { } == null &&
+            search.runSlice(ExecutionControl.Never, sliceMillis = 60_000, sliceNodes = 1L) { } == null &&
                 search.stats.search.nodes.sum == before
         }
 
@@ -184,13 +180,13 @@ class ResumableMinimizeNodeSliceTest {
     @Test
     fun `single node slices should preserve the optimum and node count`() {
         val whole = handle()
-        val expected = whole.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = -1L) { }
+        val expected = whole.runSlice(ExecutionControl.Never, sliceMillis = 60_000, sliceNodes = -1L) { }
         val search = handle()
         var terminal: MinimizeResult? = null
         var slices = 0
 
         while (terminal == null && slices++ < 1_000) {
-            terminal = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = 1L) { }
+            terminal = search.runSlice(ExecutionControl.Never, sliceMillis = 60_000, sliceNodes = 1L) { }
         }
 
         assertEquals(
@@ -221,7 +217,7 @@ class ResumableMinimizeNodeSliceTest {
             BacktrackParams(randomSeed = 0L),
         )
 
-        search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = -1L) { }
+        search.runSlice(ExecutionControl.Never, sliceMillis = 60_000, sliceNodes = -1L) { }
         val leafWork = search.stats.lp.standaloneWorkOps.sum.toLong() / LP_WORK_PER_NODE
 
         assertTrue(leafWork > 0L)
@@ -241,7 +237,7 @@ class ResumableMinimizeNodeSliceTest {
         ).bake()
         val search = BacktrackSolver(problem).resumable(LinearObjective(), BacktrackParams(randomSeed = 0L))
 
-        val verdict = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = 1L) { }
+        val verdict = search.runSlice(ExecutionControl.Never, sliceMillis = 60_000, sliceNodes = 1L) { }
 
         assertIs<MinimizeResult.Infeasible>(verdict)
     }

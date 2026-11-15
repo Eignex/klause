@@ -8,7 +8,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -54,7 +54,7 @@ class GeneralIntegerReclamationTest {
         lateinit var session: PropagationSession
         session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 10)),
             arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10))), nativeSat = false,
-            cancellation = Cancellation { limit != Long.MAX_VALUE && session.work >= limit })
+            cancellation = ExecutionControl { limit != Long.MAX_VALUE && session.work >= limit })
         val row = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
             longArrayOf(1), intArrayOf(0), LinearOp.LE, 10), useLo = true))
         session.addLearnedIntegerRow(row, 9)

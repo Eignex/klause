@@ -8,7 +8,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.Bits
 import com.eignex.util.collections.IntArrayDeque
@@ -385,10 +385,14 @@ class PropagationState private constructor(
     internal var propagations: Long = 0L
 
     internal var work: Long = 0L
+    internal var workLimit: Long = Long.MAX_VALUE
     internal var preparationIndexWork: Long = 0L
 
-    internal fun preparationStatistics(): Map<String, Long> = if (preparationIndexWork == 0L) emptyMap()
-        else mapOf("propagationPreparationIndexWork" to preparationIndexWork)
+    internal fun preparationStatistics(): Map<String, Long> = if (preparationIndexWork == 0L) {
+        emptyMap()
+    } else {
+        mapOf("propagationPreparationIndexWork" to preparationIndexWork)
+    }
     internal val finiteWork = FinitePropagationWork()
     internal var finiteMutationInterruptible = false
     internal var finiteMaintenanceActive = false
@@ -478,13 +482,19 @@ class PropagationState private constructor(
     val refPayload: MutableList<Any?> by lazy(LazyThreadSafetyMode.NONE) {
         object : AbstractMutableList<Any?>() {
             override val size: Int
-                get() = if (!incremental && nativeEngine == null) baseFactorCount + learned.size
-                else refPayloadStore.size
-            override fun get(index: Int): Any? =
-                if (!incremental && index >= baseFactorCount && nativeEngine == null) {
-                    learned.store.payload(index - baseFactorCount)
-                } else refPayloadStore[index]
-            override fun add(index: Int, element: Any?) { refPayloadStore.add(index, element) }
+                get() = if (!incremental && nativeEngine == null) {
+                    baseFactorCount + learned.size
+                } else {
+                    refPayloadStore.size
+                }
+            override fun get(index: Int): Any? = if (!incremental && index >= baseFactorCount && nativeEngine == null) {
+                learned.store.payload(index - baseFactorCount)
+            } else {
+                refPayloadStore[index]
+            }
+            override fun add(index: Int, element: Any?) {
+                refPayloadStore.add(index, element)
+            }
             override fun removeAt(index: Int): Any? = refPayloadStore.removeAt(index)
             override fun set(index: Int, element: Any?): Any? {
                 if (index !in 0 until size) throw IndexOutOfBoundsException("factor payload $index outside $size")
@@ -497,7 +507,9 @@ class PropagationState private constructor(
                 }
                 return if (!incremental && index >= baseFactorCount && nativeEngine == null) {
                     learned.store.setPayload(index - baseFactorCount, element)
-                } else refPayloadStore.set(index, element)
+                } else {
+                    refPayloadStore.set(index, element)
+                }
             }
         }
     }
@@ -1094,7 +1106,7 @@ class PropagationState private constructor(
      *
      * Returns `null` on success (state is at fixpoint); otherwise the conflict-levels set.
      *
-     * [cancellation] is polled whenever a real token is supplied (i.e. not [Cancellation.Never]),
+     * [cancellation] is polled whenever a real token is supplied (i.e. not [ExecutionControl.Never]),
      * on both the full-propagation ([allFactors]) and the incremental per-node path. A targeted
      * fixpoint can itself wedge on a slow propagator over wide domains (a reified-linear bound
      * crawl tightens one step at a time across a Long-wide span), so the search path must poll too
@@ -1107,7 +1119,7 @@ class PropagationState private constructor(
         allFactors: Boolean,
         initialFactor: Int = -1,
         initialFactors: IntArray = emptyIntArray(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         skipExpensiveBake: Boolean = false,
     ): IntArray? {
         val start = TimeSource.Monotonic.markNow()
@@ -1120,7 +1132,7 @@ class PropagationState private constructor(
         }
     }
 
-    internal fun inprocessingFixpoint(initialFactor: Int, cancellation: Cancellation): IntArray? {
+    internal fun inprocessingFixpoint(initialFactor: Int, cancellation: ExecutionControl): IntArray? {
         val start = TimeSource.Monotonic.markNow()
         val previousFloor = cancelFloor
         cancelFloor = 0
@@ -1129,7 +1141,7 @@ class PropagationState private constructor(
             if (initialFactor >= 0 || nativeEngine != null) {
                 return drainFixpoint(false, initialFactor, emptyIntArray(), cancellation, false)
             }
-            return fireQueue(cancellation !== Cancellation.Never, 0, cancellation, false)
+            return fireQueue(cancellation !== ExecutionControl.Never, 0, cancellation, false)
         } finally {
             cancelFloor = previousFloor
             propagationNanos += start.elapsedNow().inWholeNanoseconds
@@ -1213,13 +1225,13 @@ class PropagationState private constructor(
 
     internal val rootFixpointStarted: Boolean get() = rootPreparationStarted
 
-    internal fun advanceRootFixpoint(cancellation: Cancellation): IntArray? {
+    internal fun advanceRootFixpoint(cancellation: ExecutionControl): IntArray? {
         check(rootPreparationStarted)
         val start = TimeSource.Monotonic.markNow()
         finiteWork.cancellation = cancellation
         try {
             return fireQueue(
-                cancellation !== Cancellation.Never, 0, cancellation, false,
+                cancellation !== ExecutionControl.Never, 0, cancellation, false,
                 maxFires = PROPAGATION_PREPARATION_BATCH_SIZE, cancelIsPause = true,
             )
         } finally {
@@ -1231,7 +1243,7 @@ class PropagationState private constructor(
         allFactors: Boolean,
         initialFactor: Int,
         initialFactors: IntArray,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         skipExpensiveBake: Boolean,
     ): IntArray? {
         // The native-SAT lane runs its own arena-packed two-watched-literal BCP; the atom store,
@@ -1261,7 +1273,7 @@ class PropagationState private constructor(
         flushPendingChanneling()
         val factorCount = totalFactorCount
         propBegin(factorCount)
-        val pollable = cancellation !== Cancellation.Never
+        val pollable = cancellation !== ExecutionControl.Never
         // Full propagation (bakes) is one-shot, not in the per-node BCP loop or a resumable slice, so
         // it polls from the first fire. Only the incremental per-node path defers the poll past the
         // fire floor, so a normal small fixpoint — and resumable slicing, which pauses at decision
@@ -1305,7 +1317,7 @@ class PropagationState private constructor(
     private fun fireQueue(
         pollable: Boolean,
         floor: Int,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         skipExpensiveBake: Boolean,
         maxFires: Int = Int.MAX_VALUE,
         cancelIsPause: Boolean = false,
@@ -1336,7 +1348,9 @@ class PropagationState private constructor(
             }
             fireCount++
             val schedule = propagationSchedule
-            val fid = if (schedule == null) propQueue.removeFirst() else {
+            val fid = if (schedule == null) {
+                propQueue.removeFirst()
+            } else {
                 val selected = schedule.remove(propQueue) { factorAt(it).propagationFamily() }
                 work += schedule.selectionWork
                 selected
@@ -1368,8 +1382,11 @@ class PropagationState private constructor(
                 attribution?.note(family, FactorAttribution.Metric.Interrupted)
                 (f as? InterruptiblePropagator)?.interrupted(this, fid)
                 propEnq(fid)
-                if (pendingFiniteMutation != null) runCancelled = !cancelIsPause
-                else if (!cancelIsPause) runCancelled = true
+                if (pendingFiniteMutation != null) {
+                    runCancelled = !cancelIsPause
+                } else if (!cancelIsPause) {
+                    runCancelled = true
+                }
                 conflictLevels = null
                 return null
             } finally {

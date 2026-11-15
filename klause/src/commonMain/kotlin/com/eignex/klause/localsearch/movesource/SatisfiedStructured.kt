@@ -2,7 +2,7 @@ package com.eignex.klause.localsearch.movesource
 
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /**
  * Feasibility-preserving structured moves drawn from currently-satisfied factors. Each satisfied
@@ -55,12 +55,12 @@ class SatisfiedStructured private constructor(
 
     internal val supportsBoardCoverage: Boolean get() = structuralFirst && sampleCount > 0
 
-    override fun generate(state: LocalSearchState, sink: MoveSink) = generate(state, sink, Cancellation.Never)
+    override fun generate(state: LocalSearchState, sink: MoveSink) = generate(state, sink, ExecutionControl.Never)
 
     internal fun generate(
         state: LocalSearchState,
         sink: MoveSink,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         retainCoverage: Boolean = true,
     ) {
         val total = state.problem.numFactors
@@ -71,7 +71,9 @@ class SatisfiedStructured private constructor(
                 repeat(sampleCount) { draw ->
                     val retained = if (retainCoverage && draw == 0 && elected != null && state.cost == 0L) {
                         state.boardCoverage.nextFactor(state)
-                    } else null
+                    } else {
+                        null
+                    }
                     val fid = retained ?: if (draw == 0 && elected != null && elected.isNotEmpty()) {
                         elected[state.rng.nextInt(elected.size)]
                     } else {
@@ -79,7 +81,9 @@ class SatisfiedStructured private constructor(
                     }
                     if (retainCoverage && draw == 0 && elected != null && state.cost == 0L &&
                         state.boardCoverage.generate(state, fid, sink, cancellation)
-                    ) return@repeat
+                    ) {
+                        return@repeat
+                    }
                     if (!state.violated.contains(fid)) proposeAsOwner(state, fid, sink)
                 }
             }

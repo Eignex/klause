@@ -10,7 +10,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RootWorkAccounting
 import com.eignex.klause.propagation.baked
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.arrays.emptyLongArray
 import com.eignex.util.collections.IntArrayList
@@ -59,7 +59,7 @@ class SharedIntOccurrence internal constructor(internal val offsets: IntArray, i
 internal class PresolveSession(
     private val base: BakedProblem,
     private val bakeConfig: BakeConfig = BakeConfig.NONE,
-    private val cancellation: Cancellation = base.cancellation,
+    private val cancellation: ExecutionControl = base.cancellation,
 ) {
 
     // Working factor set indexed by stable id: `[0, base.factors.size)` are the originals, appended
@@ -125,8 +125,8 @@ internal class PresolveSession(
     private var inputDirty: Boolean = true
     private var aggregateEntryUnits: Long? = null
 
-    internal fun entryUnits(token: Cancellation): Long {
-        if (token.workMeter() == null) return 0L
+    internal fun entryUnits(token: ExecutionControl): Long {
+        if (token.accounting == null) return 0L
         aggregateEntryUnits?.let { return it }
         val input = if (addedLog.isEmpty() && droppedFactorLog.isEmpty() && reseedEpoch == 0) base else passInput()
         return (token.presolveBudget()?.entryUnits(input.factors) ?: passBaseUnits(input.factors)).also {
@@ -217,7 +217,7 @@ internal class PresolveSession(
 
     internal fun anyTouchedFactor(
         mark: ChangeMark?,
-        token: Cancellation,
+        token: ExecutionControl,
         candidate: (Factor) -> Boolean,
     ): Boolean {
         if (mark == null || markStale(mark)) return true

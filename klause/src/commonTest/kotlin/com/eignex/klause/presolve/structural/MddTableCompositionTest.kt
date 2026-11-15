@@ -13,7 +13,7 @@ import com.eignex.klause.propagation.holeReasonFor
 import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.propagation.undoTo
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -111,7 +111,7 @@ class MddTableCompositionTest {
             ExtensionalComposition.Limits(records = 2),
             ExtensionalComposition.Limits(pairWork = 10),
         )) {
-            val delta = ExtensionalComposition.reduce(arrayOf(mdd, table), Cancellation.Never, limits)
+            val delta = ExtensionalComposition.reduce(arrayOf(mdd, table), ExecutionControl.Never, limits)
 
             assertTrue(delta.isEmpty)
             assertFalse(delta.infeasible)

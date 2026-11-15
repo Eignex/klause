@@ -4,9 +4,9 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
@@ -16,7 +16,7 @@ import com.eignex.klause.solver.search.SearchBranchAttemptObserver
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -37,14 +37,19 @@ class ResumableSatisfactionTest {
             override fun onSearchStart(session: PropagationSession) {
                 native = session
                 repeat(2) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
-                session.maintainCapWindow(1, 10_000L, 64L,
-                    { session.activeLearnedClauseCount <= 1 }) { false }
+                session.maintainCapWindow(
+                    1,
+                    10_000L,
+                    64L,
+                    { session.activeLearnedClauseCount <= 1 },
+                ) { false }
                 assertEquals(1, session.activeLearnedClauseCount)
                 assertTrue(session.nativeCapWindowPending)
             }
             override fun onRestart(session: PropagationSession) = Unit
         }
-        val params = BacktrackParams(nativeSat = true, pbLearning = false, randomSeed = 1L,
+        val params = BacktrackParams(
+            nativeSat = true, pbLearning = false, randomSeed = 1L,
             maxLearnedClauses = 1, learnedMemoryWork = 128L, learnedMemoryScratchBytes = 64L,
             tieredLearnedDb = false, clauseExchange = exchange,
             branchObserver = object : SearchBranchAttemptObserver {
@@ -55,11 +60,12 @@ class ResumableSatisfactionTest {
                     assertEquals(1, session.activeLearnedClauseCount)
                     attempts++
                 }
-            })
+            },
+        )
 
         val result = BacktrackSolver(problem).resumableSolve(params).use { search ->
             var verdict: SolveResult? = null
-            repeat(32) { if (verdict == null) verdict = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) }
+            repeat(32) { if (verdict == null) verdict = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L) }
             assertNotNull(verdict)
         }
 
@@ -76,13 +82,21 @@ class ResumableSatisfactionTest {
             override fun onSearchStart(session: PropagationSession) {
                 native = session
                 repeat(257) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
-                forgetIfOverCap(session, BacktrackParams(maxLearnedClauses = 128,
-                    learnedMemoryWork = 64L, learnedMemoryScratchBytes = 64L, tieredLearnedDb = false))
+                forgetIfOverCap(
+                    session,
+                    BacktrackParams(
+                        maxLearnedClauses = 128,
+                        learnedMemoryWork = 64L,
+                        learnedMemoryScratchBytes = 64L,
+                        tieredLearnedDb = false,
+                    ),
+                )
                 assertTrue(session.nativeCapWindowPending)
             }
             override fun onRestart(session: PropagationSession) = Unit
         }
-        val params = BacktrackParams(nativeSat = true, pbLearning = false, randomSeed = 1L,
+        val params = BacktrackParams(
+            nativeSat = true, pbLearning = false, randomSeed = 1L,
             maxLearnedClauses = 128, learnedMemoryWork = 64L, learnedMemoryScratchBytes = 64L,
             tieredLearnedDb = false, clauseExchange = exchange,
             branchObserver = object : SearchBranchAttemptObserver {
@@ -92,11 +106,12 @@ class ResumableSatisfactionTest {
                     assertEquals(128, session.activeLearnedClauseCount)
                     attempts++
                 }
-            })
+            },
+        )
 
         val result = BacktrackSolver(problem).resumableSolve(params).use { search ->
             var verdict: SolveResult? = null
-            repeat(2048) { if (verdict == null) verdict = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) }
+            repeat(2048) { if (verdict == null) verdict = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L) }
             assertNotNull(verdict)
         }
 
@@ -114,13 +129,21 @@ class ResumableSatisfactionTest {
                 override fun onSearchStart(session: PropagationSession) {
                     native = session
                     repeat(6) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 5) }
-                    forgetIfOverCap(session, BacktrackParams(maxLearnedClauses = 1,
-                        learnedMemoryWork = 128L, learnedMemoryScratchBytes = 64L, tieredLearnedDb = true))
+                    forgetIfOverCap(
+                        session,
+                        BacktrackParams(
+                            maxLearnedClauses = 1,
+                            learnedMemoryWork = 128L,
+                            learnedMemoryScratchBytes = 64L,
+                            tieredLearnedDb = true,
+                        ),
+                    )
                     assertTrue(session.nativeCapWindowPending)
                 }
                 override fun onRestart(session: PropagationSession) = Unit
             }
-            val params = BacktrackParams(nativeSat = true, pbLearning = false, randomSeed = 1L,
+            val params = BacktrackParams(
+                nativeSat = true, pbLearning = false, randomSeed = 1L,
                 maxLearnedClauses = 1, learnedMemoryWork = 128L, learnedMemoryScratchBytes = 64L,
                 tieredLearnedDb = true, clauseExchange = exchange,
                 branchObserver = object : SearchBranchAttemptObserver {
@@ -131,12 +154,13 @@ class ResumableSatisfactionTest {
                         assertEquals(6, session.activeLearnedClauseCount)
                         attempts++
                     }
-                })
+                },
+            )
 
             val result = BacktrackSolver(problem).resumableSolve(params).use { search ->
                 var verdict: SolveResult? = null
                 repeat(32) {
-                    if (verdict == null) verdict = search.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceWork)
+                    if (verdict == null) verdict = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, sliceWork)
                 }
                 assertNotNull(verdict)
             }
@@ -157,14 +181,22 @@ class ResumableSatisfactionTest {
             override fun onSearchStart(session: PropagationSession) {
                 native = session
                 repeat(6) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 5) }
-                forgetIfOverCap(session, BacktrackParams(maxLearnedClauses = 1,
-                    learnedMemoryWork = 128L, learnedMemoryScratchBytes = 64L, tieredLearnedDb = true))
+                forgetIfOverCap(
+                    session,
+                    BacktrackParams(
+                        maxLearnedClauses = 1,
+                        learnedMemoryWork = 128L,
+                        learnedMemoryScratchBytes = 64L,
+                        tieredLearnedDb = true,
+                    ),
+                )
                 assertTrue(session.nativeCapWindowPending)
                 visits = session.nativeCapTraversalVisits
             }
             override fun onRestart(session: PropagationSession) = Unit
         }
-        val params = BacktrackParams(nativeSat = true, pbLearning = false, randomSeed = 1L,
+        val params = BacktrackParams(
+            nativeSat = true, pbLearning = false, randomSeed = 1L,
             maxLearnedClauses = 1, learnedMemoryWork = 0L, learnedMemoryScratchBytes = 64L,
             tieredLearnedDb = true, clauseExchange = exchange,
             branchObserver = object : SearchBranchAttemptObserver {
@@ -174,11 +206,12 @@ class ResumableSatisfactionTest {
                     assertEquals(visits, session.nativeCapTraversalVisits)
                     attempts++
                 }
-            })
+            },
+        )
 
         val result = BacktrackSolver(problem).resumableSolve(params).use { search ->
             var verdict: SolveResult? = null
-            repeat(32) { if (verdict == null) verdict = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) }
+            repeat(32) { if (verdict == null) verdict = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L) }
             assertNotNull(verdict)
         }
 
@@ -199,11 +232,19 @@ class ResumableSatisfactionTest {
                 }
                 override fun onRestart(session: PropagationSession) = Unit
             }
-            val params = BacktrackParams(randomSeed = 1L, nativeSat = false, pbLearning = false,
-                reasonPreflight = true, clauseExchange = exchange)
+            val params = BacktrackParams(
+                randomSeed = 1L,
+                nativeSat = false,
+                pbLearning = false,
+                reasonPreflight = true,
+                clauseExchange = exchange,
+            )
 
-            val result = if (resumed) solver.resumableSolve(params).use { runToVerdict(it, 1L) }
-            else solver.solve(params)
+            val result = if (resumed) {
+                solver.resumableSolve(params).use { runToVerdict(it, 1L) }
+            } else {
+                solver.solve(params)
+            }
 
             assertIs<SolveResult.Unsat>(result)
             assertTrue(observed)
@@ -225,11 +266,19 @@ class ResumableSatisfactionTest {
                 }
                 override fun onRestart(session: PropagationSession) = Unit
             }
-            val params = BacktrackParams(randomSeed = 1L, nativeSat = false, pbLearning = false,
-                costAwarePropagation = true, clauseExchange = exchange)
+            val params = BacktrackParams(
+                randomSeed = 1L,
+                nativeSat = false,
+                pbLearning = false,
+                costAwarePropagation = true,
+                clauseExchange = exchange,
+            )
 
-            val result = if (resumed) solver.resumableSolve(params).use { runToVerdict(it, 1L) }
-            else solver.solve(params)
+            val result = if (resumed) {
+                solver.resumableSolve(params).use { runToVerdict(it, 1L) }
+            } else {
+                solver.solve(params)
+            }
 
             assertIs<SolveResult.Unsat>(result)
             assertTrue(observed)
@@ -244,7 +293,9 @@ class ResumableSatisfactionTest {
         var native: PropagationSession? = null
         var closed = 0
         val exchange = object : ClauseExchange {
-            override fun onSearchStart(session: PropagationSession) { native = session }
+            override fun onSearchStart(session: PropagationSession) {
+                native = session
+            }
             override fun onRestart(session: PropagationSession) = Unit
         }
         val component = object : SearchComponent, AutoCloseable {
@@ -253,10 +304,13 @@ class ResumableSatisfactionTest {
                 closed++
             }
         }
-        val search = BacktrackSolver(pigeonhole(3, 2).bake()).resumableSolve(BacktrackParams(
-            clauseExchange = exchange, componentFactory = { listOf(component) },
-        ))
-        repeat(10) { if (native == null) search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) }
+        val search = BacktrackSolver(pigeonhole(3, 2).bake()).resumableSolve(
+            BacktrackParams(
+                clauseExchange = exchange,
+                componentFactory = { listOf(component) },
+            ),
+        )
+        repeat(10) { if (native == null) search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L) }
 
         search.close()
         search.close()
@@ -268,32 +322,52 @@ class ResumableSatisfactionTest {
 
     @Test
     fun `ordinary and resumed search should reclaim learned memory without restarts`() {
-        for (native in listOf(false, true)) for (resumed in listOf(false, true)) {
-            var injected = false
-            val exchange = object : ClauseExchange {
-                override fun onSearchStart(session: PropagationSession) {
-                    if (injected) return
-                    assertEquals(native, session.usesNativeSat)
-                    injected = true
-                    repeat(16) { session.addLearnedClause(Clause(intArrayOf(0, 1)), 9) }
+        for (native in listOf(false, true)) {
+            for (resumed in listOf(false, true)) {
+                var injected = false
+                val exchange = object : ClauseExchange {
+                    override fun onSearchStart(session: PropagationSession) {
+                        if (injected) return
+                        assertEquals(native, session.usesNativeSat)
+                        injected = true
+                        repeat(16) { session.addLearnedClause(Clause(intArrayOf(0, 1)), 9) }
+                    }
+                    override fun onRestart(session: PropagationSession) = Unit
                 }
-                override fun onRestart(session: PropagationSession) = Unit
-            }
-            val params = BacktrackParams(nativeSat = native, randomSeed = 1L, pbLearning = false,
-                clauseExchange = exchange, learnedMemoryBytes = 0L, learnedMemoryWork = 1_000_000L, maxDecisions = 100L)
-            val solver = BacktrackSolver(pigeonhole(3, 2).bake())
+                val params = BacktrackParams(
+                    nativeSat = native,
+                    randomSeed = 1L,
+                    pbLearning = false,
+                    clauseExchange = exchange,
+                    learnedMemoryBytes = 0L,
+                    learnedMemoryWork = 1_000_000L,
+                    maxDecisions = 100L,
+                )
+                val solver = BacktrackSolver(pigeonhole(3, 2).bake())
 
-            val result = if (resumed) solver.resumableSolve(params).use { search ->
-                var verdict: SolveResult? = null
-                repeat(100) { if (verdict == null) verdict = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) }
-                assertNotNull(verdict)
-            }
-            else solver.solve(params)
+                val result = if (resumed) {
+                    solver.resumableSolve(params).use { search ->
+                        var verdict: SolveResult? = null
+                        repeat(100) {
+                            if (verdict == null) {
+                                verdict = search.runSlice(
+                                    ExecutionControl.Never,
+                                    Long.MAX_VALUE,
+                                    1L,
+                                )
+                            }
+                        }
+                        assertNotNull(verdict)
+                    }
+                } else {
+                    solver.solve(params)
+                }
 
-            assertIs<SolveResult.Unsat>(result)
-            assertEquals(0.0, result.stats.search.restarts.sum)
-            assertTrue(result.stats.search.learning.getValue("learnedMemoryRECLAIMED") > 0L)
-            assertTrue(result.stats.search.learning.getValue("learningClauseRetired") >= 16L)
+                assertIs<SolveResult.Unsat>(result)
+                assertEquals(0.0, result.stats.search.restarts.sum)
+                assertTrue(result.stats.search.learning.getValue("learnedMemoryRECLAIMED") > 0L)
+                assertTrue(result.stats.search.learning.getValue("learningClauseRetired") >= 16L)
+            }
         }
     }
 
@@ -301,8 +375,12 @@ class ResumableSatisfactionTest {
     fun `ordinary and resumed solves publish attributed first uip consumption`() {
         val solver = BacktrackSolver(pigeonhole(3, 2).bake())
         for (nativeSat in listOf(false, true)) {
-            val params = BacktrackParams(randomSeed = 1L, nativeSat = nativeSat, pbLearning = false,
-                propagationAttribution = true)
+            val params = BacktrackParams(
+                randomSeed = 1L,
+                nativeSat = nativeSat,
+                pbLearning = false,
+                propagationAttribution = true,
+            )
             val ordinary = assertIs<SolveResult.Unsat>(solver.solve(params.copy(propagationAttribution = false)))
             val complete = assertIs<SolveResult.Unsat>(solver.solve(params))
             val resumed = solver.resumableSolve(params).use { runToVerdict(it, 1L) }
@@ -329,7 +407,7 @@ class ResumableSatisfactionTest {
         val search = BacktrackSolver(pigeonhole(3, 2).bake()).resumableSolve(
             BacktrackParams(componentFactory = { listOf(component) }),
         )
-        assertNull(search.runSlice(Cancellation.Never, 0L, 1L))
+        assertNull(search.runSlice(ExecutionControl.Never, 0L, 1L))
 
         search.close()
         search.close()
@@ -353,7 +431,7 @@ class ResumableSatisfactionTest {
             BacktrackParams(componentFactory = { listOf(component) }),
         )
         assertEquals(0, batches)
-        assertNull(search.runSlice(Cancellation.Never, 0L, 1L))
+        assertNull(search.runSlice(ExecutionControl.Never, 0L, 1L))
         assertEquals(0, batches)
 
         val verdict = search.use { runToVerdict(it, 1L) }
@@ -380,7 +458,7 @@ class ResumableSatisfactionTest {
         BacktrackSolver(problem.bake()).resumableSolve(BacktrackParams(randomSeed = 0L))
 
     private fun runToVerdict(search: ResumableSolve, sliceWork: Long): SolveResult {
-        while (true) search.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceWork)?.let { return it }
+        while (true) search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, sliceWork)?.let { return it }
     }
 
     @Test
@@ -403,7 +481,7 @@ class ResumableSatisfactionTest {
     fun `a work-budgeted slice should pause before the search finishes`() {
         val search = handle(pigeonhole(6, 5))
 
-        assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceNodes = 1L))
+        assertNull(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, sliceNodes = 1L))
         assertFalse(search.isDone)
     }
 
@@ -411,7 +489,7 @@ class ResumableSatisfactionTest {
     fun `a fired run token should end the search instead of pausing it`() {
         val search = handle(pigeonhole(6, 5))
 
-        val verdict = search.runSlice(Cancellation { true }, Long.MAX_VALUE, sliceNodes = 1_000_000L)
+        val verdict = search.runSlice(ExecutionControl { true }, Long.MAX_VALUE, sliceNodes = 1_000_000L)
 
         assertIs<SolveResult.Unknown>(verdict)
         assertTrue(search.isDone)
@@ -421,7 +499,7 @@ class ResumableSatisfactionTest {
     fun `a constructor refutation should return even with no slice work allowance`() {
         val search = handle(pigeonhole(2, 1))
 
-        val verdict = search.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceNodes = 0L)
+        val verdict = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, sliceNodes = 0L)
 
         assertIs<SolveResult.Unsat>(verdict)
     }
@@ -431,7 +509,7 @@ class ResumableSatisfactionTest {
         val solver = BacktrackSolver(pigeonhole(3, 2).bake())
 
         assertFailsWith<SearchInitializationCancelled> {
-            solver.resumableSolve(BacktrackParams(cancellation = Cancellation { true }))
+            solver.resumableSolve(BacktrackParams(cancellation = ExecutionControl { true }))
         }
 
         assertIs<SolveResult.Unsat>(runToVerdict(solver.resumableSolve(BacktrackParams()), 1L))
@@ -446,7 +524,7 @@ class ResumableSatisfactionTest {
             BacktrackParams(componentFactory = { listOf(component) }),
         )
 
-        val result = search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, 0L) }
+        val result = search.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 0L) }
 
         assertIs<SolveResult.Unknown>(result)
         assertTrue(search.isDone)
@@ -468,12 +546,12 @@ class ResumableSatisfactionTest {
     fun `a resumed handle should retain its bound lifetime cancellation scope`() {
         var cancelled = false
         val search = BacktrackSolver(pigeonhole(6, 5).bake()).resumableSolve(
-            BacktrackParams().withLifetimeCancellation(Cancellation { cancelled }),
+            BacktrackParams().withLifetimeCancellation(ExecutionControl { cancelled }),
         )
-        assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+        assertNull(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L))
         cancelled = true
 
-        val result = search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) }
+        val result = search.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L) }
 
         assertIs<SolveResult.Unknown>(result)
         assertTrue(search.isDone)

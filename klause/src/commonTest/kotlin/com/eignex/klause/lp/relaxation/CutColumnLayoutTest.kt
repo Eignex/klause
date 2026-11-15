@@ -3,7 +3,7 @@ package com.eignex.klause.lp.relaxation
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -15,11 +15,11 @@ class CutColumnLayoutTest {
         val source = CutSource(CutSourceKind.INTEGER, 0)
         val first = CutSourceMap(Any(), 0, listOf(CutColumnSource(source)))
         val next = CutSourceMap(first.model, 1, first.columns)
-        val bound = assertNotNull(CutColumnLayout.capture(first, 64L, Cancellation.Never) {})
+        val bound = assertNotNull(CutColumnLayout.capture(first, 64L, ExecutionControl.Never) {})
         val layout = assertNotNull(bound.layoutFor(first))
 
         assertNull(bound.layoutFor(next))
-        assertNotNull(assertNotNull(layout.bind(next, Cancellation.Never) {}).layoutFor(next))
+        assertNotNull(assertNotNull(layout.bind(next, ExecutionControl.Never) {}).layoutFor(next))
     }
 
     @Test
@@ -28,7 +28,7 @@ class CutColumnLayoutTest {
         for (column in listOf(CutColumnSource(source, scale = BigFraction.ofLong(2)),
             CutColumnSource(source, offset = BigFraction.ONE))) {
             val map = CutSourceMap(Any(), 0, listOf(column))
-            assertNull(CutColumnLayout.capture(map, 64L, Cancellation.Never) {})
+            assertNull(CutColumnLayout.capture(map, 64L, ExecutionControl.Never) {})
         }
     }
 
@@ -38,7 +38,7 @@ class CutColumnLayoutTest {
         val map = CutSourceMap(Any(), 0, listOf(CutColumnSource(source)))
         var work = 0L
 
-        assertNull(CutColumnLayout.capture(map, 9L, Cancellation.Never) { work += it })
+        assertNull(CutColumnLayout.capture(map, 9L, ExecutionControl.Never) { work += it })
         assertTrue(work > 0L)
     }
 
@@ -46,15 +46,15 @@ class CutColumnLayoutTest {
     fun `cancellation after validation work should withhold the binding`() {
         val source = CutSource(CutSourceKind.INTEGER, 0)
         val map = CutSourceMap(Any(), 0, listOf(CutColumnSource(source)))
-        val bound = assertNotNull(CutColumnLayout.capture(map, 64L, Cancellation.Never) {})
+        val bound = assertNotNull(CutColumnLayout.capture(map, 64L, ExecutionControl.Never) {})
         val layout = assertNotNull(bound.layoutFor(map))
         var cancelled = false
         var work = 0L
 
-        val interrupted = layout.bind(map, Cancellation { cancelled }) { work += it; cancelled = true }
+        val interrupted = layout.bind(map, ExecutionControl { cancelled }) { work += it; cancelled = true }
 
         assertNull(interrupted)
         assertTrue(work > 0L)
-        assertNotNull(layout.bind(map, Cancellation.Never) {})
+        assertNotNull(layout.bind(map, ExecutionControl.Never) {})
     }
 }

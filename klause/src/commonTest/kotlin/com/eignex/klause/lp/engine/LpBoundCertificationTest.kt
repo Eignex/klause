@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -15,32 +15,58 @@ class LpBoundCertificationTest {
         val zero = ExactLpNumber.of(0L)
         for (upper in listOf(false, true)) {
             val sign = if (upper) 1L else -1L
-            val bounds = if (upper) ExactLpBounds(upper = ExactLpSide(zero)) else
+            val bounds = if (upper) {
+                ExactLpBounds(upper = ExactLpSide(zero))
+            } else {
                 ExactLpBounds(ExactLpSide(zero))
-            val source = assertNotNull(LpExactState(ExactLpModel(
-                List(size) { column ->
-                    listOf(column to 2L, (column + 1) % size to if (column == size - 1) -1L else 1L)
-                        .sortedBy { it.first }
-                        .map { (row, coefficient) -> ExactLpEntry(row, ExactLpNumber.of(coefficient)) }
-                },
-                List(size) { zero },
-                List(size * 2) { ExactLpColumn(bounds) },
-                List(size) { ExactLpRow() },
-                ExactLpObjective(List(size) { column ->
-                    when (column) {
-                        0 -> ExactLpNumber.of(sign * 3L)
-                        size - 1 -> ExactLpNumber.of(BigFraction.ofLong(sign * 49L) *
-                            BigFraction.ofLong(50L).reciprocal())
-                        else -> zero
-                    }
-                } + List(size) { zero }),
-            )).toWorkingModel())
-            val basis = Basis(IntArray(size) { it }, Array(size * 2) {
-                if (it < size) VarStatus.BASIC else if (upper) VarStatus.AT_UPPER else VarStatus.AT_LOWER
-            })
+            }
+            val source = assertNotNull(
+                LpExactState(
+                    ExactLpModel(
+                        List(size) { column ->
+                            listOf(column to 2L, (column + 1) % size to if (column == size - 1) -1L else 1L)
+                                .sortedBy { it.first }
+                                .map { (row, coefficient) -> ExactLpEntry(row, ExactLpNumber.of(coefficient)) }
+                        },
+                        List(size) { zero },
+                        List(size * 2) { ExactLpColumn(bounds) },
+                        List(size) { ExactLpRow() },
+                        ExactLpObjective(
+                            List(size) { column ->
+                                when (column) {
+                                    0 -> ExactLpNumber.of(sign * 3L)
 
-            val result = certifyLpBoundOnly(source, DoubleArray(size) { sign * 0.99 },
-                ReconstructionLimits(maxAttempts = 1), basis = basis)
+                                    size - 1 -> ExactLpNumber.of(
+                                        BigFraction.ofLong(sign * 49L) *
+                                            BigFraction.ofLong(50L).reciprocal(),
+                                    )
+
+                                    else -> zero
+                                }
+                            } + List(size) { zero },
+                        ),
+                    ),
+                ).toWorkingModel(),
+            )
+            val basis = Basis(
+                IntArray(size) { it },
+                Array(size * 2) {
+                    if (it < size) {
+                        VarStatus.BASIC
+                    } else if (upper) {
+                        VarStatus.AT_UPPER
+                    } else {
+                        VarStatus.AT_LOWER
+                    }
+                },
+            )
+
+            val result = certifyLpBoundOnly(
+                source,
+                DoubleArray(size) { sign * 0.99 },
+                ReconstructionLimits(maxAttempts = 1),
+                basis = basis,
+            )
 
             assertEquals(BigFraction.ZERO, assertNotNull(result.bound).value)
         }
@@ -52,28 +78,52 @@ class LpBoundCertificationTest {
         val zero = ExactLpNumber.of(0L)
         for ((upper, openColumns) in listOf(false to 98, false to size, true to 98, true to size)) {
             val sign = if (upper) 1L else -1L
-            val bounds = if (upper) ExactLpBounds(upper = ExactLpSide(zero)) else
+            val bounds = if (upper) {
+                ExactLpBounds(upper = ExactLpSide(zero))
+            } else {
                 ExactLpBounds(ExactLpSide(zero))
-            val boxed = ExactLpBounds(ExactLpSide(ExactLpNumber.of(if (upper) -1L else 0L)),
-                ExactLpSide(ExactLpNumber.of(if (upper) 0L else 1L)))
-            val source = assertNotNull(LpExactState(ExactLpModel(
-                List(size) { column ->
-                    listOf(column to 2L, (column + 1) % size to 1L).sortedBy { it.first }
-                        .map { (row, coefficient) -> ExactLpEntry(row, ExactLpNumber.of(coefficient)) }
+            }
+            val boxed = ExactLpBounds(
+                ExactLpSide(ExactLpNumber.of(if (upper) -1L else 0L)),
+                ExactLpSide(ExactLpNumber.of(if (upper) 0L else 1L)),
+            )
+            val source = assertNotNull(
+                LpExactState(
+                    ExactLpModel(
+                        List(size) { column ->
+                            listOf(column to 2L, (column + 1) % size to 1L).sortedBy { it.first }
+                                .map { (row, coefficient) -> ExactLpEntry(row, ExactLpNumber.of(coefficient)) }
+                        },
+                        List(size) { zero },
+                        List(size) { ExactLpColumn(if (it < openColumns) bounds else boxed) } +
+                            List(size) { ExactLpColumn(bounds) },
+                        List(size) { ExactLpRow() },
+                        ExactLpObjective(
+                            List(size) { ExactLpNumber.of(sign * if (it == 0) 3L else 2L) } +
+                                List(size) { zero },
+                        ),
+                    ),
+                ).toWorkingModel(),
+            )
+            val basis = Basis(
+                IntArray(size) { it },
+                Array(size * 2) {
+                    if (it < size) {
+                        VarStatus.BASIC
+                    } else if (upper) {
+                        VarStatus.AT_UPPER
+                    } else {
+                        VarStatus.AT_LOWER
+                    }
                 },
-                List(size) { zero },
-                List(size) { ExactLpColumn(if (it < openColumns) bounds else boxed) } +
-                    List(size) { ExactLpColumn(bounds) },
-                List(size) { ExactLpRow() },
-                ExactLpObjective(List(size) { ExactLpNumber.of(sign * if (it == 0) 3L else 2L) } +
-                    List(size) { zero }),
-            )).toWorkingModel())
-            val basis = Basis(IntArray(size) { it }, Array(size * 2) {
-                if (it < size) VarStatus.BASIC else if (upper) VarStatus.AT_UPPER else VarStatus.AT_LOWER
-            })
+            )
 
-            val result = certifyLpBoundOnly(source, DoubleArray(size) { sign * 0.99 },
-                ReconstructionLimits(maxAttempts = 1), basis = basis)
+            val result = certifyLpBoundOnly(
+                source,
+                DoubleArray(size) { sign * 0.99 },
+                ReconstructionLimits(maxAttempts = 1),
+                basis = basis,
+            )
 
             assertEquals(BigFraction.ZERO, assertNotNull(result.bound).value)
         }
@@ -84,29 +134,43 @@ class LpBoundCertificationTest {
         val size = 129
         val zero = ExactLpNumber.of(0L)
         val eighth = BigFraction.ofLong(8L).reciprocal()
-        val source = assertNotNull(LpExactState(ExactLpModel(
-            List(size) { column ->
-                listOf(column to if (column == 0) 2L else -2L,
-                    (column + 1) % size to if (column == size - 1) -1L else 1L)
-                    .sortedBy { it.first }
-                    .map { (row, coefficient) -> ExactLpEntry(row, ExactLpNumber.of(coefficient)) }
-            },
-            List(size) { zero },
-            List(size * 2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
-            List(size) { ExactLpRow() },
-            ExactLpObjective(List(size) { column ->
-                when (column) {
-                    0 -> ExactLpNumber.of(-1L)
-                    size - 1 -> ExactLpNumber.of(eighth)
-                    else -> zero
-                }
-            } + List(size) { zero }),
-        )).toWorkingModel())
-        val basis = Basis(IntArray(size) { it },
-            Array(size * 2) { if (it < size) VarStatus.BASIC else VarStatus.AT_LOWER })
+        val source = assertNotNull(
+            LpExactState(
+                ExactLpModel(
+                    List(size) { column ->
+                        listOf(
+                            column to if (column == 0) 2L else -2L,
+                            (column + 1) % size to if (column == size - 1) -1L else 1L,
+                        )
+                            .sortedBy { it.first }
+                            .map { (row, coefficient) -> ExactLpEntry(row, ExactLpNumber.of(coefficient)) }
+                    },
+                    List(size) { zero },
+                    List(size * 2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+                    List(size) { ExactLpRow() },
+                    ExactLpObjective(
+                        List(size) { column ->
+                            when (column) {
+                                0 -> ExactLpNumber.of(-1L)
+                                size - 1 -> ExactLpNumber.of(eighth)
+                                else -> zero
+                            }
+                        } + List(size) { zero },
+                    ),
+                ),
+            ).toWorkingModel(),
+        )
+        val basis = Basis(
+            IntArray(size) { it },
+            Array(size * 2) { if (it < size) VarStatus.BASIC else VarStatus.AT_LOWER },
+        )
 
-        val result = certifyLpBoundOnly(source, DoubleArray(size) { if (it == 0) -0.125 else 0.0 },
-            ReconstructionLimits(maxAttempts = 1), basis = basis)
+        val result = certifyLpBoundOnly(
+            source,
+            DoubleArray(size) { if (it == 0) -0.125 else 0.0 },
+            ReconstructionLimits(maxAttempts = 1),
+            basis = basis,
+        )
 
         assertNull(result.bound)
     }
@@ -115,24 +179,40 @@ class LpBoundCertificationTest {
     fun `large basis repair should certify only admitted open directions`() {
         val size = 129
         val zero = ExactLpNumber.of(0L)
-        val basis = Basis(IntArray(size) { it },
-            Array(size * 2) { if (it < size) VarStatus.BASIC else VarStatus.AT_LOWER })
+        val basis = Basis(
+            IntArray(size) { it },
+            Array(size * 2) { if (it < size) VarStatus.BASIC else VarStatus.AT_LOWER },
+        )
         for (boxed in listOf(true, false)) {
-            val source = assertNotNull(LpExactState(ExactLpModel(
-                List(size) { column ->
-                    listOf(column to 2L, (column + 1) % size to 1L).sortedBy { it.first }
-                        .map { (row, coefficient) -> ExactLpEntry(row, ExactLpNumber.of(coefficient)) }
-                },
-                List(size) { zero },
-                List(size) { column -> ExactLpColumn(ExactLpBounds(ExactLpSide(zero),
-                    ExactLpSide(ExactLpNumber.of(1L)).takeIf { boxed && column > 0 })) } +
-                    List(size) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
-                List(size) { ExactLpRow() },
-                ExactLpObjective(List(size) { ExactLpNumber.of(-3L) } + List(size) { zero }),
-            )).toWorkingModel())
+            val source = assertNotNull(
+                LpExactState(
+                    ExactLpModel(
+                        List(size) { column ->
+                            listOf(column to 2L, (column + 1) % size to 1L).sortedBy { it.first }
+                                .map { (row, coefficient) -> ExactLpEntry(row, ExactLpNumber.of(coefficient)) }
+                        },
+                        List(size) { zero },
+                        List(size) { column ->
+                            ExactLpColumn(
+                                ExactLpBounds(
+                                    ExactLpSide(zero),
+                                    ExactLpSide(ExactLpNumber.of(1L)).takeIf { boxed && column > 0 },
+                                ),
+                            )
+                        } +
+                            List(size) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+                        List(size) { ExactLpRow() },
+                        ExactLpObjective(List(size) { ExactLpNumber.of(-3L) } + List(size) { zero }),
+                    ),
+                ).toWorkingModel(),
+            )
 
-            val result = certifyLpBoundOnly(source, DoubleArray(size) { -0.99 },
-                ReconstructionLimits(maxAttempts = 1), basis = basis)
+            val result = certifyLpBoundOnly(
+                source,
+                DoubleArray(size) { -0.99 },
+                ReconstructionLimits(maxAttempts = 1),
+                basis = basis,
+            )
 
             assertEquals(0, result.metrics.pointChecks)
             if (boxed) {
@@ -149,31 +229,49 @@ class LpBoundCertificationTest {
     fun `open direction repair should avoid a structurally matched singular subsystem`() {
         val size = 129
         val zero = ExactLpNumber.of(0L)
-        val source = assertNotNull(LpExactState(ExactLpModel(
-            List(size) { column ->
-                val entries = when (column) {
-                    0 -> listOf(0 to 1L, 1 to 1L, 2 to 1L)
-                    1 -> listOf(0 to 1L, 1 to 1L, 2 to 2L)
-                    2 -> listOf(0 to 1L, 1 to 2L, 2 to 4L, 3 to 1L)
-                    else -> listOf(column to 2L, (column + 1) % size to 1L)
-                }
-                entries.sortedBy { it.first }.map { (row, coefficient) ->
-                    ExactLpEntry(row, ExactLpNumber.of(coefficient))
-                }
-            },
-            List(size) { zero },
-            List(size) { column -> ExactLpColumn(ExactLpBounds(ExactLpSide(zero),
-                ExactLpSide(ExactLpNumber.of(1L)).takeIf { column >= 2 })) } +
-                List(size) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
-            List(size) { ExactLpRow() },
-            ExactLpObjective(List(size) { ExactLpNumber.of(if (it == 1) -4L else -3L) } +
-                List(size) { zero }),
-        )).toWorkingModel())
-        val basis = Basis(IntArray(size) { it },
-            Array(size * 2) { if (it < size) VarStatus.BASIC else VarStatus.AT_LOWER })
+        val source = assertNotNull(
+            LpExactState(
+                ExactLpModel(
+                    List(size) { column ->
+                        val entries = when (column) {
+                            0 -> listOf(0 to 1L, 1 to 1L, 2 to 1L)
+                            1 -> listOf(0 to 1L, 1 to 1L, 2 to 2L)
+                            2 -> listOf(0 to 1L, 1 to 2L, 2 to 4L, 3 to 1L)
+                            else -> listOf(column to 2L, (column + 1) % size to 1L)
+                        }
+                        entries.sortedBy { it.first }.map { (row, coefficient) ->
+                            ExactLpEntry(row, ExactLpNumber.of(coefficient))
+                        }
+                    },
+                    List(size) { zero },
+                    List(size) { column ->
+                        ExactLpColumn(
+                            ExactLpBounds(
+                                ExactLpSide(zero),
+                                ExactLpSide(ExactLpNumber.of(1L)).takeIf { column >= 2 },
+                            ),
+                        )
+                    } +
+                        List(size) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+                    List(size) { ExactLpRow() },
+                    ExactLpObjective(
+                        List(size) { ExactLpNumber.of(if (it == 1) -4L else -3L) } +
+                            List(size) { zero },
+                    ),
+                ),
+            ).toWorkingModel(),
+        )
+        val basis = Basis(
+            IntArray(size) { it },
+            Array(size * 2) { if (it < size) VarStatus.BASIC else VarStatus.AT_LOWER },
+        )
 
-        val result = certifyLpBoundOnly(source, DoubleArray(size) { -0.99 },
-            ReconstructionLimits(maxAttempts = 1), basis = basis)
+        val result = certifyLpBoundOnly(
+            source,
+            DoubleArray(size) { -0.99 },
+            ReconstructionLimits(maxAttempts = 1),
+            basis = basis,
+        )
 
         assertTrue(assertNotNull(result.bound).value < BigFraction.ZERO)
         assertEquals(2, assertNotNull(result.metrics.basisRepair).restrictedColumns)
@@ -183,22 +281,37 @@ class LpBoundCertificationTest {
     @Test
     fun `retained basis should recover coupled dual equations without a primal`() {
         val zero = ExactLpNumber.of(0L)
-        val source = assertNotNull(LpExactState(ExactLpModel(
-            listOf(
-                listOf(ExactLpEntry(0, ExactLpNumber.of(3L)), ExactLpEntry(1, ExactLpNumber.of(1L))),
-                listOf(ExactLpEntry(0, ExactLpNumber.of(2L)), ExactLpEntry(1, ExactLpNumber.of(4L))),
+        val source = assertNotNull(
+            LpExactState(
+                ExactLpModel(
+                    listOf(
+                        listOf(ExactLpEntry(0, ExactLpNumber.of(3L)), ExactLpEntry(1, ExactLpNumber.of(1L))),
+                        listOf(ExactLpEntry(0, ExactLpNumber.of(2L)), ExactLpEntry(1, ExactLpNumber.of(4L))),
+                    ),
+                    listOf(ExactLpNumber.of(5L), ExactLpNumber.of(5L)),
+                    List(2) { ExactLpColumn(ExactLpBounds()) } +
+                        List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+                    List(2) { ExactLpRow() },
+                    ExactLpObjective(listOf(ExactLpNumber.of(-1L), ExactLpNumber.of(-1L), zero, zero)),
+                ),
+            ).toWorkingModel(),
+        )
+        val basis = Basis(
+            intArrayOf(0, 1),
+            arrayOf(
+                VarStatus.BASIC,
+                VarStatus.BASIC,
+                VarStatus.AT_LOWER,
+                VarStatus.AT_LOWER,
             ),
-            listOf(ExactLpNumber.of(5L), ExactLpNumber.of(5L)),
-            List(2) { ExactLpColumn(ExactLpBounds()) } +
-                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
-            List(2) { ExactLpRow() },
-            ExactLpObjective(listOf(ExactLpNumber.of(-1L), ExactLpNumber.of(-1L), zero, zero)),
-        )).toWorkingModel())
-        val basis = Basis(intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC,
-            VarStatus.AT_LOWER, VarStatus.AT_LOWER))
+        )
 
-        val result = certifyLpBoundOnly(source, doubleArrayOf(-0.3 + 1e-10, -0.1 - 1e-10),
-            ReconstructionLimits(maxAttempts = 1), basis = basis)
+        val result = certifyLpBoundOnly(
+            source,
+            doubleArrayOf(-0.3 + 1e-10, -0.1 - 1e-10),
+            ReconstructionLimits(maxAttempts = 1),
+            basis = basis,
+        )
 
         assertEquals(BigFraction.ofLong(-2L), assertNotNull(result.bound).value)
         val repair = assertNotNull(result.metrics.basisRepair)
@@ -213,8 +326,12 @@ class LpBoundCertificationTest {
     fun `singleton basis equations should recover fractional multipliers`() {
         val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
 
-        val result = certifyLpBoundOnly(model(upper = null, coefficient = 3L, rhs = 1L),
-            doubleArrayOf(-1.0 / 3.0), ReconstructionLimits(maxAttempts = 1), basis = basis)
+        val result = certifyLpBoundOnly(
+            model(upper = null, coefficient = 3L, rhs = 1L),
+            doubleArrayOf(-1.0 / 3.0),
+            ReconstructionLimits(maxAttempts = 1),
+            basis = basis,
+        )
 
         assertEquals(BigFraction.ofLong(-3L).reciprocal(), assertNotNull(result.bound).value)
         assertEquals(1, assertNotNull(result.metrics.basisRepair).peeledRows)
@@ -224,21 +341,29 @@ class LpBoundCertificationTest {
     @Test
     fun `basis bounds should remain available when unrepaired residuals exceed the scalar limit`() {
         val zero = ExactLpNumber.of(0L)
-        val source = assertNotNull(LpExactState(ExactLpModel(
-            listOf(
-                listOf(ExactLpEntry(0, ExactLpNumber.of(3L))),
-                listOf(ExactLpEntry(0, ExactLpNumber.of((1L shl 60) + 1L))),
-            ),
-            listOf(ExactLpNumber.of(1L)),
-            listOf(ExactLpColumn(ExactLpBounds())) +
-                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(ExactLpNumber.of(-1L), zero, zero)),
-        )).toWorkingModel())
+        val source = assertNotNull(
+            LpExactState(
+                ExactLpModel(
+                    listOf(
+                        listOf(ExactLpEntry(0, ExactLpNumber.of(3L))),
+                        listOf(ExactLpEntry(0, ExactLpNumber.of((1L shl 60) + 1L))),
+                    ),
+                    listOf(ExactLpNumber.of(1L)),
+                    listOf(ExactLpColumn(ExactLpBounds())) +
+                        List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+                    listOf(ExactLpRow()),
+                    ExactLpObjective(listOf(ExactLpNumber.of(-1L), zero, zero)),
+                ),
+            ).toWorkingModel(),
+        )
         val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER, VarStatus.AT_LOWER))
 
-        val result = certifyLpBoundOnly(source, doubleArrayOf(-1.0 / 3.0),
-            ReconstructionLimits(maxBits = 64, maxAttempts = 1), basis = basis)
+        val result = certifyLpBoundOnly(
+            source,
+            doubleArrayOf(-1.0 / 3.0),
+            ReconstructionLimits(maxBits = 64, maxAttempts = 1),
+            basis = basis,
+        )
 
         assertEquals(BigFraction.ofLong(-3L).reciprocal(), assertNotNull(result.bound).value)
         assertTrue(result.metrics.maxBits <= 64)
@@ -248,8 +373,12 @@ class LpBoundCertificationTest {
     fun `exhausted reconstruction attempts should withhold a basis derived bound`() {
         val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
 
-        val result = certifyLpBoundOnly(model(upper = null, coefficient = 3L, rhs = 1L),
-            doubleArrayOf(-1.0 / 3.0), ReconstructionLimits(maxAttempts = 0), basis = basis)
+        val result = certifyLpBoundOnly(
+            model(upper = null, coefficient = 3L, rhs = 1L),
+            doubleArrayOf(-1.0 / 3.0),
+            ReconstructionLimits(maxAttempts = 0),
+            basis = basis,
+        )
 
         assertNull(result.bound)
     }
@@ -257,22 +386,30 @@ class LpBoundCertificationTest {
     @Test
     fun `deferred singleton columns should recover after the coupled dual core`() {
         val zero = ExactLpNumber.of(0L)
-        val source = assertNotNull(LpExactState(ExactLpModel(
-            listOf(
-                listOf(ExactLpEntry(0, ExactLpNumber.of(3L)), ExactLpEntry(1, ExactLpNumber.of(1L))),
-                listOf(ExactLpEntry(1, ExactLpNumber.of(2L)), ExactLpEntry(2, ExactLpNumber.of(1L))),
-                listOf(ExactLpEntry(1, ExactLpNumber.of(1L)), ExactLpEntry(2, ExactLpNumber.of(3L))),
-            ),
-            listOf(ExactLpNumber.of(3L), ExactLpNumber.of(4L), ExactLpNumber.of(4L)),
-            List(3) { ExactLpColumn(ExactLpBounds()) } +
-                List(3) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
-            List(3) { ExactLpRow() },
-            ExactLpObjective(List(3) { ExactLpNumber.of(-1L) } + List(3) { zero }),
-        )).toWorkingModel())
+        val source = assertNotNull(
+            LpExactState(
+                ExactLpModel(
+                    listOf(
+                        listOf(ExactLpEntry(0, ExactLpNumber.of(3L)), ExactLpEntry(1, ExactLpNumber.of(1L))),
+                        listOf(ExactLpEntry(1, ExactLpNumber.of(2L)), ExactLpEntry(2, ExactLpNumber.of(1L))),
+                        listOf(ExactLpEntry(1, ExactLpNumber.of(1L)), ExactLpEntry(2, ExactLpNumber.of(3L))),
+                    ),
+                    listOf(ExactLpNumber.of(3L), ExactLpNumber.of(4L), ExactLpNumber.of(4L)),
+                    List(3) { ExactLpColumn(ExactLpBounds()) } +
+                        List(3) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+                    List(3) { ExactLpRow() },
+                    ExactLpObjective(List(3) { ExactLpNumber.of(-1L) } + List(3) { zero }),
+                ),
+            ).toWorkingModel(),
+        )
         val basis = Basis(intArrayOf(0, 1, 2), Array(6) { if (it < 3) VarStatus.BASIC else VarStatus.AT_LOWER })
 
-        val result = certifyLpBoundOnly(source, doubleArrayOf(-0.2 + 1e-10, -0.4 - 1e-10, -0.2 + 1e-10),
-            ReconstructionLimits(maxAttempts = 1), basis = basis)
+        val result = certifyLpBoundOnly(
+            source,
+            doubleArrayOf(-0.2 + 1e-10, -0.4 - 1e-10, -0.2 + 1e-10),
+            ReconstructionLimits(maxAttempts = 1),
+            basis = basis,
+        )
 
         assertEquals(BigFraction.ofLong(-3L), assertNotNull(result.bound).value)
         val repair = assertNotNull(result.metrics.basisRepair)
@@ -284,17 +421,31 @@ class LpBoundCertificationTest {
     @Test
     fun `eliminated logical basics should contribute their costs to dual repair`() {
         val zero = ExactLpNumber.of(0L)
-        val source = assertNotNull(LpExactState(ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)), ExactLpEntry(1, ExactLpNumber.of(3L)))),
-            listOf(ExactLpNumber.of(5L), ExactLpNumber.of(3L)),
-            listOf(ExactLpColumn(ExactLpBounds())) + List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
-            List(2) { ExactLpRow() },
-            ExactLpObjective(listOf(ExactLpNumber.of(-1L), ExactLpNumber.of(2L), zero)),
-        )).toWorkingModel())
+        val source = assertNotNull(
+            LpExactState(
+                ExactLpModel(
+                    listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)), ExactLpEntry(1, ExactLpNumber.of(3L)))),
+                    listOf(ExactLpNumber.of(5L), ExactLpNumber.of(3L)),
+                    listOf(ExactLpColumn(ExactLpBounds())) + List(2) {
+                        ExactLpColumn(
+                            ExactLpBounds(
+                                ExactLpSide(zero),
+                            ),
+                        )
+                    },
+                    List(2) { ExactLpRow() },
+                    ExactLpObjective(listOf(ExactLpNumber.of(-1L), ExactLpNumber.of(2L), zero)),
+                ),
+            ).toWorkingModel(),
+        )
         val basis = Basis(intArrayOf(1, 0), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.AT_LOWER))
 
-        val result = certifyLpBoundOnly(source, doubleArrayOf(2.0, -1.0 + 1e-10),
-            ReconstructionLimits(maxAttempts = 1), basis = basis)
+        val result = certifyLpBoundOnly(
+            source,
+            doubleArrayOf(2.0, -1.0 + 1e-10),
+            ReconstructionLimits(maxAttempts = 1),
+            basis = basis,
+        )
 
         val bound = assertNotNull(result.bound)
         assertEquals(BigFraction.ofLong(7L), bound.value)
@@ -306,8 +457,12 @@ class LpBoundCertificationTest {
     fun `singular retained basis should supply no bound on an open objective`() {
         val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
 
-        val result = certifyLpBoundOnly(model(upper = null, coefficient = 0L), doubleArrayOf(-1.0),
-            ReconstructionLimits(maxAttempts = 1), basis = basis)
+        val result = certifyLpBoundOnly(
+            model(upper = null, coefficient = 0L),
+            doubleArrayOf(-1.0),
+            ReconstructionLimits(maxAttempts = 1),
+            basis = basis,
+        )
 
         assertNull(result.bound)
         assertEquals("SINGULAR", assertNotNull(result.metrics.basisRepair).decline)
@@ -317,10 +472,13 @@ class LpBoundCertificationTest {
     fun `basis derived bounds should require both acceptance gates`() {
         val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
         for (denied in listOf(LpCertifier.RATIONAL, LpCertifier.EXACT_BASIS)) {
-            val result = certifyLpBoundOnly(model(upper = null, coefficient = 3L, rhs = 1L),
-                doubleArrayOf(-1.0 / 3.0), ReconstructionLimits(maxAttempts = 1),
+            val result = certifyLpBoundOnly(
+                model(upper = null, coefficient = 3L, rhs = 1L),
+                doubleArrayOf(-1.0 / 3.0),
+                ReconstructionLimits(maxAttempts = 1),
                 policy = LpCertificationPolicy { certifier, successful -> successful && certifier != denied },
-                basis = basis)
+                basis = basis,
+            )
 
             assertNull(result.bound)
             assertEquals(1, result.metrics.dualSuccesses)
@@ -343,8 +501,13 @@ class LpBoundCertificationTest {
             override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
         }
 
-        val result = certifyLpBoundOnly(model(upper = null, coefficient = 3L, rhs = 1L),
-            doubleArrayOf(-1.0 / 3.0), ReconstructionLimits(maxAttempts = 1), observer = observer, basis = basis)
+        val result = certifyLpBoundOnly(
+            model(upper = null, coefficient = 3L, rhs = 1L),
+            doubleArrayOf(-1.0 / 3.0),
+            ReconstructionLimits(maxAttempts = 1),
+            observer = observer,
+            basis = basis,
+        )
 
         assertNotNull(result.bound)
         assertEquals(listOf(LpCertifier.RATIONAL, LpCertifier.EXACT_BASIS), certifiers)
@@ -356,15 +519,21 @@ class LpBoundCertificationTest {
     fun `independent dual denominators should certify a bound on free columns`() {
         val coefficients = listOf(101L, 103L, 107L, 109L, 1L)
         val zero = ExactLpNumber.of(0L)
-        val source = assertNotNull(LpExactState(ExactLpModel(
-            coefficients.mapIndexed { row, value -> listOf(ExactLpEntry(row, ExactLpNumber.of(value))) },
-            coefficients.map { ExactLpNumber.of(1L) },
-            coefficients.map { ExactLpColumn(ExactLpBounds()) } +
-                coefficients.map { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
-            coefficients.map { ExactLpRow() },
-            ExactLpObjective(coefficients.indices.map { ExactLpNumber.of(if (it < 4) -1L else 0L) } +
-                coefficients.map { zero }),
-        )).toWorkingModel())
+        val source = assertNotNull(
+            LpExactState(
+                ExactLpModel(
+                    coefficients.mapIndexed { row, value -> listOf(ExactLpEntry(row, ExactLpNumber.of(value))) },
+                    coefficients.map { ExactLpNumber.of(1L) },
+                    coefficients.map { ExactLpColumn(ExactLpBounds()) } +
+                        coefficients.map { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+                    coefficients.map { ExactLpRow() },
+                    ExactLpObjective(
+                        coefficients.indices.map { ExactLpNumber.of(if (it < 4) -1L else 0L) } +
+                            coefficients.map { zero },
+                    ),
+                ),
+            ).toWorkingModel(),
+        )
 
         for (noise in listOf(0.0, -1e-8)) {
             val duals = coefficients.take(4).map { -1.0 / it } + noise
@@ -385,46 +554,63 @@ class LpBoundCertificationTest {
     @Test
     fun `missing bound sides should reject before unrelated right hand side arithmetic`() {
         val zero = ExactLpNumber.of(0L)
-        val source = assertNotNull(LpExactState(ExactLpModel(
-            listOf(List(3) { ExactLpEntry(it, ExactLpNumber.of(1L)) }),
-            listOf(1L, 3L, 5L).map { ExactLpNumber.of(BigFraction.ofLong((1L shl 61) - it).reciprocal()) },
-            List(4) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
-            List(3) { ExactLpRow() },
-            ExactLpObjective(listOf(ExactLpNumber.of(-1L), zero, zero, zero)),
-        )).toWorkingModel())
+        val source = assertNotNull(
+            LpExactState(
+                ExactLpModel(
+                    listOf(List(3) { ExactLpEntry(it, ExactLpNumber.of(1L)) }),
+                    listOf(1L, 3L, 5L).map { ExactLpNumber.of(BigFraction.ofLong((1L shl 61) - it).reciprocal()) },
+                    List(4) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+                    List(3) { ExactLpRow() },
+                    ExactLpObjective(listOf(ExactLpNumber.of(-1L), zero, zero, zero)),
+                ),
+            ).toWorkingModel(),
+        )
         val cases = listOf(-0.125 to 128, -Double.fromBits((1023L - 130L) shl 52) to 256)
 
         for ((multiplier, bits) in cases) {
-            val result = certifyLpBoundOnly(source, DoubleArray(3) { multiplier },
-                ReconstructionLimits(maxBits = bits, maxAttempts = 0))
+            val result = certifyLpBoundOnly(
+                source,
+                DoubleArray(3) { multiplier },
+                ReconstructionLimits(maxBits = bits, maxAttempts = 0),
+            )
 
             assertNull(result.bound)
             assertEquals(ReconstructionDecline.CANDIDATE, result.metrics.decline)
             val rejection = assertNotNull(result.metrics.dualRejection)
             assertEquals(0, rejection.column)
             assertTrue(rejection.upper)
-            assertEquals(BigFraction.MINUS_ONE - exactDouble(multiplier) * BigFraction.ofLong(3L),
-                rejection.reduced)
+            assertEquals(
+                BigFraction.MINUS_ONE - exactDouble(multiplier) * BigFraction.ofLong(3L),
+                rejection.reduced,
+            )
         }
     }
 
     @Test
     fun `missing bound side should retain the exact reduced cost obstruction`() {
-        val result = certifyLpBoundOnly(model(upper = null, coefficient = 3L, rhs = 1L),
-            doubleArrayOf(-1.0 / 3.0), ReconstructionLimits(maxAttempts = 0))
+        val result = certifyLpBoundOnly(
+            model(upper = null, coefficient = 3L, rhs = 1L),
+            doubleArrayOf(-1.0 / 3.0),
+            ReconstructionLimits(maxAttempts = 0),
+        )
 
         val rejection = assertNotNull(result.metrics.dualRejection)
         assertEquals(0, rejection.column)
         assertTrue(rejection.upper)
-        assertEquals(BigFraction.ofLong(-1L) - exactDouble(-1.0 / 3.0) * BigFraction.ofLong(3L),
-            rejection.reduced)
+        assertEquals(
+            BigFraction.ofLong(-1L) - exactDouble(-1.0 / 3.0) * BigFraction.ofLong(3L),
+            rejection.reduced,
+        )
         assertNull(result.bound)
     }
 
     @Test
     fun `dual only certification should reconstruct fractional multipliers without recovering a primal`() {
-        val result = certifyLpBoundOnly(model(upper = null, coefficient = 3L, rhs = 1L),
-            doubleArrayOf(-1.0 / 3.0), ReconstructionLimits(maxAttempts = 1))
+        val result = certifyLpBoundOnly(
+            model(upper = null, coefficient = 3L, rhs = 1L),
+            doubleArrayOf(-1.0 / 3.0),
+            ReconstructionLimits(maxAttempts = 1),
+        )
         val bound = assertNotNull(result.bound)
 
         assertEquals(BigFraction.ofLong(-3L).reciprocal(), bound.value)
@@ -438,8 +624,11 @@ class LpBoundCertificationTest {
 
     @Test
     fun `zero reconstruction attempts should retain only the binary dual candidate`() {
-        val result = certifyLpBoundOnly(model(upper = null, coefficient = 3L, rhs = 1L),
-            doubleArrayOf(-1.0 / 3.0), ReconstructionLimits(maxAttempts = 0))
+        val result = certifyLpBoundOnly(
+            model(upper = null, coefficient = 3L, rhs = 1L),
+            doubleArrayOf(-1.0 / 3.0),
+            ReconstructionLimits(maxAttempts = 0),
+        )
 
         assertNull(result.bound)
         assertEquals(ReconstructionDecline.CANDIDATE, result.metrics.decline)
@@ -509,7 +698,12 @@ class LpBoundCertificationTest {
 
     @Test
     fun `cancelled and nonfinite dual candidates should supply no bound`() {
-        val cancelled = certifyLpBoundOnly(model(), doubleArrayOf(-1.0), ReconstructionLimits(), Cancellation { true })
+        val cancelled = certifyLpBoundOnly(
+            model(),
+            doubleArrayOf(-1.0),
+            ReconstructionLimits(),
+            ExecutionControl { true },
+        )
         val nonfinite = certifyLpBoundOnly(model(), doubleArrayOf(Double.NaN), ReconstructionLimits())
 
         assertNull(cancelled.bound)
@@ -536,8 +730,13 @@ class LpBoundCertificationTest {
             }
         }
 
-        val result = certifyLpBoundOnly(model(), doubleArrayOf(-1.0), ReconstructionLimits(), observer = observer,
-            policy = LpCertificationPolicy { _, _ -> false })
+        val result = certifyLpBoundOnly(
+            model(),
+            doubleArrayOf(-1.0),
+            ReconstructionLimits(),
+            observer = observer,
+            policy = LpCertificationPolicy { _, _ -> false },
+        )
 
         assertNull(result.bound)
         assertEquals(listOf(LpCertifier.RATIONAL), certifiers)
@@ -554,7 +753,9 @@ class LpBoundCertificationTest {
             override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
             override fun observeExactInput(accepted: Boolean) = Unit
             override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
-            override fun observePhase(metrics: LpPhaseMetrics) { phases += metrics }
+            override fun observePhase(metrics: LpPhaseMetrics) {
+                phases += metrics
+            }
         }
         val unobserved = certifyLpBoundOnly(model(), doubleArrayOf(-1.0), ReconstructionLimits())
 
@@ -582,7 +783,9 @@ class LpBoundCertificationTest {
                 override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
                 override fun observeExactInput(accepted: Boolean) = Unit
                 override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
-                override fun observePhase(metrics: LpPhaseMetrics) { phases += metrics }
+                override fun observePhase(metrics: LpPhaseMetrics) {
+                    phases += metrics
+                }
             }
             val unobserved = certifyLpBoundOnly(model(), doubleArrayOf(dual), limits)
 
@@ -634,15 +837,20 @@ class LpBoundCertificationTest {
     @Test
     fun `integer bound checking should withhold a proof after cancellation during policy review`() {
         var cancelled = false
-        val token = Cancellation { cancelled }
+        val token = ExecutionControl { cancelled }
         val policy = LpCertificationPolicy { _, success ->
             assertTrue(success)
             cancelled = true
             success
         }
 
-        val result = certifyLpIntegerBoundOnly(model(), doubleArrayOf(-1.0), ReconstructionLimits(), token,
-            policy = policy)
+        val result = certifyLpIntegerBoundOnly(
+            model(),
+            doubleArrayOf(-1.0),
+            ReconstructionLimits(),
+            token,
+            policy = policy,
+        )
 
         assertNull(result.bound)
         assertEquals(ReconstructionDecline.CANCELLED, result.metrics.decline)
@@ -651,15 +859,29 @@ class LpBoundCertificationTest {
 
     private fun model(upper: Long? = 10L, coefficient: Long = 1L, rhs: Long = 5L): LpModel {
         val zero = ExactLpNumber.of(0L)
-        return assertNotNull(LpExactState(ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(coefficient)))),
-            listOf(ExactLpNumber.of(rhs)),
-            listOf(
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), upper?.let { ExactLpSide(ExactLpNumber.of(it)) })),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-            ),
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(ExactLpNumber.of(-1L), zero)),
-        )).toWorkingModel())
+        return assertNotNull(
+            LpExactState(
+                ExactLpModel(
+                    listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(coefficient)))),
+                    listOf(ExactLpNumber.of(rhs)),
+                    listOf(
+                        ExactLpColumn(
+                            ExactLpBounds(
+                                ExactLpSide(zero),
+                                upper?.let {
+                                    ExactLpSide(
+                                        ExactLpNumber
+                                            .of(it),
+                                    )
+                                },
+                            ),
+                        ),
+                        ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                    ),
+                    listOf(ExactLpRow()),
+                    ExactLpObjective(listOf(ExactLpNumber.of(-1L), zero)),
+                ),
+            ).toWorkingModel(),
+        )
     }
 }

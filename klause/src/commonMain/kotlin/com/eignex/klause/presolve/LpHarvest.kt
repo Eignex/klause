@@ -22,7 +22,7 @@ import com.eignex.klause.solver.result.LpHarvestReport
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.SolveStatsSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /**
  * Fold the LP relaxation's proven reductions into [problem] permanently. The harvests share one root-LP
@@ -57,7 +57,7 @@ fun lpHarvest(
     objective: LinearObjective,
     plan: LpPlan,
     bakeConfig: BakeConfig = BakeConfig.NONE,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): Problem = lpHarvestReporting(problem, objective, plan, bakeConfig, cancellation).problem
 
 /** [lpHarvest]'s transformed [problem] paired with its report and LP telemetry. */
@@ -78,7 +78,7 @@ fun lpRootInfeasible(
     problem: Problem,
     objective: LinearObjective,
     plan: LpPlan,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     randomSeed: Long? = null,
 ): Boolean = lpRootInfeasibleReporting(
@@ -96,7 +96,7 @@ internal fun lpRootInfeasibleReporting(
     problem: Problem,
     objective: LinearObjective,
     plan: LpPlan,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     randomSeed: Long? = null,
     projections: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
@@ -128,7 +128,7 @@ fun lpRootBounds(
     problem: Problem,
     objective: LinearObjective,
     plan: LpPlan,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     randomSeed: Long? = null,
 ): Problem = lpRootBoundsReporting(
@@ -146,7 +146,7 @@ internal fun lpRootBoundsReporting(
     problem: Problem,
     objective: LinearObjective,
     plan: LpPlan,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     randomSeed: Long? = null,
     minimumSpan: Long = 0L,
@@ -195,14 +195,14 @@ fun lpHarvestReporting(
     objective: LinearObjective,
     plan: LpPlan,
     bakeConfig: BakeConfig = BakeConfig.NONE,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     randomSeed: Long? = null,
     numericalLp: Boolean = false,
 ): LpHarvestResult {
     // The token must reach the simplex itself, not just the probe loops below: one primal phase-1 on a
     // large relaxation runs far past the presolve budget, and the engine polls only the `cancellation`
-    // that `LpParams` hands it — every `LpSolver` entry point defaults to `Cancellation.Never`.
+    // that `LpParams` hands it — every `LpSolver` entry point defaults to `ExecutionControl.Never`.
     val sink = SolveStatsSink(backend = "lp-harvest", lpProbeRoute = LpRoute.ROOT)
     val engine = LpEngine(
         problem,

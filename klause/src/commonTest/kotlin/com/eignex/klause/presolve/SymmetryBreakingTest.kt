@@ -26,7 +26,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.conditionedRoot
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
@@ -101,7 +101,7 @@ class SymmetryBreakingTest {
 
         for (pass in listOf(PresolvePass.BREAK_SYMMETRIES, PresolvePass.VALUE_PRECEDENCE)) {
             val budget = PresolveBudget(6)
-            val context = PresolveContext(cancellation = budget.orSpent(Cancellation.Never))
+            val context = PresolveContext(cancellation = budget.orSpent(ExecutionControl.Never))
 
             assertTrue(pass.applyFinite(problem, context).isEmpty)
         }
@@ -259,7 +259,7 @@ class SymmetryBreakingTest {
         val context = PresolveContext.of(objective, transformObjective = true)
         val factors = listOf(AllDifferent(intArrayOf(0, 1)))
         val pinned = Problem(0, 2, Array(2) { IntDomain(0, 3) }, factors).bake()
-            .conditionedRoot(Assumptions.None.withInt(0, 3), Cancellation.Never)
+            .conditionedRoot(Assumptions.None.withInt(0, 3), ExecutionControl.Never)
         val holes = Problem(0, 2, arrayOf(IntDomain(0, 3).excludeValue(1), IntDomain(0, 3)), factors).bake()
 
         for (problem in listOf(pinned, holes)) {
@@ -304,7 +304,7 @@ class SymmetryBreakingTest {
         val context = PresolveContext.of(
             LinearObjective(intCoefficients = longArrayOf(1, 1, 1)), transformObjective = true,
         )
-            .withCancellation(budget.orSpent(Cancellation.Never))
+            .withCancellation(budget.orSpent(ExecutionControl.Never))
 
         assertTrue(PresolvePass.BREAK_OBJECTIVE_SYMMETRIES.applyFinite(problem, context).isEmpty)
         assertTrue(budget.spent() > 0)

@@ -43,7 +43,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -62,9 +62,12 @@ class LpEngineTest {
         session.pinBool(1, true)
         session.popToLevel(1)
 
-        val rootPruned = LpEngine(problem,
+        val rootPruned = LpEngine(
+            problem,
             LinearObjective(boolWeights = longArrayOf(5, 2), intCoefficients = longArrayOf(1)),
-            LpParams(), SolveStatsSink("late-linear-bound")).use { engine ->
+            LpParams(),
+            SolveStatsSink("late-linear-bound"),
+        ).use { engine ->
             assertTrue(engine.pruneNode(session, 4.0, -1, true))
             session.popToLevel(0)
             engine.pruneNode(session, 4.0, -1, true)
@@ -75,24 +78,39 @@ class LpEngineTest {
 
     @Test
     fun `a restored root refreshes expired preferences without another lp query`() {
-        val problem = Problem(0, 6, Array(6) { IntDomain(0, 5) }, listOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
-            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(4, 5), LinearOp.GE, 1),
-        )).bake()
+        val problem = Problem(
+            0,
+            6,
+            Array(6) { IntDomain(0, 5) },
+            listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(4, 5), LinearOp.GE, 1),
+            ),
+        ).bake()
         val objective = LinearObjective(intCoefficients = LongArray(6) { 2L })
         val factory = RecordingLpEngineFactory()
-        LpEngine(problem, objective,
-            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
-                rootCutHarvest = false)), SolveStatsSink("refreshed-root-preferences"),
-            LpSolveContext(factory)).use { engine ->
+        LpEngine(
+            problem,
+            objective,
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    probe = true,
+                    componentOwnership = true,
+                    rootCutHarvest = false,
+                ),
+            ),
+            SolveStatsSink("refreshed-root-preferences"),
+            LpSolveContext(factory),
+        ).use { engine ->
             val cp = CpSearchComponent(PropagationSession(problem))
             engine.cpAdapter.attach(cp.session, feasibility = false)
             val shared = SearchSession(listOf(cp, engine.propagator))
             shared.initialize()
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
-            assertTrue(engine.retainRootPrimalTargets(Cancellation.Never))
+            assertTrue(engine.retainRootPrimalTargets(ExecutionControl.Never))
             engine.rootRoundingWarmStart = null
             val expired = assertNotNull(engine.rootPrimalTargets)
             shared.push(SearchDecision.IntAtLeast(0, 1L))
@@ -101,7 +119,7 @@ class LpEngineTest {
             val queries = factory.floatAllowances.size
             val before = engine.totalSolveWork()
 
-            val refreshed = engine.refreshRootPrimalTargets(cp.session, Cancellation.Never)
+            val refreshed = engine.refreshRootPrimalTargets(cp.session, ExecutionControl.Never)
 
             assertTrue(refreshed)
             assertFalse(expired === engine.rootPrimalTargets)
@@ -115,10 +133,20 @@ class LpEngineTest {
     fun `root preference refresh declines live search restrictions`() {
         val problem = boundedProblem().bake()
         val factory = RecordingLpEngineFactory()
-        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
-            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
-                rootCutHarvest = false)), SolveStatsSink("nested-root-preference-refresh"),
-            LpSolveContext(factory)).use { engine ->
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    probe = true,
+                    componentOwnership = true,
+                    rootCutHarvest = false,
+                ),
+            ),
+            SolveStatsSink("nested-root-preference-refresh"),
+            LpSolveContext(factory),
+        ).use { engine ->
             val cp = CpSearchComponent(PropagationSession(problem))
             engine.cpAdapter.attach(cp.session, feasibility = false)
             val shared = SearchSession(listOf(cp, engine.propagator))
@@ -129,7 +157,7 @@ class LpEngineTest {
             val before = engine.totalSolveWork()
             val queries = factory.floatAllowances.size
 
-            val refreshed = engine.refreshRootPrimalTargets(cp.session, Cancellation.Never)
+            val refreshed = engine.refreshRootPrimalTargets(cp.session, ExecutionControl.Never)
 
             assertFalse(refreshed)
             assertNull(engine.rootPrimalTargets)
@@ -141,13 +169,23 @@ class LpEngineTest {
     @Test
     fun `cancelled root preference refresh withholds a new guide`() {
         val problem = boundedProblem().bake()
-        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
-            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
-                rootCutHarvest = false)), SolveStatsSink("cancelled-root-preference-refresh")).use { engine ->
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    probe = true,
+                    componentOwnership = true,
+                    rootCutHarvest = false,
+                ),
+            ),
+            SolveStatsSink("cancelled-root-preference-refresh"),
+        ).use { engine ->
             val session = PropagationSession(problem)
             val before = engine.totalSolveWork()
 
-            val refreshed = engine.refreshRootPrimalTargets(session, Cancellation { true })
+            val refreshed = engine.refreshRootPrimalTargets(session, ExecutionControl { true })
 
             assertFalse(refreshed)
             assertNull(engine.rootPrimalTargets)
@@ -160,8 +198,12 @@ class LpEngineTest {
         val problem = Problem(0, 1, arrayOf(IntDomain(1, 2)), emptyList())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val session = PropagationSession(problem)
-        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)),
-            SolveStatsSink("deferred-simplex-objective-bound")).use { engine ->
+        LpEngine(
+            problem,
+            objective,
+            LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink("deferred-simplex-objective-bound"),
+        ).use { engine ->
 
             val pruned = engine.pruneNode(session, 1.0, -1, true, deferSimplex = true)
 
@@ -172,13 +214,23 @@ class LpEngineTest {
     @Test
     fun `numerical root preparation finishes before the bounded root query`() {
         val sink = SolveStatsSink("paid-numerical-root-preparation")
-        LpEngine(boundedProblem().bake(), LinearObjective(intCoefficients = LongArray(3) { 2L }),
-            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
-                probe = false, rootCutHarvest = false)), sink).use { engine ->
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+        LpEngine(
+            boundedProblem().bake(),
+            LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    componentOwnership = true,
+                    probe = false,
+                    rootCutHarvest = false,
+                ),
+            ),
+            sink,
+        ).use { engine ->
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             val prepared = assertNotNull(engine.propagator.metrics)
             val paid = prepared.preparationWork
-            val query = Cancellation { engine.propagator.metrics?.preparationSuccesses == 0L }
+            val query = ExecutionControl { engine.propagator.metrics?.preparationSuccesses == 0L }
 
             val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(), query)
 
@@ -193,18 +245,31 @@ class LpEngineTest {
     fun `paused root layout preparation retains charged construction`() {
         val problem = boundedProblem().bake()
         val sink = SolveStatsSink("paused-root-layout")
-        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
-            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
-                probe = false, rootCutHarvest = false)), sink,
-            projections = FactorProjectionProviders.Default.prepare(problem)).use { engine ->
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    componentOwnership = true,
+                    probe = false,
+                    rootCutHarvest = false,
+                ),
+            ),
+            sink,
+            projections = FactorProjectionProviders.Default.prepare(problem),
+        ).use { engine ->
             val before = engine.totalSolveWork()
 
-            val readyInFirstSlice = engine.prepareRootLayout(Cancellation.Never, Cancellation {
-                engine.totalSolveWork() > before
-            })
+            val readyInFirstSlice = engine.prepareRootLayout(
+                ExecutionControl.Never,
+                ExecutionControl {
+                    engine.totalSolveWork() > before
+                },
+            )
             val paid = engine.totalSolveWork()
             val prepared = sink.snapshot().lp.phases["TEMPLATE_PREPARATION_NODE"]?.calls
-            val ready = engine.prepareRootLayout(Cancellation.Never, Cancellation.Never)
+            val ready = engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never)
             val imported = sink.snapshot().lp.phases["TEMPLATE_ASSEMBLY_NODE"]?.outcomes?.get("EXACT_BOUND_OBJECTS")
             val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
 
@@ -214,8 +279,10 @@ class LpEngineTest {
             assertNotNull(prepared)
             assertEquals(prepared, sink.snapshot().lp.phases["TEMPLATE_PREPARATION_NODE"]?.calls)
             assertNotNull(imported)
-            assertEquals(imported,
-                sink.snapshot().lp.phases["TEMPLATE_ASSEMBLY_NODE"]?.outcomes?.get("EXACT_BOUND_OBJECTS"))
+            assertEquals(
+                imported,
+                sink.snapshot().lp.phases["TEMPLATE_ASSEMBLY_NODE"]?.outcomes?.get("EXACT_BOUND_OBJECTS"),
+            )
             assertEquals(3.0, bound)
         }
     }
@@ -226,19 +293,30 @@ class LpEngineTest {
         val sink = SolveStatsSink("root-layout-invocation-boundary")
         var current: LpEngine? = null
         var sliceStart = Long.MAX_VALUE
-        val invocation = Cancellation { (current?.totalSolveWork() ?: 0L) > sliceStart }
-        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
-            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
-                probe = false, rootCutHarvest = false), cancellation = invocation), sink,
-            projections = FactorProjectionProviders.Default.prepare(problem)).use { engine ->
+        val invocation = ExecutionControl { (current?.totalSolveWork() ?: 0L) > sliceStart }
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    componentOwnership = true,
+                    probe = false,
+                    rootCutHarvest = false,
+                ),
+                cancellation = invocation,
+            ),
+            sink,
+            projections = FactorProjectionProviders.Default.prepare(problem),
+        ).use { engine ->
             current = engine
             val before = engine.totalSolveWork()
             sliceStart = before
 
-            val readyInFirstSlice = engine.prepareRootLayout(Cancellation.Never, invocation)
+            val readyInFirstSlice = engine.prepareRootLayout(ExecutionControl.Never, invocation)
             val paid = engine.totalSolveWork()
             sliceStart = Long.MAX_VALUE
-            val ready = engine.prepareRootLayout(Cancellation.Never, invocation)
+            val ready = engine.prepareRootLayout(ExecutionControl.Never, invocation)
             val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
 
             assertFalse(readyInFirstSlice)
@@ -252,17 +330,27 @@ class LpEngineTest {
     @Test
     fun `containing cancellation retires a paused root layout`() {
         var cancelled = false
-        val lifetime = Cancellation { cancelled }
+        val lifetime = ExecutionControl { cancelled }
         val sink = SolveStatsSink("cancelled-root-layout")
-        LpEngine(boundedProblem(), LinearObjective(intCoefficients = LongArray(3) { 2L }),
-            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
-                probe = false, rootCutHarvest = false)), sink).use { engine ->
+        LpEngine(
+            boundedProblem(),
+            LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    componentOwnership = true,
+                    probe = false,
+                    rootCutHarvest = false,
+                ),
+            ),
+            sink,
+        ).use { engine ->
             val before = engine.totalSolveWork()
-            assertFalse(engine.prepareRootLayout(lifetime, Cancellation { engine.totalSolveWork() > before }))
+            assertFalse(engine.prepareRootLayout(lifetime, ExecutionControl { engine.totalSolveWork() > before }))
             val paid = engine.totalSolveWork()
             cancelled = true
 
-            engine.prepareRootLayout(lifetime, Cancellation.Never)
+            engine.prepareRootLayout(lifetime, ExecutionControl.Never)
             val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(), lifetime)
 
             assertTrue(bound.isNaN())
@@ -273,13 +361,24 @@ class LpEngineTest {
 
     @Test
     fun `root layout resumption does not renew spent construction work`() {
-        LpEngine(boundedProblem(), LinearObjective(intCoefficients = LongArray(3) { 2L }),
-            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true, rootMaxWork = 1L,
-                probe = false, rootCutHarvest = false)), SolveStatsSink("spent-root-layout")).use { engine ->
-            engine.prepareRootLayout(Cancellation.Never, Cancellation.Never)
+        LpEngine(
+            boundedProblem(),
+            LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    componentOwnership = true,
+                    rootMaxWork = 1L,
+                    probe = false,
+                    rootCutHarvest = false,
+                ),
+            ),
+            SolveStatsSink("spent-root-layout"),
+        ).use { engine ->
+            engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never)
             val spent = engine.totalSolveWork()
 
-            engine.prepareRootLayout(Cancellation.Never, Cancellation.Never)
+            engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never)
             val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
 
             assertTrue(spent > 0L)
@@ -293,21 +392,35 @@ class LpEngineTest {
         val problem = boundedProblem().bake()
         val sink = SolveStatsSink("retained-root-preparation")
         var rootPolls = 0
-        val rootToken = Cancellation { rootPolls++ > 0 }
-        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
-            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
-                probe = false, rootCutHarvest = false)), sink,
-            projections = FactorProjectionProviders.Default.prepare(problem)).use { engine ->
+        val rootToken = ExecutionControl { rootPolls++ > 0 }
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    componentOwnership = true,
+                    probe = false,
+                    rootCutHarvest = false,
+                ),
+            ),
+            sink,
+            projections = FactorProjectionProviders.Default.prepare(problem),
+        ).use { engine ->
             val cp = CpSearchComponent(PropagationSession(problem))
             engine.cpAdapter.attach(cp.session, feasibility = false)
             SearchSession(listOf(cp, engine.propagator)).initialize()
             val relaxer = assertNotNull(engine.lpRelaxer)
 
-            val root = engine.rootLpRelaxationBound(relaxer, emptyList(), rootToken,
-                preparationCancellation = Cancellation.Never)
+            val root = engine.rootLpRelaxationBound(
+                relaxer,
+                emptyList(),
+                rootToken,
+                preparationCancellation = ExecutionControl.Never,
+            )
             val prepared = sink.snapshot().lp.phases["TEMPLATE_PREPARATION_NODE"]?.calls ?: 0L
             val node = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            val bound = assertNotNull(engine.solveNode(node.model, null, Cancellation.Never)?.second).objective
+            val bound = assertNotNull(engine.solveNode(node.model, null, ExecutionControl.Never)?.second).objective
 
             assertTrue(root.isNaN())
             assertTrue(prepared > 0L)
@@ -319,20 +432,35 @@ class LpEngineTest {
     @Test
     fun `source root bounds exclude live search restrictions`() {
         val problem = boundedProblem()
-        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
-            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
-                probe = false, rootCutHarvest = false)),
-            SolveStatsSink("unconditional-source-root")).use { engine ->
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    componentOwnership = true,
+                    probe = false,
+                    rootCutHarvest = false,
+                ),
+            ),
+            SolveStatsSink("unconditional-source-root"),
+        ).use { engine ->
             val cp = CpSearchComponent(PropagationSession(problem))
             engine.cpAdapter.attach(cp.session, feasibility = false)
             val shared = SearchSession(listOf(cp, engine.propagator))
             shared.initialize()
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             shared.push(SearchDecision.IntAtLeast(0, 1L))
 
             val root = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
             val child = assertNotNull(engine.nodeRelaxation(assertNotNull(engine.lpRelaxer), cp.session))
-            val childBound = assertNotNull(engine.solveNode(child.model, null, Cancellation.Never)?.second).objective
+            val childBound = assertNotNull(
+                engine.solveNode(
+                    child.model,
+                    null,
+                    ExecutionControl.Never,
+                )?.second,
+            ).objective
 
             assertEquals(3.0, root)
             assertEquals(4.0, childBound)
@@ -342,14 +470,32 @@ class LpEngineTest {
     @Test
     fun `source root bounds accept noncompact exact rows`() {
         val coefficient = BigFraction.ofLong(Long.MAX_VALUE) + BigFraction.ONE
-        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, (0 until 2).map { block ->
-            ExactLinear.of(intArrayOf(Term.ofIntVar(2 * block), Term.ofIntVar(2 * block + 1)),
-                listOf(coefficient, coefficient + BigFraction.ONE), LinearOp.GE, coefficient)
-        })
-        LpEngine(problem, LinearObjective(intCoefficients = LongArray(4) { 1L }),
-            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
-                probe = false, rootCutHarvest = false)),
-            SolveStatsSink("noncompact-source-root")).use { engine ->
+        val problem = Problem(
+            0,
+            4,
+            Array(4) { IntDomain(0, 1) },
+            (0 until 2).map { block ->
+                ExactLinear.of(
+                    intArrayOf(Term.ofIntVar(2 * block), Term.ofIntVar(2 * block + 1)),
+                    listOf(coefficient, coefficient + BigFraction.ONE),
+                    LinearOp.GE,
+                    coefficient,
+                )
+            },
+        )
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(4) { 1L }),
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    componentOwnership = true,
+                    probe = false,
+                    rootCutHarvest = false,
+                ),
+            ),
+            SolveStatsSink("noncompact-source-root"),
+        ).use { engine ->
 
             val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
 
@@ -360,16 +506,34 @@ class LpEngineTest {
     @Test
     fun `retained layouts accept noncompact exact source rows`() {
         val coefficient = BigFraction.ofLong(Long.MAX_VALUE) + BigFraction.ONE
-        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, (0 until 2).map { block ->
-            ExactLinear.of(intArrayOf(Term.ofIntVar(2 * block), Term.ofIntVar(2 * block + 1)),
-                listOf(coefficient, coefficient + BigFraction.ONE), LinearOp.GE, coefficient)
-        })
+        val problem = Problem(
+            0,
+            4,
+            Array(4) { IntDomain(0, 1) },
+            (0 until 2).map { block ->
+                ExactLinear.of(
+                    intArrayOf(Term.ofIntVar(2 * block), Term.ofIntVar(2 * block + 1)),
+                    listOf(coefficient, coefficient + BigFraction.ONE),
+                    LinearOp.GE,
+                    coefficient,
+                )
+            },
+        )
         val objective = LinearObjective(intCoefficients = LongArray(4) { 1L })
         assertNotNull(CpToLpRelaxation(problem, objective).build(RootDomains(problem)).model.doubleView)
-        LpEngine(problem, objective,
-            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
-                probe = false, rootCutHarvest = false)),
-            SolveStatsSink("exact-retained-layout")).use { engine ->
+        LpEngine(
+            problem,
+            objective,
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    componentOwnership = true,
+                    probe = false,
+                    rootCutHarvest = false,
+                ),
+            ),
+            SolveStatsSink("exact-retained-layout"),
+        ).use { engine ->
 
             val relaxation = engine.nodeRelaxation(assertNotNull(engine.lpRelaxer), PropagationSession(problem))
 
@@ -385,33 +549,43 @@ class LpEngineTest {
         val sink = SolveStatsSink("default-earned-preparation")
 
         repeat(32) {
-            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
-                projections = projections).use { engine ->
+            LpEngine(
+                problem,
+                objective,
+                LpParams(lpPlan = LpPlan(bounding = true)),
+                sink,
+                projections = projections,
+            ).use { engine ->
                 assertEquals(3.0, engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList()))
             }
         }
 
         val phases = sink.snapshot().lp.phases
         assertTrue(phases.filterKeys { it.startsWith("TEMPLATE_FUNDING_") }.values.sumOf { it.calls } > 0L)
-        assertTrue(phases.filterKeys { it.startsWith("TEMPLATE_PREPARATION_") }.values.sumOf {
-            it.outcomes["FACTORS_REUSED"] ?: 0L
-        } > 0L)
+        assertTrue(
+            phases.filterKeys { it.startsWith("TEMPLATE_PREPARATION_") }.values.sumOf {
+                it.outcomes["FACTORS_REUSED"] ?: 0L
+            } > 0L,
+        )
     }
 
     @Test
     fun `cancelled template preparation charges the containing LP allowance`() {
         val problem = boundedProblem().bake()
         var work = 0L
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             private val meter = WorkMeter { work += it }
             override fun isCancelled(): Boolean = work >= 3L
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
-        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(3) { 2L }),
             LpParams(lpPlan = LpPlan(bounding = true), cancellation = token),
             SolveStatsSink("cancelled-template-charge"),
             projections = FactorProjectionProviders.Default.prepare(problem),
-            eagerSourcePreparation = true).use { engine ->
+            eagerSourcePreparation = true,
+        ).use { engine ->
             val before = engine.totalSolveWork()
             work = 0L
 
@@ -428,16 +602,21 @@ class LpEngineTest {
     fun `cancelled admission lookup charges the containing LP allowance`() {
         val problem = boundedProblem().bake()
         var work = 0L
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             private val meter = WorkMeter { work += it }
             override fun isCancelled(): Boolean = work >= 1L
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
-        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
-            LpParams(lpPlan = LpPlan(bounding = true, sourcePreparation = LpSourcePreparation.ADMITTED),
-                cancellation = token),
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(
+                lpPlan = LpPlan(bounding = true, sourcePreparation = LpSourcePreparation.ADMITTED),
+                cancellation = token,
+            ),
             SolveStatsSink("cancelled-admission-charge"),
-            projections = FactorProjectionProviders.Default.prepare(problem)).use { engine ->
+            projections = FactorProjectionProviders.Default.prepare(problem),
+        ).use { engine ->
             val before = engine.totalSolveWork()
             work = 0L
 
@@ -453,12 +632,23 @@ class LpEngineTest {
     @Test
     fun `retained root layouts adopt propagated source bounds`() {
         val source = boundedProblem()
-        val problem = source.withFactors(source.factors +
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1))
-        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
-            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
-                probe = false, rootCutHarvest = false)),
-            SolveStatsSink("root-layout-propagation")).use { engine ->
+        val problem = source.withFactors(
+            source.factors +
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+        )
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    componentOwnership = true,
+                    probe = false,
+                    rootCutHarvest = false,
+                ),
+            ),
+            SolveStatsSink("root-layout-propagation"),
+        ).use { engine ->
 
             val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
 
@@ -475,13 +665,26 @@ class LpEngineTest {
         )
         for ((grant, cancelled, outcome) in cases) {
             val sink = SolveStatsSink("root-query-admission")
-            LpEngine(boundedProblem(), LinearObjective(intCoefficients = LongArray(3) { 2L }),
-                LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
-                    probe = false, rootCutHarvest = false)), sink,
-                nodeWorkAllowance = { grant }).use { engine ->
+            LpEngine(
+                boundedProblem(),
+                LinearObjective(intCoefficients = LongArray(3) { 2L }),
+                LpParams(
+                    lpPlan = LpPlan(
+                        bounding = true,
+                        componentOwnership = true,
+                        probe = false,
+                        rootCutHarvest = false,
+                    ),
+                ),
+                sink,
+                nodeWorkAllowance = { grant },
+            ).use { engine ->
 
-                val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(),
-                    Cancellation { cancelled })
+                val bound = engine.rootLpRelaxationBound(
+                    assertNotNull(engine.lpRelaxer),
+                    emptyList(),
+                    ExecutionControl { cancelled },
+                )
 
                 if (outcome == "BOUND") assertEquals(3.0, bound) else assertTrue(bound.isNaN())
                 assertEquals(1L, sink.snapshot().lp.phases["ROOT_QUERY_ROOT"]?.outcomes?.get("COMPONENT_$outcome"))
@@ -492,19 +695,36 @@ class LpEngineTest {
     @Test
     fun `complete component node deductions honor the injected proof policy`() {
         for (accepted in listOf(false, true)) {
-            val problem = Problem(0, 4, Array(4) { IntDomain(0, 5) }, listOf(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
-            ))
+            val problem = Problem(
+                0,
+                4,
+                Array(4) { IntDomain(0, 5) },
+                listOf(
+                    Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                    Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+                ),
+            )
             val sink = SolveStatsSink("complete-component-policy")
-            val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, success ->
-                accepted && success
-            })
+            val context = LpSolveContext(
+                certificationPolicy = LpCertificationPolicy { _, success ->
+                    accepted && success
+                },
+            )
 
-            val pruned = LpEngine(problem,
+            val pruned = LpEngine(
+                problem,
                 LinearObjective(intCoefficients = LongArray(4) { 1L }, constant = 7L),
-                LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
-                    probe = false, rootCutHarvest = false)), sink, context).use { engine ->
+                LpParams(
+                    lpPlan = LpPlan(
+                        bounding = true,
+                        componentOwnership = true,
+                        probe = false,
+                        rootCutHarvest = false,
+                    ),
+                ),
+                sink,
+                context,
+            ).use { engine ->
                 engine.pruneNode(PropagationSession(problem), 8.0, -1, true)
             }
 
@@ -515,14 +735,29 @@ class LpEngineTest {
 
     @Test
     fun `ordinary component roots yield checked partial bounds after their adaptive query`() {
-        val problem = Problem(0, 120, Array(120) { IntDomain(0, 1) }, (0 until 120).map { variable ->
-            val next = (variable / 60) * 60 + (variable + 1) % 60
-            Linear(intArrayOf(1, 1), intArrayOf(variable, next), LinearOp.GE, 1)
-        })
-        LpEngine(problem, LinearObjective(intCoefficients = LongArray(120) { 1L }),
-            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
-                probe = false, rootCutHarvest = false), solveBudgetMillis = 30_000L),
-            SolveStatsSink("ordinary-root-query-quantum")).use { engine ->
+        val problem = Problem(
+            0,
+            120,
+            Array(120) { IntDomain(0, 1) },
+            (0 until 120).map { variable ->
+                val next = (variable / 60) * 60 + (variable + 1) % 60
+                Linear(intArrayOf(1, 1), intArrayOf(variable, next), LinearOp.GE, 1)
+            },
+        )
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(120) { 1L }),
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    componentOwnership = true,
+                    probe = false,
+                    rootCutHarvest = false,
+                ),
+                solveBudgetMillis = 30_000L,
+            ),
+            SolveStatsSink("ordinary-root-query-quantum"),
+        ).use { engine ->
             engine.observeNodeWork(reachedOptimum = true, degenerateColumns = 0, columns = 1, rows = 1)
 
             val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
@@ -538,20 +773,31 @@ class LpEngineTest {
         val problem = boundedProblem().bake()
         val factory = RecordingLpEngineFactory()
         var sliceStopped = false
-        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
-            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
-                probe = false, rootCutHarvest = false), cancellation = Cancellation { sliceStopped },
-                solveBudgetMillis = 30_000L),
-            SolveStatsSink("root-installation-token"), LpSolveContext(factory)).use { engine ->
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    componentOwnership = true,
+                    probe = false,
+                    rootCutHarvest = false,
+                ),
+                cancellation = ExecutionControl { sliceStopped },
+                solveBudgetMillis = 30_000L,
+            ),
+            SolveStatsSink("root-installation-token"),
+            LpSolveContext(factory),
+        ).use { engine ->
             val base = assertNotNull(engine.lpRelaxer).build(RootDomains(problem))
             sliceStopped = true
-            val installed = assertNotNull(engine.cpAdapter.sourceRootRelaxation(base, Cancellation.Never))
-            assertTrue(engine.propagator.prepare(Cancellation.Never, 100_000L))
+            val installed = assertNotNull(engine.cpAdapter.sourceRootRelaxation(base, ExecutionControl.Never))
+            assertTrue(engine.propagator.prepare(ExecutionControl.Never, 100_000L))
             val prepared = factory.calls.size
             assertTrue(prepared > 0)
             sliceStopped = false
 
-            val result = assertNotNull(engine.solveNode(installed.model, null, Cancellation.Never)?.second)
+            val result = assertNotNull(engine.solveNode(installed.model, null, ExecutionControl.Never)?.second)
 
             assertEquals(3.0, result.objective)
             assertEquals(prepared, factory.calls.size)
@@ -561,13 +807,23 @@ class LpEngineTest {
     @Test
     fun `ordinary component roots honor an empty cut selection from a nonempty pool`() {
         val problem = boundedProblem()
-        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
-            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
-                probe = false, rootCutHarvest = false), solveBudgetMillis = 30_000L),
-            SolveStatsSink("ordinary-root-cut-selection")).use { engine ->
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    componentOwnership = true,
+                    probe = false,
+                    rootCutHarvest = false,
+                ),
+                solveBudgetMillis = 30_000L,
+            ),
+            SolveStatsSink("ordinary-root-cut-selection"),
+        ).use { engine ->
             val relaxer = assertNotNull(engine.lpRelaxer)
             val base = relaxer.build(PropagationSession(problem))
-            val cut = engine.dualSimplex(base.model, Cancellation.Never).use { simplex ->
+            val cut = engine.dualSimplex(base.model, ExecutionControl.Never).use { simplex ->
                 assertNotNull(simplex.solve())
                 simplex.gomoryCuts(8).first()
             }
@@ -583,22 +839,38 @@ class LpEngineTest {
 
     @Test
     fun `ordinary component roots retain global cuts for later node queries`() {
-        val problem = Problem(0, 4, Array(4) { IntDomain(0, 5) }, listOf(
-            Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.LE, 3),
-            Linear(intArrayOf(2, 2), intArrayOf(2, 3), LinearOp.LE, 3),
-        ))
+        val problem = Problem(
+            0,
+            4,
+            Array(4) { IntDomain(0, 5) },
+            listOf(
+                Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.LE, 3),
+                Linear(intArrayOf(2, 2), intArrayOf(2, 3), LinearOp.LE, 3),
+            ),
+        )
         val factory = RecordingLpEngineFactory()
         val sink = SolveStatsSink("ordinary-root-cuts")
-        LpEngine(problem, LinearObjective(intCoefficients = LongArray(4) { -1L }),
-            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
-                probe = false, rootCutHarvest = false), solveBudgetMillis = 30_000L),
-            sink, LpSolveContext(factory)).use { engine ->
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(4) { -1L }),
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    componentOwnership = true,
+                    probe = false,
+                    rootCutHarvest = false,
+                ),
+                solveBudgetMillis = 30_000L,
+            ),
+            sink,
+            LpSolveContext(factory),
+        ).use { engine ->
             val cp = CpSearchComponent(PropagationSession(problem))
             engine.cpAdapter.attach(cp.session, feasibility = false)
             SearchSession(listOf(cp, engine.propagator)).initialize()
             val relaxer = assertNotNull(engine.lpRelaxer)
             val base = relaxer.build(cp.session)
-            val cut = engine.dualSimplex(base.model, Cancellation.Never).use { simplex ->
+            val cut = engine.dualSimplex(base.model, ExecutionControl.Never).use { simplex ->
                 assertNotNull(simplex.solve())
                 simplex.gomoryCuts(8).first()
             }
@@ -618,16 +890,32 @@ class LpEngineTest {
 
     @Test
     fun `an ordinary component root solves only the child narrowed by a later decision`() {
-        val problem = Problem(0, 4, Array(4) { IntDomain(0, 5) }, listOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
-        ))
+        val problem = Problem(
+            0,
+            4,
+            Array(4) { IntDomain(0, 5) },
+            listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+            ),
+        )
         val factory = RecordingLpEngineFactory()
         val sink = SolveStatsSink("ordinary-root-child")
-        LpEngine(problem, LinearObjective(intCoefficients = LongArray(4) { 1L }),
-            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
-                probe = false, rootCutHarvest = false), solveBudgetMillis = 30_000L),
-            sink, LpSolveContext(factory)).use { engine ->
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(4) { 1L }),
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    componentOwnership = true,
+                    probe = false,
+                    rootCutHarvest = false,
+                ),
+                solveBudgetMillis = 30_000L,
+            ),
+            sink,
+            LpSolveContext(factory),
+        ).use { engine ->
             val cp = CpSearchComponent(PropagationSession(problem))
             engine.cpAdapter.attach(cp.session, feasibility = false)
             val shared = SearchSession(listOf(cp, engine.propagator))
@@ -648,16 +936,32 @@ class LpEngineTest {
 
     @Test
     fun `ordinary component roots retain their owners for later node queries`() {
-        val problem = Problem(0, 4, Array(4) { IntDomain(0, 5) }, listOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
-        ))
+        val problem = Problem(
+            0,
+            4,
+            Array(4) { IntDomain(0, 5) },
+            listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+            ),
+        )
         val factory = RecordingLpEngineFactory()
         val sink = SolveStatsSink("ordinary-root-owner")
-        LpEngine(problem, LinearObjective(intCoefficients = LongArray(4) { 1L }),
-            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
-                probe = false, rootCutHarvest = false), solveBudgetMillis = 30_000L),
-            sink, LpSolveContext(factory)).use { engine ->
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(4) { 1L }),
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    componentOwnership = true,
+                    probe = false,
+                    rootCutHarvest = false,
+                ),
+                solveBudgetMillis = 30_000L,
+            ),
+            sink,
+            LpSolveContext(factory),
+        ).use { engine ->
             val cp = CpSearchComponent(PropagationSession(problem))
             engine.cpAdapter.attach(cp.session, feasibility = false)
             SearchSession(listOf(cp, engine.propagator)).initialize()
@@ -677,19 +981,35 @@ class LpEngineTest {
 
     @Test
     fun `partial component root bounds honor the injected proof policy`() {
-        val problem = Problem(0, 6, Array(6) { IntDomain(0, 5) }, listOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
-            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(4, 5), LinearOp.GE, 1),
-        ))
+        val problem = Problem(
+            0,
+            6,
+            Array(6) { IntDomain(0, 5) },
+            listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(4, 5), LinearOp.GE, 1),
+            ),
+        )
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
-                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                model: LpModel,
+                cancellation: ExecutionControl,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
                 )
                 return object : PersistentLpSolver by delegate {
                     override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
@@ -699,12 +1019,26 @@ class LpEngineTest {
         }
         for (allowed in listOf(emptySet(), setOf(LpCertifier.INTEGER), setOf(LpCertifier.RATIONAL))) {
             val sink = SolveStatsSink("partial-component-root-policy")
-            val context = LpSolveContext(factory, LpCertificationPolicy { certifier, success ->
-                success && certifier in allowed
-            })
-            LpEngine(problem, LinearObjective(intCoefficients = LongArray(6) { 1L }, constant = 7L),
-                LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
-                    probe = false, rootCutHarvest = false)), sink, context).use { engine ->
+            val context = LpSolveContext(
+                factory,
+                LpCertificationPolicy { certifier, success ->
+                    success && certifier in allowed
+                },
+            )
+            LpEngine(
+                problem,
+                LinearObjective(intCoefficients = LongArray(6) { 1L }, constant = 7L),
+                LpParams(
+                    lpPlan = LpPlan(
+                        bounding = true,
+                        componentOwnership = true,
+                        probe = false,
+                        rootCutHarvest = false,
+                    ),
+                ),
+                sink,
+                context,
+            ).use { engine ->
 
                 val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
 
@@ -712,8 +1046,10 @@ class LpEngineTest {
                 assertEquals(LpFloatTermination.WORK, engine.propagator.floatTermination)
                 assertFalse(engine.propagator.floatPaused)
                 if (allowed.isNotEmpty()) {
-                    assertEquals(1L,
-                        sink.snapshot().lp.phases["ROOT_QUERY_ROOT"]?.outcomes?.get("COMPONENT_PARTIAL_BOUND"))
+                    assertEquals(
+                        1L,
+                        sink.snapshot().lp.phases["ROOT_QUERY_ROOT"]?.outcomes?.get("COMPONENT_PARTIAL_BOUND"),
+                    )
                 }
             }
         }
@@ -721,20 +1057,36 @@ class LpEngineTest {
 
     @Test
     fun `ordinary node pruning consumes a checked partial component bound`() {
-        val problem = Problem(0, 6, Array(6) { IntDomain(0, 5) }, listOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
-            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(4, 5), LinearOp.GE, 1),
-        ))
+        val problem = Problem(
+            0,
+            6,
+            Array(6) { IntDomain(0, 5) },
+            listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(4, 5), LinearOp.GE, 1),
+            ),
+        )
         val sink = SolveStatsSink("partial-component-prune")
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
-                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                model: LpModel,
+                cancellation: ExecutionControl,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
                 )
                 return object : PersistentLpSolver by delegate {
                     override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
@@ -743,9 +1095,20 @@ class LpEngineTest {
             }
         }
 
-        val pruned = LpEngine(problem, LinearObjective(intCoefficients = LongArray(6) { 1L }, constant = 7L),
-            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
-                probe = false, rootCutHarvest = false)), sink, LpSolveContext(factory)).use { engine ->
+        val pruned = LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(6) { 1L }, constant = 7L),
+            LpParams(
+                lpPlan = LpPlan(
+                    bounding = true,
+                    componentOwnership = true,
+                    probe = false,
+                    rootCutHarvest = false,
+                ),
+            ),
+            sink,
+            LpSolveContext(factory),
+        ).use { engine ->
             engine.pruneNode(PropagationSession(problem), 8.0, -1, true).also {
                 assertEquals(LpFloatTermination.WORK, engine.propagator.floatTermination)
             }
@@ -759,7 +1122,9 @@ class LpEngineTest {
     @Test
     fun `root pruning retains complete useful element property groups`() {
         val problem = Problem(
-            0, 4, arrayOf(IntDomain(0, 2), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 9)),
+            0,
+            4,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 9)),
             arrayOf(
                 Element(0, 1, longArrayOf(0, 1, 0), false, 0),
                 Element(0, 2, longArrayOf(1, 0, 1), false, 0),
@@ -767,10 +1132,12 @@ class LpEngineTest {
             ),
         )
         LpEngine(
-            problem, LinearObjective(intCoefficients = longArrayOf(0, 1, 1, 0)),
-            LpParams(lpConfig = LpConfig.AUTO), SolveStatsSink("groups"),
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(0, 1, 1, 0)),
+            LpParams(lpConfig = LpConfig.AUTO),
+            SolveStatsSink("groups"),
         ).use { engine ->
-            engine.pruneIneffectiveHulls(Cancellation.Never)
+            engine.pruneIneffectiveHulls(ExecutionControl.Never)
 
             val relaxation = assertNotNull(engine.lpRelaxer).build(PropagationSession(problem))
             assertEquals(setOf(0, 1, 2), relaxation.hullFactorIds.toSet())
@@ -827,18 +1194,15 @@ class LpEngineTest {
         ),
     )
 
-    private fun metricSolver(
-        workOps: Long = 0L,
-        termination: LpFloatTermination? = null,
-        pivots: Int = 0,
-    ): LpSolver = object : LpSolver {
-        override val infeasibleRay: DoubleArray? = null
-        override val lastWorkOps: Long = workOps
-        override val lastTermination = termination
-        override val lastPivots = pivots
-        override fun solve(warm: Basis?) = null
-        override fun solvePrimal(warm: Basis?) = null
-    }
+    private fun metricSolver(workOps: Long = 0L, termination: LpFloatTermination? = null, pivots: Int = 0): LpSolver =
+        object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override val lastWorkOps: Long = workOps
+            override val lastTermination = termination
+            override val lastPivots = pivots
+            override fun solve(warm: Basis?) = null
+            override fun solvePrimal(warm: Basis?) = null
+        }
 
     private fun budgetedEngine(
         sink: SolveStatsSink,
@@ -900,7 +1264,7 @@ class LpEngineTest {
     fun `private root probes should charge assembly and solves once to the containing engine`() {
         val sink = SolveStatsSink(backend = "private-root")
         budgetedEngine(sink, LpPlan(bounding = true, rootMaxWork = 12_000L)).use { parent ->
-            parent.forObjective(LinearObjective(), Cancellation.Never, rootProbe = true).use { child ->
+            parent.forObjective(LinearObjective(), ExecutionControl.Never, rootProbe = true).use { child ->
                 child.noteNodeOverhead(3_000L)
                 child.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 2_000L))
 
@@ -997,12 +1361,17 @@ class LpEngineTest {
             LpEngine(
                 problem,
                 LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L)),
-                LpParams(lpPlan = LpPlan(bounding = true, boundMaxDepth = 0, componentOwnership = components),
-                    solveBudgetMillis = 30_000L),
+                LpParams(
+                    lpPlan = LpPlan(bounding = true, boundMaxDepth = 0, componentOwnership = components),
+                    solveBudgetMillis = 30_000L,
+                ),
                 SolveStatsSink(backend = "separate-preparation-cap"),
                 LpSolveContext(factory, decline),
-                rootQueryPolicy = if (components) LpRootQueryPolicy.SHARED_WORK else
-                    LpRootQueryPolicy.SEPARATE_PREPARATION,
+                rootQueryPolicy = if (components) {
+                    LpRootQueryPolicy.SHARED_WORK
+                } else {
+                    LpRootQueryPolicy.SEPARATE_PREPARATION
+                },
             ).use { engine ->
                 val queryCap = engine.nodeWorkBudget()
 
@@ -1048,8 +1417,11 @@ class LpEngineTest {
                 LpParams(lpPlan = plan, solveBudgetMillis = 4L),
                 SolveStatsSink(backend = "preparation-remaining"),
                 nodeWorkAllowance = { offered },
-                rootQueryPolicy = if (components) LpRootQueryPolicy.SHARED_WORK else
-                    LpRootQueryPolicy.SEPARATE_PREPARATION,
+                rootQueryPolicy = if (components) {
+                    LpRootQueryPolicy.SHARED_WORK
+                } else {
+                    LpRootQueryPolicy.SEPARATE_PREPARATION
+                },
             ).use { engine ->
                 engine.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 5_000L))
 
@@ -1076,11 +1448,16 @@ class LpEngineTest {
 
                         engine.observeNodeWorkStop(metricSolver(termination = termination, pivots = pivots))
 
-                        val grows = (policy == LpRootQueryPolicy.SHARED_WORK ||
-                            policy == LpRootQueryPolicy.INTERRUPTED_WORK) &&
+                        val grows = (
+                            policy == LpRootQueryPolicy.SHARED_WORK ||
+                                policy == LpRootQueryPolicy.INTERRUPTED_WORK
+                            ) &&
                             termination == LpFloatTermination.WORK && pivots > 0
-                        assertEquals(if (grows) before * 2 else before, engine.nodeWorkBudget(),
-                            "$policy $termination pivots=$pivots")
+                        assertEquals(
+                            if (grows) before * 2 else before,
+                            engine.nodeWorkBudget(),
+                            "$policy $termination pivots=$pivots",
+                        )
                     }
                 }
             }
@@ -1120,7 +1497,7 @@ class LpEngineTest {
 
             solver.resumable(LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L)), params).use { search ->
                 while (factory.floatAllowances.isEmpty() && !search.isDone) {
-                    search.runSlice(Cancellation.Never, 1_000L, 64L) {}
+                    search.runSlice(ExecutionControl.Never, 1_000L, 64L) {}
                 }
             }
 
@@ -1224,8 +1601,8 @@ class LpEngineTest {
             SolveStatsSink(backend = "production"),
         )
 
-        assertFalse(rejecting.rootLpInfeasibleNoBake(Cancellation.Never))
-        assertTrue(production.rootLpInfeasibleNoBake(Cancellation.Never))
+        assertFalse(rejecting.rootLpInfeasibleNoBake(ExecutionControl.Never))
+        assertTrue(production.rootLpInfeasibleNoBake(ExecutionControl.Never))
         assertEquals(1, factory.calls.count { it.kind == EngineConstruction.TABLEAU })
         val construction = factory.calls.single { it.kind == EngineConstruction.TABLEAU }
         assertEquals(LpZeroObjectivePricing.LARGEST_PIVOT, construction.zeroObjectivePricing)

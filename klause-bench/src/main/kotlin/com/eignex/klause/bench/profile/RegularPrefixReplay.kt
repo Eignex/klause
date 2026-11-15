@@ -33,7 +33,7 @@ import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.explainAtoms
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -170,7 +170,7 @@ internal object RegularPrefixReplay {
             val model = if (mode.startsWith("definitions")) definitions.problem else source
             val allocated = bean.getThreadAllocatedBytes(thread)
             val started = System.nanoTime()
-            val stop = Cancellation.after(if (fixed) 5.seconds else 2.seconds)
+            val stop = ExecutionControl.after(if (fixed) 5.seconds else 2.seconds)
             val native = PropagationSession(model, cancellation = stop)
             val originalBranching = CpBranching { session, sourceId ->
                 originalAlternatives(session, source.numIntVars, sourceId)
@@ -221,7 +221,7 @@ internal object RegularPrefixReplay {
             val runNs = System.nanoTime() - started
             val runBytes = bean.getThreadAllocatedBytes(thread) - allocated
             val checkStarted = System.nanoTime()
-            val checkStop = Cancellation.after(2.seconds)
+            val checkStop = ExecutionControl.after(2.seconds)
             val checked = if (result is SearchResult.Satisfied) {
                 val sample = Sample(
                     BooleanArray(source.numBoolVars) { native.boolValue(it) ?: false },

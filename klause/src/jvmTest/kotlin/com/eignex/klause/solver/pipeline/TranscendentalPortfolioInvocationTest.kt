@@ -5,12 +5,12 @@ import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.result.TerminationReason
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class TranscendentalPortfolioInvocationTest(private val engine: FiniteEngine) {
@@ -28,8 +28,10 @@ class TranscendentalPortfolioInvocationTest(private val engine: FiniteEngine) {
             (declare-const x Real)
             (assert (= (exp x) 2))
             (check-sat)
-                """.trimIndent(),
-            )).source.originalSource)
+                    """.trimIndent(),
+                )
+                ).source.originalSource,
+        )
         val params = PolynomialTheoryParams(
             maximumWork = 100000,
             strategy = PolynomialStrategyParams(
@@ -56,8 +58,10 @@ class TranscendentalPortfolioInvocationTest(private val engine: FiniteEngine) {
             (assert b)
             (assert (= (exp x) 1))
             (check-sat)
-                """.trimIndent(),
-            )).source.originalSource)
+                    """.trimIndent(),
+                )
+                ).source.originalSource,
+        )
         val params = TranscendentalTheoryParams(
             maximumWork = 100000,
             maximumDepth = 0,
@@ -91,8 +95,10 @@ class TranscendentalPortfolioInvocationTest(private val engine: FiniteEngine) {
             (assert (> (exp x) 0))
             (minimize (exp x))
             (check-sat)
-                """.trimIndent(),
-            )).source.originalSource)
+                    """.trimIndent(),
+                )
+                ).source.originalSource,
+        )
 
         val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), TranscendentalTheoryParams(), engine, 4)
 

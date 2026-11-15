@@ -8,7 +8,7 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.explainAtoms
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.shl
 import kotlin.test.Test
@@ -22,7 +22,7 @@ class PartialLinearImplicationTest {
     @Test
     fun `affine activity should decline when reconstruction exceeds the rational size limit`() {
         val value = BigFraction.of(BIG_ONE shl 4095, BIG_ONE)
-        val arithmetic = PartialImplicationArithmetic(Cancellation.Never)
+        val arithmetic = PartialImplicationArithmetic(ExecutionControl.Never)
 
         val activity = arithmetic.affineValue(value, BigFraction.ofLong(2), BigFraction.ZERO)
 
@@ -46,7 +46,7 @@ class PartialLinearImplicationTest {
                 column == 1 && !upper -> ExplainedLinearBound(BigFraction.ofLong(2), false, premise(1))
                 else -> null
             }
-        }, Cancellation.Never)
+        }, ExecutionControl.Never)
 
         assertTrue(assertNotNull(implication).truth)
         assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)),
@@ -59,7 +59,7 @@ class PartialLinearImplicationTest {
 
         val implication = partialLinearImplication(comparison, { _, upper ->
             if (upper) ExplainedLinearBound(BigFraction.ONE, false, axiom) else null
-        }, Cancellation.Never)
+        }, ExecutionControl.Never)
 
         assertNull(implication)
     }
@@ -70,7 +70,7 @@ class PartialLinearImplicationTest {
 
         val implication = partialLinearImplication(comparison, { _, upper ->
             if (upper) ExplainedLinearBound(BigFraction.ONE, true, axiom) else null
-        }, Cancellation.Never)
+        }, ExecutionControl.Never)
 
         assertTrue(assertNotNull(implication).truth)
     }
@@ -81,7 +81,7 @@ class PartialLinearImplicationTest {
 
         val implication = partialLinearImplication(comparison, { _, upper ->
             if (!upper) ExplainedLinearBound(BigFraction.ONE, false, axiom) else null
-        }, Cancellation.Never)
+        }, ExecutionControl.Never)
 
         assertFalse(assertNotNull(implication).truth)
     }
@@ -92,7 +92,7 @@ class PartialLinearImplicationTest {
 
         val implication = partialLinearImplication(comparison, { _, upper ->
             if (upper) ExplainedLinearBound(BigFraction.ONE, false, axiom) else null
-        }, Cancellation.Never)
+        }, ExecutionControl.Never)
 
         assertNull(implication)
     }
@@ -104,7 +104,7 @@ class PartialLinearImplicationTest {
         session.push(SearchDecision.Bool(Lit.make(0, true)))
         val implication = assertNotNull(partialLinearImplication(unary(LinearOp.LE), { _, upper ->
             if (upper) ExplainedLinearBound(BigFraction.ZERO, false, premise(0)) else null
-        }, Cancellation.Never))
+        }, ExecutionControl.Never))
         assertNotNull(session.explainAtoms(implication.premise))
 
         session.popTo(0)
@@ -118,7 +118,7 @@ class PartialLinearImplicationTest {
         val implication = partialLinearImplication(unary(LinearOp.LE), { _, _ ->
             stopped = true
             ExplainedLinearBound(BigFraction.ZERO, false, axiom)
-        }, Cancellation { stopped })
+        }, ExecutionControl { stopped })
 
         assertNull(implication)
     }
@@ -131,7 +131,7 @@ class PartialLinearImplicationTest {
 
         val implication = partialLinearImplication(comparison, { _, upper ->
             if (upper) ExplainedLinearBound(BigFraction.ofLong(3) * half, false, axiom) else null
-        }, Cancellation.Never)
+        }, ExecutionControl.Never)
 
         assertTrue(assertNotNull(implication).truth)
     }

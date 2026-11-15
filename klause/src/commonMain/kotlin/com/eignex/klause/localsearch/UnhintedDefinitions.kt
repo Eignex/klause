@@ -8,15 +8,17 @@ import com.eignex.klause.factor.arithmetic.WideDivMod
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep.SweepNode
 import com.eignex.klause.solver.objective.FunctionalObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.ScanMeter
 
-internal fun unhintedDefinitionSweep(problem: Problem, cancellation: Cancellation): DefinitionalSweep? {
+internal fun unhintedDefinitionSweep(problem: Problem, cancellation: ExecutionControl): DefinitionalSweep? {
+    return ScanMeter(cancellation).use { scan ->
+    if (!scan.check()) return@use null
     val nodes = ArrayList<SweepNode>()
     var hasDivision = false
     var hasWideDivision = false
     for (factor in problem.factors) {
-        cancellation.charge(1)
-        if (cancellation()) return null
+        if (!scan.visit(1L)) return@use null
         val node = when (factor) {
             is Abs -> SweepNode.IntDef(FunctionalObjective.Abs(factor.result,
                 FunctionalObjective.Operand.v(factor.operand)), intArrayOf(factor.operand))
@@ -41,13 +43,15 @@ internal fun unhintedDefinitionSweep(problem: Problem, cancellation: Cancellatio
         }
         if (node != null) nodes += node
     }
+    if (!scan.check()) return@use null
     if (hasDivision) nodes += divModDefinitions(problem, cancellation)
-    if (cancellation()) return null
+    if (!scan.check()) return@use null
     if (hasWideDivision) nodes += wideDivModDefinitions(problem, cancellation)
     for (node in nodes) {
-        cancellation.charge(5L + 3L * (node.intInputs.size + node.boolInputs.size))
-        if (cancellation()) return null
+        if (!scan.visit(5L + 3L * (node.intInputs.size + node.boolInputs.size))) return@use null
     }
+    if (!scan.check()) return@use null
     val ordered = orderedDefinitions(problem, nodes, cancellation)
-    return if (cancellation() || ordered.isEmpty()) null else DefinitionalSweep(ordered)
+    if (!scan.check() || ordered.isEmpty()) null else DefinitionalSweep(ordered)
+    }
 }

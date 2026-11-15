@@ -3,15 +3,15 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.DEFAULT_VIOLATION_SOFT_CAP
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.solver.forInvocation
-import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolverParams
+import com.eignex.klause.solver.forInvocation
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.solver.withLifetime
+import com.eignex.klause.util.ExecutionControl
 
 /**
  * Per-call params for the local-search [LocalSearchSolver]. Engine setup
@@ -44,8 +44,8 @@ data class LocalSearchParams(
      *  the requested values on every restart and ignores any move that would change
      *  them. Defaults to none. */
     override val assumptions: Assumptions = Assumptions.None,
-    /** Cooperative cancellation predicate; see [Cancellation]. */
-    val cancellation: Cancellation = Cancellation.Never,
+    /** Cooperative cancellation predicate; see [ExecutionControl]. */
+    val cancellation: ExecutionControl = ExecutionControl.Never,
     /**
      * Optional live-event listener; see [SearchEvent]. Called inline on the search thread at
      * coarse points only, such as new incumbents. `null` disables observation.
@@ -112,13 +112,16 @@ data class LocalSearchParams(
     val objectiveGuidance: ObjectiveGuidance = ObjectiveGuidance.Functional,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): LocalSearchParams =
-        if (assumptions.isEmpty && assumptions.deductions.isEmpty) this
-        else copy(assumptions = merge(this.assumptions, assumptions))
+        if (assumptions.isEmpty && assumptions.deductions.isEmpty) {
+            this
+        } else {
+            copy(assumptions = merge(this.assumptions, assumptions))
+        }
 
-    override fun withCancellation(cancellation: Cancellation): LocalSearchParams =
+    override fun withCancellation(cancellation: ExecutionControl): LocalSearchParams =
         copy(cancellation = this.cancellation.forInvocation(cancellation))
 
-    override fun withLifetimeCancellation(cancellation: Cancellation): LocalSearchParams =
+    override fun withLifetimeCancellation(cancellation: ExecutionControl): LocalSearchParams =
         copy(cancellation = this.cancellation.withLifetime(cancellation))
 
     private companion object {

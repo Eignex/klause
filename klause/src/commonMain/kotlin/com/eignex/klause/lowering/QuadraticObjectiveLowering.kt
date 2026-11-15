@@ -6,14 +6,14 @@ import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticObjectiveTerm
 import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 private typealias QuadraticTerms = Map<List<Int>, BigFraction>
 
 internal fun lowerQuadraticObjective(
     expression: PolynomialExpression,
     sourceVariables: Map<Int, QuadraticVariable>,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): QuadraticObjectiveSpec? {
     fun step() = cancellation.polynomialSourceCheckpoint(1)
     fun add(target: MutableMap<List<Int>, BigFraction>, powers: List<Int>, coefficient: BigFraction) {

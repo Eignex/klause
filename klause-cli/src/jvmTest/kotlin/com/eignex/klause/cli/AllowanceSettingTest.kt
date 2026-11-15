@@ -1,6 +1,6 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -49,7 +49,7 @@ class AllowanceSettingTest {
         val common = CommonOptions().apply { engineParams.add("presolve-work-limit=0") }
 
         assertTrue(common.routingCancellation()())
-        val (stop, budget) = SolveCore.presolveAllowance(common, Cancellation.Never)
+        val (stop, budget) = SolveCore.presolveAllowance(common, ExecutionControl.Never)
 
         assertTrue(stop())
         assertNotNull(budget)
@@ -62,7 +62,7 @@ class AllowanceSettingTest {
     fun `unlimited preparation work should retain its separate phase deadline`() {
         val common = CommonOptions().apply { engineParams.add("presolve-work-limit=unlimited") }
 
-        val (stop, budget) = SolveCore.presolveAllowance(common, Cancellation.Never)
+        val (stop, budget) = SolveCore.presolveAllowance(common, ExecutionControl.Never)
 
         assertNull(budget)
         assertNotNull(stop.deadline())

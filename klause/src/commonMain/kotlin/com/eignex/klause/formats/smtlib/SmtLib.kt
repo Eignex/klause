@@ -12,7 +12,7 @@ import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.solver.pipeline.SourceAttachment
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.io.CharSource
 import com.eignex.util.io.StringCharSource
 import kotlin.coroutines.cancellation.CancellationException
@@ -61,7 +61,7 @@ object SmtLib {
         unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         semanticOverrides: SemanticOverrides = SemanticOverrides(),
     ): SmtLibProblem = parse(
         { StringCharSource(text) }, unboundedIntLo, unboundedIntHi, settings, cancellation, semanticOverrides,
@@ -73,7 +73,7 @@ object SmtLib {
         unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         semanticOverrides: SemanticOverrides = SemanticOverrides(),
     ): SmtLibProblem {
         var transferred = false
@@ -100,7 +100,7 @@ object SmtLib {
         unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         semanticOverrides: SemanticOverrides = SemanticOverrides(),
     ): SmtLibProblem = parseSmtLibSource(
         openSource, unboundedIntLo, unboundedIntHi, settings, cancellation, semanticOverrides,

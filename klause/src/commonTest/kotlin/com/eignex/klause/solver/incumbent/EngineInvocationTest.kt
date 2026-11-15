@@ -15,7 +15,7 @@ import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
@@ -56,7 +56,7 @@ class EngineInvocationTest {
         )
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
 
-        val checked = binding.checkWitness(point, Cancellation.Never)
+        val checked = binding.checkWitness(point, ExecutionControl.Never)
 
         assertIs<SourceEvidenceCheck.Checked>(checked)
     }
@@ -91,7 +91,7 @@ class EngineInvocationTest {
                 exactReals = listOf(value),
             )
 
-            assertIs<SourceEvidenceCheck.Rejected>(binding.checkWitness(point, Cancellation.Never))
+            assertIs<SourceEvidenceCheck.Rejected>(binding.checkWitness(point, ExecutionControl.Never))
         }
     }
 
@@ -118,7 +118,7 @@ class EngineInvocationTest {
         )
         val point = Sample(booleanArrayOf(), longArrayOf(), exactInts = listOf(wide))
 
-        val checked = binding.checkWitness(point, Cancellation.Never)
+        val checked = binding.checkWitness(point, ExecutionControl.Never)
 
         assertIs<SourceEvidenceCheck.Checked>(checked)
     }
@@ -135,7 +135,7 @@ class EngineInvocationTest {
         )
         val point = Sample(booleanArrayOf(false), longArrayOf(Long.MAX_VALUE))
 
-        val checked = binding.checkWitness(point, Cancellation.Never)
+        val checked = binding.checkWitness(point, ExecutionControl.Never)
 
         assertIs<SourceEvidenceCheck.Rejected>(checked)
     }
@@ -203,7 +203,7 @@ class EngineInvocationTest {
         val binding = EngineInvocation(plan, model, objective, condition = condition)
         val point = Sample(booleanArrayOf(false), longArrayOf(3))
 
-        val checked = binding.checkWitness(point, Cancellation { true })
+        val checked = binding.checkWitness(point, ExecutionControl { true })
 
         assertIs<SourceEvidenceCheck.Unavailable>(checked)
     }
@@ -227,7 +227,7 @@ class EngineInvocationTest {
         )
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0))
 
-        val checked = binding.checkWitness(point, Cancellation.Never)
+        val checked = binding.checkWitness(point, ExecutionControl.Never)
 
         assertIs<SourceEvidenceCheck.Unavailable>(checked)
     }
@@ -242,7 +242,7 @@ class EngineInvocationTest {
         exported.intValues[0] = 5
         val point = Sample(booleanArrayOf(true), longArrayOf(3))
 
-        val checked = binding.checkWitness(point, Cancellation.Never)
+        val checked = binding.checkWitness(point, ExecutionControl.Never)
 
         assertIs<SourceEvidenceCheck.Checked>(checked)
     }
@@ -275,7 +275,7 @@ class EngineInvocationTest {
         for (assumptions in variants) {
             val binding = EngineInvocation(plan, model, objective, executionAssumptions = assumptions)
 
-            assertIs<SourceEvidenceCheck.Rejected>(binding.checkWitness(point, Cancellation.Never))
+            assertIs<SourceEvidenceCheck.Rejected>(binding.checkWitness(point, ExecutionControl.Never))
         }
     }
 
@@ -291,7 +291,7 @@ class EngineInvocationTest {
         for (assumptions in variants) {
             val binding = EngineInvocation(plan, model, objective, assumptions, Assumptions.None)
 
-            assertIs<SourceEvidenceCheck.Rejected>(binding.checkWitness(point, Cancellation.Never))
+            assertIs<SourceEvidenceCheck.Rejected>(binding.checkWitness(point, ExecutionControl.Never))
         }
     }
 }

@@ -21,7 +21,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.sourceCondition
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -36,12 +36,12 @@ class FiniteNumericalRemovalTest {
     private val objective = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0))
     private val center = Sample(booleanArrayOf(), longArrayOf(1, 0, 0, 0))
     private val source = requireNotNull(problem.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
-        Cancellation.Never))
+        ExecutionControl.Never))
 
     @Test
     fun `relaxation disagreement should free differing source inputs`() {
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
-        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, source, cuts = false)
         }
@@ -59,7 +59,7 @@ class FiniteNumericalRemovalTest {
     @Test
     fun `completed selections should decline a request smaller than every packet`() {
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
-        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, source, cuts = false)
         }
@@ -77,7 +77,7 @@ class FiniteNumericalRemovalTest {
     @Test
     fun `completed selections should fill places left after their packets`() {
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
-        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, source, cuts = false)
         }
@@ -96,7 +96,7 @@ class FiniteNumericalRemovalTest {
     @Test
     fun `an agreeing relaxation should retain agreement with random fallback`() {
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
-        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, source, cuts = false)
         }
@@ -116,10 +116,10 @@ class FiniteNumericalRemovalTest {
         val model = Problem(1, 4, Array(4) { IntDomain(0, 1) },
             listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 3), LinearOp.EQ, 1L))).bake()
         val original = requireNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
-            Cancellation.Never))
+            ExecutionControl.Never))
         val incumbent = Sample(booleanArrayOf(false), longArrayOf(1, 0, 0, 0))
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
-        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, original, cuts = false)
         }
@@ -138,9 +138,9 @@ class FiniteNumericalRemovalTest {
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
         val removal = FiniteNumericalRemoval(problem, objective, source, funding,
             FiniteNumericalRemoval.Signal.Disagreement)
-        val publisher = SourceNumericalFeedback(funding, Cancellation.Never, request = removal.request)
+        val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never, request = removal.request)
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
-            it.capture = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never)
+            it.capture = LinearAuthorityCapture(0, 0L, 0L, ExecutionControl.Never)
             publisher.acquire(it, source, cuts = false)
         }
 
@@ -156,10 +156,10 @@ class FiniteNumericalRemovalTest {
     @Test
     fun `a delivered projection without the signal field should be unavailable rather than agreement`() {
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
-        val publisher = SourceNumericalFeedback(funding, Cancellation.Never,
+        val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never,
             request = LinearAuthorityFeedbackRequest(refutation = true))
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
-            it.capture = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never)
+            it.capture = LinearAuthorityCapture(0, 0L, 0L, ExecutionControl.Never)
             publisher.acquire(it, source, cuts = false)
         }
         val removal = FiniteNumericalRemoval(problem, objective, source, funding,
@@ -178,7 +178,7 @@ class FiniteNumericalRemovalTest {
         val pinned = source.atScope(source.scope.copy(condition = pins.sourceCondition()))
         val cutoff = SourceNumericalCutoff(BigFraction.ONE, "repair-improvement")
         val query = assertNotNull(cutoff.applyTo(pinned, funding))
-        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, query, cutoff, cuts = false)
         }
@@ -200,12 +200,12 @@ class FiniteNumericalRemovalTest {
     fun `maximizing source cutoffs should retain original objective units`() {
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
         val original = requireNotNull(problem.linearAuthorityContext(objective.negated(), ObjectiveSense.MAXIMIZE,
-            Cancellation.Never))
+            ExecutionControl.Never))
         val pins = Assumptions.None.withInt(3, 0)
         val pinned = original.atScope(original.scope.copy(condition = pins.sourceCondition()))
         val cutoff = SourceNumericalCutoff(BigFraction.MINUS_ONE, "repair-improvement")
         val query = assertNotNull(cutoff.applyTo(pinned, funding))
-        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, query, cutoff, cuts = false)
         }
@@ -225,7 +225,7 @@ class FiniteNumericalRemovalTest {
     @Test
     fun `foreign finite models objectives and centers should retire numerical guidance`() {
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
-        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, source, cuts = false)
         }
@@ -249,7 +249,7 @@ class FiniteNumericalRemovalTest {
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
         val pins = Assumptions.None.withInt(2, 0)
         val original = source.atScope(source.scope.copy(condition = pins.sourceCondition()))
-        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, original, cuts = false)
         }
@@ -257,7 +257,7 @@ class FiniteNumericalRemovalTest {
             FiniteNumericalRemoval.Signal.Disagreement, pins)
 
         removal.accept(center, pins, original, null, acquisition.feedback)
-        val freed = removal.destroy(Random(17), problem, center, objective, 1.0, pins, Cancellation.Never)
+        val freed = removal.destroy(Random(17), problem, center, objective, 1.0, pins, ExecutionControl.Never)
 
         assertEquals(FiniteNumericalRemoval.Status.Supported, removal.status)
         assertEquals(setOf(0, 1, 3), freed.ints.toSet())
@@ -266,7 +266,7 @@ class FiniteNumericalRemovalTest {
     @Test
     fun `numerical selections should close through supplied definitions`() {
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
-        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, source, cuts = false)
         }
@@ -290,9 +290,9 @@ class FiniteNumericalRemovalTest {
         val incumbent = Sample(booleanArrayOf(), longArrayOf(1, 0, 1, 0))
         val pins = Assumptions.None.withInt(2, 1)
         val original = requireNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
-            Cancellation.Never)).let { it.atScope(it.scope.copy(condition = pins.sourceCondition())) }
+            ExecutionControl.Never)).let { it.atScope(it.scope.copy(condition = pins.sourceCondition())) }
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
-        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, original, cuts = false)
         }
@@ -303,7 +303,7 @@ class FiniteNumericalRemovalTest {
         removal.accept(incumbent, pins, original, null, acquisition.feedback)
         assertEquals(FiniteNumericalRemoval.Status.Supported, removal.status)
 
-        val freed = removal.destroy(Random(17), model, incumbent, objective, 0.25, pins, Cancellation.Never)
+        val freed = removal.destroy(Random(17), model, incumbent, objective, 0.25, pins, ExecutionControl.Never)
 
         assertTrue(freed.isEmpty)
         assertEquals(FiniteNumericalRemoval.Status.ClosureDeclined, removal.status)
@@ -314,7 +314,7 @@ class FiniteNumericalRemovalTest {
     @Test
     fun `exhausted funding should decline numerical selection without partial freedoms`() {
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
-        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, source, cuts = false)
         }
@@ -334,14 +334,14 @@ class FiniteNumericalRemovalTest {
     fun `cancellation should decline numerical selection and release the snapshot`() {
         var cancelled = false
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
-        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, source, cuts = false)
         }
         val removal = FiniteNumericalRemoval(problem, objective, source, funding,
             FiniteNumericalRemoval.Signal.Disagreement)
         removal.accept(center, Assumptions.None, source, null, acquisition.feedback,
-            cancellation = Cancellation { cancelled })
+            cancellation = ExecutionControl { cancelled })
         cancelled = true
 
         val freed = removal.destroy(Random(17), problem, center, objective, 0.5)
@@ -354,7 +354,7 @@ class FiniteNumericalRemovalTest {
     @Test
     fun `the selection call cancellation should interrupt ranking without partial freedoms`() {
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
-        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
             publisher.acquire(it, source, cuts = false)
         }
@@ -364,7 +364,7 @@ class FiniteNumericalRemovalTest {
         var polls = 0
 
         val freed = removal.destroy(Random(17), problem, center, objective, 0.5,
-            Assumptions.None, Cancellation { ++polls >= 3 })
+            Assumptions.None, ExecutionControl { ++polls >= 3 })
 
         assertTrue(freed.isEmpty)
         assertEquals(FiniteNumericalRemoval.Status.Cancelled, removal.status)

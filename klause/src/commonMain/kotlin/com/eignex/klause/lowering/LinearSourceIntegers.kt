@@ -3,13 +3,11 @@ package com.eignex.klause.lowering
 import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.fitsLong
 
-internal fun LinearSourceProblem.integralRealBounds(
-    stop: Cancellation,
-): Array<Pair<BigFraction, BigFraction>?>? {
+internal fun LinearSourceProblem.integralRealBounds(stop: ExecutionControl): Array<Pair<BigFraction, BigFraction>?>? {
     if (stop()) return null
     val integral = BooleanArray(variableValues.size)
     val lower = arrayOfNulls<BigFraction>(variableValues.size)

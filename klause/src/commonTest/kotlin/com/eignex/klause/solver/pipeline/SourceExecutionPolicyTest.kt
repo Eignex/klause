@@ -18,11 +18,11 @@ import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.result.SearchEvent
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -33,8 +33,11 @@ class SourceExecutionPolicyTest {
         for (mode in LpSourcePreparation.entries) {
             for (applicationDefault in listOf(false, true)) {
                 val config = LpConfig(sourcePreparation = mode)
-                val policy = if (applicationDefault) SourceExecutionPolicy(portfolioLpCeiling = config)
-                else SourceExecutionPolicy(lpCeiling = config)
+                val policy = if (applicationDefault) {
+                    SourceExecutionPolicy(portfolioLpCeiling = config)
+                } else {
+                    SourceExecutionPolicy(lpCeiling = config)
+                }
 
                 val resolved = policy.lpConfig(FiniteEngine.BACKTRACK)
 
@@ -105,7 +108,7 @@ class SourceExecutionPolicyTest {
         )
         )
         val budget = NodeBudget(7)
-        val stop = Cancellation { true }
+        val stop = ExecutionControl { true }
         val events: (SearchEvent) -> Unit = {}
         val policy = SourceExecutionPolicy(
             lpCeiling = LpConfig.OFF,

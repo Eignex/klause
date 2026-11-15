@@ -2,7 +2,7 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.math.BigInteger
@@ -23,7 +23,7 @@ class ResidualBudgetGateTest {
             BigInteger.ZERO,
             BigInteger.valueOf(6),
             emptyMap(),
-            ComponentAllowance(Cancellation.Never),
+            ComponentAllowance(ExecutionControl.Never),
         )
 
         assertEquals(bound == 5L, accepted)
@@ -39,7 +39,7 @@ class ResidualBudgetGateTest {
             BigInteger.TEN,
             BigInteger.valueOf(11),
             mapOf(0 to true),
-            ComponentAllowance(Cancellation.Never),
+            ComponentAllowance(ExecutionControl.Never),
         )
 
         assertTrue(accepted)
@@ -55,7 +55,7 @@ class ResidualBudgetGateTest {
             BigInteger.ZERO,
             BigInteger.valueOf(3),
             emptyMap(),
-            ComponentAllowance(Cancellation.Never),
+            ComponentAllowance(ExecutionControl.Never),
         )
 
         assertFalse(accepted)
@@ -71,7 +71,7 @@ class ResidualBudgetGateTest {
             BigInteger.ZERO,
             BigInteger.valueOf(3),
             emptyMap(),
-            ComponentAllowance(Cancellation.Never),
+            ComponentAllowance(ExecutionControl.Never),
         )
 
         assertTrue(accepted)
@@ -87,7 +87,7 @@ class ResidualBudgetGateTest {
             BigInteger.ZERO,
             BigInteger.valueOf(6),
             emptyMap(),
-            ComponentAllowance(Cancellation.Never),
+            ComponentAllowance(ExecutionControl.Never),
         )
 
         assertFalse(accepted)
@@ -103,7 +103,7 @@ class ResidualBudgetGateTest {
             BigInteger.ZERO,
             BigInteger.valueOf(6),
             emptyMap(),
-            ComponentAllowance(Cancellation { true }),
+            ComponentAllowance(ExecutionControl { true }),
         )
 
         assertFalse(accepted)

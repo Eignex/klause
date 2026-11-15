@@ -12,7 +12,7 @@ import com.eignex.klause.solver.validation.LinearSourceCheck
 import com.eignex.klause.solver.validation.LinearSourceWitness
 import com.eignex.klause.solver.validation.capturedSourceSlack
 import com.eignex.klause.solver.validation.checkLinearSourceWitness
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
 
@@ -66,7 +66,7 @@ class LinearSourceOutcome internal constructor(
     val numericalClaims: Boolean get() = source.semantics.effective.feasibilityTolerance?.isExact == false
 }
 
-internal fun PreparedLinearSource.check(sample: Sample, stop: Cancellation): LinearSourceCheck {
+internal fun PreparedLinearSource.check(sample: Sample, stop: ExecutionControl): LinearSourceCheck {
     val values = ArrayList<BigFraction>(view.columns.size)
     for (reference in view.columns) {
         stop.charge(1L)
@@ -85,7 +85,7 @@ internal fun PreparedLinearSource.check(sample: Sample, stop: Cancellation): Lin
     return checkLinearSourceWitness(view.source, values, stop)
 }
 
-internal fun PreparedLinearSource.check(assignment: OpenTheoryAssignment, stop: Cancellation): LinearSourceCheck {
+internal fun PreparedLinearSource.check(assignment: OpenTheoryAssignment, stop: ExecutionControl): LinearSourceCheck {
     if (assignment is OpenTheoryAssignment.Sampled) return check(assignment.sample, stop)
     if (assignment is OpenTheoryAssignment.Difference) return check(assignment.sample, stop)
     var realAssignment = assignment
@@ -152,7 +152,7 @@ internal fun executeLinearSource(
     execute: (
         SourceExecutionRequest,
         SourceExecutionCallbacks,
-        ((Cancellation, Boolean) -> Unit)?,
+        ((ExecutionControl, Boolean) -> Unit)?,
     ) -> SourceExecutionResult,
 ): SourceExecutionResult {
     val invocation = request.invocation
@@ -238,6 +238,7 @@ internal fun executeLinearSource(
     }
     when (result) {
         is SourceExecutionResult.Prepared -> return result
+
         is SourceExecutionResult.Finite -> (result.result.outcome as? FiniteSolveOutcome.Completed)?.let { completed ->
             val point = sample(completed.bestSample)
             native = when (completed.verdict) {
@@ -383,9 +384,11 @@ internal fun executeLinearSource(
     val bound = when (result) {
         is SourceExecutionResult.Linear -> (result.result as? OpenTheoryExecution.Optimize)?.result?.linearResult?.bound
             ?.let { prepared.qualifyBound(it, nativeClaimsUnrestricted) }
+
         is SourceExecutionResult.Finite -> result.result.nativeObjectiveBound?.let {
             prepared.qualifyBound(it.evidence, nativeClaimsUnrestricted, it)
         }
+
         else -> null
     }
     val snapshot = LinearSourceOutcome(
@@ -409,7 +412,7 @@ internal fun executeLinearSource(
 private fun PreparedLinearSource.matchesNativeObjective(
     point: LinearSourceWitness,
     nativeValue: BigFraction?,
-    stop: Cancellation,
+    stop: ExecutionControl,
 ): Boolean {
     val value = point.objective ?: return false
     val native = nativeValue?.let { it * view.objectiveScale.reciprocal() } ?: return false

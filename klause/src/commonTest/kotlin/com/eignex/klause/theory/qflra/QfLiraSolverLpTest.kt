@@ -48,7 +48,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ONE
@@ -140,18 +140,18 @@ class QfLiraSolverLpTest {
         var stopped = false
         var charged = 0L
         val meter = WorkMeter { charged += it }
-        val parent = object : Cancellation {
+        val parent = object : ExecutionControl() {
             override fun isCancelled() = false
-            override fun workMeter() = meter
+            override val accounting get() = meter
         }
         val factory = TrackingLpFactory()
         ExactLiraSearchComponent(halfIntegerSource()).use { component ->
             component.useSolveStop(parent)
             component.solveWith(LpSolveContext(factory))
-            val session = SearchSession(listOf(component), cancellation = Cancellation { stopped })
+            val session = SearchSession(listOf(component), cancellation = ExecutionControl { stopped })
             assertIs<ComponentResult.Consistent>(session.initialize())
             val captured = factory.lastCancellation
-            assertSame(meter, captured.workMeter())
+            assertSame(meter, captured.accounting)
             val before = charged
             captured.charge(7L)
             assertEquals(before + 7L, charged)
@@ -539,7 +539,7 @@ class QfLiraSolverLpTest {
             component.solveWith(LpSolveContext(factory))
             val session = SearchSession(
                 listOf(component),
-                cancellation = Cancellation { stopped },
+                cancellation = ExecutionControl { stopped },
                 atoms = SearchAtomRegistry(0),
             )
             assertIs<ComponentResult.Indeterminate>(session.initialize())
@@ -556,7 +556,7 @@ class QfLiraSolverLpTest {
         ExactLiraSearchComponent(halfIntegerSource()).use { component ->
             val session = SearchSession(
                 listOf(component),
-                cancellation = Cancellation { stopped },
+                cancellation = ExecutionControl { stopped },
                 atoms = SearchAtomRegistry(0),
             )
             session.initialize()
@@ -626,7 +626,7 @@ class QfLiraSolverLpTest {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 refactorUpdateLimit: Int,
                 iterationLimit: Int,
                 workLimit: Long,
@@ -733,11 +733,11 @@ class QfLiraSolverLpTest {
     ) : LpEngineFactory by ProductionLpEngineFactory {
         var created = 0
         var closed = 0
-        lateinit var lastCancellation: Cancellation
+        lateinit var lastCancellation: ExecutionControl
 
         override fun newPersistentSolver(
             model: LpModel,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
             refactorUpdateLimit: Int,
             iterationLimit: Int,
             workLimit: Long,

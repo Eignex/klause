@@ -9,7 +9,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -181,7 +181,7 @@ class OriginalClauseSubsumptionTest {
         )) {
             val budget = PresolveBudget(Long.MAX_VALUE)
 
-            val delta = OriginalClauseSubsumption.simplify(problem, budget.orSpent(Cancellation.Never), limits)
+            val delta = OriginalClauseSubsumption.simplify(problem, budget.orSpent(ExecutionControl.Never), limits)
 
             assertTrue(delta.isEmpty)
             assertTrue(budget.spent() in 1L..40L)
@@ -195,7 +195,7 @@ class OriginalClauseSubsumptionTest {
 
         val delta = OriginalClauseSubsumption.simplify(
             problem,
-            budget.orSpent(Cancellation.Never),
+            budget.orSpent(ExecutionControl.Never),
             OriginalClauseSubsumption.Limits(candidates = 32),
         )
 
@@ -207,12 +207,12 @@ class OriginalClauseSubsumptionTest {
     fun `cancellation should retain only completed equivalent transformations`() {
         val problem = problem(clause(0, 2), clause(1, 2, 4), clause(2, 4), clause(0, 2, 4))
         val full = PresolveBudget(Long.MAX_VALUE)
-        OriginalClauseSubsumption.simplify(problem, full.orSpent(Cancellation.Never))
+        OriginalClauseSubsumption.simplify(problem, full.orSpent(ExecutionControl.Never))
         var partial = false
         for (allowance in 0L..full.spent()) {
             val budget = PresolveBudget(allowance)
 
-            val delta = OriginalClauseSubsumption.simplify(problem, budget.orSpent(Cancellation.Never))
+            val delta = OriginalClauseSubsumption.simplify(problem, budget.orSpent(ExecutionControl.Never))
 
             assertTrue(budget.spent() <= allowance)
             checkModels(problem, delta)

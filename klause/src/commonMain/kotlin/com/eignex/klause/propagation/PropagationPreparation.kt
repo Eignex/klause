@@ -1,13 +1,13 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal const val PROPAGATION_PREPARATION_BATCH_SIZE: Int = 256
 
 internal class PropagationPreparation(
     problem: Problem,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
     private val propagationCancelFloor: Int,
     private val pbLearning: Boolean,
     private val cumulativeUnarySubsets: Boolean = false,
@@ -57,7 +57,9 @@ internal class PropagationPreparation(
         }
         if (!rootStarted) {
             val queue = rootQueue ?: live.beginRootFixpoint().also { rootQueue = it }
-            if (queue.hasNext()) queue.next() else {
+            if (queue.hasNext()) {
+                queue.next()
+            } else {
                 rootStarted = true
                 rootQueue = null
             }

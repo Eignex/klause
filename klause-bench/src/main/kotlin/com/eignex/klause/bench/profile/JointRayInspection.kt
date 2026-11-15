@@ -2,10 +2,7 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
-import com.eignex.klause.util.Cancellation
-import java.io.File
-import java.lang.Long.parseUnsignedLong
-import java.lang.reflect.InvocationTargetException
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -15,6 +12,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.Long.parseUnsignedLong
+import java.lang.reflect.InvocationTargetException
 
 internal object JointRayInspection {
     private const val ENGINE = "com.eignex.klause.lp.engine."
@@ -23,7 +23,7 @@ internal object JointRayInspection {
     private val rayName = Regex("conditional-[0-3]-ray\\.json")
     private val encoded = Regex("[0-9a-f]{16}")
 
-    fun inspect(out: File, stop: Cancellation) {
+    fun inspect(out: File, stop: ExecutionControl) {
         val files = out.listFiles().orEmpty().filter { rayName.matches(it.name) }.sortedBy { it.name }
         require(files.size <= 4)
         val rays = buildJsonArray {
@@ -47,7 +47,7 @@ internal object JointRayInspection {
         }.toString())
     }
 
-    private fun inspectRay(file: File, stop: Cancellation): JsonObject {
+    private fun inspectRay(file: File, stop: ExecutionControl): JsonObject {
         require(file.length() in 1L..1_048_576L)
         val payload = file.readBytes()
         val input = Reports.json.parseToJsonElement(payload.decodeToString()).jsonObject
@@ -98,7 +98,7 @@ internal object JointRayInspection {
         }
     }
 
-    private fun verify(model: Any, ray: DoubleArray, negated: Boolean, stop: Cancellation): JsonObject {
+    private fun verify(model: Any, ray: DoubleArray, negated: Boolean, stop: ExecutionControl): JsonObject {
         val started = System.nanoTime()
         val limits = create("ReconstructionLimits", 8192, 65536, 4096, WORK, BYTES, 0)
         val meter = create("ReconstructionMeter", limits, stop)

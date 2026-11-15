@@ -11,7 +11,7 @@ import com.eignex.klause.ir.TranscendentalFunction
 import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -73,7 +73,7 @@ class TranscendentalAssignmentTest {
         )
 
         val first = request.execute(params, FiniteEngine.MIXED, 1)
-        val later = request.execute(params.copy(cancellation = Cancellation { true }), FiniteEngine.MIXED, 1)
+        val later = request.execute(params.copy(cancellation = ExecutionControl { true }), FiniteEngine.MIXED, 1)
 
         val witness = assertIs<OpenTheoryResult.Sat>(first.result).assignment
         assertEquals("log(2)", witness.realValue(0))

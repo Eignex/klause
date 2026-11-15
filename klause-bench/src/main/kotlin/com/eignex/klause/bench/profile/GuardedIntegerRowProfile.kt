@@ -27,15 +27,15 @@ import com.eignex.klause.solver.search.SearchConflictResolution
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.sun.management.ThreadMXBean
-import java.io.File
-import java.lang.management.ManagementFactory
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import kotlin.time.Duration.Companion.seconds
 
 internal object GuardedIntegerRowProfile {
     private class Meter {
@@ -191,7 +191,7 @@ internal object GuardedIntegerRowProfile {
         }
         val guarded = (if (element) source else
             source.withFactors(source.factors + Clause(intArrayOf(Lit.make(0, truth))))).withIntDomains(domains)
-        val stop = Cancellation.after(10.seconds)
+        val stop = ExecutionControl.after(10.seconds)
         val budget = PresolveBudget(1_000_000L)
         val prepared = FinitePipeline.prepare(FinitePipelineRequest(guarded, FiniteEngine.BACKTRACK,
             solutionSetSensitive = true, cancellation = stop, solveCancellation = stop, presolveBudget = budget,

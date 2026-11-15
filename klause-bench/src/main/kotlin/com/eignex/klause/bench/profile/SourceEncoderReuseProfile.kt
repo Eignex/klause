@@ -23,12 +23,12 @@ import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderProvider
-import com.eignex.klause.util.Cancellation
-import java.io.File
-import kotlin.time.Duration.Companion.seconds
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import kotlin.time.Duration.Companion.seconds
 
 internal object SourceEncoderReuseProfile {
     @JvmStatic
@@ -84,7 +84,7 @@ internal object SourceEncoderReuseProfile {
                 }
             },
         )
-        val stop = Cancellation.after(3.seconds)
+        val stop = ExecutionControl.after(3.seconds)
         val started = System.nanoTime()
         val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY,
             FiniteEngine.BACKTRACK, providers = providers, cancellation = stop))

@@ -15,7 +15,7 @@ import com.eignex.klause.presolve.effortStats
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.time.Duration
 
 /** Installed execution family, after source routing and operation admission. */
@@ -73,7 +73,7 @@ class SourceExecutionRequest private constructor(
     /** Optional override of canonical source preparation. */
     val presolveConfig: PresolveConfig?,
     /** Containing token for the optional source preparation phase. */
-    val presolveCancellation: Cancellation,
+    val presolveCancellation: ExecutionControl,
     /** Shared source preparation ledger, without a renewed allowance. */
     val presolveBudget: PresolveBudget?,
     /** Optional native integer controls, retaining their shared decision allowance. */
@@ -93,37 +93,49 @@ class SourceExecutionRequest private constructor(
     internal fun withPortfolioLpQueryObserver(
         observer: (String, Double?, LpQueryObservation) -> Unit,
     ): SourceExecutionRequest {
-        require(invocation.request.engine == FiniteEngine.MIXED &&
-            SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly) {
+        require(
+            invocation.request.engine == FiniteEngine.MIXED &&
+                SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly,
+        ) {
             "LP query observation requires mixed finite source execution"
         }
-        return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
+        return SourceExecutionRequest(
+            invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, observer, onPortfolioGuidance, onPortfolioJointRepair)
+            prepareOnly, observer, onPortfolioGuidance, onPortfolioJointRepair,
+        )
     }
 
     internal fun withPortfolioGuidanceObserver(
         observer: (String, PooledGuidanceObservation) -> Unit,
     ): SourceExecutionRequest {
-        require(invocation.request.engine == FiniteEngine.MIXED &&
-            SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly) {
+        require(
+            invocation.request.engine == FiniteEngine.MIXED &&
+                SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly,
+        ) {
             "guidance observation requires mixed finite source execution"
         }
-        return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
+        return SourceExecutionRequest(
+            invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, onPortfolioLpQuery, observer, onPortfolioJointRepair)
+            prepareOnly, onPortfolioLpQuery, observer, onPortfolioJointRepair,
+        )
     }
 
     internal fun withPortfolioJointRepairObserver(
         observer: (String, Long, JointRepairObservation) -> Unit,
     ): SourceExecutionRequest {
-        require(invocation.request.engine == FiniteEngine.MIXED &&
-            SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly) {
+        require(
+            invocation.request.engine == FiniteEngine.MIXED &&
+                SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly,
+        ) {
             "joint repair observation requires mixed finite source execution"
         }
-        return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
+        return SourceExecutionRequest(
+            invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, observer)
+            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, observer,
+        )
     }
 
     /**
@@ -137,10 +149,10 @@ class SourceExecutionRequest private constructor(
         cores: Int = 1,
         randomSeed: Long? = null,
         nodeBudget: NodeBudget? = null,
-        timeout: Cancellation = Cancellation.Never,
-        cancellation: Cancellation = Cancellation.Never,
+        timeout: ExecutionControl = ExecutionControl.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         presolveConfig: PresolveConfig? = null,
-        presolveCancellation: Cancellation = Cancellation.Never,
+        presolveCancellation: ExecutionControl = ExecutionControl.Never,
         presolveBudget: PresolveBudget? = null,
     ) : this(
         invocation, SourceExecutionPolicy(explicitPresolve = presolveConfig != null), executionOptions,
@@ -157,10 +169,10 @@ class SourceExecutionRequest private constructor(
         cores: Int = 1,
         randomSeed: Long? = null,
         nodeBudget: NodeBudget? = null,
-        timeout: Cancellation = Cancellation.Never,
-        cancellation: Cancellation = Cancellation.Never,
+        timeout: ExecutionControl = ExecutionControl.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         presolveConfig: PresolveConfig? = null,
-        presolveCancellation: Cancellation = Cancellation.Never,
+        presolveCancellation: ExecutionControl = ExecutionControl.Never,
         presolveBudget: PresolveBudget? = null,
     ) : this(
         invocation,
@@ -178,7 +190,7 @@ class SourceExecutionRequest private constructor(
         invocation: PreparedSourceInvocation,
         controls: SourceExecutionControls,
         cores: Int,
-        presolveCancellation: Cancellation,
+        presolveCancellation: ExecutionControl,
         presolveBudget: PresolveBudget?,
         policy: SourceExecutionPolicy,
     ) : this(
@@ -196,7 +208,7 @@ class SourceExecutionRequest private constructor(
         polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
         cores: Int = 1,
         presolveConfig: PresolveConfig? = null,
-        presolveCancellation: Cancellation = Cancellation.Never,
+        presolveCancellation: ExecutionControl = ExecutionControl.Never,
         presolveBudget: PresolveBudget? = null,
     ) : this(
         invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
@@ -210,7 +222,7 @@ class SourceExecutionRequest private constructor(
         cores: Int = 1,
     ) : this(
         invocation, null, TheoryParams(), nonlinearInteger.polynomial, cores, null,
-        Cancellation.Never, null, nonlinearInteger, null, nonlinearInteger.nodeBudget,
+        ExecutionControl.Never, null, nonlinearInteger, null, nonlinearInteger.nodeBudget,
     )
 
     /** Bind full exact function controls without renewing the containing invocation. */
@@ -220,7 +232,7 @@ class SourceExecutionRequest private constructor(
         cores: Int = 1,
     ) : this(
         invocation, null, TheoryParams(), PolynomialTheoryParams(), cores, null,
-        Cancellation.Never, null, null, transcendental, transcendental.nodeBudget,
+        ExecutionControl.Never, null, null, transcendental, transcendental.nodeBudget,
     )
 
     init {
@@ -228,9 +240,13 @@ class SourceExecutionRequest private constructor(
         if (invocation.request.engine == FiniteEngine.FIXED && cores > 1) {
             throw PipelineConfigException("engine 'fixed' is single-core; use 'backtrack' for a parallel pool")
         }
-        policy.validate(SourceSetup.executionKind(invocation), invocation.request.engine, prepareOnly = prepareOnly,
+        policy.validate(
+            SourceSetup.executionKind(invocation),
+            invocation.request.engine,
+            prepareOnly = prepareOnly,
             presolveConfig = presolveConfig,
-            canonicalPolynomial = invocation.canonicalPolynomial)
+            canonicalPolynomial = invocation.canonicalPolynomial,
+        )
     }
 }
 
@@ -290,7 +306,9 @@ sealed class SourceExecutionResult protected constructor(
     val completeSearchAdmitted: Boolean?
         get() = when (this) {
             is Finite -> result.completeSearchAdmitted
+
             is Prepared, is Declined, is Refuted -> null
+
             else -> invocation.admission?.let { admission ->
                 ExecutionStrategy.COMPLETE in admission.arms &&
                     SourceSetup.executionKind(invocation) != SourceExecutionKind.HEURISTIC
@@ -397,19 +415,24 @@ fun SourceSetup.execute(
     if (request.prepareOnly && kind == SourceExecutionKind.LINEAR) return prepareSourceExecution(request)
     val result = if (request.invocation.linearSource != null) {
         executeLinearSource(request, callbacks, ::executeCapturedSource)
-    } else executeCapturedSource(request, callbacks)
+    } else {
+        executeCapturedSource(request, callbacks)
+    }
     if (kind != SourceExecutionKind.FINITE) {
         val observed = result.preparationStats ?: when (result) {
             is SourceExecutionResult.Linear -> when (val execution = result.result) {
                 is OpenTheoryExecution.Satisfy -> execution.result.stats.presolve
                 is OpenTheoryExecution.Optimize -> execution.result.stats.presolve
             }
+
             else -> null
         }
         val config = request.presolveConfig ?: PresolveConfig.DEFAULT
         val effort = if (request.presolveBudget == null && observed?.effort != null) {
             observed.effort
-        } else config.effortStats(request.presolveBudget, observed?.effort?.elapsed ?: Duration.ZERO)
+        } else {
+            config.effortStats(request.presolveBudget, observed?.effort?.elapsed ?: Duration.ZERO)
+        }
         result.preparationStats = (observed ?: PresolveStats()).copy(effort = effort)
     }
     return result
@@ -444,7 +467,7 @@ private fun validateSourceExecution(request: SourceExecutionRequest): SourceExec
 private fun executeCapturedSource(
     request: SourceExecutionRequest,
     callbacks: SourceExecutionCallbacks,
-    bindScope: ((Cancellation, Boolean) -> Unit)? = null,
+    bindScope: ((ExecutionControl, Boolean) -> Unit)? = null,
 ): SourceExecutionResult {
     val invocation = request.invocation
     val kind = SourceSetup.executionKind(invocation)
@@ -459,26 +482,43 @@ private fun executeCapturedSource(
             require(finite.shape === shape) { "finite execution belongs to a different source invocation" }
             invocation.requireFiniteExecution(finite.shape, finite.engine, finite.operation)
             bindScope?.invoke(
-                finite.cancellation or Cancellation { finite.deadlineExceeded() },
+                finite.cancellation or ExecutionControl { finite.deadlineExceeded() },
                 finite.toleranceCheck == null,
             )
-            val result = FinitePipeline.solve(finite, callbacks.finite, finite.lpSolveContext,
+            val result = FinitePipeline.solve(
+                finite,
+                callbacks.finite,
+                finite.lpSolveContext,
                 if (invocation.requestsFiniteNumericalCompanions) request.theory.boundTo(invocation) else null,
-                request.onPortfolioLpQuery, request.onPortfolioGuidance, request.onPortfolioJointRepair)
+                request.onPortfolioLpQuery,
+                request.onPortfolioGuidance,
+                request.onPortfolioJointRepair,
+            )
             SourceExecutionResult.Finite(invocation, result)
         }
 
         is SourceProblemRoute.OpenTheory -> {
             val params = request.theory.boundTo(invocation)
             // Native workers own the lowered view; the linear source stays with the invocation to qualify claims.
-            val native = if (invocation.linearSource == null) route.request else
+            val native = if (invocation.linearSource == null) {
+                route.request
+            } else {
                 route.request.withPreparedPlan(route.preparedPlan.linearWorkingPlan())
+            }
             val result = if (kind == SourceExecutionKind.HEURISTIC) {
                 executeSourceHeuristic(invocation, native.preparedPlan, params, request.cores, callbacks)
             } else {
                 val prepared = native.withPresolve(
                     request.presolveConfig ?: route.request.presolveConfig,
-                    cancellation = route.request.presolveCancellation or request.presolveCancellation or
+                    cancellation = route.request.presolveCancellation.withAccounting(
+                        if (request.presolveBudget !=
+                            null
+                        ) {
+                            request.presolveCancellation
+                        } else {
+                            route.request.presolveCancellation
+                        },
+                    ) or request.presolveCancellation or
                         invocation.cancellation,
                     budget = request.presolveBudget ?: route.request.presolveBudget,
                 )
@@ -492,9 +532,9 @@ private fun executeCapturedSource(
                 route.request
             } else {
                 PolynomialTheoryRequest(
-                route.request.problem,
-                route.preparedPlan.linearWorkingPlan(),
-            )
+                    route.request.problem,
+                    route.preparedPlan.linearWorkingPlan(),
+                )
             }
             val params = request.polynomial.boundTo(invocation)
             val objective = invocation.workingLinearObjective
@@ -505,8 +545,10 @@ private fun executeCapturedSource(
                 invocation.cancellation or params.cancellation or params.timeout,
                 request.presolveBudget,
             )
-            if (source.infeasible) return SourceExecutionResult.Refuted(invocation).also {
-                it.preparationStats = source.stats
+            if (source.infeasible) {
+                return SourceExecutionResult.Refuted(invocation).also {
+                    it.preparationStats = source.stats
+                }
             }
             val prepared = original.afterSourcePreparation(source, params.cancellation or params.timeout)
                 ?: return SourceExecutionResult.Declined(invocation, TerminationReason.BudgetExhausted).also {
@@ -567,14 +609,18 @@ private fun executeSourceHeuristic(
 )
 
 private fun TheoryParams.boundTo(invocation: PreparedSourceInvocation): TheoryParams = copy(
-    cancellation = cancellation or invocation.cancellation,
+    cancellation = cancellation.withAccounting(
+        if (cancellation.accounting != null) cancellation else invocation.cancellation,
+    ) or invocation.cancellation,
     timeout = timeout or invocation.containingDeadline(),
 )
 
 private fun PolynomialTheoryParams.boundTo(invocation: PreparedSourceInvocation): PolynomialTheoryParams = copy(
-    cancellation = cancellation or invocation.cancellation,
+    cancellation = cancellation.withAccounting(
+        if (cancellation.accounting != null) cancellation else invocation.cancellation,
+    ) or invocation.cancellation,
     timeout = timeout or invocation.containingDeadline(),
 )
 
-private fun PreparedSourceInvocation.containingDeadline(): Cancellation =
-    cancellation.deadline()?.let { Cancellation.until(it) } ?: Cancellation.Never
+private fun PreparedSourceInvocation.containingDeadline(): ExecutionControl =
+    cancellation.deadline()?.let { ExecutionControl.until(it) } ?: ExecutionControl.Never

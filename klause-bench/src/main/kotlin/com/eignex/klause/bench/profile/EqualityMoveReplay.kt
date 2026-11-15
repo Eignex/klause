@@ -27,7 +27,7 @@ import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
@@ -55,7 +55,7 @@ internal object EqualityMoveReplay {
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         val started = System.nanoTime()
         val allocated = trajectoryThreadBytes()
-        val stop = Cancellation.after(30.seconds)
+        val stop = ExecutionControl.after(30.seconds)
         val parsed = Xcsp3.parse(bytes.decodeToString())
         require(parsed.problem.numIntVars <= 128 && parsed.problem.numFactors <= 256)
         require(parsed.problem.numBoolVars == 0 && parsed.problem.numRealVars == 0)

@@ -12,7 +12,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -125,7 +125,7 @@ class RepairTraceTest {
 
             val result = engine.resumable(LinearObjective(), LocalSearchParams(maxFlips = 4, randomSeed = 7,
                 initialAssignment = Sample(booleanArrayOf(), longArrayOf(0, 1, 2)))).use {
-                assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+                assertNotNull(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {})
             }
 
             results.add(Triple(result.assignment, result.stats.ls.moves.sum, draws))
@@ -151,7 +151,7 @@ class RepairTraceTest {
         val handle = engine.resumable(LinearObjective(), LocalSearchParams(maxFlips = 1, randomSeed = 7,
             initialAssignment = Sample(booleanArrayOf(), LongArray(32) { if (it == 1) 1L else 0L })))
 
-        assertNull(handle.runSlice(Cancellation { policy.incumbents.isNotEmpty() && ++polls >= 3 },
+        assertNull(handle.runSlice(ExecutionControl { policy.incumbents.isNotEmpty() && ++polls >= 3 },
             Long.MAX_VALUE, -1) {})
         val pending = trace.attempts.last()
         assertNull(pending.endpoint)
@@ -176,12 +176,12 @@ class RepairTraceTest {
 
         engine.resumable(LinearObjective(), LocalSearchParams(maxFlips = 1, randomSeed = 7,
             initialAssignment = Sample(booleanArrayOf(), LongArray(32) { if (it == 1) 1L else 0L }))).use { handle ->
-            assertNull(handle.runSlice(Cancellation { policy.incumbents.isNotEmpty() && ++polls >= 3 },
+            assertNull(handle.runSlice(ExecutionControl { policy.incumbents.isNotEmpty() && ++polls >= 3 },
                 Long.MAX_VALUE, -1) {})
             val pending = trace.attempts.last()
             val phases = pending.frames.toList()
 
-            assertNotNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+            assertNotNull(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {})
 
             assertEquals(phases, pending.frames.take(phases.size))
             assertEquals(listOf("before", "perturbed", "prepared", "repaired", "endpoint"),

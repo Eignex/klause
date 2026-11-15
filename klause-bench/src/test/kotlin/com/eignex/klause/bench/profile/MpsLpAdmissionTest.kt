@@ -16,14 +16,14 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.PreparedSourcePlan
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import kotlinx.serialization.json.jsonArray
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlinx.serialization.json.jsonArray
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.EnumSource
 
 class MpsLpAdmissionTest {
     @Test
@@ -32,7 +32,7 @@ class MpsLpAdmissionTest {
             listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
 
-        val relaxation = MpsLpAdmission.rootRelaxation(problem, objective, false, Cancellation.Never)
+        val relaxation = MpsLpAdmission.rootRelaxation(problem, objective, false, ExecutionControl.Never)
         val model = relaxation.javaClass.getMethod("getModel").invoke(relaxation)
 
         assertEquals(1, model.javaClass.getMethod("getM").invoke(model))

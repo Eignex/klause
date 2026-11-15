@@ -15,7 +15,7 @@ import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.MAX_SCALAR_COLUMN_ENTRIES
 import com.eignex.klause.simplex.basis.RationalBasisOrder
 import com.eignex.klause.simplex.basis.SymbolicLu
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SparseSlices
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.koblas.SparseMatrix
@@ -118,7 +118,7 @@ internal const val DEFAULT_REFACTOR_UPDATE_LIMIT: Int = 64
  */
 internal class RevisedSimplex(
     private var model: LpModel,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     private val refactorUpdateLimit: Int = DEFAULT_REFACTOR_UPDATE_LIMIT,
     private val iterationLimit: Int = 0,
     private val workLimit: Long = 0L,
@@ -333,9 +333,9 @@ internal class RevisedSimplex(
 
     // The work counted into [work] is charged to the caller's token at every poll and when a solve ends,
     // so a work-metered token stops the solve at the same pivot however loaded the machine is.
-    private var stopToken: Cancellation = cancellation
+    private var stopToken: ExecutionControl = cancellation
     private var chargedOps = 0L
-    private val cancellation: Cancellation = cancelledWhen({ stopToken.deadline() }) {
+    private val cancellation: ExecutionControl = cancelledWhen({ stopToken.deadline() }) {
         chargeWork()
         stopToken()
     }
@@ -530,7 +530,7 @@ internal class RevisedSimplex(
     override val lastSingularRefactorizations: Int get() = observations.singularRefactorizations
     override val lastSmallPivotBails: Int get() = observations.smallPivotBails
     override val lastMetrics: LpSolveMetrics get() = observations.snapshot(work.ops)
-    override fun pausedDualProposal(cancellation: Cancellation): DoubleArray? {
+    override fun pausedDualProposal(cancellation: ExecutionControl): DoubleArray? {
         if (activeSolve?.isAdvancing != false || cancellation()) return null
         val proposal = DoubleArray(m)
         var nonzero = false
@@ -570,7 +570,9 @@ internal class RevisedSimplex(
     }
 
     init {
-        if (initialMatrix == null) rebuildRowView() else {
+        if (initialMatrix == null) {
+            rebuildRowView()
+        } else {
             rowCols = initialMatrix.rowCols
             rowVals = initialMatrix.rowVals
         }
@@ -669,7 +671,9 @@ internal class RevisedSimplex(
         cachedStatus = null
         solvedExactState = null
         if (failure != null) {
-            if (cleanup == null) cleanup = failure else if (cleanup !== failure) cleanup.addSuppressed(failure)
+            if (cleanup == null) cleanup = failure else if (cleanup !== failure) {
+                cleanup.addSuppressed(failure)
+            }
         }
         cleanup?.let { throw it }
     }
@@ -700,8 +704,11 @@ internal class RevisedSimplex(
                 }
             ) {
                 factorCopyFailed = true
-                observations.termination = if (cancellation()) LpFloatTermination.CANCELLED
-                    else LpFloatTermination.NUMERICAL
+                observations.termination = if (cancellation()) {
+                    LpFloatTermination.CANCELLED
+                } else {
+                    LpFloatTermination.NUMERICAL
+                }
                 return@profiled RefactorResult.FAILED
             }
             hasImportedFactors = true
@@ -784,7 +791,11 @@ internal class RevisedSimplex(
             val buildAfter = operationWork(solver)
             val measured = if (buildBefore == null || buildAfter == null ||
                 buildAfter.refactorization.attempts <= buildBefore.refactorization.attempts
-            ) null else operationDelta(buildBefore, buildAfter) { it.refactorization.mergedWith(it.repair) }
+            ) {
+                null
+            } else {
+                operationDelta(buildBefore, buildAfter) { it.refactorization.mergedWith(it.repair) }
+            }
             if (measured == null) observations.basisBuildUnmeasured++ else observations.basisBuildWork += measured
             if (buildBefore != null && buildAfter != null) {
                 observations.basisBuildDeclines += maxOf(0L,
@@ -1172,9 +1183,9 @@ internal class RevisedSimplex(
         }
     }
 
-    override fun prepareLogicals(token: Cancellation): Basis? = prepareSourceBasis(null, token)
+    override fun prepareLogicals(token: ExecutionControl): Basis? = prepareSourceBasis(null, token)
 
-    override fun prepareBasis(basis: Basis, token: Cancellation): Basis? = prepareSourceBasis(basis, token)
+    override fun prepareBasis(basis: Basis, token: ExecutionControl): Basis? = prepareSourceBasis(basis, token)
 
     override fun retainedBasis(): Basis? {
         if (activeSolve != null) return null
@@ -1187,7 +1198,7 @@ internal class RevisedSimplex(
         return Basis(basicVar.copyOf(), status.copyOf(), captureEligible = false)
     }
 
-    private fun prepareSourceBasis(warm: Basis?, token: Cancellation): Basis? {
+    private fun prepareSourceBasis(warm: Basis?, token: ExecutionControl): Basis? {
         if (activeSolve != null) return null
         observations.termination = null
         continuationAvailable = false
@@ -1226,7 +1237,7 @@ internal class RevisedSimplex(
         }
     }
 
-    override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+    override fun adopt(state: LpExactState, token: ExecutionControl): Boolean {
         if (activeSolve != null) return false
         observations.termination = null
         val current = model.exactState ?: return false
@@ -1263,14 +1274,16 @@ internal class RevisedSimplex(
         installUnscaledFallback(next)
     }
 
-    internal fun adoptProbe(next: LpModel, source: LpScalingView, token: Cancellation): Boolean {
+    internal fun adoptProbe(next: LpModel, source: LpScalingView, token: ExecutionControl): Boolean {
         val current = model.exactState ?: return false
         val state = next.exactState ?: return false
         if (activeSolve != null || allowUnscaledFallback || !current.sameMatrix(state) || token()) return false
         if (source.colPtr !== numerical.colPtr || source.rowIdx !== numerical.rowIdx ||
             source.colVal !== numerical.colVal || source.rowExponents !== numerical.rowExponents ||
             source.columnExponents !== numerical.columnExponents
-        ) return false
+        ) {
+            return false
+        }
         val refreshed = source.refresh(next) ?: return false
         if (token()) return false
         continuationAvailable = false
@@ -2915,7 +2928,7 @@ internal class RevisedSimplex(
     /** The structural primal `x*` at the last optimal [solve], for scoring tableau cuts by violation. */
     private var optimalPrimal: DoubleArray? = null
 
-    internal fun probeObjective(token: Cancellation): Double? {
+    internal fun probeObjective(token: ExecutionControl): Double? {
         val values = cachedBeta ?: return null
         if (optimalBasis == null || cachedModel !== model || cachedPrimalOnly || cachedNumerical !== numerical) {
             return null
@@ -2936,11 +2949,17 @@ internal class RevisedSimplex(
 
     private fun probeOrderWork(): Long = if (basisSolverFactory == null &&
         basisLifecycle.current?.orderHintDimension == m
-    ) 24L * m + 64L else 0L
+    ) {
+        24L * m + 64L
+    } else {
+        0L
+    }
 
     private fun probeFactorCopy(): BasisFactorCopy? = if (basisSolverFactory == null && basisLifecycle.factorized) {
         basisLifecycle.current?.factorCopy?.takeIf { it.dimension == m }
-    } else null
+    } else {
+        null
+    }
 
     private fun currentProbeValues(point: LpModel, basis: Basis): Boolean = reuseProbeValues &&
         point === model && optimalBasis === basis && cachedModel === point && cachedNumerical === numerical &&
@@ -2950,7 +2969,9 @@ internal class RevisedSimplex(
         if (!currentProbeValues(point, basis) || columns.any {
                 status[it] != VarStatus.BASIC || cost(it) == 0.0 || optimalPrimal?.get(it) == model.loShiftD(it)
             }
-        ) return 0L
+        ) {
+            return 0L
+        }
         val capture = 4L * m + 4L * numVars + 64L
         val solve = nnzB.toLong() + (basisLifecycle.current?.updateCount ?: 0).toLong() * m
         // Nonzero basic values and costs require both setup solves; basic bounds preserve the nonbasic seats.
@@ -2974,7 +2995,9 @@ internal class RevisedSimplex(
         if (!values.all { it.isFinite() } || !current()) return
         if (!basis.basicVars.contentEquals(parent.basicVar) || !basis.status.contentEquals(parent.status) ||
             !seats.contentEquals(parent.status)
-        ) return
+        ) {
+            return
+        }
         cachedBeta = values
         cachedStatus = seats
         cachedModel = point
@@ -2988,7 +3011,7 @@ internal class RevisedSimplex(
         columns: IntArray,
         splits: LongArray,
         allowance: Long,
-        token: Cancellation,
+        token: ExecutionControl,
         observe: (LpProbeMetrics) -> Unit,
     ): List<LpDirectionalGain>? {
         fun decline(reason: LpProbeDecline): List<LpDirectionalGain>? {
@@ -3005,12 +3028,18 @@ internal class RevisedSimplex(
         if (columns.isEmpty() || columns.size > 2 ||
             columns.size != splits.size || columns.any { it !in 0 until n } ||
             (columns.size == 2 && columns[0] == columns[1])
-        ) return decline(LpProbeDecline.SPLIT)
+        ) {
+            return decline(LpProbeDecline.SPLIT)
+        }
         for (index in columns.indices) {
             val split = splits[index]
-            if (split == Long.MAX_VALUE || !(split.toDouble() < point[columns[index]] &&
-                    point[columns[index]] < (split + 1L).toDouble())
-            ) return decline(LpProbeDecline.SPLIT)
+            if (split == Long.MAX_VALUE || !(
+                split.toDouble() < point[columns[index]] &&
+                    point[columns[index]] < (split + 1L).toDouble()
+            )
+            ) {
+                return decline(LpProbeDecline.SPLIT)
+            }
         }
         val factorCopy = probeFactorCopy()
         val scan = 2L * numVars + m + 1L + if (factorCopy != null) m.toLong() else 0L
@@ -3057,7 +3086,7 @@ internal class RevisedSimplex(
         columns: IntArray,
         splits: LongArray,
         allowance: Long,
-        token: Cancellation,
+        token: ExecutionControl,
         observe: (LpProbeMetrics) -> Unit,
     ): List<LpDirectionalValues>? {
         fun decline(reason: LpProbeDecline): List<LpDirectionalValues>? {
@@ -3076,7 +3105,9 @@ internal class RevisedSimplex(
             columns.any { it !in 0 until n } || splits.any { it == Long.MAX_VALUE } ||
             (columns.size == 2 && columns[0] == columns[1]) ||
             pointBasis.basicVars.size != m || pointBasis.status.size != numVars
-        ) return decline(LpProbeDecline.SPLIT)
+        ) {
+            return decline(LpProbeDecline.SPLIT)
+        }
         val factorCopy = probeFactorCopy()
         val scan = 3L * numVars + 2L * m + 1L + if (factorCopy != null) m.toLong() else 0L
         if (scan >= allowance) return decline(LpProbeDecline.ALLOWANCE)
@@ -3110,7 +3141,7 @@ internal class RevisedSimplex(
         }).runValues(columns, splits, allowance - scan, token, observe)
     }
 
-    private fun probeBasisDecline(source: LpProbeSource, token: Cancellation): LpProbeDecline? {
+    private fun probeBasisDecline(source: LpProbeSource, token: ExecutionControl): LpProbeDecline? {
         val basis = source.basis
         val seen = BooleanArray(numVars)
         for ((slot, column) in basis.basicVars.withIndex()) {
@@ -3124,9 +3155,13 @@ internal class RevisedSimplex(
             if (column % 256 == 0 && token()) return LpProbeDecline.CANCELLED
             val valid = when (basis.status[column]) {
                 VarStatus.BASIC -> seen[column]
+
                 VarStatus.AT_LOWER -> !seen[column] && source.model.hasFiniteLower(column)
+
                 VarStatus.AT_UPPER -> !seen[column] && source.model.hasFiniteUpper(column)
+
                 VarStatus.FIXED -> !seen[column] && source.model.fixed(column)
+
                 VarStatus.FREE -> !seen[column] && !source.model.hasFiniteLower(column) &&
                     !source.model.hasFiniteUpper(column)
             }
@@ -3139,13 +3174,15 @@ internal class RevisedSimplex(
         pointModel: LpModel,
         columns: IntArray,
         allowance: Long,
-        token: Cancellation,
+        token: ExecutionControl,
         charge: (Long) -> Unit,
     ): List<LpDirectionalCost?>? {
         if (columns.isEmpty() || columns.size > 2 || allowance <= 0L || token() || activeSolve != null ||
             optimalBasis == null || !basisLifecycle.factorized ||
             (model !== pointModel && (model.exactState == null || model.exactState !== pointModel.exactState))
-        ) return null
+        ) {
+            return null
+        }
         val factors = basisLifecycle.current ?: return null
         if (nnzB < 0 || nnzB > colVal.size) return null
         // Basic columns are skipped before either CSC dot product.
@@ -3156,7 +3193,9 @@ internal class RevisedSimplex(
         val perColumn = 6L * m + 8L * numVars + scans + nnzB + factors.updateCount.toLong() * m
         if (shared > allowance || perColumn > (allowance - shared) / columns.size ||
             columns.any { it !in 0 until n }
-        ) return null
+        ) {
+            return null
+        }
         val required = shared + columns.size * perColumn
         charge(required)
         if (token()) return null
@@ -3166,7 +3205,9 @@ internal class RevisedSimplex(
             columns.map { column ->
                 if (token()) return null
                 val slot = basicVar.indexOf(column)
-                if (slot < 0) null else {
+                if (slot < 0) {
+                    null
+                } else {
                     row.unit(slot)
                     factors.btran(row, expectedDensity = 1.0)
                     if (token()) return null
@@ -3180,7 +3221,7 @@ internal class RevisedSimplex(
         }
     }
 
-    private fun directionalReducedCosts(token: Cancellation): DoubleArray? {
+    private fun directionalReducedCosts(token: ExecutionControl): DoubleArray? {
         val costs = DoubleArray(numVars)
         for (j in 0 until numVars) {
             if (j % 256 == 0 && token()) return null
@@ -3194,7 +3235,7 @@ internal class RevisedSimplex(
     private fun directionalRowCosts(
         column: Int,
         row: IndexedVector,
-        token: Cancellation,
+        token: ExecutionControl,
         reducedCosts: DoubleArray?,
     ): LpDirectionalCost? {
         var down = Double.POSITIVE_INFINITY
@@ -3495,11 +3536,14 @@ internal class RevisedSimplex(
                         valueUpdates = 0
                     }
                 }
+
                 PivotFold.REBUILT -> {
                     basicValues(beta)
                     valueUpdates = 0
                 }
+
                 PivotFold.BASIS_CHANGED -> return IterationResult.BASIS_CHANGED
+
                 PivotFold.FAILED -> return IterationResult.FAILED
             }
         }
@@ -3509,25 +3553,27 @@ internal class RevisedSimplex(
 
     private fun phaseOneViolation(beta: DoubleArray, gradient: DoubleArray): Double =
         profiled(SimplexProfilePhase.FEASIBILITY_SCAN) {
-        var violation = 0.0
-        for (i in 0 until m) {
-            val column = basicVar[i]
-            val lower = if (model.hasFiniteLower(column)) numerical.lowerD(column) else -Double.MAX_VALUE
-            val upper = if (model.hasFiniteUpper(column)) numerical.upperD(column) else Double.MAX_VALUE
-            gradient[i] = when {
-                beta[i] < lower - feasibilityTolerance -> {
-                    violation += lower - beta[i]
-                    -1.0
+            var violation = 0.0
+            for (i in 0 until m) {
+                val column = basicVar[i]
+                val lower = if (model.hasFiniteLower(column)) numerical.lowerD(column) else -Double.MAX_VALUE
+                val upper = if (model.hasFiniteUpper(column)) numerical.upperD(column) else Double.MAX_VALUE
+                gradient[i] = when {
+                    beta[i] < lower - feasibilityTolerance -> {
+                        violation += lower - beta[i]
+                        -1.0
+                    }
+
+                    beta[i] > upper + feasibilityTolerance -> {
+                        violation += beta[i] - upper
+                        1.0
+                    }
+
+                    else -> 0.0
                 }
-                beta[i] > upper + feasibilityTolerance -> {
-                    violation += beta[i] - upper
-                    1.0
-                }
-                else -> 0.0
             }
+            return@profiled violation
         }
-        return@profiled violation
-    }
 
     private fun advancePhaseOneValues(
         beta: DoubleArray,

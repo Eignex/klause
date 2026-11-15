@@ -21,7 +21,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.LpStatsSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.sun.management.OperatingSystemMXBean
 import com.sun.management.ThreadMXBean
@@ -74,7 +74,7 @@ internal object LpTemplatePreparationProfile {
         require(originalSource.numRealVars == 0 && originalSource.numIntVars >= 2)
         val objective = requireNotNull(compiled.objective).toLinearObjective()
             .let { if (compiled.maximize) it.negated() else it }
-        val stop = Cancellation.after(120.seconds)
+        val stop = ExecutionControl.after(120.seconds)
         val management = ManagementFactory.getThreadMXBean()
         val cpu = management.takeIf {
             it.isCurrentThreadCpuTimeSupported && it.isThreadCpuTimeEnabled
@@ -144,9 +144,9 @@ internal object LpTemplatePreparationProfile {
                         val sink = LpStatsSink()
                         var work = 0L
                         val meter = WorkMeter { work += it }
-                        val token = object : Cancellation {
+                        val token = object : ExecutionControl() {
                             override fun isCancelled(): Boolean = stop()
-                            override fun workMeter(): WorkMeter = meter
+                            override val accounting: WorkMeter get() = meter
                         }
                         var assemblyNs = 0L
                         var solveNs = 0L
@@ -197,9 +197,9 @@ internal object LpTemplatePreparationProfile {
                                 }
                             } else rootDomains
                             val consumerToken = if (change == "cancel" && step % 2 == 1) {
-                                object : Cancellation {
+                                object : ExecutionControl() {
                                     override fun isCancelled(): Boolean = true
-                                    override fun workMeter(): WorkMeter = meter
+                                    override val accounting: WorkMeter get() = meter
                                 }
                             } else token
                             val consumer = CpToLpRelaxation(view, cost,

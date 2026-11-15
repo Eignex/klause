@@ -12,7 +12,7 @@ import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -69,10 +69,10 @@ class BlockedClauseEliminationTest {
         for ((clauses, protected) in scans) {
             val problem = Problem(302, 0, emptyArray(), listOf(clause(pos(301))) + clauses)
             val setup = PresolveBudget(Long.MAX_VALUE)
-            assertNotNull(SatClauseDb.build(problem, protected, setup.orSpent(Cancellation.Never)))
+            assertNotNull(SatClauseDb.build(problem, protected, setup.orSpent(ExecutionControl.Never)))
             for (finite in listOf(false, true)) {
                 val budget = PresolveBudget(setup.spent() + 1_020L)
-                val token = budget.orSpent(Cancellation.Never)
+                val token = budget.orSpent(ExecutionControl.Never)
                 val delta = if (finite) {
                     BlockedClauseElimination.eliminate(problem, protected, token).let {
                         SourceDelta(it.droppedIndices, it.addedFactors, rebuild = it.rebuild)
@@ -101,10 +101,10 @@ class BlockedClauseEliminationTest {
             val problem = Problem(width + 1, 0, emptyArray(), clauses)
             val budget = PresolveBudget(Long.MAX_VALUE)
             val setup = PresolveBudget(Long.MAX_VALUE)
-            assertNotNull(SatClauseDb.build(problem, emptySet(), setup.orSpent(Cancellation.Never)))
+            assertNotNull(SatClauseDb.build(problem, emptySet(), setup.orSpent(ExecutionControl.Never)))
 
             val delta = BlockedClauseElimination.eliminateSource(
-                problem, cancellation = budget.orSpent(Cancellation.Never),
+                problem, cancellation = budget.orSpent(ExecutionControl.Never),
             )
 
             assertEquals(width == 257, delta.isEmpty)
@@ -147,7 +147,7 @@ class BlockedClauseEliminationTest {
             ),
         )
 
-        val delta = Presolve.eliminateSourceBlockedClauses(problem, emptySet(), Cancellation.Never)
+        val delta = Presolve.eliminateSourceBlockedClauses(problem, emptySet(), ExecutionControl.Never)
 
         val reduced = assertNotNull(problem.withSourcePassDelta(delta))
         assertTrue(clauseCount(reduced) < clauseCount(problem))
@@ -172,7 +172,7 @@ class BlockedClauseEliminationTest {
             ),
         )
 
-        val delta = Presolve.eliminateSourceBlockedClauses(problem, emptySet(), Cancellation.Never)
+        val delta = Presolve.eliminateSourceBlockedClauses(problem, emptySet(), ExecutionControl.Never)
 
         assertTrue(delta.isEmpty)
     }

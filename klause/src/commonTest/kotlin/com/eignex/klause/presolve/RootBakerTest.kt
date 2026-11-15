@@ -25,7 +25,7 @@ import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PropagationCapability
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import kotlin.random.Random
 import kotlin.test.Test
@@ -98,7 +98,7 @@ class RootBakerTest {
             0, 4, Array(4) { IntDomain(0, 3) }, factors,
             seedDeductions = seed,
             alreadyFolded = true,
-            cancellation = budget.orSpent(Cancellation.Never),
+            cancellation = budget.orSpent(ExecutionControl.Never),
             projectionProviders = providers,
         )
         val rng = Random(42L)
@@ -151,7 +151,7 @@ class RootBakerTest {
                     0, 1, arrayOf(domain), listOf(factor),
                     seedDeductions = seed,
                     alreadyFolded = true,
-                    cancellation = budget.orSpent(Cancellation { ++polls > 200 }),
+                    cancellation = budget.orSpent(ExecutionControl { ++polls > 200 }),
                 )
                 polls = 0
 
@@ -177,7 +177,7 @@ class RootBakerTest {
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
             ),
-        ).bake(budget.orSpent(Cancellation.Never))
+        ).bake(budget.orSpent(ExecutionControl.Never))
 
         RootBaker.bake(problem, BakeConfig(probeIntBounds = true))
 
@@ -190,7 +190,7 @@ class RootBakerTest {
     fun `a certified refutation should survive spent construction allowance`() {
         val budget = PresolveBudget(0L)
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyList())
-            .bake(budget.orSpent(Cancellation.Never))
+            .bake(budget.orSpent(ExecutionControl.Never))
 
         val result = RootBaker.provenInfeasible(problem, BakeConfig.NONE)
 
@@ -227,7 +227,7 @@ class RootBakerTest {
         )) {
             val budget = PresolveBudget(1)
             val problem = Problem(1, 1, arrayOf(IntDomain(0, 3)), emptyList())
-                .bake(budget.orSpent(Cancellation.Never))
+                .bake(budget.orSpent(ExecutionControl.Never))
 
             val result = RootBaker.bake(problem, config)
 
@@ -250,10 +250,10 @@ class RootBakerTest {
             ),
         )
         val reference = PresolveBudget(Long.MAX_VALUE)
-        val root = source.bake(reference.orSpent(Cancellation.Never))
+        val root = source.bake(reference.orSpent(ExecutionControl.Never))
         assertIs<PropagationResult.Unsat>(root.propagate(Assumptions.None.withBool(0, true), root.cancellation))
         val budget = PresolveBudget(reference.spent())
-        val problem = source.bake(budget.orSpent(Cancellation.Never))
+        val problem = source.bake(budget.orSpent(ExecutionControl.Never))
 
         val result = assertIs<PropagationResult.Implied>(
             RootBaker.bake(
@@ -286,7 +286,7 @@ class RootBakerTest {
                 ),
             )
             val reference = PresolveBudget(Long.MAX_VALUE)
-            val root = source.bake(reference.orSpent(Cancellation.Never))
+            val root = source.bake(reference.orSpent(ExecutionControl.Never))
             if (op == LinearOp.LE) root.propagate(Assumptions.None.withInt(0, 0), root.cancellation)
             val failedValue = if (op == LinearOp.GE) 0L else 3L
             assertIs<PropagationResult.Unsat>(
@@ -296,7 +296,7 @@ class RootBakerTest {
                 ),
             )
             val budget = PresolveBudget(reference.spent())
-            val problem = source.bake(budget.orSpent(Cancellation.Never))
+            val problem = source.bake(budget.orSpent(ExecutionControl.Never))
 
             val result = assertIs<PropagationResult.Implied>(
                 RootBaker.bake(
@@ -328,11 +328,11 @@ class RootBakerTest {
             ),
         )
         val reference = PresolveBudget(Long.MAX_VALUE)
-        val root = source.bake(reference.orSpent(Cancellation.Never))
+        val root = source.bake(reference.orSpent(ExecutionControl.Never))
         RootBaker.bake(root, BakeConfig(probeIntBounds = true))
         assertIs<PropagationResult.Unsat>(root.propagate(Assumptions.None.withInt(0, 1), root.cancellation))
         val budget = PresolveBudget(Long.MAX_VALUE)
-        val token = budget.orSpent(Cancellation { budget.rootPropagationWork >= reference.rootPropagationWork })
+        val token = budget.orSpent(ExecutionControl { budget.rootPropagationWork >= reference.rootPropagationWork })
         val problem = source.bake(token)
 
         val result = assertIs<PropagationResult.Implied>(RootBaker.bake(problem, BakeConfig(probeIntHoles = true)))
@@ -348,7 +348,7 @@ class RootBakerTest {
         for (config in listOf(BakeConfig(probeFailedLiterals = true), BakeConfig(probeIntBounds = true))) {
             val budget = PresolveBudget(3 * 53L)
             val problem = Problem(1, 1, arrayOf(IntDomain(0, 3)), emptyList())
-                .bake(budget.orSpent(Cancellation.Never))
+                .bake(budget.orSpent(ExecutionControl.Never))
 
             val result = RootBaker.bake(problem, config)
 
@@ -372,7 +372,7 @@ class RootBakerTest {
         val entries = 2L + source.numFactors + source.factors.sumOf { it.structuralKeyWeight.toLong() }
         val budget = PresolveBudget(53L * entries + 1L)
 
-        val result = source.bake(budget.orSpent(Cancellation.Never))
+        val result = source.bake(budget.orSpent(ExecutionControl.Never))
 
         assertIs<PropagationResult.Implied>(result.baked)
         assertEquals(0L, budget.remaining())
@@ -392,11 +392,11 @@ class RootBakerTest {
             ),
         )
         val reference = PresolveBudget(Long.MAX_VALUE)
-        val root = source.bake(reference.orSpent(Cancellation.Never))
+        val root = source.bake(reference.orSpent(ExecutionControl.Never))
         root.propagate(Assumptions.None.withInt(0, 0), root.cancellation)
         root.propagate(Assumptions.None.withTightenedMin(0, 1), root.cancellation)
         val budget = PresolveBudget(reference.spent())
-        val problem = source.bake(budget.orSpent(Cancellation.Never))
+        val problem = source.bake(budget.orSpent(ExecutionControl.Never))
 
         val result = assertIs<PropagationResult.Implied>(RootBaker.bake(problem, BakeConfig(probeIntHoles = true)))
 
@@ -417,10 +417,10 @@ class RootBakerTest {
             ),
         )
         val reference = PresolveBudget(Long.MAX_VALUE)
-        val root = source.bake(reference.orSpent(Cancellation.Never))
+        val root = source.bake(reference.orSpent(ExecutionControl.Never))
         root.propagate(Assumptions.None.withBool(0, true), root.cancellation)
         val budget = PresolveBudget(reference.spent())
-        val problem = source.bake(budget.orSpent(Cancellation.Never))
+        val problem = source.bake(budget.orSpent(ExecutionControl.Never))
 
         val result = assertIs<PropagationResult.Implied>(
             RootBaker.bake(problem, BakeConfig(probeFailedLiterals = true)),
@@ -437,7 +437,7 @@ class RootBakerTest {
         budget.charge(Long.MAX_VALUE - 1L)
 
         val root = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyList())
-            .bake(budget.orSpent(Cancellation.Never))
+            .bake(budget.orSpent(ExecutionControl.Never))
         RootBaker.bake(root, BakeConfig(probeIntHoles = true))
 
         assertEquals(Long.MAX_VALUE, budget.spent())
@@ -458,11 +458,11 @@ class RootBakerTest {
         )
         val budget = PresolveBudget(Long.MAX_VALUE)
         val reference = PresolveBudget(Long.MAX_VALUE)
-        val control = source.bake(reference.orSpent(Cancellation.Never))
+        val control = source.bake(reference.orSpent(ExecutionControl.Never))
         control.propagate(Assumptions.None.withBool(0, true), control.cancellation)
         val root = source.bake(
             budget.orSpent(
-                Cancellation {
+                ExecutionControl {
                     budget.rootPropagationWork >= reference.rootPropagationWork
                 },
             ),
@@ -530,7 +530,7 @@ class RootBakerTest {
 
     @Test
     fun `an already-fired cancellation should skip probing tightening`() {
-        val cancelled = Cancellation { true }
+        val cancelled = ExecutionControl { true }
         val p = Problem(
             numBoolVars = 0,
             numIntVars = 2,

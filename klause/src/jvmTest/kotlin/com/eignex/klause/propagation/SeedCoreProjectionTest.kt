@@ -4,7 +4,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.Test
@@ -30,7 +30,7 @@ class SeedCoreProjectionTest(private val nativeSat: Boolean, private val pinValu
         val pins = Assumptions(bools = mapOf(0 to pinValue, 1 to pinValue, 2 to pinValue))
         val conflict = assertIs<PropagationResult.Unsat>(session.seed(pins))
 
-        val projected = session.projectSeedCore(pins, conflict, Cancellation.Never)
+        val projected = session.projectSeedCore(pins, conflict, ExecutionControl.Never)
 
         assertContentEquals(intArrayOf(2, 3), projected.conflictLevels)
     }
@@ -45,7 +45,7 @@ class SeedCoreProjectionTest(private val nativeSat: Boolean, private val pinValu
         val pins = Assumptions(bools = mapOf(0 to pinValue, 1 to pinValue, 3 to pinValue))
         val conflict = assertIs<PropagationResult.Unsat>(session.seed(pins))
 
-        val projected = session.projectSeedCore(pins, conflict, Cancellation.Never)
+        val projected = session.projectSeedCore(pins, conflict, ExecutionControl.Never)
 
         assertContentEquals(intArrayOf(1, 3), projected.conflictLevels)
     }
@@ -57,7 +57,7 @@ class SeedCoreProjectionTest(private val nativeSat: Boolean, private val pinValu
         val pins = Assumptions(bools = mapOf(0 to pinValue), ints = mapOf(0 to 1L))
         val conflict = assertIs<PropagationResult.Unsat>(session.seed(pins))
 
-        val projected = session.projectSeedCore(pins, conflict, Cancellation.Never)
+        val projected = session.projectSeedCore(pins, conflict, ExecutionControl.Never)
 
         assertContentEquals(conflict.conflictLevels, projected.conflictLevels)
     }
@@ -71,7 +71,7 @@ class SeedCoreProjectionTest(private val nativeSat: Boolean, private val pinValu
         val pins = Assumptions(bools = mapOf(0 to pinValue, 1 to pinValue, 2 to pinValue))
         val conflict = assertIs<PropagationResult.Unsat>(session.seed(pins))
 
-        val projected = session.projectSeedCore(pins, conflict, Cancellation { true })
+        val projected = session.projectSeedCore(pins, conflict, ExecutionControl { true })
 
         assertContentEquals(conflict.conflictLevels, projected.conflictLevels)
     }
@@ -87,7 +87,7 @@ class SeedCoreProjectionTest(private val nativeSat: Boolean, private val pinValu
         val pins = Assumptions(bools = mapOf(0 to pinValue, 1 to pinValue, last to pinValue))
         val conflict = assertIs<PropagationResult.Unsat>(session.seed(pins))
 
-        val projected = session.projectSeedCore(pins, conflict, Cancellation.Never)
+        val projected = session.projectSeedCore(pins, conflict, ExecutionControl.Never)
 
         assertContentEquals(conflict.conflictLevels, projected.conflictLevels)
     }

@@ -27,7 +27,7 @@ import com.eignex.klause.theory.TheoryEncoding
 import com.eignex.klause.theory.TheoryRealId
 import com.eignex.klause.theory.qfnra.PolynomialTheoryService
 import com.eignex.klause.theory.qfnra.QfNraAssignment
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigInt
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -48,7 +48,7 @@ internal class SharedPolynomialModel private constructor(
     // cut short by cancellation keeps sound but weaker root deductions and is rebuilt by the next check.
     private val finitePoints = AtomicReference<Pair<PreparedFactorProjections?, FinitePointCheck>?>(null)
 
-    fun finitePointCheck(projections: PreparedFactorProjections?, cancellation: Cancellation): FinitePointCheck {
+    fun finitePointCheck(projections: PreparedFactorProjections?, cancellation: ExecutionControl): FinitePointCheck {
         finitePoints.load()?.let { (selected, check) -> if (selected === projections) return check }
         val baked = projections?.let { finite.bake(it, cancellation) } ?: finite.bake(cancellation)
         val check = FinitePointCheck(baked, finiteEnforcingFactors)
@@ -69,18 +69,14 @@ internal class SharedPolynomialModel private constructor(
     }
 
     companion object {
-        fun assemble(
-            source: Problem,
-            sourceFormula: PolynomialRealFormula? = null,
-        ): SharedPolynomialModel? {
-            return source.preparePolynomialExecutionPlan(sourceFormula).execution.polynomial?.completion
-        }
+        fun assemble(source: Problem, sourceFormula: PolynomialRealFormula? = null): SharedPolynomialModel? =
+            source.preparePolynomialExecutionPlan(sourceFormula).execution.polynomial?.completion
 
         internal fun lower(
             source: Problem,
             sourceFormula: PolynomialRealFormula?,
             projections: PreparedFactorProjections,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
             onDecline: (EncoderDecline) -> Unit,
         ): SharedPolynomialModel? {
             projections.requireSource(source)
@@ -119,13 +115,17 @@ internal class SharedPolynomialModel private constructor(
                         changed = true
                     }
                     if (participating[index]) {
-                        for (id in factor.intVars) if (!relevantIntegers[id]) {
+                        for (id in factor.intVars) {
+                            if (!relevantIntegers[id]) {
                             relevantIntegers[id] = true
                             changed = true
                         }
-                        for (id in factor.boolVars) if (!relevantBooleans[id]) {
+                        }
+                        for (id in factor.boolVars) {
+                            if (!relevantBooleans[id]) {
                             relevantBooleans[id] = true
                             changed = true
+                        }
                         }
                     }
                 }

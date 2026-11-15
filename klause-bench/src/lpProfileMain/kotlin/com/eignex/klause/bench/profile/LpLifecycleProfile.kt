@@ -41,7 +41,7 @@ import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -69,7 +69,7 @@ fun main(args: Array<String>) {
     val bytes = Base64.decode(options.getValue("source64"))
     require(bytes.size in 1..1_048_576)
     val repeats = options.getValue("repeats").toInt().also { require(it in 1..5) }
-    val stop = Cancellation.after(120.seconds)
+    val stop = ExecutionControl.after(120.seconds)
     val start = Monotonic.markNow()
     val preparationAllocated = profileAllocatedBytes()
     val compiled = Mps.parse(bytes.decodeToString()).toProblem()
@@ -177,7 +177,7 @@ fun main(args: Array<String>) {
     } else if (!profileExpired(stop)) sourceWorker(compiled.model, requireNotNull(objective), stop)
 }
 
-private fun profileExpired(cancellation: Cancellation): Boolean {
+private fun profileExpired(cancellation: ExecutionControl): Boolean {
     if (!cancellation()) return false
     println(buildJsonObject {
         put("kind", "profile-stop")
@@ -195,7 +195,7 @@ private fun lifecycle(
     round: Int,
     retained: Boolean,
     observed: Boolean,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
     claims: Boolean = false,
     arbitraryPrecision: Boolean = false,
@@ -536,14 +536,14 @@ private class LifecycleFactory(
 
     override fun newGeneralSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         workLimit: Long,
         pricing: LpPricingOptions,
     ): LpSolver = observe(RevisedSimplex(model, cancellation, workLimit = workLimit, pricing = pricing), false)
 
     override fun newTableauSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         iterationLimit: Int,
         workLimit: Long,
         trackDegeneracy: Boolean,
@@ -553,7 +553,7 @@ private class LifecycleFactory(
 
     override fun newPersistentSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         refactorUpdateLimit: Int,
         iterationLimit: Int,
         workLimit: Long,
@@ -587,13 +587,13 @@ private class LifecycleFactory(
 private fun sourceWorker(
     problem: Problem,
     objective: LinearObjective,
-    containing: Cancellation,
+    containing: ExecutionControl,
     arbitraryPrecision: Boolean = false,
     timeoutSeconds: Int = 2,
     preserveOverflowCheckpoint: Boolean = true,
 ) {
-    val deadline = Cancellation.after(timeoutSeconds.seconds)
-    val stop = Cancellation { containing() || deadline() }
+    val deadline = ExecutionControl.after(timeoutSeconds.seconds)
+    val stop = ExecutionControl { containing() || deadline() }
     val factory = LifecycleFactory(observed = true, classifyOwners = false)
     val started = Monotonic.markNow()
     val allocated = profileAllocatedBytes()

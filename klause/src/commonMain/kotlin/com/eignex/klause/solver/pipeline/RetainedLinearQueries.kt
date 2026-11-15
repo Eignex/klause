@@ -32,7 +32,7 @@ import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.Vsids
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
@@ -42,13 +42,13 @@ internal class RetainedLinearQueries(
     private val model: Problem,
     private val params: TheoryParams,
     private val objective: LinearObjective?,
-    private val hints: (Cancellation, OpenTheorySolveState) -> SearchCandidateHints = { _, _ ->
+    private val hints: (ExecutionControl, OpenTheorySolveState) -> SearchCandidateHints = { _, _ ->
         SearchCandidateHints.None
     },
-    private val open: (Cancellation, OpenTheorySolveState) -> PlannedSearch?,
+    private val open: (ExecutionControl, OpenTheorySolveState) -> PlannedSearch?,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val state = OpenTheorySolveState(params)
-    private val scope = ConditionedQueryScope(params.timeout or params.cancellation)
+    private val scope = ConditionedQueryScope(params.timeout.withAccounting(params.cancellation) or params.cancellation)
     private var planned: PlannedSearch? = null
     private var sourceRefuted = false
     private var sourceDeclined = false
@@ -63,13 +63,13 @@ internal class RetainedLinearQueries(
     val exhausted: Boolean get() = sourceDeclined || !state.work.hasAllowance() ||
         state.work.acceptedChecks >= params.maxLeaves
 
-    fun <T> withCondition(condition: ExactNeighborhoodCondition, cancellation: Cancellation, action: () -> T): T {
+    fun <T> withCondition(condition: ExactNeighborhoodCondition, cancellation: ExecutionControl, action: () -> T): T {
         check(!closed) { "conditioned query owner is closed" }
         validate(condition)
         return scope.withCondition(condition, cancellation) { action() }
     }
 
-    fun prepareBooleanCenter(cancellation: Cancellation): Boolean {
+    fun prepareBooleanCenter(cancellation: ExecutionControl): Boolean {
         check(!closed) { "conditioned query owner is closed" }
         check(!checking) { "a worker may execute one conditioned query at a time" }
         val empty = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
@@ -94,7 +94,7 @@ internal class RetainedLinearQueries(
         return session.boolValue(variable)
     }
 
-    override fun check(condition: ExactNeighborhoodCondition, cancellation: Cancellation): ExactNeighborhoodResult {
+    override fun check(condition: ExactNeighborhoodCondition, cancellation: ExecutionControl): ExactNeighborhoodResult {
         check(!closed) { "conditioned query owner is closed" }
         check(!checking) { "a worker may execute one conditioned query at a time" }
         validate(condition)
@@ -113,8 +113,11 @@ internal class RetainedLinearQueries(
     private fun decide(conditions: List<ExactNeighborhoodCondition>): ExactNeighborhoodResult {
         if (scope.stop() || exhausted) return ExactNeighborhoodResult.Undecided
         if (sourceRefuted) return ExactNeighborhoodResult.Refuted
-        val search = prepared() ?: return if (sourceRefuted) ExactNeighborhoodResult.Refuted
-            else ExactNeighborhoodResult.Undecided
+        val search = prepared() ?: return if (sourceRefuted) {
+            ExactNeighborhoodResult.Refuted
+        } else {
+            ExactNeighborhoodResult.Undecided
+        }
         val session = search.session
         if (model.numIntVars + model.numRealVars == 0 && !session.consumeCheck()) {
             return ExactNeighborhoodResult.Undecided
@@ -145,10 +148,15 @@ internal class RetainedLinearQueries(
             when (val event = run.next()) {
                 is SearchRunEvent.Satisfied -> {
                     val sample = event.model.sample()
-                    if (conditions.all { matches(it, sample) }) ExactNeighborhoodResult.Witness(sample)
-                    else ExactNeighborhoodResult.Undecided
+                    if (conditions.all { matches(it, sample) }) {
+                        ExactNeighborhoodResult.Witness(sample)
+                    } else {
+                        ExactNeighborhoodResult.Undecided
+                    }
                 }
+
                 SearchRunEvent.Exhausted -> ExactNeighborhoodResult.Refuted
+
                 SearchRunEvent.Paused, is SearchRunEvent.Indeterminate -> ExactNeighborhoodResult.Undecided
             }
         } finally {
@@ -174,7 +182,9 @@ internal class RetainedLinearQueries(
                     retained = true
                     return created
                 }
+
                 is ComponentResult.Conflict -> sourceRefuted = true
+
                 // A root representation decline belongs to the source, so a later query would decline the same way.
                 ComponentResult.Indeterminate -> sourceDeclined = !scope.stop() &&
                     created.session.executionControls.stopCause == SearchStopCause.RepresentationDecline
@@ -197,8 +207,14 @@ internal class RetainedLinearQueries(
         for ((upper, bounds) in listOf(false to condition.lower, true to condition.upper)) {
             for ((coordinate, threshold) in bounds) {
                 if (scope.stop() || exhausted) return ComponentResult.Indeterminate
-                val term = SourceBoundTerm(if (coordinate < model.numIntVars) SearchIntValue(coordinate)
-                    else SearchRealValue(coordinate - model.numIntVars), BigFraction.ONE)
+                val term = SourceBoundTerm(
+                    if (coordinate < model.numIntVars) {
+                        SearchIntValue(coordinate)
+                    } else {
+                        SearchRealValue(coordinate - model.numIntVars)
+                    },
+                    BigFraction.ONE,
+                )
                 val result = assertBound(session, listOf(term), threshold, upper)
                 if (result !is ComponentResult.Consistent) return result
             }
@@ -227,8 +243,12 @@ internal class RetainedLinearQueries(
         }
         for (id in objective.realCoefficientValues.indices) {
             val coefficient = objective.realCoefficientValues[id]
-            if (coefficient != 0.0) terms += SourceBoundTerm(SearchRealValue(id),
-                requireNotNull(BigFraction.ofDouble(coefficient)))
+            if (coefficient != 0.0) {
+                terms += SourceBoundTerm(
+                SearchRealValue(id),
+                requireNotNull(BigFraction.ofDouble(coefficient)),
+            )
+            }
         }
         return object : SearchNodePolicy {
             override fun beforeBranch(context: com.eignex.klause.solver.search.SearchContext): SearchNodeDisposition {
@@ -240,8 +260,13 @@ internal class RetainedLinearQueries(
                 for (id in objective.boolWeightValues.indices) {
                     if (context.boolValue(id) == true) threshold -= BigFraction.ofLong(objective.boolWeightValues[id])
                 }
-                if (terms.isEmpty()) return if (BigFraction.ZERO < threshold) SearchNodeDisposition.Expand
-                    else SearchNodeDisposition.Prune
+                if (terms.isEmpty()) {
+                    return if (BigFraction.ZERO < threshold) {
+                        SearchNodeDisposition.Expand
+                    } else {
+                        SearchNodeDisposition.Prune
+                    }
+                }
                 return when (assertBound(session, terms, threshold, upper = true, strict = true)) {
                     ComponentResult.Consistent -> SearchNodeDisposition.Expand
                     is ComponentResult.Conflict -> SearchNodeDisposition.Prune
@@ -254,9 +279,13 @@ internal class RetainedLinearQueries(
     private fun AssembledSearchModel.sample(): Sample {
         val integers = List(model.numIntVars) { requireNotNull(valueOf(SearchExactIntValue(SourceIntId(it)))) }
         val reals = List(model.numRealVars) { requireNotNull(valueOf(SearchExactRealValue(SourceRealId(it)))) }
-        val finite = if (integers.all { it.fitsLong() }) LongArray(integers.size) { integers[it].toLongExact() }
-            else LongArray(0)
-        return Sample(BooleanArray(model.numBoolVars) { requireNotNull(valueOf(SearchBoolValue(it))) },
+        val finite = if (integers.all { it.fitsLong() }) {
+            LongArray(integers.size) { integers[it].toLongExact() }
+        } else {
+            LongArray(0)
+        }
+        return Sample(
+            BooleanArray(model.numBoolVars) { requireNotNull(valueOf(SearchBoolValue(it))) },
             finite,
             DoubleArray(reals.size) { reals[it].toDouble() }, exactReals = reals, exactInts = integers)
     }

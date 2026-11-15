@@ -8,7 +8,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RootWorkAccounting
 import com.eignex.klause.propagation.rootDeductions
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 
 private const val INITIAL_PROBES = 128
@@ -20,7 +20,7 @@ internal object BoundedIntegerProbing {
         problem: BakedProblem,
         base: PropagationResult.Implied,
         config: BakeConfig,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): PropagationResult {
         if (problem.numIntVars == 0) return base
         if (config.probeTotalBudget == 0 || config.probeBudgetPerVar == 0) {
@@ -51,8 +51,11 @@ internal object BoundedIntegerProbing {
             if (result is PropagationResult.Unsat) return result
             accounting.charge(problem.numBoolVars.toLong() + problem.numIntVars)
             val extra = state.rootDeductions(base.toAssumptions())
-            if (extra.isEmpty && extra.toAssumptions().deductions.isEmpty) result
-            else (result as PropagationResult.Implied).merge(extra)
+            if (extra.isEmpty && extra.toAssumptions().deductions.isEmpty) {
+                result
+            } else {
+                (result as PropagationResult.Implied).merge(extra)
+            }
         } finally {
             accounting.flush()
         }
@@ -63,7 +66,7 @@ internal object BoundedIntegerProbing {
         private var acc: PropagationResult.Implied,
         private val config: BakeConfig,
         private val session: PropagationSession,
-        private val cancellation: Cancellation,
+        private val cancellation: ExecutionControl,
     ) {
         private val perVar = IntArray(problem.numIntVars)
         private var calls = 0

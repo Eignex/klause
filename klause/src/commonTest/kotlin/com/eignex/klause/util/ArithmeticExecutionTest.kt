@@ -13,14 +13,99 @@ import kotlin.time.TestTimeSource
 class ArithmeticExecutionTest {
     private val pool = WorkCreditPool(100)
     private var stopped = false
-    private val token: ArithmeticCancellation = object : ArithmeticCancellation {
+    private val token: ExecutionControl = object : ExecutionControl() {
         override fun isCancelled(): Boolean = stopped || pool.exhausted
-        override fun arithmeticSource(): ArithmeticWorkSource = object : ArithmeticWorkSource {
-            override fun isCancelled(): Boolean = token.isCancelled()
+        override val admission: ArithmeticWorkSource get() = object : ArithmeticWorkSource {
+            override val exhausted get() = pool.exhausted
             override fun reserve(maximum: Int): WorkReservation? = pool.reserve(maximum)
         }
     }
     private val execution = ArithmeticExecution(token) { error("cancelled") }
+
+    @Test
+    fun `copying an owner should retain its adapted admission allowance`() {
+        val selected = WorkCreditPool(3)
+        val adapted = object : ExecutionControl(token) {
+            override val admission = object : ArithmeticWorkSource {
+                override val exhausted get() = selected.exhausted
+                override fun reserve(maximum: Int) = selected.reserve(maximum)
+            }
+        }
+        val cursor = ArithmeticExecution(ExecutionControl(adapted)) { error("allowance") }
+
+        assertFailsWith<IllegalStateException> {
+            cursor.operation { repeat(4) { cursor.step() } }
+        }
+
+        assertEquals(3L, selected.spent)
+        assertEquals(0L, pool.spent)
+    }
+
+    @Test
+    fun `a callback should release credit and rebind its subsequent work owner`() {
+        val second = WorkCreditPool(100)
+        val replacement = object : ExecutionControl() {
+            override fun isCancelled(): Boolean = second.exhausted
+            override val admission = object : ArithmeticWorkSource {
+                override val exhausted get() = second.exhausted
+                override fun reserve(maximum: Int) = second.reserve(maximum)
+            }
+        }
+        var current = token
+        val control = object : ExecutionControl() {
+            override fun isCancelled(): Boolean = current()
+            override val admission get() = admissionFrom(current)
+        }
+        val cursor = ArithmeticExecution(control) { error("cancelled") }
+
+        cursor.operation {
+            cursor.step()
+            cursor.handoff { current = replacement }
+            cursor.step()
+        }
+
+        assertEquals(1L, pool.spent)
+        assertEquals(1L, second.spent)
+        assertEquals(99, assertNotNull(pool.reserve(100)).capacity)
+    }
+
+    @Test
+    fun `replacing a stop predicate should retain the accounting owner allowance`() {
+        val owned = ArithmeticExecution(ExecutionControl.Never.withAccounting(token)) { error("allowance") }
+
+        assertFailsWith<IllegalStateException> {
+            owned.operation { repeat(101) { owned.step() } }
+        }
+
+        assertEquals(100L, pool.spent)
+    }
+
+    @Test
+    fun `checkpoint cost should observe a stop without spending additional work`() {
+        assertFailsWith<IllegalStateException> {
+            execution.operation(8) {
+                execution.step()
+                stopped = true
+                execution.pollingCost(8)
+            }
+        }
+
+        assertEquals(1L, pool.spent)
+        assertEquals(99, assertNotNull(pool.reserve(100)).capacity)
+    }
+
+    @Test
+    fun `bulk admission should stop at the exact containing allowance`() {
+        var admitted = 0
+
+        assertFailsWith<IllegalStateException> {
+            execution.operation { execution.advance(101) { admitted += it } }
+        }
+
+        assertEquals(100, admitted)
+        assertEquals(100L, pool.spent)
+        assertTrue(pool.exhausted)
+    }
 
     @Test
     fun `pure checkpoints should spend no work`() {
@@ -46,7 +131,7 @@ class ArithmeticExecutionTest {
     @Test
     fun `an opaque checkpoint should permit a later caller invocation`() {
         var cancelled = true
-        val opaque = ArithmeticExecution(Cancellation { cancelled }) { error("cancelled") }
+        val opaque = ArithmeticExecution(ExecutionControl { cancelled }) { error("cancelled") }
         assertFailsWith<IllegalStateException> { opaque.checkpoint() }
         cancelled = false
 
@@ -62,6 +147,20 @@ class ArithmeticExecutionTest {
 
         assertEquals(4L, pool.spent)
         assertEquals(96, assertNotNull(pool.reserve(100)).capacity)
+    }
+
+    @Test
+    fun `a looser nested quantum should retain the containing stop cadence`() {
+        assertFailsWith<IllegalStateException> {
+            execution.operation(4) {
+                execution.operation(64) {
+                    stopped = true
+                    repeat(8) { execution.step() }
+                }
+            }
+        }
+
+        assertEquals(4L, pool.spent)
     }
 
     @Test
@@ -141,12 +240,14 @@ class ArithmeticExecutionTest {
 
     @Test
     fun `a prepared operation should settle before every pause`() {
-        val pending = execution.iterator(sequence {
+        val pending = execution.iterator(
+            sequence {
             repeat(3) {
                 execution.step()
                 yield(it)
             }
-        }.iterator())
+        }.iterator()
+        )
 
         assertEquals(0, pending.next())
         assertEquals(1L, pool.spent)
@@ -159,7 +260,7 @@ class ArithmeticExecutionTest {
     @Test
     fun `a live deadline should prevent publication inside a short final batch`() {
         val clock = TestTimeSource()
-        val timed = ArithmeticExecution(Cancellation.until(clock.markNow() + 1.seconds)) { error("deadline") }
+        val timed = ArithmeticExecution(ExecutionControl.until(clock.markNow() + 1.seconds)) { error("deadline") }
 
         assertFailsWith<IllegalStateException> {
             timed.operation {
@@ -170,11 +271,14 @@ class ArithmeticExecutionTest {
     }
 
     @Test
-    fun `an opaque meter should retain per debit predicate order`() {
+    fun `opaque accounting should remain independent of operation checkpoints`() {
         val events = ArrayList<String>()
-        val opaque = object : Cancellation {
-            override fun isCancelled(): Boolean { events += "poll"; return false }
-            override fun workMeter(): WorkMeter = WorkMeter { events += "charge:$it" }
+        val opaque = object : ExecutionControl() {
+            override fun isCancelled(): Boolean {
+                events += "poll";
+                return false
+            }
+            override val accounting: WorkMeter get() = WorkMeter { events += "charge:$it" }
         }
         val legacy = ArithmeticExecution(opaque) { error("cancelled") }
 
@@ -182,6 +286,6 @@ class ArithmeticExecutionTest {
             repeat(2) { legacy.step { events += "local" } }
         }
 
-        assertEquals(List(2) { listOf("poll", "local", "charge:1", "poll") }.flatten(), events)
+        assertEquals(listOf("poll", "local", "charge:1", "local", "charge:1", "poll"), events)
     }
 }

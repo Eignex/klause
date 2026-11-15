@@ -11,7 +11,7 @@ import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.ir.WideConstants
 import com.eignex.klause.ir.WideConsts
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.fitsLong
@@ -22,7 +22,7 @@ import com.eignex.util.numbers.unaryMinus
 
 internal fun <T> minMaxEncoding(
     factor: ArrayMinMax,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     row: (LinearRow) -> T,
     all: (List<T>) -> T,
     any: (List<T>) -> T,
@@ -41,7 +41,7 @@ internal fun <T> minMaxEncoding(
 
 internal fun <T> realMinMaxEncoding(
     factor: RealArrayMinMax,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     row: (LinearRow) -> T,
     all: (List<T>) -> T,
     any: (List<T>) -> T,
@@ -62,7 +62,7 @@ internal fun <T> realMinMaxEncoding(
 
 internal fun <T> gridMinMaxEncoding(
     factor: GridArrayMinMax,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     row: (LinearRow) -> T,
     all: (List<T>) -> T,
     any: (List<T>) -> T,
@@ -79,7 +79,7 @@ internal fun <T> gridMinMaxEncoding(
 
 internal fun <T> elementEncoding(
     factor: Element,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     row: (LinearRow) -> T,
     all: (List<T>) -> T,
     any: (List<T>) -> T,
@@ -118,15 +118,21 @@ private fun binaryElementRow(factor: Element): LinearRow {
     val coefficients = arrayOf(BIG_ONE, -delta)
     val variables = intArrayOf(factor.result, factor.idx)
     val equality = if (coefficients.all { it.fitsLong() } && bound.fitsLong()) {
-        LinearRow.ofInts(variables, LongArray(2) { coefficients[it].toLongExact() },
-            LinearOp.EQ, bound.toLongExact())
-    } else LinearRow.ofColumns(variables, intArrayOf(), WideConstants(WideConsts(coefficients), bound), LinearOp.EQ)
+        LinearRow.ofInts(
+            variables,
+            LongArray(2) { coefficients[it].toLongExact() },
+            LinearOp.EQ,
+            bound.toLongExact(),
+        )
+    } else {
+        LinearRow.ofColumns(variables, intArrayOf(), WideConstants(WideConsts(coefficients), bound), LinearOp.EQ)
+    }
     return equality
 }
 
 internal fun <T> realElementEncoding(
     factor: RealElement,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     row: (LinearRow) -> T,
     all: (List<T>) -> T,
     any: (List<T>) -> T,
@@ -140,8 +146,11 @@ internal fun <T> realElementEncoding(
     for (position in 0 until factor.size) {
         selectionCheckpoint(cancellation)
         val guard = row(LinearRow.ofInts(index, longArrayOf(1), LinearOp.NE, offset + position))
-        val variables = if (factor.arrIsVars) intArrayOf(factor.result, factor.entries[position])
-            else intArrayOf(factor.result)
+        val variables = if (factor.arrIsVars) {
+            intArrayOf(factor.result, factor.entries[position])
+        } else {
+            intArrayOf(factor.result)
+        }
         val coefficients = if (factor.arrIsVars) doubleArrayOf(1.0, -1.0) else doubleArrayOf(1.0)
         val bound = if (factor.arrIsVars) 0.0 else factor.constants[position]
         val equality = LinearRow.ofColumns(intArrayOf(), variables,
@@ -151,7 +160,7 @@ internal fun <T> realElementEncoding(
     return all(relations)
 }
 
-private fun selectionCheckpoint(cancellation: Cancellation) {
+private fun selectionCheckpoint(cancellation: ExecutionControl) {
     cancellation.charge(1)
     if (cancellation()) throw SelectionEncodingInterrupted()
 }

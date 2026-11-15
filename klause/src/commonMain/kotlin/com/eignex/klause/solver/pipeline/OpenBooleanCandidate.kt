@@ -12,7 +12,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.HintIndexOutcome
 import com.eignex.klause.solver.result.OpenHintUsageSink
 import com.eignex.klause.solver.search.SearchCandidateHints
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.MutableIntObjectMap
@@ -53,7 +53,7 @@ internal class SourceConjunctionHints private constructor(
     private var primitive: SearchCandidateHints,
     private val inputs: MutableSet<Int>,
     private val gates: MutableMap<Int, Gate>,
-    private val stop: Cancellation,
+    private val stop: ExecutionControl,
     private val usage: OpenHintUsageSink?,
 ) : SearchCandidateHints, AutoCloseable {
     private var clauses: SourceClauseGuidance? = null
@@ -217,7 +217,7 @@ internal class SourceConjunctionHints private constructor(
             boolCount: Int,
             variables: IntArray,
             primitive: SearchCandidateHints,
-            stop: Cancellation,
+            stop: ExecutionControl,
             maxClauses: Int = MAX_INDEX_ENTRIES,
             usage: OpenHintUsageSink? = null,
             available: (() -> Boolean)? = null,
@@ -313,8 +313,11 @@ internal class SourceConjunctionHints private constructor(
                     return visits <= MAX_INDEX_ENTRIES && !stopped(stop, count)
                 }
                 fun visitDecline(): SourceConjunctionHints? = decline(
-                    shared?.outcome ?: if (visits > MAX_INDEX_ENTRIES) HintIndexOutcome.VISITS
-                    else HintIndexOutcome.STOPPED,
+                    shared?.outcome ?: if (visits > MAX_INDEX_ENTRIES) {
+                        HintIndexOutcome.VISITS
+                    } else {
+                        HintIndexOutcome.STOPPED
+                    },
                 )
                 for (clause in clauses) {
                     if (!visit()) return visitDecline()
@@ -417,7 +420,7 @@ internal class SourceConjunctionHints private constructor(
         private fun pair(a: Int, b: Int): Long =
             (minOf(a, b).toLong() shl 32) or (maxOf(a, b).toLong() and 0xffff_ffffL)
 
-        private fun stopped(stop: Cancellation, visits: Int): Boolean {
+        private fun stopped(stop: ExecutionControl, visits: Int): Boolean {
             stop.charge(visits.toLong())
             return stop()
         }
@@ -498,7 +501,7 @@ internal data class OpenCandidateParams(
     /** Seed of the search RNG, fixed so one skeleton and allowance always draw the same proposal. */
     val randomSeed: Long = 1L,
     /** Cooperative cancellation token, observed by the projection's bake and by the search. */
-    val cancellation: Cancellation = Cancellation.Never,
+    val cancellation: ExecutionControl = ExecutionControl.Never,
 )
 
 /**
@@ -509,7 +512,7 @@ internal data class OpenCandidateParams(
  */
 internal fun ComponentPlan.booleanSkeleton(
     source: Problem,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): OpenBooleanSkeleton? {
     if (source.numBoolVars == 0) return null
     val shared = source.factors.indices.filter {

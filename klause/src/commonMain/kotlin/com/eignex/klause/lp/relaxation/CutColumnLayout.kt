@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal sealed interface CutColumnBinding
 
@@ -13,10 +13,11 @@ internal fun CutColumnBinding.layoutFor(map: CutSourceMap): CutColumnLayout? =
 internal class CutColumnLayout private constructor(private val kinds: IntArray, private val ids: IntArray) {
     val storageUnits: Long get() = kinds.size.toLong() * 2L + 8L
 
-    fun bind(map: CutSourceMap, cancellation: Cancellation, onWork: (Long) -> Unit): CutColumnBinding? {
+    fun bind(map: CutSourceMap, cancellation: ExecutionControl, onWork: (Long) -> Unit): CutColumnBinding? {
         var work = 1L
         var matches = kinds.size == map.columnCount
-        if (matches) for (index in kinds.indices) {
+        if (matches) {
+            for (index in kinds.indices) {
             if (cancellation()) {
                 matches = false
                 break
@@ -30,6 +31,7 @@ internal class CutColumnLayout private constructor(private val kinds: IntArray, 
                 break
             }
         }
+        }
         onWork(work + if (matches) 4L else 0L)
         return if (matches && !cancellation()) BoundCutColumns(map, this) else null
     }
@@ -41,7 +43,7 @@ internal class CutColumnLayout private constructor(private val kinds: IntArray, 
         fun capture(
             map: CutSourceMap,
             maximumUnits: Long,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
             onWork: (Long) -> Unit,
         ): CutColumnBinding? {
             var work = 1L

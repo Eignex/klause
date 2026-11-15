@@ -4,7 +4,7 @@ import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal class LinearAuthorityTemplate private constructor(
@@ -16,8 +16,10 @@ internal class LinearAuthorityTemplate private constructor(
     val cuts: LinearAuthorityCuts?,
 ) {
     fun atPoint(
-        point: Map<SourceCoordinate, Double>, cancellation: Cancellation,
-        onWork: (Long) -> Unit, onCost: (Long, Long) -> Unit,
+        point: Map<SourceCoordinate, Double>,
+        cancellation: ExecutionControl,
+        onWork: (Long) -> Unit,
+        onCost: (Long, Long) -> Unit,
     ): LinearAuthorityTemplate? {
         val original = cuts ?: return null
         val directed = LinearAuthorityCuts.prepareAtPoint(numeric, cancellation, point,
@@ -33,7 +35,8 @@ internal class LinearAuthorityTemplate private constructor(
     }
 
     fun withAdditional(
-        additional: List<LinearAuthorityCut>, cancellation: Cancellation,
+        additional: List<LinearAuthorityCut>,
+        cancellation: ExecutionControl,
         maximumCandidates: Int = Int.MAX_VALUE,
         onCost: (Long, Long) -> Unit = { _, _ -> },
     ): LinearAuthorityTemplate? {
@@ -56,7 +59,9 @@ internal class LinearAuthorityTemplate private constructor(
     }
 
     fun withReplayCuts(
-        supplied: List<LinearAuthorityCut>, cancellation: Cancellation, onCost: (Long, Long) -> Unit,
+        supplied: List<LinearAuthorityCut>,
+        cancellation: ExecutionControl,
+        onCost: (Long, Long) -> Unit,
     ): LinearAuthorityTemplate? {
         require(cuts == null && supplied.size <= 64)
         for (cut in supplied) {
@@ -77,7 +82,9 @@ internal class LinearAuthorityTemplate private constructor(
 
     companion object {
         fun prepare(
-            source: SourceProofContext, cancellation: Cancellation, cuts: Boolean = false,
+            source: SourceProofContext,
+            cancellation: ExecutionControl,
+            cuts: Boolean = false,
             complementaryCuts: Boolean = false,
             onCutWork: (Long) -> Unit = {},
         ): LinearAuthorityTemplate? {
@@ -91,7 +98,9 @@ internal class LinearAuthorityTemplate private constructor(
             }
             val separated = if (cuts) {
                 LinearAuthorityCuts.prepare(numeric, cancellation, complementaryCuts, onCutWork) ?: return null
-            } else null
+            } else {
+                null
+            }
             return LinearAuthorityTemplate(source, numeric, coordinates, indices, rows, separated)
         }
     }

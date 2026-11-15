@@ -20,7 +20,7 @@ import com.eignex.klause.solver.pipeline.preparePolynomialExecutionPlan
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.random.Random
 import kotlin.test.Test
@@ -138,7 +138,7 @@ class ContinuousProductEncoderTest {
             },
         )
 
-        val completion = LeafRealCompletion(source, null).complete(candidate, Cancellation.Never)
+        val completion = LeafRealCompletion(source, null).complete(candidate, ExecutionControl.Never)
 
         assertEquals(0L, state.cost)
         assertIs<Verification.Rejected>(verifyRealCoordinates(source, claimed))
@@ -217,9 +217,9 @@ class ContinuousProductEncoderTest {
         )
         val selected = FactorProjectionProviders.Default.prepare(source)
         var work = 0L
-        val stopped = object : Cancellation {
+        val stopped = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 2L
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
 
         val interrupted = selected.linearTheoryModel(EncodingTarget.LINEAR, cancellation = stopped)

@@ -2,14 +2,14 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class PrivateRebuildAdmission private constructor(
     val protectedColumns: Set<Int>,
     val candidates: Int,
 ) {
     companion object {
-        fun analyze(problem: Problem, cancellation: Cancellation): PrivateRebuildAdmission? {
+        fun analyze(problem: Problem, cancellation: ExecutionControl): PrivateRebuildAdmission? {
             val columns = problem.numBoolVars
             cancellation.charge(columns * 12L)
             if (cancellation()) return null

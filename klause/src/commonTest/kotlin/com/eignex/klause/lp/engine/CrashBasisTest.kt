@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -116,7 +116,7 @@ class CrashBasisTest {
         builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
         val model = builder.build(Sense.MINIMIZE)
 
-        val cancelled = triangularCrashBasis(model, Cancellation { true })
+        val cancelled = triangularCrashBasis(model, ExecutionControl { true })
         val exhausted = triangularCrashBasis(model, workLimit = 1L)
 
         assertNull(cancelled.basis)

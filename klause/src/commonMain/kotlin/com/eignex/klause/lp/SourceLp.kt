@@ -28,7 +28,7 @@ import com.eignex.klause.simplex.exact.ExactDoubleBoundedRow
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.result.SourceLpWorkStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.util.numbers.magnitudeBitLength
 import kotlin.time.ComparableTimeMark
@@ -160,31 +160,31 @@ internal class SourceLpBudget(
     fun <T> run(
         rows: List<ExactRationalInequality>,
         variables: Int,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         additional: List<List<ExactRationalInequality>> = emptyList(),
         rhs: List<BigFraction> = emptyList(),
-        block: (Cancellation) -> T?,
+        block: (ExecutionControl) -> T?,
     ): T? = runAdmitted(rows, variables, cancellation, additional, rhs, false, block)
 
     fun <T> runPairing(
         rows: List<ExactRationalInequality>,
         variables: Int,
-        cancellation: Cancellation,
-        block: (Cancellation) -> T?,
+        cancellation: ExecutionControl,
+        block: (ExecutionControl) -> T?,
     ): T? = runAdmitted(rows, variables, cancellation, emptyList(), emptyList(), true, block)
 
     fun <T> runPrepared(
-        cancellation: Cancellation,
-        prepare: (Cancellation) -> SourceLpInput?,
+        cancellation: ExecutionControl,
+        prepare: (ExecutionControl) -> SourceLpInput?,
         onDecline: (String) -> Unit = {},
-        block: (Cancellation) -> T?,
+        block: (ExecutionControl) -> T?,
     ): T? = runAdmitted(emptyList(), 0, cancellation, emptyList(), emptyList(), false, block, prepare,
         onDecline = onDecline)
 
     fun <T> runSparse(
-        cancellation: Cancellation,
-        prepare: (Cancellation) -> SparseSourceLpPreparation,
-        block: (SparseSourceLp, Cancellation) -> T?,
+        cancellation: ExecutionControl,
+        prepare: (ExecutionControl) -> SparseSourceLpPreparation,
+        block: (SparseSourceLp, ExecutionControl) -> T?,
     ): T? {
         var prepared: SparseSourceLp? = null
         return runAdmitted(
@@ -195,21 +195,21 @@ internal class SourceLpBudget(
     }
 
     fun admitSparse(
-        cancellation: Cancellation,
-        prepare: (Cancellation) -> SparseSourceLpPreparation,
+        cancellation: ExecutionControl,
+        prepare: (ExecutionControl) -> SparseSourceLpPreparation,
     ): SourceLpSparseAdmission? = runSparse(cancellation, prepare) { prepared, _ ->
         SourceLpSparseAdmission(this, prepared)
     }
 
-    fun admitSparse(prepared: SparseSourceLp, cancellation: Cancellation): SourceLpSparseAdmission? =
+    fun admitSparse(prepared: SparseSourceLp, cancellation: ExecutionControl): SourceLpSparseAdmission? =
         admitSparse(cancellation) {
             SparseSourceLpPreparation(prepared, null, SparseSourceLpMetrics(0L, 0L, 0L, 0L, 0L))
         }
 
     fun <T> resumeSparse(
         admission: SourceLpSparseAdmission,
-        cancellation: Cancellation,
-        block: (SparseSourceLp, Cancellation) -> T?,
+        cancellation: ExecutionControl,
+        block: (SparseSourceLp, ExecutionControl) -> T?,
     ): T? {
         require(admission.budget === this)
         if (admission.closed) return null
@@ -223,13 +223,13 @@ internal class SourceLpBudget(
     private fun <T> runAdmitted(
         rows: List<ExactRationalInequality>,
         variables: Int,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         additional: List<List<ExactRationalInequality>>,
         rhs: List<BigFraction>,
         pairing: Boolean,
-        block: (Cancellation) -> T?,
-        prepare: ((Cancellation) -> SourceLpInput?)? = null,
-        sparse: ((Cancellation) -> SparseSourceLpPreparation)? = null,
+        block: (ExecutionControl) -> T?,
+        prepare: ((ExecutionControl) -> SourceLpInput?)? = null,
+        sparse: ((ExecutionControl) -> SparseSourceLpPreparation)? = null,
         resumed: SourceLpSparseAdmission? = null,
         onDecline: (String) -> Unit = {},
     ): T? {
@@ -248,7 +248,7 @@ internal class SourceLpBudget(
             cancellation
         } else {
             // A requested cap is a deadline, so a phase handed this token can budget a share of the time left.
-            cancellation or Cancellation.until(start + (activeCap - activeNanos).nanoseconds)
+            cancellation or ExecutionControl.until(start + (activeCap - activeNanos).nanoseconds)
         }
         try {
             if (resumed != null) return block(token).takeUnless { token() || resumed.closed }
@@ -343,7 +343,7 @@ internal class SourceLp(
     private var frozenRows: List<ExactRationalInequality>? = null
     private val rows: List<ExactRationalInequality> get() = checkNotNull(frozenRows)
     private var owner: LpScopedSolver? = null
-    private var currentToken = Cancellation.Never
+    private var currentToken = ExecutionControl.Never
     private val definitions = LinkedHashMap<List<Pair<Int, BigFraction>>, Int>()
     private val definitionRows = ArrayList<ExactRationalInequality>()
     private var installedRhs: List<BigFraction>? = null
@@ -365,7 +365,7 @@ internal class SourceLp(
 
     @Suppress("TooGenericExceptionCaught")
     fun solve(
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         activity: Int? = null,
         rhs: List<BigFraction>? = null,
         branches: List<ExactRationalInequality> = emptyList(),
@@ -455,7 +455,7 @@ internal class SourceLp(
                 if (!current.replaceObjective(objective, token)) return@run null
                 if (branches.isNotEmpty() && !current.push(token)) return@run null
                 AutoCloseable {
-                    if (branches.isNotEmpty() && !current.pop(0, Cancellation.Never)) failed = true
+                    if (branches.isNotEmpty() && !current.pop(0, ExecutionControl.Never)) failed = true
                 }.use {
                     val assertions = ArrayList<LpBoundAssertion>(branches.size)
                     for (row in branches) {
@@ -570,7 +570,7 @@ internal fun List<BigFraction>.admittedSourcePoint(): Boolean = all {
 
 internal fun List<BigFraction>.satisfiesSourceRows(
     rows: List<ExactRationalInequality>,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): Boolean = rows.all { row ->
     if (cancellation()) return@all false
     var value = BigFraction.ZERO
@@ -585,7 +585,7 @@ internal fun sourceEqualityRows(
     rows: List<ExactRationalInequality>,
     variables: Int,
     budget: SourceLpBudget,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): List<ExactRationalInequality>? = budget.runPairing(rows, variables, cancellation) { token ->
     val paired = pairedSourceLowerBounds(rows, token) ?: return@runPairing null
     val selected = BooleanArray(rows.size)
@@ -600,7 +600,7 @@ internal fun sourceEqualityRows(
 
 private class SourcePairedBounds(val lower: List<BigFraction?>, val opposite: IntArray)
 
-private fun pairedSourceLowerBounds(rows: List<ExactRationalInequality>, token: Cancellation): SourcePairedBounds? {
+private fun pairedSourceLowerBounds(rows: List<ExactRationalInequality>, token: ExecutionControl): SourcePairedBounds? {
     val scales = rows.map { row ->
         if (token()) return null
         row.coefficients.firstOrNull { !it.isZero }?.let { if (it < BigFraction.ZERO) it.negated() else it }
@@ -640,7 +640,7 @@ internal fun sourceDoubleBoundedSplit(
     rows: List<ExactRationalInequality>,
     variables: Int,
     budget: SourceLpBudget,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): ExactDoubleBoundedSplit {
     return budget.run(rows, variables, cancellation) { token ->
         val pairedLower = pairedSourceLowerBounds(rows, token) ?: return@run ExactDoubleBoundedSplit.Unknown
@@ -684,7 +684,7 @@ internal fun sourceDescendingDirection(
     rows: List<ExactRationalInequality>,
     activity: ExactRationalInequality,
     variables: Int,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     budget: SourceLpBudget,
 ): Boolean? {
     return budget.run(rows, variables, cancellation, additional = listOf(listOf(activity))) { token ->

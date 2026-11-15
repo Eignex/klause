@@ -16,13 +16,13 @@ import com.eignex.klause.theory.difference.DifferenceSearchComponent
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.PreparedExactLiraComponentFactory
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Builds the theory component selected by this plan. */
 internal fun ComponentPlan.theoryComponent(
     spec: Problem,
     smtStats: SmtStatsSink? = null,
-    theorySolveStop: Cancellation? = null,
+    theorySolveStop: ExecutionControl? = null,
 ): SearchComponent? =
     openTheoryComponent(encodedTheoryFragment(spec) ?: theoryFragment(spec), smtStats, theorySolveStop)
 
@@ -30,11 +30,11 @@ internal fun ComponentPlan.theoryComponent(
 internal fun ComponentPlan.openTheoryComponent(
     fragment: Problem,
     smtStats: SmtStatsSink? = null,
-    theorySolveStop: Cancellation? = null,
+    theorySolveStop: ExecutionControl? = null,
     preparedSource: PreparedExactLiraComponentFactory? = null,
 ): SearchComponent? {
     val resources = SearchInvocationResources()
-    val opening = SearchComponentOpening(Cancellation.Never, smtStats, theorySolveStop, resources)
+    val opening = SearchComponentOpening(ExecutionControl.Never, smtStats, theorySolveStop, resources)
     return try {
         theoryComponentFactory(fragment) { preparedSource }?.invoke(opening)?.single()
     } catch (failure: Throwable) {

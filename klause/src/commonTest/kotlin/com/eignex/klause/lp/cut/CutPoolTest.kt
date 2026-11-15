@@ -12,7 +12,7 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.relaxation.CutColumnSource
 import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -96,7 +96,7 @@ class CutPoolTest {
         var cancelProjection = false
         var work = 0L
         val events = ArrayList<Pair<String, String>>()
-        val pool = CutPool(prepareSources = true, cancellation = Cancellation { cancelled },
+        val pool = CutPool(prepareSources = true, cancellation = ExecutionControl { cancelled },
             onPreparationWork = {
                 work += it
                 if (cancelProjection && it >= source.projectedPreparationUnits) cancelled = true
@@ -150,7 +150,7 @@ class CutPoolTest {
         var cancelled = false
         var cancelOnCharge = true
         var work = 0L
-        val pool = CutPool(prepareSources = true, cancellation = Cancellation { cancelled },
+        val pool = CutPool(prepareSources = true, cancellation = ExecutionControl { cancelled },
             onPreparationWork = { work += it; if (cancelOnCharge) cancelled = true })
         assertTrue(pool.add(source, map))
         pool.remap(map)

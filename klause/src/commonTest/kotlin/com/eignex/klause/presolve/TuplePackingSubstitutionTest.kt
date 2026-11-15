@@ -20,7 +20,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.baked
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -199,7 +199,7 @@ class TuplePackingSubstitutionTest {
             TuplePackingSubstitution.Limits(scope = 3))) {
             assertNull(TuplePackingSubstitution.substitute(source, emptySet(), limits = limits))
         }
-        assertNull(TuplePackingSubstitution.substitute(source, emptySet(), Cancellation { true }))
+        assertNull(TuplePackingSubstitution.substitute(source, emptySet(), ExecutionControl { true }))
     }
 
     @Test

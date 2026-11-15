@@ -8,9 +8,9 @@ import com.eignex.klause.propagation.PropagationSession
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.test.assertEquals
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import kotlin.test.assertEquals
 
 class ConditionalComponentTraceTest {
     private val separator = 10

@@ -13,7 +13,7 @@ import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -386,7 +386,7 @@ class PortfolioPlanTest {
                 annotatedParams = annotated,
                 engineParams = params,
                 randomSeed = 1L,
-                cancellation = Cancellation.Never,
+                cancellation = ExecutionControl.Never,
                 nodeBudget = null,
                 solveBudgetMillis = null,
                 lpConfig = LpConfig.AUTO,

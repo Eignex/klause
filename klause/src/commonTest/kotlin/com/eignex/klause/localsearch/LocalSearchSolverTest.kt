@@ -16,7 +16,7 @@ import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -45,7 +45,15 @@ class LocalSearchSolverTest {
         for (slice in longArrayOf(1L, 3L, 9L)) {
             val actual = solver.resumableSolve(params).use { handle ->
                 var result: SolveResult? = null
-                repeat(20) { if (result == null) result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, slice) }
+                repeat(20) {
+                    if (result == null) {
+                        result = handle.runSlice(
+                            ExecutionControl.Never,
+                            Long.MAX_VALUE,
+                            slice,
+                        )
+                    }
+                }
                 assertIs<SolveResult.Sat>(result)
             }
 
@@ -69,14 +77,14 @@ class LocalSearchSolverTest {
         )
         val solver = LocalSearchSolver(problem, greedyRepairOnRestart = false)
         val expected = assertIs<SolveResult.Sat>(solver.solve(params))
-        solver.resumableSolve(params.copy(cancellation = Cancellation { true })).use { handle ->
-            assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
-            val paused = handle.runSlice(Cancellation { true }, Long.MAX_VALUE, -1L)
+        solver.resumableSolve(params.copy(cancellation = ExecutionControl { true })).use { handle ->
+            assertNull(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L))
+            val paused = handle.runSlice(ExecutionControl { true }, Long.MAX_VALUE, -1L)
             assertNull(paused)
             assertTrue(handle.stats.ls.moves.sum > 0.0)
             assertTrue(!handle.isDone)
 
-            val actual = assertIs<SolveResult.Sat>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+            val actual = assertIs<SolveResult.Sat>(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L))
 
             assertEquals(expected.assignment, actual.assignment)
             assertEquals(expected.stats.ls.moves, actual.stats.ls.moves)
@@ -99,15 +107,15 @@ class LocalSearchSolverTest {
         )
         val expected = assertIs<SolveResult.Unknown>(solver.solve(params))
         solver.resumableSolve(params).use { handle ->
-            assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+            assertNull(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L))
             val before = handle.stats.ls.moves.sum
             var polls = 0
-            val paused = handle.runSlice(Cancellation { ++polls >= 2 }, Long.MAX_VALUE, -1L)
+            val paused = handle.runSlice(ExecutionControl { ++polls >= 2 }, Long.MAX_VALUE, -1L)
             assertNull(paused)
             assertTrue(handle.stats.ls.moves.sum >= before)
             assertTrue(handle.stats.ls.moves.sum < params.maxFlips)
 
-            val actual = assertIs<SolveResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+            val actual = assertIs<SolveResult.Unknown>(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L))
 
             assertEquals(expected.stats.ls.moves, actual.stats.ls.moves)
             assertEquals(expected.stats.search.restarts, actual.stats.search.restarts)
@@ -130,13 +138,13 @@ class LocalSearchSolverTest {
         )
 
         LocalSearchSolver(problem, greedyRepairOnRestart = false).resumableSolve(params).use { handle ->
-            assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 0L))
-            val result = assertIs<SolveResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+            assertNull(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 0L))
+            val result = assertIs<SolveResult.Unknown>(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L))
 
             assertEquals(TerminationReason.BudgetExhausted, result.reason)
             assertEquals(1.0, result.stats.ls.moves.sum)
             assertTrue(handle.isDone)
-            assertEquals(result, handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 100L))
+            assertEquals(result, handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 100L))
         }
     }
 

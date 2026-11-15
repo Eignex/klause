@@ -20,10 +20,7 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
-import com.eignex.klause.util.Cancellation
-import java.io.File
-import java.lang.reflect.Modifier
-import kotlin.time.Duration.Companion.seconds
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -32,6 +29,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.reflect.Modifier
+import kotlin.time.Duration.Companion.seconds
 
 internal object LinearPrefixInspection {
     fun inspect(
@@ -42,7 +42,7 @@ internal object LinearPrefixInspection {
         val emergencySeconds = if (incremental) 40 else 10
         val captures = (0..1).map { replay ->
             val incrementalRows = incremental && !incrementalControl && replay == 1
-            val stop = Cancellation.after(emergencySeconds.seconds)
+            val stop = ExecutionControl.after(emergencySeconds.seconds)
             val started = System.nanoTime()
             val invocation = SourceSetup.prepare(SourceSetupRequest(
                 compiled.source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK, cancellation = stop,
@@ -104,14 +104,14 @@ internal object LinearPrefixInspection {
                     put("openingAndTraversalNs", elapsed)
                     if (run != null) {
                         val theory = (field(run, "planned") as PlannedSearch).theory
-                        put("partialPropagation", LinearPrefixSnapshot(Cancellation.after(10.seconds))
+                        put("partialPropagation", LinearPrefixSnapshot(ExecutionControl.after(10.seconds))
                             .record(theory?.let { member(it, "getPartialLinearPropagationStats") }))
                     }
                 }
                 out.resolve("prefix-$replay-status.json").writeText("$status\n")
                 check(ready) { "prefix did not reach its boundary: $status" }
                 val planned = field(requireNotNull(run), "planned") as PlannedSearch
-                val capture = LinearPrefixSnapshot(Cancellation.after(10.seconds))
+                val capture = LinearPrefixSnapshot(ExecutionControl.after(10.seconds))
                     .capture(planned, run, compiled, out.resolve("prefix-$replay.exact"))
                 val bytes = capture.toString().toByteArray()
                 require(bytes.size <= MAX_BYTES) { "prefix snapshot exceeds byte allowance" }
@@ -140,7 +140,7 @@ internal object LinearPrefixInspection {
                         put("sourceBoundBatching", !batching || replay == 1)
                         put("probeNs", probeElapsed)
                         put("continuationNs", continuationElapsed)
-                        put("probe", LinearPrefixSnapshot(Cancellation.after(10.seconds)).record(deductions))
+                        put("probe", LinearPrefixSnapshot(ExecutionControl.after(10.seconds)).record(deductions))
                         put("propagation", propagation.javaClass.simpleName)
                         put("continuation", continuation?.javaClass?.simpleName)
                         put("stopped", stop())
@@ -154,7 +154,7 @@ internal object LinearPrefixInspection {
                         put("assignedBooleans", (0 until (field(requireNotNull(planned.theory), "model") as Problem)
                             .numBoolVars).count { planned.session.boolValue(it) != null })
                         put("stopCause", planned.session.executionControls.stopCause?.name)
-                        put("partialPropagation", LinearPrefixSnapshot(Cancellation.after(10.seconds))
+                        put("partialPropagation", LinearPrefixSnapshot(ExecutionControl.after(10.seconds))
                             .record(member(requireNotNull(planned.theory), "getPartialLinearPropagationStats")))
                     }
                     out.resolve("probe-$replay.json").writeText("$observation\n")
@@ -162,7 +162,7 @@ internal object LinearPrefixInspection {
                     if (boundary.paused && continuation == null && !stop() &&
                         planned.session.executionControls.stopCause == null
                     ) {
-                        val afterCapture = LinearPrefixSnapshot(Cancellation.after(10.seconds)).capture(
+                        val afterCapture = LinearPrefixSnapshot(ExecutionControl.after(10.seconds)).capture(
                             planned, run, compiled, out.resolve("after-$replay.exact"),
                         )
                         out.resolve("after-$replay.json").writeText("$afterCapture\n")
@@ -223,7 +223,7 @@ internal object LinearPrefixInspection {
     private const val MAX_BYTES = 64 * 1024 * 1024
 }
 
-internal class LinearPrefixSnapshot(private val stop: Cancellation) {
+internal class LinearPrefixSnapshot(private val stop: ExecutionControl) {
     private var remaining = 1_000_000
     private val premiseIds = LinkedHashMap<SearchAtomPremise, Int>()
     private val premises = ArrayList<SearchAtomPremise>()

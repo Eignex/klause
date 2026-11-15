@@ -17,7 +17,7 @@ import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.linearTheoryModel
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.bigIntOf
@@ -36,16 +36,16 @@ class GridAbsTest {
     fun `grid encoding preparation should stop on the containing work allowance`() {
         val relation = GridAbs(0, 1, -2.0, 2.0, 101, 0.0, 2.0, 101)
         var work = 0L
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 7
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
 
         val rows = gridAbsoluteValueRows(relation, cancellation)
 
         assertNull(rows)
         assertEquals(7L, work)
-        assertNotNull(gridAbsoluteValueRows(relation, Cancellation.Never))
+        assertNotNull(gridAbsoluteValueRows(relation, ExecutionControl.Never))
     }
 
     @Test

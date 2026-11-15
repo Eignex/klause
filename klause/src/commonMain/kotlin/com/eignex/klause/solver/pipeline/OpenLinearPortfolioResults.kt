@@ -17,7 +17,7 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -26,8 +26,8 @@ internal class OpenLinearPortfolioResults(
     private val original: SourceProofContext,
     private val values: OpenSourceObjective,
     private val incumbents: PortfolioIncumbents<OpenIncumbentValue>,
-    private val cancellation: Cancellation,
-    private val timeout: Cancellation = Cancellation.Never,
+    private val cancellation: ExecutionControl,
+    private val timeout: ExecutionControl = ExecutionControl.Never,
 ) : PortfolioTerminalCheck {
     private data class Accepted(val result: LinearOptimizationResult, val rayValue: BigFraction?)
     private val accepted = AtomicReference<Accepted?>(null)
@@ -50,19 +50,33 @@ internal class OpenLinearPortfolioResults(
             accepted.store(Accepted(it, rayValue))
         }.check(worker, native) ?: return null
         if (mathematical.verification !is Verification.Accepted) return mathematical
-        if (claim is SourceClaim.Ray && rayValue == null) return PortfolioTerminalPublication(
-            Verification.Indeterminate("linear ray lacks its exact source base value")) {}
+        if (claim is SourceClaim.Ray && rayValue == null) {
+            return PortfolioTerminalPublication(
+            Verification.Indeterminate("linear ray lacks its exact source base value"),
+        ) {}
+        }
         val standing = incumbents.exchange.current()?.objective?.source
         val boundary = when (claim) {
             is SourceClaim.Optimal -> (claim.value as? SourceValue.Rational)?.value
             is SourceClaim.Limit -> (claim.value as? SourceValue.Rational)?.value
             else -> null
         }
-        val contradicts = standing != null && (claim == SourceClaim.Refutation ||
-            (boundary != null && (values.improves(standing, boundary) ||
-                (claim is SourceClaim.Limit && standing == boundary))))
-        return if (contradicts) PortfolioTerminalPublication(
-            Verification.Rejected("linear terminal contradicts an accepted source incumbent")) {} else mathematical
+        val contradicts = standing != null && (
+            claim == SourceClaim.Refutation ||
+            (
+                boundary != null && (
+                    values.improves(standing, boundary) ||
+                (claim is SourceClaim.Limit && standing == boundary)
+                )
+            )
+        )
+        return if (contradicts) {
+            PortfolioTerminalPublication(
+            Verification.Rejected("linear terminal contradicts an accepted source incumbent"),
+        ) {}
+        } else {
+            mathematical
+        }
     }
 
     fun fold(result: MinimizeResult): OpenTheoryOptimum {
@@ -105,7 +119,9 @@ internal class OpenLinearPortfolioResults(
             val oldValue = (old?.value as? SourceValue.Rational)?.value
             if (oldValue == null || values.improves(oldValue, value) ||
                 (oldValue == value && claim.strict && old.strict != true)
-            ) standing = candidate
+            ) {
+                standing = candidate
+            }
         }
         return standing
     }

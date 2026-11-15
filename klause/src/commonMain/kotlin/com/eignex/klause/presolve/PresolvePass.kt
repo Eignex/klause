@@ -3,9 +3,9 @@ package com.eignex.klause.presolve
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.linear.AffineSingletons
 import com.eignex.klause.presolve.linear.LinearSubSumAggregation
-import com.eignex.klause.presolve.structural.StructuralReduction
 import com.eignex.klause.presolve.structural.RedundantConstraints
 import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeIncremental
+import com.eignex.klause.presolve.structural.StructuralReduction
 import com.eignex.klause.propagation.BakedProblem
 
 private const val PROBE_PASS_MAX_CANDIDATES = 2_048

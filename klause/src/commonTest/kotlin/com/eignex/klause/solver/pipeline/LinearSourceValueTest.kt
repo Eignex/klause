@@ -8,7 +8,7 @@ import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
@@ -28,7 +28,7 @@ class LinearSourceValueTest {
         val source = SourceProofContext(scope, setOf(real), emptyMap(), mapOf(real to third))
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0 / 3.0), exactReals = listOf(third))
 
-        val value = source.linearValue(sample, Cancellation.Never)
+        val value = source.linearValue(sample, ExecutionControl.Never)
 
         assertEquals(BigFraction.ofLong(9).reciprocal(), value)
     }
@@ -45,7 +45,7 @@ class LinearSourceValueTest {
         )
         val sample = Sample(booleanArrayOf(), longArrayOf(), exactInts = listOf(parseBigInt("18446744073709551616")))
 
-        val value = source.linearValue(sample, Cancellation.Never)
+        val value = source.linearValue(sample, ExecutionControl.Never)
 
         assertEquals(BigFraction.of(parseBigInt("129127208515966861311"), BIG_ONE), value)
     }
@@ -56,7 +56,7 @@ class LinearSourceValueTest {
         val source = SourceProofContext(scope, setOf(real), emptyMap(), mapOf(real to BigFraction.ONE))
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0 / 3.0))
 
-        val value = source.linearValue(sample, Cancellation.Never)
+        val value = source.linearValue(sample, ExecutionControl.Never)
 
         assertNull(value)
     }
@@ -66,7 +66,7 @@ class LinearSourceValueTest {
         val source = SourceProofContext(scope, emptySet(), emptyMap())
         val sample = Sample(booleanArrayOf(), longArrayOf())
 
-        val value = source.linearValue(sample, Cancellation.Never)
+        val value = source.linearValue(sample, ExecutionControl.Never)
 
         assertNull(value)
     }
@@ -76,7 +76,7 @@ class LinearSourceValueTest {
         val source = SourceProofContext(scope, emptySet(), emptyMap(), emptyMap())
         val sample = Sample(booleanArrayOf(), longArrayOf())
 
-        val value = source.linearValue(sample, Cancellation { true })
+        val value = source.linearValue(sample, ExecutionControl { true })
 
         assertNull(value)
     }

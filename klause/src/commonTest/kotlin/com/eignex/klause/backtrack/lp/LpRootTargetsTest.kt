@@ -17,7 +17,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -44,14 +44,14 @@ class LpRootTargetsTest {
             engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
                 primal = DoubleArray(relaxation.model.n) { 1.0 },
                 sourceProblem = problem, auxiliaryPoint = true)
-            assertTrue(engine.retainRootPrimalTargets(Cancellation.Never))
+            assertTrue(engine.retainRootPrimalTargets(ExecutionControl.Never))
             engine.rootRoundingWarmStart = null
-            assertNotNull(engine.pickRootComponent(session, Cancellation.Never))
+            assertNotNull(engine.pickRootComponent(session, ExecutionControl.Never))
             val expired = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L))
             engine.restartRootPrimalTargets()
             assertNull(engine.rootPrimalTargets)
 
-            val refreshed = engine.refreshRootPrimalTargets(session, Cancellation.Never)
+            val refreshed = engine.refreshRootPrimalTargets(session, ExecutionControl.Never)
             val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
 
             assertTrue(refreshed)
@@ -80,12 +80,12 @@ class LpRootTargetsTest {
             engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
                 primal = DoubleArray(relaxation.model.n) { 1.0 },
                 sourceProblem = problem, auxiliaryPoint = true)
-            assertTrue(engine.retainRootPrimalTargets(Cancellation.Never))
+            assertTrue(engine.retainRootPrimalTargets(ExecutionControl.Never))
             engine.rootRoundingWarmStart = null
             engine.restartRootPrimalTargets()
 
             engine.clearRootPrimalTargets()
-            val refreshed = engine.refreshRootPrimalTargets(session, Cancellation.Never)
+            val refreshed = engine.refreshRootPrimalTargets(session, ExecutionControl.Never)
             val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
 
             assertFalse(refreshed)
@@ -112,7 +112,7 @@ class LpRootTargetsTest {
                 engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
                     primal = DoubleArray(relaxation.model.n) { 1.0 },
                     sourceProblem = problem, auxiliaryPoint = true)
-                assertTrue(engine.retainRootPrimalTargets(Cancellation.Never))
+                assertTrue(engine.retainRootPrimalTargets(ExecutionControl.Never))
                 engine.rootRoundingWarmStart = null
                 engine.restartRootPrimalTargets()
                 if (guard == "spent") allowance = 0L
@@ -122,7 +122,7 @@ class LpRootTargetsTest {
                 } else session
 
                 val declined = engine.refreshRootPrimalTargets(requested,
-                    Cancellation { guard == "cancelled" })
+                    ExecutionControl { guard == "cancelled" })
 
                 assertFalse(declined, guard)
                 assertNull(engine.rootPrimalTargets, guard)
@@ -130,7 +130,7 @@ class LpRootTargetsTest {
                     engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList(), guard)
                 allowance = 1_000_000L
                 session.popToLevel(0)
-                assertTrue(engine.refreshRootPrimalTargets(session, Cancellation.Never), guard)
+                assertTrue(engine.refreshRootPrimalTargets(session, ExecutionControl.Never), guard)
                 assertEquals(listOf(1L, 0L),
                     engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList(), guard)
                 assertTrue(factory.calls.isEmpty(), guard)
@@ -150,17 +150,17 @@ class LpRootTargetsTest {
         LpEngine(problem, objective,
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                 rootCutHarvest = false)), sink, LpSolveContext(factory)).use { engine ->
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
-            assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
             val session = PropagationSession(problem)
-            engine.pickRootComponent(session, Cancellation.Never)
+            engine.pickRootComponent(session, ExecutionControl.Never)
             session.pinInt(0, 0)
-            engine.pickRootComponent(session, Cancellation.Never)
+            engine.pickRootComponent(session, ExecutionControl.Never)
             engine.restartRootPrimalTargets()
             engine.cpAdapter.reset()
             engine.rootRoundingWarmStart = null
-            assertNull(engine.lpRoundingProbe(objective, Cancellation.Never, accept = { null }))
+            assertNull(engine.lpRoundingProbe(objective, ExecutionControl.Never, accept = { null }))
             val constructed = factory.calls.size
 
             val completed = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(1L, 0L)).toList()
@@ -188,7 +188,7 @@ class LpRootTargetsTest {
         LpEngine(problem, objective,
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                 rootCutHarvest = false)), sink, LpSolveContext(factory)).use { engine ->
-            assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
             val constructed = factory.calls.size
 
             val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
@@ -208,7 +208,7 @@ class LpRootTargetsTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
         val factory = RecordingLpEngineFactory()
         var stopped = false
-        val token = Cancellation { stopped }
+        val token = ExecutionControl { stopped }
         LpEngine(problem, objective,
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                 rootCutHarvest = false)), SolveStatsSink("resumed-auxiliary-value-order"),
@@ -253,7 +253,7 @@ class LpRootTargetsTest {
                     knownColumns = if (guard == "masked") BooleanArray(relaxation.model.n) { true } else null,
                     sourceProblem = source, auxiliaryPoint = true)
 
-                val retained = engine.retainRootPrimalTargets(Cancellation.Never)
+                val retained = engine.retainRootPrimalTargets(ExecutionControl.Never)
                 val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
 
                 assertFalse(retained, guard)
@@ -272,7 +272,7 @@ class LpRootTargetsTest {
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                 rootCutHarvest = false)), SolveStatsSink("masked-root-value-order"),
             LpSolveContext(factory)).use { engine ->
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
             val relaxation = assertNotNull(engine.rootRoundingWarmStart).relaxation
             val known = BooleanArray(relaxation.model.n)
@@ -280,7 +280,7 @@ class LpRootTargetsTest {
             engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
                 primal = DoubleArray(relaxation.model.n) { 1.0 }, knownColumns = known)
             val queries = factory.floatAllowances.size
-            assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
             assertNull(engine.rootRoundingWarmStart)
             val before = engine.totalSolveWork()
 
@@ -303,10 +303,10 @@ class LpRootTargetsTest {
         LpEngine(problem, objective,
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                 rootCutHarvest = false)), SolveStatsSink("fresh-node-before-root-target")).use { engine ->
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
             val relaxation = assertNotNull(engine.rootRoundingWarmStart).relaxation
-            assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
             val hints = LpHints(2, 0)
             val nodePoint = DoubleArray(relaxation.model.n)
             nodePoint[relaxation.intColOf[1]] = 1.0
@@ -329,10 +329,10 @@ class LpRootTargetsTest {
         LpEngine(problem, objective,
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                 rootCutHarvest = false)), SolveStatsSink("replaced-root-value-target")).use { engine ->
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
             val relaxation = assertNotNull(engine.rootRoundingWarmStart).relaxation
-            assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
             assertEquals(1L, engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).first())
             val earlier = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L))
 
@@ -353,9 +353,9 @@ class LpRootTargetsTest {
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, branching = false,
                 componentOwnership = true, rootCutHarvest = false)),
             SolveStatsSink("disabled-root-value-target")).use { engine ->
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
-            assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
 
             val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L))
 

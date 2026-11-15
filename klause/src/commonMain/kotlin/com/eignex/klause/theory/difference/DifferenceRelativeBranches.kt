@@ -10,7 +10,7 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchTheoryAtom
 import com.eignex.klause.solver.search.SearchTheoryDecision
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 @Suppress("ReturnCount")
 internal class DifferenceRelativeBranches private constructor(
@@ -83,7 +83,7 @@ internal class DifferenceRelativeBranches private constructor(
         return stopped
     }
 
-    private fun hasOpenBoolean(context: SearchContext, stop: Cancellation): Boolean {
+    private fun hasOpenBoolean(context: SearchContext, stop: ExecutionControl): Boolean {
         for (variable in 0 until sourceBools) {
             stop.charge(1)
             if (stopped(context)) return false
@@ -110,7 +110,7 @@ internal class DifferenceRelativeBranches private constructor(
         private const val GRAPH_NODE_UNITS = 32L
         private const val MAX_INTERVAL_WIDTH = 255L
 
-        fun create(source: DifferenceFragment, sourceBools: Int, stop: Cancellation): DifferenceRelativeBranches? {
+        fun create(source: DifferenceFragment, sourceBools: Int, stop: ExecutionControl): DifferenceRelativeBranches? {
             if (source.edges.size > MAX_EDGES || !source.carriesAPotential() || stop()) return null
             val bounds = HashMap<Pair<Int, Int>, Long>()
             for (edge in source.edges) {
@@ -146,7 +146,7 @@ internal class DifferenceRelativeBranches private constructor(
             return if (stop()) null else DifferenceRelativeBranches(ordered, source, sourceBools)
         }
 
-        private fun preferredValue(index: Int, interval: Interval, stop: Cancellation): Long? {
+        private fun preferredValue(index: Int, interval: Interval, stop: ExecutionControl): Long? {
             val cardinality = interval.upper - interval.lower + 1
             var ordinal = index.toLong()
             var offset = 0L

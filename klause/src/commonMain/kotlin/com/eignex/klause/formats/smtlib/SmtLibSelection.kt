@@ -20,9 +20,9 @@ import com.eignex.util.numbers.div
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus
-import com.eignex.util.numbers.remainderOf as truncatedRemainder
 import com.eignex.util.numbers.signum
 import com.eignex.util.numbers.toLongExact
+import com.eignex.util.numbers.remainderOf as truncatedRemainder
 
 internal fun Compiler.Builder.exclusiveIntegerSelection(
     result: Int,

@@ -17,7 +17,7 @@ import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.pipeline.LinearAuthorityInvocation
 import com.eignex.klause.solver.pipeline.TheoryParams
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -37,11 +37,11 @@ class LinearAuthorityCaptureTest {
 
     @Test
     fun `candidate violation should precede insertion and survive owner close`() {
-        val capture = LinearAuthorityCapture(2, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(2, 10_000L, 1_000_000L, ExecutionControl.Never)
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
             authority.capture = capture
-            authority.advance(source, Cancellation.Never, cuts = true, cutMask = emptySet())
-            authority.advance(source, Cancellation.Never, cuts = true)
+            authority.advance(source, ExecutionControl.Never, cuts = true, cutMask = emptySet())
+            authority.advance(source, ExecutionControl.Never, cuts = true)
         }
 
         val before = capture.records.first()
@@ -58,11 +58,11 @@ class LinearAuthorityCaptureTest {
     @Test
     fun `warm capture should keep template generation separate from child verification scope`() {
         val child = source.atScope(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ONE))))
-        val capture = LinearAuthorityCapture(2, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(2, 10_000L, 1_000_000L, ExecutionControl.Never)
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
             authority.capture = capture
-            authority.advance(source, Cancellation.Never, cuts = true, cutMask = emptySet())
-            authority.advance(child, Cancellation.Never, cuts = true, cutMask = emptySet())
+            authority.advance(source, ExecutionControl.Never, cuts = true, cutMask = emptySet())
+            authority.advance(child, ExecutionControl.Never, cuts = true, cutMask = emptySet())
         }
 
         val record = capture.records.last()
@@ -75,7 +75,7 @@ class LinearAuthorityCaptureTest {
 
     @Test
     fun `capture without a template should leave generation provenance unavailable`() {
-        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
 
         capture.record(source, null, null, null, LinearAuthorityResult())
 
@@ -84,11 +84,11 @@ class LinearAuthorityCaptureTest {
 
     @Test
     fun `retracting a cut mask should remove its stronger retained coordinate side`() {
-        val capture = LinearAuthorityCapture(2, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(2, 10_000L, 1_000_000L, ExecutionControl.Never)
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
             authority.capture = capture
-            authority.advance(source, Cancellation.Never, cuts = true)
-            authority.advance(source, Cancellation.Never, cuts = true, cutMask = emptySet())
+            authority.advance(source, ExecutionControl.Never, cuts = true)
+            authority.advance(source, ExecutionControl.Never, cuts = true, cutMask = emptySet())
         }
 
         val retracted = capture.records.last()
@@ -98,14 +98,14 @@ class LinearAuthorityCaptureTest {
 
     @Test
     fun `explicit replay should reproduce a point and freshly checked bound under the same mask`() {
-        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
             authority.capture = capture
-            authority.advance(source, Cancellation.Never, cuts = true, cutMask = emptySet())
+            authority.advance(source, ExecutionControl.Never, cuts = true, cutMask = emptySet())
         }
         val original = capture.records.single()
 
-        val replay = LinearAuthorityReplay.run(original, emptySet(), 1_000_000L, 4_000_000L, Cancellation.Never)
+        val replay = LinearAuthorityReplay.run(original, emptySet(), 1_000_000L, 4_000_000L, ExecutionControl.Never)
 
         val query = assertNotNull(replay.query)
         assertEquals(original.point, query.point)
@@ -123,15 +123,15 @@ class LinearAuthorityCaptureTest {
             setOf(x, bool), mapOf("strict" to SourcePremise(SourceInequality(
                 mapOf(x to BigFraction.ofLong(-2)), BigFraction.MINUS_ONE, strict = true), mapOf(0 to true))),
             mapOf(x to BigFraction.ONE))
-        val template = assertNotNull(LinearAuthorityTemplate.prepare(guarded, Cancellation.Never, cuts = true))
-        val query = assertNotNull(LinearAuthorityQuery.prepare(guarded, template, Cancellation.Never,
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(guarded, ExecutionControl.Never, cuts = true))
+        val query = assertNotNull(LinearAuthorityQuery.prepare(guarded, template, ExecutionControl.Never,
             cutMask = emptySet()))
-        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
         capture.record(guarded, query, template, mapOf(x to BigFraction.ofLong(2).reciprocal()),
             LinearAuthorityResult())
 
         val replay = LinearAuthorityReplay.run(capture.records.single(), emptySet(), 1_000_000L, 4_000_000L,
-            Cancellation.Never)
+            ExecutionControl.Never)
 
         val record = assertNotNull(replay.query)
         assertEquals(guarded.scope, record.context.scope)
@@ -145,13 +145,13 @@ class LinearAuthorityCaptureTest {
     fun `observer should preserve source operations and numerical accounting`() {
         val baseline = SourceLpBudget()
         val observed = SourceLpBudget()
-        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
         val control = LinearAuthority(baseline, retainLp = true).use {
-            it.advance(source, Cancellation.Never, cuts = true)
+            it.advance(source, ExecutionControl.Never, cuts = true)
         }
         val treatment = LinearAuthority(observed, retainLp = true).use {
             it.capture = capture
-            it.advance(source, Cancellation.Never, cuts = true)
+            it.advance(source, ExecutionControl.Never, cuts = true)
         }
 
         assertEquals(control.bound?.claim, treatment.bound?.claim)
@@ -165,7 +165,7 @@ class LinearAuthorityCaptureTest {
 
     @Test
     fun `observer should preserve exhaustive frontier traversal and sibling proof accounting`() {
-        val capture = LinearAuthorityCapture(16, 100_000L, 4_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(16, 100_000L, 4_000_000L, ExecutionControl.Never)
         val params = TheoryParams(sourceCuts = false)
         val baseline = LinearAuthorityInvocation(source, params, boundOrdered = true).use {
             it.run { _, _ -> }
@@ -195,10 +195,10 @@ class LinearAuthorityCaptureTest {
         ), mapOf(x to BigFraction.MINUS_ONE))
         val enabled = guarded.atScope(scope.copy(condition = SourceCondition(
             lower = mapOf(y to BigFraction.ONE), upper = mapOf(y to BigFraction.ONE))))
-        val template = assertNotNull(LinearAuthorityTemplate.prepare(guarded, Cancellation.Never, cuts = true))
-        val capture = LinearAuthorityCapture(3, 10_000L, 1_000_000L, Cancellation.Never)
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(guarded, ExecutionControl.Never, cuts = true))
+        val capture = LinearAuthorityCapture(3, 10_000L, 1_000_000L, ExecutionControl.Never)
         for (current in listOf(enabled, guarded, enabled)) {
-            val query = assertNotNull(LinearAuthorityQuery.prepare(current, template, Cancellation.Never,
+            val query = assertNotNull(LinearAuthorityQuery.prepare(current, template, ExecutionControl.Never,
                 cutMask = emptySet()))
             capture.record(current, query, template, mapOf(x to BigFraction.ONE, y to BigFraction.ONE),
                 LinearAuthorityResult())
@@ -215,7 +215,7 @@ class LinearAuthorityCaptureTest {
 
     @Test
     fun `bounded capture should leave missing observations unknown`() {
-        for (stop in listOf(Cancellation.Never, Cancellation { true })) {
+        for (stop in listOf(ExecutionControl.Never, ExecutionControl { true })) {
             val capture = LinearAuthorityCapture(1, 0L, 0L, stop)
 
             capture.record(source, null, null, null, LinearAuthorityResult())
@@ -229,12 +229,12 @@ class LinearAuthorityCaptureTest {
 
     @Test
     fun `delivery should keep the latest query after the archive fills`() {
-        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
         capture.deliver(10_000L, 1_000_000L)
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
             authority.capture = capture
-            authority.advance(source, Cancellation.Never, cuts = true, cutMask = emptySet())
-            authority.advance(source, Cancellation.Never, cuts = true)
+            authority.advance(source, ExecutionControl.Never, cuts = true, cutMask = emptySet())
+            authority.advance(source, ExecutionControl.Never, cuts = true)
         }
 
         assertEquals(1, capture.records.size)
@@ -246,7 +246,7 @@ class LinearAuthorityCaptureTest {
 
     @Test
     fun `eviction should not lower the cumulative construction ledger`() {
-        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
         capture.deliver(10_000L, 1_000_000L)
         repeat(2) { capture.record(source, null, null, null, LinearAuthorityResult()) }
         val entries = capture.constructedEntries
@@ -262,7 +262,7 @@ class LinearAuthorityCaptureTest {
 
     @Test
     fun `a delivery-only record should spend on references instead of copied rows`() {
-        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
         capture.deliver(10_000L, 1_000_000L)
         capture.record(source, null, null, null, LinearAuthorityResult())
         val archived = capture.constructedBytes
@@ -275,7 +275,7 @@ class LinearAuthorityCaptureTest {
 
     @Test
     fun `a query beyond the delivery allowance should be reported as oversized`() {
-        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
         capture.deliver(1L, 1_000_000L)
 
         capture.record(source, null, null, null, LinearAuthorityResult())
@@ -292,7 +292,7 @@ class LinearAuthorityCaptureTest {
             "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE, bool to BigFraction.ONE),
                 BigFraction.ONE)),
         ), mapOf(x to BigFraction.ONE))
-        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
 
         capture.record(guarded, null, null, null, LinearAuthorityResult())
 
@@ -305,15 +305,15 @@ class LinearAuthorityCaptureTest {
     fun `a requested projection should match the full record on its requested fields`() {
         for (request in listOf(installed, LinearAuthorityFeedbackRequest(refutation = true),
             LinearAuthorityFeedbackRequest())) {
-            val full = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply { deliver(10_000L, 1_000_000L) }
-            val narrow = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply {
+            val full = LinearAuthorityCapture(0, 0L, 0L, ExecutionControl.Never).apply { deliver(10_000L, 1_000_000L) }
+            val narrow = LinearAuthorityCapture(0, 0L, 0L, ExecutionControl.Never).apply {
                 deliver(10_000L, 1_000_000L, request)
             }
             for (mask in listOf<Set<Int>?>(emptySet(), null)) {
                 val (expected, actual) = listOf(full, narrow).map { capture ->
                     LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
                         authority.capture = capture
-                        authority.advance(source, Cancellation.Never, cuts = true, cutMask = mask)
+                        authority.advance(source, ExecutionControl.Never, cuts = true, cutMask = mask)
                     }
                     assertNotNull(capture.delivered)
                 }
@@ -337,15 +337,15 @@ class LinearAuthorityCaptureTest {
 
     @Test
     fun `a requested projection should never evaluate unrequested cuts`() {
-        val full = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply { deliver(10_000L, 1_000_000L) }
-        val narrow = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply {
+        val full = LinearAuthorityCapture(0, 0L, 0L, ExecutionControl.Never).apply { deliver(10_000L, 1_000_000L) }
+        val narrow = LinearAuthorityCapture(0, 0L, 0L, ExecutionControl.Never).apply {
             deliver(10_000L, 1_000_000L, installed)
         }
 
         for (capture in listOf(full, narrow)) {
             LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
                 authority.capture = capture
-                authority.advance(source, Cancellation.Never, cuts = true, cutMask = emptySet())
+                authority.advance(source, ExecutionControl.Never, cuts = true, cutMask = emptySet())
             }
         }
 
@@ -359,7 +359,7 @@ class LinearAuthorityCaptureTest {
         val bounded = source.atScope(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ZERO),
             upper = mapOf(x to BigFraction.ONE))))
         fun charged(request: LinearAuthorityFeedbackRequest, context: SourceProofContext): Long {
-            val capture = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply {
+            val capture = LinearAuthorityCapture(0, 0L, 0L, ExecutionControl.Never).apply {
                 deliver(10_000L, 1_000_000L, request)
             }
             capture.record(context, null, null, null, LinearAuthorityResult())
@@ -375,10 +375,10 @@ class LinearAuthorityCaptureTest {
     fun `queries after an archive allowance overflow should be delivery-only`() {
         val bounded = source.atScope(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ZERO),
             upper = mapOf(x to BigFraction.ONE))))
-        val single = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never).apply {
+        val single = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never).apply {
             record(source, null, null, null, LinearAuthorityResult())
         }.bytes
-        val capture = LinearAuthorityCapture(64, 10_000L, 2 * single + 1, Cancellation.Never).apply {
+        val capture = LinearAuthorityCapture(64, 10_000L, 2 * single + 1, ExecutionControl.Never).apply {
             deliver(10_000L, 1_000_000L, installed)
         }
 
@@ -392,12 +392,12 @@ class LinearAuthorityCaptureTest {
 
     @Test
     fun `on-demand evaluation should debit the cumulative construction ledger`() {
-        val capture = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply {
+        val capture = LinearAuthorityCapture(0, 0L, 0L, ExecutionControl.Never).apply {
             deliver(10_000L, 1_000_000L, installed)
         }
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
             authority.capture = capture
-            authority.advance(source, Cancellation.Never, cuts = true)
+            authority.advance(source, ExecutionControl.Never, cuts = true)
         }
         val record = assertNotNull(capture.delivered)
         val bytes = capture.constructedBytes
@@ -411,19 +411,19 @@ class LinearAuthorityCaptureTest {
 
     @Test
     fun `on-demand evaluation beyond the delivered allowance should be oversized`() {
-        val measured = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply {
+        val measured = LinearAuthorityCapture(0, 0L, 0L, ExecutionControl.Never).apply {
             deliver(10_000L, 1_000_000L, installed)
         }
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
             authority.capture = measured
-            authority.advance(source, Cancellation.Never, cuts = true)
+            authority.advance(source, ExecutionControl.Never, cuts = true)
         }
-        val capture = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply {
+        val capture = LinearAuthorityCapture(0, 0L, 0L, ExecutionControl.Never).apply {
             deliver(10_000L, measured.constructedBytes - 64L, installed)
         }
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
             authority.capture = capture
-            authority.advance(source, Cancellation.Never, cuts = true)
+            authority.advance(source, ExecutionControl.Never, cuts = true)
         }
         val record = assertNotNull(capture.delivered)
 
@@ -435,15 +435,15 @@ class LinearAuthorityCaptureTest {
 
     @Test
     fun `on-demand evaluation should decline once its query is replaced or released`() {
-        val capture = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply {
+        val capture = LinearAuthorityCapture(0, 0L, 0L, ExecutionControl.Never).apply {
             deliver(10_000L, 1_000_000L, installed)
         }
         val (replaced, released) = LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
             authority.capture = capture
-            authority.advance(source, Cancellation.Never, cuts = true)
+            authority.advance(source, ExecutionControl.Never, cuts = true)
             val first = assertNotNull(capture.delivered)
-            authority.advance(source, Cancellation.Never, cuts = true, cutMask = emptySet())
-            authority.advance(source, Cancellation.Never, cuts = true)
+            authority.advance(source, ExecutionControl.Never, cuts = true, cutMask = emptySet())
+            authority.advance(source, ExecutionControl.Never, cuts = true)
             first to assertNotNull(capture.delivered).also { capture.stopDelivery() }
         }
 
@@ -457,12 +457,12 @@ class LinearAuthorityCaptureTest {
     @Test
     fun `on-demand evaluation should decline after cancellation`() {
         var stopped = false
-        val capture = LinearAuthorityCapture(0, 0L, 0L, Cancellation { stopped }).apply {
+        val capture = LinearAuthorityCapture(0, 0L, 0L, ExecutionControl { stopped }).apply {
             deliver(10_000L, 1_000_000L, installed)
         }
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
             authority.capture = capture
-            authority.advance(source, Cancellation.Never, cuts = true)
+            authority.advance(source, ExecutionControl.Never, cuts = true)
         }
         val record = assertNotNull(capture.delivered)
         stopped = true

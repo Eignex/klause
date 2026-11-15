@@ -15,7 +15,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -59,7 +59,7 @@ class LpRetainedSourcesTest {
 
         assertFailsWith<LpAssemblyCancelled> {
             sources.prepare(LpExactState(LpRetainedSources.emptyModel()), RootDomains(problem),
-                Cancellation { work > 0L }) { work += it }
+                ExecutionControl { work > 0L }) { work += it }
         }
 
         assertEquals(1L, work)
@@ -568,7 +568,7 @@ class LpRetainedSourcesTest {
         val state = LpExactState(LpRetainedSources.emptyModel())
         val domains = RootDomains(problem)
         val first = assertNotNull(sources.prepare(state, domains))
-        assertFailsWith<LpAssemblyCancelled> { sources.prepare(state, domains, Cancellation { true }) }
+        assertFailsWith<LpAssemblyCancelled> { sources.prepare(state, domains, ExecutionControl { true }) }
         val second = assertNotNull(sources.prepare(state, domains))
         second.commit()
 

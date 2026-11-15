@@ -9,7 +9,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -44,7 +44,7 @@ class PresolvePassTest {
         )) {
             assertFalse(pass.applyFinite(problem, PresolveContext.EMPTY).isEmpty, pass.id)
             var polls = 0
-            val context = PresolveContext(cancellation = Cancellation { polls++; true })
+            val context = PresolveContext(cancellation = ExecutionControl { polls++; true })
 
             val delta = pass.applyFinite(problem, context)
 
@@ -65,7 +65,7 @@ class PresolvePassTest {
 
         for (pass in listOf(PresolvePass.PROBE, PresolvePass.IMPLICATION_GRAPH)) {
             val budget = PresolveBudget(Long.MAX_VALUE)
-            val context = PresolveContext(cancellation = budget.orSpent(Cancellation.Never))
+            val context = PresolveContext(cancellation = budget.orSpent(ExecutionControl.Never))
 
             pass.applyFinite(problem, context)
 
@@ -84,7 +84,7 @@ class PresolvePassTest {
         val budget = PresolveBudget(3)
 
         val delta = PresolvePass.VALUE_PRECEDENCE.applyFinite(
-            problem, PresolveContext(cancellation = budget.orSpent(Cancellation.Never)),
+            problem, PresolveContext(cancellation = budget.orSpent(ExecutionControl.Never)),
         )
 
         assertTrue(delta.isEmpty)
@@ -102,8 +102,8 @@ class PresolvePassTest {
             val limited = PresolveBudget(1)
             val unlimited = PresolveBudget(Long.MAX_VALUE)
 
-            pass.applyFinite(problem, PresolveContext(cancellation = limited.orSpent(Cancellation.Never)))
-            pass.applyFinite(problem, PresolveContext(cancellation = unlimited.orSpent(Cancellation.Never)))
+            pass.applyFinite(problem, PresolveContext(cancellation = limited.orSpent(ExecutionControl.Never)))
+            pass.applyFinite(problem, PresolveContext(cancellation = unlimited.orSpent(ExecutionControl.Never)))
 
             assertTrue(limited.remaining() == 0L, pass.id)
             assertEquals(0L, limited.rootConstructionEntries, pass.id)
@@ -124,10 +124,10 @@ class PresolvePassTest {
             val finiteBudget = PresolveBudget(10_000L)
 
             val sourceDelta = pass.applySource(
-                source, PresolveContext(cancellation = sourceBudget.orSpent(Cancellation.Never)),
+                source, PresolveContext(cancellation = sourceBudget.orSpent(ExecutionControl.Never)),
             )
             val finiteDelta = pass.applyFinite(
-                finite, PresolveContext(cancellation = finiteBudget.orSpent(Cancellation.Never)),
+                finite, PresolveContext(cancellation = finiteBudget.orSpent(ExecutionControl.Never)),
             )
 
             assertFalse(sourceDelta.isEmpty)
@@ -159,7 +159,7 @@ class PresolvePassTest {
         val budget = PresolveBudget(Long.MAX_VALUE)
 
         val prepared = Presolver.runSource(problem, PresolveConfig.parse("off,+probe-open"),
-            PresolveContext(presolveBudget = budget), budget.orSpent(Cancellation.Never))
+            PresolveContext(presolveBudget = budget), budget.orSpent(ExecutionControl.Never))
 
         assertEquals(listOf(PresolvePass.PROBE_OPEN_RANGES), prepared.passesFired)
         assertEquals(7L, prepared.problem.intBounds.upper(0))

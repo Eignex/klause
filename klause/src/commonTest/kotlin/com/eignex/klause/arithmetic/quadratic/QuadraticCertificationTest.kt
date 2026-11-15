@@ -1,7 +1,7 @@
 package com.eignex.klause.arithmetic.quadratic
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -187,7 +187,7 @@ class QuadraticCertificationTest {
     @Test
     fun `cancelled invocation should not publish a certificate`() {
         val model = QuadraticModel(listOf(q(0)), listOf(listOf(q(2))))
-        val cancelled = QuadraticCertification(QuadraticControl(Cancellation { true }))
+        val cancelled = QuadraticCertification(QuadraticControl(ExecutionControl { true }))
 
         val stop = assertFailsWith<QuadraticInterrupted> {
             cancelled.bound(model, QuadraticStationaryCertificate(listOf(q(0)), emptyList()))

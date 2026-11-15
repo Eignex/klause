@@ -1,7 +1,7 @@
 package com.eignex.klause.arithmetic.transcendental
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -102,7 +102,7 @@ class TranscendentalArithmeticTest {
 
     @Test
     fun `cancelled arithmetic should publish no enclosure`() {
-        val arithmetic = TranscendentalArithmetic(cancellation = Cancellation { true })
+        val arithmetic = TranscendentalArithmetic(cancellation = ExecutionControl { true })
 
         assertFailsWith<TranscendentalInterrupted> { arithmetic.exp(RationalEnclosure.point(q(0)), 4) }
     }

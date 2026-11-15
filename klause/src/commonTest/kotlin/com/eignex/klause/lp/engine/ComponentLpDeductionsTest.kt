@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -23,7 +23,7 @@ class ComponentLpDeductionsTest {
         owner.use {
             val result = assertNotNull(it.solve())
             assertNotNull(it.nodeDeductions(result.duals))
-            val meter = MixedCertificateMeter(Cancellation.Never)
+            val meter = MixedCertificateMeter(ExecutionControl.Never)
             meter.reserve(8L * 249_998L)
 
             assertNull(it.nodeDeductions(result.duals, sharedMeter = meter))
@@ -124,7 +124,7 @@ class ComponentLpDeductionsTest {
             val result = assertNotNull(it.solve())
             val expected = assertNotNull(it.nodeDeductions(result.duals)).primary.exactObjectiveBound()
 
-            assertNull(it.nodeDeductions(result.duals, cancellation = Cancellation { true }))
+            assertNull(it.nodeDeductions(result.duals, cancellation = ExecutionControl { true }))
 
             assertEquals(expected, assertNotNull(it.nodeDeductions(result.duals)).primary.exactObjectiveBound())
         }

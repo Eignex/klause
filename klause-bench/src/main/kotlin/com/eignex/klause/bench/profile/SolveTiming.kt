@@ -9,7 +9,7 @@ import com.eignex.klause.bench.runner.Runners
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import java.io.File
@@ -78,7 +78,7 @@ object SolveTiming {
             val deadline = System.currentTimeMillis() + timeoutMs
             val params = BacktrackPresets.conflictDriven(
                 randomSeed = SEED,
-                cancellation = Cancellation { System.currentTimeMillis() > deadline },
+                cancellation = ExecutionControl { System.currentTimeMillis() > deadline },
             )
             val solver = BacktrackSolver(entry.problem.bake())
             val objective = entry.objective

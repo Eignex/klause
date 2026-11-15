@@ -9,7 +9,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.ScanMeter
 import com.eignex.util.collections.Bits
 import com.eignex.util.collections.IntArrayList
@@ -42,7 +42,7 @@ internal object XorUnits {
      * Idempotent: a literal already forced and a column already fixed are not stated again, so the round
      * engine reaches a fixpoint.
      */
-    fun deriveXorUnits(problem: Problem, cancellation: Cancellation = Cancellation.Never): SourceDelta {
+    fun deriveXorUnits(problem: Problem, cancellation: ExecutionControl = ExecutionControl.Never): SourceDelta {
         val work = ScanMeter(cancellation)
         if (!work.check()) return SourceDelta()
         val system = ParitySystem(problem, work)

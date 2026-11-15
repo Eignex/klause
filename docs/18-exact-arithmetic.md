@@ -3,26 +3,45 @@
 Exact kernels certify arithmetic facts for source-aware callers. They own immutable
 values, numerical certificates and private workspace; callers own formula truth,
 strategy and publication. Kernels read no factors, finite domains or solver verdicts
-and charge work to the containing token.
+and charge work to the explicitly bound execution owner.
 
 `util.ArithmeticExecution` separates native work admission from cancellation
 checkpoints. An owned arithmetic operation uses a local cursor: floating proposal
-loops checkpoint after at most 64 admitted units, quadratic certification after at
-most eight, and polynomial and enclosure kernels after at most 32. Coefficient
+loops checkpoint after at most 256 admitted units, quadratic certification after at
+most 64, and polynomial and enclosure kernels after at most 2,048. Operand limbs
+add checkpoint weight without changing the charged work currency. Coefficient
 operations whose combined operand size exceeds 4096 bits force a checkpoint before
-the exact primitive.
+the exact primitive. Admission leases can cover eight checkpoint quanta;
+cancellation polling does not settle a lease or allocate another reservation.
 Entry, allocation admission, callback handoff, prepared-cursor suspension and all
-exits settle spent work and check the live containing stop. Nested methods share
-the cursor; retained state holds no unused credit while paused. A stopped operation
+exits settle spent work and check the live containing stop. Callback return rebinds
+the live accounting owner. Nested methods share the cursor; concurrent witness
+checks each own a cursor. Retained state holds no unused credit while paused. A stopped operation
 publishes no partial arithmetic result. One arbitrary-precision primitive remains
 cooperative and runs to completion between checkpoints.
+
+Polynomial query advances group internal generator pauses within 32,768 work units
+or 8,192 pauses. The initial normalization pause remains an entry boundary. Every
+returned pause settles admission; internal pauses within an advance share its cursor.
+Witness probe completion and committed root rewrites form suspension boundaries before search resumes.
 
 A unit is one explicit kernel `step`: scalar multiply-accumulate, coefficient visit,
 elimination update or operation admission, according to the kernel. A quadratic
 primitive used by polynomial refutation admits one polynomial unit; a pure
 checkpoint admits none. Numerical evaluation order and exact operands are unchanged.
-Opaque caller tokens retain their per-step before/after predicates and unit charges;
-only owned accounting sources can reserve bounded credit.
+Accounting does not determine polling cadence. Nested operations share their
+owner's cursor even when the owner has no reservation source. A direct step
+outside an operation is a complete one-unit boundary. Counter charges themselves
+perform no cancellation observation. Only explicit allowance sources reserve
+credit; opaque work sinks receive exact completed unit charges.
+Admission reports permanent exhaustion separately from stop predicates. A view
+cannot mask its native owner's exhausted allowance, and combined presolve stops
+intersect available slice credit without selecting another accounting owner.
+Admission objects contain quota state only. A finite worker owns one plain stop
+1,024-unit countdown shared by its nested propagation and scoring loops. Loops contribute
+their visited units to that countdown instead of multiplying independent polling
+intervals. Full checks at publication and suspension bypass the countdown.
+Independent workers never share countdown state; unbound controls check immediately.
 
 ## Exact quadratic certificates
 
@@ -42,7 +61,8 @@ Preparation builds the floating model before separate iteration and row-selectio
 Koblas ASUM computes Hessian row magnitudes and DOT computes squared constraint-row
 magnitudes for the numerical step size.
 Koblas dot and AXPY calls process complete vectors, admitting one work unit per
-entry before each call. Owned controls batch containing checks independently of
+entry before each call. Vector admission adds units in checkpoint-sized batches
+without a scalar counter loop. Owned controls batch containing checks independently of
 these debits. Nonfinite inputs or iterates decline the
 proposal. Reduction rounding can change selected rows; it has no certificate
 authority. Selected rows and all equality rows form an exact rational KKT system;
@@ -172,7 +192,7 @@ and only the specialized polynomial's distinct real roots.
 
 ### Invocation resources
 
-Every operation checks the caller's `Cancellation` at bounded checkpoints and charges deterministic work;
+Every operation checks the caller's `ExecutionControl` at bounded checkpoints and charges deterministic work;
 `PolynomialInterrupted` publishes no partial result. `PolynomialLimits` defaults to
 65,536 dense coefficients and 262,144 elimination matrix cells, and dimensions are
 checked before allocation. No cap truncates a polynomial or supplies a refutation;

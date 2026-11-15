@@ -11,7 +11,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.theory.qfnia.QuadraticIntegerComponent
 import com.eignex.klause.theory.qfnia.QuadraticIntegerNode
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class QuadraticIntegerTraversalCursor(
     private val boolCount: Int,
@@ -19,16 +19,17 @@ internal class QuadraticIntegerTraversalCursor(
     private val params: SearchSolveParams,
     private val branching: BooleanBranching,
     private val decisionBudget: SearchDecisionBudget,
-    private val lifetime: Cancellation,
+    private val lifetime: ExecutionControl,
     private val work: () -> Long,
 ) : AutoCloseable {
     private var global = lifetime
     private val slice = SliceBudget(work, { 0L }, { 0L })
     private val session = SearchSession(
-        listOf(component), cancellation = object : Cancellation {
+        listOf(component), cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = global()
             override fun deadline() = global.deadline()
-            override fun workMeter() = global.workMeter()
+            override val accounting get() = global.accounting
+            override val admission get() = admissionFrom(global)
         },
         branchers = listOf(component), atoms = SearchAtomRegistry(boolCount),
     )
@@ -40,7 +41,7 @@ internal class QuadraticIntegerTraversalCursor(
     val outcome: QuadraticIntegerNode? get() = component.outcome
 
     fun advance(
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         sliceMillis: Long,
         sliceWork: Long,
         onModel: (QuadraticIntegerNode.Closed) -> Unit,
@@ -57,9 +58,14 @@ internal class QuadraticIntegerTraversalCursor(
         val paused = { slice.expired() }
         if (!initialized) {
             when (session.initialize()) {
-                is ComponentResult.Conflict -> terminal = if (global()) SearchRunEvent.Indeterminate.Cancelled
-                    else SearchRunEvent.Exhausted
+                is ComponentResult.Conflict -> terminal = if (global()) {
+                    SearchRunEvent.Indeterminate.Cancelled
+                } else {
+                    SearchRunEvent.Exhausted
+                }
+
                 ComponentResult.Indeterminate -> terminal = SearchRunEvent.Indeterminate.Component
+
                 ComponentResult.Consistent -> Unit
             }
             initialized = true
@@ -72,11 +78,13 @@ internal class QuadraticIntegerTraversalCursor(
         while (!global() && !paused()) {
             when (val event = cursor.next()) {
                 is SearchRunEvent.Satisfied -> onModel(requireNotNull(event.model.valueOf(component.modelKey)))
+
                 SearchRunEvent.Paused -> {
                     if (component.outcome is QuadraticIntegerNode.Unbounded) terminal = event
                     slice.noteOverspend()
                     return terminal
                 }
+
                 SearchRunEvent.Exhausted, is SearchRunEvent.Indeterminate -> {
                     terminal = event
                     return event

@@ -1,12 +1,12 @@
 package com.eignex.klause.bench.source
 
+import org.apache.commons.compress.archivers.zip.ZipFile
 import java.io.File
 import java.net.URI
 import java.nio.file.Files
 import java.util.zip.CRC32
 import java.util.zip.CheckedInputStream
 import java.util.zip.GZIPInputStream
-import org.apache.commons.compress.archivers.zip.ZipFile
 
 internal class CorpusZipCollection(
     private val uri: URI,

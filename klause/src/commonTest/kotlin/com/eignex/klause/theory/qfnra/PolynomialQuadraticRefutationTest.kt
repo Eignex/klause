@@ -5,7 +5,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -135,7 +135,7 @@ class PolynomialQuadraticRefutationTest {
             "(declare-const x Real) (assert (and (<= (* x x) 1) (>= x 2)))",
         )
         var cancelled = false
-        val arithmetic = PolynomialArithmetic(Cancellation { cancelled })
+        val arithmetic = PolynomialArithmetic(ExecutionControl { cancelled })
         val formula = PolynomialFormula.normalize(source.formula, arithmetic)
         val atoms = assertNotNull(formula.conjunctiveAtoms(arithmetic, Int.MAX_VALUE))
         val preparing = preparePolynomialQuadraticRefutation(atoms, arithmetic)

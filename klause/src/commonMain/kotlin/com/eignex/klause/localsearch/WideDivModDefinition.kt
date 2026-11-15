@@ -7,7 +7,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep.SweepNode
 import com.eignex.klause.solver.Assignment
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigInt
@@ -47,7 +47,7 @@ internal class WideDivModDefinition(
 
 internal fun wideDivModDefinitions(
     problem: Problem,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): List<SweepNode> {
     val definitions = ArrayList<SweepNode>()
     for (factor in problem.factors) {

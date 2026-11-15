@@ -7,7 +7,6 @@ import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.ineffectiveNumerics
-import com.eignex.util.process.processProperty
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream

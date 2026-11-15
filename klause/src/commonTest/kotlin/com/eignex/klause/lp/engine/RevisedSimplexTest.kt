@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -35,7 +35,7 @@ class RevisedSimplexTest {
                     var work = 0L
 
                     val costs = assertNotNull(solver.directionalCosts(model, intArrayOf(x), 100_000L,
-                        Cancellation.Never) { work += it })
+                        ExecutionControl.Never) { work += it })
 
                     assertEquals(3.0 / objectiveScale, assertNotNull(costs.single()).down, 1e-7)
                     assertEquals(5.0 / objectiveScale, assertNotNull(costs.single()).up, 1e-7)
@@ -68,13 +68,13 @@ class RevisedSimplexTest {
                 var independentWork = 0L
                 val independent = variables.take(2).map { variable ->
                     assertNotNull(solver.directionalCosts(model, intArrayOf(variable[0]), 100_000L,
-                        Cancellation.Never) { independentWork += it }).single()
+                        ExecutionControl.Never) { independentWork += it }).single()
                 }
                 var pairedWork = 0L
 
                 val together = assertNotNull(solver.directionalCosts(model,
                     intArrayOf(variables[0][0], variables[1][0]), independentWork - 1L,
-                    Cancellation.Never) { pairedWork += it })
+                    ExecutionControl.Never) { pairedWork += it })
 
                 assertEquals(independent.size, together.size)
                 for (index in together.indices) {
@@ -108,7 +108,7 @@ class RevisedSimplexTest {
                 assertNotNull(solver.solve())
                 var work = 0L
                 val costs = assertNotNull(solver.directionalCosts(model, columns, 100_000L,
-                    Cancellation.Never) { work += it })
+                    ExecutionControl.Never) { work += it })
                 assertEquals(3.0, assertNotNull(costs[0]).down, 1e-7)
                 assertEquals(5.0, assertNotNull(costs[0]).up, 1e-7)
                 assertEquals(7.0, assertNotNull(costs[1]).down, 1e-7)
@@ -118,7 +118,7 @@ class RevisedSimplexTest {
                 work = 0L
 
                 val unavailable = solver.directionalCosts(model, columns, required - 1L,
-                    Cancellation.Never) { work += it }
+                    ExecutionControl.Never) { work += it }
 
                 assertNull(unavailable)
                 assertEquals(0L, work)
@@ -138,7 +138,7 @@ class RevisedSimplexTest {
 
                 val costs = solver.directionalCosts(if (decline == "stale") halfIntegralModel() else model,
                     columns, when (decline) { "unfunded" -> 1L; "zero" -> 0L; else -> 100_000L },
-                    Cancellation { decline == "cancelled" }) { work += it }
+                    ExecutionControl { decline == "cancelled" }) { work += it }
 
                 assertNull(costs, decline)
                 assertEquals(0L, work, decline)
@@ -154,7 +154,7 @@ class RevisedSimplexTest {
             val metrics = solver.lastMetrics
             val basis = assertNotNull(solver.retainedBasis())
 
-            solver.directionalCosts(model, intArrayOf(0), 100_000L, Cancellation.Never) { assertTrue(it > 0L) }
+            solver.directionalCosts(model, intArrayOf(0), 100_000L, ExecutionControl.Never) { assertTrue(it > 0L) }
 
             assertEquals(metrics, solver.lastMetrics)
             assertEquals(basis.basicVars.toList(), solver.retainedBasis()?.basicVars?.toList())
@@ -267,7 +267,7 @@ class RevisedSimplexTest {
     @Test
     fun `cancellation during a pause should publish no numerical result`() {
         var cancelled = false
-        RevisedSimplex(halfIntegralModel(), cancellation = Cancellation { cancelled }).use { solver ->
+        RevisedSimplex(halfIntegralModel(), cancellation = ExecutionControl { cancelled }).use { solver ->
             solver.openSolve().use { cursor ->
                 assertIs<LpSolveStep.Paused>(cursor.advance(shouldPause = { true }))
 
@@ -398,7 +398,7 @@ class RevisedSimplexTest {
             var work = 0L
 
             val values = owner.directionalValues(LpProbeSource(model, point.basis), intArrayOf(0, 1), longArrayOf(0, 0),
-                1_000_000L, Cancellation.Never) { completed += it.completed; work += it.work }
+                1_000_000L, ExecutionControl.Never) { completed += it.completed; work += it.work }
 
             assertNotNull(values)
             assertEquals(listOf(LpDirectionalValues(8.0, 8.0), LpDirectionalValues(8.0, 8.0)), values)
@@ -406,7 +406,7 @@ class RevisedSimplexTest {
             assertTrue(work in 1L..1_000_000L)
             assertEquals(metrics, owner.lastMetrics)
             assertNull(owner.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
-                1_000_000L, Cancellation.Never) {})
+                1_000_000L, ExecutionControl.Never) {})
         }
     }
 

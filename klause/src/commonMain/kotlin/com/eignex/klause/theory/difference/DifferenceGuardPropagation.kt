@@ -12,14 +12,14 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchExplanation
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 // Theory propagation of open guards whose edge would close a negative cycle, as in Cotton and Maler,
 // "Fast and Flexible Difference Constraint Propagation for DPLL(T)", SAT 2006, https://doi.org/10.1007/11814948_19.
 @Suppress("ReturnCount")
 internal class DifferenceGuardPropagation private constructor(
     private val base: DifferenceFragment,
-    stop: Cancellation,
+    stop: ExecutionControl,
 ) {
     private val source = IntArray(base.edges.size) { nodeOf(base, base.edges[it].source, stop) }
     private val target = IntArray(base.edges.size) { nodeOf(base, base.edges[it].target, stop) }
@@ -60,7 +60,7 @@ internal class DifferenceGuardPropagation private constructor(
     fun propagate(fragment: DifferenceFragment, values: LongArray, context: SearchContext): ComponentResult {
         var interrupted = false
         var remaining = POLL_INTERVAL
-        fun token(): Cancellation = context.executionControls.cancellation
+        fun token(): ExecutionControl = context.executionControls.cancellation
         fun nativeStop(): Boolean {
             if (!interrupted) interrupted = context.executionControls.exhausted
             return interrupted
@@ -76,19 +76,12 @@ internal class DifferenceGuardPropagation private constructor(
             remaining -= units.toInt()
             return false
         }
-        val stop = object : Cancellation {
-            override fun isCancelled(): Boolean =
-                if (token().workMeter() != null) forcePoll() else advance(1)
+        val stop = object : ExecutionControl() {
+            override fun isCancelled(): Boolean = advance(1)
 
             override fun deadline() = token().deadline()
-            override fun workMeter() = token().workMeter()
-
-            override fun charge(units: Long) {
-                val owner = token()
-                val metered = owner.workMeter() != null
-                owner.charge(units)
-                if (metered || token().workMeter() != null) forcePoll() else advance(units)
-            }
+            override val accounting get() = token().accounting
+            override val admission get() = admissionFrom(token())
         }
         fun finish(result: ComponentResult): ComponentResult {
             if (forcePoll() || result is ComponentResult.Indeterminate) {
@@ -139,7 +132,7 @@ internal class DifferenceGuardPropagation private constructor(
         return result
     }
 
-    private fun sweep(context: SearchContext, stop: Cancellation, forcePoll: () -> Boolean): ComponentResult {
+    private fun sweep(context: SearchContext, stop: ExecutionControl, forcePoll: () -> Boolean): ComponentResult {
         var heads = 0
         while (cursor < base.numNodes && heads < HEAD_SWEEP_BUDGET) {
             if (stop()) return ComponentResult.Indeterminate
@@ -196,7 +189,7 @@ internal class DifferenceGuardPropagation private constructor(
         edge: Int,
         path: IntArray,
         context: SearchContext,
-        stop: Cancellation,
+        stop: ExecutionControl,
         forcePoll: () -> Boolean,
     ): SearchExplanation? {
         stop.charge(path.size * 2L + 1L)
@@ -226,12 +219,14 @@ internal class DifferenceGuardPropagation private constructor(
     internal companion object {
         // External cancellation is polled every POLL_INTERVAL units; an attached work meter after every debit.
         private const val POLL_INTERVAL = 64
+
         // Each open origin costs one sparse query; matches the finite difference propagator's sweep budget.
         private const val HEAD_SWEEP_BUDGET = 64
+
         // Optional index: declined above this edge count, like the other private difference indexes.
         private const val MAX_EDGES = 65_536
 
-        private fun nodeOf(fragment: DifferenceFragment, endpoint: Int, stop: Cancellation): Int {
+        private fun nodeOf(fragment: DifferenceFragment, endpoint: Int, stop: ExecutionControl): Int {
             if (endpoint == DifferenceFragment.ZERO) return fragment.zeroNode
             if (stop()) return 0
             var lower = 0
@@ -253,7 +248,7 @@ internal class DifferenceGuardPropagation private constructor(
         fun create(
             base: DifferenceFragment,
             numBools: Int,
-            stop: Cancellation,
+            stop: ExecutionControl,
             maxEdges: Int = MAX_EDGES,
         ): DifferenceGuardPropagation? {
             if (base.edges.size > maxEdges) return null

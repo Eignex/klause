@@ -10,7 +10,7 @@ import com.eignex.klause.lowering.LinearFormulaLowering
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.pipeline.ExactSearchRow
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
@@ -19,12 +19,12 @@ private const val MAX_CONDITIONED_LINEAR_CASES = 4096
 
 internal fun PreparedFactorProjections.conditionedLinearSupported(
     index: Int,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): Boolean = conditionedLinearDomains(index, cancellation) != null
 
 private fun PreparedFactorProjections.conditionedLinearDomains(
     index: Int,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): List<Pair<SourceIntId, IntSpan>>? {
     val selected = encoder(index, EncodingTarget.LINEAR)
     if (selected.support != EncoderSupport.CONDITIONED || selected.requiredBooleans.isNotEmpty()) return null
@@ -36,7 +36,9 @@ private fun PreparedFactorProjections.conditionedLinearDomains(
         if (cancellation()) return null
         if (id.index !in 0 until problem.numIntVars || !problem.intBounds.hasLower(id.index) ||
             !problem.intBounds.hasUpper(id.index)
-        ) return null
+        ) {
+            return null
+        }
         val domain = problem.declaredIntDomains.finiteDomain(id.index)
             .spanOrNull(MAX_CONDITIONED_LINEAR_CASES.toLong()) ?: return null
         cases *= domain.size.toLong()
@@ -49,7 +51,7 @@ internal fun PreparedFactorProjections.installConditionedLinearFactor(
     index: Int,
     integerPins: Map<SourceIntId, BigInt>,
     booleanPins: Map<SourceBoolId, Boolean>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     allocator: EncodingRealAllocator,
     onDecline: (EncoderDecline) -> Unit,
 ): List<EncodedTheoryFactor>? {
@@ -103,7 +105,9 @@ internal fun PreparedFactorProjections.installConditionedLinearFactor(
         if (!install(0) || cancellation()) {
             if (cancellation()) onDecline(EncoderDecline.RESOURCE)
             null
-        } else result
+        } else {
+            result
+        }
     } catch (_: LinearEncodingInterrupted) {
         onDecline(EncoderDecline.RESOURCE)
         null

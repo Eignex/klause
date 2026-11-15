@@ -2,11 +2,15 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolveSizeStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ArithmeticExecution
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
@@ -14,10 +18,83 @@ import kotlin.time.TimeSource
 
 class PresolveBudgetTest {
     @Test
+    fun `independent budget stops should not narrow the selected admission owner`() {
+        val budget = PresolveBudget(100)
+        val other = PresolveBudget(100)
+        val source = assertNotNull((budget.slice(80) or other.slice(10)).admission)
+
+        val granted = assertNotNull(source.reserve(100))
+        granted.settle(20)
+
+        assertEquals(80, granted.capacity)
+        assertEquals(20L, budget.spent())
+        assertEquals(0L, other.spent())
+    }
+
+    @Test
+    fun `boolean conjunction should not mask exhaustion of a containing slice`() {
+        val budget = PresolveBudget(100)
+        val control = (budget.slice(80) or budget.slice(10)) and ExecutionControl { false }
+        val execution = ArithmeticExecution(control) { error("allowance") }
+
+        assertFailsWith<IllegalStateException> {
+            execution.operation { repeat(10) { execution.step() } }
+        }
+
+        assertEquals(10L, budget.spent())
+    }
+
+    @Test
+    fun `held slice credit should not establish permanent exhaustion`() {
+        val budget = PresolveBudget(100)
+        val source = assertNotNull((budget.slice(80) or budget.slice(10)).admission)
+        val granted = assertNotNull(source.reserve(100))
+
+        assertNull(source.reserve(1))
+
+        assertFalse(source.exhausted)
+        granted.settle(0)
+        assertEquals(10, assertNotNull(source.reserve(100)).capacity)
+    }
+
+    @Test
+    fun `a composed slice should admit only its tightest remaining credit`() {
+        val budget = PresolveBudget(100)
+        val containing = budget.slice(80)
+        val limited = containing or budget.slice(10)
+        val source = assertNotNull(limited.admission)
+
+        val credit = assertNotNull(source.reserve(100))
+        credit.settle(credit.capacity)
+
+        assertEquals(10, credit.capacity)
+        assertEquals(10L, budget.spent())
+        assertSame(containing.accounting, limited.accounting)
+        assertFalse(containing())
+        assertTrue(limited())
+    }
+    @Test
+    fun `slice admission should return unused credit without renewing its allowance`() {
+        val budget = PresolveBudget(11)
+        val source = assertNotNull(budget.slice(7).admission)
+        val first = assertNotNull(source.reserve(10))
+        assertEquals(7, first.capacity)
+        assertNull(source.reserve(1))
+
+        first.settle(3)
+        val remaining = assertNotNull(source.reserve(10))
+        remaining.settle(remaining.capacity)
+
+        assertEquals(4, remaining.capacity)
+        assertEquals(7L, budget.spent())
+        assertTrue(source.exhausted)
+    }
+
+    @Test
     fun `direct stop observation should reuse only its owning budget token`() {
         val budget = PresolveBudget(100)
         val other = PresolveBudget(100)
-        val token = budget.observeStops(Cancellation { true })
+        val token = budget.observeStops(ExecutionControl { true })
         val first = PresolveInvocation("first", PresolveLane.SOURCE, PresolveSizeStats(0, 0, 0))
         val second = PresolveInvocation("second", PresolveLane.SOURCE, PresolveSizeStats(0, 0, 0))
         budget.activeInvocation = first
@@ -37,7 +114,7 @@ class PresolveBudgetTest {
     fun `stop observation should retain newer predicates with the same meter`() {
         val budget = PresolveBudget(100)
         var stopped = false
-        val token = budget.slice(50) or Cancellation { stopped }
+        val token = budget.slice(50) or ExecutionControl { stopped }
         val observed = budget.observeStops(token)
 
         assertFalse(observed())
@@ -67,11 +144,11 @@ class PresolveBudgetTest {
         var work = 0L
         var laterCalls = 0
         val meter = WorkMeter { work += it }
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = true
             override fun deadline() = deadline
-            override fun workMeter() = meter
-        } or Cancellation { laterCalls++; false }
+            override val accounting get() = meter
+        } or ExecutionControl { laterCalls++; false }
         val observed = budget.observeStops(budget.observeStops(token))
 
         observed.charge(7L)
@@ -79,7 +156,7 @@ class PresolveBudgetTest {
         assertTrue(observed())
         assertEquals(0, laterCalls)
         assertEquals(deadline, observed.deadline())
-        assertSame(meter, observed.workMeter())
+        assertSame(meter, observed.accounting)
         assertEquals(7L, work)
         assertEquals(0L, budget.spent())
     }
@@ -123,7 +200,7 @@ class PresolveBudgetTest {
     @Test
     fun `work charged through a composed slice should land in the budget`() {
         val budget = PresolveBudget(1000)
-        val token = budget.slice(500) or Cancellation.Never
+        val token = budget.slice(500) or ExecutionControl.Never
 
         token.charge(200)
 
@@ -133,8 +210,8 @@ class PresolveBudgetTest {
     @Test
     fun `the phase token should fire once its budget is spent`() {
         val budget = PresolveBudget(100)
-        val phase = budget.orSpent(Cancellation.Never)
-        assertSame(budget.slice(100).workMeter(), phase.workMeter())
+        val phase = budget.orSpent(ExecutionControl.Never)
+        assertSame(budget.slice(100).accounting, phase.accounting)
 
         phase.charge(100)
 
@@ -143,6 +220,6 @@ class PresolveBudgetTest {
 
     @Test
     fun `the phase token should fire when the outer token does`() {
-        assertTrue(PresolveBudget(100).orSpent(Cancellation { true })())
+        assertTrue(PresolveBudget(100).orSpent(ExecutionControl { true })())
     }
 }

@@ -12,7 +12,7 @@ import com.eignex.klause.propagation.RootWorkMeter
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -26,240 +26,376 @@ import kotlin.test.assertTrue
 class PrivateRebuildGenerationTest {
     @Test
     fun `mixed private rows should retain local source parity propagation`() {
-        for (width in 2..3) for (phase in 0..1) for (native in listOf(false, true)) {
-            val columns = if (width == 2) intArrayOf(3, 4) else intArrayOf(2, 3, 4)
-            val rows = listOf(intArrayOf(0, 1, 3) to 0, columns to phase)
-            val clauses = rows.flatMap { (variables, target) ->
-                (0 until (1 shl variables.size)).filter { it.countOneBits() % 2 != target }.map { mask ->
-                    Clause(IntArray(variables.size) { Lit.make(variables[it], mask and (1 shl it) == 0) })
+        for (width in 2..3) {
+            for (phase in 0..1) {
+                for (native in listOf(false, true)) {
+                    val columns = if (width == 2) intArrayOf(3, 4) else intArrayOf(2, 3, 4)
+                    val rows = listOf(intArrayOf(0, 1, 3) to 0, columns to phase)
+                    val clauses = rows.flatMap { (variables, target) ->
+                        (0 until (1 shl variables.size)).filter { it.countOneBits() % 2 != target }.map { mask ->
+                            Clause(IntArray(variables.size) { Lit.make(variables[it], mask and (1 shl it) == 0) })
+                        }
+                    } + Clause(intArrayOf(Lit.make(5, true), Lit.make(6, true)))
+                    val source = Problem(7, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+                    val canonical = PropagationSession(source, nativeSat = native)
+                    val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
+                    val generation = assertNotNull(
+                        PrivateRebuildGeneration.prepare(
+                            canonical,
+                            1_048_576L,
+                            ExecutionControl.Never,
+                            parity = captured,
+                        ),
+                    )
+                    val consumer = PropagationSession(generation.problem)
+
+                    assertIs<PropagationResult.Implied>(consumer.pinBool(3, false))
+                    assertIs<PropagationResult.Implied>(consumer.pinBool(2, false))
+
+                    assertEquals(phase != 0, consumer.boolValue(4))
+                    assertNull(consumer.boolValue(0))
+                    assertNull(consumer.boolValue(1))
+                    for (variable in 0..6) assertNull(canonical.boolValue(variable))
                 }
-            } + Clause(intArrayOf(Lit.make(5, true), Lit.make(6, true)))
-            val source = Problem(7, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
-            val canonical = PropagationSession(source, nativeSat = native)
-            val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
-            val generation = assertNotNull(PrivateRebuildGeneration.prepare(canonical, 1_048_576L,
-                Cancellation.Never, parity = captured))
-            val consumer = PropagationSession(generation.problem)
-
-            assertIs<PropagationResult.Implied>(consumer.pinBool(3, false))
-            assertIs<PropagationResult.Implied>(consumer.pinBool(2, false))
-
-            assertEquals(phase != 0, consumer.boolValue(4))
-            assertNull(consumer.boolValue(0))
-            assertNull(consumer.boolValue(1))
-            for (variable in 0..6) assertNull(canonical.boolValue(variable))
+            }
         }
     }
 
     @Test
     fun `mixed parity views should propagate free choices within a compact byte grant`() {
-        for (phase in 0..1) for (native in listOf(false, true)) {
-            val rows = listOf(intArrayOf(0, 1, 4) to phase, intArrayOf(2, 4, 5) to 1,
-                intArrayOf(3, 5, 6) to phase)
-            val clauses = rows.flatMap { (variables, target) ->
-                (0 until 8).filter { it.countOneBits() % 2 != target }.map { mask ->
-                    Clause(IntArray(3) { Lit.make(variables[it], mask and (1 shl it) == 0) })
-                }
-            } + Clause(intArrayOf(Lit.make(7, true), Lit.make(8, true)))
-            val source = Problem(9, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
-            val canonical = PropagationSession(source, nativeSat = native)
-            val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
-            val generation = assertNotNull(PrivateRebuildGeneration.prepare(canonical, 30_000L,
-                Cancellation.Never, parity = captured))
-
-            for (mask in 0 until 16) {
-                val consumer = PropagationSession(generation.problem)
-                for (variable in 0..3) assertIs<PropagationResult.Implied>(
-                    consumer.pinBool(variable, mask and (1 shl variable) != 0),
+        for (phase in 0..1) {
+            for (native in listOf(false, true)) {
+                val rows = listOf(
+                    intArrayOf(0, 1, 4) to phase,
+                    intArrayOf(2, 4, 5) to 1,
+                    intArrayOf(3, 5, 6) to phase,
                 )
-                assertIs<PropagationResult.Implied>(consumer.pinBool(7, true))
-                assertIs<PropagationResult.Implied>(consumer.pinBool(8, false))
+                val clauses = rows.flatMap { (variables, target) ->
+                    (0 until 8).filter { it.countOneBits() % 2 != target }.map { mask ->
+                        Clause(IntArray(3) { Lit.make(variables[it], mask and (1 shl it) == 0) })
+                    }
+                } + Clause(intArrayOf(Lit.make(7, true), Lit.make(8, true)))
+                val source = Problem(9, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+                val canonical = PropagationSession(source, nativeSat = native)
+                val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
+                val generation = assertNotNull(
+                    PrivateRebuildGeneration.prepare(
+                        canonical,
+                        30_000L,
+                        ExecutionControl.Never,
+                        parity = captured,
+                    ),
+                )
 
-                val first = (mask and 1 != 0) xor (mask and 2 != 0) xor (phase != 0)
-                val second = first xor (mask and 4 != 0) xor true
-                val third = second xor (mask and 8 != 0) xor (phase != 0)
-                assertEquals(first, consumer.boolValue(4))
-                assertEquals(second, consumer.boolValue(5))
-                assertEquals(third, consumer.boolValue(6))
-                assertTrue(clauses.all { clause ->
-                    clause.literals.any { Lit.evaluate(it, assertNotNull(consumer.boolValue(Lit.variable(it)))) }
-                })
+                for (mask in 0 until 16) {
+                    val consumer = PropagationSession(generation.problem)
+                    for (variable in 0..3) {
+                        assertIs<PropagationResult.Implied>(
+                            consumer.pinBool(variable, mask and (1 shl variable) != 0),
+                        )
+                    }
+                    assertIs<PropagationResult.Implied>(consumer.pinBool(7, true))
+                    assertIs<PropagationResult.Implied>(consumer.pinBool(8, false))
+
+                    val first = (mask and 1 != 0) xor (mask and 2 != 0) xor (phase != 0)
+                    val second = first xor (mask and 4 != 0) xor true
+                    val third = second xor (mask and 8 != 0) xor (phase != 0)
+                    assertEquals(first, consumer.boolValue(4))
+                    assertEquals(second, consumer.boolValue(5))
+                    assertEquals(third, consumer.boolValue(6))
+                    assertTrue(
+                        clauses.all { clause ->
+                            clause.literals.any {
+                                Lit.evaluate(
+                                    it,
+                                    assertNotNull(
+                                        consumer.boolValue(
+                                            Lit
+                                                .variable(it),
+                                        ),
+                                    ),
+                                )
+                            }
+                        },
+                    )
+                }
+                assertTrue(generation.modeledBytes <= 30_000L)
+                for (variable in 0..8) assertNull(canonical.boolValue(variable))
             }
-            assertTrue(generation.modeledBytes <= 30_000L)
-            for (variable in 0..8) assertNull(canonical.boolValue(variable))
         }
     }
 
     @Test
     fun `wide free coordinate expressions should retain bounded mixed propagation`() {
-        for (phase in 0..1) for (native in listOf(false, true)) {
-            val clauses = (0 until 65).flatMap { row ->
-                val variables = if (row == 0) intArrayOf(0, 1, 66)
-                else intArrayOf(row + 1, row + 65, row + 66)
-                (0 until 8).filter { it.countOneBits() % 2 != phase }.map { mask ->
-                    Clause(IntArray(3) { Lit.make(variables[it], mask and (1 shl it) == 0) })
-                }
-            } + Clause(intArrayOf(Lit.make(131, true), Lit.make(132, true)))
-            val source = Problem(133, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
-            val canonical = PropagationSession(source, nativeSat = native)
-            val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
-            val generation = assertNotNull(PrivateRebuildGeneration.prepare(canonical, 1_048_576L,
-                Cancellation.Never, parity = captured))
-            val consumer = PropagationSession(generation.problem)
+        for (phase in 0..1) {
+            for (native in listOf(false, true)) {
+                val clauses = (0 until 65).flatMap { row ->
+                    val variables = if (row == 0) {
+                        intArrayOf(0, 1, 66)
+                    } else {
+                        intArrayOf(row + 1, row + 65, row + 66)
+                    }
+                    (0 until 8).filter { it.countOneBits() % 2 != phase }.map { mask ->
+                        Clause(IntArray(3) { Lit.make(variables[it], mask and (1 shl it) == 0) })
+                    }
+                } + Clause(intArrayOf(Lit.make(131, true), Lit.make(132, true)))
+                val source = Problem(133, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+                val canonical = PropagationSession(source, nativeSat = native)
+                val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
+                val generation = assertNotNull(
+                    PrivateRebuildGeneration.prepare(
+                        canonical,
+                        1_048_576L,
+                        ExecutionControl.Never,
+                        parity = captured,
+                    ),
+                )
+                val consumer = PropagationSession(generation.problem)
 
-            for (variable in 0..65) assertIs<PropagationResult.Implied>(consumer.pinBool(variable, false))
-            assertIs<PropagationResult.Implied>(consumer.pinBool(131, true))
-            assertIs<PropagationResult.Implied>(consumer.pinBool(132, false))
+                for (variable in 0..65) assertIs<PropagationResult.Implied>(consumer.pinBool(variable, false))
+                assertIs<PropagationResult.Implied>(consumer.pinBool(131, true))
+                assertIs<PropagationResult.Implied>(consumer.pinBool(132, false))
 
-            for (row in 0 until 65) assertEquals(phase != 0 && row % 2 == 0, consumer.boolValue(row + 66))
-            assertTrue(clauses.all { clause ->
-                clause.literals.any { Lit.evaluate(it, assertNotNull(consumer.boolValue(Lit.variable(it)))) }
-            })
-            for (variable in 0 until 133) assertNull(canonical.boolValue(variable))
+                for (row in 0 until 65) assertEquals(phase != 0 && row % 2 == 0, consumer.boolValue(row + 66))
+                assertTrue(
+                    clauses.all { clause ->
+                        clause.literals.any { Lit.evaluate(it, assertNotNull(consumer.boolValue(Lit.variable(it)))) }
+                    },
+                )
+                for (variable in 0 until 133) assertNull(canonical.boolValue(variable))
+            }
         }
     }
 
     @Test
     fun `mixed parity rows should retain short expanded deductions`() {
-        for (phase in 0..1) for (native in listOf(false, true)) {
-            val rows = listOf(intArrayOf(0, 1, 5) to phase, intArrayOf(0, 5, 6) to 0,
-                intArrayOf(2, 6, 7) to 0, intArrayOf(3, 7, 8) to 0, intArrayOf(4, 8, 9) to 0)
-            val clauses = rows.flatMap { (variables, target) ->
-                (0 until 8).filter { it.countOneBits() % 2 != target }.map { mask ->
-                    Clause(IntArray(3) { Lit.make(variables[it], mask and (1 shl it) == 0) })
-                }
-            } + Clause(intArrayOf(Lit.make(10, true), Lit.make(11, true)))
-            val source = Problem(12, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
-            val canonical = PropagationSession(source, nativeSat = native)
-            val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
-            val generation = assertNotNull(PrivateRebuildGeneration.prepare(canonical, 1_048_576L,
-                Cancellation.Never, parity = captured))
-            val consumer = PropagationSession(generation.problem)
+        for (phase in 0..1) {
+            for (native in listOf(false, true)) {
+                val rows = listOf(
+                    intArrayOf(0, 1, 5) to phase,
+                    intArrayOf(0, 5, 6) to 0,
+                    intArrayOf(2, 6, 7) to 0,
+                    intArrayOf(3, 7, 8) to 0,
+                    intArrayOf(4, 8, 9) to 0,
+                )
+                val clauses = rows.flatMap { (variables, target) ->
+                    (0 until 8).filter { it.countOneBits() % 2 != target }.map { mask ->
+                        Clause(IntArray(3) { Lit.make(variables[it], mask and (1 shl it) == 0) })
+                    }
+                } + Clause(intArrayOf(Lit.make(10, true), Lit.make(11, true)))
+                val source = Problem(12, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+                val canonical = PropagationSession(source, nativeSat = native)
+                val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
+                val generation = assertNotNull(
+                    PrivateRebuildGeneration.prepare(
+                        canonical,
+                        1_048_576L,
+                        ExecutionControl.Never,
+                        parity = captured,
+                    ),
+                )
+                val consumer = PropagationSession(generation.problem)
 
-            assertIs<PropagationResult.Implied>(consumer.pinBool(1, false))
+                assertIs<PropagationResult.Implied>(consumer.pinBool(1, false))
 
-            assertEquals(phase != 0, consumer.boolValue(6))
-            assertNull(consumer.boolValue(0))
-            assertNull(consumer.boolValue(5))
-            for (variable in 0 until 12) assertNull(canonical.boolValue(variable))
+                assertEquals(phase != 0, consumer.boolValue(6))
+                assertNull(consumer.boolValue(0))
+                assertNull(consumer.boolValue(5))
+                for (variable in 0 until 12) assertNull(canonical.boolValue(variable))
+            }
         }
     }
 
     @Test
     fun `joint private rows should expose free coordinate cancellations`() {
-        for (phase in 0..1) for (native in listOf(false, true)) {
-            val rows = listOf(intArrayOf(6, 1, 2) to 0, intArrayOf(8, 6, 0) to 0,
-                intArrayOf(5, 3, 4) to 0, intArrayOf(7, 5, 0) to 0, intArrayOf(9, 8, 7) to phase)
-            val clauses = rows.flatMap { (variables, target) ->
-                (0 until 8).filter { it.countOneBits() % 2 != target }.map { mask ->
-                    Clause(IntArray(3) { Lit.make(variables[it], mask and (1 shl it) == 0) })
+        for (phase in 0..1) {
+            for (native in listOf(false, true)) {
+                val rows = listOf(
+                    intArrayOf(6, 1, 2) to 0,
+                    intArrayOf(8, 6, 0) to 0,
+                    intArrayOf(5, 3, 4) to 0,
+                    intArrayOf(7, 5, 0) to 0,
+                    intArrayOf(9, 8, 7) to phase,
+                )
+                val clauses = rows.flatMap { (variables, target) ->
+                    (0 until 8).filter { it.countOneBits() % 2 != target }.map { mask ->
+                        Clause(IntArray(3) { Lit.make(variables[it], mask and (1 shl it) == 0) })
+                    }
+                } + Clause(intArrayOf(Lit.make(10, true), Lit.make(11, true)))
+                val source = Problem(12, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+                val canonical = PropagationSession(source, nativeSat = native)
+                val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
+                val generation = assertNotNull(
+                    PrivateRebuildGeneration.prepare(
+                        canonical,
+                        1_048_576L,
+                        ExecutionControl.Never,
+                        parity = captured,
+                    ),
+                )
+                val consumer = PropagationSession(generation.problem)
+
+                for ((variable, value) in listOf(1 to false, 2 to true, 3 to false, 4 to true)) {
+                    assertIs<PropagationResult.Implied>(consumer.pinBool(variable, value))
                 }
-            } + Clause(intArrayOf(Lit.make(10, true), Lit.make(11, true)))
-            val source = Problem(12, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
-            val canonical = PropagationSession(source, nativeSat = native)
-            val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
-            val generation = assertNotNull(PrivateRebuildGeneration.prepare(canonical, 1_048_576L,
-                Cancellation.Never, parity = captured))
-            val consumer = PropagationSession(generation.problem)
 
-            for ((variable, value) in listOf(1 to false, 2 to true, 3 to false, 4 to true)) {
-                assertIs<PropagationResult.Implied>(consumer.pinBool(variable, value))
+                assertEquals(phase != 0, consumer.boolValue(9))
+                assertNull(consumer.boolValue(0))
+                assertNull(canonical.boolValue(9))
             }
-
-            assertEquals(phase != 0, consumer.boolValue(9))
-            assertNull(consumer.boolValue(0))
-            assertNull(canonical.boolValue(9))
         }
     }
 
     @Test
     fun `learned equivalences should open a reconstructable private consumer without root pins`() {
-        for (replacement in listOf(2, 3)) for (native in listOf(false, true)) {
-            val source = Problem(4, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(1, replacement, 4)), Clause(intArrayOf(1, replacement, 5)),
-                Clause(intArrayOf(0, Lit.negate(replacement), 6)), Clause(intArrayOf(0, Lit.negate(replacement), 7)),
-            )).bake()
-            val session = PropagationSession(source, nativeSat = native)
-            session.addLearnedClause(Clause(intArrayOf(1, replacement)), 2)
-            session.addLearnedClause(Clause(intArrayOf(0, Lit.negate(replacement))), 2)
-            val captured = assertNotNull(PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true })
+        for (replacement in listOf(2, 3)) {
+            for (native in listOf(false, true)) {
+                val source = Problem(
+                    4,
+                    0,
+                    emptyArray(),
+                    arrayOf(
+                        Clause(intArrayOf(1, replacement, 4)),
+                        Clause(intArrayOf(1, replacement, 5)),
+                        Clause(intArrayOf(0, Lit.negate(replacement), 6)),
+                        Clause(intArrayOf(0, Lit.negate(replacement), 7)),
+                    ),
+                ).bake()
+                val session = PropagationSession(source, nativeSat = native)
+                session.addLearnedClause(Clause(intArrayOf(1, replacement)), 2)
+                session.addLearnedClause(Clause(intArrayOf(0, Lit.negate(replacement))), 2)
+                val captured = assertNotNull(PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true })
 
-            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
-                Cancellation.Never, learnedBinary = captured))
-            val reduced = assertIs<SolveResult.Sat>(BacktrackSolver(generation.problem).solve(
-                BacktrackParams(nativeSat = native),
-            ))
-            val point = generation.reconstruct(reduced.assignment)
+                val generation = assertNotNull(
+                    PrivateRebuildGeneration.prepare(
+                        session,
+                        1_048_576L,
+                        ExecutionControl.Never,
+                        learnedBinary = captured,
+                    ),
+                )
+                val reduced = assertIs<SolveResult.Sat>(
+                    BacktrackSolver(generation.problem).solve(
+                        BacktrackParams(nativeSat = native),
+                    ),
+                )
+                val point = generation.reconstruct(reduced.assignment)
 
-            assertEquals(1, generation.equivalenceMerges)
-            assertNotSame(source, generation.problem)
-            assertTrue(source.factors.all { factor ->
-                (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
-            })
-            assertNull(session.boolValue(0))
-            assertEquals(4, source.numFactors)
+                assertEquals(1, generation.equivalenceMerges)
+                assertNotSame(source, generation.problem)
+                assertTrue(
+                    source.factors.all { factor ->
+                        (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
+                    },
+                )
+                assertNull(session.boolValue(0))
+                assertEquals(4, source.numFactors)
+            }
         }
     }
 
     @Test
     fun `owned equivalence premises should survive canonical forgetting`() {
-        for (replacement in listOf(2, 3)) for (native in listOf(false, true)) {
-            val source = Problem(4, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(1, replacement, 4)), Clause(intArrayOf(1, replacement, 5)),
-                Clause(intArrayOf(0, Lit.negate(replacement), 6)), Clause(intArrayOf(0, Lit.negate(replacement), 7)),
-            )).bake()
-            val session = PropagationSession(source, nativeSat = native)
-            session.addLearnedClause(Clause(intArrayOf(1, replacement)), 2)
-            session.addLearnedClause(Clause(intArrayOf(0, Lit.negate(replacement))), 2)
-            val captured = assertNotNull(PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true })
-            session.forgetLearnedClauses { _, _ -> false }
+        for (replacement in listOf(2, 3)) {
+            for (native in listOf(false, true)) {
+                val source = Problem(
+                    4,
+                    0,
+                    emptyArray(),
+                    arrayOf(
+                        Clause(intArrayOf(1, replacement, 4)),
+                        Clause(intArrayOf(1, replacement, 5)),
+                        Clause(intArrayOf(0, Lit.negate(replacement), 6)),
+                        Clause(intArrayOf(0, Lit.negate(replacement), 7)),
+                    ),
+                ).bake()
+                val session = PropagationSession(source, nativeSat = native)
+                session.addLearnedClause(Clause(intArrayOf(1, replacement)), 2)
+                session.addLearnedClause(Clause(intArrayOf(0, Lit.negate(replacement))), 2)
+                val captured = assertNotNull(PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true })
+                session.forgetLearnedClauses { _, _ -> false }
 
-            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
-                Cancellation.Never, learnedBinary = captured))
-            val reduced = assertIs<SolveResult.Sat>(BacktrackSolver(generation.problem).solve(
-                BacktrackParams(nativeSat = native),
-            ))
-            val point = generation.reconstruct(reduced.assignment)
+                val generation = assertNotNull(
+                    PrivateRebuildGeneration.prepare(
+                        session,
+                        1_048_576L,
+                        ExecutionControl.Never,
+                        learnedBinary = captured,
+                    ),
+                )
+                val reduced = assertIs<SolveResult.Sat>(
+                    BacktrackSolver(generation.problem).solve(
+                        BacktrackParams(nativeSat = native),
+                    ),
+                )
+                val point = generation.reconstruct(reduced.assignment)
 
-            assertEquals(0, session.learnedClauseCount)
-            assertTrue(source.factors.all { factor ->
-                (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
-            })
+                assertEquals(0, session.learnedClauseCount)
+                assertTrue(
+                    source.factors.all { factor ->
+                        (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
+                    },
+                )
+            }
         }
     }
 
     @Test
     fun `new root pins should withhold an earlier learned equivalence capture`() {
-        val source = Problem(4, 0, emptyArray(), arrayOf(
-            Clause(intArrayOf(1, 2, 4)), Clause(intArrayOf(1, 2, 5)),
-            Clause(intArrayOf(0, 3, 6)), Clause(intArrayOf(0, 3, 7)),
-            Clause(intArrayOf(0, 4, 6)), Clause(intArrayOf(0, 4, 7)),
-            Clause(intArrayOf(0, 5, 6)), Clause(intArrayOf(0, 5, 7)),
-        )).bake()
+        val source = Problem(
+            4,
+            0,
+            emptyArray(),
+            arrayOf(
+                Clause(intArrayOf(1, 2, 4)),
+                Clause(intArrayOf(1, 2, 5)),
+                Clause(intArrayOf(0, 3, 6)),
+                Clause(intArrayOf(0, 3, 7)),
+                Clause(intArrayOf(0, 4, 6)),
+                Clause(intArrayOf(0, 4, 7)),
+                Clause(intArrayOf(0, 5, 6)),
+                Clause(intArrayOf(0, 5, 7)),
+            ),
+        ).bake()
         val session = PropagationSession(source)
         session.addLearnedClause(Clause(intArrayOf(1, 2)), 2)
         session.addLearnedClause(Clause(intArrayOf(0, 3)), 2)
         val captured = assertNotNull(PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true })
         session.addLearnedClause(Clause(intArrayOf(0)), 1)
 
-        val generation = PrivateRebuildGeneration.prepare(session, 1_048_576L,
-            Cancellation.Never, learnedBinary = captured)
+        val generation = PrivateRebuildGeneration.prepare(
+            session,
+            1_048_576L,
+            ExecutionControl.Never,
+            learnedBinary = captured,
+        )
 
         assertNull(generation)
     }
 
     @Test
     fun `matching dimensions should not grant another source learned equivalence authority`() {
-        val source = Problem(3, 0, emptyArray(), arrayOf(
-            Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 3, 4)), Clause(intArrayOf(0, 3, 5)),
-        )).bake()
+        val source = Problem(
+            3,
+            0,
+            emptyArray(),
+            arrayOf(
+                Clause(intArrayOf(1, 2)),
+                Clause(intArrayOf(0, 3, 4)),
+                Clause(intArrayOf(0, 3, 5)),
+            ),
+        ).bake()
         val session = PropagationSession(source)
         session.addLearnedClause(Clause(intArrayOf(0, 3)), 2)
         val captured = assertNotNull(PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true })
         val unrelated = Problem(3, 0, emptyArray(), source.factors.copyOf()).bake()
 
-        val generation = PrivateRebuildGeneration.prepare(PropagationSession(unrelated), 1_048_576L,
-            Cancellation.Never, learnedBinary = captured)
+        val generation = PrivateRebuildGeneration.prepare(
+            PropagationSession(unrelated),
+            1_048_576L,
+            ExecutionControl.Never,
+            learnedBinary = captured,
+        )
 
         assertNull(generation)
     }
@@ -267,16 +403,31 @@ class PrivateRebuildGenerationTest {
     @Test
     fun `global root progress should produce reconstructable private eliminations`() {
         for (native in listOf(false, true)) {
-            val source = Problem(5, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 4)),
-                Clause(intArrayOf(0, 6)), Clause(intArrayOf(0, 6, 2)),
-                Clause(intArrayOf(1, 6)), Clause(intArrayOf(1, 6, 4)),
-                Clause(intArrayOf(6, 8)), Clause(intArrayOf(6, 9)),
-            )).bake()
+            val source = Problem(
+                5,
+                0,
+                emptyArray(),
+                arrayOf(
+                    Clause(intArrayOf(0, 2)),
+                    Clause(intArrayOf(1, 4)),
+                    Clause(intArrayOf(0, 6)),
+                    Clause(intArrayOf(0, 6, 2)),
+                    Clause(intArrayOf(1, 6)),
+                    Clause(intArrayOf(1, 6, 4)),
+                    Clause(intArrayOf(6, 8)),
+                    Clause(intArrayOf(6, 9)),
+                ),
+            ).bake()
             val session = PropagationSession(source, nativeSat = native)
             session.addRootDerivedClause(Clause(intArrayOf(6)), 1, OWN_ORIGIN, false)
 
-            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L, Cancellation.Never))
+            val generation = assertNotNull(
+                PrivateRebuildGeneration.prepare(
+                    session,
+                    1_048_576L,
+                    ExecutionControl.Never,
+                ),
+            )
             val reduced = assertIs<SolveResult.Sat>(BacktrackSolver(generation.problem).solve())
             val point = generation.reconstruct(reduced.assignment)
 
@@ -284,9 +435,11 @@ class PrivateRebuildGenerationTest {
             assertTrue(generation.eliminated > 0)
             assertTrue(generation.problem.numFactors < source.numFactors)
             assertTrue(point.boolValue(3))
-            assertTrue(source.factors.all { factor ->
-                (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
-            })
+            assertTrue(
+                source.factors.all { factor ->
+                    (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
+                },
+            )
             assertEquals(null, session.boolValue(0))
         }
     }
@@ -294,80 +447,131 @@ class PrivateRebuildGenerationTest {
     @Test
     fun `unchanged clauses should remain shared and unmodified in a private consumer`() {
         for (native in listOf(false, true)) {
-            val source = Problem(6, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(3, 5, 6)), Clause(intArrayOf(0, 2)),
-                Clause(intArrayOf(3, 5, 7)), Clause(intArrayOf(1, 2)),
-                Clause(intArrayOf(2, 4, 6)), Clause(intArrayOf(2, 4, 7)),
-                Clause(intArrayOf(8, 10)), Clause(intArrayOf(8, 11)),
-            )).bake()
+            val source = Problem(
+                6,
+                0,
+                emptyArray(),
+                arrayOf(
+                    Clause(intArrayOf(3, 5, 6)),
+                    Clause(intArrayOf(0, 2)),
+                    Clause(intArrayOf(3, 5, 7)),
+                    Clause(intArrayOf(1, 2)),
+                    Clause(intArrayOf(2, 4, 6)),
+                    Clause(intArrayOf(2, 4, 7)),
+                    Clause(intArrayOf(8, 10)),
+                    Clause(intArrayOf(8, 11)),
+                ),
+            ).bake()
             val unchanged = source.factors.take(6).map { it as Clause }
                 .filter { clause -> clause.literals.none { Lit.variable(it) == 0 } }
             val literals = unchanged.map { it.literals.copyOf() }
             val session = PropagationSession(source, nativeSat = native)
             session.addRootDerivedClause(Clause(intArrayOf(8)), 1, OWN_ORIGIN, false)
-            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L, Cancellation.Never))
+            val generation = assertNotNull(
+                PrivateRebuildGeneration.prepare(
+                    session,
+                    1_048_576L,
+                    ExecutionControl.Never,
+                ),
+            )
 
-            val reduced = assertIs<SolveResult.Sat>(BacktrackSolver(generation.problem).solve(
-                BacktrackParams(nativeSat = native),
-            ))
+            val reduced = assertIs<SolveResult.Sat>(
+                BacktrackSolver(generation.problem).solve(
+                    BacktrackParams(nativeSat = native),
+                ),
+            )
             val point = generation.reconstruct(reduced.assignment)
 
             for (index in unchanged.indices) {
                 assertTrue(generation.problem.factors.any { it === unchanged[index] })
                 assertContentEquals(literals[index], unchanged[index].literals)
             }
-            assertTrue(source.factors.all { factor ->
-                (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
-            })
+            assertTrue(
+                source.factors.all { factor ->
+                    (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
+                },
+            )
         }
     }
 
     @Test
     fun `translated learning should enter a reconstructed private consumer`() {
         for (native in listOf(false, true)) {
-            val source = Problem(6, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(3, 5, 6)), Clause(intArrayOf(0, 2)),
-                Clause(intArrayOf(3, 5, 7)), Clause(intArrayOf(1, 2)),
-                Clause(intArrayOf(2, 4, 6)), Clause(intArrayOf(2, 4, 7)),
-                Clause(intArrayOf(8, 10)), Clause(intArrayOf(8, 11)),
-            )).bake()
+            val source = Problem(
+                6,
+                0,
+                emptyArray(),
+                arrayOf(
+                    Clause(intArrayOf(3, 5, 6)),
+                    Clause(intArrayOf(0, 2)),
+                    Clause(intArrayOf(3, 5, 7)),
+                    Clause(intArrayOf(1, 2)),
+                    Clause(intArrayOf(2, 4, 6)),
+                    Clause(intArrayOf(2, 4, 7)),
+                    Clause(intArrayOf(8, 10)),
+                    Clause(intArrayOf(8, 11)),
+                ),
+            ).bake()
             val session = PropagationSession(source, nativeSat = native)
             session.addRootDerivedClause(Clause(intArrayOf(8)), 1, OWN_ORIGIN, false)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
 
-            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L, Cancellation.Never))
-            val reduced = assertIs<SolveResult.Sat>(BacktrackSolver(generation.problem).solve(
-                BacktrackParams(nativeSat = native),
-            ))
+            val generation = assertNotNull(
+                PrivateRebuildGeneration.prepare(
+                    session,
+                    1_048_576L,
+                    ExecutionControl.Never,
+                ),
+            )
+            val reduced = assertIs<SolveResult.Sat>(
+                BacktrackSolver(generation.problem).solve(
+                    BacktrackParams(nativeSat = native),
+                ),
+            )
             val point = generation.reconstruct(reduced.assignment)
 
             assertEquals(1, generation.warmClauses.translated)
-            assertTrue(source.factors.all { factor ->
-                (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
-            })
+            assertTrue(
+                source.factors.all { factor ->
+                    (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
+                },
+            )
         }
     }
 
     @Test
     fun `completed eliminations should remain consumable when the local pass allowance expires`() {
-        val source = Problem(7, 0, emptyArray(), listOf(
-            Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 3)),
-        ) + List(16) { Clause(intArrayOf(4, 6, 8)) } +
-            List(16) { Clause(intArrayOf(5, 6, 10)) } +
-            List(16) { Clause(intArrayOf(4, 7, 9)) } +
-            List(16) { Clause(intArrayOf(5, 7, 11)) } +
-            List(128) { Clause(intArrayOf(12, 4, 6)) }).bake()
+        val source = Problem(
+            7,
+            0,
+            emptyArray(),
+            listOf(
+                Clause(intArrayOf(0, 2)),
+                Clause(intArrayOf(1, 3)),
+            ) + List(16) { Clause(intArrayOf(4, 6, 8)) } +
+                List(16) { Clause(intArrayOf(5, 6, 10)) } +
+                List(16) { Clause(intArrayOf(4, 7, 9)) } +
+                List(16) { Clause(intArrayOf(5, 7, 11)) } +
+                List(128) { Clause(intArrayOf(12, 4, 6)) },
+        ).bake()
 
-        val generation = assertNotNull(PrivateRebuildGeneration.prepare(
-            PropagationSession(source), 1_048_576L, Cancellation.Never, passWork = { 17_000L },
-        ))
+        val generation = assertNotNull(
+            PrivateRebuildGeneration.prepare(
+                PropagationSession(source),
+                1_048_576L,
+                ExecutionControl.Never,
+                passWork = { 17_000L },
+            ),
+        )
         val point = generation.reconstruct(Sample(BooleanArray(7) { it == 2 || it == 3 }, longArrayOf()))
 
         assertTrue(generation.passStopped)
         assertTrue(generation.eliminated > 0)
-        assertTrue(source.factors.all { factor ->
-            (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
-        })
+        assertTrue(
+            source.factors.all { factor ->
+                (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
+            },
+        )
     }
 
     @Test
@@ -375,10 +579,13 @@ class PrivateRebuildGenerationTest {
         for (scoped in listOf(false, true)) {
             val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()
             val session = PropagationSession(source)
-            if (scoped) session.addLearnedClause(Clause(intArrayOf(1)), 1, permanent = true)
-            else session.seed(Assumptions.None.withBool(0, false))
+            if (scoped) {
+                session.addLearnedClause(Clause(intArrayOf(1)), 1, permanent = true)
+            } else {
+                session.seed(Assumptions.None.withBool(0, false))
+            }
 
-            val generation = PrivateRebuildGeneration.prepare(session, 1_048_576L, Cancellation.Never)
+            val generation = PrivateRebuildGeneration.prepare(session, 1_048_576L, ExecutionControl.Never)
 
             assertNull(generation)
         }
@@ -386,7 +593,7 @@ class PrivateRebuildGenerationTest {
 
     @Test
     fun `insufficient memory or cancellation should retain the established source`() {
-        for ((bytes, cancellation) in listOf(0L to Cancellation.Never, 1_048_576L to Cancellation { true })) {
+        for ((bytes, cancellation) in listOf(0L to ExecutionControl.Never, 1_048_576L to ExecutionControl { true })) {
             val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()
             val session = PropagationSession(source)
 
@@ -401,11 +608,19 @@ class PrivateRebuildGenerationTest {
     @Test
     fun `cancellation during private baking should withhold the generation`() {
         for (duringPropagation in listOf(false, true)) {
-            val source = Problem(4, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 2)),
-                Clause(intArrayOf(2, 4, 6)), Clause(intArrayOf(2, 4, 7)),
-                Clause(intArrayOf(3, 5, 6)), Clause(intArrayOf(3, 5, 7)),
-            )).bake()
+            val source = Problem(
+                4,
+                0,
+                emptyArray(),
+                arrayOf(
+                    Clause(intArrayOf(0, 2)),
+                    Clause(intArrayOf(1, 2)),
+                    Clause(intArrayOf(2, 4, 6)),
+                    Clause(intArrayOf(2, 4, 7)),
+                    Clause(intArrayOf(3, 5, 6)),
+                    Clause(intArrayOf(3, 5, 7)),
+                ),
+            ).bake()
             var stopped = false
             var constructions = 0
             val meter = object : RootWorkMeter {
@@ -418,9 +633,9 @@ class PrivateRebuildGenerationTest {
                     if (!duringPropagation) stopped = true
                 }
             }
-            val token = object : Cancellation {
+            val token = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = stopped
-                override fun workMeter(): RootWorkMeter = meter
+                override val accounting: RootWorkMeter get() = meter
             }
 
             val generation = PrivateRebuildGeneration.prepare(PropagationSession(source), 1_048_576L, token)
@@ -435,9 +650,13 @@ class PrivateRebuildGenerationTest {
     @Test
     fun `matching dimensions should not grant another model reconstruction authority`() {
         val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()
-        val generation = assertNotNull(PrivateRebuildGeneration.prepare(
-            PropagationSession(source), 1_048_576L, Cancellation.Never,
-        ))
+        val generation = assertNotNull(
+            PrivateRebuildGeneration.prepare(
+                PropagationSession(source),
+                1_048_576L,
+                ExecutionControl.Never,
+            ),
+        )
         val unrelated = Problem(2, 0, emptyArray(), emptyArray()).bake()
 
         assertFailsWith<IllegalArgumentException> {

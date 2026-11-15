@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -26,7 +26,7 @@ class ExactPointFeasibleTest {
                 assertNotNull(state.toWorkingModel()),
                 doubleArrayOf(1.0 / 2_000_003.0, 1.0 / 2_000_029.0),
                 LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
-                Cancellation.Never,
+                ExecutionControl.Never,
             )
 
             assertEquals(0, result.repairs)
@@ -68,7 +68,7 @@ class ExactPointFeasibleTest {
                 model,
                 values,
                 LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
-                Cancellation.Never,
+                ExecutionControl.Never,
             )
 
             assertEquals(2, result.repairs)
@@ -98,7 +98,7 @@ class ExactPointFeasibleTest {
                 assertNotNull(state.toWorkingModel()),
                 doubleArrayOf(0.5, 0.625, 0.625),
                 LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
-                Cancellation.Never,
+                ExecutionControl.Never,
             )
 
             assertNull(result.witness)
@@ -120,7 +120,7 @@ class ExactPointFeasibleTest {
                 assertNotNull(state.toWorkingModel()),
                 doubleArrayOf(0.5),
                 LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
-                Cancellation.Never,
+                ExecutionControl.Never,
             )
 
             assertNull(result.witness)
@@ -140,7 +140,7 @@ class ExactPointFeasibleTest {
                 assertNotNull(state.toWorkingModel()),
                 doubleArrayOf(1.0),
                 LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
-                Cancellation.Never,
+                ExecutionControl.Never,
             )
 
             assertNull(result.witness)
@@ -160,7 +160,7 @@ class ExactPointFeasibleTest {
                 assertNotNull(state.toWorkingModel()),
                 doubleArrayOf(0.5),
                 request,
-                Cancellation { true },
+                ExecutionControl { true },
             )
 
             assertNull(first.witness)
@@ -181,7 +181,7 @@ class ExactPointFeasibleTest {
                 assertNotNull(state.toWorkingModel()),
                 doubleArrayOf(0.5),
                 LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits(maxBits = 24)),
-                Cancellation.Never,
+                ExecutionControl.Never,
             )
 
             assertNull(result.witness)
@@ -211,7 +211,7 @@ class ExactPointFeasibleTest {
                 model,
                 doubleArrayOf(0.5),
                 LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
-                Cancellation.Never,
+                ExecutionControl.Never,
             )
 
             val point = assertNotNull(result.witness)

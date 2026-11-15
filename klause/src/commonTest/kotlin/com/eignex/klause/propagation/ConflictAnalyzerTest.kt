@@ -8,7 +8,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -67,7 +67,7 @@ class ConflictAnalyzerTest {
         state.reasonPreflight = true
         check(state.pinBoolAsDecision(0, true))
         check(state.pinBoolAsDecision(1, true))
-        state.finiteWork.cancellation = Cancellation { true }
+        state.finiteWork.cancellation = ExecutionControl { true }
 
         val result = state.conflictAnalyzer.analyzeConflictClause(clause)
 
@@ -152,7 +152,7 @@ class ConflictAnalyzerTest {
             state.currentFactor = 0
             check(state.factorAt(0).propagate(state, 0))
             var polls = 0
-            state.finiteWork.cancellation = Cancellation { ++polls >= stop }
+            state.finiteWork.cancellation = ExecutionControl { ++polls >= stop }
 
             val result = state.conflictAnalyzer.analyzeConflictClause(
                 intArrayOf(Lit.make(x, true), Lit.make(b, false), Lit.make(0, false)))

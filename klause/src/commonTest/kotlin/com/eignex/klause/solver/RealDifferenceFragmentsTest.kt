@@ -26,7 +26,7 @@ import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.result.PresolvePreparationStage
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -78,7 +78,7 @@ class RealDifferenceFragmentsTest {
                 strict = true, activator = 0),
         ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
             realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY }).bake()
-            .withRealDifferenceSystem(Cancellation.Never)
+            .withRealDifferenceSystem(ExecutionControl.Never)
         val state = PropagationState(problem, Assumptions.None)
         val id = problem.numFactors - 1
 
@@ -97,7 +97,7 @@ class RealDifferenceFragmentsTest {
                 LinearOp.LE, BigFraction.ZERO, strict = true, activator = 0),
         ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY)).bake()
-            .withRealDifferenceSystem(Cancellation.Never)
+            .withRealDifferenceSystem(ExecutionControl.Never)
         val state = PropagationState(problem, Assumptions.None)
         val id = problem.numFactors - 1
         val propagator = PropagationProblem(problem).propagators[id]
@@ -117,7 +117,7 @@ class RealDifferenceFragmentsTest {
             RealElement(0, 0, intArrayOf(1, 2), indexOffset = 0),
         ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
             realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY }).bake()
-            .withRealDifferenceSystem(Cancellation.Never)
+            .withRealDifferenceSystem(ExecutionControl.Never)
         val state = PropagationState(problem, Assumptions.None)
         assertTrue(state.pinLit(Lit.make(0, true)))
         val id = problem.numFactors - 1
@@ -140,7 +140,7 @@ class RealDifferenceFragmentsTest {
             RealElement(0, 0, intArrayOf(1, 2), indexOffset = 0),
         ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
             realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY }).bake()
-            .withRealDifferenceSystem(Cancellation.Never)
+            .withRealDifferenceSystem(ExecutionControl.Never)
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
         val root = state.mark()
@@ -168,7 +168,7 @@ class RealDifferenceFragmentsTest {
             RealElement(0, 0, doubleArrayOf(0.0, 1.0), indexOffset = 0),
         ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY)).bake()
-            .withRealDifferenceSystem(Cancellation.Never)
+            .withRealDifferenceSystem(ExecutionControl.Never)
         val first = PropagationState(problem, Assumptions.None)
         val second = PropagationState(problem, Assumptions.None)
         second.atomVarEq(1, 0)
@@ -191,7 +191,7 @@ class RealDifferenceFragmentsTest {
             RealElement(1, 2, doubleArrayOf(0.0, 1.0), indexOffset = 0),
         ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
             realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY }).bake()
-            .withRealDifferenceSystem(Cancellation.Never)
+            .withRealDifferenceSystem(ExecutionControl.Never)
         val system = assertIs<DifferenceSystem>(problem.factors.last())
         val remapped = system.remap(VarRemap(intArrayOf(), intArrayOf(1, 0)))
         val projected = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(remapped))
@@ -213,7 +213,7 @@ class RealDifferenceFragmentsTest {
                 listOf(BigFraction.ONE, BigFraction.ONE.negated()), LinearOp.LE, BigFraction.ZERO),
         ), numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY)).bake()
-            .withRealDifferenceSystem(Cancellation.Never)
+            .withRealDifferenceSystem(ExecutionControl.Never)
         val state = PropagationState(problem, Assumptions.None)
         val id = problem.numFactors - 1
 
@@ -229,9 +229,9 @@ class RealDifferenceFragmentsTest {
         ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY)).bake()
         var work = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 4L
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
 
         val result = problem.withRealDifferenceSystem(stop)
@@ -251,7 +251,7 @@ class RealDifferenceFragmentsTest {
                 listOf(BigFraction.ONE, BigFraction.ONE.negated()), LinearOp.LE, BigFraction.ZERO),
         ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
             realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY }).bake()
-            .withRealDifferenceSystem(Cancellation.Never)
+            .withRealDifferenceSystem(ExecutionControl.Never)
         val state = PropagationState(problem, Assumptions.None)
         val id = problem.numFactors - 1
 
@@ -269,7 +269,7 @@ class RealDifferenceFragmentsTest {
                 listOf(BigFraction.ONE, BigFraction.ONE.negated()), LinearOp.LE, BigFraction.ZERO),
         ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
             realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY }).bake()
-            .withRealDifferenceSystem(Cancellation.Never)
+            .withRealDifferenceSystem(ExecutionControl.Never)
         val state = PropagationState(problem, Assumptions.None)
         val id = problem.numFactors - 1
         val propagator = PropagationProblem(problem).propagators[id]
@@ -311,7 +311,7 @@ class RealDifferenceFragmentsTest {
         ), numRealVars = 1, realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(2.0),
             semantics = semantics).bake()
 
-        val prepared = problem.withRealDifferenceSystem(Cancellation.Never)
+        val prepared = problem.withRealDifferenceSystem(ExecutionControl.Never)
 
         assertSame(problem, prepared)
         assertFalse(prepared.factors.any { it is DifferenceSystem })

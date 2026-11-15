@@ -2,16 +2,16 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 internal class FiniteCompanionAdmission(
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
     activeMillis: Long,
     constructionMillis: Long,
-    private val capture: (Cancellation) -> SourceProofContext?,
+    private val capture: (ExecutionControl) -> SourceProofContext?,
     private val clock: TimeSource = TimeSource.Monotonic,
 ) {
     private val deadline = requireNotNull(cancellation.deadline())
@@ -28,7 +28,7 @@ internal class FiniteCompanionAdmission(
 
     init { require(active > Duration.ZERO && construction > Duration.ZERO) }
 
-    fun contextForStart(global: Cancellation, sliceMillis: Long): SourceProofContext? {
+    fun contextForStart(global: ExecutionControl, sliceMillis: Long): SourceProofContext? {
         if (!initiallyFunded || cancellation.isCancelled() || global.isCancelled() || remaining() < active) {
             return decline()
         }
@@ -39,7 +39,7 @@ internal class FiniteCompanionAdmission(
             if (allowance <= Duration.ZERO) return decline()
             attempted = true
             val localDeadline = minOf(deadline - pairLifetime, deadline - (remaining() - allowance))
-            val limited = Cancellation.until(localDeadline) or cancellation or global
+            val limited = ExecutionControl.until(localDeadline) or cancellation or global
             val started = clock.markNow()
             val captured = try { capture(limited) } finally {
                 elapsedNanos = started.elapsedNow().inWholeNanoseconds

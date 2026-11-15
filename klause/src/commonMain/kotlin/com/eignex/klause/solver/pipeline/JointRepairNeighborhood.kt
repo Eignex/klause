@@ -5,7 +5,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceProofContext
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
@@ -29,7 +29,7 @@ internal class JointRepairNeighborhood private constructor(
     private val refutedPins = ArrayDeque<Pair<Int, BigFraction>>()
     private var refutationBools: Map<Int, Boolean>? = null
     private var refutationBudget: SourceLpBudget? = null
-    private var refutationToken: Cancellation = Cancellation.Never
+    private var refutationToken: ExecutionControl = ExecutionControl.Never
     var refutationSeeds: Long = 0
         private set
     var additionalRefutationSeeds: Long = 0
@@ -55,11 +55,11 @@ internal class JointRepairNeighborhood private constructor(
         refutedPins.clear()
         refutationBools = null
         refutationBudget = null
-        refutationToken = Cancellation.Never
+        refutationToken = ExecutionControl.Never
     }
 
     fun guideRefutation(assumptions: Set<SourceDerivation.Assumption>, condition: ExactNeighborhoodCondition,
-        budget: SourceLpBudget, token: Cancellation): Boolean {
+        budget: SourceLpBudget, token: ExecutionControl): Boolean {
         val funding = budget.funding
         if (funding == null || condition.cutoff != null || condition.bools.size > MAX_REFUTATION_BOOLEANS) {
             clearRefutation()
@@ -71,15 +71,25 @@ internal class JointRepairNeighborhood private constructor(
             funding.charge(0L, 64L)
             val coordinate = assumption.coordinate
             if (coordinate.kind != SourceCoordinate.Kind.Integer || coordinate.id !in 0 until integers ||
-                eligible?.get(coordinate.id) == false) continue
+                eligible?.get(coordinate.id) == false
+            ) {
+                    continue
+                }
             val value = condition.lower[coordinate.id] ?: continue
             if (condition.upper[coordinate.id] != value) continue
             val bits = value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength()
             if (bits > MAX_GUIDANCE_SCALAR_BITS || !payRefutation(budget, token,
                     1L + condition.bools.size + MAX_REFUTED_PINS * (1L + bits),
-                    128L + 64L * condition.bools.size)) break
+                    128L + 64L * condition.bools.size,
+                )
+            ) {
+                    break
+                }
             if (refutationBudget !== budget || refutationBools != condition.bools ||
-                refutedPins.any { it.first == coordinate.id && it.second != value }) clearRefutation()
+                refutedPins.any { it.first == coordinate.id && it.second != value }
+            ) {
+                    clearRefutation()
+                }
             refutedPins.removeAll { it.first == coordinate.id }
             if (refutedPins.size == MAX_REFUTED_PINS) refutedPins.removeFirst()
             refutedPins.addLast(coordinate.id to value)
@@ -92,7 +102,7 @@ internal class JointRepairNeighborhood private constructor(
         return false
     }
 
-    private fun payRefutation(budget: SourceLpBudget, token: Cancellation, work: Long, bytes: Long): Boolean {
+    private fun payRefutation(budget: SourceLpBudget, token: ExecutionControl, work: Long, bytes: Long): Boolean {
         val funding = budget.funding ?: return false
         if (token() || funding.remainingWork <= work || funding.remainingAllocation <= bytes) return false
         // Advisory metadata spends the containing ledger without renewing a numerical query grant.
@@ -132,10 +142,13 @@ internal class JointRepairNeighborhood private constructor(
     }
 
     fun guide(hint: LinearRepairGuidance.Hint?, centers: List<BigFraction>,
-        budget: SourceLpBudget, token: Cancellation): Boolean {
+        budget: SourceLpBudget, token: ExecutionControl): Boolean {
         rankedSeeds = null
         if (hint == null || token() || seeds.isEmpty() || centers.size < integers ||
-            centers.size > LinearRepairGuidance.MAX_COLUMNS) return false
+            centers.size > LinearRepairGuidance.MAX_COLUMNS
+        ) {
+                return false
+            }
         val funding = budget.funding ?: return false
         val work = 1L + 16L * seeds.size
         val bytes = 256L + 128L * seeds.size
@@ -171,7 +184,9 @@ internal class JointRepairNeighborhood private constructor(
     ): ExactNeighborhoodCondition {
         val order = rankedSeeds ?: seeds
         onRefutationRoots?.invoke(emptyList())
-        val freed = if (round == 0L || order.isEmpty()) emptySet() else {
+        val freed = if (round == 0L || order.isEmpty()) {
+            emptySet()
+        } else {
             val width = minOf(inputs?.size ?: integers, maxOf(2, count), MAX_FREE_INTEGERS)
             val preferred = refutationRoots(centers, bools, cutoff).take(width)
             onRefutationRoots?.invoke(preferred)
@@ -215,7 +230,10 @@ internal class JointRepairNeighborhood private constructor(
 
     companion object {
         fun prepare(
-            source: SourceProofContext, integers: Int, reals: Int, cancellation: Cancellation,
+            source: SourceProofContext,
+            integers: Int,
+            reals: Int,
+            cancellation: ExecutionControl,
             sourceIntegers: IntArray? = null,
         ): JointRepairNeighborhood? {
             if (cancellation() || integers.toLong() + reals > MAX_INDEX_ENTRIES) return null
@@ -239,8 +257,11 @@ internal class JointRepairNeighborhood private constructor(
                     cancellation.charge(1)
                     if (cancellation() || ++entries > MAX_INDEX_ENTRIES) return null
                     if (coefficient.isZero || coordinate.kind == SourceCoordinate.Kind.Boolean) continue
-                    val column = if (coordinate.kind == SourceCoordinate.Kind.Integer) coordinate.id
-                        else integers + coordinate.id
+                    val column = if (coordinate.kind == SourceCoordinate.Kind.Integer) {
+                        coordinate.id
+                    } else {
+                        integers + coordinate.id
+                    }
                     columns.add(column)
                 }
                 for (coordinate in premise.integerPins.keys) {
@@ -255,9 +276,16 @@ internal class JointRepairNeighborhood private constructor(
                 }
                 rows += columns.toIntArray()
             }
-            return if (cancellation()) null else
-                JointRepairNeighborhood(integers, rows,
-                    Array(occurrences.size) { occurrences[it]?.toIntArray() ?: emptyIntArray() }, inputs)
+            return if (cancellation()) {
+                null
+            } else {
+                JointRepairNeighborhood(
+                    integers,
+                    rows,
+                    Array(occurrences.size) { occurrences[it]?.toIntArray() ?: emptyIntArray() },
+                    inputs,
+                )
+            }
         }
     }
 }

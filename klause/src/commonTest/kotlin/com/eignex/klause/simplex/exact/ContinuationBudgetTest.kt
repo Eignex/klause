@@ -1,6 +1,6 @@
 package com.eignex.klause.simplex.exact
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -8,7 +8,7 @@ import kotlin.test.assertFailsWith
 class ContinuationBudgetTest {
     @Test
     fun `phase reports retain zero charges and first visit order`() {
-        val budget = ContinuationBudget(ExactContinuationLimits(), Cancellation.Never)
+        val budget = ContinuationBudget(ExactContinuationLimits(), ExecutionControl.Never)
         budget.phase = ContinuationPhase.VERIFY
         budget.step(units = 0L)
         budget.phase = ContinuationPhase.INPUT
@@ -45,7 +45,7 @@ class ContinuationBudgetTest {
 
     @Test
     fun `phase report snapshots retain their completed prefix`() {
-        val budget = ContinuationBudget(ExactContinuationLimits(), Cancellation.Never)
+        val budget = ContinuationBudget(ExactContinuationLimits(), ExecutionControl.Never)
         budget.step(units = 2L, bytes = 3L)
         val work = budget.workByPhase
         val allocation = budget.allocationByPhase
@@ -73,7 +73,7 @@ class ContinuationBudgetTest {
                 maxWork = if (reason == ContinuationDecline.WORK) 2L else 100L,
                 maxAllocation = if (reason == ContinuationDecline.ALLOCATION) 3L else 100L,
             )
-            val budget = ContinuationBudget(limits, Cancellation { cancelled })
+            val budget = ContinuationBudget(limits, ExecutionControl { cancelled })
             budget.step(units = 2L, bytes = 3L)
             budget.phase = ContinuationPhase.VERIFY
             cancelled = reason == ContinuationDecline.CANCELLED

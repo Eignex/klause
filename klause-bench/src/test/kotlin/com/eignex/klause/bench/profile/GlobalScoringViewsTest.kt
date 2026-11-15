@@ -12,16 +12,16 @@ import com.eignex.klause.localsearch.LocalSearchProblem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.FactorProjectionProviders
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertSame
-import org.junit.jupiter.api.BeforeAll
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
 
 class GlobalScoringViewsTest {
     @Test
@@ -203,7 +203,7 @@ class GlobalScoringViewsTest {
     fun `cancelled construction publishes no alternate relation`(polls: Int) {
         val table = Table(intArrayOf(0, 1, 2), longArrayOf(0, 1, 0, 1, 0, 2, 2, 1, 2, 0, 1, 0))
         var remaining = polls
-        val result = GlobalScoringViews.alternate(table, Cancellation { remaining-- == 0 })
+        val result = GlobalScoringViews.alternate(table, ExecutionControl { remaining-- == 0 })
 
         assertEquals("cancelled", result.reason)
         assertNull(result.factor)

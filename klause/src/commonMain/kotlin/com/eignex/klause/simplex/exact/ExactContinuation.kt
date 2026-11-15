@@ -1,6 +1,6 @@
 package com.eignex.klause.simplex.exact
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.abs
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
@@ -115,7 +115,7 @@ internal class ExactContinuationResult(
 internal class ContinuationStop(val reason: ContinuationDecline) : RuntimeException()
 private class ContinuationOverflow : RuntimeException()
 
-internal class ContinuationBudget(val limits: ExactContinuationLimits, val token: Cancellation) {
+internal class ContinuationBudget(val limits: ExactContinuationLimits, val token: ExecutionControl) {
     private val started = Monotonic.markNow()
     var work = 0L
         private set
@@ -207,7 +207,7 @@ internal class ExactContinuation(private var input: ExactContinuationInput) {
 
     fun resume(
         limits: ExactContinuationLimits = ExactContinuationLimits(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         replacement: ExactContinuationInput? = null,
     ): ExactContinuationResult {
         val budget = ContinuationBudget(

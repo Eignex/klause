@@ -11,7 +11,7 @@ import com.eignex.klause.ir.defaultIrSemantics
 import com.eignex.klause.ir.withStorage
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PreparedFactorProjections
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyDoubleArray
 import com.eignex.util.collections.Bits
 import kotlin.time.Duration
@@ -56,7 +56,7 @@ class BakedProblem private constructor(
     packedOpenIntLo: Bits?,
     packedOpenIntHi: Bits?,
     modelBounds: IntBounds?,
-    internal val cancellation: Cancellation,
+    internal val cancellation: ExecutionControl,
     settings: ProblemSettings,
     internal val projectionProviders: FactorProjectionProviders?,
     private val projectionSelection: ((Problem) -> PreparedFactorProjections)?,
@@ -147,7 +147,7 @@ class BakedProblem private constructor(
         packedOpenIntLo: Bits? = null,
         packedOpenIntHi: Bits? = null,
         modelBounds: IntBounds? = null,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         alreadyFolded: Boolean = false,
         settings: ProblemSettings = ProblemSettings(),
         projectionProviders: FactorProjectionProviders? = null,
@@ -199,7 +199,7 @@ class BakedProblem private constructor(
         packedOpenIntLo: Bits? = null,
         packedOpenIntHi: Bits? = null,
         modelBounds: IntBounds? = null,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         alreadyFolded: Boolean = false,
         settings: ProblemSettings = ProblemSettings(),
         projectionProviders: FactorProjectionProviders? = null,
@@ -265,7 +265,7 @@ class BakedProblem private constructor(
             domains: Array<IntDomain>,
             factors: List<Factor>,
             deductions: PropagationResult,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
         ): BakedProblem = BakedProblem(
             numBoolVars = base.numBoolVars,
             numIntVars = base.numIntVars,

@@ -16,17 +16,17 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.parseBigInt
-import java.io.File
-import java.math.BigInteger
-import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.io.File
+import java.math.BigInteger
+import kotlin.time.Duration.Companion.milliseconds
 
 /** Separate retained-node cutoff and prepared-root separator comparisons using qualified snapshots. */
 object ScopedResidualConsumer {
@@ -365,7 +365,7 @@ object ScopedResidualConsumer {
 
     private fun funded(study: Study, run: (Invocation) -> JsonObject): JsonObject {
         val start = System.nanoTime()
-        val allowance = ComponentAllowance(Cancellation.after(study.millis.milliseconds))
+        val allowance = ComponentAllowance(ExecutionControl.after(study.millis.milliseconds))
         if (!allowance.visit()) return decline("containing-allowance")
         val opening = if (study.fromRoot) preparedRoot(study, allowance) else Opening(study.context)
         val context = opening.context

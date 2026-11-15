@@ -2,12 +2,12 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.bound.CumulativeFlowBound
 import com.eignex.klause.factor.scheduling.Cumulative
-import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
-import com.eignex.klause.util.constructionLongArray
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesLowerBound
 import com.eignex.klause.lp.statesUpperBound
+import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
+import com.eignex.klause.util.constructionLongArray
 
 /**
  * A [Cumulative] normalized to the constant data the LP relaxations and the flow

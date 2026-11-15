@@ -11,12 +11,12 @@ import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.sun.management.ThreadMXBean
-import java.io.File
-import java.lang.management.ManagementFactory
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
 
 internal object CoefficientLiftingProfile {
     @Volatile

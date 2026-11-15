@@ -13,7 +13,7 @@ import com.eignex.klause.solver.evidence.SourceResultCapture
 import com.eignex.klause.solver.evidence.SourceResultEvidence
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
 
@@ -22,7 +22,7 @@ internal fun SourceMapping.captureSolve(
     result: SolveResult,
     capture: SourceResultCapture,
     producer: String,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): SolveResult {
     require(reduced === target) { "result reconstruction belongs to another reduced model" }
     require(capture.belongsTo(source)) { "result capture belongs to another original source" }
@@ -34,6 +34,7 @@ internal fun SourceMapping.captureSolve(
             SolveResult.Sat(point, result.stats,
                 requireNotNull(captured.evidence).withMappings(capture.context.scope, listOf(mapping)))
         }
+
         is SolveResult.Unsat -> {
             val proof = mapping.project(SourceClaim.Refutation, capture.context, cancellation).derivation
             val candidate = capture.solve(SolveResult.Unsat(stats = result.stats), producer, proof)
@@ -42,6 +43,7 @@ internal fun SourceMapping.captureSolve(
             val engineScope = admittedScope(capture, result.evidence, checked)
             SolveResult.Unsat(stats = result.stats, evidence = evidence.withMappings(engineScope, listOf(mapping)))
         }
+
         is SolveResult.Unknown -> {
             val evidence = result.evidence ?: SourceResultEvidence(capture.context.scope, emptyList())
             result.copy(evidence = evidence.withMappings(result.evidence?.engineScope, listOf(mapping)))
@@ -55,7 +57,7 @@ internal fun SourceMapping.captureMinimize(
     capture: SourceResultCapture,
     objective: LinearObjective,
     producer: String,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): MinimizeResult {
     require(reduced === target) { "result reconstruction belongs to another reduced model" }
     require(capture.belongsTo(source, objective)) { "result capture belongs to another original source objective" }
@@ -72,11 +74,13 @@ internal fun SourceMapping.captureMinimize(
             MinimizeResult.BestFound(point, candidate.objective, result.reason, result.stats,
                 evidence.withMappings(capture.context.scope, listOf(mapping)))
         }
+
         is MinimizeResult.Infeasible -> {
             val solved = captureSolve(reduced, SolveResult.Unsat(stats = result.stats, evidence = result.evidence),
                 capture, producer, cancellation)
             MinimizeResult.Infeasible(stats = result.stats, evidence = solved.evidence)
         }
+
         is MinimizeResult.Unbounded -> {
             val point = sourcePoint(reduced, result.sample)
             val candidate = MinimizeResult.Unbounded(
@@ -89,6 +93,7 @@ internal fun SourceMapping.captureMinimize(
             MinimizeResult.Unbounded(point, candidate.objective, result.direction, result.stats,
                 evidence.withMappings(engineScope, listOf(mapping)))
         }
+
         is MinimizeResult.Unknown -> {
             val evidence = result.evidence ?: SourceResultEvidence(capture.context.scope, emptyList())
             result.copy(evidence = evidence.withMappings(result.evidence?.engineScope, listOf(mapping)))
@@ -103,7 +108,7 @@ private fun SourceMapping.captureOptimal(
     objective: LinearObjective,
     producer: String,
     mapping: SourceMappingEvidence,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): MinimizeResult.Optimal {
     val point = sourcePoint(reduced, result.sample)
     val candidate = MinimizeResult.Optimal(point, objective.minimizedTelemetry(point, capture), result.stats)
@@ -112,12 +117,27 @@ private fun SourceMapping.captureOptimal(
     val claim = provisional.evidence?.derivations?.map { it.claim }
         ?.filterIsInstance<SourceClaim.Optimal>()?.firstOrNull()
     val proof = claim?.let { mapping.project(SourceClaim.Bound(it.value), capture.context, cancellation).derivation }
-    val captured = if (proof == null) provisional else capture.minimize(candidate, objective, producer,
-        SourceDerivation.Optimum(SourceDerivation.SourceWitness, proof), cancellation)
-    val evidence = captured.evidence ?: SourceResultEvidence(capture.context.scope, listOf(
-        SourceEvidence(capture.context.scope,
-            SourceClaim.Witness(point), SourceDerivation.SourceWitness),
-    ))
+    val captured = if (proof == null) {
+        provisional
+    } else {
+        capture.minimize(
+        candidate,
+        objective,
+        producer,
+        SourceDerivation.Optimum(SourceDerivation.SourceWitness, proof),
+        cancellation,
+    )
+    }
+    val evidence = captured.evidence ?: SourceResultEvidence(
+        capture.context.scope,
+        listOf(
+        SourceEvidence(
+            capture.context.scope,
+            SourceClaim.Witness(point),
+            SourceDerivation.SourceWitness,
+        ),
+    )
+    )
     val checked = claim?.let { evidence.verify(it, capture.context, cancellation) }
     val engineScope = admittedScope(capture, result.evidence, checked)
     return MinimizeResult.Optimal(point, candidate.objective, result.stats,
@@ -138,10 +158,14 @@ private fun SourceMapping.admittedScope(
     checked: SourceEvidenceCheck?,
 ) = when {
     checked == SourceEvidenceCheck.Checked -> capture.context.scope
+
     source === target && original == null -> capture.context.scope
+
     source === target && original?.scope == capture.context.scope && original.engineScope == capture.context.scope ->
         capture.context.scope
+
     original?.engineScope != capture.context.scope -> original?.engineScope
+
     else -> null
 }
 
@@ -149,9 +173,13 @@ private fun SourceMapping.sourcePoint(reduced: Problem, sample: Sample): Sample 
     val point = reconstructFrom(reduced, sample)
     if (point.numBoolVars == source.numBoolVars && point.numIntVars == source.numIntVars &&
         point.numRealVars == source.numRealVars
-    ) return point
-    require(point.numBoolVars >= source.numBoolVars && point.numIntVars >= source.numIntVars &&
-        point.numRealVars >= source.numRealVars) { "reconstruction lacks original coordinates" }
+    ) {
+        return point
+    }
+    require(
+        point.numBoolVars >= source.numBoolVars && point.numIntVars >= source.numIntVars &&
+            point.numRealVars >= source.numRealVars,
+    ) { "reconstruction lacks original coordinates" }
     val exact = point.exactInts?.take(source.numIntVars)
     val integers = when {
         exact == null -> LongArray(source.numIntVars) { point.intValue(it) }

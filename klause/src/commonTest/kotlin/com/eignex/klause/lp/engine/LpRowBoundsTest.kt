@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.math.pow
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -296,7 +296,7 @@ class LpRowBoundsTest {
         }.build(Sense.MINIMIZE)
         val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
 
-        val bounds = mixedRowBounds(model, Cancellation { true })
+        val bounds = mixedRowBounds(model, ExecutionControl { true })
 
         assertTrue(bounds.isEmpty())
     }

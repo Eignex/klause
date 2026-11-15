@@ -33,7 +33,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.minimizeInt
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBrancher
@@ -47,7 +46,7 @@ import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -81,8 +80,11 @@ class BacktrackSolverTest {
             val solver = BacktrackSolver(problem.bake())
             val params = BacktrackParams(variableSelector = selector, valueSelector = IndomainMin, randomSeed = 3L)
 
-            if (optimize) assertIs<MinimizeResult.Optimal>(solver.minimize(problem.minimizeInt(0), params))
-            else assertIs<SolveResult.Sat>(solver.solve(params))
+            if (optimize) {
+                assertIs<MinimizeResult.Optimal>(solver.minimize(problem.minimizeInt(0), params))
+            } else {
+                assertIs<SolveResult.Sat>(solver.solve(params))
+            }
 
             assertEquals(1, attached.size)
             assertEquals("attach", events.first())
@@ -422,7 +424,7 @@ class BacktrackSolverTest {
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         val fired = BacktrackSolver(p.bake()).solve(
-            BacktrackParams(randomSeed = 0L, cancellation = Cancellation { true }, propagationCancelFloor = 0),
+            BacktrackParams(randomSeed = 0L, cancellation = ExecutionControl { true }, propagationCancelFloor = 0),
         )
         assertIs<SolveResult.Unknown>(fired)
         assertIs<SolveResult.Sat>(BacktrackSolver(p.bake()).solve(BacktrackParams(randomSeed = 0L)))

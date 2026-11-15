@@ -4,7 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.ir.PolynomialRelation
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -123,7 +123,7 @@ class PolynomialAffineConsequencesTest {
     @Test
     fun `interrupted endpoint capture publishes no partial consequences`() {
         var stopped = false
-        val arithmetic = PolynomialArithmetic(Cancellation { stopped })
+        val arithmetic = PolynomialArithmetic(ExecutionControl { stopped })
         val x = Polynomial.variable(0)
         val y = Polynomial.variable(1)
         val atoms = listOf(PolynomialAtom(y, PolynomialRelation.GE),

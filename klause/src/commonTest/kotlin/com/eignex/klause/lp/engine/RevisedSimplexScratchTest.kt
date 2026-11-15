@@ -3,7 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -29,7 +29,7 @@ class RevisedSimplexScratchTest {
                 assertNotNull(model.rebind(longArrayOf(0L), longArrayOf(3L)).authoritativeModel()),
                 boundRevision = 1L,
             )
-            assertTrue(solver.adopt(next, Cancellation.Never))
+            assertTrue(solver.adopt(next, ExecutionControl.Never))
 
             assertNull(solver.infeasibleRay)
             assertNull(solver.infeasibleBasis)

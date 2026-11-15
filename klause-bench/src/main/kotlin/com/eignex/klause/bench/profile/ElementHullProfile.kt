@@ -19,15 +19,15 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.sun.management.ThreadMXBean
-import java.io.File
-import java.lang.management.ManagementFactory
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import kotlin.time.Duration.Companion.seconds
 
 internal object ElementHullProfile {
     @JvmStatic
@@ -41,7 +41,7 @@ internal object ElementHullProfile {
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         out.resolve("source.xml").writeBytes(bytes)
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
-        val stop = Cancellation.after(30.seconds)
+        val stop = ExecutionControl.after(30.seconds)
         val parsed = Xcsp3.parse(bytes.decodeToString())
         val objective = parsed.objective?.toLinearObjective()?.let {
             if (parsed.sense == ObjectiveSense.MAXIMIZE) it.negated() else it
@@ -103,7 +103,7 @@ internal object ElementHullProfile {
         problem: Problem,
         objective: LinearObjective?,
         config: LpConfig,
-        stop: Cancellation,
+        stop: ExecutionControl,
     ) = buildJsonObject {
         val method = LpAutoConfig.javaClass.methods.single { it.name.startsWith("admission$") }
         val admission = method.invoke(LpAutoConfig, problem, config, LpPlan())

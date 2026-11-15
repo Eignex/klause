@@ -1,14 +1,14 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.PollStride
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal fun nodeDualCertificate(
     model: LpModel,
     duals: DoubleArray,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     observer: LpCertificationObserver? = null,
     eliminateContinuousObjective: Boolean = false,
     onAdditionalCertificate: ((LpDeductionCertificate) -> Unit)? = null,
@@ -81,8 +81,11 @@ internal fun nodeDualCertificate(
     val objectiveCertificate = if (onAdditionalCertificate != null && (rows != null || integralObjective)) {
         try {
             meter.attempt(observer, "OBJECTIVE_EXPRESSION") {
-                if (rows != null) objectiveExpressionCertificate(model, rows.single(), meter)
-                else objectiveBoxCertificate(model, meter)
+                if (rows != null) {
+                    objectiveExpressionCertificate(model, rows.single(), meter)
+                } else {
+                    objectiveBoxCertificate(model, meter)
+                }
             }
         } catch (_: LpProjectionStop) {
             null
@@ -127,10 +130,12 @@ internal fun nodeDualCertificate(
     }
     observer?.observe(LpCertifier.INTEGER, accepted != null, LpCertifierCost.Metered(meter.work - initialWork))
     if (cancellation()) return null
-    for (candidate in candidates) if (candidate !== accepted) {
+    for (candidate in candidates) {
+        if (candidate !== accepted) {
         onAdditionalCertificate?.invoke(
             if (objectiveRows != null) IntegralObjectiveCertificate(candidate, objectiveRows) else candidate,
         )
+    }
     }
     val selected = accepted ?: return null
     return if (objectiveRows != null) IntegralObjectiveCertificate(selected, objectiveRows) else selected
@@ -203,7 +208,9 @@ private fun integralObjectiveAfterRow(
         if (cost.isZero) continue
         if (!source.column(column).integral ||
             ExactLpNumber.of(meter.multiply(cost, scale.reciprocal())).exactLong() == null
-        ) return false
+        ) {
+            return false
+        }
         constant = meter.add(constant, meter.multiply(cost, model.exactShift(column)).negated())
     }
     constant = meter.add(meter.multiply(constant, scale.reciprocal()), source.objective.externalConstant.value)
@@ -376,7 +383,10 @@ private fun finiteEndpointCancellation(
                     meter.step()
                     changedRows[it.row] == preferred && state.rows.row(it.row).active &&
                         counts[it.row] == 1 && !it.number.value.isZero
-                }) continue
+                }
+            ) {
+                    continue
+                }
             var residual = meter.read(model.exactCost(column))
             model.forEachRationalColumn(column) { row, coefficient ->
                 meter.step()
@@ -417,7 +427,9 @@ private fun changedIntegralRows(
     preferredColumns: IntArray?,
 ): BooleanArray? {
     val source = state.model
-    val columns = if (preferredColumns != null) preferredColumns.asIterable() else {
+    val columns = if (preferredColumns != null) {
+        preferredColumns.asIterable()
+    } else {
         meter.reserve(source.numVars.toLong() * 8L + 64L)
         state.changedColumns
     }
@@ -491,19 +503,30 @@ private fun repairMixedColumn(
         residual = meter.add(residual, meter.multiply(y[row], coefficient).negated())
     }
     val bounds = model.exactBounds(column)
-    if (!((residual.signum() > 0 && bounds.lower == null) ||
-            (residual.signum() < 0 && bounds.upper == null))) return false
+    if (!(
+        (residual.signum() > 0 && bounds.lower == null) ||
+            (residual.signum() < 0 && bounds.upper == null)
+    )
+    ) {
+                return false
+            }
     for (entry in state.model.columnEntries(column)) {
         meter.step()
         if (!state.rows.row(entry.row).active || continuousCounts[entry.row] != 1 ||
-            entry.number.value.isZero) continue
+            entry.number.value.isZero
+        ) {
+                continue
+            }
         val inverse = meter.read(meter.read(entry.number.value).reciprocal())
         val candidate = meter.add(y[entry.row], meter.multiply(residual, inverse))
         val slack = model.slackCol(entry.row)
         val slackBounds = model.exactBounds(slack)
         val slackCost = meter.read(model.exactCost(slack))
         if ((slackBounds.lower == null && candidate < slackCost) ||
-            (slackBounds.upper == null && candidate > slackCost)) continue
+            (slackBounds.upper == null && candidate > slackCost)
+        ) {
+                continue
+            }
         // A singleton continuous row cancels this residual without changing another real reduced cost.
         y[entry.row] = candidate
         return true
@@ -586,13 +609,14 @@ internal class MixedDualBound(
         BigFraction.ofLong(improvingMax) - BigFraction.ofLong(sourceConstant) - bound
 }
 
-internal class MixedCertificateMeter(private val cancellation: Cancellation) {
-    private val meter = LpProjectionMeter(250_000L, 16L * 1024L * 1024L)
+internal class MixedCertificateMeter(private val cancellation: ExecutionControl) {
     private val stride = PollStride()
-    private val meteredCancellation = cancellation.workMeter() != null
+    private val polling = cancellation.stopPolling
     private var reason = "UNSUPPORTED"
-    val work: Long get() = meter.work
-    val allocation: Long get() = meter.allocation
+    var work: Long = 0L
+        private set
+    var allocation: Long = 0L
+        private set
     fun poll() {
         if (cancellation()) {
             reason = "CANCELLED"
@@ -614,19 +638,19 @@ internal class MixedCertificateMeter(private val cancellation: Cancellation) {
         this.reason = reason
         return null
     }
-    fun step() = charge(1L, 0L, matrix = true)
-    fun reconstructionStep() = charge(8L, 96L, matrix = false)
-    fun reserve(bytes: Long) = charge(bytes / 8L + 1L, bytes, matrix = false)
-    fun protect(bytes: Long) = charge(0L, bytes, matrix = false)
+    fun step() = charge(1L, 0L)
+    fun reconstructionStep() = charge(8L, 96L)
+    fun reserve(bytes: Long) = charge(bytes / 8L + 1L, bytes)
+    fun protect(bytes: Long) = charge(0L, bytes)
 
-    private fun charge(work: Long, bytes: Long, matrix: Boolean) {
-        if (meteredCancellation || stride.due(work)) poll()
-        try {
-            meter.reserve(work, bytes, matrix)
-        } catch (stopped: LpProjectionStop) {
+    private fun charge(work: Long, bytes: Long) {
+        if (polling?.due(work.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()) ?: stride.due(work)) poll()
+        if (work < 0L || bytes < 0L || work > 250_000L - this.work || bytes > 16L * 1024L * 1024L - allocation) {
             reason = "RESOURCE_LIMIT"
-            throw stopped
+            throw LpProjectionStop()
         }
+        this.work += work
+        allocation += bytes
     }
 
     fun read(value: BigFraction): BigFraction {
@@ -636,19 +660,19 @@ internal class MixedCertificateMeter(private val cancellation: Cancellation) {
             throw LpProjectionStop()
         }
         val words = (bits.toLong() + 63L) / 64L
-        charge(1L + words * words, 64L + (bits.toLong() + 7L) / 4L, matrix = false)
+        charge(1L + words * words, 64L + (bits.toLong() + 7L) / 4L)
         return value
     }
 
     fun less(left: BigFraction, right: BigFraction): Boolean {
         val a = read(left)
         val b = read(right)
-        charge(16L, 128L, matrix = false)
+        charge(16L, 128L)
         return a < b
     }
 
     fun multiplier(certificate: LpDeductionCertificate, row: Int): BigFraction {
-        charge(64L, 512L, matrix = false)
+        charge(64L, 512L)
         return read(certificate.exactMultiplier(row))
     }
 

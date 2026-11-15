@@ -18,7 +18,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.freeBooleanProbeCandidates
 import com.eignex.klause.propagation.propagate
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.PollStride
 import com.eignex.util.collections.DynamicBits
 import com.eignex.util.collections.IntArrayDeque
@@ -55,7 +55,7 @@ internal object Probing {
      * Savelsbergh, "Preprocessing and probing techniques for mixed integer programming problems",
      * ORSA J. Computing 6(4), 1994, https://doi.org/10.1287/ijoc.6.4.445
      */
-    fun probe(problem: BakedProblem, maxCandidates: Int, cancellation: Cancellation): PassDelta {
+    fun probe(problem: BakedProblem, maxCandidates: Int, cancellation: ExecutionControl): PassDelta {
         val candidates = problem.freeBooleanProbeCandidates(maxCandidates, cancellation)
         if (candidates.isEmpty()) return PassDelta()
         val units = ArrayList<Factor>()
@@ -104,7 +104,7 @@ internal object Probing {
      * Bounded by [maxCandidates] probes and metered through [cancellation]; stopping early keeps whatever
      * was proved, since a partial propagation still only derives implied bounds.
      */
-    fun probeSource(problem: Problem, maxCandidates: Int, cancellation: Cancellation): SourceDelta {
+    fun probeSource(problem: Problem, maxCandidates: Int, cancellation: ExecutionControl): SourceDelta {
         if (cancellation()) return SourceDelta()
         val probe = OpenRangeProbe(problem, cancellation)
         if (!probe.hasRows) return SourceDelta()
@@ -160,7 +160,8 @@ internal object Probing {
 // `Σ (sign·coeffs(k))·cols(k) ≤ sign·bound`, active unconditionally or only while its guard column holds
 // `guardValue`.
 @Suppress("TooManyFunctions")
-private class OpenRangeProbe(private val problem: Problem, private val cancellation: Cancellation) : IntervalBounds {
+private class OpenRangeProbe(private val problem: Problem, private val cancellation: ExecutionControl) :
+    IntervalBounds {
     private val numInts = problem.numIntVars
     private val numCols = numInts + problem.numBoolVars
     private val lo = LongArray(numCols)
@@ -185,7 +186,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
     private val queue = IntArrayDeque()
     private val queued = BooleanArray(numCols)
     private val poll = PollStride()
-    private val meter = cancellation.workMeter()
+    private val meter = cancellation.accounting
     private var stopped = false
 
     private var conflict = false

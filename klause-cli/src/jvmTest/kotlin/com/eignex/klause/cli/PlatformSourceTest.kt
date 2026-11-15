@@ -2,12 +2,12 @@ package com.eignex.klause.cli
 
 import com.eignex.util.io.CharSource
 import com.eignex.util.io.useSource
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class PlatformSourceTest(private val failure: Boolean) {

@@ -28,7 +28,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.explainAtoms
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -56,7 +56,7 @@ class QfLraSystemTest {
                 }
                 val committed = ArrayList<Int>()
 
-                assertTrue(system.assertComparisons(comparisons, Cancellation.Never, committed::add))
+                assertTrue(system.assertComparisons(comparisons, ExecutionControl.Never, committed::add))
 
                 assertEquals(listOf(0, 1, 2), committed)
                 val active = assertNotNull(lp.state?.activeSide(0, upper))
@@ -88,7 +88,7 @@ class QfLraSystemTest {
             )
             val committed = ArrayList<Int>()
 
-            assertTrue(system.assertComparisons(comparisons, Cancellation.Never, committed::add))
+            assertTrue(system.assertComparisons(comparisons, ExecutionControl.Never, committed::add))
 
             assertEquals(listOf(0), committed)
             assertNull(lp.state?.activeSide(1, true))
@@ -102,7 +102,7 @@ class QfLraSystemTest {
         var armed = false
         var stopped = false
         var spent = 0L
-        LpPropagator(object : LpSearchPolicy {}, cancellation = Cancellation { stopped }, onEdit = {
+        LpPropagator(object : LpSearchPolicy {}, cancellation = ExecutionControl { stopped }, onEdit = {
             if (armed) {
                 spent += it
                 stopped = true
@@ -119,7 +119,7 @@ class QfLraSystemTest {
             val committed = ArrayList<Int>()
             armed = true
 
-            assertFalse(system.assertComparisons(comparisons, Cancellation.Never, committed::add))
+            assertFalse(system.assertComparisons(comparisons, ExecutionControl.Never, committed::add))
 
             assertSame(before, lp.state)
             assertTrue(committed.isEmpty())
@@ -127,7 +127,7 @@ class QfLraSystemTest {
             assertEquals(4L, spent)
             armed = false
             stopped = false
-            assertTrue(system.assertComparisons(comparisons, Cancellation.Never, committed::add))
+            assertTrue(system.assertComparisons(comparisons, ExecutionControl.Never, committed::add))
             assertEquals(listOf(0, 1), committed)
             assertEquals(BigFraction.ONE, assertNotNull(lp.state?.activeSide(0, false)).side.number.value)
             assertEquals(BigFraction.ONE, assertNotNull(lp.state?.activeSide(0, true)).side.number.value)
@@ -149,7 +149,7 @@ class QfLraSystemTest {
             )
             val committed = ArrayList<Int>()
 
-            assertFalse(system.assertComparisons(comparisons, Cancellation.Never, committed::add))
+            assertFalse(system.assertComparisons(comparisons, ExecutionControl.Never, committed::add))
 
             assertEquals(listOf(0), committed)
             assertEquals(BigFraction.ONE, assertNotNull(lp.state?.activeSide(0, true)).side.number.value)
@@ -157,7 +157,7 @@ class QfLraSystemTest {
             assertTrue(lp.atLevel(0))
             assertTrue(lp.atLevel(1))
             committed.clear()
-            assertFalse(system.assertComparisons(comparisons, Cancellation.Never, committed::add))
+            assertFalse(system.assertComparisons(comparisons, ExecutionControl.Never, committed::add))
             assertEquals(listOf(0), committed)
             assertEquals(0, assertNotNull(lp.state).model.m)
             assertEquals(BigFraction.ONE, assertNotNull(lp.state?.activeSide(0, true)).side.number.value)
@@ -181,7 +181,7 @@ class QfLraSystemTest {
             )
             val committed = ArrayList<Int>()
 
-            assertTrue(system.assertComparisons(comparisons, Cancellation.Never, committed::add))
+            assertTrue(system.assertComparisons(comparisons, ExecutionControl.Never, committed::add))
 
             assertEquals(listOf(0, 1), committed)
             assertEquals(0, assertNotNull(lp.state).model.m)
@@ -203,7 +203,7 @@ class QfLraSystemTest {
 
             assertTrue(system.assertComparisons(listOf(PremisedSmtComparison(
                 ExactComparison(emptyMap(), BigFraction.ZERO, LinearOp.EQ, false, true), axiom,
-            )), Cancellation.Never, committed::add))
+            )), ExecutionControl.Never, committed::add))
 
             assertEquals(listOf(0), committed)
             assertSame(before, lp.state)
@@ -224,7 +224,7 @@ class QfLraSystemTest {
             val committed = ArrayList<Int>()
             var polls = 0
 
-            assertFalse(system.assertComparisons(comparisons, Cancellation { ++polls >= 4 }, committed::add))
+            assertFalse(system.assertComparisons(comparisons, ExecutionControl { ++polls >= 4 }, committed::add))
 
             assertSame(before, lp.state)
             assertTrue(committed.isEmpty())
@@ -243,7 +243,7 @@ class QfLraSystemTest {
 
             assertTrue(system.assertComparisons(listOf(PremisedSmtComparison(
                 ExactComparison(mapOf(0 to BigFraction.ONE), value, LinearOp.EQ, false, true), axiom,
-            )), Cancellation.Never, committed::add))
+            )), ExecutionControl.Never, committed::add))
 
             assertEquals(listOf(0), committed)
             for (upper in listOf(false, true)) {

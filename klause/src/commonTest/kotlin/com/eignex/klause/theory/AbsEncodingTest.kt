@@ -37,7 +37,7 @@ import com.eignex.klause.solver.pipeline.openWitnessVerifier
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.pipeline.toSample
 import com.eignex.klause.theory.qfnra.PolynomialFormula
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
@@ -61,7 +61,7 @@ class AbsEncodingTest {
 
         assertEquals("-9223372036854775808", result.assignment.intValue(relation.operand))
         assertEquals("9223372036854775808", result.assignment.intValue(relation.result))
-        assertEquals(SourceEvidenceCheck.Checked, invocation.checkWitness(sample, Cancellation.Never))
+        assertEquals(SourceEvidenceCheck.Checked, invocation.checkWitness(sample, ExecutionControl.Never))
         assertIs<Verification.Accepted<*, *>>(openWitnessVerifier(source, null).verify(Candidate(sample, null)))
     }
 
@@ -128,10 +128,10 @@ class AbsEncodingTest {
         queries.use {
             val refuted = ExactNeighborhoodCondition(mapOf(0 to false), emptyMap(), emptyMap())
             val feasible = ExactNeighborhoodCondition(mapOf(0 to true), emptyMap(), emptyMap())
-            assertIs<ExactNeighborhoodResult.Refuted>(it.check(refuted, Cancellation.Never))
-            assertIs<ExactNeighborhoodResult.Undecided>(it.check(feasible, Cancellation { true }))
+            assertIs<ExactNeighborhoodResult.Refuted>(it.check(refuted, ExecutionControl.Never))
+            assertIs<ExactNeighborhoodResult.Undecided>(it.check(feasible, ExecutionControl { true }))
 
-            val sample = assertIs<ExactNeighborhoodResult.Witness>(it.check(feasible, Cancellation.Never)).sample
+            val sample = assertIs<ExactNeighborhoodResult.Witness>(it.check(feasible, ExecutionControl.Never)).sample
 
             assertTrue(sample.boolValue(0))
             assertTrue(sample.exactIntValue(input.intVarNames.getValue("x")).toString() in setOf("-2", "2"))
@@ -151,7 +151,7 @@ class AbsEncodingTest {
             for ((positive, expected) in listOf(true to "2", false to "-2", true to "2")) {
                 val outcome = it.check(
                     ExactNeighborhoodCondition(mapOf(0 to positive), emptyMap(), emptyMap()),
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                 )
                 val sample = assertIs<ExactNeighborhoodResult.Witness>(outcome).sample
 
@@ -311,10 +311,10 @@ class AbsEncodingTest {
         queries.use {
             val refuted = ExactNeighborhoodCondition(mapOf(boolean to true), emptyMap(), emptyMap())
             val feasible = ExactNeighborhoodCondition(mapOf(boolean to false), emptyMap(), emptyMap())
-            assertIs<ExactNeighborhoodResult.Refuted>(it.check(refuted, Cancellation.Never))
-            assertIs<ExactNeighborhoodResult.Undecided>(it.check(feasible, Cancellation { true }))
+            assertIs<ExactNeighborhoodResult.Refuted>(it.check(refuted, ExecutionControl.Never))
+            assertIs<ExactNeighborhoodResult.Undecided>(it.check(feasible, ExecutionControl { true }))
 
-            val sample = assertIs<ExactNeighborhoodResult.Witness>(it.check(feasible, Cancellation.Never)).sample
+            val sample = assertIs<ExactNeighborhoodResult.Witness>(it.check(feasible, ExecutionControl.Never)).sample
 
             val values = assertNotNull(sample.exactReals)
             assertEquals(BigFraction.ONE, values[relation.result])
@@ -348,28 +348,28 @@ class AbsEncodingTest {
         val source = input.model
         val prepared = source.prepareExecutionPlan()
         val binding = EngineInvocation(prepared, ModelIdentity.of(source))
-        val context = assertNotNull(source.absSourceWitnessContext(LinearObjective(), Cancellation.Never))
+        val context = assertNotNull(source.absSourceWitnessContext(LinearObjective(), ExecutionControl.Never))
         val sourceChecker = assertNotNull(context.semanticsChecker)
         val queries = OpenExactNeighborhood(source, TheoryParams(), preparedSource = prepared, invocation = { binding })
         queries.use {
             val refuted = ExactNeighborhoodCondition(mapOf(0 to false), emptyMap(), emptyMap())
             val feasible = ExactNeighborhoodCondition(mapOf(0 to true), emptyMap(), emptyMap())
-            assertIs<ExactNeighborhoodResult.Refuted>(it.check(refuted, Cancellation.Never))
-            assertIs<ExactNeighborhoodResult.Undecided>(it.check(feasible, Cancellation { true }))
+            assertIs<ExactNeighborhoodResult.Refuted>(it.check(refuted, ExecutionControl.Never))
+            assertIs<ExactNeighborhoodResult.Undecided>(it.check(feasible, ExecutionControl { true }))
 
-            val sample = assertIs<ExactNeighborhoodResult.Witness>(it.check(feasible, Cancellation.Never)).sample
+            val sample = assertIs<ExactNeighborhoodResult.Witness>(it.check(feasible, ExecutionControl.Never)).sample
 
             assertTrue(sample.boolValue(0))
             assertTrue(sample.exactIntValue(input.intVarNames.getValue("x")).toString() in setOf("-1", "1"))
             assertTrue(source.factors.filterIsInstance<AffineAbs>().single().isSatisfied(sample::exactIntValue))
-            assertEquals(SourceEvidenceCheck.Checked, binding.checkWitness(sample, Cancellation.Never))
+            assertEquals(SourceEvidenceCheck.Checked, binding.checkWitness(sample, ExecutionControl.Never))
             val rejected = sample.copy(bools = sample.bools.also { values -> values[0] = false })
             assertEquals(
                 SourceEvidenceCheck.Checked,
-                sourceChecker.witness(sample, context.scope, Cancellation.Never),
+                sourceChecker.witness(sample, context.scope, ExecutionControl.Never),
             )
             assertIs<SourceEvidenceCheck.Rejected>(
-                sourceChecker.witness(rejected, context.scope, Cancellation.Never),
+                sourceChecker.witness(rejected, context.scope, ExecutionControl.Never),
             )
         }
     }

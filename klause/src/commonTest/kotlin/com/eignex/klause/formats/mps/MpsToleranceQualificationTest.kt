@@ -5,7 +5,7 @@ import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.toleranceQualification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -22,7 +22,7 @@ class MpsToleranceQualificationTest {
         ).toLinearSourceProblem())
         val expected = BigFraction.of(bigIntOf(9999999000000000L), bigIntOf(30000000000000001L))
 
-        val bound = source.toleranceQualification(Cancellation.Never)?.objectiveBound()
+        val bound = source.toleranceQualification(ExecutionControl.Never)?.objectiveBound()
         val witness = assertNotNull(source.checkMpsWitness(listOf(expected)))
 
         assertEquals(expected, bound)
@@ -40,7 +40,7 @@ class MpsToleranceQualificationTest {
                 "INDICATORS\n IF A I 1\n IF B I 1\nENDATA",
         ).toLinearSourceProblem())
 
-        val qualified = source.toleranceQualification(Cancellation.Never)?.verify()
+        val qualified = source.toleranceQualification(ExecutionControl.Never)?.verify()
 
         assertEquals(true, qualified)
     }
@@ -53,7 +53,7 @@ class MpsToleranceQualificationTest {
                 "BOUNDS\n FR B X\nINDICATORS\n IF R I 1\nENDATA",
         ).toLinearSourceProblem())
 
-        val bound = source.toleranceQualification(Cancellation.Never)?.objectiveBound()
+        val bound = source.toleranceQualification(ExecutionControl.Never)?.objectiveBound()
 
         assertEquals(null, bound)
     }
@@ -67,7 +67,7 @@ class MpsToleranceQualificationTest {
                 relative = SemanticRational.of(BIG_ONE, bigIntOf(2)),
             ))))
 
-            val bound = source.toleranceQualification(Cancellation.Never)?.objectiveBound()
+            val bound = source.toleranceQualification(ExecutionControl.Never)?.objectiveBound()
             val point = assertNotNull(source.checkMpsWitness(listOf(BigFraction.ofLong(expected.toLong()))))
 
             assertEquals(BigFraction.ofLong(expected.toLong()), bound)
@@ -86,7 +86,7 @@ class MpsToleranceQualificationTest {
         ))))
         val expected = BigFraction.of(bigIntOf(-39), bigIntOf(20))
 
-        val bound = source.toleranceQualification(Cancellation.Never)?.objectiveBound()
+        val bound = source.toleranceQualification(ExecutionControl.Never)?.objectiveBound()
         val point = assertNotNull(source.checkMpsWitness(listOf(expected)))
 
         assertEquals(expected, bound)
@@ -99,7 +99,7 @@ class MpsToleranceQualificationTest {
         val source = assertNotNull(Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1\nENDATA").toLinearSourceProblem())
         var visits = 0
 
-        val bound = source.toleranceQualification(Cancellation { ++visits >= 3 })?.objectiveBound()
+        val bound = source.toleranceQualification(ExecutionControl { ++visits >= 3 })?.objectiveBound()
 
         assertEquals(null, bound)
     }
@@ -109,7 +109,7 @@ class MpsToleranceQualificationTest {
         val source = assertNotNull(Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1\nENDATA")
             .toLinearSourceProblem(SemanticOverrides(feasibilityTolerance = SourceTolerance())))
 
-        val qualified = source.toleranceQualification(Cancellation.Never)?.verify()
+        val qualified = source.toleranceQualification(ExecutionControl.Never)?.verify()
 
         assertEquals(true, qualified)
     }
@@ -121,7 +121,7 @@ class MpsToleranceQualificationTest {
                 "ROWS\n N COST\n G R\nCOLUMNS\n X COST 0\nRHS\n RHS R $bound\nENDATA",
             ).toLinearSourceProblem())
 
-            val qualified = source.toleranceQualification(Cancellation.Never)?.verify()
+            val qualified = source.toleranceQualification(ExecutionControl.Never)?.verify()
 
             assertEquals(covered, qualified)
             assertEquals(!covered, source.checkMpsWitness(listOf(BigFraction.ZERO)) != null)
@@ -135,7 +135,7 @@ class MpsToleranceQualificationTest {
                 " J R 0.2\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 0.15\nENDATA",
         ).toLinearSourceProblem())
 
-        val qualified = source.toleranceQualification(Cancellation.Never)?.verify()
+        val qualified = source.toleranceQualification(ExecutionControl.Never)?.verify()
 
         assertEquals(true, qualified)
     }
@@ -149,7 +149,7 @@ class MpsToleranceQualificationTest {
             absolute = SemanticRational.of(BIG_ONE, bigIntOf(20)),
         ))))
 
-        val qualified = source.toleranceQualification(Cancellation.Never)?.verify()
+        val qualified = source.toleranceQualification(ExecutionControl.Never)?.verify()
         val witness = assertNotNull(source.checkMpsWitness(listOf(BigFraction.ZERO, BigFraction.ONE)))
 
         assertEquals(false, qualified)
@@ -163,7 +163,7 @@ class MpsToleranceQualificationTest {
                 absolute = SemanticRational.ONE,
             ))))
 
-        val qualified = source.toleranceQualification(Cancellation.Never)?.verify()
+        val qualified = source.toleranceQualification(ExecutionControl.Never)?.verify()
         val witness = assertNotNull(source.checkMpsWitness(listOf(BigFraction.MINUS_ONE)))
 
         assertEquals(false, qualified)
@@ -177,7 +177,7 @@ class MpsToleranceQualificationTest {
                 " J R -1000000000\n M1 'MARKER' 'INTEND'\nRHS\n RHS R -1\nENDATA",
         ).toLinearSourceProblem())
 
-        val qualified = source.toleranceQualification(Cancellation.Never)?.verify()
+        val qualified = source.toleranceQualification(ExecutionControl.Never)?.verify()
         val witness = assertNotNull(source.checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ONE)))
 
         assertEquals(false, qualified)
@@ -191,7 +191,7 @@ class MpsToleranceQualificationTest {
                 absolute = SemanticRational.of(BIG_ONE, bigIntOf(2)),
             ))))
 
-        val qualified = source.toleranceQualification(Cancellation.Never)?.verify()
+        val qualified = source.toleranceQualification(ExecutionControl.Never)?.verify()
 
         assertEquals(true, qualified)
     }
@@ -203,7 +203,7 @@ class MpsToleranceQualificationTest {
                 relative = SemanticRational.ONE,
             ))))
 
-        val qualified = source.toleranceQualification(Cancellation.Never)?.verify()
+        val qualified = source.toleranceQualification(ExecutionControl.Never)?.verify()
         val witness = assertNotNull(source.checkMpsWitness(listOf(BigFraction.ONE)))
 
         assertEquals(false, qualified)
@@ -218,7 +218,7 @@ class MpsToleranceQualificationTest {
         for ((policy, covered) in cases) {
             val source = assertNotNull(parsed.toLinearSourceProblem(SemanticOverrides(feasibilityTolerance = policy)))
 
-            val qualified = source.toleranceQualification(Cancellation.Never)?.verify()
+            val qualified = source.toleranceQualification(ExecutionControl.Never)?.verify()
 
             assertEquals(covered, qualified)
         }
@@ -229,7 +229,7 @@ class MpsToleranceQualificationTest {
         val source = assertNotNull(Mps.parse("ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1\nENDATA")
             .toLinearSourceProblem())
 
-        val qualified = source.toleranceQualification(Cancellation { true })
+        val qualified = source.toleranceQualification(ExecutionControl { true })
 
         assertEquals(null, qualified)
     }

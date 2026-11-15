@@ -4,12 +4,12 @@ import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class CompletedMoveEvaluation(
     private val state: LocalSearchState,
     private val objective: Objective,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
     private val mayAttempt: () -> Boolean,
     private val complete: (Sample) -> Completion,
     private val current: () -> Sample,
@@ -114,7 +114,9 @@ internal class CompletedMoveEvaluation(
         val exploring = exploration?.takeIf { it in distinct }
             ?: distinct[proposal % distinct.size]
         proposal = if (proposal == Int.MAX_VALUE) 0 else proposal + 1
-        val ranked = if (deterministic) finiteMoves.minByOrNull(rawScore) else {
+        val ranked = if (deterministic) {
+            finiteMoves.minByOrNull(rawScore)
+        } else {
             AcceptanceRule.Greedy.choose(state.rng, finiteMoves, emptyList(), 1.0, rawScore)
         }
         if (ranked != null && rawScore(ranked) < 0.0) {

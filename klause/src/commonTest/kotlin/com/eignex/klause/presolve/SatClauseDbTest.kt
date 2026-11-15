@@ -5,7 +5,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -76,7 +76,7 @@ class SatClauseDbTest {
         )
         for (short in listOf(false, true)) {
             val full = PresolveBudget(Long.MAX_VALUE)
-            val token = full.orSpent(Cancellation.Never)
+            val token = full.orSpent(ExecutionControl.Never)
             val complete = assertNotNull(
                 if (short) {
                     SatClauseDb.buildShortClauses(problem, 8) {
@@ -93,7 +93,7 @@ class SatClauseDbTest {
             assertEquals(1, complete.origin(0))
             for (allowance in 1L..full.spent() step 7) {
                 val budget = PresolveBudget(allowance)
-                val stop = budget.orSpent(Cancellation.Never)
+                val stop = budget.orSpent(ExecutionControl.Never)
 
                 val partial = if (short) {
                     SatClauseDb.buildShortClauses(problem, 8) {
@@ -115,7 +115,7 @@ class SatClauseDbTest {
         val problem = Problem(3, 0, emptyArray(), listOf(Clause(intArrayOf(pos(0), pos(1), pos(2)))))
         var polls = 0
 
-        val partial = SatClauseDb.build(problem, emptySet(), Cancellation { ++polls >= 17 })
+        val partial = SatClauseDb.build(problem, emptySet(), ExecutionControl { ++polls >= 17 })
 
         assertNull(partial)
         assertEquals(17, polls)

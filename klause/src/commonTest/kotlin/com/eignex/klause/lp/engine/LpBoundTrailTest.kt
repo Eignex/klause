@@ -3,7 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -114,7 +114,7 @@ class LpBoundTrailTest {
         val trail = LpBoundTrail(model)
         val before = trail.state
         var polls = 0
-        val during = Cancellation { ++polls >= 2 }
+        val during = ExecutionControl { ++polls >= 2 }
 
         assertFalse(trail.assertBound(0, false, ExactLpSide(zero), 1L, during))
 
@@ -125,7 +125,7 @@ class LpBoundTrailTest {
         assertFalse(trail.pop(1))
         assertFalse(trail.recenter(emptyList()))
         assertFalse(trail.replaceObjective(ExactLpObjective(listOf(zero))))
-        assertFalse(trail.push(Cancellation { true }))
+        assertFalse(trail.push(ExecutionControl { true }))
         assertSame(before, trail.state)
     }
 
@@ -198,7 +198,7 @@ class LpBoundTrailTest {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 refactorUpdateLimit: Int,
                 iterationLimit: Int,
                 workLimit: Long,
@@ -207,7 +207,7 @@ class LpBoundTrailTest {
             ): PersistentLpSolver {
                 val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                 return object : PersistentLpSolver by delegate {
-                    override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+                    override fun adopt(state: LpExactState, token: ExecutionControl): Boolean =
                         !reject && delegate.adopt(state, token)
                 }
             }
@@ -321,7 +321,7 @@ class LpBoundTrailTest {
             val before = trail.state
             var polls = 0
 
-            assertIs<LpBoundBatchResult.Declined>(trail.assertBounds(updates, Cancellation { ++polls >= stop }))
+            assertIs<LpBoundBatchResult.Declined>(trail.assertBounds(updates, ExecutionControl { ++polls >= stop }))
 
             assertSame(before, trail.state)
         }
@@ -362,7 +362,7 @@ class LpBoundTrailTest {
                 val basis = assertNotNull(solver.continuationBasis(model))
                 var polls = 0
 
-                assertFalse(solver.adopt(LpExactState(source), Cancellation { ++polls >= stop }))
+                assertFalse(solver.adopt(LpExactState(source), ExecutionControl { ++polls >= stop }))
 
                 val retained = assertNotNull(solver.continuationBasis(model))
                 assertContentEquals(basis.basicVars, retained.basicVars)
@@ -385,7 +385,7 @@ class LpBoundTrailTest {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 refactorUpdateLimit: Int,
                 iterationLimit: Int,
                 workLimit: Long,
@@ -394,7 +394,7 @@ class LpBoundTrailTest {
             ): PersistentLpSolver {
                 val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                 return object : PersistentLpSolver by delegate {
-                    override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+                    override fun adopt(state: LpExactState, token: ExecutionControl): Boolean {
                         val accepted = delegate.adopt(state, token)
                         if (fail) throw primary
                         return accepted

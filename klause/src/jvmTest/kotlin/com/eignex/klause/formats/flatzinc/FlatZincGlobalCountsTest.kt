@@ -2,10 +2,10 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.propagation.bake
-import kotlin.test.Test
-import kotlin.test.assertEquals
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 @RunWith(Parameterized::class)
 class FlatZincGlobalCountsTest(private val constraint: String, private val expected: Int) {

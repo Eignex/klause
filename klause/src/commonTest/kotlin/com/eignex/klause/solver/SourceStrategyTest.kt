@@ -55,7 +55,7 @@ import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.solver.result.QuadraticClaim
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.skema.SchemaDef
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
@@ -713,7 +713,7 @@ class SourceStrategyTest {
             realUpper = doubleArrayOf(1.0, 0.0),
         )
         for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
-            val cancelled = strategy.solve(PolynomialTheoryParams(cancellation = Cancellation { true }))
+            val cancelled = strategy.solve(PolynomialTheoryParams(cancellation = ExecutionControl { true }))
             assertEquals(TerminationReason.Cancelled, assertIs<OpenTheoryResult.Unknown>(cancelled).reason)
 
             assertIs<OpenTheoryResult.Sat>(strategy.solve())

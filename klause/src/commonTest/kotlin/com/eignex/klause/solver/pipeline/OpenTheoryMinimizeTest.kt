@@ -7,7 +7,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ZERO
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -100,7 +100,7 @@ class OpenTheoryMinimizeTest {
 
         val sliced = minimizer.descent(TheoryParams()).use { descent ->
             var verdict: OpenTheoryOptimum? = null
-            while (verdict == null) verdict = descent.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) { _, _ -> }
+            while (verdict == null) verdict = descent.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L) { _, _ -> }
             verdict
         }
 
@@ -115,7 +115,7 @@ class OpenTheoryMinimizeTest {
         val minimizer = OpenTheoryMinimizer(parsed.model, objective)
 
         val result = minimizer.descent(TheoryParams()) { BIG_ZERO }.use { descent ->
-            descent.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceWork = -1L) { _, _ -> }
+            descent.runSlice(ExecutionControl.Never, Long.MAX_VALUE, sliceWork = -1L) { _, _ -> }
         }
 
         val bounded = assertIs<OpenTheoryOptimum.Bounded>(result)
@@ -162,7 +162,7 @@ class OpenTheoryMinimizeTest {
         val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
 
         val result = OpenTheoryMinimizer(parsed.model, objective)
-            .minimize(TheoryParams(cancellation = Cancellation { true }))
+            .minimize(TheoryParams(cancellation = ExecutionControl { true }))
 
         assertIs<OpenTheoryOptimum.Bounded>(result)
         assertNull(result.incumbent)
@@ -193,7 +193,7 @@ class OpenTheoryMinimizeTest {
                 objective,
                 PresolveConfig.NONE,
                 solutionSetSensitive = false,
-                presolveCancellation = Cancellation.Never,
+                presolveCancellation = ExecutionControl.Never,
                 presolveBudget = null,
             )
             val result = assertIs<OpenTheoryOptimum.Bounded>(
@@ -222,7 +222,7 @@ class OpenTheoryMinimizeTest {
             objective,
             PresolveConfig.NONE,
             solutionSetSensitive = false,
-            presolveCancellation = Cancellation.Never,
+            presolveCancellation = ExecutionControl.Never,
             presolveBudget = null,
         )
 

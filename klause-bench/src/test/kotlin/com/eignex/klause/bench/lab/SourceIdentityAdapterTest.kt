@@ -9,11 +9,11 @@ import com.eignex.lab.bench.BenchProtocol
 import com.eignex.lab.bench.BenchRequest
 import com.eignex.lab.bench.BenchStatus
 import com.github.luben.zstd.Zstd
-import java.nio.file.Files
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.nio.file.Files
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse

@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.lattice
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -101,9 +101,9 @@ class BareissEchelonTest {
     fun `cancellation within a support merge should discard all partial deductions`() {
         val row = sparseIntRow((0 until 129).associateWith { bigIntOf(1) })
         var spent = 0L
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = spent >= 65 * LATTICE_WORK_WEIGHT
-            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+            override val accounting: WorkMeter get() = WorkMeter { spent += it }
         }
 
         val e = bareissEchelon(listOf(SparseIntRow.Zero, SparseIntRow.Zero, row, row), 129, vec(0, 1, 1, 1), token)
@@ -121,9 +121,9 @@ class BareissEchelonTest {
         for (width in listOf(1, 3, 129)) {
             val row = sparseIntRow((0 until width).associateWith { bigIntOf(1) })
             var spent = 0L
-            val token = object : Cancellation {
+            val token = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = false
-                override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+                override val accounting: WorkMeter get() = WorkMeter { spent += it }
             }
 
             val e = bareissEchelon(listOf(row, row), width, vec(1, 1), token)

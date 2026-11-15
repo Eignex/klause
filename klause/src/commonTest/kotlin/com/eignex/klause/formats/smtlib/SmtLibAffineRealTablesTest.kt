@@ -1,5 +1,4 @@
 package com.eignex.klause.formats.smtlib
-
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.ir.LinearOp
@@ -7,7 +6,8 @@ import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -152,7 +152,7 @@ class SmtLibAffineRealTablesTest {
 
     @Test
     fun `exhausted optional capture supplies no partial table equation`() {
-        val capture = SmtLibAffineRealTables(Cancellation.Never, entryLimit = 1)
+        val capture = SmtLibAffineRealTables(ExecutionControl.Never, entryLimit = 1)
         capture.declarations(listOf(0, 1))
         capture.equality(4, RealComb(emptyMap(), mapOf(0 to BigFraction.ONE), BigFraction.ZERO))
         capture.implication(intArrayOf(0, 4), trueLiteral = -1)
@@ -163,9 +163,9 @@ class SmtLibAffineRealTablesTest {
     @Test
     fun `scalar capture forwards overridden caller charges and respects containing cancellation`() {
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 64
-            override fun charge(units: Long) { charged += units }
+            override val accounting = WorkMeter { units -> charged += units }
         }
         val capture = SmtLibAffineRealTables(stop)
         capture.declarations(listOf(0, 1))
@@ -179,17 +179,16 @@ class SmtLibAffineRealTablesTest {
     @Test
     fun `containing cancellation is observed after an optional capture decline`() {
         var cancelled = false
-        val capture = SmtLibAffineRealTables(Cancellation { cancelled }, entryLimit = 0)
+        val capture = SmtLibAffineRealTables(ExecutionControl { cancelled }, entryLimit = 0)
         capture.declarations(listOf(0, 1))
         cancelled = true
 
         assertFailsWith<PolynomialSourceInterrupted> { capture.infer() }
     }
 
-
     @Test
     fun `a completed table survives exhaustion while a later table is still being prepared`() {
-        val capture = SmtLibAffineRealTables(Cancellation.Never, entryLimit = 20_000)
+        val capture = SmtLibAffineRealTables(ExecutionControl.Never, entryLimit = 20_000)
         capture.declarations((0 until 8).toList())
         for (value in 0..2) {
             capture.equality(200 + 2 * value,
@@ -202,11 +201,13 @@ class SmtLibAffineRealTablesTest {
             capture.conjunction(1000 + 2 * assignment, cube, trueLiteral = -1)
             capture.implication(intArrayOf(1000 + 2 * assignment, 200 + 2 * assignment.countOneBits()), -1)
         }
-        for (variable in 0 until 8) for (value in 0..1) {
+        for (variable in 0 until 8) {
+            for (value in 0..1) {
             val equality = 400 + 4 * variable + 2 * value
             capture.equality(equality,
                 RealComb(emptyMap(), mapOf(variable to BigFraction.ONE), BigFraction.ofLong(-value.toLong())))
             capture.implication(intArrayOf(2 * variable + 1 - value, equality), trueLiteral = -1)
+        }
         }
         capture.equality(900, RealComb(emptyMap(), mapOf(9 to BigFraction.ONE), BigFraction.ZERO))
         for (assignment in 0 until 256) {
@@ -226,13 +227,15 @@ class SmtLibAffineRealTablesTest {
 
     @Test
     fun `a small capture allowance still completes a unit coefficient table`() {
-        val capture = SmtLibAffineRealTables(Cancellation.Never, entryLimit = 512)
+        val capture = SmtLibAffineRealTables(ExecutionControl.Never, entryLimit = 512)
         capture.declarations(listOf(0, 1))
-        for (variable in 0 until 2) for (value in 0..1) {
+        for (variable in 0 until 2) {
+            for (value in 0..1) {
             val equality = 100 + 4 * variable + 2 * value
             capture.equality(equality,
                 RealComb(emptyMap(), mapOf(variable to BigFraction.ONE), BigFraction.ofLong(-value.toLong())))
             capture.implication(intArrayOf(2 * variable + 1 - value, equality), trueLiteral = -1)
+        }
         }
         for (value in 0..2) {
             capture.equality(200 + 2 * value,

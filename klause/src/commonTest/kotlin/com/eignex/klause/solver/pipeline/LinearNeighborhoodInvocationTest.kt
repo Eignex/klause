@@ -12,7 +12,7 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
@@ -48,7 +48,7 @@ class LinearNeighborhoodInvocationTest {
         val request = OpenTheoryRequest(source, LinearObjective(realCoefficients = doubleArrayOf(1.0)))
         val third = BigFraction.ofLong(3).reciprocal()
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-        val original = assertNotNull(request.linearAuthorityContext(Cancellation.Never))
+        val original = assertNotNull(request.linearAuthorityContext(ExecutionControl.Never))
         val context = SourceProofContext(
             original.scope.copy(
                 condition = SourceCondition(

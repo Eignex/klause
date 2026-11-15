@@ -20,7 +20,7 @@ import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -40,8 +40,8 @@ class LinearRefutationReuseTest {
             "right" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE,
                 y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
         ))
-        val cache = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never)
-        val learned = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never, resolve = true)
+        val cache = LinearRefutationReuse(source, SourceLpBudget(), ExecutionControl.Never)
+        val learned = LinearRefutationReuse(source, SourceLpBudget(), ExecutionControl.Never, resolve = true)
         learned.name(x, BigFraction.ZERO, 0)
         learned.name(y, BigFraction.ZERO, 2)
         for (upper in listOf(true, false)) {
@@ -98,9 +98,9 @@ class LinearRefutationReuseTest {
                 SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, false)),
                 SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(z, true)),
             ))))
-        val cache = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never)
+        val cache = LinearRefutationReuse(source, SourceLpBudget(), ExecutionControl.Never)
         var stopped = false
-        val learned = LinearRefutationReuse(source, SourceLpBudget(), Cancellation { stopped }, resolve = true)
+        val learned = LinearRefutationReuse(source, SourceLpBudget(), ExecutionControl { stopped }, resolve = true)
         learned.name(x, BigFraction.ZERO, 2)
         learned.name(y, BigFraction.ZERO, 4)
         learned.name(z, BigFraction.ZERO, 6)
@@ -153,7 +153,7 @@ class LinearRefutationReuseTest {
 
     @Test
     fun `an unnamed real predicate should retain cache reuse without admitting resolution`() {
-        val reuse = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never, resolve = true)
+        val reuse = LinearRefutationReuse(source, SourceLpBudget(), ExecutionControl.Never, resolve = true)
         reuse.retain(evidence)
 
         val reused = assertNotNull(reuse.find(restricted.condition))
@@ -177,7 +177,7 @@ class LinearRefutationReuseTest {
                 SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(left, upper)),
                 SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(right, upper)),
             )))
-            val reuse = LinearRefutationReuse(context, SourceLpBudget(), Cancellation.Never)
+            val reuse = LinearRefutationReuse(context, SourceLpBudget(), ExecutionControl.Never)
             val full = SourceCondition().bound(left, BigFraction.ZERO, upper).bound(right, BigFraction.ZERO, upper)
             reuse.retain(SourceEvidence(scope.copy(condition = full), SourceClaim.Refutation, conflict))
             for (endpoint in listOf(BigFraction.ZERO, coefficient)) {
@@ -212,7 +212,7 @@ class LinearRefutationReuseTest {
             SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
             SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(integer, true)),
         )))
-        val reuse = LinearRefutationReuse(local, SourceLpBudget(), Cancellation.Never)
+        val reuse = LinearRefutationReuse(local, SourceLpBudget(), ExecutionControl.Never)
         reuse.retain(SourceEvidence(local.scope.copy(condition = opening.pin(0, true)
             .bound(integer, BigFraction.ZERO, true)), SourceClaim.Refutation, conflict))
 
@@ -234,7 +234,7 @@ class LinearRefutationReuseTest {
         )))
         var polls = 0
         var stopAfter = Int.MAX_VALUE
-        val reuse = LinearRefutationReuse(local, SourceLpBudget(), Cancellation { ++polls >= stopAfter })
+        val reuse = LinearRefutationReuse(local, SourceLpBudget(), ExecutionControl { ++polls >= stopAfter })
         reuse.retain(SourceEvidence(scope.copy(condition = SourceCondition(upper = mapOf(integer to BigFraction.ZERO))),
             SourceClaim.Refutation, conflict))
         polls = 0
@@ -249,7 +249,7 @@ class LinearRefutationReuseTest {
 
     @Test
     fun `real and nonintegral missing sides should decline unit propagation`() {
-        val reuse = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never)
+        val reuse = LinearRefutationReuse(source, SourceLpBudget(), ExecutionControl.Never)
         reuse.retain(evidence)
         assertNull(reuse.unit(SourceCondition()))
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
@@ -259,7 +259,7 @@ class LinearRefutationReuseTest {
             SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
             SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(integer, true)),
         )))
-        val integral = LinearRefutationReuse(local, SourceLpBudget(), Cancellation.Never)
+        val integral = LinearRefutationReuse(local, SourceLpBudget(), ExecutionControl.Never)
         integral.retain(SourceEvidence(scope.copy(condition = SourceCondition(upper =
             mapOf(integer to BigFraction.ofLong(2).reciprocal()))), SourceClaim.Refutation, conflict))
 
@@ -268,7 +268,7 @@ class LinearRefutationReuseTest {
 
     @Test
     fun `support reduction should reuse a checked refutation after an unrelated bound changes`() {
-        val reuse = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never)
+        val reuse = LinearRefutationReuse(source, SourceLpBudget(), ExecutionControl.Never)
         reuse.retain(evidence)
         val condition = SourceCondition(upper = mapOf(x to BigFraction.ZERO, other to BigFraction.MINUS_ONE))
 
@@ -290,7 +290,7 @@ class LinearRefutationReuseTest {
                 SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper)),
             )))
             val condition = SourceCondition().bound(x, BigFraction.ZERO, upper)
-            val reuse = LinearRefutationReuse(context, SourceLpBudget(), Cancellation.Never)
+            val reuse = LinearRefutationReuse(context, SourceLpBudget(), ExecutionControl.Never)
             reuse.retain(SourceEvidence(scope.copy(condition = condition), SourceClaim.Refutation, conflict))
 
             for (value in listOf(BigFraction.ZERO, coefficient)) {
@@ -310,7 +310,7 @@ class LinearRefutationReuseTest {
                 SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper)),
             )))
             val condition = SourceCondition().bound(x, BigFraction.ZERO, upper)
-            val reuse = LinearRefutationReuse(context, SourceLpBudget(), Cancellation.Never)
+            val reuse = LinearRefutationReuse(context, SourceLpBudget(), ExecutionControl.Never)
             reuse.retain(SourceEvidence(scope.copy(condition = condition), SourceClaim.Refutation, conflict))
             val conditions = listOf(SourceCondition(),
                 SourceCondition().bound(x, coefficient.negated(), upper),
@@ -325,7 +325,7 @@ class LinearRefutationReuseTest {
         val window = SourceCondition(lower = mapOf(other to BigFraction.ZERO),
             upper = mapOf(other to BigFraction.ONE))
         val local = source.atScope(scope.copy(condition = window))
-        val reuse = LinearRefutationReuse(local, SourceLpBudget(), Cancellation.Never)
+        val reuse = LinearRefutationReuse(local, SourceLpBudget(), ExecutionControl.Never)
         val conditioned = SourceCondition(window.bools, window.lower, window.upper + (x to BigFraction.ZERO))
         reuse.retain(SourceEvidence(local.scope.copy(condition = conditioned), SourceClaim.Refutation, proof))
 
@@ -337,7 +337,7 @@ class LinearRefutationReuseTest {
     fun `reuse should retain complete Boolean substitutions after numeric support reduction`() {
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
         val guarded = SourceProofContext(scope, source.coordinates + bool, source.premises)
-        val reuse = LinearRefutationReuse(guarded, SourceLpBudget(), Cancellation.Never)
+        val reuse = LinearRefutationReuse(guarded, SourceLpBudget(), ExecutionControl.Never)
         val condition = SourceCondition(bools = mapOf(0 to true), upper = mapOf(x to BigFraction.ZERO))
         reuse.retain(SourceEvidence(scope.copy(condition = condition), SourceClaim.Refutation, proof))
 
@@ -350,7 +350,7 @@ class LinearRefutationReuseTest {
     fun `a proof with open Boolean coordinates should not enter reuse`() {
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
         val guarded = SourceProofContext(scope, source.coordinates + bool, source.premises)
-        val reuse = LinearRefutationReuse(guarded, SourceLpBudget(), Cancellation.Never)
+        val reuse = LinearRefutationReuse(guarded, SourceLpBudget(), ExecutionControl.Never)
 
         reuse.retain(evidence)
 
@@ -364,7 +364,7 @@ class LinearRefutationReuseTest {
         val rows = mapOf("guarded" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE),
             emptyMap(), mapOf(integer to BigFraction.ZERO)))
         val guarded = SourceProofContext(scope, setOf(integer), rows)
-        val reuse = LinearRefutationReuse(guarded, SourceLpBudget(), Cancellation.Never)
+        val reuse = LinearRefutationReuse(guarded, SourceLpBudget(), ExecutionControl.Never)
         val condition = SourceCondition(lower = mapOf(integer to BigFraction.ZERO),
             upper = mapOf(integer to BigFraction.ZERO))
         val derived = LinearPinnedRefutation(SourceDerivation.Premise("guarded"))
@@ -386,7 +386,7 @@ class LinearRefutationReuseTest {
         )
 
         for (otherScope in foreign) {
-            val reuse = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never)
+            val reuse = LinearRefutationReuse(source, SourceLpBudget(), ExecutionControl.Never)
             reuse.retain(SourceEvidence(otherScope, SourceClaim.Refutation, proof))
 
             assertNull(reuse.find(restricted.condition))
@@ -398,7 +398,7 @@ class LinearRefutationReuseTest {
         val changed = SourceProofContext(scope, setOf(x, other), mapOf(
             "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
         ))
-        val reuse = LinearRefutationReuse(changed, SourceLpBudget(), Cancellation.Never)
+        val reuse = LinearRefutationReuse(changed, SourceLpBudget(), ExecutionControl.Never)
 
         reuse.retain(evidence)
 
@@ -407,7 +407,7 @@ class LinearRefutationReuseTest {
 
     @Test
     fun `objective bounds should not enter refutation reuse`() {
-        val reuse = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never)
+        val reuse = LinearRefutationReuse(source, SourceLpBudget(), ExecutionControl.Never)
 
         reuse.retain(SourceEvidence(restricted, SourceClaim.Bound(BigFraction.ONE), proof))
 
@@ -418,7 +418,7 @@ class LinearRefutationReuseTest {
     fun `cancelled import verification should preserve the retained alternative for a later check`() {
         var polls = 0
         var stopAfter = Int.MAX_VALUE
-        val reuse = LinearRefutationReuse(source, SourceLpBudget(), Cancellation { ++polls >= stopAfter })
+        val reuse = LinearRefutationReuse(source, SourceLpBudget(), ExecutionControl { ++polls >= stopAfter })
         reuse.retain(evidence)
         polls = 0
         stopAfter = 20
@@ -434,7 +434,7 @@ class LinearRefutationReuseTest {
     fun `an exhausted cumulative grant should withhold reuse without discarding a proof`() {
         val funding = SourceLpFunding(1_000_000L, 1_000_000L).apply { grant(1_000_000L) }
         val budget = SourceLpBudget(funding = funding)
-        val reuse = LinearRefutationReuse(source, budget, Cancellation.Never)
+        val reuse = LinearRefutationReuse(source, budget, ExecutionControl.Never)
         reuse.retain(evidence)
         funding.grant(0L)
 
@@ -448,7 +448,7 @@ class LinearRefutationReuseTest {
     fun `reuse allocation admission should retire the cache before exhausting numerical funding`() {
         for (allocation in listOf(32_768L, 1_000_000L)) {
             val funding = SourceLpFunding(1_000_000L, allocation).apply { grant(1_000_000L) }
-            val reuse = LinearRefutationReuse(source, SourceLpBudget(funding = funding), Cancellation.Never,
+            val reuse = LinearRefutationReuse(source, SourceLpBudget(funding = funding), ExecutionControl.Never,
                 maximumAllocation = 8192L)
             reuse.retain(evidence)
             assertNotNull(reuse.find(restricted.condition))
@@ -471,7 +471,7 @@ class LinearRefutationReuseTest {
         val context = SourceProofContext(scope, source.coordinates, rows)
         val funding = SourceLpFunding(1_000_000L, 16_000_000L).apply { grant(32L) }
         val budget = SourceLpBudget(funding = funding)
-        val reuse = LinearRefutationReuse(context, budget, Cancellation.Never)
+        val reuse = LinearRefutationReuse(context, budget, ExecutionControl.Never)
 
         reuse.retain(evidence)
 
@@ -487,7 +487,7 @@ class LinearRefutationReuseTest {
         }
         val context = SourceProofContext(scope, source.coordinates, rows)
         val funding = SourceLpFunding(1_000_000L, 96_000L).apply { grant(1_000_000L) }
-        val reuse = LinearRefutationReuse(context, SourceLpBudget(funding = funding), Cancellation.Never,
+        val reuse = LinearRefutationReuse(context, SourceLpBudget(funding = funding), ExecutionControl.Never,
             maximumAllocation = 6_000L)
 
         reuse.retain(evidence)
@@ -501,7 +501,7 @@ class LinearRefutationReuseTest {
     @Test
     fun `entry eviction should keep the newer proof and charge cleanup work`() {
         val budget = SourceLpBudget()
-        val reuse = LinearRefutationReuse(source, budget, Cancellation.Never, maximumEntries = 1)
+        val reuse = LinearRefutationReuse(source, budget, ExecutionControl.Never, maximumEntries = 1)
         reuse.retain(evidence)
         val stronger = scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.MINUS_ONE)))
         reuse.retain(SourceEvidence(stronger, SourceClaim.Refutation, proof))
@@ -517,7 +517,7 @@ class LinearRefutationReuseTest {
 
     @Test
     fun `proofs exceeding the retention allocation should leave all queries open`() {
-        val reuse = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never, maximumBytes = 64L)
+        val reuse = LinearRefutationReuse(source, SourceLpBudget(), ExecutionControl.Never, maximumBytes = 64L)
 
         reuse.retain(evidence)
 
@@ -527,7 +527,7 @@ class LinearRefutationReuseTest {
 
     @Test
     fun `source lifecycle should distinguish a checked lookup from consumed pruning`() {
-        val reuse = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never)
+        val reuse = LinearRefutationReuse(source, SourceLpBudget(), ExecutionControl.Never)
         reuse.retain(evidence)
         assertNotNull(reuse.find(restricted.condition))
         assertNull(reuse.observations()["learningSourceRefutationConsumed"])

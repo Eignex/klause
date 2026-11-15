@@ -38,11 +38,20 @@ internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
         }
     }
     sample.ownedReferences(lazyReasonMemo, lazyReasonMemo.size.toLong() * 2L, true)
-    lazyReasonMemo.forEach { (marker, reason) -> sample.step(); add(marker); add(reason) }
+    lazyReasonMemo.forEach { (marker, reason) ->
+        sample.step()
+        add(marker)
+        add(reason)
+    }
     add(nativeConflictReason)
     add(atoms.pendingMoveAnt)
-    sample.record(mapOf("reasonPayloadBytes" to reasonBytes, "reasonArrays" to reasons.size.toLong(),
-        "reasonReferenceSlots" to reasonSlots))
+    sample.record(
+        mapOf(
+            "reasonPayloadBytes" to reasonBytes,
+            "reasonArrays" to reasons.size.toLong(),
+            "reasonReferenceSlots" to reasonSlots,
+        ),
+    )
 
     val atomColumns = listOf(atoms.intVar, atoms.truth, atoms.lvl, atoms.undoAtomId, atoms.undoTruth, atoms.undoLvl)
     val atomRuns = sample.seenIdentities<VarAtomIndex>()
@@ -53,17 +62,19 @@ internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
         atomBytes += column.backingData.size.toLong() * Int.SIZE_BYTES
         sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, true)
     }
-    for (indexes in listOf(atoms.byIntVar, atoms.watchedByVar)) for (index in indexes) {
-        sample.step()
-        if (index == null || !sample.retain(atomRuns, index)) continue
-        for (run in listOf(index.ge, index.le, index.eq)) {
+    for (indexes in listOf(atoms.byIntVar, atoms.watchedByVar)) {
+        for (index in indexes) {
             sample.step()
-            atomBytes += run.mainKeys.allocatedBytes + run.pendKeys.allocatedBytes +
-                (run.mainIds.backingData.size.toLong() + run.pendIds.backingData.size) * Int.SIZE_BYTES
-            sample.owned(run.mainKeys, run.mainKeys.allocatedBytes, true)
-            sample.owned(run.pendKeys, run.pendKeys.allocatedBytes, true)
-            sample.owned(run.mainIds.backingData, run.mainIds.backingData.size.toLong() * Int.SIZE_BYTES, true)
-            sample.owned(run.pendIds.backingData, run.pendIds.backingData.size.toLong() * Int.SIZE_BYTES, true)
+            if (index == null || !sample.retain(atomRuns, index)) continue
+            for (run in listOf(index.ge, index.le, index.eq)) {
+                sample.step()
+                atomBytes += run.mainKeys.allocatedBytes + run.pendKeys.allocatedBytes +
+                    (run.mainIds.backingData.size.toLong() + run.pendIds.backingData.size) * Int.SIZE_BYTES
+                sample.owned(run.mainKeys, run.mainKeys.allocatedBytes, true)
+                sample.owned(run.pendKeys, run.pendKeys.allocatedBytes, true)
+                sample.owned(run.mainIds.backingData, run.mainIds.backingData.size.toLong() * Int.SIZE_BYTES, true)
+                sample.owned(run.pendIds.backingData, run.pendIds.backingData.size.toLong() * Int.SIZE_BYTES, true)
+            }
         }
     }
     sample.ownedReferences(atoms.byIntVar, atoms.byIntVar.size.toLong(), true)
@@ -72,18 +83,21 @@ internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
     sample.ownedReferences(atoms.watchersByLit, atoms.watchersByLit.size.toLong(), true)
     var channelBytes = 0L
     for (pending in pendingChanneling) {
-        sample.step(); channelBytes += pending.size.toLong() * Int.SIZE_BYTES
+        sample.step()
+        channelBytes += pending.size.toLong() * Int.SIZE_BYTES
         sample.owned(pending, pending.size.toLong() * Int.SIZE_BYTES, true)
     }
     sample.ownedReferences(pendingChanneling, pendingChanneling.size.toLong(), true)
-    sample.record(mapOf(
-        "atomCapacityBytes" to atomBytes,
-        "atomReferenceSlots" to atoms.kind.size.toLong() + atoms.ant.size + atoms.undoAnt.size +
-            atoms.watchersByLit.size + atoms.byIntVar.size + atoms.watchedByVar.size,
-        "pendingChannelingPayloadBytes" to channelBytes,
-        "pendingChannelingReferenceSlots" to pendingChanneling.size.toLong(),
-        "atomCount" to atoms.intVar.size.toLong(),
-    ))
+    sample.record(
+        mapOf(
+            "atomCapacityBytes" to atomBytes,
+            "atomReferenceSlots" to atoms.kind.size.toLong() + atoms.ant.size + atoms.undoAnt.size +
+                atoms.watchersByLit.size + atoms.byIntVar.size + atoms.watchedByVar.size,
+            "pendingChannelingPayloadBytes" to channelBytes,
+            "pendingChannelingReferenceSlots" to pendingChanneling.size.toLong(),
+            "atomCount" to atoms.intVar.size.toLong(),
+        ),
+    )
     reasonIndexMemory(sample)
 }
 
@@ -102,7 +116,10 @@ private fun PropagationState.protectedLearnedMemory(
     intMaxReason.forEach(::protect)
     for (i in 0 until undo.size) {
         sample.step()
-        if (undo.tag[i] == 1) { protect(undo.minReason[i]); protect(undo.maxReason[i]) }
+        if (undo.tag[i] == 1) {
+            protect(undo.minReason[i])
+            protect(undo.maxReason[i])
+        }
     }
     for (i in 0 until learned.pendingAttach.size) {
         sample.step()
@@ -157,11 +174,13 @@ private fun PropagationState.learnedSharingMemory(
         add(propagator.initialIntEventWatches)
         when (propagator) {
             is ClausePropagator -> add(propagator.literals)
+
             is PseudoBooleanPropagator -> {
                 add(propagator.literals)
                 add(propagator.byWeightDesc)
                 addLong(propagator.weights)
             }
+
             is LearnedIntegerPropagator -> {
                 protectedInteger = protectedInteger || retained
                 add(propagator.row.variables)
@@ -184,7 +203,8 @@ private fun PropagationState.learnedSharingMemory(
         learned.store[index, GeneralLearnedRows.PERMANENT] == 1 || sample.contains(protected, index)
     }
     for (column in columns) {
-        sample.step(); metadata += column.backingData.size.toLong() * Int.SIZE_BYTES
+        sample.step()
+        metadata += column.backingData.size.toLong() * Int.SIZE_BYTES
         sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, protectedRows)
     }
     sample.ownedReferences(refPayloadStore, refPayloadStore.size.toLong(), baseFactorCount > 0 || protectedRows)
@@ -209,8 +229,11 @@ private fun PropagationState.learnedSharingMemory(
         sample.step()
         if (posting == null) continue
         watchers += posting.backingData.size.toLong() * Int.SIZE_BYTES
-        sample.owned(posting.backingData, posting.backingData.size.toLong() * Int.SIZE_BYTES,
-            protectedPosting(sample, posting, protected))
+        sample.owned(
+            posting.backingData,
+            posting.backingData.size.toLong() * Int.SIZE_BYTES,
+            protectedPosting(sample, posting, protected),
+        )
     }
     val events = intEvents
     val overflow = events.overflow
@@ -237,7 +260,8 @@ private fun PropagationState.learnedSharingMemory(
         if (list != null) sample.owned(list.backingData, list.backingData.size.toLong() * Int.SIZE_BYTES, true)
     }
     for (mark in events.dirtyMark) {
-        sample.step(); eventBytes += mark?.allocatedBytes ?: 0L
+        sample.step()
+        eventBytes += mark?.allocatedBytes ?: 0L
         if (mark != null) sample.owned(mark, mark.allocatedBytes, true)
     }
     sample.ownedReferences(events.dirtyVars, events.dirtyVars.size.toLong(), true)
@@ -246,54 +270,79 @@ private fun PropagationState.learnedSharingMemory(
     propagationSchedule?.let { sample.owned(it, it.capacityBytes, true) }
     sample.owned(atoms.dirtyFactors, atoms.dirtyFactors.allocatedBytes, true)
     sample.owned(learned.importUses, learned.importUses.allocatedBytes)
-    sample.record(mapOf(
-        "sessionEventCapacityBytes" to eventBytes,
-        "sessionEventIndexReferenceCapacity" to (overflow?.referenceCapacity?.toLong() ?: 0L),
-        "sessionEventLiveReferenceSlots" to events.dirtyVars.size.toLong() + events.dirtyMark.size,
-        "learnedObjects" to learned.size.toLong(),
-        "learnedRetiredSlots" to learned.retiredCount.toLong(),
-        "learnedPayloadBytes" to payload,
-        "learnedMetadataCapacityBytes" to metadata,
-        "learnedCapIndexStateBytes" to learned.capRanking.modeledBytes,
-        "learnedReferenceSlots" to learned.store.referenceCapacity + (learned.integerRows?.referenceCapacity ?: 0L),
-        "learnedIntegerRowCacheCapacityBytes" to (learned.integerRows?.let {
-            it.primitiveCapacityBytes + it.referenceCapacity * Long.SIZE_BYTES
-        } ?: 0L),
-        "learnedIntegerRowIndexBytes" to (learned.integerRows?.size?.toLong() ?: 0L) * Int.SIZE_BYTES,
-        "sessionWatchCapacityBytes" to watchers,
-        "sessionWatchIndexReferenceSlots" to watches.pos.referenceCapacity,
-        "sessionQueueCapacityBytes" to propQueue.allocatedBytes + atoms.dirtyFactors.allocatedBytes,
-        "propagationScheduleCapacityBytes" to (propagationSchedule?.capacityBytes ?: 0L),
-        "pendingAttachments" to learned.pendingAttach.size.toLong(),
-        "importUseCapacityBytes" to learned.importUses.allocatedBytes,
-        "retainedPeerImports" to peerImports,
-        "retainedConsumedPeerImports" to consumedPeerImports,
-        "retainedConsumed" to consumed,
-    ))
+    sample.record(
+        mapOf(
+            "sessionEventCapacityBytes" to eventBytes,
+            "sessionEventIndexReferenceCapacity" to (overflow?.referenceCapacity?.toLong() ?: 0L),
+            "sessionEventLiveReferenceSlots" to events.dirtyVars.size.toLong() + events.dirtyMark.size,
+            "learnedObjects" to learned.size.toLong(),
+            "learnedRetiredSlots" to learned.retiredCount.toLong(),
+            "learnedPayloadBytes" to payload,
+            "learnedMetadataCapacityBytes" to metadata,
+            "learnedCapIndexStateBytes" to learned.capRanking.modeledBytes,
+            "learnedReferenceSlots" to learned.store.referenceCapacity + (learned.integerRows?.referenceCapacity ?: 0L),
+            "learnedIntegerRowCacheCapacityBytes" to (
+                learned.integerRows?.let {
+                    it.primitiveCapacityBytes + it.referenceCapacity * Long.SIZE_BYTES
+                } ?: 0L
+                ),
+            "learnedIntegerRowIndexBytes" to (learned.integerRows?.size?.toLong() ?: 0L) * Int.SIZE_BYTES,
+            "sessionWatchCapacityBytes" to watchers,
+            "sessionWatchIndexReferenceSlots" to watches.pos.referenceCapacity,
+            "sessionQueueCapacityBytes" to propQueue.allocatedBytes + atoms.dirtyFactors.allocatedBytes,
+            "propagationScheduleCapacityBytes" to (propagationSchedule?.capacityBytes ?: 0L),
+            "pendingAttachments" to learned.pendingAttach.size.toLong(),
+            "importUseCapacityBytes" to learned.importUses.allocatedBytes,
+            "retainedPeerImports" to peerImports,
+            "retainedConsumedPeerImports" to consumedPeerImports,
+            "retainedConsumed" to consumed,
+        ),
+    )
 }
 
 private fun PropagationState.reasonIndexMemory(sample: SharingMemoryObservation) {
-    val journal = listOf(undo.tag, undo.varId, undo.level, undo.minLvl, undo.maxLvl,
-        undo.minReason, undo.maxReason, undo.holeHistLen)
+    val journal = listOf(
+        undo.tag,
+        undo.varId,
+        undo.level,
+        undo.minLvl,
+        undo.maxLvl,
+        undo.minReason,
+        undo.maxReason,
+        undo.holeHistLen,
+    )
     var journalBytes = undo.carved.allocatedBytes
     sample.owned(undo.carved, undo.carved.allocatedBytes, true)
     for (column in journal) {
-        sample.step(); journalBytes += column.backingData.size.toLong() * Int.SIZE_BYTES
+        sample.step()
+        journalBytes += column.backingData.size.toLong() * Int.SIZE_BYTES
         sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, true)
     }
     var historyBytes = 0L
-    for (columns in listOf(boundMoves, holeHistLvl, holeHistPos)) for (column in columns) {
-        sample.step()
-        historyBytes += (column?.backingData?.size?.toLong() ?: 0L) * Int.SIZE_BYTES
-        if (column != null) sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, true)
+    for (columns in listOf(boundMoves, holeHistLvl, holeHistPos)) {
+        for (column in columns) {
+            sample.step()
+            historyBytes += (column?.backingData?.size?.toLong() ?: 0L) * Int.SIZE_BYTES
+            if (column != null) {
+                sample.owned(
+                    column.backingData,
+                    column.backingData.size.toLong() * Int
+                        .SIZE_BYTES,
+                    true,
+                )
+            }
+        }
     }
-    for (columns in listOf(boundMovePriorMin, boundMovePriorMax, holeHistVal)) for (column in columns) {
-        sample.step()
-        historyBytes += column?.allocatedBytes ?: 0L
-        if (column != null) sample.owned(column, column.allocatedBytes, true)
+    for (columns in listOf(boundMovePriorMin, boundMovePriorMax, holeHistVal)) {
+        for (column in columns) {
+            sample.step()
+            historyBytes += column?.allocatedBytes ?: 0L
+            if (column != null) sample.owned(column, column.allocatedBytes, true)
+        }
     }
     for (index in holeHistIndex) {
-        sample.step(); historyBytes += index?.primitiveCapacityBytes ?: 0L
+        sample.step()
+        historyBytes += index?.primitiveCapacityBytes ?: 0L
         if (index != null) sample.owned(index, index.primitiveCapacityBytes, true)
     }
     for (array in listOf(boolReason, intMinReason, intMaxReason, boolPinPos)) {
@@ -314,13 +363,15 @@ private fun PropagationState.reasonIndexMemory(sample: SharingMemoryObservation)
     sample.ownedReferences(holeHistIndex, holeHistIndex.size.toLong(), true)
     sample.ownedReferences(undo.domain, undo.domain.size.toLong(), true)
     sample.ownedReferences(undo.revTrail, undo.revTrail.size.toLong(), true)
-    sample.record(mapOf(
-        "reasonIndexCapacityBytes" to
-            (boolReason.size.toLong() + intMinReason.size + intMaxReason.size + boolPinPos.size) * Int.SIZE_BYTES,
-        "reasonJournalCapacityBytes" to journalBytes,
-        "reasonHistoryCapacityBytes" to historyBytes,
-        "reasonHistoryReferenceSlots" to boundMoves.size.toLong() + holeHistLvl.size + holeHistPos.size +
-            boundMovePriorMin.size + boundMovePriorMax.size + holeHistVal.size + holeHistIndex.size +
-            undo.domain.size + undo.revTrail.size,
-    ))
+    sample.record(
+        mapOf(
+            "reasonIndexCapacityBytes" to
+                (boolReason.size.toLong() + intMinReason.size + intMaxReason.size + boolPinPos.size) * Int.SIZE_BYTES,
+            "reasonJournalCapacityBytes" to journalBytes,
+            "reasonHistoryCapacityBytes" to historyBytes,
+            "reasonHistoryReferenceSlots" to boundMoves.size.toLong() + holeHistLvl.size + holeHistPos.size +
+                boundMovePriorMin.size + boundMovePriorMax.size + holeHistVal.size + holeHistIndex.size +
+                undo.domain.size + undo.revTrail.size,
+        ),
+    )
 }

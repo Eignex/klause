@@ -15,7 +15,7 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.div
@@ -41,7 +41,7 @@ internal fun lowerLinearSource(
     source: LinearSourceProblem,
     settings: ProblemSettings,
     numerical: Boolean,
-    stop: Cancellation,
+    stop: ExecutionControl,
 ): LinearSourceView? {
     if (stop()) return null
     val integralBounds = source.integralRealBounds(stop) ?: return null
@@ -59,7 +59,9 @@ internal fun lowerLinearSource(
         val variable = source.variableValues[index]
         columns[index] = if (variable.integer || integralBounds[index] != null) {
             Term.ofIntVar(integers++)
-        } else Term.ofRealVar(reals++)
+        } else {
+            Term.ofRealVar(reals++)
+        }
         if (variable.integer) sourceIntegers += Term.intVar(columns[index]) else sourceReals += columns[index]
     }
     val lower = LongArray(integers)
@@ -127,7 +129,9 @@ internal fun lowerLinearSource(
         fun add(bound: BigFraction, relation: LinearOp) {
             val comparison = row(original.termValues, relation, bound)
             val guard = original.indicator
-            factors += if (guard == null) comparison as Factor else {
+            factors += if (guard == null) {
+                comparison as Factor
+            } else {
                 LinearIndicator(Term.intVar(columns[guard.column]), guard.whenOne, comparison as ExactLinear)
             }
         }
@@ -149,7 +153,9 @@ internal fun lowerLinearSource(
             val reference = columns[term.column]
             if (Term.isReal(reference)) {
                 onlyIntegers = false
-            } else integral[Term.intVar(reference)] += term.coefficient.fraction()
+            } else {
+                integral[Term.intVar(reference)] += term.coefficient.fraction()
+            }
         }
         var multiplier = BIG_ONE
         if (onlyIntegers) {
@@ -213,7 +219,7 @@ internal fun lowerLinearSource(
 private fun BigFraction.fitsObjectiveLong(): Boolean =
     den == BIG_ONE && num.fitsLong() && num.toLongExact() != Long.MIN_VALUE
 
-private fun LinearSourceProblem.canProjectToDouble(stop: Cancellation): Boolean {
+private fun LinearSourceProblem.canProjectToDouble(stop: ExecutionControl): Boolean {
     fun supported(value: SemanticRational?): Boolean {
         stop.charge(1L)
         if (stop()) return false

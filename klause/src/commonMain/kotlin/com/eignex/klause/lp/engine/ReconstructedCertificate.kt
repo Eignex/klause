@@ -7,7 +7,7 @@ import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ExactSimplexBound
 import com.eignex.klause.simplex.exact.Frac128
 import com.eignex.klause.simplex.exact.Frac128Ops
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.PollStride
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.abs
@@ -115,7 +115,7 @@ private class ReconstructionLayoutStop(val reason: LogicalBasisLayoutDecline) : 
 
 internal class ReconstructionMeter(
     val limits: ReconstructionLimits = ReconstructionLimits(),
-    private val cancellation: Cancellation = Cancellation.Never,
+    private val cancellation: ExecutionControl = ExecutionControl.Never,
 ) {
     var phase = ReconstructionPhase.INPUT
     var attempts = 0
@@ -137,11 +137,14 @@ internal class ReconstructionMeter(
     private var work = 0L
     private var allocation = 0L
     private var maxBits = 0
-    private val stride = PollStride()
-    private val meteredCancellation = cancellation.workMeter() != null
+    private val stride = PollStride(calls = 2048)
+    private val polling = cancellation.stopPolling
+
+    private fun due(units: Long): Boolean =
+        polling?.due(units.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()) ?: stride.due(units)
 
     fun step(units: Long = 1L) {
-        if (meteredCancellation || stride.due(units)) poll()
+        if (due(units)) poll()
         if (units > limits.maxWork - work) throw ReconstructionStop(ReconstructionDecline.WORK)
         work += units
     }
@@ -165,6 +168,7 @@ internal class ReconstructionMeter(
         val bits = value.magnitudeBitLength()
         maxBits = maxOf(maxBits, bits)
         if (bits > limits.maxBits) throw ReconstructionStop(ReconstructionDecline.BITS)
+        if (bits > 128 && due(bits.toLong() / Long.SIZE_BITS)) poll()
         storage(32L + (bits.toLong() + 7L) / 8L)
         return value
     }
@@ -412,8 +416,11 @@ private class FixedReconstructionVerifier(
         var value = if (ray) from(BigFraction.ZERO) else from(a.constant)
         if (!a.hasOpenStructuralBounds) {
             for (i in y.indices) {
-                if (y[i].isZero || a.rhs[i].isZero) meter.step()
-                else value = plus(value, times(y[i], from(a.rhs[i])))
+                if (y[i].isZero || a.rhs[i].isZero) {
+                    meter.step()
+                } else {
+                    value = plus(value, times(y[i], from(a.rhs[i])))
+                }
             }
         }
         val reduced = ArrayList<BigFraction>(a.size)
@@ -421,7 +428,9 @@ private class FixedReconstructionVerifier(
         val selectedReduced = if (a.hasOpenStructuralBounds) {
             meter.storage(64L + a.size.toLong() * 8L)
             ArrayList<Frac128>(a.size)
-        } else null
+        } else {
+            null
+        }
         var strict = false
         for (j in 0 until a.size) {
             var d = if (ray) from(BigFraction.ZERO) else from(a.costs[j])
@@ -436,9 +445,14 @@ private class FixedReconstructionVerifier(
                     return null
                 }
                 if (selectedReduced == null) {
-                    if (side.number.value.isZero) meter.step()
-                    else value = plus(value, times(d, from(side.number.value)))
-                } else selectedReduced += d
+                    if (side.number.value.isZero) {
+                        meter.step()
+                    } else {
+                        value = plus(value, times(d, from(side.number.value)))
+                    }
+                } else {
+                    selectedReduced += d
+                }
                 selected += ExactSimplexBound(j, upper)
                 strict = strict || side.strict
             }
@@ -446,8 +460,11 @@ private class FixedReconstructionVerifier(
         }
         if (selectedReduced != null) {
             for (i in y.indices) {
-                if (y[i].isZero || a.rhs[i].isZero) meter.step()
-                else value = plus(value, times(y[i], from(a.rhs[i])))
+                if (y[i].isZero || a.rhs[i].isZero) {
+                    meter.step()
+                } else {
+                    value = plus(value, times(y[i], from(a.rhs[i])))
+                }
             }
             for (index in selected.indices) {
                 meter.step()
@@ -455,8 +472,11 @@ private class FixedReconstructionVerifier(
                 val side = requireNotNull(
                     if (cited.upper) a.bounds[cited.column].upper else a.bounds[cited.column].lower,
                 )
-                if (side.number.value.isZero) meter.step()
-                else value = plus(value, times(selectedReduced[index], from(side.number.value)))
+                if (side.number.value.isZero) {
+                    meter.step()
+                } else {
+                    value = plus(value, times(selectedReduced[index], from(side.number.value)))
+                }
             }
         }
         if (!ray) value = plus(times(value, reciprocal(from(a.scale))), from(a.external))
@@ -521,8 +541,11 @@ private class BigReconstructionVerifier(
         var value = if (ray) from(BigFraction.ZERO) else from(a.constant)
         if (!a.hasOpenStructuralBounds) {
             for (i in y.indices) {
-                if (y[i].isZero || a.rhs[i].isZero) meter.step()
-                else value = plus(value, times(y[i], from(a.rhs[i])))
+                if (y[i].isZero || a.rhs[i].isZero) {
+                    meter.step()
+                } else {
+                    value = plus(value, times(y[i], from(a.rhs[i])))
+                }
             }
         }
         val reduced = ArrayList<BigFraction>(a.size)
@@ -541,8 +564,11 @@ private class BigReconstructionVerifier(
                     return null
                 }
                 if (!a.hasOpenStructuralBounds) {
-                    if (side.number.value.isZero) meter.step()
-                    else value = plus(value, times(d, from(side.number.value)))
+                    if (side.number.value.isZero) {
+                        meter.step()
+                    } else {
+                        value = plus(value, times(d, from(side.number.value)))
+                    }
                 }
                 selected += ExactSimplexBound(j, upper)
                 strict = strict || side.strict
@@ -551,16 +577,22 @@ private class BigReconstructionVerifier(
         }
         if (a.hasOpenStructuralBounds) {
             for (i in y.indices) {
-                if (y[i].isZero || a.rhs[i].isZero) meter.step()
-                else value = plus(value, times(y[i], from(a.rhs[i])))
+                if (y[i].isZero || a.rhs[i].isZero) {
+                    meter.step()
+                } else {
+                    value = plus(value, times(y[i], from(a.rhs[i])))
+                }
             }
             for (cited in selected) {
                 meter.step()
                 val side = requireNotNull(
                     if (cited.upper) a.bounds[cited.column].upper else a.bounds[cited.column].lower,
                 )
-                if (side.number.value.isZero) meter.step()
-                else value = plus(value, times(reduced[cited.column], from(side.number.value)))
+                if (side.number.value.isZero) {
+                    meter.step()
+                } else {
+                    value = plus(value, times(reduced[cited.column], from(side.number.value)))
+                }
             }
         }
         if (!ray) value = plus(times(value, reciprocal(from(a.scale))), from(a.external))
@@ -621,8 +653,10 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
             meter.verificationRestarts++
             BigReconstructionVerifier(a, meter).dual(candidate, ray)
         } ?: run {
-            if (usesBasis) meter.basisDualRejection = meter.dualRejection?.let {
+            if (usesBasis) {
+                meter.basisDualRejection = meter.dualRejection?.let {
                 it.copy(basic = basis?.status?.get(it.column) == VarStatus.BASIC)
+            }
             }
             return
         }
@@ -744,7 +778,7 @@ internal fun reconstructCertificate(
     duals: DoubleArray? = null,
     basis: Basis? = null,
     ray: DoubleArray? = null,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     limits: ReconstructionLimits = ReconstructionLimits(),
     claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
 ): ReconstructedCertificate = reconstructCandidates(
@@ -755,7 +789,9 @@ internal fun reconstructCertificate(
     basis, cancellation, limits,
     goal = if (claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.CONTRADICTION) {
         ReconstructionGoal.POINT
-    } else ReconstructionGoal.ATTAINMENT,
+    } else {
+        ReconstructionGoal.ATTAINMENT
+    },
     validate = { meter ->
         for (vector in listOfNotNull(primal, duals, ray)) {
             meter.step(vector.size.toLong())
@@ -770,7 +806,7 @@ internal fun reconstructRationalCertificate(
     duals: List<BigFraction>? = null,
     basis: Basis? = null,
     ray: List<BigFraction>? = null,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     limits: ReconstructionLimits = ReconstructionLimits(),
 ): ReconstructedCertificate = reconstructCandidates(
     model, primal?.size ?: 0, duals?.size ?: 0, ray?.size ?: 0,
@@ -818,7 +854,7 @@ private fun reconstructCandidates(
     duals: ((ReconstructionMeter) -> List<BigFraction>)?,
     ray: ((ReconstructionMeter) -> List<BigFraction>)?,
     basis: Basis?,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     limits: ReconstructionLimits,
     goal: ReconstructionGoal = ReconstructionGoal.ATTAINMENT,
     inputObserver: LpCertificationObserver? = null,
@@ -865,8 +901,11 @@ private fun reconstructCandidates(
             (goal != ReconstructionGoal.POINT || current.point == null) &&
             (goal != ReconstructionGoal.BOUND || (current.bound == null && limits.maxAttempts > 0))
         ) {
-            var violation = if (goal == ReconstructionGoal.BOUND) null else
+            var violation = if (goal == ReconstructionGoal.BOUND) {
+                null
+            } else {
                 reconstructionViolation(authority, x, y ?: rho, ray = y == null && rho != null, meter)
+            }
             var correction = BigFraction.ofLong(2L)
             var previous: BigInt? = null
             var round = 0
@@ -903,11 +942,15 @@ private fun reconstructCandidates(
                         val vector = reconstructExactVector(y, denominator, meter)
                             ?: if (goal == ReconstructionGoal.BOUND) {
                                 reconstructRationalEntries(y, denominator, meter)
-                            } else null
+                            } else {
+                                null
+                            }
                         vector?.let {
                             val candidate = if (goal == ReconstructionGoal.BOUND) {
                                 repairBoundMultipliers(authority, it, meter)
-                            } else it
+                            } else {
+                                it
+                            }
                             current.dual(candidate, ray = false)
                         }
                     }
@@ -928,7 +971,9 @@ private fun reconstructCandidates(
                 if (current.attained() || current.conflict != null ||
                     (goal == ReconstructionGoal.BOUND && current.bound != null) ||
                     (goal == ReconstructionGoal.POINT && current.point != null)
-                ) break
+                ) {
+                    break
+                }
                 val next = nextReconstructionRound(round)
                 repeat(
                     next - round,
@@ -1047,7 +1092,7 @@ internal fun verifyRationalCertificate(
     duals: List<BigFraction>? = null,
     ray: List<BigFraction>? = null,
     basis: Basis? = null,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     limits: ReconstructionLimits = ReconstructionLimits(),
 ): ReconstructedCertificate {
     val meter = ReconstructionMeter(limits, cancellation)
@@ -1105,7 +1150,7 @@ internal fun certifyLpConflictOnly(
     model: LpModel,
     ray: DoubleArray,
     limits: ReconstructionLimits,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
 ): ReconstructedCertificate {
@@ -1122,7 +1167,7 @@ private fun certifyLpConflictOnlyWithin(
     model: LpModel,
     ray: DoubleArray,
     limits: ReconstructionLimits,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
 ): ReconstructedCertificate {
@@ -1142,7 +1187,7 @@ internal fun certifyLpIntegerBoundOnly(
     model: LpModel,
     duals: DoubleArray,
     limits: ReconstructionLimits,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
 ): ReconstructedCertificate {
@@ -1181,7 +1226,7 @@ private fun certifyLpIntegerBoundWithin(
     model: LpModel,
     duals: DoubleArray,
     limits: ReconstructionLimits,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     observer: LpCertificationObserver?,
     policy: LpCertificationPolicy,
 ): ReconstructedCertificate {
@@ -1212,7 +1257,9 @@ private fun certifyLpIntegerBoundWithin(
         decline = ReconstructionDecline.CANCELLED
         (observer as? LpClaimObservation)?.refuse("CANCELLED")
         null
-    } else accepted
+    } else {
+        accepted
+    }
     val metrics = meter.snapshot(decline)
     observer?.observe(LpCertifier.INTEGER, bound != null, LpCertifierCost.Metered(metrics.work))
     timer.finish("INTEGER_${decline?.name ?: if (result != null) "BOUND" else "REFUSED"}", metrics.work)
@@ -1224,7 +1271,7 @@ internal fun certifyLpBoundOnly(
     model: LpModel,
     duals: DoubleArray,
     limits: ReconstructionLimits,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
     basis: Basis? = null,
@@ -1242,7 +1289,7 @@ private fun certifyLpBoundOnlyWithin(
     model: LpModel,
     duals: DoubleArray,
     limits: ReconstructionLimits,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
     basis: Basis? = null,

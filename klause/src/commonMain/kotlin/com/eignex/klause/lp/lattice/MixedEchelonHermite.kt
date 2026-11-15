@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.lattice
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.compareTo
@@ -65,7 +65,7 @@ internal fun mixedEchelonHermite(
     inequalities: List<SparseIntRow>,
     cols: Int,
     equalityRhs: Array<BigInt>? = null,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): MixedEchelonHermite {
     if (cols == 0) {
         return MixedEchelonHermite(emptyList(), inequalities, UnimodularTransform(0))

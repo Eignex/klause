@@ -7,11 +7,11 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.solver.validation.verifyProjectedSourceWitness
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class FloatGridPublication(
     private val binding: SelectedFloatGridBinding,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
     private val toleranceCheck: ((Sample) -> Boolean)?,
     private val callbacks: FiniteSolveCallbacks,
 ) {
@@ -55,7 +55,9 @@ internal class FloatGridPublication(
         lastChecked = native
         if (previous != null && objective != null &&
             (if (binding.metadata.maximize) objective <= previous else objective >= previous)
-        ) return null
+        ) {
+            return null
+        }
         if (cancellation()) return null
         best = sample
         bestObjective = objective
@@ -71,24 +73,33 @@ internal class FloatGridPublication(
         nativeSourceMinimum: MinimizeResult? = null,
     ): FiniteSolveResult {
         // A checked native best already stands or failed to improve, so checking it again publishes nothing.
-        if (native is FiniteSolveOutcome.Completed) native.bestSample
+        if (native is FiniteSolveOutcome.Completed) {
+            native.bestSample
             ?.takeUnless { it === lastChecked && binding.objective != null }?.let(::onSample)
+        }
         val qualified = if (native is FiniteSolveOutcome.Completed) {
             FiniteSolveOutcome.Completed(
                 when {
                     binding.consumer.declaredGridSemantics && native.verdict == FiniteSolveVerdict.UNSAT ->
                         FiniteSolveVerdict.UNSAT
+
                     accepted == 0L -> FiniteSolveVerdict.UNKNOWN
+
                     binding.consumer.declaredGridSemantics && native.verdict == FiniteSolveVerdict.OPTIMAL &&
                         native.bestSample != null && lastChecked === native.bestSample -> FiniteSolveVerdict.OPTIMAL
+
                     binding.consumer.declaredGridSemantics && native.verdict != FiniteSolveVerdict.OPTIMAL ->
                         native.verdict
+
                     binding.objective != null -> FiniteSolveVerdict.BEST_FOUND
+
                     else -> FiniteSolveVerdict.SAT
                 },
                 native.stats, accepted, best, native.elapsedMs,
             )
-        } else native
+        } else {
+            native
+        }
         return FiniteSolveResult(preparation, elapsed, qualified, nativeSourceResult, nativeSourceMinimum).also {
             it.bindNativeGridOutcome(NativeGridOutcome(binding.metadata, native))
         }

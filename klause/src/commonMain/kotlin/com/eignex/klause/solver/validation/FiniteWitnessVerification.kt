@@ -9,13 +9,13 @@ import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.math.abs
 
 internal fun finiteWitnessVerifier(
     problem: BakedProblem,
     objective: LinearObjective?,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     toleranceCheck: ((Sample) -> Boolean)? = null,
 ): CandidateVerifier<Sample, Double?> = finiteWitnessVerifier(
     problem, objective, Assumptions.None, cancellation, toleranceCheck,
@@ -25,7 +25,7 @@ internal fun finiteWitnessVerifier(
     problem: BakedProblem,
     objective: LinearObjective?,
     assumptions: Assumptions,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     toleranceCheck: ((Sample) -> Boolean)? = null,
 ): CandidateVerifier<Sample, Double?> {
     val points = FinitePointCheck(problem)
@@ -38,7 +38,7 @@ private fun verifyFiniteWitness(
     problem: BakedProblem,
     objective: LinearObjective?,
     assumptions: Assumptions,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     toleranceCheck: ((Sample) -> Boolean)?,
     points: FinitePointCheck,
     candidate: Candidate<Sample, Double?>,
@@ -81,7 +81,7 @@ private fun checkSourceObligations(
     problem: BakedProblem,
     sample: Sample,
     assumptions: Assumptions,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     toleranceCheck: ((Sample) -> Boolean)?,
     points: FinitePointCheck,
 ): Verification<Nothing, Nothing>? {

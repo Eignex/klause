@@ -2,7 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.IntArrayList
 
@@ -80,19 +80,25 @@ internal class BooleanRepairClosure private constructor(
                 var satisfied = false
                 for (literal in (factor as Clause).literals) {
                     val pinned = frozen[Lit.variable(literal)].toInt()
-                    if (pinned == 0) residual.add(literal) else if (Lit.evaluate(literal, pinned == 2)) {
+                    if (pinned == 0) {
+                        residual.add(literal)
+                    } else if (Lit.evaluate(literal, pinned == 2)) {
                         satisfied = true
                         break
                     }
                     if (++visits % 256 == 0) yield(null)
                 }
-                if (!satisfied) when (residual.size) {
+                if (!satisfied) {
+                    when (residual.size) {
                     0 -> inconsistent = true
+
                     1 -> units.add(residual[0])
+
                     2 -> {
                         checkNotNull(edgeLists[Lit.negate(residual[0])]).add(residual[1])
                         checkNotNull(edgeLists[Lit.negate(residual[1])]).add(residual[0])
                     }
+
                     else -> {
                         val row = clauses.size
                         clauses.add(residual.toIntArray())
@@ -102,6 +108,7 @@ internal class BooleanRepairClosure private constructor(
                             if (++visits % 256 == 0) yield(null)
                         }
                     }
+                }
                 }
                 if ((index + 1) % 256 == 0) yield(null)
             }
@@ -146,9 +153,19 @@ internal class BooleanRepairClosure private constructor(
                 yield(null)
                 val objectiveScores = DoubleArray(size)
                 yield(null)
-                BooleanSupportRepairs(rows, clauseStamps, unitRows, unitStamps,
-                    breakStamps, breakScores, objectiveStamps, objectiveScores)
-            } else null
+                BooleanSupportRepairs(
+                    rows,
+                    clauseStamps,
+                    unitRows,
+                    unitStamps,
+                    breakStamps,
+                    breakScores,
+                    objectiveStamps,
+                    objectiveScores,
+                )
+            } else {
+                null
+            }
             @Suppress("UNCHECKED_CAST")
             yield(PreparedBooleanRepairs(BooleanRepairClosure(
                 edges as Array<IntArray>, units.toIntArray(), clauses.toTypedArray(),
@@ -163,7 +180,7 @@ internal class BooleanRepairClosure private constructor(
         support?.beginBatch()
     }
 
-    fun closeInto(state: LocalSearchState, moves: List<Move>, sink: MoveSink, cancellation: Cancellation) {
+    fun closeInto(state: LocalSearchState, moves: List<Move>, sink: MoveSink, cancellation: ExecutionControl) {
         beginScoringBatch()
         for (move in moves) {
             if (cancellation.isCancelled()) return
@@ -176,7 +193,7 @@ internal class BooleanRepairClosure private constructor(
         }
     }
 
-    fun close(state: LocalSearchState, move: Move, cancellation: Cancellation): Move? {
+    fun close(state: LocalSearchState, move: Move, cancellation: ExecutionControl): Move? {
         if (inconsistent) return null
         operationsBeforePoll = 0
         if (interrupted(cancellation)) return null
@@ -186,7 +203,9 @@ internal class BooleanRepairClosure private constructor(
             support?.clauseStamps?.fill(0)
             support?.unitStamps?.fill(0)
             epoch = 1
-        } else epoch++
+        } else {
+            epoch++
+        }
         end = 0
         unitHead = 0
         unitTail = 0
@@ -202,7 +221,9 @@ internal class BooleanRepairClosure private constructor(
                 seedStamps[variable] = epoch
                 seedParity[variable] = true
                 seeds[seedCount++] = variable
-            } else seedParity[variable] = !seedParity[variable]
+            } else {
+                seedParity[variable] = !seedParity[variable]
+            }
         }
         for (literal in units) {
             if (interrupted(cancellation)) return null
@@ -222,7 +243,9 @@ internal class BooleanRepairClosure private constructor(
             val variable = Lit.variable(literal)
             if (state.assignment.boolValue(variable) != Lit.isPositive(literal) &&
                 state.invariants?.isDefinedBool(variable) != true
-            ) closed.add(Move.BoolFlip(variable))
+            ) {
+                closed.add(Move.BoolFlip(variable))
+            }
         }
         val result = when (closed.size) {
             0 -> null
@@ -236,7 +259,7 @@ internal class BooleanRepairClosure private constructor(
         return result.takeUnless { cancellation.isCancelled() }
     }
 
-    private fun interrupted(cancellation: Cancellation): Boolean {
+    private fun interrupted(cancellation: ExecutionControl): Boolean {
         repairWork?.charge(1L)
         // Nested short clauses share the same bounded graph-visit window.
         if (operationsBeforePoll-- > 0) return false
@@ -256,7 +279,7 @@ internal class BooleanRepairClosure private constructor(
         return true
     }
 
-    private fun expand(cancellation: Cancellation, supportState: LocalSearchState?): Boolean {
+    private fun expand(cancellation: ExecutionControl, supportState: LocalSearchState?): Boolean {
         var cursor = 0
         val scratch = support
         while (cursor < end || unitHead != unitTail || supportHead != supportTail) {
@@ -288,7 +311,7 @@ internal class BooleanRepairClosure private constructor(
         return !cancellation.isCancelled()
     }
 
-    private fun expandLiteral(literal: Int, cancellation: Cancellation, withSupport: Boolean): Boolean {
+    private fun expandLiteral(literal: Int, cancellation: ExecutionControl, withSupport: Boolean): Boolean {
         for (forced in edges[literal]) {
             if (interrupted(cancellation)) return false
             if (!force(forced)) return false
@@ -316,7 +339,9 @@ internal class BooleanRepairClosure private constructor(
 
     // Unforced live values are not premises for a proposal's unit consequences.
     private fun expandClause(
-        literals: IntArray, cancellation: Cancellation, supportState: LocalSearchState?,
+        literals: IntArray,
+        cancellation: ExecutionControl,
+        supportState: LocalSearchState?,
     ): Boolean {
         var unknown = 0
         var last = Lit.NONE
@@ -326,7 +351,9 @@ internal class BooleanRepairClosure private constructor(
             val variable = Lit.variable(literal)
             val value = if (stamps[variable] == epoch) {
                 if (values[variable]) 2 else 1
-            } else frozen[variable].toInt()
+            } else {
+                frozen[variable].toInt()
+            }
             if (value == 0) {
                 unknown++
                 last = literal
@@ -334,7 +361,9 @@ internal class BooleanRepairClosure private constructor(
                     supported = true
                 }
                 if (unknown > 1 && supportState == null) return true
-            } else if (Lit.evaluate(literal, value == 2)) return true
+            } else if (Lit.evaluate(literal, value == 2)) {
+                return true
+            }
         }
         if (unknown < 2) return unknown == 1 && force(last)
         if (supportState == null || supported) return true
@@ -347,7 +376,9 @@ internal class BooleanRepairClosure private constructor(
             val variable = Lit.variable(literal)
             if (stamps[variable] == epoch || frozen[variable].toInt() != 0 ||
                 supportState.invariants?.isDefinedBool(variable) == true
-            ) continue
+            ) {
+                continue
+            }
             if (cancellation.isCancelled()) return false
             val score = scratch.breakScore(supportState, variable)
             if (score > bestBreak) continue
@@ -383,7 +414,9 @@ private class BooleanSupportRepairs(
             breakStamps.fill(0)
             objectiveStamps.fill(0)
             epoch = 1
-        } else epoch++
+        } else {
+            epoch++
+        }
     }
 
     fun breakScore(state: LocalSearchState, variable: Int): Int {

@@ -16,7 +16,7 @@ import com.eignex.klause.solver.pipeline.SourceExecutionKind
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.executionKind
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
@@ -192,9 +192,9 @@ class MpsLinearSourceTest {
     fun `interrupted source capture should withhold the entire neutral source`() {
         val parsed = Mps.parse("ROWS\n L R\nCOLUMNS\n X R 1\n Y R 1\nRHS\n RHS R 2\nENDATA")
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 3L
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val captured = parsed.toLinearSourceProblem(cancellation = stop)

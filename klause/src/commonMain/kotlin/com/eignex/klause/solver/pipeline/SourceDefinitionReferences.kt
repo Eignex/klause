@@ -3,13 +3,13 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class SourceDefinitionReferences(definedVars: IntArray, boolFolds: List<BoolFoldDefinition>) {
     val integers = definedVars.copyOf()
     val folds = boolFolds.map { BoolFoldDefinition(it.out, it.lits.copyOf(), it.isAnd) }
 
-    fun remapped(coordinates: VarRemap, cancellation: Cancellation): SourceDefinitionReferences? {
+    fun remapped(coordinates: VarRemap, cancellation: ExecutionControl): SourceDefinitionReferences? {
         if (cancellation()) return null
         val mappedIntegers = ArrayList<Int>()
         for (id in integers) {

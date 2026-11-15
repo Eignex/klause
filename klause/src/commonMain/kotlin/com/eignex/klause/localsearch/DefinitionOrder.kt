@@ -2,7 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep.SweepNode
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.MutableIntIntMap
@@ -11,7 +11,7 @@ import com.eignex.util.collections.MutableIntIntMap
 internal fun orderedDefinitions(
     problem: Problem,
     nodes: List<SweepNode>,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): List<SweepNode> {
     var visits = 0
     fun stopped(): Boolean = visits++ % INITIALIZATION_BATCH == 0 && cancellation()
@@ -66,7 +66,7 @@ internal fun orderedDefinitions(
     return if (cancellation()) emptyList() else ordered
 }
 
-internal fun Cancellation.definitionStopped(): Boolean {
+internal fun ExecutionControl.definitionStopped(): Boolean {
     if (this()) return true
     charge(1)
     return this()

@@ -23,7 +23,6 @@ import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.util.io.openTextFile
 import com.eignex.util.io.readTextFile
 import com.eignex.util.io.useSource
@@ -163,12 +162,16 @@ internal object MiniZincMode : CliMode {
             val encodedSize = point?.lineSequence()?.filter { it.isNotEmpty() }
                 ?.sumOf { it.length.toLong() + "% klause-assignment: ".length + 1 }?.plus(100) ?: 0
             val reason = decline ?: if (encodedSize > 8 * 1024 * 1024) "text limit" else null
-            val evidence = if (reason != null) "% klause-assignment-unavailable: $reason\n" else buildString {
-                append("% klause-assignment-begin: flatzinc-integer-v1\n")
-                for (line in checkNotNull(point).lineSequence().filter { it.isNotEmpty() }) {
-                    append("% klause-assignment: ").append(line).append('\n')
+            val evidence = if (reason != null) {
+                "% klause-assignment-unavailable: $reason\n"
+            } else {
+                buildString {
+                    append("% klause-assignment-begin: flatzinc-integer-v1\n")
+                    for (line in checkNotNull(point).lineSequence().filter { it.isNotEmpty() }) {
+                        append("% klause-assignment: ").append(line).append('\n')
+                    }
+                    append("% klause-assignment-end\n")
                 }
-                append("% klause-assignment-end\n")
             }
             return rendered.removeSuffix("----------\n") + evidence + "----------\n"
         }

@@ -4,7 +4,7 @@ import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.RootComponentRounding
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.math.round
 import kotlin.time.TimeSource
 
@@ -16,7 +16,7 @@ private const val SECOND_PINNED: Byte = 3
 internal fun LpEngine.repairRootComponent(
     session: PropagationSession,
     pending: RootComponentRounding,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     targetOf: (Int) -> Double?,
     charge: () -> Unit,
 ): Boolean? {
@@ -54,7 +54,9 @@ internal fun LpEngine.repairRootComponent(
                         repair.states[frame] = SECOND_PENDING
                         repair.position = repair.positions[frame]
                         repair.retreat = false
-                    } else repair.depth--
+                    } else {
+                        repair.depth--
+                    }
                 }
                 charge()
                 continue
@@ -137,7 +139,7 @@ private fun LpEngine.repairConflictFrame(
     pending: RootComponentRounding,
     conflict: PropagationResult.Unsat,
     frame: Int,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     charge: () -> Unit,
 ): Int {
     val repair = checkNotNull(pending.repair)

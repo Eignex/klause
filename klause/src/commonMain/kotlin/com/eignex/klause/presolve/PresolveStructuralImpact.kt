@@ -8,12 +8,12 @@ import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.impliedLinearRows
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
-internal fun Factor.retainsStructure(problem: Problem, token: Cancellation): Boolean =
+internal fun Factor.retainsStructure(problem: Problem, token: ExecutionControl): Boolean =
     (this !is Linear && this !is Clause) || isBinaryPartition(problem, token)
 
-internal fun protectedStructureColumns(problem: Problem, token: Cancellation): Set<Int>? {
+internal fun protectedStructureColumns(problem: Problem, token: ExecutionControl): Set<Int>? {
     val protected = HashSet<Int>()
     for (factor in problem.factors) {
         token.charge(1)
@@ -28,7 +28,7 @@ internal fun protectedStructureColumns(problem: Problem, token: Cancellation): S
     return if (token()) null else protected
 }
 
-private fun Factor.isBinaryPartition(problem: Problem, token: Cancellation): Boolean {
+private fun Factor.isBinaryPartition(problem: Problem, token: ExecutionControl): Boolean {
     val row = this as? Linear ?: return false
     if (row.op != LinearOp.EQ || row.vars.size < 2) return false
     val constants = row.integerConstants ?: return false
@@ -40,7 +40,9 @@ private fun Factor.isBinaryPartition(problem: Problem, token: Cancellation): Boo
         val variable = row.vars[k]
         if (constants.coeff(k) != constants.bound || !bounds.hasLower(variable) || !bounds.hasUpper(variable) ||
             bounds.lower(variable) < 0L || bounds.upper(variable) > 1L
-        ) return false
+        ) {
+            return false
+        }
     }
     return true
 }
@@ -51,21 +53,23 @@ internal fun PresolveInvocation?.recordStructuralImpact(
     added: List<Factor>,
     rebuild: SourceRebuilds,
     limit: Int,
-    token: Cancellation,
+    token: ExecutionControl,
 ) {
     if (this == null || limit == 0 || (pass != "affine" && pass != "structural" && pass != "extensional")) return
     val view = StructuralImpactView(limit, token)
     for (id in dropped) {
         if (!view.factor("Removed", problem.factors[id], problem)) break
     }
-    if (!view.stopped) for (factor in added) {
+    if (!view.stopped) {
+        for (factor in added) {
         if (!view.factor("Added", factor, problem)) break
+    }
     }
     if (!view.stopped) view.reconstruction(rebuild)
     structuralImpact = view.snapshot()
 }
 
-private class StructuralImpactView(private val limit: Int, private val token: Cancellation) {
+private class StructuralImpactView(private val limit: Int, private val token: ExecutionControl) {
     private val counts = LinkedHashMap<String, Long>()
     private var visits = 0L
     var stopped = false
@@ -130,7 +134,9 @@ private class StructuralImpactView(private val limit: Int, private val token: Ca
                     val bounds = problem.intBounds
                     if (constants.coeff(k) != constants.bound || !bounds.hasLower(variable) ||
                         !bounds.hasUpper(variable) || bounds.lower(variable) < 0L || bounds.upper(variable) > 1L
-                    ) partition = false
+                    ) {
+                        partition = false
+                    }
                 }
                 if (partition) add(prefix + "PartitionRows")
             }

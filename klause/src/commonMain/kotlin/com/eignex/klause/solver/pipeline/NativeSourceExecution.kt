@@ -14,13 +14,13 @@ import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun prepareFactorQuadratic(
     request: SourceSetupRequest,
     projections: PreparedFactorProjections,
-    polynomialStop: Cancellation,
-    stop: Cancellation,
+    polynomialStop: ExecutionControl,
+    stop: ExecutionControl,
 ): SourceProblemRoute {
     val source = request.source.problem
     val bounded = if (source.hasFiniteIntegerRanges()) {
@@ -38,7 +38,10 @@ internal fun prepareFactorQuadratic(
         }
     }
     val plan = request.boundCancellation.presolveBudget().observePreparation(
-        PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, bounded, polynomialStop,
+        PresolvePreparationStage.SOURCE_ENCODER,
+        PresolveLane.SOURCE,
+        bounded,
+        polynomialStop,
     ) { token, observation ->
         bounded.preparePolynomialExecutionPlan(
             original = source,
@@ -113,17 +116,30 @@ internal fun executeNativeSource(
                     affine?.let { if (invocation.maximizeSourceObjective) it.negated() else it }
                 } else {
                     // A nonlinear objective has no coefficient sign for dual fixing.
-                    LinearObjective(boolWeights = LongArray(model.numBoolVars) { 1L },
-                        intCoefficients = LongArray(model.numIntVars) { 1L })
+                    LinearObjective(
+                        boolWeights = LongArray(model.numBoolVars) { 1L },
+                        intCoefficients = LongArray(model.numIntVars) { 1L },
+                    )
                 }
-                native.request.prepareSource(request.presolveConfig ?: PresolveConfig.DEFAULT, protection,
-                    request.presolveCancellation, params.cancellation or params.timeout, request.presolveBudget,
-                    solutionSetSensitive = quadratic != null)
-            } else null
-            if (source?.infeasible == true) return SourceExecutionResult.Refuted(invocation).also {
-                it.preparationStats = source.stats
+                native.request.prepareSource(
+                    request.presolveConfig ?: PresolveConfig.DEFAULT,
+                    protection,
+                    request.presolveCancellation,
+                    params.cancellation or params.timeout,
+                    request.presolveBudget,
+                    solutionSetSensitive = quadratic != null,
+                )
+            } else {
+                null
             }
-            val prepared = if (source == null) native.request else {
+            if (source?.infeasible == true) {
+                return SourceExecutionResult.Refuted(invocation).also {
+                    it.preparationStats = source.stats
+                }
+            }
+            val prepared = if (source == null) {
+                native.request
+            } else {
                 native.request.afterSourcePreparation(source, params.cancellation or params.timeout)
                     ?: return SourceExecutionResult.Declined(invocation, TerminationReason.BudgetExhausted).also {
                         it.preparationStats = source.stats
@@ -199,7 +215,9 @@ internal fun executeNativeSource(
                 strategy = request.polynomial.strategy,
             )
             val params = controls.copy(
-                cancellation = controls.cancellation or invocation.cancellation,
+                cancellation = controls.cancellation.withAccounting(
+                    if (controls.cancellation.accounting != null) controls.cancellation else invocation.cancellation,
+                ) or invocation.cancellation,
                 timeout = controls.timeout or invocation.nativeDeadline(),
             )
             SourceExecutionResult.Transcendental(
@@ -211,9 +229,11 @@ internal fun executeNativeSource(
 }
 
 private fun PolynomialTheoryParams.nativeBoundTo(invocation: PreparedSourceInvocation): PolynomialTheoryParams = copy(
-    cancellation = cancellation or invocation.cancellation,
+    cancellation = cancellation.withAccounting(
+        if (cancellation.accounting != null) cancellation else invocation.cancellation,
+    ) or invocation.cancellation,
     timeout = timeout or invocation.nativeDeadline(),
 )
 
-private fun PreparedSourceInvocation.nativeDeadline(): Cancellation =
-    cancellation.deadline()?.let { Cancellation.until(it) } ?: Cancellation.Never
+private fun PreparedSourceInvocation.nativeDeadline(): ExecutionControl =
+    cancellation.deadline()?.let { ExecutionControl.until(it) } ?: ExecutionControl.Never

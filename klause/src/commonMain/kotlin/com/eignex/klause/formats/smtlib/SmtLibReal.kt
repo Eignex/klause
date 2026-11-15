@@ -12,7 +12,7 @@ import com.eignex.klause.lowering.WideLinComb
 import com.eignex.klause.lowering.isConstant
 import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_TEN
 import com.eignex.util.numbers.magnitudeBitLength
@@ -201,7 +201,7 @@ private fun Compiler.Builder.reifyRealAtom(d: RealComb, linOp: LinearOp, strict:
     }
 }
 
-internal class SmtRealPredicates(private val cancellation: Cancellation, private val maxEntries: Int = 65_536) {
+internal class SmtRealPredicates(private val cancellation: ExecutionControl, private val maxEntries: Int = 65_536) {
     private data class Predicate(
         val integers: Map<Int, BigFraction>,
         val reals: Map<Int, BigFraction>,

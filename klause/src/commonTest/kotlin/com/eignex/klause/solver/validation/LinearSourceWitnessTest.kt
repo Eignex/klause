@@ -12,7 +12,7 @@ import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
@@ -29,20 +29,22 @@ class LinearSourceWitnessTest {
         val third = BigFraction.ofLong(3).reciprocal()
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", false)),
-            listOf(LinearSourceRow(
-                listOf(LinearSourceTerm(0, SemanticRational.ONE)),
-                lower = SemanticRational.of(BIG_ONE, bigIntOf(3)),
-            )),
+            listOf(
+                LinearSourceRow(
+                    listOf(LinearSourceTerm(0, SemanticRational.ONE)),
+                    lower = SemanticRational.of(BIG_ONE, bigIntOf(3)),
+                ),
+            ),
             semantics = SourceSemantics(
                 SourceFormat.MPS,
                 feasibilityTolerance = SourceTolerance(
-                absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
-            )
+                    absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
+                ),
             ).resolve(),
         )
         val value = third - BigFraction.ofLong(2_000_000).reciprocal()
 
-        val result = checkLinearSourceWitness(source, listOf(value), Cancellation.Never)
+        val result = checkLinearSourceWitness(source, listOf(value), ExecutionControl.Never)
 
         val witness = assertIs<LinearSourceCheck.Accepted>(result).witness
         assertEquals(listOf(value), witness.values)
@@ -57,21 +59,21 @@ class LinearSourceWitnessTest {
             listOf(
                 LinearSourceRow(
                     listOf(
-                LinearSourceTerm(0, SemanticRational.ONE),
-                LinearSourceTerm(0, SemanticRational.ofLong(-1)),
-            ),
-                lower = SemanticRational.ONE
-                )
+                        LinearSourceTerm(0, SemanticRational.ONE),
+                        LinearSourceTerm(0, SemanticRational.ofLong(-1)),
+                    ),
+                    lower = SemanticRational.ONE,
+                ),
             ),
             semantics = SourceSemantics(
                 SourceFormat.MPS,
                 feasibilityTolerance = SourceTolerance(
-                relative = SemanticRational.of(BIG_ONE, bigIntOf(10)),
-            )
+                    relative = SemanticRational.of(BIG_ONE, bigIntOf(10)),
+                ),
             ).resolve(),
         )
 
-        val result = checkLinearSourceWitness(source, listOf(BigFraction.ofLong(10)), Cancellation.Never)
+        val result = checkLinearSourceWitness(source, listOf(BigFraction.ofLong(10)), ExecutionControl.Never)
 
         assertFalse(assertIs<LinearSourceCheck.Accepted>(result).witness.exact)
     }
@@ -84,12 +86,16 @@ class LinearSourceWitnessTest {
             semantics = SourceSemantics(
                 SourceFormat.MPS,
                 feasibilityTolerance = SourceTolerance(
-                absolute = SemanticRational.ONE,
-            )
+                    absolute = SemanticRational.ONE,
+                ),
             ).resolve(),
         )
 
-        val result = checkLinearSourceWitness(source, listOf(BigFraction.ofLong(2).reciprocal()), Cancellation.Never)
+        val result = checkLinearSourceWitness(
+            source,
+            listOf(BigFraction.ofLong(2).reciprocal()),
+            ExecutionControl.Never,
+        )
 
         assertIs<LinearSourceCheck.Rejected>(result)
     }
@@ -100,14 +106,18 @@ class LinearSourceWitnessTest {
             listOf(LinearSourceVariable("guard", true), LinearSourceVariable("x", false)),
             listOf(
                 LinearSourceRow(
-                listOf(LinearSourceTerm(1, SemanticRational.ONE)),
-                lower = SemanticRational.ONE,
-                indicator = LinearSourceIndicator(0, true),
-            )
+                    listOf(LinearSourceTerm(1, SemanticRational.ONE)),
+                    lower = SemanticRational.ONE,
+                    indicator = LinearSourceIndicator(0, true),
+                ),
             ),
         )
 
-        val result = checkLinearSourceWitness(source, listOf(BigFraction.ZERO, BigFraction.ZERO), Cancellation.Never)
+        val result = checkLinearSourceWitness(
+            source,
+            listOf(BigFraction.ZERO, BigFraction.ZERO),
+            ExecutionControl.Never,
+        )
 
         assertTrue(assertIs<LinearSourceCheck.Accepted>(result).witness.exact)
     }
@@ -124,17 +134,19 @@ class LinearSourceWitnessTest {
             ),
         )
 
-        val result = checkLinearSourceWitness(source, listOf(BigFraction.ofLong(3)), Cancellation.Never)
+        val result = checkLinearSourceWitness(source, listOf(BigFraction.ofLong(3)), ExecutionControl.Never)
 
-        assertEquals(BigFraction.ofLong(11) * BigFraction.ofLong(10).reciprocal(),
-            assertIs<LinearSourceCheck.Accepted>(result).witness.objective)
+        assertEquals(
+            BigFraction.ofLong(11) * BigFraction.ofLong(10).reciprocal(),
+            assertIs<LinearSourceCheck.Accepted>(result).witness.objective,
+        )
     }
 
     @Test
     fun `a stopped point check should decline without rejecting the source`() {
         val source = LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList())
 
-        val result = checkLinearSourceWitness(source, listOf(BigFraction.ZERO), Cancellation { true })
+        val result = checkLinearSourceWitness(source, listOf(BigFraction.ZERO), ExecutionControl { true })
 
         assertIs<LinearSourceCheck.Declined>(result)
     }
@@ -149,13 +161,15 @@ class LinearSourceWitnessTest {
                 listOf(LinearSourceRow(terms, lower = SemanticRational.ZERO)),
             ),
             LinearSourceProblem(
-                listOf(LinearSourceVariable("x", false)), emptyList(), LinearSourceObjective(terms),
+                listOf(LinearSourceVariable("x", false)),
+                emptyList(),
+                LinearSourceObjective(terms),
             ),
         )
         for (source in sources) {
             var charged = 0L
-            val stop = object : Cancellation {
-                override fun charge(units: Long) { charged += units }
+            val stop = object : ExecutionControl() {
+                override val accounting = WorkMeter { units -> charged += units }
                 override fun isCancelled(): Boolean = charged > 0L
             }
 
@@ -167,30 +181,30 @@ class LinearSourceWitnessTest {
     }
 
     @Test
-    fun `metered point checks should stop at the first exhausted source visit`() {
+    fun `accounting should not change the source cancellation batch`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", false)),
             listOf(LinearSourceRow(List(128) { LinearSourceTerm(0, SemanticRational.ONE) })),
         )
         var charged = 0L
         val meter = WorkMeter { charged += it }
-        val stop = object : Cancellation {
-            override fun workMeter(): WorkMeter = meter
+        val stop = object : ExecutionControl() {
+            override val accounting: WorkMeter get() = meter
             override fun isCancelled(): Boolean = charged >= 1L
         }
 
         val result = checkLinearSourceWitness(source, listOf(BigFraction.ZERO), stop)
 
         assertIs<LinearSourceCheck.Declined>(result)
-        assertEquals(1L, charged)
+        assertEquals(64L, charged)
     }
 
     @Test
     fun `a cancelled final short batch should not publish a point`() {
         val source = LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList())
         var cancelled = false
-        val stop = object : Cancellation {
-            override fun charge(units: Long) { cancelled = true }
+        val stop = object : ExecutionControl() {
+            override val accounting = WorkMeter { units -> cancelled = true }
             override fun isCancelled(): Boolean = cancelled
         }
 
@@ -203,8 +217,8 @@ class LinearSourceWitnessTest {
     fun `cancellation should precede rejecting a point from a short batch`() {
         val source = LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList())
         var cancelled = false
-        val stop = object : Cancellation {
-            override fun charge(units: Long) { cancelled = true }
+        val stop = object : ExecutionControl() {
+            override val accounting = WorkMeter { units -> cancelled = true }
             override fun isCancelled(): Boolean = cancelled
         }
 
@@ -221,8 +235,8 @@ class LinearSourceWitnessTest {
             LinearSourceObjective(List(2) { LinearSourceTerm(0, SemanticRational.ONE) }),
         )
         var charged = 0L
-        val stop = object : Cancellation {
-            override fun charge(units: Long) { charged += units }
+        val stop = object : ExecutionControl() {
+            override val accounting = WorkMeter { units -> charged += units }
             override fun isCancelled(): Boolean = false
         }
 
@@ -238,7 +252,10 @@ class LinearSourceWitnessTest {
             listOf(LinearSourceRow(List(128) { LinearSourceTerm(0, SemanticRational.ONE) })),
         )
         var polls = 0
-        val stop = Cancellation { polls++; false }
+        val stop = ExecutionControl {
+            polls++
+            false
+        }
 
         checkLinearSourceWitness(source, listOf(BigFraction.ZERO), stop)
 
@@ -249,12 +266,15 @@ class LinearSourceWitnessTest {
     fun `unmetered point checks should reject a violation beyond the first batch`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", false)),
-            listOf(LinearSourceRow(
-                List(128) { LinearSourceTerm(0, SemanticRational.ONE) }, lower = SemanticRational.ONE,
-            )),
+            listOf(
+                LinearSourceRow(
+                    List(128) { LinearSourceTerm(0, SemanticRational.ONE) },
+                    lower = SemanticRational.ONE,
+                ),
+            ),
         )
 
-        val result = checkLinearSourceWitness(source, listOf(BigFraction.ZERO), Cancellation.Never)
+        val result = checkLinearSourceWitness(source, listOf(BigFraction.ZERO), ExecutionControl.Never)
 
         assertIs<LinearSourceCheck.Rejected>(result)
     }

@@ -34,7 +34,7 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Materializes [scenario] over [problem] and schedules it on one lane per core, checking every result an arm
  *  claims against [problem] and reporting each arm quarantined for a refuted claim to [onFault]. */
@@ -48,7 +48,7 @@ fun FinitePipeline.portfolioExecutor(
     onFault: ((ArmFault) -> Unit)? = null,
 ): PortfolioExecutor = portfolioExecutor(
     problem, scenario, objective, lsObjective, definitionalSweep, onEvent, onFault,
-    problem.prepareExecutionPlan(objective = objective, preferFinite = true), Cancellation.Never,
+    problem.prepareExecutionPlan(objective = objective, preferFinite = true), ExecutionControl.Never,
 )
 
 internal fun FinitePipeline.portfolioExecutor(
@@ -60,7 +60,7 @@ internal fun FinitePipeline.portfolioExecutor(
     onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
     onFault: ((ArmFault) -> Unit)?,
     preparedPlan: PreparedSourcePlan,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): PortfolioExecutor = portfolioExecutor(
     problem, scenario, objective, lsObjective, definitionalSweep,
     onEvent, onFault, preparedPlan, cancellation, false,
@@ -75,12 +75,12 @@ internal fun FinitePipeline.portfolioExecutor(
     onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
     onFault: ((ArmFault) -> Unit)?,
     preparedPlan: PreparedSourcePlan,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     numericalCompletion: Boolean,
     sourceHints: ((Set<ExecutionStrategy>) -> PreparedSourceHints?)? = null,
     numericalCompanions: TheoryParams? = null,
     objectiveCoordinates: ObjectiveCoordinateView? = null,
-    incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
+    incumbentCompletionCheck: ((Sample, BigFraction, ExecutionControl) -> Boolean)? = null,
     improvementProofShare: Double = 0.5,
     deferLpProbes: Boolean = false,
     bufferedPublications: Boolean = false,
@@ -105,9 +105,14 @@ internal fun FinitePipeline.portfolioExecutor(
     val curatedFiniteInteger = curatedPortfolio && profile.problemClass == ProblemClass.FiniteCp &&
         problem.numBoolVars == 0 && scenario.annotationArm == null
     val supportedProbeSource = if (probePolicy == InitialProbePolicy.HEURISTIC_SECOND) {
-        curatedPortfolio && profile.problemClass in setOf(ProblemClass.Sat, ProblemClass.PseudoBoolean,
-            ProblemClass.FiniteCp)
-    } else curatedFiniteInteger
+        curatedPortfolio && profile.problemClass in setOf(
+            ProblemClass.Sat,
+            ProblemClass.PseudoBoolean,
+            ProblemClass.FiniteCp,
+        )
+    } else {
+        curatedFiniteInteger
+    }
     if (deferLpProbes && !curatedFiniteInteger) {
         pipelineConfigError("portfolio-lp-start requires a curated single-core mixed finite integer optimization")
     }
@@ -139,12 +144,19 @@ internal fun FinitePipeline.portfolioExecutor(
     val companionAdmission = if (fundedCompanions && companionEligibility?.admitted == true) {
         FiniteNumericalCompanions.admission(problem, requireNotNull(objective),
             cancellation or requireNotNull(numericalCompanions).cancellation or numericalCompanions.timeout,
-            companionEligibility.requirements.construction)
-    } else null
+            companionEligibility.requirements.construction,
+        )
+    } else {
+        null
+    }
     val companionComparison: ((SearchEvent.CompanionComparison) -> Unit)? =
-        if (scenario.reportPortfolioProgress && onEvent != null) { event ->
+        if (scenario.reportPortfolioProgress && onEvent != null) {
+            { event ->
             onEvent("ls/finite-joint-companion", event)
-        } else null
+        }
+        } else {
+            null
+        }
     val companionObservation: ((Long, JointRepairObservation) -> Unit)? = onJointRepair?.let { report ->
         { seed, observation -> report("ls/finite-joint-companion", seed, observation) }
     }
@@ -152,19 +164,29 @@ internal fun FinitePipeline.portfolioExecutor(
         FiniteNumericalCompanions.prepare(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
             cancellation, companionEligibility.requirements.construction, scenario.companionAfterIncumbent,
             incumbentCompletionCheck, adaptiveRepair = adaptiveCompanionRepair, onComparison = companionComparison,
-            onObservation = companionObservation)
-    } else null
+            onObservation = companionObservation,
+        )
+    } else {
+        null
+    }
     val companions = if (companionAdmission?.initiallyFunded == true) {
         FiniteNumericalCompanions.deferred(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
             cancellation, requireNotNull(companionEligibility).requirements.construction, companionAdmission,
             incumbentCompletionCheck, afterImprovement = waitForCompanionImprovement,
             adaptiveRepair = adaptiveCompanionRepair, onComparison = companionComparison,
-            onObservation = companionObservation)
-    } else companionPreparation?.companions
+            onObservation = companionObservation,
+        )
+    } else {
+        companionPreparation?.companions
+    }
     companionEligibility?.let { eligibility ->
-        val declines = if (companionAdmission?.initiallyFunded == false) listOf("companion-lifetime-unfunded")
-        else if (eligibility.admitted && companions == null) listOf("complete-affine-capture-unavailable")
-        else eligibility.declines
+        val declines = if (companionAdmission?.initiallyFunded == false) {
+            listOf("companion-lifetime-unfunded")
+        } else if (eligibility.admitted && companions == null) {
+            listOf("complete-affine-capture-unavailable")
+        } else {
+            eligibility.declines
+        }
         val frontier = eligibility.requirements
         val repair = frontier.copy(authority = WorkerProofAuthority.WITNESS_ONLY,
             construction = frontier.construction.copy(sliceMillis = 250))
@@ -213,9 +235,13 @@ internal fun FinitePipeline.portfolioExecutor(
             improvementProofShare = improvementProofShare,
             includeRestartingProof = includeRestartingProof,
             booleanProofTasks = booleanProofTasks,
-            onProgress = if (scenario.reportPortfolioProgress) { event ->
+            onProgress = if (scenario.reportPortfolioProgress) {
+                { event ->
                 onEvent?.invoke("portfolio", SearchEvent.PortfolioDiagnostic(event))
-            } else null,
+            }
+            } else {
+                null
+            },
             diagnostics = scenario.diagnosticWorkLimit?.let { limit ->
                 PortfolioDiagnostics(limit, scenario.seed) { event ->
                     onEvent?.invoke("portfolio", SearchEvent.PortfolioDiagnostic(event))
@@ -253,7 +279,9 @@ internal fun FinitePipeline.portfolioExecutor(
             proofShares
         }
         val finiteReserved = if (shares.isEmpty()) booleanIncumbentShares(workers) else shares
-        val reserved = if (companions == null) finiteReserved else {
+        val reserved = if (companions == null) {
+            finiteReserved
+        } else {
             (if (finiteReserved.isEmpty()) DoubleArray(workers.size) else finiteReserved).also {
                 it[workers.indexOfFirst { worker -> worker.label == "ls/finite-joint-companion" }] = 0.3
             }
@@ -268,31 +296,44 @@ internal fun FinitePipeline.portfolioExecutor(
         val deferred = if (deferLpProbes) deferredLpProbes(workers) else null
         val probeWeights = when {
             probePolicy == InitialProbePolicy.LEADER_HALF -> leadingProbeWeights(workers)
+
             probePolicy == InitialProbePolicy.LP_TRANSFER -> lpTransferredProbeWeights(workers)
+
             companions == null -> intArrayOf()
+
             else -> IntArray(workers.size) { arm ->
                 if (workers[arm].label == "numerical/finite-companion") 3 else 1
             }
         }
         PortfolioInvocationPolicy(profile, reserved, reserveBeforeIncumbentOnly = true, probes = probes,
             probeWeights = probeWeights,
-            probeRanks = if (probePolicy == InitialProbePolicy.HEURISTIC_SECOND)
-                heuristicSecondProbeRanks(workers) else intArrayOf(),
+            probeRanks = if (probePolicy == InitialProbePolicy.HEURISTIC_SECOND) {
+                heuristicSecondProbeRanks(workers)
+            } else {
+                intArrayOf()
+            },
             initialHeuristics = when (probePolicy) {
                 InitialProbePolicy.FAMILY_WORK, InitialProbePolicy.ALNS_WORK -> workers.indices.filter { arm ->
                     arm < scenario.arms && workers[arm].family == ArmFamily.LocalSearch &&
                         !workers[arm].startAfterIncumbent && !workers[arm].improvementOnly &&
                         !workers[arm].auxiliaryProof
                 }.toSet()
+
                 InitialProbePolicy.HEURISTIC_WORK -> workers.indices.filter { arm ->
                     workers[arm].family in setOf(ArmFamily.LocalSearch, ArmFamily.Lns) && !workers[arm].auxiliaryProof
                 }.toSet()
+
                 else -> emptySet()
             },
-            heuristicTargets = if (probePolicy == InitialProbePolicy.ALNS_WORK) workers.indices.filter { arm ->
+            heuristicTargets = if (probePolicy == InitialProbePolicy.ALNS_WORK) {
+                workers.indices.filter { arm ->
                 workers[arm].family == ArmFamily.Lns && !workers[arm].auxiliaryProof
-            }.toSet() else null,
-            onProgress = deferred)
+            }.toSet()
+            } else {
+                null
+            },
+            onProgress = deferred,
+        )
     }
 }
 

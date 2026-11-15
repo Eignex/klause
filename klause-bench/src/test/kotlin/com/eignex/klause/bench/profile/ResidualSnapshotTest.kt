@@ -6,9 +6,12 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.math.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -16,9 +19,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
-import org.junit.jupiter.api.BeforeAll
 
 class ResidualSnapshotTest {
     companion object {
@@ -39,7 +39,7 @@ class ResidualSnapshotTest {
         return ResidualSnapshots.capture(
             problem, LinearObjective(longArrayOf(1, -2, 3, 4, 5, -6), constant = 10),
             listOf(null, null, null, null, true, null), LearnedResidualInspection(emptyList(), 0, null),
-            JsonObject(emptyMap()), JsonObject(emptyMap()), null, Cancellation.Never, maxBytes,
+            JsonObject(emptyMap()), JsonObject(emptyMap()), null, ExecutionControl.Never, maxBytes,
         )
     }
 
@@ -100,7 +100,7 @@ class ResidualSnapshotTest {
         val capture = ResidualSnapshots.capture(
             problem, LinearObjective(LongArray(4) { 1 }), List(4) { null },
             LearnedResidualRestrictions.inspect(session), JsonObject(emptyMap()), JsonObject(emptyMap()),
-            ResidualCutoff("4", List(4) { true }), Cancellation.Never, ResidualSnapshots.MAX_BYTES,
+            ResidualCutoff("4", List(4) { true }), ExecutionControl.Never, ResidualSnapshots.MAX_BYTES,
         )
 
         val snapshot = ResidualSnapshots.load(assertNotNull(capture.bytes).decodeToString())
@@ -121,7 +121,7 @@ class ResidualSnapshotTest {
             Problem(3, 0, emptyArray(), Array(3) { Clause(intArrayOf(Lit.make(it, true))) }),
             LinearObjective(), List(3) { null },
             LearnedResidualInspection(emptyList(), 0, null), JsonObject(emptyMap()), JsonObject(emptyMap()),
-            null, Cancellation { ++polls >= interruptAt }, ResidualSnapshots.MAX_BYTES,
+            null, ExecutionControl { ++polls >= interruptAt }, ResidualSnapshots.MAX_BYTES,
         )
 
         assertEquals("interrupted", capture.decline)
@@ -176,7 +176,7 @@ class ResidualSnapshotTest {
             Problem(3, 0, emptyArray(), emptyArray()),
             LinearObjective(longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE, Long.MIN_VALUE), constant = Long.MAX_VALUE),
             listOf(true, true, null), LearnedResidualInspection(emptyList(), 0, null),
-            JsonObject(emptyMap()), JsonObject(emptyMap()), null, Cancellation.Never, ResidualSnapshots.MAX_BYTES,
+            JsonObject(emptyMap()), JsonObject(emptyMap()), null, ExecutionControl.Never, ResidualSnapshots.MAX_BYTES,
         )
 
         val snapshot = ResidualSnapshots.load(assertNotNull(captured.bytes).decodeToString())

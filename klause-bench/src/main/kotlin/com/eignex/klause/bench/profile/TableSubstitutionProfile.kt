@@ -11,7 +11,7 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -47,7 +47,7 @@ internal object TableSubstitutionProfile {
             val directory = out.resolve("$index").apply { mkdirs() }
             directory.resolve("source.xml").writeBytes(bytes)
             for (mode in listOf("default", "default,+table-substitution")) {
-                val stop = Cancellation.after(8.seconds)
+                val stop = ExecutionControl.after(8.seconds)
                 val parsed = Xcsp3.parse(bytes.decodeToString(), recoveryCancellation = stop)
                 val objective = parsed.objective?.toLinearObjective()
                 val budget = PresolveBudget(550_000_000L)

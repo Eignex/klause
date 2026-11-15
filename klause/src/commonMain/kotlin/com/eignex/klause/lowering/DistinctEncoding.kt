@@ -15,9 +15,9 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.EncodingAffineExpression
 import com.eignex.klause.theory.EncodingLinearTerm
 import com.eignex.klause.theory.LinearEncodingFormula
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
-internal fun distinctLinearFormula(factor: Distinct, cancellation: Cancellation): LinearEncodingFormula? {
+internal fun distinctLinearFormula(factor: Distinct, cancellation: ExecutionControl): LinearEncodingFormula? {
     if (cancellation()) return null
     val operands = factor.operands
     val differences = ArrayList<LinearEncodingFormula>()
@@ -58,7 +58,7 @@ internal fun distinctPolynomialFormula(
     integer: (SourceIntId) -> PolynomialExpression,
     real: (SourceRealId) -> PolynomialExpression,
     conditional: (PolynomialRealFormula, PolynomialExpression, PolynomialExpression) -> PolynomialExpression,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): PolynomialRealFormula? {
     if (cancellation()) return null
     val values = ArrayList<PolynomialExpression>()
@@ -69,7 +69,9 @@ internal fun distinctPolynomialFormula(
             if (cancellation()) return null
             val coordinate = when {
                 Term.isInt(reference) -> integer(SourceIntId(Term.intVar(reference)))
+
                 Term.isReal(reference) -> real(SourceRealId(Term.realVar(reference)))
+
                 else -> conditional(
                     PolynomialRealFormula.BooleanVariable(SourceBoolId(Lit.variable(Term.lit(reference)))),
                     PolynomialRealLowering.constant(BigFraction.ONE), PolynomialRealLowering.constant(BigFraction.ZERO),
@@ -81,7 +83,12 @@ internal fun distinctPolynomialFormula(
     }
     if (cancellation()) return null
     val formula = PolynomialDistinct(values)
-    return if (factor.activator == LinearRow.ALWAYS) formula else PolynomialRealLowering.equivalent(
-        PolynomialRealFormula.BooleanVariable(SourceBoolId(factor.activator)), formula,
+    return if (factor.activator == LinearRow.ALWAYS) {
+        formula
+    } else {
+        PolynomialRealLowering.equivalent(
+        PolynomialRealFormula.BooleanVariable(SourceBoolId(factor.activator)),
+        formula,
     )
+    }
 }

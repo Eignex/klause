@@ -20,7 +20,7 @@ import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.PresolveStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.time.TimeSource
 
 /** Round cap for the presolve↔LP-harvest fixpoint: a spin guard, never the real stop. The loop
@@ -72,7 +72,7 @@ object PresolvePipeline {
         config: PresolveConfig = PresolveConfig.DEFAULT,
         linearObjective: LinearObjective? = null,
         solutionSetSensitive: Boolean = false,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         presolveBudget: PresolveBudget? = null,
         finiteLane: Boolean = false,
         transformObjective: Boolean = true,
@@ -115,14 +115,20 @@ object PresolvePipeline {
         linearObjective: LinearObjective?,
         config: PresolveConfig,
         solutionSetSensitive: Boolean,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         presolveBudget: PresolveBudget? = null,
         zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
         randomSeed: Long? = null,
         sourcePreparation: LpSourcePreparation = LpSourcePreparation.ADMITTED,
     ): PresolveOutcome = run(
         prepareSource(
-            problem, config, linearObjective, solutionSetSensitive, cancellation, presolveBudget, finiteLane = true,
+            problem,
+            config,
+            linearObjective,
+            solutionSetSensitive,
+            cancellation,
+            presolveBudget,
+            finiteLane = true,
         ),
         linearObjective,
         config,
@@ -146,7 +152,7 @@ object PresolvePipeline {
         linearObjective: LinearObjective?,
         config: PresolveConfig,
         solutionSetSensitive: Boolean,
-        callerCancellation: Cancellation = Cancellation.Never,
+        callerCancellation: ExecutionControl = ExecutionControl.Never,
         zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
         randomSeed: Long? = null,
         projections: PreparedFactorProjections? = null,
@@ -196,14 +202,21 @@ object PresolvePipeline {
         // wide output with bounded integer inputs uses the ordinary bake instead.
         val sourceProjections = projections?.forEngineView(sourceProblem)
         val (wideCoupling, rootInfeasible) = presolveBudget.observePreparation(
-            PresolvePreparationStage.PRE_BAKE_LP_FEASIBILITY, PresolveLane.SOURCE, sourceProblem,
+            PresolvePreparationStage.PRE_BAKE_LP_FEASIBILITY,
+            PresolveLane.SOURCE,
+            sourceProblem,
             preBakeSlice(cancellation, presolveBudget),
         ) { token, observation ->
             val wide = needsWideDomainLp(sourceProblem)
             val result = if (!prepared.infeasible && wide) {
                 lpRootInfeasibleReporting(
-                    sourceProblem, objective, LpPlan(bounding = true, sourcePreparation = sourcePreparation), token,
-                    zeroObjectivePricing, randomSeed, projections = sourceProjections,
+                    sourceProblem,
+                    objective,
+                    LpPlan(bounding = true, sourcePreparation = sourcePreparation),
+                    token,
+                    zeroObjectivePricing,
+                    randomSeed,
+                    projections = sourceProjections,
                     numericalLp = numericalLp,
                 ).also { if (it.infeasible) observation.preparationRefuted() }
             } else {
@@ -235,8 +248,11 @@ object PresolvePipeline {
         // output use ordinary propagation.
         val rootBounds = if (wideCoupling) {
             presolveBudget.observePreparation(
-                PresolvePreparationStage.PRE_BAKE_LP_BOUNDS, PresolveLane.SOURCE, sourceProblem,
-                preBakeSlice(cancellation, presolveBudget), output = { it.problem },
+                PresolvePreparationStage.PRE_BAKE_LP_BOUNDS,
+                PresolveLane.SOURCE,
+                sourceProblem,
+                preBakeSlice(cancellation, presolveBudget),
+                output = { it.problem },
             ) { token, _ ->
                 lpRootBoundsReporting(
                     sourceProblem, objective, LpPlan(bounding = true, sourcePreparation = sourcePreparation), token,
@@ -255,7 +271,10 @@ object PresolvePipeline {
         // actually happens, after the O(one-LP) pre-bake infeasibility/OBBT that must precede it.
         val bakeStart = TimeSource.Monotonic.markNow()
         val (baked, seeded) = presolveBudget.observePreparation(
-            PresolvePreparationStage.ROOT_BAKE, PresolveLane.FINITE, prebaked, cancellation,
+            PresolvePreparationStage.ROOT_BAKE,
+            PresolveLane.FINITE,
+            prebaked,
+            cancellation,
             output = { it.second },
         ) { token, observation ->
             val selected = projections?.forEngineView(prebaked)
@@ -280,7 +299,9 @@ object PresolvePipeline {
             null
         } else {
             presolveBudget.observeTransform(
-                PresolvePass.SUBSTITUTE_TUPLE_PACKING, seeded, cancellation,
+                PresolvePass.SUBSTITUTE_TUPLE_PACKING,
+                seeded,
+                cancellation,
                 eligible = { seeded.numIntVars > 0 },
                 unchanged = { null },
                 output = { it?.problem ?: seeded },
@@ -308,13 +329,18 @@ object PresolvePipeline {
             null
         } else {
             presolveBudget.observeTransform(
-                PresolvePass.SUBSTITUTE_BINARY_COLUMNS, packed, cancellation,
+                PresolvePass.SUBSTITUTE_BINARY_COLUMNS,
+                packed,
+                cancellation,
                 eligible = { hasBinaryCandidate(packed, emptySet(), cancellation) },
                 unchanged = { null },
                 output = { it?.problem ?: packed },
             ) {
                 BinaryColumnSubstitution.substitute(
-                    packed, context.objectiveIntVars, bakeConfig, context.linearObjective,
+                    packed,
+                    context.objectiveIntVars,
+                    bakeConfig,
+                    context.linearObjective,
                     allowMixedObjective = config.affinePivotOrder == AffinePivotOrder.REWRITE_COST,
                 ).also { result ->
                     presolveBudget?.activeInvocation?.fixedColumns = result?.columns ?: 0
@@ -339,33 +365,41 @@ object PresolvePipeline {
             currentObjective = pre.objective ?: currentObjective
             context = context.withObjective(currentObjective)
             infeasible = infeasible || pre.infeasible
-            val harvestResult = if (infeasible) null else harvestPlan?.let {
-                presolveBudget.observeTransform(
-                    PresolvePass.LP_HARVEST, pre.problem, cancellation,
-                    // Cardinality rewrites strengthen clause relaxations; propagator-only symmetry adds no LP rows.
-                    eligible = {
-                        !automaticClausalSatisfaction || pre.problem.factors.any { factor -> factor is Cardinality }
-                    },
-                    unchanged = { LpHarvestResult(pre.problem, LpHarvestReport(), LpStats()) },
-                    output = { result -> result.problem },
-                    refuted = { result ->
-                        result.report.rootInfeasible ||
-                            result.problem.baked is PropagationResult.Unsat
-                    },
-                ) {
-                    lpHarvestReporting(
+            val harvestResult = if (infeasible) {
+                null
+            } else {
+                harvestPlan?.let {
+                    presolveBudget.observeTransform(
+                        PresolvePass.LP_HARVEST,
                         pre.problem,
-                        currentObjective ?: LinearObjective(),
-                        it.copy(sourcePreparation = sourcePreparation),
-                        bakeConfig,
                         cancellation,
-                        zeroObjectivePricing,
-                        randomSeed,
-                        numericalLp = numericalLp,
-                    ).also { result ->
-                        presolveBudget?.activeInvocation?.let { invocation ->
-                            invocation.narrowedColumns = result.report.boundsShaved
-                            if (result.report.skipped) invocation.outcome = PresolveInvocationOutcome.ELIGIBILITY_SKIP
+                        // Cardinality rewrites strengthen clause relaxations; propagator-only symmetry adds no LP rows.
+                        eligible = {
+                            !automaticClausalSatisfaction || pre.problem.factors.any { factor -> factor is Cardinality }
+                        },
+                        unchanged = { LpHarvestResult(pre.problem, LpHarvestReport(), LpStats()) },
+                        output = { result -> result.problem },
+                        refuted = { result ->
+                            result.report.rootInfeasible ||
+                                result.problem.baked is PropagationResult.Unsat
+                        },
+                    ) {
+                        lpHarvestReporting(
+                            pre.problem,
+                            currentObjective ?: LinearObjective(),
+                            it.copy(sourcePreparation = sourcePreparation),
+                            bakeConfig,
+                            cancellation,
+                            zeroObjectivePricing,
+                            randomSeed,
+                            numericalLp = numericalLp,
+                        ).also { result ->
+                            presolveBudget?.activeInvocation?.let { invocation ->
+                                invocation.narrowedColumns = result.report.boundsShaved
+                                if (result.report.skipped) {
+                                    invocation.outcome = PresolveInvocationOutcome.ELIGIBILITY_SKIP
+                                }
+                            }
                         }
                     }
                 }
@@ -400,7 +434,9 @@ object PresolvePipeline {
         val reduced = current
         val posted = if (!infeasible && config.resolved(PresolvePass.POST_DIFFERENCE_SYSTEM, context)) {
             presolveBudget.observeTransform(
-                PresolvePass.POST_DIFFERENCE_SYSTEM, reduced, cancellation,
+                PresolvePass.POST_DIFFERENCE_SYSTEM,
+                reduced,
+                cancellation,
                 eligible = { reduced.numBoolVars > 0 && reduced.numIntVars >= 2 },
                 unchanged = { reduced },
                 output = { it },
@@ -458,7 +494,7 @@ private fun refit(objective: LinearObjective?, problem: Problem): LinearObjectiv
  * [cancellation], stopping as well once [budget] is spent, and carrying [budget] as the meter every pass
  * and LP solve below charges. Whatever token the caller built, the phase's work lands in its own budget.
  */
-private fun phaseCancellation(cancellation: Cancellation, budget: PresolveBudget?): Cancellation =
+private fun phaseCancellation(cancellation: ExecutionControl, budget: PresolveBudget?): ExecutionControl =
     budget?.orSpent(cancellation) ?: cancellation
 
 private fun needsWideDomainLp(problem: Problem): Boolean {
@@ -489,11 +525,11 @@ private fun needsWideDomainLp(problem: Problem): Boolean {
  * each stage costs a bounded share of the phase rather than the phase itself. The simplex charges its
  * work through the slice, which is what stops it at the same pivot on every run.
  */
-private fun preBakeSlice(cancellation: Cancellation, budget: PresolveBudget?): Cancellation = budget?.let {
+private fun preBakeSlice(cancellation: ExecutionControl, budget: PresolveBudget?): ExecutionControl = budget?.let {
     it.slice(it.remaining() / 2) or cancellation
 } ?: cancellation
 
-private fun hasBinaryCandidate(problem: BakedProblem, objective: Set<Int>, cancellation: Cancellation): Boolean {
+private fun hasBinaryCandidate(problem: BakedProblem, objective: Set<Int>, cancellation: ExecutionControl): Boolean {
     for (v in 0 until problem.numIntVars) {
         cancellation.charge(1L)
         if (cancellation()) return false

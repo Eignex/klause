@@ -5,7 +5,7 @@ import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -19,7 +19,7 @@ class PortfolioArmFactoryTest {
         val factory = PortfolioArmFactory(plan, 0, ArmFamily.Backtrack) {
             error("foreign source cannot allocate this worker")
         }
-        val resources = PortfolioInvocationResources(1, 1, 17, Cancellation.Never, null)
+        val resources = PortfolioInvocationResources(1, 1, 17, ExecutionControl.Never, null)
 
         assertFailsWith<IllegalArgumentException> { factory.materialize(foreign, resources.slots[0]) }
     }
@@ -32,7 +32,7 @@ class PortfolioArmFactoryTest {
             observedSeeds += slot.seed
             PortfolioWorker.ofSolve("source", 0) { _, _ -> SolveResult.Unknown(TerminationReason.BudgetExhausted) }
         }
-        val resources = PortfolioInvocationResources(2, 2, 17, Cancellation.Never, null)
+        val resources = PortfolioInvocationResources(2, 2, 17, ExecutionControl.Never, null)
 
         val first = factory.materialize(plan, resources.slots[0])
         val second = factory.materialize(plan, resources.slots[1])

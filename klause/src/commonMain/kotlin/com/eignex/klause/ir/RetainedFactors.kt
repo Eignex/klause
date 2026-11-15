@@ -1,6 +1,6 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class RetainedFactors private constructor(
     val source: Problem,
@@ -11,7 +11,7 @@ internal class RetainedFactors private constructor(
     fun sourceIndices(): IntArray = indices.copyOf()
 
     companion object {
-        fun between(source: Problem, target: Problem, cancellation: Cancellation): RetainedFactors? {
+        fun between(source: Problem, target: Problem, cancellation: ExecutionControl): RetainedFactors? {
             if (target.numFactors >= source.numFactors || source.numBoolVars != target.numBoolVars ||
                 source.numIntVars != target.numIntVars || source.numRealVars != target.numRealVars ||
                 source.declaredIntDomains !== target.declaredIntDomains ||

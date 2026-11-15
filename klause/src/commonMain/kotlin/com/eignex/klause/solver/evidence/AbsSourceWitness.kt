@@ -11,7 +11,7 @@ import com.eignex.klause.lp.exactComparison
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.abs
 import kotlin.uuid.Uuid
@@ -26,7 +26,7 @@ internal fun Problem.hasCompleteAbsSource(): Boolean = factors.any { it is Abs |
 
 internal fun Problem.absSourceWitnessContext(
     objective: LinearObjective,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): SourceProofContext? {
     if (cancellation() || !hasCompleteAbsSource()) return null
     val identity = Uuid.random().toString()
@@ -35,7 +35,7 @@ internal fun Problem.absSourceWitnessContext(
     return sourceProofContext(scope, objective, cancellation)
 }
 
-internal fun Problem.checkAbsSourceWitness(sample: Sample, cancellation: Cancellation): SourceEvidenceCheck {
+internal fun Problem.checkAbsSourceWitness(sample: Sample, cancellation: ExecutionControl): SourceEvidenceCheck {
     if (numRealVars > 0 && sample.exactReals == null) {
         return SourceEvidenceCheck.Unavailable("absolute value source requires rational real coordinates")
     }
@@ -43,7 +43,9 @@ internal fun Problem.checkAbsSourceWitness(sample: Sample, cancellation: Cancell
         override fun truth(boolVar: Int): Boolean = sample.boolValue(boolVar)
         override fun at(column: Int): BigFraction = if (column < numRealVars) {
             checkNotNull(sample.exactReals)[column]
-        } else BigFraction.of(sample.exactIntValue(column - numRealVars), BIG_ONE)
+        } else {
+            BigFraction.of(sample.exactIntValue(column - numRealVars), BIG_ONE)
+        }
     }
     var interrupted = false
     fun holds(row: LinearRow): Boolean {
@@ -59,10 +61,14 @@ internal fun Problem.checkAbsSourceWitness(sample: Sample, cancellation: Cancell
         if (cancellation()) return SourceEvidenceCheck.Unavailable("original-source check cancelled")
         val valid = when (factor) {
             is Abs -> sample.exactIntValue(factor.operand).abs() == sample.exactIntValue(factor.result)
+
             is AffineAbs -> factor.isSatisfied(sample::exactIntValue)
+
             else -> when (val form = factor.linearForm) {
                 is LinearForm.Conjunction -> form.rows.all(::holds)
+
                 is LinearForm.Disjunction -> form.rows.any(::holds)
+
                 is LinearForm.Relaxation, null -> return SourceEvidenceCheck.Unavailable(
                     "original factor has no complete absolute value source checker")
             }

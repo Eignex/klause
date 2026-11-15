@@ -4,7 +4,7 @@ import com.eignex.klause.factor.arithmetic.ExactRealEquality
 import com.eignex.klause.ir.*
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.*
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 
@@ -12,7 +12,10 @@ private class ExactRealSourceUnavailable : RuntimeException()
 
 private fun unavailable(): Nothing = throw ExactRealSourceUnavailable()
 
-internal fun prepareExactRealSource(request: SourceSetupRequest, stop: Cancellation): SourceProblemRoute.NativeFormula {
+internal fun prepareExactRealSource(
+    request: SourceSetupRequest,
+    stop: ExecutionControl,
+): SourceProblemRoute.NativeFormula {
     if (request.operation != ExecutionOperation.SATISFY) {
         return SourceProblemRoute.NativeFormula(
             null,
@@ -33,7 +36,7 @@ internal fun prepareExactRealSource(request: SourceSetupRequest, stop: Cancellat
 
 internal fun Problem.exactRealSource(
     providers: com.eignex.klause.solver.FactorProjectionProviders,
-    stop: Cancellation,
+    stop: ExecutionControl,
 ): TranscendentalProblem? {
     val source = this
     fun checkpoint() {

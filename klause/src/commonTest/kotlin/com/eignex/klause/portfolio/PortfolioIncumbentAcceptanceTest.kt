@@ -4,7 +4,6 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.UnresolvedRealLeafFixture
 import com.eignex.klause.backtrack.selector.IndomainMax
-import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
@@ -15,7 +14,6 @@ import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -27,22 +25,19 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.parseBigInt
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.toDouble
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -83,7 +78,7 @@ class PortfolioIncumbentAcceptanceTest {
 
             val result = Portfolio.thompson(listOf(worker)).use { portfolio ->
                 portfolio.minimize(
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                     { reported += checkNotNull(it.result.assignment).ints.single() },
                     incumbents,
                 )
@@ -126,7 +121,7 @@ class PortfolioIncumbentAcceptanceTest {
         }
 
         val result = Portfolio.thompson(listOf(worker)).use {
-            it.minimize(Cancellation.Never, onImprovement = null, incumbents)
+            it.minimize(ExecutionControl.Never, onImprovement = null, incumbents)
         }
 
         assertEquals(1L, assertIs<MinimizeResult.Optimal>(result).sample.ints.single())
@@ -162,7 +157,7 @@ class PortfolioIncumbentAcceptanceTest {
         val accepted = mutableListOf<AcceptedPortfolioIncumbent<BigFraction>>()
 
         Portfolio.thompson(listOf(worker)).use { portfolio ->
-            portfolio.minimize(Cancellation.Never, null, incumbents, onAccepted = {
+            portfolio.minimize(ExecutionControl.Never, null, incumbents, onAccepted = {
                 assertEquals(it.objective, incumbents.exchange.current()?.objective)
                 accepted += it
             })
@@ -191,7 +186,7 @@ class PortfolioIncumbentAcceptanceTest {
                 .bindInvocation(expected)
         }
 
-        val result = portfolio.use { it.solve(Cancellation.Never) }
+        val result = portfolio.use { it.solve(ExecutionControl.Never) }
 
         assertIs<SolveResult.Unknown>(result)
         assertEquals(1L, result.stats.portfolio.arms.single().faults)
@@ -215,7 +210,7 @@ class PortfolioIncumbentAcceptanceTest {
             Portfolio.thompson(workers).use { portfolio ->
                 val offered = ArrayList<Double>()
                 val result = portfolio.minimize(
-                    Cancellation { ++polls > 100_000 },
+                    ExecutionControl { ++polls > 100_000 },
                 ) { offered += requireNotNull(it.result.objectiveValue) }
                 assertTrue(polls < 100_000)
                 if (withIncumbent) {
@@ -389,7 +384,7 @@ class PortfolioIncumbentAcceptanceTest {
                 objectiveBoundSupplier = { Double.POSITIVE_INFINITY },
             ),
         ).use { search ->
-            val result = assertIs<MinimizeResult.Unknown>(search.runSlice(Cancellation.Never, 1000L, 256L) {})
+            val result = assertIs<MinimizeResult.Unknown>(search.runSlice(ExecutionControl.Never, 1000L, 256L) {})
             assertEquals(TerminationReason.Unsupported, result.reason)
             assertTrue(search.isDone)
         }
@@ -446,7 +441,7 @@ class PortfolioIncumbentAcceptanceTest {
         }
 
         val r = Portfolio.thompson(workers, witnessCheck = slowCheck).use {
-            it.minimize(Cancellation { slices >= 3 })
+            it.minimize(ExecutionControl { slices >= 3 })
         }
 
         assertTrue(checks < 20, "$checks checks for ${200 * slices} incumbents")
@@ -464,7 +459,7 @@ class PortfolioIncumbentAcceptanceTest {
         var polls = 0
 
         Portfolio.thompson(workers, witnessCheck = check, onFault = { faults += it }).use {
-            it.minimize(Cancellation { ++polls > 50 }) { improvement ->
+            it.minimize(ExecutionControl { ++polls > 50 }) { improvement ->
                 reported += checkNotNull(improvement.result.objectiveValue)
             }
         }
@@ -486,7 +481,7 @@ class PortfolioIncumbentAcceptanceTest {
         var polls = 0
 
         val r = Portfolio.thompson(workers, witnessCheck = { _, _ -> null }, onFault = { faults += it }).use {
-            it.minimize(Cancellation { ++polls > 10 })
+            it.minimize(ExecutionControl { ++polls > 10 })
         }
 
         assertIs<MinimizeResult.WithSample>(r)
@@ -521,7 +516,7 @@ class PortfolioIncumbentAcceptanceTest {
         }
 
         val result = Portfolio.thompson(listOf(complete, sibling)).use {
-            it.minimize(Cancellation.Never, null, PortfolioIncumbents.floating(), checker)
+            it.minimize(ExecutionControl.Never, null, PortfolioIncumbents.floating(), checker)
         }
 
         assertIs<MinimizeResult.Unknown>(result)
@@ -557,7 +552,7 @@ class PortfolioIncumbentAcceptanceTest {
         }
 
         val result = Portfolio.thompson(listOf(complete, sibling)).use {
-            it.minimize(Cancellation.Never, null, PortfolioIncumbents.floating(), checker)
+            it.minimize(ExecutionControl.Never, null, PortfolioIncumbents.floating(), checker)
         }
 
         assertIs<MinimizeResult.Unknown>(result)

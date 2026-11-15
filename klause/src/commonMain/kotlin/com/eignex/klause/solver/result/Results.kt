@@ -4,7 +4,7 @@ import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceResultEvidence
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /**
  * Why a solver / optimiser returned without a definitive verdict. Lets callers tell
@@ -19,7 +19,7 @@ enum class TerminationReason {
     /** Wall-clock `timeoutMillis` elapsed. */
     Timeout,
 
-    /** Cooperative [com.eignex.klause.util.Cancellation] token tripped. */
+    /** Cooperative [com.eignex.klause.util.ExecutionControl] token tripped. */
     Cancelled,
 
     /**

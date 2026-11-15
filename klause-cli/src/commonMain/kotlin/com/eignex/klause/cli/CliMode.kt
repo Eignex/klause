@@ -29,6 +29,7 @@ import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.process.printErrorLine
 import com.eignex.util.process.processProperty
@@ -44,10 +45,10 @@ import kotlin.time.Duration.Companion.milliseconds
  * Slices the shared presolve allowance and observes the invocation deadline.
  * Consumes `open-bound-proof` once and retains the token across frontend requests.
  */
-internal fun CommonOptions.routingCancellation(): Cancellation {
+internal fun CommonOptions.routingCancellation(): ExecutionControl {
     routingToken?.let { return it }
-    if (!takeOpenBoundProof()) return Cancellation { true }.also { routingToken = it }
-    val solveStop = Cancellation { deadlineAtMs?.let { nowMillis() >= it } == true }
+    if (!takeOpenBoundProof()) return ExecutionControl { true }.also { routingToken = it }
+    val solveStop = invocationCancellation()
     val budget = sharedPresolveBudget()
     val phaseStop = presolveTimeCancellation or solveStop
     val token = budget?.let { routingSlice(it, phaseStop) } ?: phaseStop
@@ -57,17 +58,27 @@ internal fun CommonOptions.routingCancellation(): Cancellation {
 
 // Required admission observes the containing stop while retaining the shared routing work ledger.
 internal fun CommonOptions.routingPreparationCancellation(): RoutingPreparationScope = RoutingPreparationScope(
-    { deadlineAtMs?.let { nowMillis() >= it } == true },
-    routingCancellation().workMeter(),
+    invocationCancellation(),
+    routingCancellation().accounting,
 )
 
-internal class RoutingPreparationScope(
-    private val stopped: () -> Boolean,
-    private var meter: WorkMeter?,
-) : Cancellation, AutoCloseable {
-    override fun isCancelled(): Boolean = stopped()
+internal fun CommonOptions.invocationCancellation(): ExecutionControl {
+    invocationStop?.let { return it }
+    val common = this
+    return object : ExecutionControl() {
+        override fun isCancelled(): Boolean = common.invocationDeadline.isCancelled()
+        override fun deadline() = common.invocationDeadline.deadline()
+    }.also { invocationStop = it }
+}
 
-    override fun workMeter(): WorkMeter? = meter
+internal class RoutingPreparationScope(private val containing: ExecutionControl, private var meter: WorkMeter?) :
+    ExecutionControl(),
+    AutoCloseable {
+    override fun isCancelled(): Boolean = containing()
+
+    override fun deadline() = containing.deadline()
+
+    override val accounting: WorkMeter? get() = meter
 
     override fun close() {
         // Retained source invocations keep the containing stop, not the preparation ledger.
@@ -95,7 +106,7 @@ internal fun CommonOptions.logRoute(route: SourceProblemRoute, elapsedMs: Long) 
 }
 
 /** Routing receives one pass-sized slice of the shared allowance; source preparation keeps the rest. */
-internal fun routingSlice(budget: PresolveBudget, solveStop: Cancellation): Cancellation =
+internal fun routingSlice(budget: PresolveBudget, solveStop: ExecutionControl): ExecutionControl =
     budget.slice((budget.remaining() / 2).coerceAtLeast(1L)) or solveStop
 
 /**
@@ -115,7 +126,13 @@ internal fun CommonOptions.sharedPresolveBudget(): PresolveBudget? {
             AllowanceSetting.Unlimited -> null
             is AllowanceSetting.Remaining -> PresolveBudget(setting.units)
         }
-        presolveTimeCancellation = if (budgetMs <= 0L) Cancellation.Never else Cancellation.after(budgetMs.milliseconds)
+        presolveTimeCancellation = if (budgetMs <= 0L) {
+            ExecutionControl.Never
+        } else {
+            ExecutionControl.after(
+                budgetMs.milliseconds,
+            )
+        }
         presolveAllowanceInitialized = true
     }
     return presolveBudget
@@ -168,12 +185,19 @@ internal class CommonOptions {
      *  ([CliMode.load]) and the solve phase ([SolveCore]) so the two phases don't each spend a
      *  fresh full budget (which would let `-t` overshoot ~2×). Null when no `-t` is given. */
     var deadlineAtMs: Long? = null
+        set(value) {
+            field = value
+            invocationDeadline = value?.let { Cancellation.after((it - nowMillis()).coerceAtLeast(0L).milliseconds) }
+                ?: Cancellation.Never
+        }
 
     /** Null also represents an explicitly disabled cap, so initialization is tracked separately. */
     internal var presolveAllowanceInitialized = false
     internal var presolveBudget: PresolveBudget? = null
-    internal var presolveTimeCancellation: Cancellation = Cancellation.Never
-    internal var routingToken: Cancellation? = null
+    internal var presolveTimeCancellation: ExecutionControl = ExecutionControl.Never
+    internal var routingToken: ExecutionControl? = null
+    internal var invocationStop: ExecutionControl? = null
+    internal var invocationDeadline: Cancellation = Cancellation.Never
     internal var nodeBudget: NodeBudget? = null
 
     /** Inclusive frontend load time, including parsing, lowering, routing and solvable construction. */

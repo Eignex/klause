@@ -14,7 +14,7 @@ import com.eignex.klause.localsearch.ScoringProjection
 import com.eignex.klause.localsearch.ScoringProjectionProvider
 import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.ScoringCapability
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal object GlobalScoringViews {
     const val MAX_ARITY = 64
@@ -48,13 +48,13 @@ internal object GlobalScoringViews {
         return Selection(provider, admissions)
     }
 
-    fun alternate(factor: Factor, stop: Cancellation = Cancellation.Never): Relation = when (factor) {
+    fun alternate(factor: Factor, stop: ExecutionControl = ExecutionControl.Never): Relation = when (factor) {
         is Table -> tableDiagram(factor, stop)
         is Mdd -> diagramTable(factor, stop)
         else -> Relation(null, "unsupported-factor", 0)
     }
 
-    private fun tableDiagram(table: Table, stop: Cancellation): Relation {
+    private fun tableDiagram(table: Table, stop: ExecutionControl): Relation {
         if (table.hi != null) return Relation(null, "interval-table", 0)
         if (table.arity > MAX_ARITY) return Relation(null, "arity-limit", 0)
         if (table.tuples.size > MAX_CELLS) return Relation(null, "cell-limit", 0)
@@ -88,7 +88,7 @@ internal object GlobalScoringViews {
             IntArray(counts.last()) { it }, 3), null, work)
     }
 
-    private fun diagramTable(mdd: Mdd, stop: Cancellation): Relation {
+    private fun diagramTable(mdd: Mdd, stop: ExecutionControl): Relation {
         val width = mdd.seq.size + if (mdd.cost >= 0) 1 else 0
         if (width > MAX_ARITY) return Relation(null, "arity-limit", 0)
         if (mdd.transitions.size > MAX_CELLS || mdd.accepting.size > MAX_CELLS) {

@@ -1,6 +1,6 @@
 package com.eignex.klause.simplex.basis
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.koblas.SparseMatrix
 import kotlin.math.abs
 import kotlin.math.max
@@ -34,7 +34,7 @@ class KotlinBasisSolverRepairTest {
                 solver.refactorizeRepairing(
                     intArrayOf(0, 1),
                     BasisRepairControl(
-                        Cancellation {
+                        ExecutionControl {
                             boundaries++
                             false
                         },
@@ -47,7 +47,7 @@ class KotlinBasisSolverRepairTest {
             KotlinBasisSolver(source).use { solver ->
                 assertTrue(solver.refactorize(intArrayOf(0, 1)))
                 var polls = 0
-                val control = BasisRepairControl(Cancellation { ++polls == boundary })
+                val control = BasisRepairControl(ExecutionControl { ++polls == boundary })
 
                 val result = solver.refactorizeRepairing(intArrayOf(0, 1), control)
 

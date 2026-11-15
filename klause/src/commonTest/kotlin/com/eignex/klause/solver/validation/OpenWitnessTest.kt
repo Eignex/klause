@@ -18,7 +18,7 @@ import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertIs
@@ -27,13 +27,25 @@ class OpenWitnessTest {
     @Test
     fun `real min max points should be checked before discrete propagation`() {
         for (maximum in listOf(false, true)) {
-            val source = Problem(0, 0, emptyArray(), arrayOf(RealArrayMinMax(2, intArrayOf(0, 1), maximum)),
-                numRealVars = 3, realLower = doubleArrayOf(0.0, 1.0, 0.0),
-                realUpper = doubleArrayOf(2.0, 3.0, 3.0))
-            val point = Sample(booleanArrayOf(), longArrayOf(),
+            val source = Problem(
+                0,
+                0,
+                emptyArray(),
+                arrayOf(RealArrayMinMax(2, intArrayOf(0, 1), maximum)),
+                numRealVars = 3,
+                realLower = doubleArrayOf(0.0, 1.0, 0.0),
+                realUpper = doubleArrayOf(2.0, 3.0, 3.0),
+            )
+            val point = Sample(
+                booleanArrayOf(),
+                longArrayOf(),
                 reals = doubleArrayOf(0.0, 1.0, if (maximum) 1.0 else 0.0),
-                exactReals = listOf(BigFraction.ZERO, BigFraction.ONE,
-                    if (maximum) BigFraction.ONE else BigFraction.ZERO))
+                exactReals = listOf(
+                    BigFraction.ZERO,
+                    BigFraction.ONE,
+                    if (maximum) BigFraction.ONE else BigFraction.ZERO,
+                ),
+            )
 
             val checked = verifyOpenWitness(source, point)
 
@@ -43,10 +55,21 @@ class OpenWitnessTest {
 
     @Test
     fun `invalid real min max points should be rejected before discrete propagation`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(RealArrayMinMax(2, intArrayOf(0, 1), true)),
-            numRealVars = 3, realLower = doubleArrayOf(0.0, 1.0, 0.0), realUpper = doubleArrayOf(2.0, 3.0, 3.0))
-        val point = Sample(booleanArrayOf(), longArrayOf(), reals = doubleArrayOf(0.0, 1.0, 0.0),
-            exactReals = listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.ZERO))
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(RealArrayMinMax(2, intArrayOf(0, 1), true)),
+            numRealVars = 3,
+            realLower = doubleArrayOf(0.0, 1.0, 0.0),
+            realUpper = doubleArrayOf(2.0, 3.0, 3.0),
+        )
+        val point = Sample(
+            booleanArrayOf(),
+            longArrayOf(),
+            reals = doubleArrayOf(0.0, 1.0, 0.0),
+            exactReals = listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.ZERO),
+        )
 
         val checked = verifyOpenWitness(source, point)
 
@@ -55,11 +78,21 @@ class OpenWitnessTest {
 
     @Test
     fun `valid real relations should not hide a violated discrete product`() {
-        val source = Problem(0, 3, Array(3) { IntDomain(0, 9) },
+        val source = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 9) },
             arrayOf(RealArrayMinMax(2, intArrayOf(0, 1), true), Product(0, 1, 2)),
-            numRealVars = 3, realLower = doubleArrayOf(0.0, 1.0, 0.0), realUpper = doubleArrayOf(2.0, 3.0, 3.0))
-        val point = Sample(booleanArrayOf(), longArrayOf(2, 3, 5), reals = doubleArrayOf(0.0, 1.0, 1.0),
-            exactReals = listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.ONE))
+            numRealVars = 3,
+            realLower = doubleArrayOf(0.0, 1.0, 0.0),
+            realUpper = doubleArrayOf(2.0, 3.0, 3.0),
+        )
+        val point = Sample(
+            booleanArrayOf(),
+            longArrayOf(2, 3, 5),
+            reals = doubleArrayOf(0.0, 1.0, 1.0),
+            exactReals = listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.ONE),
+        )
 
         val checked = verifyOpenWitness(source, point)
 
@@ -68,10 +101,21 @@ class OpenWitnessTest {
 
     @Test
     fun `cross domain relations should be checked before discrete projection`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), arrayOf(RealProduct(0, 0, 1, 0.0, 2.0)),
-            numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(2.0, 6.0))
-        val point = Sample(booleanArrayOf(), longArrayOf(2), reals = doubleArrayOf(1.0, 3.0),
-            exactReals = listOf(BigFraction.ONE, BigFraction.ofLong(3)))
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 3)),
+            arrayOf(RealProduct(0, 0, 1, 0.0, 2.0)),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(2.0, 6.0),
+        )
+        val point = Sample(
+            booleanArrayOf(),
+            longArrayOf(2),
+            reals = doubleArrayOf(1.0, 3.0),
+            exactReals = listOf(BigFraction.ONE, BigFraction.ofLong(3)),
+        )
 
         val checked = verifyOpenWitness(source, point)
 
@@ -81,12 +125,25 @@ class OpenWitnessTest {
     @Test
     fun `a real relation without a complete checker should remain indeterminate`() {
         val relation = object : Factor by Power(
-            Power.Coordinate.Real(SourceRealId(0)), 2, Power.Coordinate.Real(SourceRealId(1)),
+            Power.Coordinate.Real(SourceRealId(0)),
+            2,
+            Power.Coordinate.Real(SourceRealId(1)),
         ) {}
-        val source = Problem(0, 0, emptyArray(), arrayOf(relation), numRealVars = 2,
-            realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(2.0, 4.0))
-        val point = Sample(booleanArrayOf(), longArrayOf(), reals = doubleArrayOf(1.0, 1.0),
-            exactReals = listOf(BigFraction.ONE, BigFraction.ONE))
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(relation),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(2.0, 4.0),
+        )
+        val point = Sample(
+            booleanArrayOf(),
+            longArrayOf(),
+            reals = doubleArrayOf(1.0, 1.0),
+            exactReals = listOf(BigFraction.ONE, BigFraction.ONE),
+        )
 
         val checked = verifyOpenWitness(source, point)
 
@@ -95,24 +152,42 @@ class OpenWitnessTest {
 
     @Test
     fun `discrete point checking should retain captured provider factories`() {
-        val source = Problem(0, 3, Array(3) { IntDomain(0, 9) },
+        val source = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 9) },
             arrayOf(RealArrayMinMax(2, intArrayOf(0, 1), true), Product(0, 1, 2)),
-            numRealVars = 3, realLower = doubleArrayOf(0.0, 1.0, 0.0), realUpper = doubleArrayOf(2.0, 3.0, 3.0))
+            numRealVars = 3,
+            realLower = doubleArrayOf(0.0, 1.0, 0.0),
+            realUpper = doubleArrayOf(2.0, 3.0, 3.0),
+        )
         var selecting = true
-        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
-            check(selecting)
-            if (factor is Product) {
-                PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) { view ->
-                    BuiltInPropagationProjectionProvider.create(view, null)
+        val providers = FactorProjectionProviders(
+            propagation = PropagationProjectionProvider { factor ->
+                check(selecting)
+                if (factor is Product) {
+                    PropagationProjection(
+                        PropagationCapability.SOUND_FILTERING,
+                        AssignmentCheckCapability
+                            .EXACT,
+                    ) { view ->
+                        BuiltInPropagationProjectionProvider.create(view, null)
+                    }
+                } else {
+                    BuiltInPropagationProjectionProvider.select(factor)
                 }
-            } else BuiltInPropagationProjectionProvider.select(factor)
-        })
+            },
+        )
         val captured = providers.prepare(source)
         selecting = false
-        val point = Sample(booleanArrayOf(), longArrayOf(2, 3, 6), reals = doubleArrayOf(0.0, 1.0, 1.0),
-            exactReals = listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.ONE))
+        val point = Sample(
+            booleanArrayOf(),
+            longArrayOf(2, 3, 6),
+            reals = doubleArrayOf(0.0, 1.0, 1.0),
+            exactReals = listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.ONE),
+        )
 
-        val checked = verifyOpenWitness(source, point, Cancellation.Never, PropagationProblem(source, captured))
+        val checked = verifyOpenWitness(source, point, ExecutionControl.Never, PropagationProblem(source, captured))
 
         assertIs<Verification.Accepted<*, *>>(checked)
     }
@@ -154,7 +229,7 @@ class OpenWitnessTest {
         val valid = Sample(booleanArrayOf(), longArrayOf(2, 3, 6))
         val invalid = Sample(booleanArrayOf(), longArrayOf(2, 3, 5))
 
-        assertIs<Verification.Indeterminate>(verifyOpenWitness(source, valid, Cancellation { true }))
+        assertIs<Verification.Indeterminate>(verifyOpenWitness(source, valid, ExecutionControl { true }))
         assertIs<Verification.Rejected>(verifyOpenWitness(source, invalid))
         assertIs<Verification.Accepted<*, *>>(verifyOpenWitness(source, valid))
     }

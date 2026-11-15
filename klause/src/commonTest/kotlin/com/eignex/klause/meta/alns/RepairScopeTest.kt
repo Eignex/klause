@@ -16,7 +16,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -35,7 +35,7 @@ class RepairScopeTest {
         val caller = Assumptions(bools = mapOf(1 to false), ints = mapOf(0 to 1L))
 
         val freed = assertNotNull(RepairScope.effective(
-            FreedVars(intArrayOf(2), intArrayOf(0)), caller, sweep, Cancellation.Never,
+            FreedVars(intArrayOf(2), intArrayOf(0)), caller, sweep, ExecutionControl.Never,
         ))
 
         assertContentEquals(intArrayOf(2, 0), freed.bools)
@@ -50,7 +50,7 @@ class RepairScopeTest {
         )))
 
         assertNull(RepairScope.effective(FreedVars(intArrayOf(1), intArrayOf()), Assumptions.None,
-            sweep, Cancellation { true }))
+            sweep, ExecutionControl { true }))
     }
 
     @Test
@@ -65,7 +65,7 @@ class RepairScopeTest {
             for ((requested, expected) in listOf(intArrayOf(0) to 1.0, intArrayOf(1) to 1.0,
                 intArrayOf(0, 1) to 0.0)) {
                 val freed = assertNotNull(RepairScope.effective(FreedVars(intArrayOf(), requested),
-                    Assumptions.None, null, Cancellation.Never))
+                    Assumptions.None, null, ExecutionControl.Never))
                 val params = BacktrackParams(assumptions = RepairScope.pins(problem, center, freed), maxDecisions = 100)
 
                 val result = assertIs<MinimizeResult.Optimal>(BacktrackSolver(problem).minimize(objective, params))

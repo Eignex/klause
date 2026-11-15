@@ -171,6 +171,11 @@ this is separate from heap measurements and diagnostic payload-category sums.
   The [output contract](04-finite-formats.md#minizinc-output-rendering) defines limits
   and unavailable markers. This capture does not validate the assignment.
 
+The invocation owns one live deadline predicate, shared by loading, routing and
+solving. Rearming the deadline updates that predicate. Required source preparation
+retains the invocation stop while its routing accounting sink is active; closing
+preparation releases that sink from retained source requests.
+
 ### Arithmetic routes
 
 Native arithmetic routes compose the selected engine with exact completion: complete

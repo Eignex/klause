@@ -1,7 +1,8 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.pollStop
 import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.collections.LongHashSet
 import com.eignex.util.numbers.magnitudeBitLength
@@ -14,7 +15,7 @@ internal class LpProjectionStop : RuntimeException()
 internal class LpProjectionMeter(
     private val workLimit: Long = Long.MAX_VALUE,
     private val allocationLimit: Long = Long.MAX_VALUE,
-    private val cancellation: Cancellation = Cancellation.Never,
+    private val cancellation: ExecutionControl = ExecutionControl.Never,
 ) {
     var matrixWork: Long = 0L
         private set
@@ -29,7 +30,7 @@ internal class LpProjectionMeter(
     }
 
     fun poll() {
-        if (cancellation()) throw LpProjectionStop()
+        if (cancellation.pollStop()) throw LpProjectionStop()
     }
 
     fun reserveVectors(model: ExactLpModel, materialize: Boolean = true) {
@@ -38,7 +39,7 @@ internal class LpProjectionMeter(
     }
 
     fun reserve(work: Long, bytes: Long, matrix: Boolean) {
-        poll()
+        if (cancellation.pollStop(work.coerceIn(1L, Int.MAX_VALUE.toLong()).toInt())) throw LpProjectionStop()
         if (work < 0L || bytes < 0L || work > workLimit - this.work || bytes > allocationLimit - allocation) {
             throw LpProjectionStop()
         }
@@ -406,7 +407,7 @@ internal class LpExactState internal constructor(
         null
     }
 
-    fun canProjectWorkingModel(cancellation: Cancellation = Cancellation.Never): Boolean = try {
+    fun canProjectWorkingModel(cancellation: ExecutionControl = ExecutionControl.Never): Boolean = try {
         val meter = LpProjectionMeter(cancellation = cancellation)
         ensureMatrixProjection(meter) && run {
             meter.reserveVectors(model, materialize = false)

@@ -1,20 +1,20 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.util.Cancellation
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class LearnedResidualRestrictionsTest {
     @Test
@@ -132,7 +132,7 @@ class LearnedResidualRestrictionsTest {
         val session = PropagationSession(Problem(3, 0, emptyArray(), emptyArray()))
         session.addLearnedClause(Clause(IntArray(3) { Lit.make(it, true) }), 3)
 
-        assertEquals("interrupted", LearnedResidualRestrictions.inspect(session, Cancellation { true }).decline)
+        assertEquals("interrupted", LearnedResidualRestrictions.inspect(session, ExecutionControl { true }).decline)
         val capped = LearnedResidualRestrictions.inspect(session, maxTerms = 2)
         assertEquals("term-limit", capped.decline)
         assertFalse(capped.complete)

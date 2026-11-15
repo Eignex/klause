@@ -20,7 +20,8 @@ class SourceSamplesTest {
             val problem = ProblemJson.default.decodeFromString("""
                 {"bools":1,"reals":[{"lower":0,"upper":4}],
                  "factors":[{"exactRealEquality":{"real":0,"value":$value}}]}
-            """.trimIndent())
+                """.trimIndent(),
+            )
             val result = assertIs<SolveResult.Sat>(BacktrackSolver.source(problem).solveSample())
             assertEquals(0, result.assignment.exactRealValue(0).compareExactly(ExactRealJson.decodeFromString(value)))
             assertTrue(result.assignment.approximateRealValue(0).isFinite())
@@ -32,20 +33,22 @@ class SourceSamplesTest {
     fun `native exact sample checking should reject a different symbolic value`() {
         val problem = ProblemJson.default.decodeFromString("""
             {"reals":[{}],"factors":[{"exactRealEquality":{"real":0,"value":{"exp":"1"}}}]}
-        """.trimIndent())
+            """.trimIndent(),
+        )
         val pi = ExactRealJson.decodeFromString("""{"pi":{}}""")
         val sample = Sample(
             booleanArrayOf(), longArrayOf(), doubleArrayOf(3.141592653589793), symbolicReals = listOf(pi),
         )
         assertEquals(false, problem.checkExactRealSample(sample))
-        assertEquals(null, problem.checkExactRealSample(sample, com.eignex.klause.util.Cancellation { true }))
+        assertEquals(null, problem.checkExactRealSample(sample, com.eignex.klause.util.ExecutionControl { true }))
     }
 
     @Test
     fun `symbolic pins should respect the original native real constraints`() {
         val problem = ProblemJson.default.decodeFromString("""
             {"reals":[{"upper":2}],"factors":[{"exactRealEquality":{"real":0,"value":{"exp":"1"}}}]}
-        """.trimIndent())
+            """.trimIndent(),
+        )
         assertIs<SolveResult.Unsat>(BacktrackSolver.source(problem).solveSample())
     }
 }

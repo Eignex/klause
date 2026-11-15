@@ -16,7 +16,7 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -34,10 +34,10 @@ class ResumableOpenTheoryTest {
             val source = preparedChain()
             var stopped = false
             val search = ResumableOpenTheory(
-                OpenTheoryEngine(source, Cancellation.Never, reuseOpeningBoundAttempt = true),
+                OpenTheoryEngine(source, ExecutionControl.Never, reuseOpeningBoundAttempt = true),
                 TheoryParams(),
             )
-            val token = Cancellation { stopped }
+            val token = ExecutionControl { stopped }
 
             assertNull(search.runSlice(token, sliceMillis = Long.MAX_VALUE, sliceWork = 1))
             val paused = search.stats
@@ -60,14 +60,14 @@ class ResumableOpenTheoryTest {
     fun `cancelling a resumed search should retain preparation exactly once`() {
         val source = preparedChain()
         val search = ResumableOpenTheory(
-            OpenTheoryEngine(source, Cancellation.Never, reuseOpeningBoundAttempt = true),
+            OpenTheoryEngine(source, ExecutionControl.Never, reuseOpeningBoundAttempt = true),
             TheoryParams(),
         )
-        assertNull(search.runSlice(Cancellation.Never, sliceMillis = Long.MAX_VALUE, sliceWork = 1))
+        assertNull(search.runSlice(ExecutionControl.Never, sliceMillis = Long.MAX_VALUE, sliceWork = 1))
         val paused = search.stats
 
         val result = assertIs<OpenTheoryResult.Unknown>(search.runSlice(
-            Cancellation { true }, sliceMillis = Long.MAX_VALUE, sliceWork = 1,
+            ExecutionControl { true }, sliceMillis = Long.MAX_VALUE, sliceWork = 1,
         ))
         search.close()
 
@@ -82,12 +82,12 @@ class ResumableOpenTheoryTest {
     fun `a decided search should retain its native preparation snapshot`() {
         val source = preparedChain()
         val search = ResumableOpenTheory(
-            OpenTheoryEngine(source, Cancellation.Never, reuseOpeningBoundAttempt = true),
+            OpenTheoryEngine(source, ExecutionControl.Never, reuseOpeningBoundAttempt = true),
             TheoryParams(),
         )
 
         val result = assertIs<OpenTheoryResult.Sat>(search.runSlice(
-            Cancellation.Never, sliceMillis = Long.MAX_VALUE, sliceWork = Long.MAX_VALUE,
+            ExecutionControl.Never, sliceMillis = Long.MAX_VALUE, sliceWork = Long.MAX_VALUE,
         ))
         search.close()
 
@@ -105,14 +105,14 @@ class ResumableOpenTheoryTest {
                 stopped = true
                 source
             },
-            Cancellation.Never,
+            ExecutionControl.Never,
             reuseOpeningBoundAttempt = true,
             sourceSemantics = source.prepared.source.semantics,
         )
-        val search = ResumableOpenTheory(engine, TheoryParams(cancellation = Cancellation { stopped }))
+        val search = ResumableOpenTheory(engine, TheoryParams(cancellation = ExecutionControl { stopped }))
 
         val result = assertIs<OpenTheoryResult.Unknown>(search.runSlice(
-            Cancellation.Never, sliceMillis = Long.MAX_VALUE, sliceWork = 1,
+            ExecutionControl.Never, sliceMillis = Long.MAX_VALUE, sliceWork = 1,
         ))
         search.close()
 
@@ -202,7 +202,7 @@ class ResumableOpenTheoryTest {
         while (true) {
             slices++
             search.runSlice(
-                Cancellation.Never,
+                ExecutionControl.Never,
                 sliceMillis = Long.MAX_VALUE,
                 sliceWork = 1,
             )?.let { return it to slices }
@@ -240,7 +240,7 @@ class ResumableOpenTheoryTest {
         val search = ResumableOpenTheory(OpenTheoryPipeline.engineFor(request), TheoryParams())
         var pausedGlue = 0.0
 
-        while (search.runSlice(Cancellation.Never, sliceMillis = Long.MAX_VALUE, sliceWork = 1) == null) {
+        while (search.runSlice(ExecutionControl.Never, sliceMillis = Long.MAX_VALUE, sliceWork = 1) == null) {
             pausedGlue = maxOf(pausedGlue, search.stats.search.glueClauses.sum)
             if (pausedGlue > 0.0) break
         }

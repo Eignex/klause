@@ -4,24 +4,24 @@ import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.sun.management.ThreadMXBean
-import java.io.File
-import java.lang.management.ManagementFactory
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import kotlin.time.Duration.Companion.seconds
 
 internal object MpsLpCheckpoint {
     private const val ENGINE = "com.eignex.klause.lp.engine."
     private const val TOTAL_WORK = 150_000_000L
 
     fun measure(problem: Problem, objective: LinearObjective, out: File) {
-        val stop = Cancellation.after(30.seconds)
+        val stop = ExecutionControl.after(30.seconds)
         val prepared = MpsLpAdmission.rootRelaxation(problem, objective, false, stop)
         val sourceModel = requireNotNull(call(prepared, "getModel"))
         val authority = Class.forName(ENGINE + "LegacyLpModelKt").methods.single {
@@ -53,7 +53,7 @@ internal object MpsLpCheckpoint {
         check(bean.isThreadAllocatedMemorySupported)
         bean.isThreadAllocatedMemoryEnabled = true
         val thread = Thread.currentThread().threadId()
-        val stop = Cancellation.after(10.seconds)
+        val stop = ExecutionControl.after(10.seconds)
         val context = Class.forName(ENGINE + "LpSolveContext").getConstructor().newInstance()
         val pricing = Class.forName(ENGINE + "LpPricingOptions").constructors.single { it.parameterCount == 4 }
             .newInstance(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 3L, Long.MAX_VALUE, Long.MAX_VALUE)

@@ -1,9 +1,9 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.propagation.RootWorkMeter
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
-internal class PrivateRebuildBakeWork(private val outer: Cancellation) : Cancellation {
+internal class PrivateRebuildBakeWork(private val outer: ExecutionControl) : ExecutionControl() {
     var constructionEntries = 0L
         private set
     var propagationWork = 0L
@@ -14,18 +14,18 @@ internal class PrivateRebuildBakeWork(private val outer: Cancellation) : Cancell
 
         override fun construction(entries: Long) {
             constructionEntries = saturatedWork(constructionEntries, entries)
-            val root = outer.workMeter() as? RootWorkMeter
+            val root = outer.accounting as? RootWorkMeter
             if (root == null) outer.charge(entries) else root.construction(entries)
         }
 
         override fun propagation(units: Long) {
             propagationWork = saturatedWork(propagationWork, units)
-            val root = outer.workMeter() as? RootWorkMeter
+            val root = outer.accounting as? RootWorkMeter
             if (root == null) outer.charge(units) else root.propagation(units)
         }
     }
 
     override fun isCancelled(): Boolean = outer()
     override fun deadline() = outer.deadline()
-    override fun workMeter(): RootWorkMeter = meter
+    override val accounting: RootWorkMeter get() = meter
 }

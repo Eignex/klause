@@ -6,13 +6,13 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
-import java.io.File
-import kotlin.time.Duration.Companion.seconds
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import kotlin.time.Duration.Companion.seconds
 
 internal fun captureObjectiveProposals(
     view: TrajectoryView,
@@ -36,7 +36,7 @@ internal fun captureObjectiveProposals(
     val sink = view.proposalSink()
     ObjectiveSeed().generate(state, raw)
     ObjectiveSeed().generate(state, sink)
-    val stop = Cancellation.after(10.seconds)
+    val stop = ExecutionControl.after(10.seconds)
     val candidates = sink.list.distinct()
     val probes = ArrayList<JsonObject>()
     var visited = 0

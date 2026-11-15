@@ -11,7 +11,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.freeBooleanProbeCandidates
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatedImplicationGraph
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.PollStride
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
@@ -42,7 +42,7 @@ internal object ImplicationGraph {
     fun reduce(
         problem: Problem,
         maxCandidates: Int,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         objectiveBoolVars: Set<Int> = emptySet(),
     ): PassDelta {
         if (problem.numBoolVars == 0 || cancellation()) return PassDelta()
@@ -66,7 +66,7 @@ internal object ImplicationGraph {
      */
     fun reduceSource(
         problem: Problem,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         objectiveBoolVars: Set<Int> = emptySet(),
     ): SourceDelta {
         if (problem.numBoolVars == 0) return SourceDelta()
@@ -82,7 +82,7 @@ internal object ImplicationGraph {
         problem: Problem,
         implications: Adjacency,
         objectiveBoolVars: Set<Int>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): Reduction? {
         val work = GraphWork(cancellation)
         if (!work.check()) return null
@@ -100,11 +100,7 @@ internal object ImplicationGraph {
     private class Reduction(val factors: List<Factor>, val merges: List<BoolMerge>)
 
     /** The implication edges the clean binary clauses among [factors] encode, both directions of each. */
-    private fun binaryClauseImplications(
-        problem: Problem,
-        factors: List<Factor>,
-        work: GraphWork,
-    ): Adjacency? {
+    private fun binaryClauseImplications(problem: Problem, factors: List<Factor>, work: GraphWork): Adjacency? {
         if (!work.check()) return null
         val adj = Adjacency(2 * problem.numBoolVars)
         for (f in factors) {
@@ -132,7 +128,7 @@ internal object ImplicationGraph {
      *
      * Bounded by [maxCandidates] free Booleans (in id order); the round engine re-enters the pass.
      */
-    private fun harvestImplications(problem: Problem, maxCandidates: Int, cancellation: Cancellation): Adjacency {
+    private fun harvestImplications(problem: Problem, maxCandidates: Int, cancellation: ExecutionControl): Adjacency {
         val adj = Adjacency(2 * problem.numBoolVars)
         for (v in problem.freeBooleanProbeCandidates(maxCandidates, cancellation)) {
             if (cancellation()) break
@@ -149,12 +145,18 @@ internal object ImplicationGraph {
     fun implicationGraph(
         problem: Problem,
         maxCandidates: Int,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): Array<IntArray> = problem.propagatedImplicationGraph(maxCandidates, cancellation)
 
     /** Pin `v = [value]`, propagate, and record `pinned -> forced` for every other Boolean the
      *  propagation forces. A self-edge (the pin itself) is never emitted. */
-    private fun recordPolarity(problem: Problem, v: Int, value: Boolean, adj: Adjacency, cancellation: Cancellation) {
+    private fun recordPolarity(
+        problem: Problem,
+        v: Int,
+        value: Boolean,
+        adj: Adjacency,
+        cancellation: ExecutionControl,
+    ) {
         if (cancellation()) return
         val result = problem.propagate(Assumptions.None.withBool(v, value), cancellation)
         if (result !is PropagationResult.Implied) return
@@ -250,11 +252,7 @@ internal object ImplicationGraph {
 
     /** [candidates] minus any merge that would rename a [ReifiedPseudoBoolean]'s auxiliary and one of its
      *  body variables onto the same variable; both are kept as themselves instead. */
-    private fun compatibleMerges(
-        problem: Problem,
-        candidates: List<BoolMerge>,
-        work: GraphWork,
-    ): List<BoolMerge>? {
+    private fun compatibleMerges(problem: Problem, candidates: List<BoolMerge>, work: GraphWork): List<BoolMerge>? {
         if (candidates.isEmpty()) return candidates
         val boolMap = IntArray(problem.numBoolVars)
         for (v in boolMap.indices) {
@@ -474,8 +472,9 @@ internal object ImplicationGraph {
         return if (work.check()) component else null
     }
 
-    private class GraphWork(private val cancellation: Cancellation) {
+    private class GraphWork(private val cancellation: ExecutionControl) {
         private val poll = PollStride()
+        private val budget = cancellation.presolveBudget()
         private var stopped = false
 
         fun check(): Boolean {
@@ -486,7 +485,7 @@ internal object ImplicationGraph {
         fun visit(): Boolean {
             if (stopped) return false
             cancellation.charge(IMPLICATION_GRAPH_WORK_WEIGHT)
-            return if (cancellation.workMeter() != null || poll.due()) check() else true
+            return if (budget?.remaining() == 0L || poll.due()) check() else true
         }
     }
 

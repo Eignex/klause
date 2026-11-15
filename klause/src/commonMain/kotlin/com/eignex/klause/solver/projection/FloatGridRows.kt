@@ -12,7 +12,7 @@ import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_TWO
 import com.eignex.util.numbers.BigInt
@@ -22,12 +22,12 @@ import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.isZero
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus
-import com.eignex.util.numbers.remainderOf as bigRemainder
 import com.eignex.util.numbers.toLongExact
 import com.eignex.util.numbers.unaryMinus
 import kotlin.math.abs
 import kotlin.math.round
 import kotlin.math.roundToLong
+import com.eignex.util.numbers.remainderOf as bigRemainder
 
 private class FloatGridRow(
     val integers: IntArray,
@@ -44,7 +44,7 @@ internal fun lowerGridRow(
     factor: Linear,
     columns: Map<Int, FloatGridColumn>,
     scale: Long,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     truncate: Boolean = false,
 ): List<Factor>? {
     val constants = factor.realConstants ?: return null
@@ -57,7 +57,7 @@ internal fun lowerGridRow(
     factor: ReifiedRealLinear,
     columns: Map<Int, FloatGridColumn>,
     scale: Long,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     truncate: Boolean = false,
 ): List<Factor>? = lowerGridRow(FloatGridRow(factor.vars, factor.intCoeffs, factor.realVars, factor.realCoeffs,
     factor.op, factor.bound, factor.strict, factor.aux), columns, scale, cancellation, truncate)
@@ -66,7 +66,7 @@ private fun lowerGridRow(
     row: FloatGridRow,
     columns: Map<Int, FloatGridColumn>,
     scale: Long,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     truncate: Boolean,
 ): List<Factor>? = with(row) {
     val terms = LinkedHashMap<Int, BigFraction>()
@@ -104,11 +104,20 @@ private fun lowerGridRow(
             LinearOp.GE -> -scaled.negated().ceilInteger() + BIG_ONE
             else -> return null
         }
-    } else if (truncate) scaled.num / scaled.den else nearestInteger(scaled)
+    } else if (truncate) {
+        scaled.num / scaled.den
+    } else {
+        nearestInteger(scaled)
+    }
     val loweredBound = integerBound.word() ?: return null
     if (cancellation()) return null
-    return listOf(if (reifier == null) Linear(coefficients, variables, operation, loweredBound)
-        else ReifiedLinear(reifier, coefficients, variables, operation, loweredBound))
+    return listOf(
+        if (reifier == null) {
+            Linear(coefficients, variables, operation, loweredBound)
+        } else {
+            ReifiedLinear(reifier, coefficients, variables, operation, loweredBound)
+        },
+    )
 }
 
 private fun nearestInteger(value: BigFraction): BigInt {
@@ -127,7 +136,7 @@ private fun BigInt.word(): Long? = if (fitsLong()) toLongExact() else null
 internal fun prepareGridAbsImage(
     input: GridCoordinate,
     output: GridCoordinate,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): IntArray? {
     cancellation.charge(input.buckets.toLong())
     if (cancellation()) return null
@@ -139,11 +148,16 @@ internal fun prepareGridAbsImage(
         val magnitude = abs(input.value(index.toLong()))
         image[index] = if (magnitude < output.lower - outputStep * 0.5 ||
             magnitude > output.upper + outputStep * 0.5
-        ) -1 else {
+        ) {
+            -1
+        } else {
             val position = if (outputStep == 0.0) 0.0 else (magnitude - output.lower) / outputStep
             val rounded = round(position)
-            if (!rounded.isFinite() || abs(position - rounded) > 0.5 || rounded < 0 || rounded >= output.buckets) -1
-            else rounded.toInt()
+            if (!rounded.isFinite() || abs(position - rounded) > 0.5 || rounded < 0 || rounded >= output.buckets) {
+                -1
+            } else {
+                rounded.toInt()
+            }
         }
     }
     return if (cancellation()) null else image
@@ -152,7 +166,7 @@ internal fun prepareGridAbsImage(
 internal fun lowerGridElement(
     factor: RealElement,
     columns: Map<Int, FloatGridColumn>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): List<Factor>? {
     if (factor.size == 0) return listOf(Clause(intArrayOf()))
     val output = columns.getValue(factor.result).coordinate
@@ -166,17 +180,30 @@ internal fun lowerGridElement(
                 return null
             }
             input.variable.toLong()
-        } else output.index(factor.constants[index]) ?: return null
+        } else {
+            output.index(factor.constants[index]) ?: return null
+        }
     }
-    return if (cancellation()) null else listOf(Element(factor.idx, output.variable, entries,
-        factor.arrIsVars, factor.indexOffset))
+    return if (cancellation()) {
+        null
+    } else {
+        listOf(
+            Element(
+        factor.idx,
+        output.variable,
+        entries,
+        factor.arrIsVars,
+        factor.indexOffset,
+    )
+        )
+    }
 }
 
 internal fun lowerGridMinMax(
     factor: RealArrayMinMax,
     columns: Map<Int, FloatGridColumn>,
     scale: Long,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): GridArrayMinMax? {
     val roles = intArrayOf(factor.result) + factor.xs
     val coordinates = IntArray(roles.size)
@@ -188,8 +215,11 @@ internal fun lowerGridMinMax(
         if (cancellation()) return null
         val coordinate = columns.getValue(roles[index]).coordinate
         coordinates[index] = coordinate.variable
-        steps[index] = if (coordinate.buckets > 1) (coordinate.upper - coordinate.lower) / (coordinate.buckets - 1)
-            else 0.0
+        steps[index] = if (coordinate.buckets > 1) {
+            (coordinate.upper - coordinate.lower) / (coordinate.buckets - 1)
+        } else {
+            0.0
+        }
         origins[index] = coordinate.lower
         constants[index] = coordinate.buckets == 1
     }
@@ -203,7 +233,9 @@ internal fun lowerGridMinMax(
             if (!origin.isFinite() || !step.isFinite() ||
                 origin <= Long.MIN_VALUE.toDouble() || origin >= Long.MAX_VALUE.toDouble() ||
                 step >= Long.MAX_VALUE.toDouble()
-            ) return null
+            ) {
+                return null
+            }
             scaledOrigins[index] = origin.roundToLong()
         }
         for (origin in scaledOrigins) {

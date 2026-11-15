@@ -9,9 +9,10 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.result.ValueOrderingStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.klause.util.SharingMemorySnapshot
+import com.eignex.klause.util.pollStop
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.arrays.emptyLongArray
 import com.eignex.util.collections.IntArrayList
@@ -45,7 +46,7 @@ enum class VarKind {
 class PropagationSession private constructor(
     /** The problem being propagated. */
     val problem: Problem,
-    private var cancellation: Cancellation,
+    private var cancellation: ExecutionControl,
     propagationCancelFloor: Int,
     nativeSat: Boolean,
     pbLearning: Boolean,
@@ -66,7 +67,7 @@ class PropagationSession private constructor(
     /** Construct a private propagation projection over [problem]. */
     constructor(
         problem: Problem,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         propagationCancelFloor: Int = PROPAGATION_CANCEL_FLOOR,
         nativeSat: Boolean = false,
         pbLearning: Boolean = false,
@@ -74,7 +75,7 @@ class PropagationSession private constructor(
 
     internal constructor(
         projection: PropagationProblem,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         propagationCancelFloor: Int = PROPAGATION_CANCEL_FLOOR,
         nativeSat: Boolean = false,
         pbLearning: Boolean = false,
@@ -234,8 +235,11 @@ class PropagationSession private constructor(
 
     internal fun rootSourceClauseSize(factor: Int): Int {
         if (simplifiedRootSources?.contains(factor) == true) return 0
-        return if (usesNativeSat) (problem.factors[factor] as? Clause)?.literals?.size ?: 0
-        else (projection.propagators[factor] as? ClausePropagator)?.literals?.size ?: 0
+        return if (usesNativeSat) {
+            (problem.factors[factor] as? Clause)?.literals?.size ?: 0
+        } else {
+            (projection.propagators[factor] as? ClausePropagator)?.literals?.size ?: 0
+        }
     }
 
     internal fun rootClauseLiterals(
@@ -246,8 +250,11 @@ class PropagationSession private constructor(
     ): IntArray? {
         if (simplifiedRootSources?.contains(factor) == true) return null
         if (factor < problem.numFactors) {
-            val literals = if (usesNativeSat) (problem.factors[factor] as? Clause)?.literals
-                else (projection.propagators[factor] as? ClausePropagator)?.literals
+            val literals = if (usesNativeSat) {
+                (problem.factors[factor] as? Clause)?.literals
+            } else {
+                (projection.propagators[factor] as? ClausePropagator)?.literals
+            }
             if (literals == null || literals.size > limit) return null
             state.work += literals.size
             if (!literals.all { lit -> Lit.variable(lit) < problem.numBoolVars }) {
@@ -280,8 +287,11 @@ class PropagationSession private constructor(
         val fid = state.addLearnedClause(clause, lbd, permanent = sourceReplacement, origin = origin,
             ownedLiterals = ownedLiterals)
         state.factorAttribution?.let {
-            if (state.nativeEngine == null) it.admit(state.factorAt(fid))
-            else if (it.admissionFamilies != 0) it.note(it.admissionFamilies, FactorAttribution.Metric.Learned)
+            if (state.nativeEngine == null) {
+                it.admit(state.factorAt(fid))
+            } else if (it.admissionFamilies != 0) {
+                it.note(it.admissionFamilies, FactorAttribution.Metric.Learned)
+            }
         }
         val conflict = state.inprocessingFixpoint(fid, cancellation)
         inprocessingRootPending = state.runCancelled
@@ -297,8 +307,9 @@ class PropagationSession private constructor(
         val retired = simplifiedRootSources ?: HashSet<Int>().also { simplifiedRootSources = it }
         retired.add(factor)
         val native = state.nativeEngine
-        if (native != null) native.retireRootSource(factor)
-        else if (!state.removeInlineBoolWatches(factor, literals.size > 1)) {
+        if (native != null) {
+            native.retireRootSource(factor)
+        } else if (!state.removeInlineBoolWatches(factor, literals.size > 1)) {
             for (literal in literals) state.removeBoolWatch(factor, literal, onlyIndexed = true)
         }
         if (pendingRootSourceRetirement?.factor == factor) pendingRootSourceRetirement = null
@@ -334,12 +345,14 @@ class PropagationSession private constructor(
     /** Whether the deadline token has fired. Read by the heuristics that run propagation *inside* one
      *  decision — see [com.eignex.klause.backtrack.selector.probeAndOrder], which spends a fixpoint per
      *  candidate value — since the engine only polls between nodes and cannot see past them. */
-    internal val cancelRequested: Boolean get() = cancellation()
+    internal val cancelRequested: Boolean get() = state.work >= state.workLimit || cancellation.pollStop()
 
     internal fun extensionalDensities(variable: Int, values: LongArray, maxVisits: Int = 65_536): DoubleArray? {
         if (fixpointCancelled || state.propQueue.isNotEmpty() || state.dirtyBools.isNotEmpty() ||
             state.dirtyInts.isNotEmpty()
-        ) return null
+        ) {
+            return null
+        }
         val occurrences = projection.intOccurrences[variable]
         var remaining = maxVisits.coerceIn(0, 65_536)
         val visit = {
@@ -349,6 +362,7 @@ class PropagationSession private constructor(
         var scores: DoubleArray? = null
         state.finiteWork.begin()
         try {
+            state.finiteWork.checkNow()
             for (fid in occurrences) {
                 if (!visit()) return null
                 val provider = projection.propagators[fid] as? ExtensionalSupportProvider ?: continue
@@ -383,7 +397,7 @@ class PropagationSession private constructor(
     internal val work: Long get() = retainedState?.work ?: retiredWork
     internal val valueOrdering = ValueOrderingStatsSink()
     internal fun visitValueScore(): Boolean {
-        if (cancellation()) {
+        if (cancelRequested) {
             probeCancelled = true
             return false
         }
@@ -392,9 +406,9 @@ class PropagationSession private constructor(
     }
     internal val propagationNanos: Long get() = retainedState?.propagationNanos ?: retiredPropagationNanos
 
-    private var requiredInprocessingCancellation: Cancellation? = null
+    private var requiredInprocessingCancellation: ExecutionControl? = null
 
-    internal fun <T> withInprocessingCancellation(token: Cancellation, operation: () -> T): T {
+    internal fun <T> withInprocessingCancellation(token: ExecutionControl, operation: () -> T): T {
         val previous = requiredInprocessingCancellation
         if (previous == null) requiredInprocessingCancellation = cancellation
         return try {
@@ -407,36 +421,52 @@ class PropagationSession private constructor(
     private fun <T> withRequiredInprocessingCancellation(operation: () -> T): T =
         usingCancellation(requiredInprocessingCancellation ?: cancellation, operation)
 
-    internal fun <T> withCancellation(token: Cancellation, operation: () -> T): T = usingCancellation(
-        if (token === cancellation || token === Cancellation.Never) cancellation else cancellation or token,
+    internal fun <T> withCancellation(token: ExecutionControl, operation: () -> T): T = usingCancellation(
+        if (token === cancellation || token === ExecutionControl.Never) {
+            cancellation
+        } else {
+            PropagationControl(cancellation, token)
+        },
         operation,
     )
 
-    internal fun <T> withProbeInvocation(token: Cancellation, operation: () -> T): T {
+    internal fun <T> withWorkLimit(units: Long?, operation: () -> T): T {
+        if (units == null) return operation()
+        require(units >= 0L)
+        val previous = state.workLimit
+        state.workLimit = minOf(previous, state.work + minOf(units, Long.MAX_VALUE - state.work))
+        return try {
+            operation()
+        } finally {
+            state.workLimit = previous
+        }
+    }
+
+    internal fun <T> withProbeInvocation(token: ExecutionControl, operation: () -> T): T {
         check(!fixpointCancelled)
         // A rolled-back probe keeps its completed prefix; its caller supplies the full current scope.
         probeCancelled = false
         return usingCancellation(token, operation)
     }
 
-    private fun <T> usingCancellation(token: Cancellation, operation: () -> T): T {
+    private fun <T> usingCancellation(token: ExecutionControl, operation: () -> T): T {
         val previous = cancellation
-        val finite = state.finiteWork.cancellation
         cancellation = token
-        state.finiteWork.cancellation = cancellation
         return try {
-            operation()
+            state.finiteWork.withCancellation(token, operation)
         } finally {
             cancellation = previous
-            state.finiteWork.cancellation = finite
         }
     }
 
     init {
         onPropagationWork?.invoke { work }
         val conflict = if (preparedState == null) {
-            if (!state.seeded) state.conflictLevels ?: emptyIntArray()
-            else state.runToFixpoint(allFactors = true, cancellation = cancellation)
+            if (!state.seeded) {
+                state.conflictLevels ?: emptyIntArray()
+            } else {
+                state.runToFixpoint(allFactors = true, cancellation = cancellation)
+            }
         } else {
             check(
                 state.rootFixpointStarted && !state.runCancelled &&
@@ -464,7 +494,9 @@ class PropagationSession private constructor(
     internal companion object {
         // Point pins belong to a disposable verification root over a shareable projection, never a search root.
         fun forPointCheck(
-            projection: PropagationProblem, point: Assumptions, cancellation: Cancellation,
+            projection: PropagationProblem,
+            point: Assumptions,
+            cancellation: ExecutionControl,
         ): PropagationSession = PropagationSession(
             projection.problem, cancellation, PROPAGATION_CANCEL_FLOOR, true, false, projection,
             initialAssumptions = point,
@@ -472,7 +504,7 @@ class PropagationSession private constructor(
 
         fun preparation(
             state: PropagationState,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
             conflict: IntArray?,
         ): Iterator<PropagationSession?> = sequence {
             var buffers: PropagationSessionBuffers? = null
@@ -492,7 +524,7 @@ class PropagationSession private constructor(
             ))
         }.iterator()
 
-        fun prepared(state: PropagationState, cancellation: Cancellation, conflict: IntArray?): PropagationSession =
+        fun prepared(state: PropagationState, cancellation: ExecutionControl, conflict: IntArray?): PropagationSession =
             PropagationSession(
                 state.problem, cancellation, state.cancelFloor, state.nativeSat, state.pbLearning,
                 state.projection, state, conflict,
@@ -667,7 +699,7 @@ class PropagationSession private constructor(
      * decision level. Returns the cumulative implied set beyond the seed pins (or Unsat).
      * A seed refutation retains its complete applied prefix: propagated levels alone can
      * omit earlier assumptions that contributed through a reason chain.
-     * Cancellation stops before the next pin and sets [fixpointCancelled]; the applied
+     * ExecutionControl stops before the next pin and sets [fixpointCancelled]; the applied
      * prefix is incomplete and cannot certify the full assumption set.
      */
     fun seed(assumptions: Assumptions): PropagationResult {
@@ -751,7 +783,9 @@ class PropagationSession private constructor(
             apply()
         }
         if (applied == false) return revertAndUnsat(state.conflictLevels ?: emptyIntArray())
-        val conflict = if (applied == null) null else {
+        val conflict = if (applied == null) {
+            null
+        } else {
             state.runToFixpoint(allFactors = false, cancellation = cancellation)
         }
         if (conflict != null) return revertAndUnsat(conflict)
@@ -945,7 +979,9 @@ class PropagationSession private constructor(
             if (atMost) state.setIntMaxAsDecision(v, bound) else state.setIntMinAsDecision(v, bound)
         }
         if (pinned == false) return revertAndUnsat(state.conflictLevels ?: emptyIntArray())
-        val conflict = if (pinned == null) null else {
+        val conflict = if (pinned == null) {
+            null
+        } else {
             state.runToFixpoint(allFactors = false, cancellation = cancellation)
         }
         if (conflict != null) return revertAndUnsat(conflict)
@@ -1019,6 +1055,7 @@ class PropagationSession private constructor(
     internal fun learnedConstraintSatisfied(learned: ConflictAnalyzer.AnalysisResult.LearnedConstraint): Boolean =
         when (learned) {
             is ConflictAnalyzer.AnalysisResult.Learned -> learned.literals.any { litTruth(it) == true }
+
             is ConflictAnalyzer.AnalysisResult.LearnedPb -> {
                 var trueWeight = 0L
                 for (index in learned.literals.indices) {
@@ -1026,6 +1063,7 @@ class PropagationSession private constructor(
                 }
                 trueWeight >= learned.degree
             }
+
             is ConflictAnalyzer.AnalysisResult.LearnedIntegerRow -> try {
                 (learned.row.guard != Lit.NONE && state.litTruth(learned.row.guard) == false) ||
                     learned.row.maximum(state) <= learned.row.bound
@@ -1043,8 +1081,11 @@ class PropagationSession private constructor(
         bakedUnsat?.let { return it }
         val newFid = register()
         state.factorAttribution?.let {
-            if (state.nativeEngine == null) it.admit(state.factorAt(newFid))
-            else if (it.admissionFamilies != 0) it.note(it.admissionFamilies, FactorAttribution.Metric.Learned)
+            if (state.nativeEngine == null) {
+                it.admit(state.factorAt(newFid))
+            } else if (it.admissionFamilies != 0) {
+                it.note(it.admissionFamilies, FactorAttribution.Metric.Learned)
+            }
         }
         val conflict = state.runToFixpoint(allFactors = false, initialFactor = newFid, cancellation = cancellation)
         if (conflict != null) return revertAndUnsat(conflict)
@@ -1243,7 +1284,9 @@ class PropagationSession private constructor(
         return ReclamationPreparation(maxWork, maxScratchBytes, cleanupCancellation(cancelled)) { owner.work += it }
     }
 
-    private fun cleanupCancellation(cancelled: () -> Boolean) = CleanupCancellation { cancelRequested || cancelled() }
+    private fun cleanupCancellation(cancelled: () -> Boolean) = CleanupCancellation(cancellation.stopPolling) {
+        cancelRequested || cancelled()
+    }
 
     internal val nativeCapWindowPending: Boolean get() = state.nativeEngine?.capWindowPending == true
     internal val nativeCapTraversalVisits: Long get() = state.nativeEngine?.capTraversalVisits ?: 0L
@@ -1262,7 +1305,9 @@ class PropagationSession private constructor(
     ): Int {
         if (retainedState == null || decisionLevel != 0 || fixpointCancelled || isUnsatAtRoot ||
             inprocessingRootPending
-        ) return 0
+        ) {
+            return 0
+        }
         val polled = cleanupCancellation(cancelled)
         val retired = state.nativeEngine?.maintainCapWindow(cap, maxWork, maxScratchBytes, polled, canDrop, keep,
             nativePolicy) ?: state.maintainGeneralCapWindow(cap, maxWork, maxScratchBytes, polled, canDrop, keep)
@@ -1348,19 +1393,38 @@ class PropagationSession private constructor(
         val reportedBefore = beforeBytes.takeUnless { cleanupProgress }
         val floor = before.getValue("protectedPrimitiveBytes") +
             before.getValue("protectedReferenceSlots") * Long.SIZE_BYTES
-        if (beforeBytes <= softLimitBytes) return LearnedReclamation(ReclamationStatus.WITHIN_LIMIT,
-            reportedBefore, beforeBytes, floor, work - start)
-        if (fixpointCancelled || inprocessingRootPending || publicationPending) return LearnedReclamation(
-            ReclamationStatus.DEFERRED, reportedBefore, beforeBytes, floor, work - start,
-            protectedLimitExceeded = floor > softLimitBytes)
+        if (beforeBytes <= softLimitBytes) {
+            return LearnedReclamation(
+            ReclamationStatus.WITHIN_LIMIT,
+            reportedBefore,
+            beforeBytes,
+            floor,
+            work - start,
+        )
+        }
+        if (fixpointCancelled || inprocessingRootPending || publicationPending) {
+            return LearnedReclamation(
+            ReclamationStatus.DEFERRED,
+            reportedBefore,
+            beforeBytes,
+            floor,
+            work - start,
+            protectedLimitExceeded = floor > softLimitBytes,
+        )
+        }
         val releasedBuffers = releaseBuffers()
         val count = learnedClauseCount
         val published = state.forgetLearnedClauses(
             (maxWork - (work - start)).coerceAtLeast(0L), maxScratchBytes, { cancelRequested }, { _, _ -> false })
         if (learnedClauseCount != count) learnedClauseRevision++
-        if (!published) return LearnedReclamation(
+        if (!published) {
+            return LearnedReclamation(
             if (cancelRequested) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED,
-            reportedBefore, protectedBytes = floor, work = work - start)
+            reportedBefore,
+            protectedBytes = floor,
+            work = work - start,
+        )
+        }
         val after = sample().completeValues
         val afterBytes = after?.let(::bytes)
         val afterFloor = after?.let {
@@ -1380,8 +1444,14 @@ class PropagationSession private constructor(
         maxWork: Long = SharingMemoryObservation.DEFAULT_WORK,
         maxScratchEntries: Int = SharingMemoryObservation.DEFAULT_SCRATCH_ENTRIES,
     ): SharingMemorySnapshot {
-        if (retainedState == null) return SharingMemorySnapshot(
-            com.eignex.klause.util.SharingMemoryStatus.STALE, emptyMap(), 0L, 0)
+        if (retainedState == null) {
+            return SharingMemorySnapshot(
+            com.eignex.klause.util.SharingMemoryStatus.STALE,
+            emptyMap(),
+            0L,
+            0,
+        )
+        }
         val sample = SharingMemoryObservation(
             maxWork, maxScratchEntries, { cancelRequested }, { chargeSharingWork(1L) },
         )
@@ -1533,7 +1603,9 @@ class PropagationSession private constructor(
             for (offset in 0 until length) {
                 val lit = native?.literalOf(i, offset) ?: checkNotNull(literals)[offset]
                 val variable = Lit.variable(lit)
-                tokens[offset] = if (variable < problem.numBoolVars) lit.toLong() else {
+                tokens[offset] = if (variable < problem.numBoolVars) {
+                    lit.toLong()
+                } else {
                     val atom = variable - problem.numBoolVars
                     SharedClause.atomToken(state.atoms.intVar[atom].toLong(), state.atoms.kind[atom].ordinal.toLong(),
                         state.atoms.threshold[atom], if (Lit.isPositive(lit)) 0L else 1L)
@@ -1550,7 +1622,10 @@ class PropagationSession private constructor(
             val exported = literals ?: checkNotNull(native).literalsOf(i)
             out.add(if (native != null && exported.isNotEmpty()) {
                 SharedClause(exported, emptyLongArray(), lbd, key)
-            } else asSharedClause(exported, lbd, key))
+            } else {
+                asSharedClause(exported, lbd, key)
+            }
+            )
         }
         return out.takeUnless { cancelled() }
     }
@@ -1570,7 +1645,9 @@ class PropagationSession private constructor(
         val bools = if (boolCount == 0) emptyIntArray() else IntArray(boolCount)
         val quads = if (boolCount == lits.size) {
             emptyLongArray()
-        } else LongArray((lits.size - boolCount) * SharedClause.QUAD)
+        } else {
+            LongArray((lits.size - boolCount) * SharedClause.QUAD)
+        }
         var bi = 0
         var qi = 0
         for (lit in lits) {
@@ -1601,7 +1678,9 @@ class PropagationSession private constructor(
      */
     fun importClause(shared: SharedClause, origin: Int = OWN_ORIGIN) {
         state.work += shared.boolLits.size.toLong() + shared.atomQuads.size
-        val lits = if (shared.atomQuads.isEmpty()) shared.boolLits else {
+        val lits = if (shared.atomQuads.isEmpty()) {
+            shared.boolLits
+        } else {
             val translated = IntArray(shared.boolLits.size + shared.atomQuads.size / SharedClause.QUAD)
             var j = 0
             for (l in shared.boolLits) translated[j++] = l
@@ -1640,7 +1719,9 @@ class PropagationSession private constructor(
         val base = state.undoTop
         val pinned = applyDecision { state.pinBoolAsDecision(v, value) }
         if (pinned == false) return revertAndUnsat(state.conflictLevels ?: emptyIntArray())
-        val conflict = if (pinned == null) null else {
+        val conflict = if (pinned == null) {
+            null
+        } else {
             state.runToFixpoint(allFactors = false, cancellation = cancellation)
         }
         if (conflict != null) return revertAndUnsat(conflict)
@@ -1655,7 +1736,9 @@ class PropagationSession private constructor(
         val base = state.undoTop
         val pinned = applyDecision { state.setIntAsDecision(v, value) }
         if (pinned == false) return revertAndUnsat(state.conflictLevels ?: emptyIntArray())
-        val conflict = if (pinned == null) null else {
+        val conflict = if (pinned == null) {
+            null
+        } else {
             state.runToFixpoint(allFactors = false, cancellation = cancellation)
         }
         if (conflict != null) return revertAndUnsat(conflict)

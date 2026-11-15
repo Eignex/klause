@@ -19,7 +19,7 @@ import com.eignex.klause.solver.search.BooleanProofContext
 import com.eignex.klause.solver.search.BooleanProofTasks
 import com.eignex.klause.solver.search.BooleanTaskCheck
 import com.eignex.klause.solver.search.BooleanTaskLease
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal data class BooleanProofStep(
     val task: Int?,
@@ -101,7 +101,7 @@ internal class BooleanProofScheduler(
     }
 
     // One serialized coordinator owns the board; a worker retains its exact lease through every pause.
-    fun runSlice(worker: Int, cancellation: Cancellation, millis: Long, offeredWork: Long): BooleanProofStep {
+    fun runSlice(worker: Int, cancellation: ExecutionControl, millis: Long, offeredWork: Long): BooleanProofStep {
         check(!closed)
         require(worker in workers.indices && offeredWork > 0L && millis > 0L)
         witness?.let { return BooleanProofStep(null, sample = it) }
@@ -113,8 +113,11 @@ internal class BooleanProofScheduler(
             if (slot.search == null) {
                 val solver = solvers?.get(worker) ?: BacktrackSolver(problem)
                 val params = parameters[worker].copy(assumptions = Assumptions.None)
-                slot.search = if (satisfactionQueries) solver.openBooleanProof(params)
-                    else solver.openRepair(objective, params)
+                slot.search = if (satisfactionQueries) {
+                    solver.openBooleanProof(params)
+                } else {
+                    solver.openRepair(objective, params)
+                }
             }
             val search = checkNotNull(slot.search)
             if (started[worker] !== lease) {
@@ -135,7 +138,9 @@ internal class BooleanProofScheduler(
                 tasks.complete(lease) {
                     if (result.reason == TerminationReason.SearchExhausted) {
                         BooleanTaskCheck.NativeRefutation
-                    } else BooleanTaskCheck.Unresolved
+                    } else {
+                        BooleanTaskCheck.Unresolved
+                    }
                 }
                 slot.lease = null
             }
@@ -153,7 +158,7 @@ internal class BooleanProofScheduler(
     }
 
     fun run(
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         workLimit: Long,
         baseSliceWork: Long = 5000L,
         maxSliceWork: Long = 150000L,
@@ -182,13 +187,18 @@ internal class BooleanProofScheduler(
             if (step.reason != null && step.reason != TerminationReason.SearchExhausted) stopped[worker] = true
             allowance = (allowance.toDouble() * 1.5).toLong().coerceIn(baseSliceWork, maxSliceWork)
         }
-        return if (nativeCoverageComplete) SolveResult.Unsat(
-            stats = stats, assumptionCore = Assumptions(bools = context.scope.condition.bools),
+        return if (nativeCoverageComplete) {
+            SolveResult.Unsat(
+            stats = stats,
+            assumptionCore = Assumptions(bools = context.scope.condition.bools),
             semantics = problem.semantics,
-        ) else SolveResult.Unknown(
+        )
+        } else {
+            SolveResult.Unknown(
             if (cancellation()) TerminationReason.Cancelled else TerminationReason.BudgetExhausted,
             stats = stats, semantics = problem.semantics,
         )
+        }
     }
 
     internal fun adopt(worker: Int, search: BooleanSatisfactionRepair, literal: Int): Boolean {

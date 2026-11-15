@@ -7,7 +7,7 @@ import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.solver.pipeline.SourceAttachment
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.io.CharSource
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -16,7 +16,7 @@ internal fun parseSmtLibSource(
     unboundedIntLo: Long,
     unboundedIntHi: Long,
     settings: ProblemSettings,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     semanticOverrides: SemanticOverrides,
 ): SmtLibProblem? {
     val semantics = resolveSmtLibSemantics(unboundedIntLo, unboundedIntHi, semanticOverrides)
@@ -91,7 +91,7 @@ internal fun parseSmtLibSource(
     }
 }
 
-private class AdmissionSource(private val source: CharSource, private val cancellation: Cancellation) : CharSource {
+private class AdmissionSource(private val source: CharSource, private val cancellation: ExecutionControl) : CharSource {
     override fun next(): String? {
         if (cancellation()) throw PolynomialSourceInterrupted()
         return source.next()
@@ -103,7 +103,7 @@ private fun parseLinearAdmission(
     unboundedIntLo: Long,
     unboundedIntHi: Long,
     settings: ProblemSettings,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     semantics: EffectiveSourceSemantics,
 ): SmtLibProblem {
     val builder = Compiler.Builder(unboundedIntLo, unboundedIntHi, strictBounds = false, settings = settings,
@@ -132,7 +132,7 @@ private fun parseLinearAdmission(
 private fun buildLinearAdmission(
     builder: Compiler.Builder,
     commands: List<SExpr>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     semantics: EffectiveSourceSemantics,
 ): SmtLibProblem {
     if (builder.objectiveSpec == null) return builder.build()
@@ -151,27 +151,28 @@ private fun buildLinearAdmission(
     return objective.bindObjective(builder.buildSource(), cancellation)
 }
 
-private fun <T> withSource(
-    openSource: () -> CharSource,
-    cancellation: Cancellation,
-    read: (CharSource) -> T,
-): T {
+private fun <T> withSource(openSource: () -> CharSource, cancellation: ExecutionControl, read: (CharSource) -> T): T {
     val source = openSource()
     var interrupted = false
     val outcome = try {
         runCatching { read(source) }.also {
             if (it.exceptionOrNull() is PolynomialSourceInterrupted ||
                 it.exceptionOrNull() is CancellationException
-            ) interrupted = true
+            ) {
+                interrupted = true
+            }
         }
     } finally {
-        if (source is AutoCloseable) source.close()
-        else while (!interrupted) {
+        if (source is AutoCloseable) {
+            source.close()
+        } else {
+            while (!interrupted) {
             if (cancellation()) {
                 interrupted = true
                 break
             }
             if (source.next() == null) break
+        }
         }
     }
     if (interrupted) throw PolynomialSourceInterrupted()

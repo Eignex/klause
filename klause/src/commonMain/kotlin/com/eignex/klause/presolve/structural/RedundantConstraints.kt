@@ -15,14 +15,13 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.impliedLinearRows
-import com.eignex.klause.ir.linearRows
 import com.eignex.klause.presolve.ColumnRanges
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.PresolveShared
 import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.presolve.SubsumeState
 import com.eignex.klause.presolve.asSourceDelta
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.ScanMeter
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
@@ -41,7 +40,8 @@ private const val BOOL_VAR_MARK = 1L shl 40
 internal object RedundantConstraints {
     private class Interrupted : RuntimeException()
 
-    private fun visit(scan: ScanMeter?, units: Long = SUBSUME_WORK_WEIGHT) {
+    @Suppress("NOTHING_TO_INLINE") // Scalar scans use the bound cursor without default-argument forwarding.
+    private inline fun visit(scan: ScanMeter?, units: Long = SUBSUME_WORK_WEIGHT) {
         if (scan != null && !scan.visit(units)) throw Interrupted()
     }
 
@@ -58,7 +58,7 @@ internal object RedundantConstraints {
         problem: Problem,
         ranges: ColumnRanges,
         incremental: SubsumeIncremental? = null,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): PassDelta {
         if (incremental == null) return computeFull(problem, ranges, cancellation)
         val out = incremental.memo.reconcile(problem, incremental, cancellation)
@@ -83,7 +83,7 @@ internal object RedundantConstraints {
      */
     fun removeRedundantSourceConstraints(
         problem: Problem,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         memo: SubsumeMemo? = null,
     ): SourceDelta = computeFull(
         problem, ColumnRanges.of(problem.intBounds), cancellation, memo?.subsets,
@@ -128,7 +128,7 @@ internal object RedundantConstraints {
     private fun computeFull(
         problem: Problem,
         ranges: ColumnRanges,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         subsets: SubsetDomination? = null,
     ): PassDelta {
         val scan = ScanMeter(cancellation)
@@ -226,7 +226,7 @@ internal object RedundantConstraints {
         problem: Problem,
         ranges: ColumnRanges,
         out: List<Factor>,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         subsets: SubsetDomination? = null,
     ): PassDelta {
         val factors = problem.factors
@@ -272,6 +272,7 @@ internal object RedundantConstraints {
      */
     internal class SubsumeMemo : SubsumeState {
         val subsets = SubsetDomination()
+
         // Long-keyed to avoid boxing the shallow key on every factor: a clause-heavy model registers
         // hundreds of thousands of factors, and a `HashMap<Long, …>` would box the key on each lookup.
         private val shallowSingle = MutableLongObjectMap<SubsumeFactor>()
@@ -330,7 +331,7 @@ internal object RedundantConstraints {
         fun reconcile(
             problem: Problem,
             inc: SubsumeIncremental,
-            cancellation: Cancellation = Cancellation.Never,
+            cancellation: ExecutionControl = ExecutionControl.Never,
         ): List<Factor> {
             val drops = IntHashSet()
             // A prior firing that bailed mid-rebuild left the memo cleared, so it must rebuild (not apply a
@@ -360,8 +361,11 @@ internal object RedundantConstraints {
                     process(f, drops)
                 }
             }
-            return if (drops.isEmpty()) problem.factors.asList() else
+            return if (drops.isEmpty()) {
+                problem.factors.asList()
+            } else {
                 problem.factors.filterIndexed { i, _ -> inc.liveIds[i] !in drops }
+            }
         }
 
         // Later phases also remove indexed occurrences; duplicates have no entry and retract as a no-op.
@@ -419,6 +423,7 @@ internal object RedundantConstraints {
             }
             indexed.put(entry.id, entry)
             val f = entry.factor
+
             // Most factors (every Clause, Xor, plain global) offer nothing to the phase-2 buckets, so the
             // touched-key set and the row form are derived only once a factor actually offers.
             @Suppress("DoubleMutabilityForCollection") // deliberately lazily created on the first offer
@@ -515,7 +520,7 @@ internal object RedundantConstraints {
      * Clique-based coefficient lifting is excluded because naively clamping to the clique-reduced slack
      * is unsound.
      */
-    private fun dropCliqueImpliedKnapsacks(factors: List<Factor>, cancellation: Cancellation): List<Factor> {
+    private fun dropCliqueImpliedKnapsacks(factors: List<Factor>, cancellation: ExecutionControl): List<Factor> {
         val candidates = ArrayList<Pair<Int, LinearRow>>()
         for ((i, f) in factors.withIndex()) {
             // Clauses declare >= rows, so none can be a <= knapsack drop candidate.

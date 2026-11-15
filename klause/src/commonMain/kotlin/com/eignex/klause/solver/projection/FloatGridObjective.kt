@@ -3,7 +3,7 @@ package com.eignex.klause.solver.projection
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
@@ -30,7 +30,7 @@ internal class FloatGridObjective(
 
 internal fun FloatGridMapping.projectObjective(
     objective: LinearObjective,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): FloatGridObjective? {
     val stop = guardedCancellation(cancellation)
     if (stop()) return null
@@ -38,7 +38,9 @@ internal fun FloatGridMapping.projectObjective(
         objective.intCoefficientValues.size > source.numIntVars ||
         objective.realCoefficientValues.size > source.numRealVars ||
         target.numBoolVars.toLong() + target.numIntVars > Int.MAX_VALUE
-    ) return null
+    ) {
+        return null
+    }
     val booleans = target.numBoolVars
     val coefficients = Array(booleans + target.numIntVars) { BigFraction.ZERO }
     var offset = BigFraction.ofLong(objective.constant)
@@ -83,8 +85,11 @@ internal fun FloatGridMapping.projectObjective(
         if (stop()) return null
         val value = ratio.num * (denominator / ratio.den)
         if (!value.fitsLong()) return null
-        if (index < booleans) boolWeights[index] = value.toLongExact()
-        else intWeights[index - booleans] = value.toLongExact()
+        if (index < booleans) {
+            boolWeights[index] = value.toLongExact()
+        } else {
+            intWeights[index - booleans] = value.toLongExact()
+        }
     }
     if (!objectiveActivitiesFit(boolWeights, intWeights, stop)) return null
     if (stop()) return null
@@ -95,7 +100,7 @@ internal fun FloatGridMapping.projectObjective(
 private fun FloatGridMapping.objectiveActivitiesFit(
     bools: LongArray,
     ints: LongArray,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Boolean {
     var lower = bigIntOf(0)
     var upper = bigIntOf(0)

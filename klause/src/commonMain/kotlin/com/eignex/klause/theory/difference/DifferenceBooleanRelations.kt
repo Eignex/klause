@@ -6,9 +6,9 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.ExactWitness
 import com.eignex.klause.lp.exactComparison
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
-internal fun Problem.checkDifferenceBooleans(bools: BooleanArray, cancellation: Cancellation): Boolean? {
+internal fun Problem.checkDifferenceBooleans(bools: BooleanArray, cancellation: ExecutionControl): Boolean? {
     val witness = object : ExactWitness {
         override fun truth(boolVar: Int): Boolean = bools[boolVar]
         override fun at(column: Int): BigFraction = error("a Boolean relation has no numeric columns")

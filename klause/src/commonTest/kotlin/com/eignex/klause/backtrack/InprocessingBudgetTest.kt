@@ -6,7 +6,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.result.SearchStatsSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -105,7 +105,7 @@ class InprocessingBudgetTest {
             val pass = VivificationPass()
             val stats = SearchStatsSink()
             var cancelled = false
-            val cancellation = Cancellation {
+            val cancellation = ExecutionControl {
                 cancelled = cancelled || (session.decisionLevel > 0 && session.boolValue(1) == true)
                 cancelled
             }
@@ -128,7 +128,7 @@ class InprocessingBudgetTest {
                 Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)), Clause(intArrayOf(1, 4)),
             ))
             val session = PropagationSession(problem.bake(), nativeSat = native)
-            session.withCancellation(Cancellation { true }) {
+            session.withCancellation(ExecutionControl { true }) {
                 session.addRootDerivedClause(Clause(intArrayOf(0)), 1, 0, false)
             }
             assertTrue(session.fixpointCancelled)

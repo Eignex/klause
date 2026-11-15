@@ -12,7 +12,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.workScheduled
 import kotlin.time.TimeSource
@@ -65,7 +65,7 @@ internal class PreparingMinimize(
     override val work: Long get() = search?.work ?: budget.spent()
 
     override fun runSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceNodes: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -109,7 +109,9 @@ internal class PreparingMinimize(
                     val millis = budget.deadline?.let {
                         (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
                     } ?: sliceMillis
-                    val nodes = if (sliceNodes < 0L) -1L else {
+                    val nodes = if (sliceNodes < 0L) {
+                        -1L
+                    } else {
                         (sliceNodes - (preparedWork - before)).coerceAtLeast(0L)
                     }
                     return prepared.runSlice(global, millis, nodes, onIncumbent).also {

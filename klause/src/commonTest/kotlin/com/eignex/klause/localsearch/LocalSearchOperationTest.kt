@@ -10,7 +10,7 @@ import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -37,7 +37,7 @@ class LocalSearchOperationTest {
         val before = state.assignment.snapshot()
         val move = Move.IntSet(0, 1)
 
-        val interrupted = state.scoringPick(Cancellation { state.assignment.intValue(2) == 2L }) {
+        val interrupted = state.scoringPick(ExecutionControl { state.assignment.intValue(2) == 2L }) {
             state.weightedNetDelta(move)
             move
         }
@@ -64,7 +64,7 @@ class LocalSearchOperationTest {
         val before = state.assignment.snapshot()
         val move = Move.Compound(listOf(Move.IntSet(0, 1), Move.IntSet(1, 1)))
 
-        val interrupted = state.scoringPick(Cancellation { state.assignment.intValue(0) == 1L }) {
+        val interrupted = state.scoringPick(ExecutionControl { state.assignment.intValue(0) == 1L }) {
             state.weightedNetDelta(move)
             move
         }
@@ -98,7 +98,7 @@ class LocalSearchOperationTest {
             val delta = state.netDelta(move)
             var polls = 0
 
-            val interrupted = state.scoringPick(Cancellation { ++polls == 2 }) {
+            val interrupted = state.scoringPick(ExecutionControl { ++polls == 2 }) {
                 state.netDelta(move)
                 move
             }
@@ -169,11 +169,11 @@ class LocalSearchOperationTest {
         val params = LocalSearchParams(maxFlips = 3L, randomSeed = 0L,
             initialAssignment = Sample(booleanArrayOf(), longArrayOf(2, 2)))
         engine.resumableSolve(params).use { handle ->
-            assertNull(handle.runSlice(Cancellation { selected && ++polls >= 2 }, Long.MAX_VALUE, -1L))
+            assertNull(handle.runSlice(ExecutionControl { selected && ++polls >= 2 }, Long.MAX_VALUE, -1L))
             assertEquals(2, picks)
             assertEquals(1.0, handle.stats.ls.moves.sum)
 
-            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+            val result = handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L)
 
             val sample = assertIs<SolveResult.Sat>(result).assignment
             assertEquals(1L, sample.intValue(0))

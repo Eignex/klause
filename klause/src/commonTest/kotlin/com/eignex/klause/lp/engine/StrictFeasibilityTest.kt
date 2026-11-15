@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -272,7 +272,7 @@ class StrictFeasibilityTest {
                         owner.refinementCache,
                         if (cancel) LpRefinementLimits() else LpRefinementLimits(maxWork = 100),
                     ),
-                    cancellation = Cancellation { cancel && ++polls > 30 },
+                    cancellation = ExecutionControl { cancel && ++polls > 30 },
                 )
 
                 assertNull(result.witness)
@@ -334,7 +334,7 @@ class StrictFeasibilityTest {
         object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 refactorUpdateLimit: Int,
                 iterationLimit: Int,
                 workLimit: Long,

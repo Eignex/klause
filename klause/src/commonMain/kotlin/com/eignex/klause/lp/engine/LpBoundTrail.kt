@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.PollStride
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.minus
@@ -21,7 +22,7 @@ internal class LpBoundTrail(initial: LpExactState) {
     var state: LpExactState = initial
         private set
 
-    fun push(token: Cancellation = Cancellation.Never): Boolean {
+    fun push(token: ExecutionControl = ExecutionControl.Never): Boolean {
         if (token() || state.depth == Int.MAX_VALUE) return false
         val next = snapshot(scopes = state.scopes + state.assertions.size)
         return commit(next, token)
@@ -32,7 +33,7 @@ internal class LpBoundTrail(initial: LpExactState) {
         upper: Boolean,
         side: ExactLpSide,
         witness: Long,
-        token: Cancellation = Cancellation.Never,
+        token: ExecutionControl = ExecutionControl.Never,
     ): Boolean {
         if (token() || column !in 0 until state.model.numVars ||
             (column >= state.model.n && !state.rows.row(column - state.model.n).active) || witness < 0L ||
@@ -50,7 +51,7 @@ internal class LpBoundTrail(initial: LpExactState) {
 
     fun assertBounds(
         assertions: List<LpBoundAssertion>,
-        token: Cancellation = Cancellation.Never,
+        token: ExecutionControl = ExecutionControl.Never,
     ): LpBoundBatchResult {
         if (token()) return LpBoundBatchResult.Declined(0)
         state.conflict?.let { return LpBoundBatchResult.Conflict(0, it) }
@@ -66,8 +67,9 @@ internal class LpBoundTrail(initial: LpExactState) {
         val changed = LinkedHashSet<Int>()
         var count = 0
         var conflict = false
+        val stride = PollStride()
         for (assertion in assertions) {
-            if (token() || assertion.column !in lower.indices || assertion.depth != state.depth ||
+            if ((stride.due() && token()) || assertion.column !in lower.indices || assertion.depth != state.depth ||
                 (assertion.column >= state.model.n && !state.rows.row(assertion.column - state.model.n).active) ||
                 assertion.witness < 0L || !witnesses.add(assertion.witness) ||
                 state.boundRevision > Long.MAX_VALUE - count - 1L
@@ -84,7 +86,6 @@ internal class LpBoundTrail(initial: LpExactState) {
             }
             count++
             changed.add(assertion.column)
-            if (token()) return LpBoundBatchResult.Declined(count)
             if (!ExactLpBounds(lower[assertion.column]?.side, upper[assertion.column]?.side).consistent) {
                 conflict = true
                 break
@@ -103,7 +104,10 @@ internal class LpBoundTrail(initial: LpExactState) {
         }
     }
 
-    private fun assertUnprojectedBounds(assertions: List<LpBoundAssertion>, token: Cancellation): LpBoundBatchResult {
+    private fun assertUnprojectedBounds(
+        assertions: List<LpBoundAssertion>,
+        token: ExecutionControl,
+    ): LpBoundBatchResult {
         val staged = LpBoundTrail(state)
         var count = 0
         for (assertion in assertions) {
@@ -129,7 +133,7 @@ internal class LpBoundTrail(initial: LpExactState) {
         return state.conflict?.let { LpBoundBatchResult.Conflict(count, it) } ?: LpBoundBatchResult.Applied(count)
     }
 
-    fun pop(targetDepth: Int, token: Cancellation = Cancellation.Never): Boolean {
+    fun pop(targetDepth: Int, token: ExecutionControl = ExecutionControl.Never): Boolean {
         if (token() || targetDepth !in 0..state.depth) return false
         if (targetDepth == state.depth) return true
         if (state.boundRevision == Long.MAX_VALUE || state.popRevision == Long.MAX_VALUE) return false
@@ -159,7 +163,7 @@ internal class LpBoundTrail(initial: LpExactState) {
         return commit(next, token)
     }
 
-    fun replaceObjective(objective: ExactLpObjective, token: Cancellation = Cancellation.Never): Boolean {
+    fun replaceObjective(objective: ExactLpObjective, token: ExecutionControl = ExecutionControl.Never): Boolean {
         if (token() || objective.size != state.model.numVars || state.objectiveRevision == Long.MAX_VALUE) return false
         val pricesInactiveRow = (0 until state.model.m).any {
             !state.rows.row(it).active && !objective.cost(state.model.n + it).value.isZero
@@ -172,7 +176,7 @@ internal class LpBoundTrail(initial: LpExactState) {
         return commit(next, token)
     }
 
-    fun resetRoot(token: Cancellation = Cancellation.Never): Boolean {
+    fun resetRoot(token: ExecutionControl = ExecutionControl.Never): Boolean {
         if (token() || state.boundRevision == Long.MAX_VALUE || state.popRevision == Long.MAX_VALUE) return false
         val rows = state.rows.popped(0)
         val changedRows = (0 until rows.size).filter { rows.row(it) != state.rows.row(it) }
@@ -194,7 +198,7 @@ internal class LpBoundTrail(initial: LpExactState) {
         )
     }
 
-    fun recenter(origins: List<ExactLpNumber>, token: Cancellation = Cancellation.Never): Boolean {
+    fun recenter(origins: List<ExactLpNumber>, token: ExecutionControl = ExecutionControl.Never): Boolean {
         if (token() || origins.size != state.model.n) return false
         if ((0 until state.model.n).all { origins[it] == state.model.column(it).origin }) return true
         if (state.boundRevision == Long.MAX_VALUE || state.objectiveRevision == Long.MAX_VALUE ||
@@ -228,14 +232,14 @@ internal class LpBoundTrail(initial: LpExactState) {
         return commit(next, token)
     }
 
-    fun append(row: LpScopedRow, scoped: Boolean, token: Cancellation = Cancellation.Never): Boolean =
+    fun append(row: LpScopedRow, scoped: Boolean, token: ExecutionControl = ExecutionControl.Never): Boolean =
         append(emptyList(), listOf(row), scoped, token)
 
     fun append(
         columns: List<LpStructuralColumn>,
         rows: List<LpScopedRow>,
         scoped: Boolean,
-        token: Cancellation = Cancellation.Never,
+        token: ExecutionControl = ExecutionControl.Never,
         permanentRows: Set<Long> = emptySet(),
     ): Boolean {
         if (token()) return false
@@ -287,14 +291,19 @@ internal class LpBoundTrail(initial: LpExactState) {
         columns: List<LpStructuralColumn>,
         rows: List<LpScopedRow>,
         scoped: Boolean,
-        token: Cancellation = Cancellation.Never,
+        token: ExecutionControl = ExecutionControl.Never,
         permanentRows: Set<Long> = emptySet(),
         objective: ExactLpObjective? = null,
         assertions: List<LpBoundAssertion> = emptyList(),
     ): Boolean {
         val staged = LpBoundTrail(state)
-        val hidden = if (retired.isEmpty()) true else if (scoped) staged.suspend(retired, token)
-            else staged.deactivate(retired, token)
+        val hidden = if (retired.isEmpty()) {
+            true
+        } else if (scoped) {
+            staged.suspend(retired, token)
+        } else {
+            staged.deactivate(retired, token)
+        }
         if (!hidden || !staged.append(columns, rows, scoped, token, permanentRows) ||
             (objective != null && !staged.replaceObjective(objective, token)) ||
             staged.assertBounds(assertions, token) is LpBoundBatchResult.Declined || token()
@@ -305,9 +314,9 @@ internal class LpBoundTrail(initial: LpExactState) {
         return true
     }
 
-    fun deactivate(id: Long, token: Cancellation = Cancellation.Never): Boolean = deactivate(setOf(id), token)
+    fun deactivate(id: Long, token: ExecutionControl = ExecutionControl.Never): Boolean = deactivate(setOf(id), token)
 
-    fun deactivate(ids: Set<Long>, token: Cancellation = Cancellation.Never): Boolean {
+    fun deactivate(ids: Set<Long>, token: ExecutionControl = ExecutionControl.Never): Boolean {
         if (token()) return false
         val indices = rowIndices(ids) ?: return false
         val changed = indices.filterTo(HashSet()) {
@@ -326,7 +335,7 @@ internal class LpBoundTrail(initial: LpExactState) {
         )
     }
 
-    fun suspend(ids: Set<Long>, token: Cancellation = Cancellation.Never): Boolean {
+    fun suspend(ids: Set<Long>, token: ExecutionControl = ExecutionControl.Never): Boolean {
         if (token() || state.depth == 0) return false
         val indices = rowIndices(ids) ?: return false
         val active = indices.filterTo(HashSet()) { state.rows.row(it).active }
@@ -350,10 +359,10 @@ internal class LpBoundTrail(initial: LpExactState) {
         return indices.takeIf { it.size == ids.size }
     }
 
-    fun compact(token: Cancellation = Cancellation.Never): Boolean =
+    fun compact(token: ExecutionControl = ExecutionControl.Never): Boolean =
         compact(LpLayoutRemap(state.model.n, state.rows), token)
 
-    fun compact(remap: LpLayoutRemap, token: Cancellation = Cancellation.Never): Boolean {
+    fun compact(remap: LpLayoutRemap, token: ExecutionControl = ExecutionControl.Never): Boolean {
         if (token() || !remap.matches(state.model, state.rows)) return false
         if (remap.unchanged) return true
         if (!structuralRevisionAvailable()) return false
@@ -443,7 +452,7 @@ internal class LpBoundTrail(initial: LpExactState) {
         previous = state,
     ).also { if (matrixRevision == state.matrixRevision) it.inheritProjection(state) }
 
-    private fun commit(next: LpExactState, token: Cancellation): Boolean {
+    private fun commit(next: LpExactState, token: ExecutionControl): Boolean {
         if (token()) return false
         state = next
         return true

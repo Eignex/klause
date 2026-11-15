@@ -2,12 +2,12 @@ package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun prepareMixedEqualityRepair(
     columns: Int,
     rows: List<ExactRationalInequality>,
-    stop: Cancellation,
+    stop: ExecutionControl,
     onStage: ((String) -> Unit)? = null,
 ): MixedEqualityRepair? {
     if (columns <= 0 || columns.toLong() * columns > MAX_REPAIR_ENTRIES) {
@@ -88,7 +88,7 @@ internal fun prepareMixedEqualityRepair(
 
 internal class MixedEqualityRepair(
     private val pivots: Array<ExactRationalInequality?>,
-    private val stop: Cancellation,
+    private val stop: ExecutionControl,
     private val onStage: ((String) -> Unit)?,
 ) {
     private val work = MixedPointArithmetic(stop)
@@ -113,7 +113,7 @@ internal class MixedEqualityRepair(
 
     fun completePoint(
         rows: List<ExactRationalInequality>,
-        realCompletion: ((Int, List<ExactRationalInequality>, Cancellation) -> List<BigFraction>?)?,
+        realCompletion: ((Int, List<ExactRationalInequality>, ExecutionControl) -> List<BigFraction>?)?,
     ): List<BigFraction>? {
         val residual = ArrayList<ExactRationalInequality>()
         var entries = 0L
@@ -171,6 +171,5 @@ internal class MixedEqualityRepair(
 }
 
 private data class MixedEqualityKey(val terms: List<Pair<Int, BigFraction>>, val bound: BigFraction)
-
 
 private const val MAX_REPAIR_ENTRIES = 65536L

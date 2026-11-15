@@ -7,7 +7,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialResource
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -148,7 +148,7 @@ class PolynomialMagnitudePropagationTest {
         val formula = PolynomialFormula.normalize(source.formula, arithmetic)
         val atoms = assertNotNull(formula.conjunctiveAtoms(arithmetic, 128))
         var stopped = false
-        val interrupted = PolynomialArithmetic(Cancellation { stopped })
+        val interrupted = PolynomialArithmetic(ExecutionControl { stopped })
         val pending = preparePolynomialMagnitudeRefutation(atoms, interrupted)
         assertNull(pending.next())
         stopped = true

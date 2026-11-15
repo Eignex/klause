@@ -2,7 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.Test
@@ -28,7 +28,7 @@ class PortfolioEarlyCoreTrialTest(private val incumbentBeforeTrial: Boolean) {
 
         Portfolio.thompson(workers, maxSliceWork = 5_000L, reseedStaleThreshold = 0).also {
             it.runTimeSource = TestTimeSource()
-        }.use { it.minimize(Cancellation { reached.size >= 3 }) }
+        }.use { it.minimize(ExecutionControl { reached.size >= 3 }) }
 
         assertEquals(listOf(0, 1, 3), reached)
     }
@@ -50,7 +50,7 @@ class PortfolioEarlyCoreTrialTest(private val incumbentBeforeTrial: Boolean) {
 
         Portfolio.thompson(workers, maxSliceWork = 5_000L, reseedStaleThreshold = 0).also {
             it.runTimeSource = TestTimeSource()
-        }.use { it.minimize(Cancellation { reached.size >= 4 }) }
+        }.use { it.minimize(ExecutionControl { reached.size >= 4 }) }
 
         assertEquals(listOf(0, 1, 3, 3), reached)
     }
@@ -75,7 +75,7 @@ class PortfolioEarlyCoreTrialTest(private val incumbentBeforeTrial: Boolean) {
 
         Portfolio.thompson(workers, maxSliceWork = 5_000L, reseedStaleThreshold = 0).also {
             it.runTimeSource = TestTimeSource()
-        }.use { it.minimize(Cancellation { reached.size >= 4 }) }
+        }.use { it.minimize(ExecutionControl { reached.size >= 4 }) }
 
         assertEquals(listOf(0, 1, 3, 2), reached)
     }
@@ -96,7 +96,7 @@ class PortfolioEarlyCoreTrialTest(private val incumbentBeforeTrial: Boolean) {
 
         Portfolio.thompson(workers, maxSliceWork = 5_000L, reseedStaleThreshold = 0).also {
             it.runTimeSource = TestTimeSource()
-        }.use { it.minimize(Cancellation { reached.size >= 3 }) }
+        }.use { it.minimize(ExecutionControl { reached.size >= 3 }) }
 
         assertEquals(listOf(0, 1, 2), reached)
     }

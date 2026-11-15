@@ -9,13 +9,13 @@ import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.finiteLinearModel
 import com.eignex.klause.theory.linearTheoryModel
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class LinearCompletionEncoding(private val encoders: PreparedFactorProjections) {
     private var reusable: Boolean? = null
     private var encoded: Problem? = null
 
-    fun modelFor(sample: Sample, cancellation: Cancellation): Problem? {
+    fun modelFor(sample: Sample, cancellation: ExecutionControl): Problem? {
         if (cancellation()) return null
         encoded?.let { return it }
         if (reusable == null) {

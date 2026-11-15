@@ -7,7 +7,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.BoundedVariableElimination
 import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
 import com.eignex.klause.presolve.SourceDelta
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 
 internal class PrivateRebuildNeighborhood private constructor(
@@ -19,18 +19,20 @@ internal class PrivateRebuildNeighborhood private constructor(
     val indexedFactors: Int get() = problem.numFactors
     val sourceFactors: Int get() = source.numFactors
 
-    fun eliminate(cancellation: Cancellation): Reduction = Reduction(cancellation)
+    fun eliminate(cancellation: ExecutionControl): Reduction = Reduction(cancellation)
 
-    inner class Reduction internal constructor(cancellation: Cancellation) {
+    inner class Reduction internal constructor(cancellation: ExecutionControl) {
         private val delta = BoundedVariableElimination.eliminateSource(problem, objectiveBoolVars = protectedColumns,
             cancellation = cancellation)
         val rebuild get() = delta.rebuild
         val infeasible get() = delta.infeasible
 
-        fun materialize(cancellation: Cancellation): Problem? {
+        fun materialize(cancellation: ExecutionControl): Problem? {
             if (cancellation()) return null
             val indices = sourceIndices
-            val restored = if (indices == null) delta else {
+            val restored = if (indices == null) {
+                delta
+            } else {
                 cancellation.charge(delta.droppedIndices.size * 2L + 1L)
                 if (cancellation()) return null
                 SourceDelta(
@@ -47,7 +49,7 @@ internal class PrivateRebuildNeighborhood private constructor(
         fun prepare(
             source: Problem,
             admission: PrivateRebuildAdmission,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
         ): PrivateRebuildNeighborhood? {
             if (cancellation()) return null
             if (admission.candidates != 1) {

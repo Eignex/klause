@@ -3,7 +3,7 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -14,11 +14,18 @@ class SourceProgressRewardTest {
         var slices = 0
         val base = ScriptedSearch({ false }) {}
         val proof = object : ResumableSearch by base {
-            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
-                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+            override fun runSlice(
+                global: ExecutionControl,
+                sliceMillis: Long,
+                sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit,
+            ): MinimizeResult? {
                 base.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
-                return if (++slices == 3) MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf()), 999.0)
-                else null
+                return if (++slices == 3) {
+                    MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf()), 999.0)
+                } else {
+                    null
+                }
             }
         }
         val workers = listOf(
@@ -28,7 +35,7 @@ class SourceProgressRewardTest {
 
         val result = Portfolio(workers, fixedBandit(2, 0), baseSliceWork = 2, maxSliceWork = 2,
             reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(32, 1) {},
-            rewardPolicy = SourceProgressReward).use { it.minimize(Cancellation.Never) }
+            rewardPolicy = SourceProgressReward).use { it.minimize(ExecutionControl.Never) }
 
         assertIs<MinimizeResult.Optimal>(result)
     }

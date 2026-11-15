@@ -9,7 +9,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
@@ -50,7 +50,7 @@ class TheoryCompletionTest {
         val completion = TheoryCompletion(source, TheoryParams())
         val candidate = Sample(booleanArrayOf(), longArrayOf(), exactInts = listOf(wide))
 
-        val result = completion.complete(candidate, Cancellation.Never)
+        val result = completion.complete(candidate, ExecutionControl.Never)
 
         assertEquals(wide, assertIs<Completion.Witness>(result).sample.exactIntValue(0))
         completion.close()
@@ -61,8 +61,8 @@ class TheoryCompletionTest {
         val completion = TheoryCompletion(Problem(0, 0, emptyArray(), emptyArray()), TheoryParams(maxLeaves = 1))
         val candidate = Sample(booleanArrayOf(), longArrayOf())
 
-        val first = completion.complete(candidate, Cancellation.Never)
-        val second = completion.complete(candidate, Cancellation.Never)
+        val first = completion.complete(candidate, ExecutionControl.Never)
+        val second = completion.complete(candidate, ExecutionControl.Never)
 
         assertIs<Completion.Witness>(first)
         assertIs<Completion.Undecided>(second)
@@ -75,7 +75,7 @@ class TheoryCompletionTest {
     fun `candidate over strict rows should complete to an exact point strictly inside them`() {
         val candidate = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
 
-        val completion = TheoryCompletion(model, TheoryParams()).complete(candidate, Cancellation.Never)
+        val completion = TheoryCompletion(model, TheoryParams()).complete(candidate, ExecutionControl.Never)
 
         val x = assertNotNull(assertIs<Completion.Witness>(completion).sample.exactReals)[0]
         assertTrue(x > BigFraction.ZERO && x < BigFraction.ONE, "x=$x")
@@ -113,7 +113,7 @@ class TheoryCompletionTest {
         )
         val candidate = Sample(booleanArrayOf(false), LongArray(0), doubleArrayOf(0.0))
 
-        val completion = TheoryCompletion(guarded, TheoryParams()).complete(candidate, Cancellation.Never)
+        val completion = TheoryCompletion(guarded, TheoryParams()).complete(candidate, ExecutionControl.Never)
 
         val sample = assertIs<Completion.Witness>(completion).sample
         assertEquals(false, sample.bools.single())
@@ -153,7 +153,7 @@ class TheoryCompletionTest {
         )
         val candidate = Sample(booleanArrayOf(true), LongArray(0), doubleArrayOf(0.0))
 
-        val completion = TheoryCompletion(guarded, TheoryParams()).complete(candidate, Cancellation.Never)
+        val completion = TheoryCompletion(guarded, TheoryParams()).complete(candidate, ExecutionControl.Never)
 
         assertIs<Completion.Refuted>(completion)
     }

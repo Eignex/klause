@@ -3,7 +3,7 @@ package com.eignex.klause.presolve.linear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.equivalentLinear
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.LongArrayList
 
@@ -17,7 +17,7 @@ internal object AffinePivotOrders {
         objectiveIntVars: IntHashSet,
         capWide: Boolean,
         pivotable: ((Linear, Int) -> Boolean)?,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): AffineSingletons.PivotOrder = when (policy) {
         AffinePivotOrder.STABLE_ID ->
             StableIdOrder(ws, eliminated, objectiveIntVars, capWide, pivotable, cancellation)
@@ -35,7 +35,7 @@ internal object AffinePivotOrders {
         private val objectiveIntVars: IntHashSet,
         private val capWide: Boolean,
         private val pivotable: ((Linear, Int) -> Boolean)?,
-        private val cancellation: Cancellation,
+        private val cancellation: ExecutionControl,
     ) : AffineSingletons.PivotOrder {
         private var scanFrom = 0
 
@@ -70,7 +70,7 @@ internal object AffinePivotOrders {
         private val objectiveIntVars: IntHashSet,
         private val capWide: Boolean,
         private val pivotable: ((Linear, Int) -> Boolean)?,
-        private val cancellation: Cancellation,
+        private val cancellation: ExecutionControl,
         private val minimizeRewrite: Boolean = false,
     ) : AffineSingletons.PivotOrder {
         private val heap = PivotHeap()

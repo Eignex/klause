@@ -9,7 +9,7 @@ import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -39,7 +39,7 @@ class OptimizingCompletionTest {
             LinearObjective(realCoefficients = doubleArrayOf(1.0)),
             TheoryCompletion(problem, TheoryParams()),
         )
-        return completion.complete(Sample(BooleanArray(0), longArrayOf(3), doubleArrayOf(3.7)), Cancellation.Never)
+        return completion.complete(Sample(BooleanArray(0), longArrayOf(3), doubleArrayOf(3.7)), ExecutionControl.Never)
     }
 
     @Test

@@ -16,7 +16,7 @@ import com.eignex.klause.lp.asFraction
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.theory.EncodedTheoryFactor
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.toLong
@@ -28,7 +28,7 @@ internal class RealDifferenceSystem private constructor(
 ) {
     private var potentials: LongArray? = null
 
-    fun check(bools: IntArray, stop: Cancellation, onWork: ((Long) -> Unit)? = null): Result {
+    fun check(bools: IntArray, stop: ExecutionControl, onWork: ((Long) -> Unit)? = null): Result {
         onWork?.invoke(guards.size.toLong() + graph.numVars)
         val active = BooleanArray(guards.size) { index ->
             val guard = guards[index]
@@ -39,6 +39,7 @@ internal class RealDifferenceSystem private constructor(
             onNegativeCycle = { cycle = it }, onWork = onWork)
         return when (result) {
             Potentials.Abandoned -> Result.Interrupted
+
             Potentials.Infeasible -> {
                 // ALWAYS edges are immutable source rows and declared bounds, not scoped LP assertions.
                 val clause = cycle?.takeIf { edges -> edges.all { active[it] } }?.asSequence()
@@ -46,6 +47,7 @@ internal class RealDifferenceSystem private constructor(
                     ?.distinct()?.sorted()?.toList()?.toIntArray()
                 if (stop()) Result.Interrupted else Result.Infeasible(clause)
             }
+
             is Potentials.Found -> {
                 if (stop()) return Result.Interrupted
                 val zero = result.values.last()
@@ -74,7 +76,7 @@ internal class RealDifferenceSystem private constructor(
         fun prepare(
             model: Problem,
             forms: List<List<ExactRowForm>>,
-            stop: Cancellation = Cancellation.Never,
+            stop: ExecutionControl = ExecutionControl.Never,
         ): RealDifferenceSystem? {
             if (stop()) return null
             if (model.numIntVars != 0 || model.numRealVars == 0 || model.numRealVars > 10000) return null
@@ -84,10 +86,14 @@ internal class RealDifferenceSystem private constructor(
                 if (stop()) return null
                 if (model.realLower[real].isFinite() &&
                     !append(exactBound(real, model.realLower[real], false), ALWAYS, zero, edges, stop)
-                ) return null
+                ) {
+                    return null
+                }
                 if (model.realUpper[real].isFinite() &&
                     !append(exactBound(real, model.realUpper[real], true), ALWAYS, zero, edges, stop)
-                ) return null
+                ) {
+                    return null
+                }
             }
             for ((factorIndex, factor) in model.factors.withIndex()) {
                 val source = (factor as? EncodedTheoryFactor)?.takeIf {
@@ -115,19 +121,21 @@ internal class RealDifferenceSystem private constructor(
         fun prepareRows(
             realColumns: Int,
             rows: List<ExactRationalInequality>,
-            stop: Cancellation,
+            stop: ExecutionControl,
         ): RealDifferenceSystem? {
             if (realColumns !in 1..10000 || rows.size > 100000 || stop()) return null
             val edges = ArrayList<Edge>()
             for (row in rows) {
                 if (row.columns.any { it !in 0 until realColumns } ||
                     !append(row, ALWAYS, realColumns, edges, stop)
-                ) return null
+                ) {
+                    return null
+                }
             }
             return build(realColumns, edges, stop)
         }
 
-        private fun build(zero: Int, edges: List<Edge>, stop: Cancellation): RealDifferenceSystem? {
+        private fun build(zero: Int, edges: List<Edge>, stop: ExecutionControl): RealDifferenceSystem? {
             if (edges.isEmpty() || edges.size > 100000) return null
             var denominator = 1L
             for (edge in edges) {
@@ -177,7 +185,7 @@ internal class RealDifferenceSystem private constructor(
             guard: Int,
             zero: Int,
             edges: MutableList<Edge>,
-            stop: Cancellation,
+            stop: ExecutionControl,
         ): Boolean {
             stop.charge(1)
             if (stop()) return false
@@ -190,13 +198,17 @@ internal class RealDifferenceSystem private constructor(
             val coefficient = row.coefficients[0]
             if (coefficient.isZero ||
                 (row.columns.size == 2 && coefficient != row.coefficients[1].negated())
-            ) return false
+            ) {
+                return false
+            }
             val positive = coefficient.signum() > 0
             val magnitude = if (positive) coefficient else coefficient.negated()
             val bound = row.rhs * magnitude.reciprocal()
             if (bound.den > bigIntOf(Long.MAX_VALUE) || bound.num < bigIntOf(Long.MIN_VALUE) ||
                 bound.num > bigIntOf(Long.MAX_VALUE)
-            ) return false
+            ) {
+                return false
+            }
             val first = row.columns[0]
             val second = row.columns.getOrNull(1) ?: zero
             edges += Edge(if (positive) second else first, if (positive) first else second,

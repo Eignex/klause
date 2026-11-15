@@ -8,14 +8,14 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.sun.management.ThreadMXBean
-import java.lang.management.ManagementFactory
-import kotlin.random.Random
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
+import java.lang.management.ManagementFactory
+import kotlin.random.Random
 
 internal fun trajectoryThreadBytes(): Long = (ManagementFactory.getThreadMXBean() as ThreadMXBean).run {
     check(isThreadAllocatedMemorySupported)

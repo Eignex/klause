@@ -21,7 +21,7 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.lowering.approximateGridValue
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.encodingPreparationScope
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.FloatInterval
 import com.eignex.util.collections.IntArrayList
 
@@ -52,7 +52,7 @@ internal sealed interface FloatGridPreparation {
     class Declined(val cause: FloatGridDecline, val sourceFactor: Int? = null) : FloatGridPreparation
 }
 
-internal fun prepareFloatGrid(request: FloatGridRequest, cancellation: Cancellation): FloatGridPreparation {
+internal fun prepareFloatGrid(request: FloatGridRequest, cancellation: ExecutionControl): FloatGridPreparation {
     val stop = cancellation.encodingPreparationScope()
     val source = request.source
     if (stop()) return FloatGridPreparation.Declined(FloatGridDecline.RESOURCE)
@@ -119,8 +119,13 @@ internal fun prepareFloatGrid(request: FloatGridRequest, cancellation: Cancellat
             listOf(if (factor.variables.reals.isEmpty()) factor else factor.remap(rename))
         } else {
             val pin = optional.pinRows[id]
-            (if (pin == null) lowerFloatGridFactor(factor, bySource, policy, stop, id in request.truncatedRows)
-            else lowerGridPin(factor, pin.first, pin.second))
+            (
+                if (pin == null) {
+                lowerFloatGridFactor(factor, bySource, policy, stop, id in request.truncatedRows)
+            } else {
+                lowerGridPin(factor, pin.first, pin.second)
+            }
+            )
                 ?: return FloatGridPreparation.Declined(
                     if (stop()) FloatGridDecline.RESOURCE else FloatGridDecline.SCALING, id,
                 )
@@ -138,8 +143,11 @@ internal fun prepareFloatGrid(request: FloatGridRequest, cancellation: Cancellat
     val domains = Array(source.numIntVars + privateCoordinates.size) { id ->
         stop.charge(1)
         if (stop()) return FloatGridPreparation.Declined(FloatGridDecline.RESOURCE)
-        if (id < source.numIntVars) source.declaredIntDomains.finiteDomain(id)
-        else IntDomain(0L, privateCoordinates.getValue(id).buckets - 1L, source.settings.storage)
+        if (id < source.numIntVars) {
+            source.declaredIntDomains.finiteDomain(id)
+        } else {
+            IntDomain(0L, privateCoordinates.getValue(id).buckets - 1L, source.settings.storage)
+        }
     }
     if (stop()) return FloatGridPreparation.Declined(FloatGridDecline.RESOURCE)
     val target = Problem(
@@ -152,15 +160,18 @@ internal fun prepareFloatGrid(request: FloatGridRequest, cancellation: Cancellat
     stop.charge(columns.size.toLong() + retained.size + origins.size)
     if (stop()) return FloatGridPreparation.Declined(FloatGridDecline.RESOURCE)
     val mapping = FloatGridMapping(source, target, columns, retained, origins.toIntArray(), request.owner, stop)
-    return if (stop()) FloatGridPreparation.Declined(FloatGridDecline.RESOURCE)
-    else FloatGridPreparation.Prepared(target, mapping)
+    return if (stop()) {
+        FloatGridPreparation.Declined(FloatGridDecline.RESOURCE)
+    } else {
+        FloatGridPreparation.Prepared(target, mapping)
+    }
 }
 
 private fun preflightFloatFactor(
     source: Problem,
     factor: Factor,
     selected: BooleanArray,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Boolean {
     cancellation.charge(1)
     if (cancellation()) return false
@@ -183,11 +194,14 @@ private fun preflightFloatFactor(
     if (projected != roles.reals.size) return false
     return when (factor) {
         is Linear, is ReifiedRealLinear, is RealAbs, is RealArrayMinMax, is RealElement, is RealFiniteDomain -> true
+
         is ContinuousProduct -> factor.finiteChoices?.let { choices ->
             !choices.hasGuards || (choices.size == 1 && source.realLower[choices.operand] == choices.valueAt(0) &&
                 source.realUpper[choices.operand] == choices.valueAt(0))
         } ?: true
+
         is Power -> factor.base is Power.Coordinate.Real
+
         else -> false
     }
 }
@@ -203,8 +217,11 @@ internal fun floatGridColumn(
     val id = variable.source.index
     if (source.realLower[id].isNaN() || source.realUpper[id].isNaN() ||
         source.realLower[id] == Double.POSITIVE_INFINITY || source.realUpper[id] == Double.NEGATIVE_INFINITY
-    ) return null
-    val origin = (if (source.realLower[id].isFinite()) {
+    ) {
+        return null
+    }
+    val origin = (
+        if (source.realLower[id].isFinite()) {
         BigFraction.ofDouble(source.realLower[id])
     } else if (image != null) {
         BigFraction.ofDouble(image.lo)
@@ -219,19 +236,29 @@ internal fun floatGridColumn(
         policy.unrangedBounds.upper?.let { BigFraction.of(it.numerator, it.denominator) }
     }) ?: return null
     if (origin > upper) return null
-    val buckets = if (origin == upper && !variable.preserveBuckets) 1
-        else variable.buckets ?: inheritedBuckets ?: policy.buckets
-    val step = if (buckets == 1) BigFraction.ZERO
-    else (upper - origin) * BigFraction.ofLong(buckets - 1L).reciprocal()
+    val buckets = if (origin == upper && !variable.preserveBuckets) {
+        1
+    } else {
+        variable.buckets ?: inheritedBuckets ?: policy.buckets
+    }
+    val step = if (buckets == 1) {
+        BigFraction.ZERO
+    } else {
+        (upper - origin) * BigFraction.ofLong(buckets - 1L).reciprocal()
+    }
     val lo = approximateGridValue(origin)
     val hi = approximateGridValue(upper)
     if (!lo.isFinite() || !hi.isFinite() || !(hi - lo).isFinite() ||
         (!origin.isZero && lo == 0.0) || (!upper.isZero && hi == 0.0) ||
         (!step.isZero && (!approximateGridValue(step).isFinite() || approximateGridValue(step) == 0.0))
-    ) return null
+    ) {
+        return null
+    }
     if ((source.realLower[id].isFinite() && lo != source.realLower[id]) ||
         (source.realUpper[id].isFinite() && hi != source.realUpper[id])
-    ) return null
+    ) {
+        return null
+    }
     return FloatGridColumn(variable.source, GridCoordinate(target, lo, hi, buckets), origin, step)
 }
 
@@ -239,13 +266,15 @@ private fun lowerFloatGridFactor(
     factor: Factor,
     columns: Map<Int, FloatGridColumn>,
     policy: FloatSemantics.Grid,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     truncate: Boolean,
 ): List<Factor>? {
     fun coordinate(id: Int): GridCoordinate = columns.getValue(id).coordinate
     return when (factor) {
         is Linear -> lowerGridRow(factor, columns, policy.linearScale, cancellation, truncate)
+
         is ReifiedRealLinear -> lowerGridRow(factor, columns, policy.linearScale, cancellation, truncate)
+
         is RealAbs -> {
             val input = coordinate(factor.operand)
             val output = coordinate(factor.result)
@@ -253,18 +282,30 @@ private fun lowerFloatGridFactor(
             listOf(GridAbs(input.variable, output.variable, input.lower, input.upper, input.buckets,
                 output.lower, output.upper, output.buckets, image))
         }
+
         is ContinuousProduct -> {
             val product = GridProduct(coordinate(factor.a), coordinate(factor.b), coordinate(factor.result))
             val choices = factor.finiteChoices?.takeUnless { it.hasGuards }
-            val membership = if (choices == null) emptyList() else lowerGridFiniteValues(choices.size,
-                choices::valueAt, columns.getValue(choices.operand), cancellation) ?: return null
+            val membership = if (choices == null) {
+                emptyList()
+            } else {
+                lowerGridFiniteValues(
+                choices.size,
+                choices::valueAt,
+                columns.getValue(choices.operand),
+                cancellation,
+            ) ?: return null
+            }
             listOf(product) + membership
         }
         is Power -> listOf(GridPower(coordinate((factor.base as Power.Coordinate.Real).id.index), factor.exponent,
             coordinate((factor.result as Power.Coordinate.Real).id.index)))
         is RealArrayMinMax -> listOf(lowerGridMinMax(factor, columns, policy.linearScale, cancellation) ?: return null)
+
         is RealElement -> lowerGridElement(factor, columns, cancellation)
+
         is RealFiniteDomain -> lowerGridFiniteDomain(factor, columns.getValue(factor.variable), cancellation)
+
         else -> null
     }
 }

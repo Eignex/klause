@@ -83,6 +83,10 @@ its matching column directly, without constructing a duplicate definition.
 Completed and interrupted template preparation and import work also debit the owning
 LP allowance. Import reports its actual charges before publishing authority and
 rechecks cancellation after that debit.
+Worker bound assembly and reduced-cost scans contribute to the worker's shared
+stop countdown. Unbound callers check directly. Scoped LP operations share their
+own countdown across projection, reconstruction and source scans; complete batch
+assertions remain atomic, and enclosing query publication checks the full stop.
 Retained-source assembly and fixed-layout installation adopt the same immutable exact bound objects after a
 complete match against the current normalized column, including its origin, tag,
 integrality and both bound sides.
@@ -2056,8 +2060,9 @@ retries and nested operations share one invocation allowance, and setup, failed
 attempts and cleanup are charged. Cheap exact arithmetic charges operand
 word-length squared.
 
-Reconstruction and refinement poll ordinary tokens every 64 calls or 4096 work,
+Reconstruction and refinement poll execution stop predicates every 64 calls or 4096 work,
 while resource caps are checked on every charge. Cancelled evidence is discarded.
+Work accounting does not increase the frequency of stop or clock observations.
 A completed continuous check that stays undecided is skipped without learning a nogood, and
 its incomplete flag prevents exhaustion or optimality publication. Numerical
 failure, singularity, work stops, precision declines and cancellation keep distinct

@@ -8,7 +8,7 @@ import com.eignex.klause.lp.engine.LpProjectionMeter
 import com.eignex.klause.lp.engine.LpProjectionStop
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.argsortBy
 import com.eignex.util.collections.IntDisjointSet
 import kotlin.math.floor
@@ -16,7 +16,7 @@ import kotlin.time.TimeSource
 
 internal fun LpEngine.prepareRootComponentOrder(
     session: PropagationSession,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): RootComponentOrder? {
     val targets = rootPrimalTargets ?: return null
     if (problem.numBoolVars != 0 || problem.numRealVars != 0 || params.lpPlan.lbTreeSearch) return null
@@ -37,7 +37,9 @@ internal fun LpEngine.prepareRootComponentOrder(
                 if (rootPrimalTargets === targets && !cancellation()) {
                     targets.components = prepared
                     outcome = if (prepared == null) "CONNECTED_DECLINED" else "RETAINED"
-                } else outcome = "EXPIRED_OR_CANCELLED"
+                } else {
+                    outcome = "EXPIRED_OR_CANCELLED"
+                }
             } catch (_: LpProjectionStop) {
                 targets.componentOrderAttempted = meter.work > 0L
                 outcome = if (meter.work == 0L) "PENDING" else "PREPARATION_STOPPED"
@@ -53,7 +55,7 @@ internal fun LpEngine.prepareRootComponentOrder(
     return targets.components
 }
 
-internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellation: Cancellation): VarRef? {
+internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellation: ExecutionControl): VarRef? {
     val targets = rootPrimalTargets ?: return null
     val order = prepareRootComponentOrder(session, cancellation) ?: return null
     val variable = firstRootComponentVariable(order, session, cancellation) { group ->
@@ -72,7 +74,7 @@ internal fun LpEngine.retainRootComponentValues(
     order: RootComponentOrder,
     group: Int,
     session: PropagationSession,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ) {
     val start = order.offsets[group]
     val end = order.offsets[group + 1]
@@ -84,7 +86,9 @@ internal fun LpEngine.retainRootComponentValues(
         val work = 8L * (end - start)
         if (!rootComponentPreparationAllowed(targets, 0L, work) ||
             rootComponentPreparationWork(targets, 0L) < work || cancellation()
-        ) return
+        ) {
+            return
+        }
         noteNodeOverhead(work)
         outcome = "CANCELLED_OR_UNFIXED"
         for (index in start until end) {
@@ -247,7 +251,7 @@ private fun RootPrimalTargets.fractionality(variable: Int): Double {
 internal fun firstRootComponentVariable(
     order: RootComponentOrder,
     session: PropagationSession,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     completed: ((Int) -> Unit)? = null,
 ): Int? {
     var visited = 0

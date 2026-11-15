@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -52,7 +52,9 @@ class ComponentLpSolverTest {
             var observed = false
             owner.openSolve().use { cursor ->
                 val step = cursor.advance(shouldPause = {
-                    if (owner.lastMetrics.componentSolves < 2) false else {
+                    if (owner.lastMetrics.componentSolves < 2) {
+                        false
+                    } else {
                         observed = true
                         assertNull(owner.partialPrimalGuidance())
                         true
@@ -88,7 +90,7 @@ class ComponentLpSolverTest {
 
                 assertEquals(known, next.known.toList())
                 assertEquals(coordinates, next.coordinates.toList())
-                assertNull(owner.partialPrimalGuidance(Cancellation { true }))
+                assertNull(owner.partialPrimalGuidance(ExecutionControl { true }))
             }
         }
     }
@@ -148,8 +150,13 @@ class ComponentLpSolverTest {
             var queries = 0
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newPersistentSolver(
-                    model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
-                    workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                    model: LpModel,
+                    cancellation: ExecutionControl,
+                    refactorUpdateLimit: Int,
+                    iterationLimit: Int,
+                    workLimit: Long,
+                    trackDegeneracy: Boolean,
+                    pricing: LpPricingOptions,
                 ): PersistentLpSolver {
                     val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
                         refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
@@ -170,16 +177,16 @@ class ComponentLpSolverTest {
                 }
             }
             assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()),
-                Cancellation { queryCancelled }, factory = factory)).use { owner ->
+                ExecutionControl { queryCancelled }, factory = factory)).use { owner ->
                 assertNull(owner.resolveBounds())
                 assertEquals(LpFloatTermination.CANCELLED, owner.lastTermination)
-                assertNull(owner.partialPrimalGuidance(Cancellation { true }))
+                assertNull(owner.partialPrimalGuidance(ExecutionControl { true }))
 
                 val guide = assertNotNull(owner.partialPrimalGuidance())
 
                 assertEquals(listOf(false, true, true), guide.known.toList())
                 assertTrue(guide.coordinates.filterIndexed { index, _ -> guide.known[index] }.all { it.isFinite() })
-                assertNull(owner.partialBoundDuals(Cancellation.Never))
+                assertNull(owner.partialBoundDuals(ExecutionControl.Never))
                 assertNull(owner.exactBound())
             }
         }
@@ -198,8 +205,13 @@ class ComponentLpSolverTest {
         var queries = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
-                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                model: LpModel,
+                cancellation: ExecutionControl,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
                     refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
@@ -221,7 +233,7 @@ class ComponentLpSolverTest {
             }
         }
         assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()),
-            Cancellation { queryCancelled }, factory = factory)).use { owner ->
+            ExecutionControl { queryCancelled }, factory = factory)).use { owner ->
             assertNull(owner.resolveBounds())
             assertEquals(LpFloatTermination.CANCELLED, owner.lastTermination)
 
@@ -269,7 +281,7 @@ class ComponentLpSolverTest {
             for (stopAt in listOf(1, 4)) {
                 var polls = 0
 
-                val guide = owner.partialPrimalGuidance(Cancellation { ++polls >= stopAt })
+                val guide = owner.partialPrimalGuidance(ExecutionControl { ++polls >= stopAt })
 
                 assertNull(guide)
             }
@@ -443,7 +455,7 @@ class ComponentLpSolverTest {
             var constructed = 0
 
             assertFailsWith<LpProjectionStop> {
-                componentLpSolverOrNull(model, Cancellation.Never, { part, token ->
+                componentLpSolverOrNull(model, ExecutionControl.Never, { part, token ->
                     constructed++
                     RevisedSimplex(part, token)
                 }, ::ComponentLpSolver, projection)
@@ -484,8 +496,13 @@ class ComponentLpSolverTest {
         var acquired = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
-                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                model: LpModel,
+                cancellation: ExecutionControl,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val index = acquired++
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(
@@ -701,7 +718,7 @@ class ComponentLpSolverTest {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 refactorUpdateLimit: Int,
                 iterationLimit: Int,
                 workLimit: Long,
@@ -719,7 +736,7 @@ class ComponentLpSolverTest {
                     pricing,
                 )
                 return object : PersistentLpSolver by delegate {
-                    override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+                    override fun adopt(state: LpExactState, token: ExecutionControl): Boolean =
                         !decline && delegate.adopt(state, token)
                     override fun close() {
                         closed++
@@ -854,7 +871,7 @@ class ComponentLpSolverTest {
         val solver = assertNotNull(
             componentLpSolverOrNull(
                 builder.build(Sense.MINIMIZE),
-                com.eignex.klause.util.Cancellation.Never,
+                com.eignex.klause.util.ExecutionControl.Never,
                 { model, _ -> RevisedSimplex(model, workLimit = if (part++ == 0) 0L else 1L) },
             ),
         )
@@ -928,7 +945,7 @@ class ComponentLpSolverTest {
         val solver = assertNotNull(
             componentLpSolverOrNull(
                 model,
-                com.eignex.klause.util.Cancellation.Never,
+                com.eignex.klause.util.ExecutionControl.Never,
                 { part, token ->
                     if (index++ == 0) {
                         ProductionLpEngineFactory.newGeneralSolver(part, token, 0L, LpPricingOptions())

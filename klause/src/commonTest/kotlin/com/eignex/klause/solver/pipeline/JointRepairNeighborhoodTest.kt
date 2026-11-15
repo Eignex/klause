@@ -10,7 +10,7 @@ import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -25,7 +25,7 @@ class JointRepairNeighborhoodTest {
         val source = SourceProofContext(SourceScope(SourceRevision("refuted-pins", "exact")), columns.toSet(),
             mapOf("edge" to SourcePremise(SourceInequality(mapOf(columns[2] to BigFraction.ONE,
                 columns[3] to BigFraction.ONE), BigFraction.ONE))))
-        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 4, 0, Cancellation.Never,
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 4, 0, ExecutionControl.Never,
             sourceIntegers = intArrayOf(0, 2, 3)))
         val centers = List(4) { BigFraction.ZERO }
         val pinned = repair.propose(centers, booleanArrayOf(), 2, 0, BigFraction.ONE, null)
@@ -33,7 +33,7 @@ class JointRepairNeighborhoodTest {
         val funding = SourceLpFunding(1_000, 1_000).also { it.grant(1_000) }
         assertTrue(repair.guideRefutation(linkedSetOf(
             SourceDerivation.Assumption(columns[1], false), SourceDerivation.Assumption(columns[2], true)),
-            pinned, SourceLpBudget(funding = funding), Cancellation.Never))
+            pinned, SourceLpBudget(funding = funding), ExecutionControl.Never))
 
         val guided = repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null)
 
@@ -52,14 +52,14 @@ class JointRepairNeighborhoodTest {
         val source = SourceProofContext(SourceScope(SourceRevision("refuted-fallback", "exact")),
             columns.toSet() + SourceCoordinate(SourceCoordinate.Kind.Boolean, 0), emptyMap())
         for (variant in listOf("center", "boolean", "cutoff", "cancelled", "work", "allocation", "unpinned")) {
-            val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, Cancellation.Never))
+            val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, ExecutionControl.Never))
             val centers = List(3) { BigFraction.ZERO }
             val pinned = repair.propose(centers, booleanArrayOf(false), 2, 0, BigFraction.ONE, null)
             val funding = SourceLpFunding(if (variant == "work") 0 else 1_000,
                 if (variant == "allocation") 0 else 1_000).also { it.grant(1_000) }
             repair.guideRefutation(setOf(SourceDerivation.Assumption(columns[2], false)),
                 if (variant == "unpinned") pinned.copy(upper = emptyMap()) else pinned,
-                SourceLpBudget(funding = funding), Cancellation { variant == "cancelled" })
+                SourceLpBudget(funding = funding), ExecutionControl { variant == "cancelled" })
             val current = if (variant == "center") listOf(BigFraction.ZERO, BigFraction.ZERO, BigFraction.ONE)
                 else centers
             val cutoff = if (variant == "cutoff") BigFraction.ONE else null
@@ -76,15 +76,15 @@ class JointRepairNeighborhoodTest {
         val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val source = SourceProofContext(SourceScope(SourceRevision("independent-pins", "exact")),
             columns.toSet(), emptyMap())
-        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, Cancellation.Never))
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, ExecutionControl.Never))
         val centers = List(3) { BigFraction.ZERO }
         val budget = SourceLpBudget(funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) })
         val pinned = repair.propose(centers, booleanArrayOf(), 2, 0, BigFraction.ONE, null)
         assertTrue(repair.guideRefutation(setOf(SourceDerivation.Assumption(columns[0], false)),
-            pinned, budget, Cancellation.Never))
+            pinned, budget, ExecutionControl.Never))
         val first = repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null)
         assertTrue(repair.guideRefutation(setOf(SourceDerivation.Assumption(columns[1], false)),
-            first, budget, Cancellation.Never))
+            first, budget, ExecutionControl.Never))
 
         val combined = repair.propose(centers, booleanArrayOf(), 2, 2, BigFraction.ONE, null)
 
@@ -98,12 +98,12 @@ class JointRepairNeighborhoodTest {
         val source = SourceProofContext(SourceScope(SourceRevision("retained-funding", "exact")), columns.toSet(),
             mapOf("edge" to SourcePremise(SourceInequality(mapOf(columns[1] to BigFraction.ONE,
                 columns[2] to BigFraction.ONE), BigFraction.ONE))))
-        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, Cancellation.Never))
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, ExecutionControl.Never))
         val centers = List(3) { BigFraction.ZERO }
         val funding = SourceLpFunding(10_000, 10_000).also { it.grant(1_000) }
         val pinned = repair.propose(centers, booleanArrayOf(), 2, 0, BigFraction.ONE, null)
         assertTrue(repair.guideRefutation(setOf(SourceDerivation.Assumption(columns[2], false)),
-            pinned, SourceLpBudget(funding = funding), Cancellation.Never))
+            pinned, SourceLpBudget(funding = funding), ExecutionControl.Never))
         funding.grant(0)
         val before = funding.spent
 
@@ -121,14 +121,14 @@ class JointRepairNeighborhoodTest {
             mapOf("edge" to SourcePremise(SourceInequality(mapOf(columns[1] to BigFraction.ONE,
                 columns[2] to BigFraction.ONE), BigFraction.ONE))))
         for (variant in listOf("work", "allocation", "cancellation")) {
-            val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, Cancellation.Never))
+            val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, ExecutionControl.Never))
             val centers = List(3) { BigFraction.ZERO }
             val ordinary = repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null)
             val funding = SourceLpFunding(10_000, 10_000).also { it.grant(1_000) }
             val pinned = repair.propose(centers, booleanArrayOf(), 2, 0, BigFraction.ONE, null)
             var cancelled = false
             assertTrue(repair.guideRefutation(setOf(SourceDerivation.Assumption(columns[2], false)),
-                pinned, SourceLpBudget(funding = funding), Cancellation { cancelled }))
+                pinned, SourceLpBudget(funding = funding), ExecutionControl { cancelled }))
             when (variant) {
                 "work" -> funding.charge(funding.remainingWork)
                 "allocation" -> funding.charge(0L, funding.remainingAllocation)
@@ -153,12 +153,12 @@ class JointRepairNeighborhoodTest {
         val budget = SourceLpBudget(funding = funding)
         val guidance = LinearRepairGuidance()
         guidance.remember(source, mapOf(columns[1] to 100.0, columns[2] to 3.0, columns[3] to 5.0),
-            budget, Cancellation.Never)
-        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 5, 0, Cancellation.Never,
+            budget, ExecutionControl.Never)
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 5, 0, ExecutionControl.Never,
             sourceIntegers = intArrayOf(0, 2, 3, 4)))
         val centers = listOf(BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO,
             BigFraction.ONE, BigFraction.ONE)
-        assertTrue(repair.guide(guidance.find(source), centers, budget, Cancellation.Never))
+        assertTrue(repair.guide(guidance.find(source), centers, budget, ExecutionControl.Never))
 
         val condition = repair.propose(centers, booleanArrayOf(true), 2, 1, BigFraction.ONE, BigFraction.ONE)
 
@@ -177,14 +177,14 @@ class JointRepairNeighborhoodTest {
                 columns[1] to BigFraction.ONE), BigFraction.ONE))))
         val retained = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) }
         val guidance = LinearRepairGuidance()
-        guidance.remember(source, mapOf(columns[2] to 2.0), SourceLpBudget(funding = retained), Cancellation.Never)
+        guidance.remember(source, mapOf(columns[2] to 2.0), SourceLpBudget(funding = retained), ExecutionControl.Never)
         val centers = List(3) { BigFraction.ZERO }
 
         for (variant in listOf("missing", "work", "allocation", "cancelled", "mid-ranking")) {
-            val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, Cancellation.Never))
+            val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, ExecutionControl.Never))
             val ordinary = repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null)
             assertTrue(repair.guide(guidance.find(source), centers, SourceLpBudget(funding = retained),
-                Cancellation.Never))
+                ExecutionControl.Never))
             assertEquals(mapOf(0 to BigFraction.ZERO, 1 to BigFraction.ZERO),
                 repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null).lower)
             val funding = SourceLpFunding(if (variant == "work") 0 else 100_000,
@@ -192,7 +192,7 @@ class JointRepairNeighborhoodTest {
             var checks = 0
 
             assertFalse(repair.guide(if (variant == "missing") null else guidance.find(source), centers,
-                SourceLpBudget(funding = funding), Cancellation {
+                SourceLpBudget(funding = funding), ExecutionControl {
                     variant == "cancelled" || (variant == "mid-ranking" && ++checks == 3)
                 }))
 
@@ -207,12 +207,12 @@ class JointRepairNeighborhoodTest {
             emptyMap())
         val producer = SourceLpFunding(1000, 1000).also { it.grant(1000) }
         val guidance = LinearRepairGuidance()
-        guidance.remember(source, mapOf(integer to 2.0), SourceLpBudget(funding = producer), Cancellation.Never)
+        guidance.remember(source, mapOf(integer to 2.0), SourceLpBudget(funding = producer), ExecutionControl.Never)
         val consumer = SourceLpFunding(1000, 1000).also { it.grant(1000) }
-        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 1, 0, Cancellation.Never))
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 1, 0, ExecutionControl.Never))
 
         assertTrue(repair.guide(guidance.find(source), listOf(BigFraction.ZERO),
-            SourceLpBudget(funding = consumer), Cancellation.Never))
+            SourceLpBudget(funding = consumer), ExecutionControl.Never))
 
         assertTrue(consumer.spent > 0)
         assertTrue(consumer.allocated > 0)
@@ -222,7 +222,7 @@ class JointRepairNeighborhoodTest {
     fun `initial repair should leave integer backed real columns outside the source complement`() {
         val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val source = SourceProofContext(SourceScope(SourceRevision("backings", "exact")), columns.toSet(), emptyMap())
-        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, Cancellation.Never,
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, ExecutionControl.Never,
             sourceIntegers = intArrayOf(0, 2)))
 
         val condition = repair.propose(List(3) { BigFraction.ONE }, booleanArrayOf(), 1, 0,
@@ -240,7 +240,7 @@ class JointRepairNeighborhoodTest {
                 columns[1] to BigFraction.ONE), BigFraction.ONE)),
                 "right" to SourcePremise(SourceInequality(mapOf(columns[1] to BigFraction.ONE,
                     columns[2] to BigFraction.ONE), BigFraction.ONE))))
-        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, Cancellation.Never,
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, ExecutionControl.Never,
             sourceIntegers = intArrayOf(0, 2)))
 
         val condition = repair.propose(List(3) { BigFraction.ZERO }, booleanArrayOf(), 2, 1,
@@ -255,7 +255,7 @@ class JointRepairNeighborhoodTest {
         val columns = (0..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val source = SourceProofContext(SourceScope(SourceRevision("backing-seeds", "exact")),
             columns.toSet(), emptyMap())
-        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 4, 0, Cancellation.Never,
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 4, 0, ExecutionControl.Never,
             sourceIntegers = intArrayOf(0, 2, 3)))
         repair.guide(mapOf(columns[0] to 0.25, columns[1] to 0.5))
 
@@ -273,7 +273,7 @@ class JointRepairNeighborhoodTest {
         val source = SourceProofContext(SourceScope(SourceRevision("indicator", "exact")), setOf(trigger, x, real),
             mapOf("guarded" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE, real to BigFraction.ONE),
                 BigFraction.ONE), emptyMap(), mapOf(trigger to BigFraction.ZERO))))
-        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 2, 1, Cancellation.Never))
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 2, 1, ExecutionControl.Never))
 
         val condition = repair.propose(List(3) { BigFraction.ZERO }, booleanArrayOf(), 2, 1,
             BigFraction.ONE, null)
@@ -286,7 +286,7 @@ class JointRepairNeighborhoodTest {
     fun `oversized coordinate indexes should decline before allocation`() {
         val source = SourceProofContext(SourceScope(SourceRevision("large", "exact")), emptySet(), emptyMap())
 
-        assertNull(JointRepairNeighborhood.prepare(source, 1_048_577, 0, Cancellation.Never))
+        assertNull(JointRepairNeighborhood.prepare(source, 1_048_577, 0, ExecutionControl.Never))
     }
 
     @Test
@@ -300,7 +300,7 @@ class JointRepairNeighborhoodTest {
                 BigFraction.ONE)),
                 "real-y" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE, y to BigFraction.ONE),
                     BigFraction.ONE))))
-        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 1, Cancellation.Never))
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 1, ExecutionControl.Never))
         repair.guide(mapOf(y to 0.5, x to 1.0, z to 2.0, real to 0.5))
 
         val condition = repair.propose(List(4) { BigFraction.ZERO }, booleanArrayOf(), 2, 1,
@@ -317,7 +317,7 @@ class JointRepairNeighborhoodTest {
         val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val source = SourceProofContext(SourceScope(SourceRevision("rounding", "exact")), setOf(x, real), emptyMap())
-        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 1, 1, Cancellation.Never))
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 1, 1, ExecutionControl.Never))
 
         val condition = repair.propose(listOf(BigFraction.ONE, BigFraction.ZERO), booleanArrayOf(true),
             1, 0, BigFraction.ONE, null)
@@ -332,6 +332,6 @@ class JointRepairNeighborhoodTest {
         val source = SourceProofContext(SourceScope(SourceRevision("cancelled", "exact")), emptySet(),
             mapOf("empty" to SourcePremise(SourceInequality(emptyMap(), BigFraction.ZERO))))
 
-        assertNull(JointRepairNeighborhood.prepare(source, 0, 0, Cancellation { true }))
+        assertNull(JointRepairNeighborhood.prepare(source, 0, 0, ExecutionControl { true }))
     }
 }

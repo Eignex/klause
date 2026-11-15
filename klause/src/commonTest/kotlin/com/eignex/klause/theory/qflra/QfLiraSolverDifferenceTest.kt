@@ -24,7 +24,7 @@ import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -178,7 +178,7 @@ class QfLiraSolverDifferenceTest {
             factors = arrayOf(),
         )
         ExactLiraSearchComponent(model).use { component ->
-            component.useOperationAllowance { Cancellation { true } }
+            component.useOperationAllowance { ExecutionControl { true } }
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
 
             assertIs<ComponentResult.Indeterminate>(session.initialize())

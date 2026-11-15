@@ -7,20 +7,20 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.lab.bench.BenchCase
-import com.eignex.lab.bench.BenchInput
-import com.eignex.lab.bench.BenchRequest
-import com.eignex.lab.bench.BenchInputRoot
 import com.eignex.lab.bench.BenchContext
+import com.eignex.lab.bench.BenchInput
+import com.eignex.lab.bench.BenchInputRoot
+import com.eignex.lab.bench.BenchRequest
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
-import kotlin.test.assertContentEquals
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.CsvSource
+import kotlin.test.assertTrue
 
 class LabInputsTest {
     @ParameterizedTest

@@ -14,7 +14,7 @@ import com.eignex.klause.lp.lattice.SparseIntRow
 import com.eignex.klause.lp.lattice.bareissEchelon
 import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
@@ -32,7 +32,7 @@ import com.eignex.util.numbers.times
 internal object DependentEqualities {
     private val limits = EchelonLimits(maxRowEntries = 4096, maxTotalEntries = 262144, maxBits = 4096)
 
-    fun dropImplied(problem: Problem, cancellation: Cancellation): SourceDelta {
+    fun dropImplied(problem: Problem, cancellation: ExecutionControl): SourceDelta {
         if (problem.semantics.relaxesRows(problem.numRealVars)) return SourceDelta()
         val columns = LinkedHashMap<Int, Int>()
         val droppableFactorOf = ArrayList<Int>()
@@ -88,7 +88,7 @@ internal object DependentEqualities {
         return true
     }
 
-    private fun exactRow(row: LinearRow, cancellation: Cancellation): Pair<Map<Int, BigInt>, BigInt>? {
+    private fun exactRow(row: LinearRow, cancellation: ExecutionControl): Pair<Map<Int, BigInt>, BigInt>? {
         if (row.size > limits.maxRowEntries) return null
         val constants = row.constants
         val realValues = if (constants is RealConstants) {

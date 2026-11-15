@@ -1,7 +1,7 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /**
  * Information a presolve pass needs to stay sound and to reuse round-engine state.
@@ -16,7 +16,7 @@ data class PresolveContext(
     /** Whether the source model already supplies symmetry breaking. */
     val modelBreaksSymmetry: Boolean = false,
     /** Cooperative cancellation polled by expensive passes. */
-    val cancellation: Cancellation = Cancellation.Never,
+    val cancellation: ExecutionControl = ExecutionControl.Never,
     /** Root-bake probing policy for transformed problems. */
     val bakeConfig: BakeConfig = BakeConfig.NONE,
     /** Incremental integer-variable occurrence index. */
@@ -65,7 +65,7 @@ data class PresolveContext(
     val objectiveBoolVars: Set<Int> get() = objectiveBoolCoeffs.keys
 
     /** This context with [cancellation] set. */
-    fun withCancellation(cancellation: Cancellation): PresolveContext = copy(cancellation = cancellation)
+    fun withCancellation(cancellation: ExecutionControl): PresolveContext = copy(cancellation = cancellation)
 
     /** This context with [bakeConfig] set. */
     fun withBakeConfig(bakeConfig: BakeConfig): PresolveContext = copy(bakeConfig = bakeConfig)

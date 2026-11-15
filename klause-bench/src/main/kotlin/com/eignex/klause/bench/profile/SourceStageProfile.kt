@@ -9,11 +9,6 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.bench.tools.CliProfile
-import java.io.File
-import java.io.PrintStream
-import java.util.Base64
-import java.util.concurrent.TimeUnit
-import kotlin.concurrent.thread
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -22,6 +17,11 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.io.File
+import java.io.PrintStream
+import java.util.Base64
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 
 internal object SourceStageProfile {
     @JvmStatic

@@ -9,7 +9,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.QfNraResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -137,7 +137,7 @@ class NonlinearIntegerResiduesTest {
     fun `cancellation after an atom proof should withhold incomplete Boolean consumption`() {
         val source = source("(assert (or (= (+ (* x x) (* y y)) 3) (= (+ (* x x) (* y y)) 7)))")
         lateinit var residues: NonlinearIntegerResidues
-        val cancellation = Cancellation { residues.stats.rings >= 4 }
+        val cancellation = ExecutionControl { residues.stats.rings >= 4 }
         residues = NonlinearIntegerResidues(source, PolynomialArithmetic(cancellation), PolynomialLimits())
 
         assertFailsWith<PolynomialInterrupted> { residues.simplify() }
@@ -292,9 +292,9 @@ class NonlinearIntegerResiduesTest {
     @Test
     fun `containing cancellation should interrupt charged residue work`() {
         var charged = 0L
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 40
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
         val residues = NonlinearIntegerResidues(source("(assert (= (+ (* x x) (* y y)) 3))"),
             PolynomialArithmetic(token), PolynomialLimits())
@@ -325,7 +325,7 @@ class NonlinearIntegerResiduesTest {
             val params = NonlinearIntegerParams(residueRefutation = true)
             val whole = solveNonlinearIntegers(source, params)
             NonlinearIntegerCursor(source, params, PolynomialCondition()).use { cursor ->
-                assertNull(cursor.runSlice(Cancellation { true }))
+                assertNull(cursor.runSlice(ExecutionControl { true }))
                 assertEquals(0L, cursor.stats.polynomial.workSpent)
 
                 val resumed = requireNotNull(cursor.runSlice(maximumCandidates = 1))

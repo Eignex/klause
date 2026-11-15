@@ -435,7 +435,9 @@ floor is zero: eviction removes optional shares while imported reasons and a
 previously drained batch retain their own references. Pressure prepares a replacement
 store under work, scratch and cancellation limits, retaining globals before glue and
 using the existing quality order. Every rank comparison, hash probe and copy is
-charged; allocation size is admitted and charged before allocation. A cancelled or
+charged; allocation size is admitted and charged before allocation. External stops
+are polled within 256 visits. Entry, allocation admission, store replacement and
+return force a check; numeric work limits are checked on every debit. A cancelled or
 exhausted preparation leaves the current generation intact. Publication swaps the
 prepared store and generation without remapping consumers. Old payload-owner and
 index arrays become unreachable when the operation returns. A byte limit too small

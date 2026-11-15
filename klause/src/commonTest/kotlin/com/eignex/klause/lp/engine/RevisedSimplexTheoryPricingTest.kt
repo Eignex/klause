@@ -6,7 +6,7 @@ import com.eignex.klause.simplex.basis.BasisUpdate
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -147,7 +147,7 @@ class RevisedSimplexTheoryPricingTest {
         val updates = ArrayList<Int>()
         val simplex = RevisedSimplex(
             disturbedSupportModel(),
-            cancellation = Cancellation { ++polls == 2 },
+            cancellation = ExecutionControl { ++polls == 2 },
             basisSolverFactory = recordingFactory(updates),
             pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
         )
@@ -206,7 +206,7 @@ class RevisedSimplexTheoryPricingTest {
             val zero = ExactLpNumber.of(0L)
             val objective = ExactLpObjective(listOf(one, ExactLpNumber.of(2L), zero))
             assertTrue(trail.replaceObjective(objective))
-            assertTrue(simplex.adopt(trail.state, Cancellation.Never))
+            assertTrue(simplex.adopt(trail.state, ExecutionControl.Never))
             val current = assertNotNull(simplex.resolveBounds())
 
             assertEquals(0, simplex.lastTheoryPricingAttempts)

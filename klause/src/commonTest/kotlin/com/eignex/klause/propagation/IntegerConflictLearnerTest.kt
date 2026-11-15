@@ -1,8 +1,8 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.VariableSelector
+import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -30,7 +30,7 @@ import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -146,10 +146,16 @@ class IntegerConflictLearnerTest {
                 int_search([z],input_order,indomain_min,complete),
                 int_search([x,y],input_order,indomain_max,complete)
             ]) maximize x;
-        """.trimIndent())
-        val prepared = FinitePipeline.prepare(FinitePipelineRequest(
-            program.problem, FiniteEngine.BACKTRACK, program.linearObjective(), randomSeed = 3L,
-        ))
+            """.trimIndent(),
+        )
+        val prepared = FinitePipeline.prepare(
+            FinitePipelineRequest(
+            program.problem,
+            FiniteEngine.BACKTRACK,
+            program.linearObjective(),
+            randomSeed = 3L,
+        )
+        )
         val base = assertNotNull(program.searchHints).toSearchHints().toBacktrackParams(
             prepared.problem.numBoolVars, prepared.problem.numIntVars)
         val params = base.copy(integerRowLearning = true, pbLearning = false,
@@ -183,10 +189,16 @@ class IntegerConflictLearnerTest {
                 int_search([z],input_order,indomain_min,complete),
                 int_search([x,y],input_order,indomain_max,complete)
             ]) satisfy;
-        """.trimIndent())
-        val prepared = FinitePipeline.prepare(FinitePipelineRequest(
-            program.problem, FiniteEngine.BACKTRACK, solutionSetSensitive = true, randomSeed = 3L,
-        ))
+            """.trimIndent(),
+        )
+        val prepared = FinitePipeline.prepare(
+            FinitePipelineRequest(
+            program.problem,
+            FiniteEngine.BACKTRACK,
+            solutionSetSensitive = true,
+            randomSeed = 3L,
+        )
+        )
         var native: PropagationSession? = null
         val trace = ArithmeticLearningTrace(1024, 65536)
         val uses = mutableMapOf<Pair<LearnedIntegerPropagator, Int>, MutableSet<Long>>()
@@ -328,10 +340,24 @@ class IntegerConflictLearnerTest {
             val cp = CpSearchComponent(native, intArrayOf(4, 7, 9))
             val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
             assertIs<ComponentResult.Consistent>(shared.initialize())
-            assertIs<ComponentResult.Consistent>(shared.push(if (sign > 0)
-                SearchDecision.IntAtMost(9, 7) else SearchDecision.IntAtLeast(9, -7)))
-            assertIs<ComponentResult.Conflict>(shared.push(if (sign > 0)
-                SearchDecision.IntAtLeast(4, 2) else SearchDecision.IntAtMost(4, -2)))
+            assertIs<ComponentResult.Consistent>(
+                shared.push(
+                if (sign > 0) {
+                    SearchDecision.IntAtMost(9, 7)
+                } else {
+                    SearchDecision.IntAtLeast(9, -7)
+                },
+            )
+            )
+            assertIs<ComponentResult.Conflict>(
+                shared.push(
+                if (sign > 0) {
+                    SearchDecision.IntAtLeast(4, 2)
+                } else {
+                    SearchDecision.IntAtMost(4, -2)
+                },
+            )
+            )
             val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
             assertEquals(4L * sign, learned.row.coefficient(0))
             assertEquals(-sign.toLong(), learned.row.coefficient(2))
@@ -344,10 +370,19 @@ class IntegerConflictLearnerTest {
             for (upper in listOf(11L, 15L, 23L)) {
                 shared.popTo(0)
                 assertFalse(2L * sign in native.intDomain(1))
-                assertIs<ComponentResult.Consistent>(shared.push(if (sign > 0)
-                    SearchDecision.IntAtMost(9, upper) else SearchDecision.IntAtLeast(9, -upper)))
-                assertEquals(sign * (upper / 4),
-                    if (sign > 0) native.intDomain(0).max else native.intDomain(0).min)
+                assertIs<ComponentResult.Consistent>(
+                    shared.push(
+                    if (sign > 0) {
+                        SearchDecision.IntAtMost(9, upper)
+                    } else {
+                        SearchDecision.IntAtLeast(9, -upper)
+                    },
+                )
+                )
+                assertEquals(
+                    sign * (upper / 4),
+                    if (sign > 0) native.intDomain(0).max else native.intDomain(0).min,
+                )
                 val state = native.explanationState
                 val reason = if (sign > 0) state.intMaxReason[0] else state.intMinReason[0]
                 assertIs<LearnedIntegerPropagator>(state.factorAt(reason))
@@ -456,7 +491,7 @@ class IntegerConflictLearnerTest {
         state.runToFixpoint(allFactors = true)
         assertTrue(state.setIntMinAsDecision(0, 2))
         assertNotNull(state.runToFixpoint(allFactors = false))
-        state.finiteWork.cancellation = Cancellation { true }
+        state.finiteWork.cancellation = ExecutionControl { true }
 
         val result = state.conflictAnalyzer.analyze(1)
 
@@ -518,10 +553,24 @@ class IntegerConflictLearnerTest {
                 val cp = CpSearchComponent(native, intArrayOf(4, 7, 9))
                 val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
                 assertIs<ComponentResult.Consistent>(shared.initialize())
-                assertIs<ComponentResult.Consistent>(shared.push(if (sign > 0)
-                    SearchDecision.IntAtMost(9, 7) else SearchDecision.IntAtLeast(9, -7)))
-                assertIs<ComponentResult.Conflict>(shared.push(if (sign > 0)
-                    SearchDecision.IntAtLeast(4, 2) else SearchDecision.IntAtMost(4, -2)))
+                assertIs<ComponentResult.Consistent>(
+                    shared.push(
+                    if (sign > 0) {
+                        SearchDecision.IntAtMost(9, 7)
+                    } else {
+                        SearchDecision.IntAtLeast(9, -7)
+                    },
+                )
+                )
+                assertIs<ComponentResult.Conflict>(
+                    shared.push(
+                    if (sign > 0) {
+                        SearchDecision.IntAtLeast(4, 2)
+                    } else {
+                        SearchDecision.IntAtMost(4, -2)
+                    },
+                )
+                )
                 val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(
                     cp.lastConflict?.learnedClause,
                 )
@@ -537,12 +586,24 @@ class IntegerConflictLearnerTest {
                 assertFalse(native.learnedConstraintSatisfied(learned))
                 for (upper in listOf(11L, 15L, 23L)) {
                     shared.popTo(0)
-                    assertIs<ComponentResult.Consistent>(shared.push(if (sign > 0)
-                        SearchDecision.IntAtMost(9, upper) else SearchDecision.IntAtLeast(9, -upper)))
-                    assertEquals(if (sign > 0) upper / 4 else -(upper / 4),
-                        if (sign > 0) native.intDomain(0).max else native.intDomain(0).min)
-                    val reason = if (sign > 0) native.explanationState.intMaxReason[0]
-                        else native.explanationState.intMinReason[0]
+                    assertIs<ComponentResult.Consistent>(
+                        shared.push(
+                        if (sign > 0) {
+                            SearchDecision.IntAtMost(9, upper)
+                        } else {
+                            SearchDecision.IntAtLeast(9, -upper)
+                        },
+                    )
+                    )
+                    assertEquals(
+                        if (sign > 0) upper / 4 else -(upper / 4),
+                        if (sign > 0) native.intDomain(0).max else native.intDomain(0).min,
+                    )
+                    val reason = if (sign > 0) {
+                        native.explanationState.intMaxReason[0]
+                    } else {
+                        native.explanationState.intMinReason[0]
+                    }
                     assertIs<LearnedIntegerPropagator>(native.explanationState.factorAt(reason))
                 }
             }

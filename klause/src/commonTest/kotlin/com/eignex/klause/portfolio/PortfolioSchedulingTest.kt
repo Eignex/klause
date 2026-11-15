@@ -7,14 +7,14 @@ import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.ownSearch
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.solver.ownSearch
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.random.Random
@@ -44,9 +44,13 @@ class PortfolioSchedulingTest {
                 if (arm == 2) sampleWork[arm] += if (sampleWork[arm] == 0L) 2L else 3L
                 if (arm == 3) targetStart = listOf(sampleWork[1], sampleWork[2])
             }
-            val observed = if (arm in 1..2) object : ResumableSearch by search {
+            val observed = if (arm in 1..2) {
+                object : ResumableSearch by search {
                 override val work: Long get() = sampleWork[arm]
-            } else search
+            }
+            } else {
+                search
+            }
             trackingWorker("worker$arm", arm, observed).also {
                 if (arm > 0) it.family = if (arm == 3) ArmFamily.Lns else ArmFamily.LocalSearch
                 if (arm == 3) it.improvementOnly = true
@@ -58,7 +62,7 @@ class PortfolioSchedulingTest {
             it.runTimeSource = clock
             it.initialHeuristicArms = setOf(1, 2)
             it.initialHeuristicTargets = setOf(3)
-        }.use { it.minimize(Cancellation { targetStart != null || visits.size >= 128 }) }
+        }.use { it.minimize(ExecutionControl { targetStart != null || visits.size >= 128 }) }
 
         assertEquals(listOf(3L, 5L), targetStart)
         val completed = assertNotNull(result.stats.portfolio.heuristicStarts.single().completionNanos)
@@ -76,9 +80,13 @@ class PortfolioSchedulingTest {
                 clock += 100.milliseconds
                 if (arm in 2..3) sampleWork[arm]++
             }
-            val observed = if (arm in 2..3) object : ResumableSearch by search {
+            val observed = if (arm in 2..3) {
+                object : ResumableSearch by search {
                 override val work: Long get() = sampleWork[arm]
-            } else search
+            }
+            } else {
+                search
+            }
             trackingWorker("worker$arm", arm, observed).also {
                 if (arm >= 2) it.family = if (arm == 4) ArmFamily.Lns else ArmFamily.LocalSearch
                 if (arm == 4) it.improvementOnly = true
@@ -89,7 +97,7 @@ class PortfolioSchedulingTest {
             it.runTimeSource = clock
             it.initialHeuristicArms = setOf(2, 3)
             it.initialHeuristicTargets = setOf(4)
-        }.use { it.minimize(Cancellation { elapsed.sum() >= 8_000L }) }
+        }.use { it.minimize(ExecutionControl { elapsed.sum() >= 8_000L }) }
 
         val owed = (elapsed.sum() - 300L) / 4
         for (arm in 0..1) assertTrue(elapsed[arm] >= owed - 100L)
@@ -122,7 +130,7 @@ class PortfolioSchedulingTest {
             reseedStaleThreshold = 0).also {
             it.initialHeuristicArms = setOf(1)
             it.initialHeuristicTargets = setOf(2)
-        }.use { it.minimize(Cancellation { targetSlices > 0 || slices >= 128 }) }
+        }.use { it.minimize(ExecutionControl { targetSlices > 0 || slices >= 128 }) }
 
         assertEquals(1, targetSlices)
         assertFalse(result.stats.portfolio.heuristicStarts.single().completed)
@@ -141,9 +149,13 @@ class PortfolioSchedulingTest {
                 if (arm == 2) leaderWork += 2L
                 if (arm == 3) lnsStartWork = leaderWork
             }
-            val observed = if (arm == 2) object : ResumableSearch by search {
+            val observed = if (arm == 2) {
+                object : ResumableSearch by search {
                 override val work: Long get() = leaderWork
-            } else search
+            }
+            } else {
+                search
+            }
             trackingWorker("worker$arm", arm, observed).also {
                 if (arm >= 2) it.family = if (arm == 3) ArmFamily.Lns else ArmFamily.LocalSearch
                 if (arm == 3) it.improvementOnly = true
@@ -154,7 +166,7 @@ class PortfolioSchedulingTest {
             sliceGrowth = 1.0, reseedStaleThreshold = 0).also {
             it.runTimeSource = clock
             it.initialHeuristicArms = setOf(2, 3, 4)
-        }.use { it.minimize(Cancellation { lnsStartWork != null || visits.size >= 128 }) }
+        }.use { it.minimize(ExecutionControl { lnsStartWork != null || visits.size >= 128 }) }
 
         assertEquals(6L, lnsStartWork)
         assertTrue(result.stats.portfolio.heuristicStarts.single().completed)
@@ -172,9 +184,13 @@ class PortfolioSchedulingTest {
                 clock += 100.milliseconds
                 if (arm == 2) leaderWork++
             }
-            val observed = if (arm == 2) object : ResumableSearch by search {
+            val observed = if (arm == 2) {
+                object : ResumableSearch by search {
                 override val work: Long get() = leaderWork
-            } else search
+            }
+            } else {
+                search
+            }
             trackingWorker("worker$arm", arm, observed).also {
                 if (arm >= 2) it.family = if (arm == 3) ArmFamily.Lns else ArmFamily.LocalSearch
                 if (arm == 3) it.improvementOnly = true
@@ -184,7 +200,7 @@ class PortfolioSchedulingTest {
         val result = Portfolio(workers, fixedBandit(5, 2), reseedStaleThreshold = 0).also {
             it.runTimeSource = clock
             it.initialHeuristicArms = setOf(2, 3, 4)
-        }.use { it.minimize(Cancellation { elapsed.sum() >= 8_000L }) }
+        }.use { it.minimize(ExecutionControl { elapsed.sum() >= 8_000L }) }
 
         val owed = (elapsed.sum() - 300L) / 4
         for (arm in 0..1) assertTrue(elapsed[arm] >= owed - 100L)
@@ -241,7 +257,7 @@ class PortfolioSchedulingTest {
             sliceGrowth = 1.0, reseedStaleThreshold = 0).also {
             it.runTimeSource = clock
             it.initialHeuristicArms = setOf(1, 2)
-        }.use { it.minimize(Cancellation { siblingStartWork != null || totalSlices >= 128 }) }
+        }.use { it.minimize(ExecutionControl { siblingStartWork != null || totalSlices >= 128 }) }
 
         val sample = result.stats.portfolio.heuristicStarts.single()
         assertEquals(5L, siblingStartWork)
@@ -268,9 +284,13 @@ class PortfolioSchedulingTest {
             override val work: Long get() = leaderWork
         }
         val workers = List(4) { arm ->
-            val search = if (arm == 2) leader else ScriptedSearch({ false }) {
+            val search = if (arm == 2) {
+                leader
+            } else {
+                ScriptedSearch({ false }) {
                 visits += arm
                 if (arm == 3) siblingStartWork = leaderWork
+            }
             }
             trackingWorker("worker$arm", arm, search).also { if (arm >= 2) it.family = ArmFamily.LocalSearch }
         }
@@ -278,7 +298,7 @@ class PortfolioSchedulingTest {
         Portfolio(workers, fixedBandit(4, 2), baseSliceWork = 5L, maxSliceWork = 5L,
             sliceGrowth = 1.0, reseedStaleThreshold = 0).also {
             it.initialHeuristicArms = setOf(2, 3)
-        }.use { it.minimize(Cancellation { siblingStartWork != null || visits.size >= 128 }) }
+        }.use { it.minimize(ExecutionControl { siblingStartWork != null || visits.size >= 128 }) }
 
         assertEquals(5L, siblingStartWork)
         assertEquals(3, leaderSlices)
@@ -300,7 +320,7 @@ class PortfolioSchedulingTest {
         val result = Portfolio(workers, fixedBandit(2, 0), baseSliceWork = 5L, maxSliceWork = 5L,
             reseedStaleThreshold = 0).also {
             it.initialHeuristicArms = setOf(0, 1)
-        }.use { it.minimize(Cancellation { leaderWork >= 2L }) }
+        }.use { it.minimize(ExecutionControl { leaderWork >= 2L }) }
 
         val sample = result.stats.portfolio.heuristicStarts.single()
         assertFalse(sample.completed)
@@ -340,7 +360,7 @@ class PortfolioSchedulingTest {
         val result = Portfolio(workers, fixedBandit(3, 1), baseSliceWork = 5L, maxSliceWork = 5L,
             reseedStaleThreshold = 0).also {
             it.initialHeuristicArms = setOf(0, 1, 2)
-        }.use { it.minimize(Cancellation { thirdStartWork != null || slices >= 128 }) }
+        }.use { it.minimize(ExecutionControl { thirdStartWork != null || slices >= 128 }) }
 
         val sample = result.stats.portfolio.heuristicStarts.single()
         assertEquals(6L, thirdStartWork)
@@ -359,9 +379,13 @@ class PortfolioSchedulingTest {
                 clock += 100.milliseconds
                 if (arm == 2) leaderWork++
             }
-            val observed = if (arm == 2) object : ResumableSearch by search {
+            val observed = if (arm == 2) {
+                object : ResumableSearch by search {
                 override val work: Long get() = leaderWork
-            } else search
+            }
+            } else {
+                search
+            }
             trackingWorker("worker$arm", arm, observed).also { if (arm >= 2) it.family = ArmFamily.LocalSearch }
         }
 
@@ -369,7 +393,7 @@ class PortfolioSchedulingTest {
             reseedStaleThreshold = 0).also {
             it.runTimeSource = clock
             it.initialHeuristicArms = setOf(2, 3)
-        }.use { it.minimize(Cancellation { elapsed.sum() >= 8_000L }) }
+        }.use { it.minimize(ExecutionControl { elapsed.sum() >= 8_000L }) }
 
         val owed = (elapsed.sum() - 300L) / 4
         for (arm in 0..1) assertTrue(elapsed[arm] >= owed - 100L)
@@ -391,7 +415,7 @@ class PortfolioSchedulingTest {
             )
 
             val result = Portfolio.thompson(workers).use {
-                it.minimize(Cancellation { siblingSlices >= 3 })
+                it.minimize(ExecutionControl { siblingSlices >= 3 })
             }
 
             assertIs<MinimizeResult.BestFound>(result)
@@ -425,7 +449,7 @@ class PortfolioSchedulingTest {
                 trackingWorker("sibling2", 2, TrackingResumableSearch(null, onRun = { order += 2 })),
             )
 
-            Portfolio.thompson(workers).use { it.minimize(Cancellation { order.size >= 4 }) }
+            Portfolio.thompson(workers).use { it.minimize(ExecutionControl { order.size >= 4 }) }
 
             assertEquals(listOf(0, 1, 2, 0), order)
         }
@@ -441,7 +465,7 @@ class PortfolioSchedulingTest {
             val handle = object : IncumbentBootstrapSearch, ResumableSearch by tracked {
                 override val bootstrapPending: Boolean get() = slices < bootstrapSlices
                 override fun runSlice(
-                    global: Cancellation,
+                    global: ExecutionControl,
                     sliceMillis: Long,
                     sliceNodes: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -476,7 +500,7 @@ class PortfolioSchedulingTest {
             }
             val bandit = fixedBandit(workers.size, arm = 0)
 
-            val result = Portfolio(workers, bandit).use { it.minimize(Cancellation { order.size >= 4 }) }
+            val result = Portfolio(workers, bandit).use { it.minimize(ExecutionControl { order.size >= 4 }) }
 
             assertEquals(listOf(0, 1, 2, if (bootstrapSlices == 2) 0 else 1), order)
             assertEquals(bootstrapSlices == 2, result is MinimizeResult.BestFound)
@@ -500,7 +524,7 @@ class PortfolioSchedulingTest {
             }
         }
 
-        Portfolio.thompson(workers).use { it.minimize(Cancellation { order.size >= 9 }) }
+        Portfolio.thompson(workers).use { it.minimize(ExecutionControl { order.size >= 9 }) }
 
         assertEquals(listOf(0, 1, 2, 0, 1, 2, 0, 1, 2), order)
     }
@@ -522,7 +546,7 @@ class PortfolioSchedulingTest {
                 .also { it.restartingSearch = true }
 
             val result = Portfolio.thompson(listOf(worker), reseedStaleThreshold = threshold).use {
-                it.minimize(Cancellation { slices >= 6 })
+                it.minimize(ExecutionControl { slices >= 6 })
             }
 
             assertEquals(998.0, assertIs<MinimizeResult.BestFound>(result).objectiveValue)
@@ -546,7 +570,7 @@ class PortfolioSchedulingTest {
         val result = Portfolio(workers, bandit).also {
             it.runTimeSource = TestTimeSource()
         }.use {
-            it.minimize(Cancellation { slices.sum() >= 8 })
+            it.minimize(ExecutionControl { slices.sum() >= 8 })
         }
 
         assertEquals(998.0, assertIs<MinimizeResult.BestFound>(result).objectiveValue)
@@ -567,7 +591,7 @@ class PortfolioSchedulingTest {
         )
 
         val result = Portfolio.thompson(workers, minShares = doubleArrayOf(0.0, 1.0)).use {
-            it.minimize(Cancellation { slices.sum() >= 8 })
+            it.minimize(ExecutionControl { slices.sum() >= 8 })
         }
 
         assertEquals(999.0, assertIs<MinimizeResult.BestFound>(result).objectiveValue)
@@ -585,7 +609,7 @@ class PortfolioSchedulingTest {
             ) { _, _, _, _ -> error("the retained handle must resume") }
 
             val result = Portfolio.thompson(listOf(worker), reseedStaleThreshold = threshold).use {
-                it.minimize(Cancellation { slices >= 10 })
+                it.minimize(ExecutionControl { slices >= 10 })
             }
 
             assertEquals(998.0, assertIs<MinimizeResult.BestFound>(result).objectiveValue)
@@ -603,7 +627,7 @@ class PortfolioSchedulingTest {
             ) { _, _, _, _ -> error("the retained handle must resume") }
 
             val result = Portfolio.thompson(listOf(worker), reseedStaleThreshold = threshold).use {
-                it.minimize(Cancellation { slices >= 13 })
+                it.minimize(ExecutionControl { slices >= 13 })
             }
 
             assertEquals(0L, result.stats.portfolio.arms.single().reseeds)
@@ -633,7 +657,7 @@ class PortfolioSchedulingTest {
         var polls = 0
 
         Portfolio.thompson(workers).also { it.runTimeSource = TestTimeSource() }.use {
-            it.minimize(Cancellation { ++polls > 1_000 })
+            it.minimize(ExecutionControl { ++polls > 1_000 })
         }
 
         val share = slices.drop(1).sum().toDouble() / slices.sum()
@@ -654,7 +678,7 @@ class PortfolioSchedulingTest {
         }
 
         Portfolio.thompson(workers).also { it.runTimeSource = clock }
-            .use { it.minimize(Cancellation { slices.sum() >= 2_000 }) }
+            .use { it.minimize(ExecutionControl { slices.sum() >= 2_000 }) }
 
         assertEquals(2_000, slices.sum())
         assertTrue(slices[0] > slices.sum() / 2, "backtrack ran ${slices[0]} of ${slices.sum()} slices")
@@ -670,7 +694,7 @@ class PortfolioSchedulingTest {
         val bandit = fixedBandit(2, arm = 0)
 
         val result = Portfolio(workers, bandit).use {
-            it.minimize(Cancellation { slices.sum() >= 8 })
+            it.minimize(ExecutionControl { slices.sum() >= 8 })
         }
 
         assertEquals(999.0, assertIs<MinimizeResult.WithSample>(result).objectiveValue)
@@ -702,7 +726,7 @@ class PortfolioSchedulingTest {
         )
 
         val result = Portfolio.thompson(workers, seed = 3L).use {
-            it.minimize(Cancellation { slices.sum() >= 200 })
+            it.minimize(ExecutionControl { slices.sum() >= 200 })
         }
 
         assertIs<MinimizeResult.Unknown>(result)
@@ -748,7 +772,7 @@ class PortfolioSchedulingTest {
             }
 
             Portfolio(workers, bandit).also { it.runTimeSource = TestTimeSource() }.use {
-                it.minimize(Cancellation { visits.size >= 200 })
+                it.minimize(ExecutionControl { visits.size >= 200 })
             }
             visits
         }
@@ -794,7 +818,7 @@ class PortfolioSchedulingTest {
         }
 
         val result = Portfolio.thompson(workers, seed = 3L).also { it.runTimeSource = clock }.use {
-            it.minimize(Cancellation { elapsed.sum() >= 6_000L })
+            it.minimize(ExecutionControl { elapsed.sum() >= 6_000L })
         }
 
         assertIs<MinimizeResult.Unknown>(result)
@@ -834,7 +858,7 @@ class PortfolioSchedulingTest {
         )
 
         Portfolio.thompson(workers, seed = 3L).also { it.runTimeSource = clock }.use {
-            it.minimize(Cancellation { elapsed.sum() >= 6_000L })
+            it.minimize(ExecutionControl { elapsed.sum() >= 6_000L })
         }
 
         assertEquals(250L, elapsed[0])
@@ -861,7 +885,7 @@ class PortfolioSchedulingTest {
         )
 
         val result = Portfolio.thompson(workers, seed = 3L).also { it.runTimeSource = clock }.use {
-            it.minimize(Cancellation { elapsed.sum() >= 6_000L })
+            it.minimize(ExecutionControl { elapsed.sum() >= 6_000L })
         }
 
         assertIs<MinimizeResult.Unknown>(result)
@@ -899,7 +923,7 @@ class PortfolioSchedulingTest {
             null
         }).also { it.runTimeSource = clock }
 
-        val result = portfolio.use { it.minimize(Cancellation { elapsed.sum() >= 6_000L }) }
+        val result = portfolio.use { it.minimize(ExecutionControl { elapsed.sum() >= 6_000L }) }
 
         assertIs<MinimizeResult.BestFound>(result)
         assertTrue(checks > 0)
@@ -915,7 +939,7 @@ class PortfolioSchedulingTest {
         var polls = 0
 
         Portfolio.thompson(workers, seed = 3L).also { it.runTimeSource = TestTimeSource() }.use {
-            it.minimize(Cancellation { ++polls > 100 })
+            it.minimize(ExecutionControl { ++polls > 100 })
         }
 
         assertTrue(slices[1] > 3 * slices[0], "finder ${slices[0]} slices, improver ${slices[1]}")
@@ -930,7 +954,7 @@ class PortfolioSchedulingTest {
                 .also { it.improvementOnly = true },
         )
 
-        val result = Portfolio.thompson(workers).use { it.minimize(Cancellation { slices.sum() >= 4 }) }
+        val result = Portfolio.thompson(workers).use { it.minimize(ExecutionControl { slices.sum() >= 4 }) }
 
         assertIs<MinimizeResult.Unknown>(result)
         assertEquals(listOf(4, 0), slices.toList())
@@ -946,7 +970,7 @@ class PortfolioSchedulingTest {
         )
 
         val result = Portfolio.thompson(workers, baseSliceWork = 7L).use {
-            it.minimize(Cancellation { slices[1] >= 1 })
+            it.minimize(ExecutionControl { slices[1] >= 1 })
         }
 
         assertEquals(499.0, assertIs<MinimizeResult.WithSample>(result).objectiveValue)
@@ -980,7 +1004,7 @@ class PortfolioSchedulingTest {
                 }.also { if (arm > 0) it.family = ArmFamily.LocalSearch }
             }
 
-            Portfolio.thompson(workers, seed = 3L).use { it.solve(Cancellation { slices.sum() >= 1_000 }) }
+            Portfolio.thompson(workers, seed = 3L).use { it.solve(ExecutionControl { slices.sum() >= 1_000 }) }
 
             val localShare = slices.drop(1).sum().toDouble() / slices.sum()
             assertTrue(localShare < 0.35, "$locals local search arms took $localShare of the segments")
@@ -1001,7 +1025,7 @@ class PortfolioSchedulingTest {
                 }
             }
 
-            Portfolio.thompson(workers, seed = 3L).use { it.solve(Cancellation { chosen.size >= 100 }) }
+            Portfolio.thompson(workers, seed = 3L).use { it.solve(ExecutionControl { chosen.size >= 100 }) }
             chosen
         }
 
@@ -1030,7 +1054,7 @@ class PortfolioSchedulingTest {
         var polls = 0
 
         Portfolio.thompson(workers).also { it.runTimeSource = TestTimeSource() }.use {
-            it.minimize(Cancellation { ++polls > 300 })
+            it.minimize(ExecutionControl { ++polls > 300 })
         }
 
         assertTrue(slices[1] > 3 * slices[2], "raiser ${slices[1]} slices, idle ${slices[2]}")
@@ -1055,7 +1079,7 @@ class PortfolioSchedulingTest {
         var polls = 0
 
         Portfolio.thompson(workers).also { it.runTimeSource = TestTimeSource() }.use {
-            it.minimize(Cancellation { ++polls > 300 })
+            it.minimize(ExecutionControl { ++polls > 300 })
         }
 
         assertTrue(slices[1] > 3 * slices[2], "sharer ${slices[1]} slices, idle ${slices[2]}")
@@ -1067,7 +1091,7 @@ class PortfolioSchedulingTest {
         val fallback = TimeSource.Monotonic.markNow() + 10.seconds
 
         endlessCountedPortfolio(reached, sliceMillis = 20L, minShares = doubleArrayOf(1.0, 0.0)).use {
-            it.minimize(Cancellation { reached.size >= 5 || fallback.hasPassedNow() })
+            it.minimize(ExecutionControl { reached.size >= 5 || fallback.hasPassedNow() })
         }
 
         assertEquals(listOf(0, 1, 0, 0, 0), reached)
@@ -1094,7 +1118,7 @@ class PortfolioSchedulingTest {
                 it.runTimeSource = clock
             }.use {
                 it.reserveBeforeIncumbentOnly = feasibilityOnly
-                it.minimize(Cancellation { reached.size >= 3 })
+                it.minimize(ExecutionControl { reached.size >= 3 })
             }
 
             assertEquals(listOf(0, 1, if (feasibilityOnly) 1 else 0), reached)
@@ -1116,7 +1140,7 @@ class PortfolioSchedulingTest {
                 it.runTimeSource = TestTimeSource()
             }.use {
                 it.incumbentProbeArms = setOf(1)
-                it.minimize(Cancellation { reached.size >= 15 })
+                it.minimize(ExecutionControl { reached.size >= 15 })
             }
 
             assertIs<MinimizeResult.BestFound>(result)
@@ -1139,7 +1163,7 @@ class PortfolioSchedulingTest {
 
         val result = Portfolio.thompson(workers, minShares = doubleArrayOf(0.0, 1.0)).use {
             it.incumbentProbeArms = setOf(1)
-            it.minimize(Cancellation { slices.sum() >= 5 })
+            it.minimize(ExecutionControl { slices.sum() >= 5 })
         }
 
         assertIs<MinimizeResult.BestFound>(result)

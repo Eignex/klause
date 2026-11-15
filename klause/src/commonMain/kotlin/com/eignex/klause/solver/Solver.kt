@@ -22,7 +22,7 @@ import com.eignex.klause.solver.result.SampleResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsatCore
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /**
  * Marker for backend-specific solver params. Each solver backend ships its own data class
@@ -48,11 +48,11 @@ interface SolverParams {
 
     /** Inject cancellation for one invocation, including resumable handle construction.
      *  Supporting backends retain any separately bound lifetime scope; others default to no-op. */
-    fun withCancellation(@Suppress("UNUSED_PARAMETER") cancellation: Cancellation): SolverParams = this
+    fun withCancellation(@Suppress("UNUSED_PARAMETER") cancellation: ExecutionControl): SolverParams = this
 
     /** Add cancellation that remains bound through every invocation and resumable slice.
      *  Supporting backends compose lifetime tokens; backends without cancellation default to no-op. */
-    fun withLifetimeCancellation(@Suppress("UNUSED_PARAMETER") cancellation: Cancellation): SolverParams = this
+    fun withLifetimeCancellation(@Suppress("UNUSED_PARAMETER") cancellation: ExecutionControl): SolverParams = this
 }
 
 /**

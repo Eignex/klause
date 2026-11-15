@@ -8,7 +8,7 @@ import com.eignex.klause.lp.relaxation.CutColumnLayout
 import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.layoutFor
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.OriginCounts
 import com.eignex.util.arrays.emptyDoubleArray
 import com.eignex.util.collections.MutableIntLongMap
@@ -25,7 +25,7 @@ internal class CutPool(
     val maxCuts: Int = DEFAULT_MAX_CUTS,
     private val maxConsecutiveInactive: Int = DEFAULT_MAX_CONSECUTIVE_INACTIVE,
     private val prepareSources: Boolean = false,
-    private val cancellation: Cancellation = Cancellation.Never,
+    private val cancellation: ExecutionControl = ExecutionControl.Never,
     private val onPreparationWork: (Long) -> Unit = {},
     private val observe: (CutFamily, String, String) -> Unit = { _, _, _ -> },
 ) {

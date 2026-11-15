@@ -2,7 +2,7 @@
 
 package com.eignex.klause.solver.incumbent
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -55,7 +55,7 @@ class IncumbentExchange<A, V>(
     /** Verify [assignment]/[objective] and install it when it strictly improves the standing incumbent. */
     fun offer(assignment: A, objective: V): Publication<A, V> = checkNotNull(offer(assignment, objective, null))
 
-    private fun offer(assignment: A, objective: V, cancellation: Cancellation?): Publication<A, V>? {
+    private fun offer(assignment: A, objective: V, cancellation: ExecutionControl?): Publication<A, V>? {
         val accepted = when (val verdict = verifier.verify(Candidate(assignment, objective))) {
             is Verification.Accepted -> verdict.candidate
             is Verification.Rejected -> return Publication.Rejected(verdict.reason)
@@ -72,12 +72,15 @@ class IncumbentExchange<A, V>(
 
     internal fun offerFromWorker(assignment: A, objective: V, measure: (() -> Unit) -> Unit) {
         val buffered = bufferedOffers
-        if (buffered == null) measure { offer(assignment, objective) }
-        else buffered.add(assignment, objective, measure)
+        if (buffered == null) {
+            measure { offer(assignment, objective) }
+        } else {
+            buffered.add(assignment, objective, measure)
+        }
     }
 
     internal fun <T> withBufferedOffers(
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         observe: (IncumbentOfferEvent) -> Unit,
         measure: (() -> Unit) -> Unit,
         action: () -> T,

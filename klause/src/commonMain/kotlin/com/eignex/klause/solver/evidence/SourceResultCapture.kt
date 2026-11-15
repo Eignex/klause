@@ -12,7 +12,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 
 /** Optional claim capture over independently supplied original-source verification data. */
@@ -49,7 +49,7 @@ class SourceResultCapture private constructor(
         producer: String,
         derivation: SourceDerivation? = null,
         boundDerivation: SourceDerivation? = null,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): QuadraticOptimizationResult {
         require(context.scope.objective?.sense == result.sense) {
             "quadratic capture requires the source objective direction"
@@ -57,7 +57,9 @@ class SourceResultCapture private constructor(
         if (cancellation() || result.capturedScopes().any { it != context.scope } ||
             result.capturedInvocations().any { !accepts(it) } ||
             result.capturedEvidencePackages().any { it.engineScope != context.scope }
-        ) return result
+        ) {
+            return result
+        }
         val expected = result::class
         val mappings = result.capturedEvidencePackages().flatMap { it.mappings }.distinct()
         val captured = SourceQuadraticResultCapture(context, producer, derivation, boundDerivation, mappings)
@@ -76,12 +78,19 @@ class SourceResultCapture private constructor(
             is SolveResult.Unsat -> SourceClaim.Refutation
             is SolveResult.Unknown -> return result
         }
-        val proof = derivation ?: if (claim is SourceClaim.Witness) SourceDerivation.SourceWitness
-            else SourceDerivation.Unavailable("complete traversal derivation not captured")
-        val payload = SourceResultEvidence(context.scope, listOf(SourceEvidence(context.scope, claim, proof)),
-            listOf(SourceEngineAttestation(producer, claim))).withMappings(
-                context.scope, result.evidence?.mappings.orEmpty(),
-            )
+        val proof = derivation ?: if (claim is SourceClaim.Witness) {
+            SourceDerivation.SourceWitness
+        } else {
+            SourceDerivation.Unavailable("complete traversal derivation not captured")
+        }
+        val payload = SourceResultEvidence(
+            context.scope,
+            listOf(SourceEvidence(context.scope, claim, proof)),
+            listOf(SourceEngineAttestation(producer, claim)),
+        ).withMappings(
+            context.scope,
+            result.evidence?.mappings.orEmpty(),
+        )
         return when (result) {
             is SolveResult.Sat -> result.copy(evidence = payload)
             is SolveResult.Unsat -> result.copy(evidence = payload)
@@ -95,12 +104,14 @@ class SourceResultCapture private constructor(
         objective: LinearObjective,
         producer: String,
         derivation: SourceDerivation? = null,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): MinimizeResult {
         require(context.scope.objective != null) { "objective result capture requires an objective scope" }
         if (cancellation() || result is MinimizeResult.Unknown ||
             result.evidence?.let { it.scope != context.scope || it.engineScope != context.scope } == true
-        ) return result
+        ) {
+            return result
+        }
         val sample = result.assignment
         val witness = sample?.let { SourceClaim.Witness(it) }
         val value = if (result is MinimizeResult.Optimal) {
@@ -111,15 +122,19 @@ class SourceResultCapture private constructor(
             } catch (_: PolynomialResourceLimit) {
                 return result
             }
-        } else null
+        } else {
+            null
+        }
         val claim: SourceClaim = when (result) {
             is MinimizeResult.Optimal -> SourceClaim.Optimal(result.sample, checkNotNull(value))
+
             is MinimizeResult.Infeasible -> SourceClaim.Refutation
             is MinimizeResult.Unbounded -> SourceClaim.Ray(result.sample,
                 result.direction.withIndex().associate { (id, step) ->
                     SourceCoordinate(SourceCoordinate.Kind.Real, id) to step
                 })
             is MinimizeResult.BestFound -> checkNotNull(witness)
+
             is MinimizeResult.Unknown -> return result
         }
         val proof = derivation ?: when (claim) {
@@ -146,15 +161,17 @@ class SourceResultCapture private constructor(
         }
     }
 
-    private fun exactValue(
-        objective: LinearObjective, sample: Sample, cancellation: Cancellation,
-    ): SourceValue {
+    private fun exactValue(objective: LinearObjective, sample: Sample, cancellation: ExecutionControl): SourceValue {
         if (sample.algebraicReals == null) return SourceValue.Rational(objective.evaluateExact(sample))
         val arithmetic = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
         var value = arithmetic.rational(BigFraction.ofLong(objective.constant))
         for ((id, coefficient) in objective.boolWeights.withIndex()) {
-            if (sample.boolValue(id)) value = arithmetic.add(value,
-                arithmetic.rational(BigFraction.ofLong(coefficient)))
+            if (sample.boolValue(id)) {
+                value = arithmetic.add(
+                value,
+                arithmetic.rational(BigFraction.ofLong(coefficient)),
+            )
+            }
         }
         for ((id, coefficient) in objective.intCoefficients.withIndex()) {
             value = arithmetic.add(value, arithmetic.rational(
@@ -180,6 +197,9 @@ private class OriginalSourceBinding(
 
     fun matches(invocation: QuadraticEngineInvocation): Boolean =
         (invocation.source as? QuadraticEngineSource.ExactIr)?.problem === source &&
-            if (affine != null) invocation.affineObjective === affine
-            else objective != null && invocation.objective === objective
+            if (affine != null) {
+                invocation.affineObjective === affine
+            } else {
+                objective != null && invocation.objective === objective
+            }
 }

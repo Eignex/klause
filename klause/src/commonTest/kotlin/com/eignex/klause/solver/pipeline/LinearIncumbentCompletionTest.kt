@@ -17,7 +17,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceSemanticsChecker
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.shl
 import kotlin.test.Test
@@ -30,43 +30,80 @@ import kotlin.test.assertTrue
 class LinearIncumbentCompletionTest {
     private val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
     private val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-    private val scope = SourceScope(SourceRevision("incumbent", "exact"),
-        objective = SourceObjective("cost", ObjectiveSense.MINIMIZE))
+    private val scope = SourceScope(
+        SourceRevision("incumbent", "exact"),
+        objective = SourceObjective("cost", ObjectiveSense.MINIMIZE),
+    )
     private val third = BigFraction.ofLong(3).reciprocal()
-    private val source = SourceProofContext(scope, setOf(integer, real), mapOf(
-        "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ofLong(3),
-            integer to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-        "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ofLong(-3),
-            integer to BigFraction.ONE), BigFraction.ZERO)),
-    ), mapOf(real to BigFraction.ONE), objectiveConstant = BigFraction.ONE)
+    private val source = SourceProofContext(
+        scope,
+        setOf(integer, real),
+        mapOf(
+            "upper" to SourcePremise(
+                SourceInequality(
+                    mapOf(
+                        real to BigFraction.ofLong(3),
+                        integer to BigFraction.MINUS_ONE,
+                    ),
+                    BigFraction.ZERO,
+                ),
+            ),
+            "lower" to SourcePremise(
+                SourceInequality(
+                    mapOf(
+                        real to BigFraction.ofLong(-3),
+                        integer to BigFraction.ONE,
+                    ),
+                    BigFraction.ZERO,
+                ),
+            ),
+        ),
+        mapOf(real to BigFraction.ONE),
+        objectiveConstant = BigFraction.ONE,
+    )
     private val seed = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(0.333))
 
     @Test
     fun `residual completion should optimize disconnected real components in the source direction`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val premises = mapOf(
-            "first-lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
-                BigFraction.MINUS_ONE)),
+            "first-lower" to SourcePremise(
+                SourceInequality(
+                    mapOf(real to BigFraction.MINUS_ONE),
+                    BigFraction.MINUS_ONE,
+                ),
+            ),
             "first-upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(3))),
-            "second-lower" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE),
-                BigFraction.ofLong(-4))),
+            "second-lower" to SourcePremise(
+                SourceInequality(
+                    mapOf(other to BigFraction.MINUS_ONE),
+                    BigFraction.ofLong(-4),
+                ),
+            ),
             "second-upper" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ONE), BigFraction.ofLong(6))),
         )
 
         for (sense in listOf(ObjectiveSense.MINIMIZE, ObjectiveSense.MAXIMIZE)) {
-            val context = SourceProofContext(scope.copy(objective = SourceObjective("cost", sense)),
-                setOf(integer, real, other), premises,
-                mapOf(real to BigFraction.ONE, other to BigFraction.MINUS_ONE), objectiveConstant = BigFraction.ONE)
+            val context = SourceProofContext(
+                scope.copy(objective = SourceObjective("cost", sense)),
+                setOf(integer, real, other),
+                premises,
+                mapOf(real to BigFraction.ONE, other to BigFraction.MINUS_ONE),
+                objectiveConstant = BigFraction.ONE,
+            )
             val offered = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(0.0, 0.0))
             var checkedValue: BigFraction? = null
 
             val point = LinearIncumbentCompletion(SourceLpBudget(), originalCheck = { _, value, _ ->
                 checkedValue = value
                 true
-            }) { _, _ -> }.use { assertNotNull(it.complete(context, offered, Cancellation.Never)) }
+            }) { _, _ -> }.use { assertNotNull(it.complete(context, offered, ExecutionControl.Never)) }
 
-            val expected = if (sense == ObjectiveSense.MINIMIZE) listOf(BigFraction.ONE, BigFraction.ofLong(6))
-                else listOf(BigFraction.ofLong(3), BigFraction.ofLong(4))
+            val expected = if (sense == ObjectiveSense.MINIMIZE) {
+                listOf(BigFraction.ONE, BigFraction.ofLong(6))
+            } else {
+                listOf(BigFraction.ofLong(3), BigFraction.ofLong(4))
+            }
             assertEquals(expected, point.exactReals)
             assertEquals(1L, point.intValue(0))
             assertEquals(BigFraction.ONE + expected[0] - expected[1], checkedValue)
@@ -77,15 +114,18 @@ class LinearIncumbentCompletionTest {
     fun `companions should reuse an original checked completion of the same full point`() {
         val shared = LinearIncumbentSharing()
         var checks = 0
-        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> checks++; true }
+        val originalCheck: (Sample, BigFraction, ExecutionControl) -> Boolean = { _, _, _ ->
+            checks++
+            true
+        }
         val producerBudget = SourceLpBudget(maxOperations = 0)
         val budget = SourceLpBudget(maxOperations = 0)
         val offered = seed.copy(reals = doubleArrayOf(third.toDouble()))
 
         LinearIncumbentCompletion(producerBudget, originalCheck, shared) { _, _ -> }.use { producer ->
-            assertNotNull(producer.complete(source, offered, Cancellation.Never))
+            assertNotNull(producer.complete(source, offered, ExecutionControl.Never))
             LinearIncumbentCompletion(budget, originalCheck, shared) { _, _ -> }.use { consumer ->
-                val point = assertNotNull(consumer.complete(source, offered.copy(), Cancellation.Never))
+                val point = assertNotNull(consumer.complete(source, offered.copy(), ExecutionControl.Never))
 
                 assertEquals(listOf(third), point.exactReals)
                 assertEquals(1, checks)
@@ -97,16 +137,16 @@ class LinearIncumbentCompletionTest {
     @Test
     fun `shared lookup and snapshots should spend consumer funding without charging the producer`() {
         val shared = LinearIncumbentSharing()
-        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> true }
+        val originalCheck: (Sample, BigFraction, ExecutionControl) -> Boolean = { _, _, _ -> true }
         val producerFunding = SourceLpFunding(2_000_000L, 64L * 1024L * 1024L).also { it.grant(2_000_000L) }
         val consumerFunding = SourceLpFunding(2_000_000L, 64L * 1024L * 1024L).also { it.grant(2_000_000L) }
 
         LinearIncumbentCompletion(SourceLpBudget(funding = producerFunding), originalCheck, shared) { _, _ -> }
             .use { producer ->
-                assertNotNull(producer.complete(source, seed, Cancellation.Never))
+                assertNotNull(producer.complete(source, seed, ExecutionControl.Never))
                 val spent = producerFunding.spent
                 LinearIncumbentCompletion(SourceLpBudget(funding = consumerFunding), originalCheck, shared) { _, _ -> }
-                    .use { consumer -> assertNotNull(consumer.complete(source, seed, Cancellation.Never)) }
+                    .use { consumer -> assertNotNull(consumer.complete(source, seed, ExecutionControl.Never)) }
 
                 assertTrue(consumerFunding.spent > 0L)
                 assertTrue(consumerFunding.allocated > 0L)
@@ -118,12 +158,15 @@ class LinearIncumbentCompletionTest {
     fun `shared completions should not cross a changed original checker`() {
         val shared = LinearIncumbentSharing()
         var rejectedChecks = 0
-        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> true }
+        val originalCheck: (Sample, BigFraction, ExecutionControl) -> Boolean = { _, _, _ -> true }
 
         LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { producer ->
-            assertNotNull(producer.complete(source, seed, Cancellation.Never))
-            LinearIncumbentCompletion(SourceLpBudget(), { _, _, _ -> rejectedChecks++; false }, shared) { _, _ -> }
-                .use { consumer -> assertNull(consumer.complete(source, seed, Cancellation.Never)) }
+            assertNotNull(producer.complete(source, seed, ExecutionControl.Never))
+            LinearIncumbentCompletion(SourceLpBudget(), { _, _, _ ->
+                rejectedChecks++
+                false
+            }, shared) { _, _ -> }
+                .use { consumer -> assertNull(consumer.complete(source, seed, ExecutionControl.Never)) }
         }
 
         assertEquals(1, rejectedChecks)
@@ -132,20 +175,30 @@ class LinearIncumbentCompletionTest {
     @Test
     fun `shared completions should not cross changed source restrictions or rows`() {
         val contexts = listOf(
-            SourceProofContext(scope.copy(condition = scope.condition.bound(integer, BigFraction.ZERO, true)),
-                source.coordinates, source.premises, source.objective, source.objectiveConstant),
-            SourceProofContext(scope, source.coordinates, source.premises +
-                ("restricted" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ZERO))),
-                source.objective, source.objectiveConstant),
+            SourceProofContext(
+                scope.copy(condition = scope.condition.bound(integer, BigFraction.ZERO, true)),
+                source.coordinates,
+                source.premises,
+                source.objective,
+                source.objectiveConstant,
+            ),
+            SourceProofContext(
+                scope,
+                source.coordinates,
+                source.premises +
+                    ("restricted" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ZERO))),
+                source.objective,
+                source.objectiveConstant,
+            ),
         )
-        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> true }
+        val originalCheck: (Sample, BigFraction, ExecutionControl) -> Boolean = { _, _, _ -> true }
         val shared = LinearIncumbentSharing()
 
         LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { producer ->
-            assertNotNull(producer.complete(source, seed, Cancellation.Never))
+            assertNotNull(producer.complete(source, seed, ExecutionControl.Never))
             for (context in contexts) {
                 LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { consumer ->
-                    assertNull(consumer.complete(context, seed, Cancellation.Never))
+                    assertNull(consumer.complete(context, seed, ExecutionControl.Never))
                 }
             }
         }
@@ -155,12 +208,15 @@ class LinearIncumbentCompletionTest {
     fun `shared completion should retain the offered coordinate frame identity`() {
         val shared = LinearIncumbentSharing()
         var checks = 0
-        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> checks++; true }
+        val originalCheck: (Sample, BigFraction, ExecutionControl) -> Boolean = { _, _, _ ->
+            checks++
+            true
+        }
 
         LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { producer ->
-            assertNotNull(producer.complete(source, seed.withCoordinateFrame(Any()), Cancellation.Never))
+            assertNotNull(producer.complete(source, seed.withCoordinateFrame(Any()), ExecutionControl.Never))
             LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { consumer ->
-                assertNotNull(consumer.complete(source, seed.withCoordinateFrame(Any()), Cancellation.Never))
+                assertNotNull(consumer.complete(source, seed.withCoordinateFrame(Any()), ExecutionControl.Never))
             }
         }
 
@@ -170,13 +226,13 @@ class LinearIncumbentCompletionTest {
     @Test
     fun `shared completion should not bypass an unfunded consumer snapshot`() {
         val shared = LinearIncumbentSharing()
-        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> true }
+        val originalCheck: (Sample, BigFraction, ExecutionControl) -> Boolean = { _, _, _ -> true }
         val funding = SourceLpFunding(2_000_000L, 100L).also { it.grant(2_000_000L) }
 
         LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { producer ->
-            assertNotNull(producer.complete(source, seed, Cancellation.Never))
+            assertNotNull(producer.complete(source, seed, ExecutionControl.Never))
             LinearIncumbentCompletion(SourceLpBudget(funding = funding), originalCheck, shared) { _, _ -> }
-                .use { consumer -> assertNull(consumer.complete(source, seed, Cancellation.Never)) }
+                .use { consumer -> assertNull(consumer.complete(source, seed, ExecutionControl.Never)) }
         }
 
         assertEquals(0L, funding.allocated)
@@ -185,14 +241,14 @@ class LinearIncumbentCompletionTest {
     @Test
     fun `shared completion should reserve its retained exact scalar payload`() {
         val shared = LinearIncumbentSharing()
-        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> true }
+        val originalCheck: (Sample, BigFraction, ExecutionControl) -> Boolean = { _, _, _ -> true }
         val funding = SourceLpFunding(2_000_000L, 672L).also { it.grant(2_000_000L) }
         val budget = SourceLpBudget(maxOperations = 0, funding = funding)
 
         LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { producer ->
-            assertNotNull(producer.complete(source, seed, Cancellation.Never))
+            assertNotNull(producer.complete(source, seed, ExecutionControl.Never))
             LinearIncumbentCompletion(budget, originalCheck, shared) { _, _ -> }.use { consumer ->
-                assertNull(consumer.complete(source, seed, Cancellation.Never))
+                assertNull(consumer.complete(source, seed, ExecutionControl.Never))
             }
         }
     }
@@ -200,16 +256,16 @@ class LinearIncumbentCompletionTest {
     @Test
     fun `a shared success should not renew an unchanged private failed attempt`() {
         val shared = LinearIncumbentSharing()
-        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> true }
+        val originalCheck: (Sample, BigFraction, ExecutionControl) -> Boolean = { _, _, _ -> true }
         val funding = SourceLpFunding(2_000_000L, 64L * 1024L * 1024L).also { it.grant(2_000_000L) }
         val budget = SourceLpBudget(maxOperations = 0, funding = funding)
 
         LinearIncumbentCompletion(budget, originalCheck, shared) { _, _ -> }.use { consumer ->
-            assertNull(consumer.complete(source, seed, Cancellation.Never))
+            assertNull(consumer.complete(source, seed, ExecutionControl.Never))
             LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { producer ->
-                assertNotNull(producer.complete(source, seed, Cancellation.Never))
+                assertNotNull(producer.complete(source, seed, ExecutionControl.Never))
 
-                assertNull(consumer.complete(source, seed.copy(), Cancellation.Never))
+                assertNull(consumer.complete(source, seed.copy(), ExecutionControl.Never))
             }
         }
     }
@@ -218,13 +274,16 @@ class LinearIncumbentCompletionTest {
     fun `closing a producer should release its shared completions`() {
         val shared = LinearIncumbentSharing()
         var checks = 0
-        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> checks++; true }
+        val originalCheck: (Sample, BigFraction, ExecutionControl) -> Boolean = { _, _, _ ->
+            checks++
+            true
+        }
 
         LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { producer ->
-            assertNotNull(producer.complete(source, seed, Cancellation.Never))
+            assertNotNull(producer.complete(source, seed, ExecutionControl.Never))
         }
         LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { consumer ->
-            assertNotNull(consumer.complete(source, seed, Cancellation.Never))
+            assertNotNull(consumer.complete(source, seed, ExecutionControl.Never))
         }
 
         assertEquals(2, checks)
@@ -234,20 +293,28 @@ class LinearIncumbentCompletionTest {
     fun `full shared retention should preserve older points without refusing fresh completion`() {
         val shared = LinearIncumbentSharing()
         var checks = 0
-        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> checks++; true }
+        val originalCheck: (Sample, BigFraction, ExecutionControl) -> Boolean = { _, _, _ ->
+            checks++
+            true
+        }
         val first = Sample(booleanArrayOf(), longArrayOf(3), doubleArrayOf(1.0))
         val producerBudget = SourceLpBudget(maxOperations = 0)
 
         LinearIncumbentCompletion(producerBudget, originalCheck, shared) { _, _ -> }.use { producer ->
             for (value in 1L..16L) {
                 val offered = Sample(booleanArrayOf(), longArrayOf(3 * value), doubleArrayOf(value.toDouble()))
-                assertNotNull(producer.complete(source, offered, Cancellation.Never))
+                assertNotNull(producer.complete(source, offered, ExecutionControl.Never))
             }
             LinearIncumbentCompletion(SourceLpBudget(maxOperations = 0), originalCheck, shared) { _, _ -> }
                 .use { consumer ->
-                    assertNotNull(consumer.complete(source,
-                        Sample(booleanArrayOf(), longArrayOf(51), doubleArrayOf(17.0)), Cancellation.Never))
-                    assertNotNull(consumer.complete(source, first, Cancellation.Never))
+                    assertNotNull(
+                        consumer.complete(
+                            source,
+                            Sample(booleanArrayOf(), longArrayOf(51), doubleArrayOf(17.0)),
+                            ExecutionControl.Never,
+                        ),
+                    )
+                    assertNotNull(consumer.complete(source, first, ExecutionControl.Never))
                 }
         }
 
@@ -265,7 +332,7 @@ class LinearIncumbentCompletionTest {
             originalChecks++
             value == BigFraction.ONE + third
         }) { _, _ -> }.use {
-            assertNotNull(it.complete(source, offered, Cancellation.Never))
+            assertNotNull(it.complete(source, offered, ExecutionControl.Never))
         }
 
         assertEquals(listOf(third), point.exactReals)
@@ -281,7 +348,7 @@ class LinearIncumbentCompletionTest {
             val offered = seed.copy(reals = doubleArrayOf(value))
 
             val point = LinearIncumbentCompletion(SourceLpBudget()) { _, _ -> }.use {
-                assertNotNull(it.complete(source, offered, Cancellation.Never))
+                assertNotNull(it.complete(source, offered, ExecutionControl.Never))
             }
 
             assertEquals(listOf(third), point.exactReals)
@@ -298,8 +365,8 @@ class LinearIncumbentCompletionTest {
                 originalChecks++
                 false
             }) { _, _ -> }.use {
-                assertNull(it.complete(source, offered, Cancellation.Never))
-                assertNull(it.complete(source, offered.copy(), Cancellation.Never))
+                assertNull(it.complete(source, offered, ExecutionControl.Never))
+                assertNull(it.complete(source, offered.copy(), ExecutionControl.Never))
             }
 
             assertEquals(1, originalChecks)
@@ -312,12 +379,12 @@ class LinearIncumbentCompletionTest {
         val budget = SourceLpBudget(funding = funding)
 
         val point = LinearIncumbentCompletion(budget) { _, _ -> }.use {
-            assertNotNull(it.complete(source, seed, Cancellation.Never))
+            assertNotNull(it.complete(source, seed, ExecutionControl.Never))
         }
 
         assertEquals(seed.intValue(0), point.intValue(0))
         assertEquals(listOf(third), point.exactReals)
-        assertEquals(BigFraction.ONE + third, source.linearValue(point, Cancellation.Never))
+        assertEquals(BigFraction.ONE + third, source.linearValue(point, ExecutionControl.Never))
         assertTrue(budget.measuredPreparationWork > 0L)
         assertTrue(budget.measuredRefinementWork > 0L)
         assertTrue(budget.measuredBoundCertificationWork > 0L)
@@ -330,7 +397,7 @@ class LinearIncumbentCompletionTest {
         val budget = SourceLpBudget(funding = SourceLpFunding(0L, 0L))
 
         LinearIncumbentCompletion(budget) { _, _ -> }.use {
-            assertSame(point, it.complete(source, point, Cancellation.Never))
+            assertSame(point, it.complete(source, point, ExecutionControl.Never))
         }
     }
 
@@ -345,7 +412,7 @@ class LinearIncumbentCompletionTest {
             if (stage == "Attempts") attempts += count
             if (stage == "SeedScalarLimit") declines += count
         }.use { completion ->
-            repeat(2) { assertNull(completion.complete(source, offered, Cancellation.Never)) }
+            repeat(2) { assertNull(completion.complete(source, offered, ExecutionControl.Never)) }
         }
 
         assertEquals(0L, attempts)
@@ -360,7 +427,7 @@ class LinearIncumbentCompletionTest {
         LinearIncumbentCompletion(SourceLpBudget(funding = funding)) { stage, count ->
             if (stage == "Attempts") attempts += count
         }.use { completion ->
-            repeat(2) { assertNull(completion.complete(source, seed, Cancellation.Never)) }
+            repeat(2) { assertNull(completion.complete(source, seed, ExecutionControl.Never)) }
         }
 
         assertEquals(0L, attempts)
@@ -369,8 +436,14 @@ class LinearIncumbentCompletionTest {
 
     @Test
     fun `failed completion should reuse copied points after an intervening source context`() {
-        val rows = mapOf("negative" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE),
-            BigFraction.ZERO)))
+        val rows = mapOf(
+            "negative" to SourcePremise(
+                SourceInequality(
+                    mapOf(integer to BigFraction.ONE),
+                    BigFraction.ZERO,
+                ),
+            ),
+        )
         val contexts = listOf(
             SourceProofContext(scope, setOf(integer, real), rows, source.objective),
             SourceProofContext(scope, setOf(integer, real), rows, source.objective, BigFraction.ONE),
@@ -378,7 +451,7 @@ class LinearIncumbentCompletionTest {
         val stages = mutableListOf<String>()
         LinearIncumbentCompletion(SourceLpBudget()) { stage, _ -> stages += stage }.use {
             for (context in contexts + contexts.first()) {
-                assertNull(it.complete(context, seed.copy(), Cancellation.Never))
+                assertNull(it.complete(context, seed.copy(), ExecutionControl.Never))
             }
         }
 
@@ -388,13 +461,19 @@ class LinearIncumbentCompletionTest {
 
     @Test
     fun `changed source rows should permit a previously refused discrete seed`() {
-        val restricted = SourceProofContext(scope, source.coordinates, mapOf(
-            "negative" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ZERO)),
-        ), source.objective, source.objectiveConstant)
+        val restricted = SourceProofContext(
+            scope,
+            source.coordinates,
+            mapOf(
+                "negative" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ZERO)),
+            ),
+            source.objective,
+            source.objectiveConstant,
+        )
 
         LinearIncumbentCompletion(SourceLpBudget()) { _, _ -> }.use {
-            assertNull(it.complete(restricted, seed, Cancellation.Never))
-            val point = assertNotNull(it.complete(source, seed, Cancellation.Never))
+            assertNull(it.complete(restricted, seed, ExecutionControl.Never))
+            val point = assertNotNull(it.complete(source, seed, ExecutionControl.Never))
 
             assertEquals(listOf(third), point.exactReals)
         }
@@ -403,33 +482,66 @@ class LinearIncumbentCompletionTest {
     @Test
     fun `failed completion identity should include source restrictions objective semantics and checker`() {
         val rejected = object : SourceSemanticsChecker {
-            override fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation) =
+            override fun witness(sample: Sample, scope: SourceScope, cancellation: ExecutionControl) =
                 SourceEvidenceCheck.Rejected("source domain hole")
-            override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation) =
+            override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: ExecutionControl) =
                 SourceEvidenceCheck.Unavailable("no ray")
         }
-        val rows = mapOf("negative" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE),
-            BigFraction.ZERO)))
+        val rows = mapOf(
+            "negative" to SourcePremise(
+                SourceInequality(
+                    mapOf(integer to BigFraction.ONE),
+                    BigFraction.ZERO,
+                ),
+            ),
+        )
         val contexts = listOf(
             SourceProofContext(scope, source.coordinates, rows, source.objective),
-            SourceProofContext(scope, source.coordinates, mapOf(
-                "negative" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.MINUS_ONE)),
-            ), source.objective),
-            SourceProofContext(scope.copy(revision = SourceRevision("other", "exact")), source.coordinates,
-                rows, source.objective),
-            SourceProofContext(scope.copy(condition = scope.condition.bound(integer, BigFraction.ZERO, true)),
-                source.coordinates, rows, source.objective),
-            SourceProofContext(scope.copy(objective = SourceObjective("other", ObjectiveSense.MAXIMIZE)),
-                source.coordinates, rows, source.objective),
+            SourceProofContext(
+                scope,
+                source.coordinates,
+                mapOf(
+                    "negative" to SourcePremise(
+                        SourceInequality(
+                            mapOf(integer to BigFraction.ONE),
+                            BigFraction.MINUS_ONE,
+                        ),
+                    ),
+                ),
+                source.objective,
+            ),
+            SourceProofContext(
+                scope.copy(revision = SourceRevision("other", "exact")),
+                source.coordinates,
+                rows,
+                source.objective,
+            ),
+            SourceProofContext(
+                scope.copy(condition = scope.condition.bound(integer, BigFraction.ZERO, true)),
+                source.coordinates,
+                rows,
+                source.objective,
+            ),
+            SourceProofContext(
+                scope.copy(objective = SourceObjective("other", ObjectiveSense.MAXIMIZE)),
+                source.coordinates,
+                rows,
+                source.objective,
+            ),
             SourceProofContext(scope, source.coordinates, rows, mapOf(real to BigFraction.MINUS_ONE)),
             SourceProofContext(scope, source.coordinates, rows, source.objective, BigFraction.ONE),
             SourceProofContext(scope, source.coordinates, rows, source.objective, semanticsChecker = rejected),
-            SourceProofContext(scope, source.coordinates, rows, source.objective,
-                semantics = SourceSemantics(SourceFormat.IR).resolve()),
+            SourceProofContext(
+                scope,
+                source.coordinates,
+                rows,
+                source.objective,
+                semantics = SourceSemantics(SourceFormat.IR).resolve(),
+            ),
         )
         var attempts = 0L
         LinearIncumbentCompletion(SourceLpBudget()) { stage, count -> if (stage == "Attempts") attempts += count }.use {
-            for (context in contexts + contexts) assertNull(it.complete(context, seed, Cancellation.Never))
+            for (context in contexts + contexts) assertNull(it.complete(context, seed, ExecutionControl.Never))
         }
 
         assertEquals(contexts.size.toLong(), attempts)
@@ -438,16 +550,27 @@ class LinearIncumbentCompletionTest {
     @Test
     fun `Boolean and integer seed pins should select their source guarded rows`() {
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
-        val guarded = SourceProofContext(scope, setOf(bool, integer, real), mapOf(
-            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), third),
-                mapOf(0 to true), mapOf(integer to BigFraction.ONE)),
-            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), third.negated()),
-                mapOf(0 to true), mapOf(integer to BigFraction.ONE)),
-        ), mapOf(real to BigFraction.ONE))
+        val guarded = SourceProofContext(
+            scope,
+            setOf(bool, integer, real),
+            mapOf(
+                "upper" to SourcePremise(
+                    SourceInequality(mapOf(real to BigFraction.ONE), third),
+                    mapOf(0 to true),
+                    mapOf(integer to BigFraction.ONE),
+                ),
+                "lower" to SourcePremise(
+                    SourceInequality(mapOf(real to BigFraction.MINUS_ONE), third.negated()),
+                    mapOf(0 to true),
+                    mapOf(integer to BigFraction.ONE),
+                ),
+            ),
+            mapOf(real to BigFraction.ONE),
+        )
         val offered = Sample(booleanArrayOf(true), longArrayOf(1), doubleArrayOf(0.0))
 
         val point = LinearIncumbentCompletion(SourceLpBudget()) { _, _ -> }.use {
-            assertNotNull(it.complete(guarded, offered, Cancellation.Never))
+            assertNotNull(it.complete(guarded, offered, ExecutionControl.Never))
         }
 
         assertTrue(point.boolValue(0))
@@ -464,8 +587,8 @@ class LinearIncumbentCompletionTest {
             originalChecks++
             false
         }) { stage, count -> if (stage == "Checked") checked += count }.use {
-            assertNull(it.complete(source, seed, Cancellation.Never))
-            assertNull(it.complete(source, seed.copy(), Cancellation.Never))
+            assertNull(it.complete(source, seed, ExecutionControl.Never))
+            assertNull(it.complete(source, seed.copy(), ExecutionControl.Never))
         }
 
         assertEquals(1, originalChecks)
@@ -475,18 +598,23 @@ class LinearIncumbentCompletionTest {
     @Test
     fun `original source rejection should withhold an otherwise exact completion`() {
         val checker = object : SourceSemanticsChecker {
-            override fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation) =
+            override fun witness(sample: Sample, scope: SourceScope, cancellation: ExecutionControl) =
                 SourceEvidenceCheck.Rejected("source domain hole")
-            override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation) =
+            override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: ExecutionControl) =
                 SourceEvidenceCheck.Unavailable("no ray")
         }
-        val original = SourceProofContext(scope, source.coordinates, source.premises, source.objective,
-            semanticsChecker = checker)
+        val original = SourceProofContext(
+            scope,
+            source.coordinates,
+            source.premises,
+            source.objective,
+            semanticsChecker = checker,
+        )
         val stages = mutableListOf<String>()
 
         LinearIncumbentCompletion(SourceLpBudget()) { stage, _ -> stages += stage }.use {
-            assertNull(it.complete(original, seed, Cancellation.Never))
-            assertNull(it.complete(original, seed.copy(), Cancellation.Never))
+            assertNull(it.complete(original, seed, ExecutionControl.Never))
+            assertNull(it.complete(original, seed.copy(), ExecutionControl.Never))
         }
 
         assertEquals(1, stages.count { it == "Rejected" })
@@ -498,29 +626,43 @@ class LinearIncumbentCompletionTest {
         var cancelled = false
         var interrupt = true
         val checker = object : SourceSemanticsChecker {
-            override fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck {
+            override fun witness(
+                sample: Sample,
+                scope: SourceScope,
+                cancellation: ExecutionControl,
+            ): SourceEvidenceCheck {
                 if (interrupt) cancelled = true
                 return if (cancellation()) SourceEvidenceCheck.Unavailable("cancelled") else SourceEvidenceCheck.Checked
             }
-            override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation) =
+            override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: ExecutionControl) =
                 SourceEvidenceCheck.Unavailable("no ray")
         }
-        val original = SourceProofContext(scope, source.coordinates, source.premises, source.objective,
-            semanticsChecker = checker)
+        val original = SourceProofContext(
+            scope,
+            source.coordinates,
+            source.premises,
+            source.objective,
+            semanticsChecker = checker,
+        )
 
         LinearIncumbentCompletion(SourceLpBudget()) { _, _ -> }.use {
-            assertNull(it.complete(original, seed, Cancellation { cancelled }))
+            assertNull(it.complete(original, seed, ExecutionControl { cancelled }))
             cancelled = false
             interrupt = false
-            assertNotNull(it.complete(original, seed, Cancellation { cancelled }))
+            assertNotNull(it.complete(original, seed, ExecutionControl { cancelled }))
         }
     }
 
     @Test
     fun `bounded retention should refuse fresh seeds without retrying exhausted failures`() {
-        val impossible = SourceProofContext(scope, source.coordinates, mapOf(
-            "negative" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ZERO)),
-        ), source.objective)
+        val impossible = SourceProofContext(
+            scope,
+            source.coordinates,
+            mapOf(
+                "negative" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ZERO)),
+            ),
+            source.objective,
+        )
         var attempts = 0L
         var reused = 0L
         var exhausted = 0L
@@ -533,9 +675,15 @@ class LinearIncumbentCompletionTest {
             }
         }.use {
             repeat(17) { id ->
-                assertNull(it.complete(impossible, seed.copy(reals = doubleArrayOf(id.toDouble())), Cancellation.Never))
+                assertNull(
+                    it.complete(
+                        impossible,
+                        seed.copy(reals = doubleArrayOf(id.toDouble())),
+                        ExecutionControl.Never,
+                    ),
+                )
             }
-            assertNull(it.complete(impossible, seed.copy(reals = doubleArrayOf(0.0)), Cancellation.Never))
+            assertNull(it.complete(impossible, seed.copy(reals = doubleArrayOf(0.0)), ExecutionControl.Never))
         }
 
         assertEquals(16L, attempts)
@@ -559,7 +707,7 @@ class LinearIncumbentCompletionTest {
         }.use { completion ->
             repeat(3) {
                 funding.grant(2_000_000L)
-                assertNull(completion.complete(source, seed, Cancellation.Never))
+                assertNull(completion.complete(source, seed, ExecutionControl.Never))
             }
         }
 

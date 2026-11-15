@@ -21,7 +21,7 @@ import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.PresolveSizeStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntHashSet
 
 /**
@@ -82,15 +82,25 @@ internal val PresolvePass.baseWorkWeight: Long
         PresolvePass.COMPOSE_EXTENSIONAL, PresolvePass.SUBSTITUTE_TUPLE_PACKING,
         PresolvePass.SUBSTITUTE_TABLE_VALUES -> 0L
         PresolvePass.REMOVE_REDUNDANT -> 63L
+
         PresolvePass.FOLD_COMPARISON_CLAUSES -> 18L
+
         PresolvePass.FUSE_LINEAR_BOUNDS -> 16L
+
         PresolvePass.BREAK_SYMMETRIES -> 16L
+
         PresolvePass.AGGREGATE_SUB_SUMS -> 11L
+
         PresolvePass.REDUCE_DIOPHANTINE, PresolvePass.DUAL_FIX -> 10L
+
         PresolvePass.REDUCE_STRUCTURAL -> 7L
+
         PresolvePass.ELIMINATE_AFFINE_SINGLETONS, PresolvePass.MERGE_DUPLICATE_COLUMNS -> 5L
+
         PresolvePass.PROJECT_SINGLETON_INEQUALITIES -> 3L
+
         PresolvePass.STRENGTHEN_COEFFICIENTS, PresolvePass.MERGE_AMO_CLIQUES, PresolvePass.DERIVE_XOR_UNITS -> 1L
+
         else -> DEFAULT_PASS_BASE_WORK_WEIGHT
     }
 
@@ -148,7 +158,7 @@ object Presolver {
         problem: Problem,
         config: PresolveConfig,
         context: PresolveContext = PresolveContext.EMPTY,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): SourcePresolved {
         val passes = problemPasses(problem, config, context, PresolvePass.Capability.SOURCE)
         if (passes.isEmpty() || config.maxRounds == 0) return SourcePresolved(problem)
@@ -181,7 +191,7 @@ object Presolver {
                 return inputs.current(current)
             }
 
-            override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
+            override fun runPass(pass: PresolvePass, slice: ExecutionControl?): PassOutcome {
                 val token = (slice ?: ctx.cancellation).let { ctx.presolveBudget?.observeStops(it) ?: it }
                 return ctx.presolveBudget.observeRoundPass(
                     pass, PresolveLane.SOURCE, token,
@@ -212,10 +222,14 @@ object Presolver {
                         delta.addedFactors,
                         deductionsChanged = delta.bounds != null,
                     )
-                    for (inputs in linearInputs.values) inputs.recordDelta(
-                        current.factors, delta.droppedIndices, delta.addedFactors,
+                    for (inputs in linearInputs.values) {
+                        inputs.recordDelta(
+                        current.factors,
+                        delta.droppedIndices,
+                        delta.addedFactors,
                         deductionsChanged = delta.bounds != null,
                     )
+                    }
                     current = current.withSourcePassDelta(delta) ?: return@observeRoundPass PassOutcome.INFEASIBLE
                     ctx = ctx.withObjective(delta.objective)
                     booleanPins.record(invocation, delta.addedFactors, entrySize::isBooleanPinned)
@@ -282,7 +296,7 @@ object Presolver {
         problem: BakedProblem,
         config: PresolveConfig,
         context: PresolveContext = PresolveContext.EMPTY,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): Presolved {
         val passes = problemPasses(problem, config, context, PresolvePass.Capability.FINITE)
         val maxRounds = config.maxRounds
@@ -306,9 +320,13 @@ object Presolver {
                 token.charge(PresolvePass.STRENGTHEN_COEFFICIENTS.baseWorkWeight * units)
                 if (Presolve.strengthenCoefficients(problem, token).infeasible) {
                     PassOutcome.INFEASIBLE
-                } else PassOutcome.UNCHANGED
+                } else {
+                    PassOutcome.UNCHANGED
+                }
             } == PassOutcome.INFEASIBLE
-        } else false
+        } else {
+            false
+        }
         if (earlyRefutation) {
             return Presolved(problem, { it }, infeasible = true).also {
                 it.mapping = SourceMapping(problem, problem, TransformationGuarantees.IDENTITY)
@@ -359,7 +377,7 @@ object Presolver {
                 return inputs.current(current)
             }
 
-            override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
+            override fun runPass(pass: PresolvePass, slice: ExecutionControl?): PassOutcome {
                 val token = (slice ?: ctx.cancellation).let { ctx.presolveBudget?.observeStops(it) ?: it }
                 return ctx.presolveBudget.observeRoundPass(
                     pass, PresolveLane.FINITE, token,
@@ -434,7 +452,7 @@ object Presolver {
         passes: List<PresolvePass>,
         maxRounds: Int,
         initialContext: PresolveContext,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         abortFraction: Double,
         structuralImpactLimit: Int,
     ): Presolved {
@@ -493,7 +511,7 @@ object Presolver {
             var liftDescribedByRebuild = true
             var changed = 0L
 
-            override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
+            override fun runPass(pass: PresolvePass, slice: ExecutionControl?): PassOutcome {
                 val token = (slice ?: ctx.cancellation).let { ctx.presolveBudget?.observeStops(it) ?: it }
                 return ctx.presolveBudget.observeRoundPass(
                     pass, PresolveLane.FINITE, token,
@@ -533,15 +551,17 @@ object Presolver {
                 }
             }
 
-            fun incrementalEligible(pass: PresolvePass, token: Cancellation): Boolean = when (pass) {
+            fun incrementalEligible(pass: PresolvePass, token: ExecutionControl): Boolean = when (pass) {
                 PresolvePass.ELIMINATE_AFFINE_SINGLETONS -> session.anyTouchedFactor(affineMark, token) {
                     it.equivalentLinear()?.let { row ->
                         row.integerConstants != null && row.op == LinearOp.EQ && row.vars.size >= 2
                     } == true
                 }
+
                 PresolvePass.MERGE_DUPLICATE_COLUMNS -> session.anyTouchedFactor(dupMark, token) {
                     it.equivalentLinear()?.integerConstants != null
                 }
+
                 else -> true
             }
 

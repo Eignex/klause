@@ -5,7 +5,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.pipeline.bindOpenTheoryWork
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -668,7 +668,7 @@ class SearchSessionTest {
                 return ComponentResult.Consistent
             }
         }
-        val session = SearchSession(listOf(brancher, component), cancellation = Cancellation { fired })
+        val session = SearchSession(listOf(brancher, component), cancellation = ExecutionControl { fired })
 
         val event = session.openRun(numBoolVars = 0).next()
 
@@ -726,7 +726,7 @@ class SearchSessionTest {
     @Test
     fun `a skipped model should stop the run once the deadline has passed`() {
         var skipped = 0
-        val session = SearchSession(emptyList(), cancellation = Cancellation { skipped > 0 })
+        val session = SearchSession(emptyList(), cancellation = ExecutionControl { skipped > 0 })
         val run = session.openRun(
             numBoolVars = 10,
             modelPolicy = object : SearchModelPolicy {
@@ -745,7 +745,7 @@ class SearchSessionTest {
     fun `a skipped root model should be exhausted after a cancellation pause`() {
         var cancelled = false
         var checked = 0
-        val session = SearchSession(emptyList(), cancellation = Cancellation { cancelled })
+        val session = SearchSession(emptyList(), cancellation = ExecutionControl { cancelled })
         val run = session.openRun(
             numBoolVars = 0,
             modelPolicy = object : SearchModelPolicy {
@@ -772,7 +772,7 @@ class SearchSessionTest {
     fun `a skipped model should resume at its sibling after a cancellation pause`() {
         var cancelled = false
         var checked = 0
-        val session = SearchSession(emptyList(), cancellation = Cancellation { cancelled })
+        val session = SearchSession(emptyList(), cancellation = ExecutionControl { cancelled })
         val run = session.openRun(
             numBoolVars = 1,
             modelPolicy = object : SearchModelPolicy {
@@ -914,7 +914,7 @@ class SearchSessionTest {
                 return ComponentCheck.Infeasible()
             }
         }
-        val session = SearchSession(listOf(component), cancellation = Cancellation { checked })
+        val session = SearchSession(listOf(component), cancellation = ExecutionControl { checked })
         val run = session.openRun(numBoolVars = 0)
         session.initialize()
 

@@ -19,17 +19,17 @@ import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
-import java.io.File
-import java.lang.management.ManagementFactory
-import java.util.Base64
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import java.util.Base64
+import kotlin.time.Duration.Companion.seconds
 
 internal object LinearSourceShape {
     @JvmStatic
@@ -58,7 +58,7 @@ internal object LinearSourceShape {
         out.resolve("source.smt2").writeBytes(bytes)
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
         val started = System.nanoTime()
-        val admitted = SmtLib.parse(bytes.decodeToString(), cancellation = Cancellation.after(10.seconds))
+        val admitted = SmtLib.parse(bytes.decodeToString(), cancellation = ExecutionControl.after(10.seconds))
         val parsed = admitted
         val parsingNs = System.nanoTime() - started
         val invocation = SourceSetup.prepare(SourceSetupRequest(

@@ -2,7 +2,7 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.RationalBasisOrder
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -148,7 +148,12 @@ class ExactBasisVerifyOrderingTest {
             cancelled = true
             RationalBasisOrder(intArrayOf(0), intArrayOf(0))
         }
-        val stopped = verifyExactBasis(model, basis, cache = cancelledCache, cancellation = Cancellation { cancelled })
+        val stopped = verifyExactBasis(
+            model,
+            basis,
+            cache = cancelledCache,
+            cancellation = ExecutionControl { cancelled },
+        )
         assertEquals(ExactBasisDecline.CANCELLED, stopped.metrics.decline)
         assertEquals(0, stopped.metrics.factoryCalls)
         assertNull(stopped.witness)
@@ -216,7 +221,7 @@ class ExactBasisVerifyOrderingTest {
                     ExactLpObjective(listOf(ExactLpNumber.of(3L), zero)),
                 ),
             )
-            assertTrue(solver.adopt(changed, Cancellation.Never))
+            assertTrue(solver.adopt(changed, ExecutionControl.Never))
             val current = assertNotNull(changed.toWorkingModel())
 
             val next = verifyExactBasis(current, basis, cache = solver.exactBasisCache)
@@ -259,7 +264,7 @@ class ExactBasisVerifyOrderingTest {
                 BigFraction.ofLong(wide) * BigFraction.ofLong(wide + 1L).reciprocal(),
                 changed.witness?.primal?.single(),
             )
-            assertFalse(solver.adopt(assertNotNull(next.exactState), Cancellation.Never))
+            assertFalse(solver.adopt(assertNotNull(next.exactState), ExecutionControl.Never))
             assertNull(solver.continuationBasis(next))
         }
     }

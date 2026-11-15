@@ -13,7 +13,7 @@ import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -38,14 +38,14 @@ class CapturedRealToleranceTest {
 
     @Test
     fun `a binary64 completion within the slack of a linear row should be accepted`() {
-        val accepts = assertNotNull(capturedRealAcceptance(source(row(LinearOp.EQ, 0.25)), Cancellation.Never))
+        val accepts = assertNotNull(capturedRealAcceptance(source(row(LinearOp.EQ, 0.25)), ExecutionControl.Never))
 
         assertTrue(accepts(point(0.3)))
     }
 
     @Test
     fun `a completion beyond the slack of a linear row should be refused`() {
-        val accepts = assertNotNull(capturedRealAcceptance(source(row(LinearOp.EQ, 0.25)), Cancellation.Never))
+        val accepts = assertNotNull(capturedRealAcceptance(source(row(LinearOp.EQ, 0.25)), ExecutionControl.Never))
 
         assertFalse(accepts(point(0.5)))
     }
@@ -53,7 +53,7 @@ class CapturedRealToleranceTest {
     @Test
     fun `a completion beyond the slack of a real declaration should be refused`() {
         val wide = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 9.0)
-        val accepts = assertNotNull(capturedRealAcceptance(source(wide), Cancellation.Never))
+        val accepts = assertNotNull(capturedRealAcceptance(source(wide), ExecutionControl.Never))
 
         assertFalse(accepts(point(1.5)))
     }
@@ -61,7 +61,7 @@ class CapturedRealToleranceTest {
     @Test
     fun `a strict row should hold exactly at the accepted point`() {
         val accepts = assertNotNull(
-            capturedRealAcceptance(source(row(LinearOp.LE, 0.25, strict = true)), Cancellation.Never),
+            capturedRealAcceptance(source(row(LinearOp.LE, 0.25, strict = true)), ExecutionControl.Never),
         )
 
         assertFalse(accepts(point(0.25)))
@@ -70,7 +70,7 @@ class CapturedRealToleranceTest {
     @Test
     fun `a finite membership should admit a value within the slack of a member`() {
         val domain = RealFiniteDomain(0, doubleArrayOf(0.25, 0.75))
-        val accepts = assertNotNull(capturedRealAcceptance(source(domain), Cancellation.Never))
+        val accepts = assertNotNull(capturedRealAcceptance(source(domain), ExecutionControl.Never))
 
         assertTrue(accepts(point(0.8)))
     }
@@ -78,7 +78,7 @@ class CapturedRealToleranceTest {
     @Test
     fun `a finite membership should refuse a value between its members`() {
         val domain = RealFiniteDomain(0, doubleArrayOf(0.25, 0.75))
-        val accepts = assertNotNull(capturedRealAcceptance(source(domain), Cancellation.Never))
+        val accepts = assertNotNull(capturedRealAcceptance(source(domain), ExecutionControl.Never))
 
         assertFalse(accepts(point(0.5)))
     }
@@ -87,13 +87,13 @@ class CapturedRealToleranceTest {
     fun `a nonlinear real relation should leave completion exact`() {
         val product = source(ContinuousProduct(0, 0, 1), reals = 2)
 
-        assertNull(capturedRealAcceptance(product, Cancellation.Never))
+        assertNull(capturedRealAcceptance(product, ExecutionControl.Never))
     }
 
     @Test
     fun `a zero tolerance should leave completion exact`() {
         val exact = source(row(LinearOp.EQ, 0.25), tolerance = SourceTolerance())
 
-        assertNull(capturedRealAcceptance(exact, Cancellation.Never))
+        assertNull(capturedRealAcceptance(exact, ExecutionControl.Never))
     }
 }

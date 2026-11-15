@@ -12,7 +12,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.lowering.approximateGridValue
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
@@ -46,7 +46,7 @@ internal fun prepareFloatGridAbsentPins(
     source: Problem,
     variables: List<FloatGridVariable>,
     primary: List<FloatGridColumn>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): FloatGridAbsentPins? {
     val columns = ArrayList<FloatGridColumn>(primary.size)
     val factors = ArrayList<Factor>()
@@ -75,7 +75,9 @@ internal fun prepareFloatGridAbsentPins(
             val relation = presentChannel(selector, column) ?: return null
             factors += ReifiedLinear(booleans, relation.first, relation.second, LinearOp.EQ, relation.third)
             factors += Clause(intArrayOf(Lit.make(pin.present.index, false), Lit.make(booleans, true)))
-            val nearest = if (selector.step.isZero) 0L else {
+            val nearest = if (selector.step.isZero) {
+                0L
+            } else {
                 val position = (pin.default - selector.origin) * selector.step.reciprocal()
                 val rounded = -(position + BigFraction.ofLong(2).reciprocal()).negated().ceilInteger()
                 when {
@@ -94,7 +96,9 @@ internal fun prepareFloatGridAbsentPins(
             cancellation.charge(1)
             if (cancellation() || factor !in source.factors.indices || factor in rows ||
                 lowerGridPin(source.factors[factor], column, pin.default) == null
-            ) return null
+            ) {
+                return null
+            }
             rows[factor] = column to pin.default
         }
         columns += column
@@ -115,7 +119,9 @@ private fun absentValueColumn(primary: FloatGridColumn, default: BigFraction, va
         val position = (default - primary.origin) * primary.step.reciprocal()
         if (position.den == BIG_ONE && position.num >= BIG_ZERO &&
             position.num < bigIntOf(primary.coordinate.buckets)
-        ) return primary
+        ) {
+            return primary
+        }
         val lower = if (position.num < BIG_ZERO) position.num else BIG_ZERO
         val last = position.den * bigIntOf(primary.coordinate.buckets - 1)
         val upper = if (last > position.num) last else position.num
@@ -133,7 +139,9 @@ private fun absentValueColumn(primary: FloatGridColumn, default: BigFraction, va
     if (!lo.isFinite() || !hi.isFinite() || !(hi - lo).isFinite() ||
         !increment.isFinite() || increment <= 0.0 ||
         (!origin.isZero && lo == 0.0) || (!end.isZero && hi == 0.0)
-    ) return null
+    ) {
+        return null
+    }
     return FloatGridColumn(primary.source, GridCoordinate(variable.toInt(), lo, hi, buckets), origin, step, primary)
 }
 
@@ -159,19 +167,25 @@ internal fun lowerGridPin(factor: Factor, column: FloatGridColumn, default: BigF
                 !factor.realVars.contentEquals(intArrayOf(column.source.index)) ||
                 !factor.realCoeffs.contentEquals(doubleArrayOf(1.0)) ||
                 BigFraction.ofDouble(factor.bound) != default
-            ) return null
+            ) {
+                return null
+            }
             operation = factor.op
             reifier = factor.aux
         }
+
         is Linear -> {
             val row = factor.realConstants ?: return null
             if (row.strict || factor.vars.isNotEmpty() ||
                 !factor.realVars.contentEquals(intArrayOf(column.source.index)) ||
                 row.realCoefficients.at(0) != 1.0 || BigFraction.ofDouble(row.bound) != default
-            ) return null
+            ) {
+                return null
+            }
             operation = factor.op
             reifier = null
         }
+
         else -> return null
     }
     val coefficients: LongArray
@@ -188,6 +202,11 @@ internal fun lowerGridPin(factor: Factor, column: FloatGridColumn, default: BigF
         coefficients = longArrayOf(1)
     }
     val variables = intArrayOf(column.coordinate.variable)
-    return listOf(if (reifier == null) Linear(coefficients, variables, operation, bound)
-        else ReifiedLinear(reifier, coefficients, variables, operation, bound))
+    return listOf(
+        if (reifier == null) {
+            Linear(coefficients, variables, operation, bound)
+        } else {
+            ReifiedLinear(reifier, coefficients, variables, operation, bound)
+        },
+    )
 }

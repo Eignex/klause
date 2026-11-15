@@ -14,7 +14,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertIs
@@ -28,7 +28,7 @@ class ProjectedSourceWitnessTest {
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.5, 0.0),
             exactReals = listOf(BigFraction.of(bigIntOf(1), bigIntOf(2)), BigFraction.ZERO))
 
-        val result = verifyProjectedSourceWitness(source, checker, point, Cancellation.Never) { true }
+        val result = verifyProjectedSourceWitness(source, checker, point, ExecutionControl.Never) { true }
 
         assertIs<Verification.Rejected>(result)
     }
@@ -43,7 +43,7 @@ class ProjectedSourceWitnessTest {
         val checker = source.withFactors(emptyArray()).bake()
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0), exactReals = listOf(BigFraction.ZERO))
         for (filter in listOf<((Sample) -> Boolean)?>(null, { true })) {
-            val result = verifyProjectedSourceWitness(source, checker, point, Cancellation.Never,
+            val result = verifyProjectedSourceWitness(source, checker, point, ExecutionControl.Never,
                 toleranceCheck = filter)
 
             assertIs<Verification.Accepted<*, *>>(result)
@@ -60,7 +60,7 @@ class ProjectedSourceWitnessTest {
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.5, 0.0),
             exactReals = listOf(BigFraction.of(bigIntOf(1), bigIntOf(2)), BigFraction.ZERO))
 
-        val result = verifyProjectedSourceWitness(source, checker, point, Cancellation.Never) { true }
+        val result = verifyProjectedSourceWitness(source, checker, point, ExecutionControl.Never) { true }
 
         assertIs<Verification.Indeterminate>(result)
     }

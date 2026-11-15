@@ -15,7 +15,7 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -38,7 +38,7 @@ internal object ResidualReplayControls {
         vars: IntArray,
         factors: List<Factor>,
         weights: LongArray,
-        stop: Cancellation,
+        stop: ExecutionControl,
         seed: Long,
         control: (BacktrackParams) -> BacktrackParams = { it },
     ): ResidualRun {
@@ -91,16 +91,16 @@ internal object ResidualReplayControls {
         val witness = BooleanArray(weights.size) { snapshot.values[it] == true }
         for (v in isolated) witness[v] = weights[v] < 0L
         val preparedNanos = System.nanoTime() - started
-        val childStop = Cancellation.after(millis.milliseconds)
+        val childStop = ExecutionControl.after(millis.milliseconds)
         val children = components.indices.sortedBy { grouped[it].size }.map { i ->
             solve(components[i].toIntArray(), grouped[i], weights, childStop, seed)
         }
         val vars = used.sorted().toIntArray()
-        val joint = solve(vars, factors, weights, Cancellation.after(millis.milliseconds), seed)
-        val ordered = solve(vars, factors, weights, Cancellation.after(millis.milliseconds), seed) {
+        val joint = solve(vars, factors, weights, ExecutionControl.after(millis.milliseconds), seed)
+        val ordered = solve(vars, factors, weights, ExecutionControl.after(millis.milliseconds), seed) {
             it.copy(objectiveGuidedValues = true)
         }
-        val lp = solve(vars, factors, weights, Cancellation.after(millis.milliseconds), seed) {
+        val lp = solve(vars, factors, weights, ExecutionControl.after(millis.milliseconds), seed) {
             it.copy(lpConfig = LpConfig(LpEmphasis.DEFAULT))
         }
         val optima = children.map { exactOptimum(it, weights) }

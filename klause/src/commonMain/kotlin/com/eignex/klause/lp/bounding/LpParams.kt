@@ -2,7 +2,7 @@ package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.relaxation.LpRelaxation
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /**
  * The LP-bounding runtime's own parameters, independent of the search layer's `BacktrackParams`. Both the
@@ -18,7 +18,7 @@ class LpParams(
     /** High-level emphasis to resolve into [lpPlan] against the problem structure, or null. */
     val lpConfig: LpConfig? = null,
     /** Deadline token polled by every LP solve / fixpoint. */
-    val cancellation: Cancellation = Cancellation.Never,
+    val cancellation: ExecutionControl = ExecutionControl.Never,
     /** The whole-solve wall budget in milliseconds, which sizes the cumulative LP work allowance; null = uncapped. */
     val solveBudgetMillis: Long? = null,
     /** Seed for the feasibility pump and randomized pricing; null means 0. */

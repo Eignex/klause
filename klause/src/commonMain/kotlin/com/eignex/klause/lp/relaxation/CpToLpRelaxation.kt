@@ -5,9 +5,6 @@ import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.Product
-import com.eignex.klause.factor.arithmetic.RealAbs
-import com.eignex.klause.factor.arithmetic.RealArrayMinMax
-import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
@@ -76,7 +73,7 @@ import com.eignex.klause.theory.encodingSourceRealCount
 import com.eignex.klause.theory.finiteLinearModel
 import com.eignex.klause.theory.privateLinearCompletion
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyDoubleArray
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayList
@@ -317,13 +314,19 @@ internal fun LpRelaxation.withModel(
         sourceMap = sources,
         rowFactorIds = if (remap != null) {
             remap.retainedRows.map { rowFactorIds.getOrElse(it) { -1 } }.toIntArray()
-        } else if (reboundModel.m == model.m) rowFactorIds else {
+        } else if (reboundModel.m == model.m) {
+            rowFactorIds
+        } else {
             require(reboundModel.m >= model.m) { "row removal requires a metadata remap" }
             IntArray(reboundModel.m) { rowFactorIds.getOrElse(it) { -1 } }
         },
-        realUpperRows = if (remap == null) realUpperRows else realUpperRows.mapNotNull { (row, variable) ->
+        realUpperRows = if (remap == null) {
+            realUpperRows
+        } else {
+            realUpperRows.mapNotNull { (row, variable) ->
             remap.row(row).takeIf { it >= 0 }?.let { it to variable }
-        }.toMap(),
+        }.toMap()
+        },
         preparationTemplates = preparationTemplates,
     )
 }
@@ -394,7 +397,7 @@ internal fun leafRealFeasibility(
     problem: Problem,
     objective: LinearObjective?,
     sample: Sample,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     componentSplit: Boolean = true,
     sink: LpStatsSink? = null,
     context: LpSolveContext = LpSolveContext.Production,
@@ -450,9 +453,15 @@ internal fun LpRelaxation.leafResult(
     }
     val exact = exactLeafResult(certified, problem, objective, sample)
     return if (exact.verdict in setOf(LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND)) {
-        LeafRealResult(exact.verdict, exact.reals, exact.exactReals,
-            uncertifiedReals = certified.float?.let { floatReals(it.primal, problem) })
-    } else exact
+        LeafRealResult(
+            exact.verdict,
+            exact.reals,
+            exact.exactReals,
+            uncertifiedReals = certified.float?.let { floatReals(it.primal, problem) },
+        )
+    } else {
+        exact
+    }
 }
 
 /** The factors behind the rows [certified]'s infeasibility proof combines: its exact conflict, else its Farkas ray. */
@@ -683,7 +692,7 @@ internal class CpToLpRelaxation(
     elementIndexes: Set<Int>? = null,
     private val templateStats: LpStatsSink? = null,
     private val reuseSourceTemplates: Boolean = true,
-    private val preparationCancellation: Cancellation = Cancellation.Never,
+    private val preparationCancellation: ExecutionControl = ExecutionControl.Never,
     private val reuseTemplateIndexes: Boolean = true,
     private val reuseTemplateMetadata: Boolean = false,
     private val earnTemplatePreparation: Boolean = false,
@@ -703,7 +712,7 @@ internal class CpToLpRelaxation(
         onTemplateWork(work)
     }
 
-    private fun prepareTemplates(cancellation: Cancellation) {
+    private fun prepareTemplates(cancellation: ExecutionControl) {
         if (!reuseSourceTemplates || projections == null) return
         preparationTemplates = null
         val start = TimeSource.Monotonic.markNow()
@@ -731,10 +740,12 @@ internal class CpToLpRelaxation(
         if (cancellation()) throw LpAssemblyCancelled()
     }
 
-    private fun recordConstruction(relaxation: LpRelaxation, cancellation: Cancellation) {
+    private fun recordConstruction(relaxation: LpRelaxation, cancellation: ExecutionControl) {
         if (!reuseSourceTemplates || !earnTemplatePreparation || projections == null ||
             preparationTemplates != null
-        ) return
+        ) {
+            return
+        }
         if (problem.numRealVars != 0 || !projections.builtInRelaxation) return
         val model = relaxation.model
         if (model.n == 0 || model.doubleView != null || model.exactState != null) return
@@ -756,9 +767,13 @@ internal class CpToLpRelaxation(
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
     private var cumulativeRelaxation: CumulativeRelaxation? = null
     private val builtInFamilySource: Problem by lazy {
-        if (projections?.builtInRelaxation != false) problem else problem.withFactors(
+        if (projections?.builtInRelaxation != false) {
+            problem
+        } else {
+            problem.withFactors(
             problem.factors.filterIndexed { id, _ -> projections.usesBuiltInRelaxation(id) }.toTypedArray(),
         )
+        }
     }
 
     /**
@@ -789,13 +804,15 @@ internal class CpToLpRelaxation(
             cumulativeRelaxation = owner.takeIf { it.applicable }
         }
         structurallyPersistent = !objectiveCone && !cumulative && !diffn && projections?.builtInRelaxation != false
-        if (structurallyPersistent) for (fid in problem.factors.indices) {
+        if (structurallyPersistent) {
+            for (fid in problem.factors.indices) {
             val factor = problem.factors[fid]
             if (factor !is Linear && hasLiveDomainCoefficients(factor)) {
                 structurallyPersistent = false
                 break
             }
             if ((fid + 1) % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+        }
         }
     }.iterator()
 
@@ -833,7 +850,7 @@ internal class CpToLpRelaxation(
     fun build(
         session: PropagationSession,
         extraCuts: List<Cut> = emptyList(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): LpRelaxation = build(SessionDomains(session), extraCuts, cancellation)
 
     /** Build the relaxation over [domains], optionally appending separator-produced [extraCuts] as extra
@@ -841,13 +858,13 @@ internal class CpToLpRelaxation(
     fun build(
         domains: RelaxationDomains,
         extraCuts: List<Cut> = emptyList(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): LpRelaxation = build(domains, extraCuts, cancellation, null)
 
     fun build(
         domains: RelaxationDomains,
         extraCuts: List<Cut>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         onDiscardedAssembly: ((Long) -> Unit)?,
     ): LpRelaxation {
         val token = cancellation or preparationCancellation
@@ -866,7 +883,7 @@ internal class CpToLpRelaxation(
 
     fun prepareBuild(
         domains: RelaxationDomains,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         onWork: (Long) -> Unit,
         onComplete: (LpRelaxation) -> Unit,
     ): Iterator<Unit> = sequence {
@@ -913,13 +930,13 @@ internal class CpToLpRelaxation(
     fun emitRegion(
         region: LpEmissionRegion,
         domains: RelaxationDomains,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): LpEmission = emitRegion(region, domains, cancellation, null)
 
     fun emitRegion(
         region: LpEmissionRegion,
         domains: RelaxationDomains,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         onWork: ((Long) -> Unit)?,
     ): LpEmission {
         if (preparationTemplates == null) prepareTemplates(cancellation or preparationCancellation)
@@ -936,7 +953,9 @@ internal class CpToLpRelaxation(
             LpEmission(region, relaxation, tracked.dependencies())
         } finally {
             val model = completed?.model
-            val work = if (model == null) assembler.constructionSize else {
+            val work = if (model == null) {
+                assembler.constructionSize
+            } else {
                 model.n.toLong() + model.m + (model.doubleView?.colVal?.size ?: model.csc.rowIdx.size)
             }
             onWork?.invoke(work)
@@ -951,7 +970,7 @@ internal class CpToLpRelaxation(
      * the result is independent of any session. This is the float filter's persistent model; exact
      * certificates keep running on the per-node pin-consulting [build], whose magnitudes rationalize.
      */
-    fun buildGatedResidual(cancellation: Cancellation = Cancellation.Never): LpRelaxation? {
+    fun buildGatedResidual(cancellation: ExecutionControl = ExecutionControl.Never): LpRelaxation? {
         if (!realResidual || problem.numIntVars > 0 || problem.factors.any { it is ContinuousProduct }) return null
         return Assembler(RootDomains(problem), gated = true, cancellation = cancellation).assemble(emptyList())
     }
@@ -969,7 +988,7 @@ internal class CpToLpRelaxation(
     private inner class Assembler(
         private val domains: RelaxationDomains,
         private val gated: Boolean = false,
-        private val cancellation: Cancellation = Cancellation.Never,
+        private val cancellation: ExecutionControl = ExecutionControl.Never,
         private val region: LpEmissionRegion? = null,
         private val columnDomains: RelaxationDomains = domains,
     ) : ExactRelaxationBuilder, SharedIndexChoices, LpBoundRowBuilder {
@@ -990,7 +1009,9 @@ internal class CpToLpRelaxation(
             } finally {
                 templateStats?.observeTemplateBoundStorageWork(slots)
             }
-        } else null
+        } else {
+            null
+        }
         private val intCol = IntArray(if (region == null) problem.numIntVars else 0) { -1 }
         private val boolCol = IntArray(if (region == null) problem.numBoolVars else 0) { -1 }
         private val realCol = IntArray(if (region == null) problem.numRealVars else 0) { -1 }
@@ -1578,7 +1599,8 @@ internal class CpToLpRelaxation(
                 rowFactorIds = rowFactor.toIntArray(),
                 colRealId = reals,
                 colRealSign = signs,
-                sourceMap = cutSources?.withParentRows(cutParents) ?: if (region == null) cpCutSources(
+                sourceMap = cutSources?.withParentRows(cutParents) ?: if (region == null) {
+                    cpCutSources(
                     model,
                     problem,
                     colVarIds,
@@ -1589,7 +1611,10 @@ internal class CpToLpRelaxation(
                     presence,
                     auxiliarySources,
                     domains,
-                ) else null,
+                )
+                } else {
+                    null
+                },
                 gatedRows = gatedRowList.toIntArray(),
                 gatedAux = gatedAuxList.toIntArray(),
                 gatedWhenTrue = BooleanArray(gatedWhenTrueList.size) { gatedWhenTrueList[it] == 1 },
@@ -1781,9 +1806,12 @@ internal class CpToLpRelaxation(
                 val bounds = problem.intBounds
                 val rootImplied = when (relation) {
                     LinearOp.LE -> bounds.hasUpper(variable) && root.max <= threshold
+
                     LinearOp.GE -> bounds.hasLower(variable) && root.min >= threshold
+
                     LinearOp.EQ -> bounds.hasLower(variable) && bounds.hasUpper(variable) &&
                         root.min == threshold && root.max == threshold
+
                     LinearOp.NE -> false
                 }
                 if (!rootImplied) return false
@@ -1851,7 +1879,9 @@ internal class CpToLpRelaxation(
         ) {
             checkCancellation()
             val rel = relationOf(op) ?: return
-            val premises = if (indicator < 0) null else {
+            val premises = if (indicator < 0) {
+                null
+            } else {
                 val domain = liveDomain(indicator)
                 if (domain.min != value || domain.max != value) return
                 LpRowPremises(intArrayOf(indicator, indicator), booleanArrayOf(false, true), longArrayOf(value, value))
@@ -1964,17 +1994,23 @@ internal class CpToLpRelaxation(
 internal fun LeafRealResult.checkedEncoding(
     encoded: Problem,
     sample: Sample,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): LeafRealResult {
     if (exactReals == null || verdict == LpVerdict.INFEASIBLE) return this
     val point = sample.copy(reals = reals, exactReals = exactReals)
     if (encoded.encodingSourceRealCount != encoded.numRealVars) {
-        return if (privateLinearCompletion(encoded, point, cancellation) == true) this
-        else LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray(), uncertifiedReals = reals)
+        return if (privateLinearCompletion(encoded, point, cancellation) == true) {
+            this
+        } else {
+            LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray(), uncertifiedReals = reals)
+        }
     }
     val checked = verifyRealCoordinates(encoded, point)
-    return if (!cancellation() && checked is Verification.Accepted) this
-    else LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray(), uncertifiedReals = reals)
+    return if (!cancellation() && checked is Verification.Accepted) {
+        this
+    } else {
+        LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray(), uncertifiedReals = reals)
+    }
 }
 
 internal fun LeafRealResult.observeConsumption(sink: LpStatsSink?) {

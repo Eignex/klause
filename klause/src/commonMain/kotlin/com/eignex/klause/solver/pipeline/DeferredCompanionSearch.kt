@@ -6,13 +6,13 @@ import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.time.TimeSource
 
 internal class DeferredCompanionSearch(
     private val unavailableReason: () -> TerminationReason,
     private val clock: TimeSource = TimeSource.Monotonic,
-    private val open: (Cancellation, Long) -> ResumableSearch?,
+    private val open: (ExecutionControl, Long) -> ResumableSearch?,
 ) : InstructionSlicedSearch, ReseedGuard {
     private var search: ResumableSearch? = null
     private var terminal: MinimizeResult? = null
@@ -26,22 +26,32 @@ internal class DeferredCompanionSearch(
     override val work: Long get() = search?.work ?: 0L
     override val chargedInstructions: Long get() = (search as? InstructionSlicedSearch)?.chargedInstructions ?: work
 
-    override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
-        onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? =
+    override fun runSlice(
+        global: ExecutionControl,
+        sliceMillis: Long,
+        sliceNodes: Long,
+        onIncumbent: (MinimizeResult.WithSample) -> Unit,
+    ): MinimizeResult? =
         advance(global, sliceMillis) { search, millis -> search.runSlice(global, millis, sliceNodes, onIncumbent) }
 
-    override fun runInstructionSlice(global: Cancellation, sliceMillis: Long, sliceInstructions: Long,
-        onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? =
-        advance(global, sliceMillis) { search, millis ->
-            if (search is InstructionSlicedSearch) {
-                search.runInstructionSlice(global, millis, sliceInstructions, onIncumbent)
-            } else {
-                search.runSlice(global, millis, sliceInstructions, onIncumbent)
-            }
+    override fun runInstructionSlice(
+        global: ExecutionControl,
+        sliceMillis: Long,
+        sliceInstructions: Long,
+        onIncumbent: (MinimizeResult.WithSample) -> Unit,
+    ): MinimizeResult? = advance(global, sliceMillis) { search, millis ->
+        if (search is InstructionSlicedSearch) {
+            search.runInstructionSlice(global, millis, sliceInstructions, onIncumbent)
+        } else {
+            search.runSlice(global, millis, sliceInstructions, onIncumbent)
         }
+    }
 
-    private fun advance(global: Cancellation, sliceMillis: Long,
-        run: (ResumableSearch, Long) -> MinimizeResult?): MinimizeResult? {
+    private fun advance(
+        global: ExecutionControl,
+        sliceMillis: Long,
+        run: (ResumableSearch, Long) -> MinimizeResult?,
+    ): MinimizeResult? {
         terminal?.let { return it }
         check(!closed)
         if (sliceMillis <= 0L) return null

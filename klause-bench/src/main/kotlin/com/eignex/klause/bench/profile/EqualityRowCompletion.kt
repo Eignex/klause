@@ -7,7 +7,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -17,7 +17,7 @@ internal fun equalityRowCompletion(
     state: LocalSearchState,
     objective: LinearObjective,
     center: Sample,
-    stop: Cancellation,
+    stop: ExecutionControl,
     file: File,
 ) {
     val started = System.nanoTime()

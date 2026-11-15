@@ -20,14 +20,14 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.sun.management.ThreadMXBean
-import java.io.File
-import java.lang.management.ManagementFactory
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import kotlin.time.Duration.Companion.seconds
 
 internal object CumulativeChoiceProfile {
     @JvmStatic
@@ -53,20 +53,26 @@ internal object CumulativeChoiceProfile {
         val thread = Thread.currentThread().threadId()
         val records = out.resolve("choices.jsonl")
         records.writeText("")
-        for (emphasis in listOf<PresolveEmphasis?>(null, PresolveEmphasis.OFF,
-            PresolveEmphasis.DEFAULT, PresolveEmphasis.AGGRESSIVE)) {
-            val stop = Cancellation.after(20.seconds)
+        for (emphasis in listOf<PresolveEmphasis?>(
+            null,
+            PresolveEmphasis.OFF,
+            PresolveEmphasis.DEFAULT,
+            PresolveEmphasis.AGGRESSIVE,
+        )) {
+            val stop = ExecutionControl.after(20.seconds)
             val before = bean.getThreadAllocatedBytes(thread)
             val started = System.nanoTime()
             val parsed = parseFlatZinc(text)
             val budget = PresolveBudget(500_000_000L)
             val preparation = emphasis?.let {
-                FinitePipeline.prepare(FinitePipelineRequest(
-                    parsed.problem, FiniteEngine.BACKTRACK, parsed.linearObjective(),
-                    presolveConfig = PresolveConfig(it),
-                    explicitPresolveConfig = true, cancellation = stop, solveCancellation = stop,
-                    presolveBudget = budget, randomSeed = 3L,
-                ))
+                FinitePipeline.prepare(
+                    FinitePipelineRequest(
+                        parsed.problem, FiniteEngine.BACKTRACK, parsed.linearObjective(),
+                        presolveConfig = PresolveConfig(it),
+                        explicitPresolveConfig = true, cancellation = stop, solveCancellation = stop,
+                        presolveBudget = budget, randomSeed = 3L,
+                    ),
+                )
             }
             val problem = preparation?.problem ?: parsed.problem
             val session = PropagationSession(problem, stop)
@@ -91,18 +97,28 @@ internal object CumulativeChoiceProfile {
                 put("integers", problem.numIntVars)
                 put("booleans", problem.numBoolVars)
                 put("factors", problem.factors.size)
-                put("cumulatives", buildJsonArray {
-                    for (factor in problem.factors.filterIsInstance<Cumulative>()) add(buildJsonObject {
-                        put("tasks", factor.n)
-                        put("unary", factor.unary)
-                        put("constantDurations", factor.durationVars.isEmpty())
-                        put("optional", factor.presents.isNotEmpty())
-                        put("rangedDemands", factor.resourceVars.count {
-                            session.intDomain(it).min != session.intDomain(it).max
-                        })
-                        put("channelRows", channelRows(problem, factor, session))
-                    })
-                })
+                put(
+                    "cumulatives",
+                    buildJsonArray {
+                        for (factor in problem.factors.filterIsInstance<Cumulative>()) {
+                            add(
+                                buildJsonObject {
+                                    put("tasks", factor.n)
+                                    put("unary", factor.unary)
+                                    put("constantDurations", factor.durationVars.isEmpty())
+                                    put("optional", factor.presents.isNotEmpty())
+                                    put(
+                                        "rangedDemands",
+                                        factor.resourceVars.count {
+                                            session.intDomain(it).min != session.intDomain(it).max
+                                        },
+                                    )
+                                    put("channelRows", channelRows(problem, factor, session))
+                                },
+                            )
+                        }
+                    },
+                )
                 if (options.isEmpty() && preparation == null) {
                     put("q", session.intDomain(parsed.intVarsByName.getValue("q")).toString())
                     put("machine", session.intDomain(parsed.intVarsByName.getValue("machine")).toString())
@@ -118,24 +134,47 @@ internal object CumulativeChoiceProfile {
     private fun channelRows(problem: Problem, factor: Cumulative, session: PropagationSession) = buildJsonArray {
         val rows = problem.factors.filterIsInstance<ReifiedLinear>().filter { it.op == LinearOp.EQ }
         for (demand in factor.resourceVars.distinct()) {
-            for (channel in rows.filter { demand in it.vars }) add(buildJsonObject {
-                put("demand", demand)
-                put("demandDomain", session.intDomain(demand).toString())
-                put("boolean", channel.auxBoolVar)
-                put("equalities", buildJsonArray {
-                    for (row in rows.filter { it.auxBoolVar == channel.auxBoolVar }) add(buildJsonObject {
-                        put("bound", row.constants.exactBound.toString())
-                        put("terms", buildJsonArray {
-                            for (index in row.vars.indices) add(buildJsonObject {
-                                val variable = row.vars[index]
-                                put("variable", variable)
-                                put("coefficient", row.constants.exactCoeff(index).toString())
-                                put("domain", session.intDomain(variable).toString())
-                            })
-                        })
-                    })
-                })
-            })
+            for (channel in rows.filter { demand in it.vars }) {
+                add(
+                    buildJsonObject {
+                        put("demand", demand)
+                        put("demandDomain", session.intDomain(demand).toString())
+                        put("boolean", channel.auxBoolVar)
+                        put(
+                            "equalities",
+                            buildJsonArray {
+                                for (row in rows.filter { it.auxBoolVar == channel.auxBoolVar }) {
+                                    add(
+                                        buildJsonObject {
+                                            put("bound", row.constants.exactBound.toString())
+                                            put(
+                                                "terms",
+                                                buildJsonArray {
+                                                    for (index in row.vars.indices) {
+                                                        add(
+                                                            buildJsonObject {
+                                                                val variable = row.vars[index]
+                                                                put("variable", variable)
+                                                                put(
+                                                                    "coefficient",
+                                                                    row.constants.exactCoeff(
+                                                                        index,
+                                                                    ).toString(),
+                                                                )
+                                                                put("domain", session.intDomain(variable).toString())
+                                                            },
+                                                        )
+                                                    }
+                                                },
+                                            )
+                                        },
+                                    )
+                                }
+                            },
+                        )
+                    },
+                )
+            }
         }
     }
 

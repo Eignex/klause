@@ -17,7 +17,7 @@ import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -44,11 +44,11 @@ class PortfolioInvocationTest {
         }
 
         PortfolioInvocation(plan, factories,
-            PortfolioInvocationControls(seed = 17, cancellation = Cancellation { visits.size >= 4 }),
+            PortfolioInvocationControls(seed = 17, cancellation = ExecutionControl { visits.size >= 4 }),
             PortfolioEvidence(runtime.model, CandidateVerifier.trusting()), objective,
         ) { workers ->
             PortfolioInvocationPolicy(probeRanks = heuristicSecondProbeRanks(workers))
-        }.use { it.minimize(Cancellation.Never, null) }
+        }.use { it.minimize(ExecutionControl.Never, null) }
 
         assertEquals(listOf(17L, 18L, 19L, 20L), seeds)
         assertEquals(listOf(0, 2, 1, 3), visits)
@@ -135,11 +135,11 @@ class PortfolioInvocationTest {
         val invocation = PortfolioInvocation(
             plan,
             listOf(factory),
-            PortfolioInvocationControls(cancellation = Cancellation { true }),
+            PortfolioInvocationControls(cancellation = ExecutionControl { true }),
             PortfolioEvidence(ModelIdentity.of(source), CandidateVerifier.trusting()),
         )
 
-        val result = invocation.use { it.solve(Cancellation.Never) }
+        val result = invocation.use { it.solve(ExecutionControl.Never) }
 
         assertIs<SolveResult.Unknown>(result)
         assertFalse(entered)

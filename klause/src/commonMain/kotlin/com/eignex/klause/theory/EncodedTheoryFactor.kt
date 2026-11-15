@@ -18,7 +18,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.SelectedEncoderRequest
 import com.eignex.klause.solver.pipeline.ExactSearchRow
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigInt
 
 internal class EncodedTheoryFactor private constructor(
@@ -36,15 +36,18 @@ internal class EncodedTheoryFactor private constructor(
         ),
     )
 
-    fun atFactorIndex(index: Int): EncodedTheoryFactor = if (index == attribution.sourceFactorIndex) this
-    else EncodedTheoryFactor(source, linearForm, attribution.atFactorIndex(index), variables)
+    fun atFactorIndex(index: Int): EncodedTheoryFactor = if (index == attribution.sourceFactorIndex) {
+        this
+    } else {
+        EncodedTheoryFactor(source, linearForm, attribution.atFactorIndex(index), variables)
+    }
 }
 
 internal fun PreparedFactorProjections.linearTheoryModel(
     target: EncodingTarget,
     indices: List<Int> = problem.factors.indices.toList(),
     fixedIntegers: Map<SourceIntId, BigInt> = emptyMap(),
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     fixedBooleans: Map<SourceBoolId, Boolean> = emptyMap(),
     onDecline: (EncoderDecline) -> Unit = {},
     completeFiniteConditions: Boolean = false,
@@ -93,7 +96,7 @@ internal fun PreparedFactorProjections.installLinearFactor(
     target: EncodingTarget,
     integerPins: Map<SourceIntId, BigInt> = emptyMap(),
     booleanPins: Map<SourceBoolId, Boolean> = emptyMap(),
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     allocator: EncodingRealAllocator? = null,
     onDecline: (EncoderDecline) -> Unit = {},
     completeFiniteConditions: Boolean = false,
@@ -111,7 +114,7 @@ private fun PreparedFactorProjections.installSelectedLinearFactor(
     selected: Encoder,
     integerPins: Map<SourceIntId, BigInt>,
     booleanPins: Map<SourceBoolId, Boolean>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     allocator: EncodingRealAllocator,
     onDecline: (EncoderDecline) -> Unit,
     completeFiniteConditions: Boolean,
@@ -124,7 +127,9 @@ private fun PreparedFactorProjections.installSelectedLinearFactor(
     if (completeFiniteConditions && target == EncodingTarget.LINEAR &&
         selected.support == EncoderSupport.CONDITIONED &&
         selected.requiredIntegers.any { it !in integerPins }
-    ) return installConditionedLinearFactor(index, integerPins, booleanPins, cancellation, allocator, onDecline)
+    ) {
+        return installConditionedLinearFactor(index, integerPins, booleanPins, cancellation, allocator, onDecline)
+    }
     val source = problem.factors[index]
     val sourceIndex = (source as? EncodedTheoryFactor)?.attribution?.sourceFactorIndex ?: index
     val booleans = source.boolVars.toMutableSet()
@@ -164,12 +169,18 @@ private fun PreparedFactorProjections.installSelectedLinearFactor(
     val attribution = if (source is EncodedTheoryFactor && integerPins.isEmpty() && booleanPins.isEmpty() &&
         encoding.auxiliaryDefinitions().isEmpty() && encoding.guardDefinitions().isEmpty() &&
         encoding.realAuxiliaries.isEmpty()
-    ) source.attribution else EncodingAttribution(sourceIndex,
+    ) {
+        source.attribution
+    } else {
+        EncodingAttribution(
+            sourceIndex,
         booleans.sorted().map(::SourceBoolId), integers.sorted().map(::SourceIntId),
         reals.sorted().map(::SourceRealId), integerConditions = integerPins,
         booleanConditions = booleanPins, auxiliaries = encoding.realAuxiliaries,
         affineAuxiliaries = encoding.auxiliaryDefinitions(),
-        linearGuards = encoding.guardDefinitions(), conditions = conditions)
+        linearGuards = encoding.guardDefinitions(), conditions = conditions,
+        )
+    }
     return forms.map { EncodedTheoryFactor(source, it, attribution) }
 }
 
@@ -178,7 +189,7 @@ private class LinearTheoryEncoding(
     override val sourceFactorIndex: Int,
     private val fixedIntegers: Map<SourceIntId, BigInt>,
     private val fixedBooleans: Map<SourceBoolId, Boolean>,
-    override val cancellation: Cancellation,
+    override val cancellation: ExecutionControl,
     private val booleans: Set<Int>,
     private val integers: Set<Int>,
     private val reals: Set<Int>,
@@ -308,19 +319,23 @@ private class LinearTheoryEncoding(
                 }
                 lowering.relation(formula.form)
             }
+
             is LinearEncodingFormula.Comparison -> {
                 val (terms, constant) = expand(formula.expression)
                 val row = ExactSearchRow.of(terms.keys.toIntArray(), terms.values.toList(), formula.relation,
                     formula.bound - constant, formula.strict)
                 lowering.relation(row.linearForm)
             }
+
             is LinearEncodingFormula.Guard -> {
                 require(formula.guard.owner === owner) { "foreign encoding guard" }
                 val index = formula.guard.index
                 require(index !in active) { "cyclic encoding guard definition" }
                 clauses(checkNotNull(guards[index]), active + index)
             }
+
             is LinearEncodingFormula.And -> lowering.and(formula.operands.map { clauses(it, active) })
+
             is LinearEncodingFormula.Or -> lowering.or(formula.operands.map { clauses(it, active) })
         }
     }

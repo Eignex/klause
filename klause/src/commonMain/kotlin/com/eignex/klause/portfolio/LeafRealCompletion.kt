@@ -20,7 +20,7 @@ import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.solver.validation.permitsToleranceOptimum
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.AbsRealCompletion
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.math.ceil
 
 /**
@@ -47,7 +47,7 @@ internal class LeafRealCompletion(
     var observeLp: ((LpVerdict, LpStats) -> Unit)? = null
     var observeFloat: ((Sample) -> Unit)? = null
 
-    override fun complete(candidate: Sample, cancellation: Cancellation): Completion {
+    override fun complete(candidate: Sample, cancellation: ExecutionControl): Completion {
         if (objective == null || objective.realCoefficientValues.all { it == 0.0 }) {
             absCompletion?.let { completion ->
                 val checked = completion.complete(candidate, cancellation)

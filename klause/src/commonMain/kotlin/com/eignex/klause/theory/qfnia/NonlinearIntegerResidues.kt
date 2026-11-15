@@ -12,9 +12,9 @@ import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.div
 import com.eignex.util.numbers.gcd
 import com.eignex.util.numbers.magnitudeBitLength
-import com.eignex.util.numbers.remainderOf as integerRemainder
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLong
+import com.eignex.util.numbers.remainderOf as integerRemainder
 
 internal data class NonlinearIntegerResidueCounts(
     val rings: Long = 0,

@@ -2,14 +2,14 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.unaryMinus
 
-internal fun Problem.requiresExactObjectiveRoute(objective: LinearObjective?, stop: Cancellation): Boolean {
+internal fun Problem.requiresExactObjectiveRoute(objective: LinearObjective?, stop: ExecutionControl): Boolean {
     if (objective == null) return false
     for (coefficient in objective.realCoefficientValues) {
         stop.charge(1)

@@ -566,6 +566,19 @@ discovery and stops posting chains when it fires.
 
 [PresolveBudget](../klause/src/commonMain/kotlin/com/eignex/klause/presolve/PresolveBudget.kt)
 owns one deterministic phase allowance across routing, passes, probes and rebuilds.
+Execution controls bind its work sink explicitly. Scans check remaining phase
+credit directly and observe external cancellation at bounded checkpoints; attaching
+accounting does not change the polling cadence.
+Structural scans bind their work sink and serial quota at entry. Scalar polling
+checks the quota directly and observes external stops within 256 polls; entry,
+rewrite publication and exit force observation. Nested arithmetic uses the full
+stop surface, so scalar and arithmetic cadences do not multiply.
+Serial arithmetic admission reserves only available slice credit and returns its
+unused prefix at scope exit. Reserved credit does not count as spent. Source
+preparation carries this admission through its diagnostic work sink.
+Views intersect admission only when they debit the same containing allowance.
+Remaining quota excludes spent work; available credit also excludes outstanding
+reservations. Temporarily held credit cannot establish exhaustion.
 The CLI also bounds optional work by an elapsed ceiling; `presolve-work-limit=unlimited`
 removes only the work cap. Host speed can therefore affect which reductions finish.
 [Resource configuration](06-sessions.md#configuration-and-lifetime) owns these controls.
@@ -627,9 +640,12 @@ retains completed sound reductions and discards unfinished analysis. The followi
 families describe the premises and preservation guarantees of those reductions.
 Both lanes poll after entry charging and meter factor, column, term, signature
 and rewrite visits. Bound fusion, duplicate-column and subsumption scans accumulate
-those charges and flush them and poll the pass token every 64 visits or 4,096 units,
+those charges and flush them and poll the pass token every 64 visits,
 and immediately at entry and before publishing, so a stop overruns by at most one
-stride. Duplicate-column aggregation, bound fusion and source duplicate/domination
+stride. Native allowance-backed scans reserve credit before advancing and settle
+used credit at boundaries; other work sinks accumulate completed debits without
+reservations. Work prices do not set the clock cadence.
+Duplicate-column aggregation, bound fusion and source duplicate/domination
 indexing discard unfinished transactions. Structural reduction
 retains only fully collected factor rewrites and their bound tightenings; factor
 hooks and structural-key construction remain atomic.

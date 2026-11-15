@@ -26,7 +26,7 @@ import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceScope
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal data class LinearAuthorityLpShape(
     val inputRows: Int, val rows: Int, val columns: Int, val admitted: Boolean,
@@ -107,7 +107,7 @@ internal class LinearAuthorityLp(
         rows: List<ExactRationalInequality>,
         costs: List<BigFraction>,
         constant: BigFraction,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         inactive: Set<Int> = emptySet(),
         onDecline: (String) -> Unit = {},
         claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
@@ -126,23 +126,40 @@ internal class LinearAuthorityLp(
                 ExactLpNumber.of(constant),
             )
             fun model() = ExactLpModel(
-                costs.indices.map { column -> workingRows.mapIndexedNotNull { index, row ->
-                    row.columns.indexOf(column).takeIf { it >= 0 }?.let {
-                        ExactLpEntry(index, ExactLpNumber.of(row.coefficients[it]))
+                costs.indices.map { column ->
+                    workingRows.mapIndexedNotNull { index, row ->
+                        row.columns.indexOf(column).takeIf { it >= 0 }?.let {
+                            ExactLpEntry(index, ExactLpNumber.of(row.coefficients[it]))
+                        }
                     }
-                } },
+                },
                 workingRows.map { ExactLpNumber.of(it.rhs) },
-                (if (retained == null) packed.columns else packed.columns.map {
+                (
+                    if (retained == null) {
+                    packed.columns
+                } else {
+                    packed.columns.map {
                     it.copy(bounds = ExactLpBounds())
-                }) + workingRows.map {
+                }
+                }
+                ) + workingRows.map {
                     ExactLpColumn(ExactLpBounds(ExactLpSide(zero, it.strict)), integral = false)
                 },
                 workingRows.map { ExactLpRow(strict = it.strict) },
                 objective,
             )
-            val owner = if (retained != null) retained.bind(packed, objective, token, ::model)
-                ?: return@runPrepared null else LpScopedSolver(LpExactState(model()), token, context = budget.context,
-                    iterationLimit = 1024, workLimit = 2_000_000L)
+            val owner = if (retained != null) {
+                retained.bind(packed, objective, token, ::model)
+                ?: return@runPrepared null
+            } else {
+                LpScopedSolver(
+                LpExactState(model()),
+                token,
+                context = budget.context,
+                iterationLimit = 1024,
+                workLimit = 2_000_000L,
+            )
+            }
             val preparation = owner.metrics.preparationWork
             val refinement = owner.refinementCache.work
             try {
@@ -156,7 +173,9 @@ internal class LinearAuthorityLp(
                     MutableList(workingRows.size) { BigFraction.ZERO }.also { weights ->
                         for (id in conflict.rows.indices) weights[conflict.rows[id]] += conflict.multipliers[id]
                     }
-                } else result.farkasRay?.map { BigFraction.ofLong(it).negated() }
+                } else {
+                    result.farkasRay?.map { BigFraction.ofLong(it).negated() }
+                }
                 val conflictWeights = conflictMultipliers?.let {
                     packed.lift(it, List(costs.size) { BigFraction.ZERO }, token)
                 }
@@ -178,7 +197,7 @@ internal class LinearAuthorityLp(
         costs: List<BigFraction>,
         constant: BigFraction,
         scope: SourceScope,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         inactive: Set<Int>,
         unconditionalRows: Boolean,
     ): LinearAuthorityLpGuidance? {
@@ -202,8 +221,11 @@ internal class LinearAuthorityLp(
         }
         var phase: String? = null
         var workingRows = packed.rows.size
-        val policy = if (unconditionalRows) guidancePolicy else
+        val policy = if (unconditionalRows) {
+            guidancePolicy
+        } else {
             guidancePolicy.copy(rowPolicy = SparseSourceLpRowPolicy.IDENTITY)
+        }
         return retained.advance(
             packed, costs, constant, scope, cancellation, policy, observer,
         ) guideResult@{ guide, prepared, token ->
@@ -251,8 +273,12 @@ internal class LinearAuthorityLp(
     }
 
     fun recover(
-        coordinates: List<SourceCoordinate>, point: List<BigFraction>, rows: List<ExactRationalInequality>,
-        inactive: Set<Int>, cancellation: Cancellation, observe: (String, Long) -> Unit,
+        coordinates: List<SourceCoordinate>,
+        point: List<BigFraction>,
+        rows: List<ExactRationalInequality>,
+        inactive: Set<Int>,
+        cancellation: ExecutionControl,
+        observe: (String, Long) -> Unit,
         progress: LinearPrimalRecoveryProgress,
     ): List<BigFraction>? = session?.withGuidance(cancellation) { token ->
         recoverLinearPrimal(coordinates, point, rows, inactive, token, complete = { residual, columns, active ->
@@ -282,8 +308,13 @@ internal class LinearAuthorityLp(
     }
 
     fun refine(
-        coordinates: List<SourceCoordinate>, point: List<BigFraction>, rows: List<ExactRationalInequality>,
-        inactive: Set<Int>, costs: List<BigFraction>, cancellation: Cancellation, observe: (String, Long) -> Unit,
+        coordinates: List<SourceCoordinate>,
+        point: List<BigFraction>,
+        rows: List<ExactRationalInequality>,
+        inactive: Set<Int>,
+        costs: List<BigFraction>,
+        cancellation: ExecutionControl,
+        observe: (String, Long) -> Unit,
     ): List<BigFraction>? = session?.withGuidance(cancellation) { token ->
         refineLinearPrimal(coordinates, point, rows, inactive, costs, token, complete = { residual, objective, active ->
             val retained = objectiveCompletion ?: LinearResidualCompletion(budget, guidancePolicy,
@@ -303,10 +334,12 @@ internal class LinearAuthorityLp(
         coefficients: List<BigFraction>,
         rhs: BigFraction,
         strict: Boolean,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): List<BigFraction>? {
-        if (session != null) return LinearAuthorityLp(budget, onShape, onPhase = onPhase).use {
+        if (session != null) {
+            return LinearAuthorityLp(budget, onShape, onPhase = onPhase).use {
             it.combination(rows, coefficients, rhs, strict, cancellation)
+        }
         }
         val count = rows.size
         val constraints = ArrayList<ExactRationalInequality>()
@@ -322,8 +355,13 @@ internal class LinearAuthorityLp(
         }
         equality(rows.map { it.rhs } + if (strict) listOf(BigFraction.ZERO) else emptyList(), rhs)
         val variables = count + if (strict) 1 else 0
-        for (id in 0 until variables) constraints += ExactRationalInequality(intArrayOf(id),
-            listOf(BigFraction.MINUS_ONE), BigFraction.ZERO)
+        for (id in 0 until variables) {
+            constraints += ExactRationalInequality(
+            intArrayOf(id),
+            listOf(BigFraction.MINUS_ONE),
+            BigFraction.ZERO,
+        )
+        }
         if (strict) {
             val selected = rows.indices.filter { rows[it].strict }
             if (selected.isEmpty()) return null

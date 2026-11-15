@@ -1,6 +1,6 @@
 package com.eignex.klause.arithmetic.difference
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 
 internal enum class DifferencePathCompletion { Completed, Abandoned, Declined }
@@ -25,7 +25,7 @@ internal class DifferencePathScratch(size: Int) {
     var completion = DifferencePathCompletion.Declined
     private var stamp = 0
 
-    fun begin(source: Int, endpoints: IntArray, stop: Cancellation): Int {
+    fun begin(source: Int, endpoints: IntArray, stop: ExecutionControl): Int {
         completion = DifferencePathCompletion.Declined
         if (stamp == Int.MAX_VALUE) {
             stop.charge(reached.size * 3L)
@@ -61,7 +61,7 @@ internal class DifferencePathScratch(size: Int) {
     fun reach(node: Int) { reached[node] = stamp }
 
     @Suppress("ReturnCount")
-    fun pathTo(node: Int, source: IntArray, stop: Cancellation = Cancellation.Never): IntArray? {
+    fun pathTo(node: Int, source: IntArray, stop: ExecutionControl = ExecutionControl.Never): IntArray? {
         if (completion != DifferencePathCompletion.Completed || !settled(node)) return null
         stop.charge(predecessor.size.toLong())
         if (stop()) return null
@@ -95,7 +95,7 @@ internal fun differenceShortestPaths(
     origin: Int,
     needed: IntArray,
     scratch: DifferencePathScratch,
-    stop: Cancellation = Cancellation.Never,
+    stop: ExecutionControl = ExecutionControl.Never,
     skipped: BooleanArray? = null,
 ): DifferencePathCompletion {
     var pending = scratch.begin(origin, needed, stop)
@@ -150,13 +150,13 @@ internal class DifferenceLongHeap(capacity: Int) {
 
     fun isEmpty(): Boolean = size == 0
 
-    fun clear(stop: Cancellation = Cancellation.Never) {
+    fun clear(stop: ExecutionControl = ExecutionControl.Never) {
         stop.charge(size.toLong())
         for (i in 0 until size) pos[heap[i]] = -1
         size = 0
     }
 
-    fun push(id: Int, key: Long, stop: Cancellation = Cancellation.Never) {
+    fun push(id: Int, key: Long, stop: ExecutionControl = ExecutionControl.Never) {
         val p = pos[id]
         if (p >= 0) {
             if (key >= keys[id]) return
@@ -171,7 +171,7 @@ internal class DifferenceLongHeap(capacity: Int) {
         siftUp(size - 1, stop)
     }
 
-    fun pop(stop: Cancellation = Cancellation.Never): Int {
+    fun pop(stop: ExecutionControl = ExecutionControl.Never): Int {
         val top = heap[0]
         pos[top] = -1
         size--
@@ -183,7 +183,7 @@ internal class DifferenceLongHeap(capacity: Int) {
         return top
     }
 
-    private fun siftUp(start: Int, stop: Cancellation) {
+    private fun siftUp(start: Int, stop: ExecutionControl) {
         var i = start
         while (i > 0) {
             stop.charge(1)
@@ -194,7 +194,7 @@ internal class DifferenceLongHeap(capacity: Int) {
         }
     }
 
-    private fun siftDown(start: Int, stop: Cancellation) {
+    private fun siftDown(start: Int, stop: ExecutionControl) {
         var i = start
         while (true) {
             stop.charge(1)

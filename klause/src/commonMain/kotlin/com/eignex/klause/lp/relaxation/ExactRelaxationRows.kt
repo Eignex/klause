@@ -11,7 +11,7 @@ import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class ExactRelaxationRows {
     private class Row(val columns: IntArray, val coefficients: List<BigFraction>, val rhs: BigFraction)
@@ -33,7 +33,7 @@ internal class ExactRelaxationRows {
             validity = premises)
     }
 
-    fun project(model: LpModel, cancellation: Cancellation): LpModel? {
+    fun project(model: LpModel, cancellation: ExecutionControl): LpModel? {
         if (rows.isEmpty()) return model
         val original = model.authoritativeModel() ?: return null
         val matrix = List(model.n) { column ->

@@ -19,7 +19,7 @@ import com.eignex.klause.solver.result.QuadraticIncumbent
 import com.eignex.klause.solver.result.QuadraticObjectiveBound
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -89,7 +89,7 @@ class SourceQuadraticEvidenceTest {
             "fixture-engine",
             derivation = null,
             boundDerivation = SourceQuadraticBoxDerivation,
-            cancellation = Cancellation.Never,
+            cancellation = ExecutionControl.Never,
         )
 
         val terminalResult = assertIs<QuadraticOptimizationResult.Optimal>(captured, "captured variant")

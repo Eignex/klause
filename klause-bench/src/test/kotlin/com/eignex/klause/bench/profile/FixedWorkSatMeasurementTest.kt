@@ -1,7 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.sha256
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonObject
@@ -30,8 +30,10 @@ class FixedWorkSatMeasurementTest {
         val first = measure(FixedWorkUnit.CONFLICTS, 20, index = 0, source = pigeonhole(6, 5))
         val second = measure(FixedWorkUnit.CONFLICTS, 20, index = 1, source = pigeonhole(6, 5))
 
-        assertEquals(first.path("trajectory", "prefix").text("digest"),
-            second.path("trajectory", "prefix").text("digest"))
+        assertEquals(
+            first.path("trajectory", "prefix").text("digest"),
+            second.path("trajectory", "prefix").text("digest"),
+        )
         assertEquals("cold", first.text("jvmState"))
         assertEquals("warm", second.text("jvmState"))
     }
@@ -57,7 +59,11 @@ class FixedWorkSatMeasurementTest {
     @Test
     fun `a deadline during search reports interrupted partial work`() {
         var polls = 0
-        val record = measure(FixedWorkUnit.CONFLICTS, 1_000_000, deadline = Cancellation { ++polls > DEADLINE_POLLS })
+        val record = measure(
+            FixedWorkUnit.CONFLICTS,
+            1_000_000,
+            deadline = ExecutionControl { ++polls > DEADLINE_POLLS },
+        )
 
         assertEquals("deadline", record.text("stop"))
         assertTrue(record.flag("interrupted"))
@@ -81,17 +87,21 @@ class FixedWorkSatMeasurementTest {
         limit: Long,
         index: Int = 0,
         traceRows: Int = 1024,
-        deadline: Cancellation? = null,
+        deadline: ExecutionControl? = null,
         source: ByteArray = pigeonhole(7, 6),
     ): JsonObject {
         val out = createTempDirectory("fixed-work-sat").toFile()
         try {
-            val request = FixedWorkRequest(out.resolve("php.cnf").path, sha256(source), 1, "clausal-balanced",
-                unit, limit, 10_000, 0, traceRows)
+            val request = FixedWorkRequest(
+                out.resolve("php.cnf").path, sha256(source), 1, "clausal-balanced",
+                unit, limit, 10_000, 0, traceRows,
+            )
             val trace = out.resolve(FixedWorkSatMeasurement.TRACE)
             val record = if (deadline == null) {
                 FixedWorkSatMeasurement.invoke(source, request, index, true, trace)
-            } else FixedWorkSatMeasurement.invoke(source, request, index, true, trace, deadline)
+            } else {
+                FixedWorkSatMeasurement.invoke(source, request, index, true, trace, deadline)
+            }
             if (traceRows > 0) {
                 assertEquals(record.path("trajectory").number("rowsWritten"), trace.readLines().size.toLong())
             }
@@ -117,8 +127,12 @@ class FixedWorkSatMeasurementTest {
             fun variable(pigeon: Int, hole: Int) = pigeon * holes + hole + 1
             val clauses = buildList {
                 for (pigeon in 0 until pigeons) add((0 until holes).map { variable(pigeon, it) })
-                for (hole in 0 until holes) for (a in 0 until pigeons) for (b in a + 1 until pigeons) {
-                    add(listOf(-variable(a, hole), -variable(b, hole)))
+                for (hole in 0 until holes) {
+                    for (a in 0 until pigeons) {
+                        for (b in a + 1 until pigeons) {
+                            add(listOf(-variable(a, hole), -variable(b, hole)))
+                        }
+                    }
                 }
             }
             append("p cnf ${pigeons * holes} ${clauses.size}\n")

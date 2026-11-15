@@ -36,7 +36,7 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
 
     fun proposeActiveRows(
         model: QuadraticModel, start: List<Double>, iterations: Int = 32,
-    ): List<Int>? = control.operation(64) {
+    ): List<Int>? = control.operation(256) {
         control.step()
         require(start.size == model.dimension && iterations >= 0)
         val numeric = prepare(model, start) ?: return@operation null
@@ -121,13 +121,13 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
 
     private fun dot(initial: Double, left: DoubleArray, right: DoubleArray): Double {
         if (left.isEmpty()) return initial
-        repeat(left.size) { control.step() }
+        control.steps(left.size)
         return initial + koblas.dot(left, 0, right, 0, left.size)
     }
 
     private fun axpy(alpha: Double, source: DoubleArray, destination: DoubleArray) {
         if (source.isEmpty()) return
-        repeat(source.size) { control.step() }
+        control.steps(source.size)
         koblas.axpy(destination, 0, alpha, source, 0, source.size)
     }
 

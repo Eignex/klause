@@ -13,7 +13,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -63,8 +63,8 @@ class AbsRealCompletionTest {
         )
         val completion = LeafRealCompletion(source, null)
 
-        val refuted = completion.complete(Sample(BooleanArray(0), longArrayOf(0)), Cancellation.Never)
-        val sibling = completion.complete(Sample(BooleanArray(0), longArrayOf(-1)), Cancellation.Never)
+        val refuted = completion.complete(Sample(BooleanArray(0), longArrayOf(0)), ExecutionControl.Never)
+        val sibling = completion.complete(Sample(BooleanArray(0), longArrayOf(-1)), ExecutionControl.Never)
 
         assertIs<Completion.Refuted>(refuted)
         assertTrue(refuted.work > 0L)
@@ -135,13 +135,13 @@ class AbsRealCompletionTest {
         )
         val completion = AbsRealCompletion(source)
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 7L
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val interrupted = completion.complete(Sample(BooleanArray(0), LongArray(0)), stop)
-        val sibling = completion.complete(Sample(BooleanArray(0), LongArray(0)), Cancellation.Never)
+        val sibling = completion.complete(Sample(BooleanArray(0), LongArray(0)), ExecutionControl.Never)
 
         assertIs<AbsRealCompletion.Result.Undecided>(interrupted.result)
         assertEquals(charged, interrupted.work)

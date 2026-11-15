@@ -11,17 +11,17 @@ import com.eignex.klause.solver.search.RegisteredTheoryDecision
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceBoundAtom
-import com.eignex.klause.util.Cancellation
-import java.io.File
-import java.lang.reflect.Method
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.reflect.Method
 
 internal object LinearDisjunctionInspection {
-    fun inspect(engine: Any, stop: Cancellation, out: File) {
+    fun inspect(engine: Any, stop: ExecutionControl, out: File) {
         val started = System.nanoTime()
         if (stop()) {
             skipped(out, "original-deadline-spent", stop)
@@ -80,7 +80,7 @@ internal object LinearDisjunctionInspection {
     }
 
     private fun replay(
-        component: Any, register: Method, fragment: Problem, sourceBooleans: Int, stop: Cancellation,
+        component: Any, register: Method, fragment: Problem, sourceBooleans: Int, stop: ExecutionControl,
     ): JsonObject {
         val registry = SearchAtomRegistry(sourceBooleans)
         val context = SearchSession(emptyList(), cancellation = stop, atoms = registry)
@@ -192,7 +192,7 @@ internal object LinearDisjunctionInspection {
     private fun assertions(registry: SearchAtomRegistry): List<RegisteredTheoryDecision> =
         (field(registry, "assertions") as List<*>).map { it as RegisteredTheoryDecision }
 
-    private fun skipped(out: File, reason: String, stop: Cancellation) {
+    private fun skipped(out: File, reason: String, stop: ExecutionControl) {
         val result = buildJsonObject {
             put("mode", "isolated-disjunction-naming")
             put("status", "skipped")

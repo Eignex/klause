@@ -6,7 +6,7 @@ import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.qfnra.PolynomialCondition
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
@@ -128,7 +128,7 @@ class NonlinearIntegerBoundsTest {
         val source = problem("(declare-const n Int) (assert (> n 0))")
 
         assertFailsWith<PolynomialInterrupted> {
-            source.integerBounds(PolynomialCondition(), PolynomialArithmetic(Cancellation { true }))
+            source.integerBounds(PolynomialCondition(), PolynomialArithmetic(ExecutionControl { true }))
         }
     }
 

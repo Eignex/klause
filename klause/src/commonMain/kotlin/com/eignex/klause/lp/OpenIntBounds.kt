@@ -12,7 +12,7 @@ import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.certifiedTightVariableBound
 import com.eignex.klause.lp.engine.columnNeighborhood
 import com.eignex.klause.lp.engine.rowIndex
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyDoubleArray
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.addExact
@@ -82,7 +82,7 @@ internal class TightenedIntBounds(val bounds: Array<OpenIntBounds>, val refuted:
 internal fun tightenOpenIntBounds(
     bounds: Array<OpenIntBounds>,
     constraints: List<Linear>,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     realConstraints: List<Linear> = emptyList(),
     realLower: DoubleArray = emptyDoubleArray(),
     realUpper: DoubleArray = emptyDoubleArray(),
@@ -172,7 +172,7 @@ private fun tightenByNeighborhoodProbes(
     work: Array<OpenIntBounds>,
     posCol: IntArray,
     negCol: IntArray,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     observer: LpCertificationObserver?,
     context: LpSolveContext,
 ): Array<OpenIntBounds> {
@@ -304,7 +304,7 @@ private const val FBBT_CANCEL_POLL = 64
 private fun fbbtTightenOpenIntBounds(
     bounds: Array<OpenIntBounds>,
     constraints: List<Linear>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     realRows: List<Linear> = emptyList(),
     rLo: DoubleArray = emptyDoubleArray(),
     rUp: DoubleArray = emptyDoubleArray(),
@@ -420,60 +420,61 @@ internal fun propagateRow(
     sign: Long,
     b: IntervalBounds,
     visit: (() -> Boolean)? = null,
-): Boolean =
-    try {
-        val effBound = mulExact(sign, bound)
-        // Minimum activity Σ min(aⱼ·xⱼ) over finite terms, plus how many terms are −∞ (open on the min side).
-        var minActivity = 0L
-        var numInf = 0
-        var infIdx = -1
-        for (idx in coeffs.indices) {
-            if (visit != null && !visit()) return false
-            val a = mulExact(sign, coeffs[idx])
-            if (a == 0L) continue
-            val v = vars[idx]
-            if (if (a > 0L) b.loOpen(v) else b.hiOpen(v)) {
-                numInf++
-                infIdx = idx
-                if (numInf > 1) return false // ≥2 unbounded terms ⇒ the row implies nothing
-            } else {
-                minActivity = addExact(minActivity, mulExact(a, if (a > 0L) b.loVal(v) else b.hiVal(v)))
-            }
+): Boolean = try {
+    val effBound = mulExact(sign, bound)
+    // Minimum activity Σ min(aⱼ·xⱼ) over finite terms, plus how many terms are −∞ (open on the min side).
+    var minActivity = 0L
+    var numInf = 0
+    var infIdx = -1
+    for (idx in coeffs.indices) {
+        if (visit != null && !visit()) return false
+        val a = mulExact(sign, coeffs[idx])
+        if (a == 0L) continue
+        val v = vars[idx]
+        if (if (a > 0L) b.loOpen(v) else b.hiOpen(v)) {
+            numInf++
+            infIdx = idx
+            if (numInf > 1) return false // ≥2 unbounded terms ⇒ the row implies nothing
+        } else {
+            minActivity = addExact(minActivity, mulExact(a, if (a > 0L) b.loVal(v) else b.hiVal(v)))
         }
-        var changed = false
-        for (idx in coeffs.indices) {
-            if (visit != null && !visit()) return false
-            // A collapsed pair is tighter than the rows imply, so nothing may be derived off it.
-            if (b.crossed) break
-            val a = mulExact(sign, coeffs[idx])
-            if (a == 0L) continue
-            val v = vars[idx]
-            val restMin = when {
-                numInf == 0 -> subExact(minActivity, mulExact(a, if (a > 0L) b.loVal(v) else b.hiVal(v)))
-
-                infIdx == idx -> minActivity // this term was the sole −∞; the rest is finite
-
-                else -> continue // the sole −∞ is a different term ⇒ no bound for this one
-            }
-            val num = subExact(effBound, restMin)
-            if (a > 0L) {
-                val cand = floorDivSafe(num, a) ?: continue
-                if (b.hiOpen(v) || cand < b.hiVal(v)) {
-                    b.setHi(v, cand)
-                    changed = true
-                }
-            } else {
-                val cand = ceilDivSafe(num, a) ?: continue
-                if (b.loOpen(v) || cand > b.loVal(v)) {
-                    b.setLo(v, cand)
-                    changed = true
-                }
-            }
-        }
-        changed
-    } catch (_: CheckedLongOverflowException) {
-        false
     }
+    var changed = false
+    for (idx in coeffs.indices) {
+        if (visit != null && !visit()) return false
+        // A collapsed pair is tighter than the rows imply, so nothing may be derived off it.
+        if (b.crossed) break
+        val a = mulExact(sign, coeffs[idx])
+        if (a == 0L) continue
+        val v = vars[idx]
+        val restMin = when {
+            numInf == 0 -> subExact(minActivity, mulExact(a, if (a > 0L) b.loVal(v) else b.hiVal(v)))
+
+            infIdx == idx -> minActivity
+
+            // this term was the sole −∞; the rest is finite
+
+            else -> continue // the sole −∞ is a different term ⇒ no bound for this one
+        }
+        val num = subExact(effBound, restMin)
+        if (a > 0L) {
+            val cand = floorDivSafe(num, a) ?: continue
+            if (b.hiOpen(v) || cand < b.hiVal(v)) {
+                b.setHi(v, cand)
+                changed = true
+            }
+        } else {
+            val cand = ceilDivSafe(num, a) ?: continue
+            if (b.loOpen(v) || cand > b.loVal(v)) {
+                b.setLo(v, cand)
+                changed = true
+            }
+        }
+    }
+    changed
+} catch (_: CheckedLongOverflowException) {
+    false
+}
 
 /**
  * Whether [b] already rules out the row `Σ (sign·coeffs(k))·vars(k) ≤ sign·bound`: every term is bounded on

@@ -35,7 +35,7 @@ import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.toLongExact
@@ -97,9 +97,9 @@ class SelectionEncoderTest {
             realUpper = doubleArrayOf(3.0),
         )
         var work = 0L
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 2
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
         val declines = mutableListOf<EncoderDecline>()
 
@@ -282,11 +282,11 @@ class SelectionEncoderTest {
         OpenExactNeighborhood(source, TheoryParams(), preparedSource = prepared).use {
             val refuted = it.check(
                 ExactNeighborhoodCondition(mapOf(0 to true), emptyMap(), emptyMap()),
-                Cancellation.Never,
+                ExecutionControl.Never,
             )
             val sibling = it.check(
                 ExactNeighborhoodCondition(mapOf(0 to false), emptyMap(), emptyMap()),
-                Cancellation.Never,
+                ExecutionControl.Never,
             )
 
             assertIs<ExactNeighborhoodResult.Refuted>(refuted)

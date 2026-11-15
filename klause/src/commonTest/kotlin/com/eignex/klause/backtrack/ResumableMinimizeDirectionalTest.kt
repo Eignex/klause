@@ -16,7 +16,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -54,7 +54,7 @@ class ResumableMinimizeDirectionalTest {
             while (slices++ < 128 && !search.isDone &&
                 (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("CONSUMED") ?: 0L) == 0L
             ) {
-                search.runSlice(Cancellation.Never, 1000L, 32L) {}
+                search.runSlice(ExecutionControl.Never, 1000L, 32L) {}
             }
 
             val observations = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
@@ -74,7 +74,7 @@ class ResumableMinimizeDirectionalTest {
             lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false))
         val objective = LinearObjective(boolWeights = longArrayOf(1L, 1L))
         ResumableMinimize(BacktrackSolver(problem), objective, params, rebindable = true).use { search ->
-            assertNotNull(search.runSlice(Cancellation.Never, 1000L, 1000L) {})
+            assertNotNull(search.runSlice(ExecutionControl.Never, 1000L, 1000L) {})
             val before = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes["RESET"] ?: 0L
 
             search.rebind(Assumptions.None.withBool(0, false), 1000L)

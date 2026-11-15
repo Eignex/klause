@@ -8,17 +8,17 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpCertifierStats
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.sun.management.ThreadMXBean
-import java.io.File
-import java.lang.management.ManagementFactory
-import kotlin.time.Duration.Companion.seconds
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import kotlin.time.Duration.Companion.seconds
 
 internal object MpsLpQuery {
     fun measure(problem: Problem, objective: LinearObjective, out: File) {
@@ -49,12 +49,12 @@ internal object MpsLpQuery {
     ) {
         val plan = LpPlan(bounding = true, boundMaxDepth = 0, probe = false, cuts = false,
             objectiveCone = mode == "cone-cold", rootBudgetFraction = 0.0)
-        val containing = Cancellation.after(30.seconds)
-        var callStop: Cancellation = containing
-        val token = object : Cancellation {
+        val containing = ExecutionControl.after(30.seconds)
+        var callStop: ExecutionControl = containing
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = callStop()
             override fun deadline() = callStop.deadline()
-            override fun workMeter() = callStop.workMeter()
+            override val accounting get() = callStop.accounting
         }
         var owner: Pair<AutoCloseable, Any>? = null
         val sameRoot = mode.endsWith("-session")
@@ -72,7 +72,7 @@ internal object MpsLpQuery {
         try {
             var repeat = 0
             while (true) {
-                callStop = containing or Cancellation.after(10.seconds)
+                callStop = containing or ExecutionControl.after(10.seconds)
                 val startNs = System.nanoTime()
                 val startBytes = bean.getThreadAllocatedBytes(thread)
                 val reused = owner != null
@@ -179,7 +179,7 @@ internal object MpsLpQuery {
         problem: Problem,
         objective: LinearObjective,
         plan: LpPlan,
-        token: Cancellation,
+        token: ExecutionControl,
         rootPolicy: String,
     ): Pair<AutoCloseable, Any> {
         val routeType = Class.forName("com.eignex.klause.solver.result.LpRoute")
@@ -201,7 +201,7 @@ internal object MpsLpQuery {
         return (constructor.newInstance(*values) as AutoCloseable) to sink
     }
 
-    private fun checkedRootBound(owner: AutoCloseable, token: Cancellation): Double {
+    private fun checkedRootBound(owner: AutoCloseable, token: ExecutionControl): Double {
         val relaxer = owner.javaClass.methods.single { it.name.startsWith("getLpRelaxer") }
             .invoke(owner)
         val type = Class.forName("com.eignex.klause.lp.bounding.LpBoundingKt")

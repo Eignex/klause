@@ -7,7 +7,7 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.solveAndCertify
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.CheckedLongOverflowException
 
 /**
@@ -33,7 +33,7 @@ import com.eignex.util.numbers.CheckedLongOverflowException
 internal fun openLpInfeasible(
     openBounds: Array<OpenIntBounds>,
     constraints: List<Linear>,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     observer: LpCertificationObserver? = null,
     context: LpSolveContext = LpSolveContext.Production,
 ): Boolean {

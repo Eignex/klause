@@ -10,7 +10,7 @@ import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal data class SparseSourceLpLimits(val work: Long, val allocation: Long, val scalarBits: Int = 4096) {
@@ -54,7 +54,8 @@ internal class SparseSourceLp private constructor(
     } ?: intArrayOf(primaryRows[row])
 
     fun emittedInactiveRows(
-        inactive: Set<Int>, cancellation: Cancellation,
+        inactive: Set<Int>,
+        cancellation: ExecutionControl,
         onCost: (Long, Long) -> Boolean,
     ): Set<Int>? {
         if (cancellation()) return null
@@ -87,7 +88,7 @@ internal class SparseSourceLp private constructor(
 
     fun sourceRowWeights(
         weights: List<BigFraction>,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): List<BigFraction>? {
         if (weights.size != emittedRowCount || cancellation()) return null
         val expanded = MutableList(sourceRowCount) { BigFraction.ZERO }
@@ -113,14 +114,15 @@ internal class SparseSourceLp private constructor(
             costs: List<BigFraction>,
             constant: BigFraction,
             limits: SparseSourceLpLimits,
-            cancellation: Cancellation = Cancellation.Never,
+            cancellation: ExecutionControl = ExecutionControl.Never,
             rowPolicy: SparseSourceLpRowPolicy = SparseSourceLpRowPolicy.IDENTITY,
         ): SparseSourceLpPreparation {
             val meter = SparsePreparationMeter(limits, cancellation)
             var inputEntries = 0L
             var emittedEntries = 0L
             fun result(prepared: SparseSourceLp? = null) = SparseSourceLpPreparation(
-                prepared, meter.decline,
+                prepared,
+                meter.decline,
                 SparseSourceLpMetrics(inputEntries, emittedEntries, meter.bits, meter.work, meter.allocation),
             )
             if (!meter.reserve(1L, 0L)) return result()
@@ -133,13 +135,17 @@ internal class SparseSourceLp private constructor(
             val dimension = columns.size.toLong() + rows.size
             if (!meter.reserve(dimension * 8L + 1L, dimension * 256L + 1024L) ||
                 !meter.number(constant)
-            ) return result()
+            ) {
+                return result()
+            }
             for (column in columns.indices) {
                 val descriptor = columns[column]
                 if (!meter.number(costs[column]) || !meter.number(descriptor.origin.value) ||
                     descriptor.bounds.lower?.let { !meter.side(it) } == true ||
                     descriptor.bounds.upper?.let { !meter.side(it) } == true
-                ) return result()
+                ) {
+                    return result()
+                }
             }
             for (row in rows) {
                 if (!meter.number(row.rhs)) return result()
@@ -189,24 +195,40 @@ internal class SparseSourceLp private constructor(
                 rhs += ExactLpNumber.of(row.rhs)
             }
             val model = ExactLpModel(
-                matrix, rhs,
+                matrix,
+                rhs,
                 columns + emittedRows.mapIndexed { id, row ->
                     // Opposing closed inequalities share a fixed logical column; either multiplier sign
                     // lifts to one of the original source rows.
-                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero, row.strict),
-                        ExactLpSide(zero).takeIf { oppositeRows[id] >= 0 }), integral = false)
+                    ExactLpColumn(
+                        ExactLpBounds(
+                            ExactLpSide(zero, row.strict),
+                            ExactLpSide(zero).takeIf { oppositeRows[id] >= 0 },
+                        ),
+                        integral = false,
+                    )
                 },
                 emittedRows.map { ExactLpRow(strict = it.strict) },
-                ExactLpObjective(costs.map(ExactLpNumber::of) + List(emittedRows.size) { zero },
-                    ExactLpNumber.of(constant)),
+                ExactLpObjective(
+                    costs.map(ExactLpNumber::of) + List(emittedRows.size) { zero },
+                    ExactLpNumber.of(constant),
+                ),
             )
             if (!meter.poll()) return result()
             val adjacency = matrix.map { column ->
                 column.map { it.row }.toIntArray()
             }
             if (!meter.poll()) return result()
-            return result(SparseSourceLp(model, rowSupport, adjacency, rows.size,
-                primaryRows.toIntArray(), oppositeRows.toIntArray()))
+            return result(
+                SparseSourceLp(
+                    model,
+                    rowSupport,
+                    adjacency,
+                    rows.size,
+                    primaryRows.toIntArray(),
+                    oppositeRows.toIntArray(),
+                ),
+            )
         }
 
         fun prepare(
@@ -215,13 +237,23 @@ internal class SparseSourceLp private constructor(
             costs: List<BigFraction>,
             constant: BigFraction,
             policy: SparseSourceLpPolicy,
-            cancellation: Cancellation = Cancellation.Never,
-        ): SparseSourceLpPreparation = prepare(rows, columns, costs, constant, policy.preparation,
-            cancellation, policy.rowPolicy)
+            cancellation: ExecutionControl = ExecutionControl.Never,
+        ): SparseSourceLpPreparation = prepare(
+            rows,
+            columns,
+            costs,
+            constant,
+            policy.preparation,
+            cancellation,
+            policy.rowPolicy,
+        )
     }
 }
 
-private class SparsePreparationMeter(private val limits: SparseSourceLpLimits, private val cancellation: Cancellation) {
+private class SparsePreparationMeter(
+    private val limits: SparseSourceLpLimits,
+    private val cancellation: ExecutionControl,
+) {
     var decline: SparseSourceLpDecline? = null
     var work = 0L
         private set
@@ -273,12 +305,16 @@ private class SparsePreparationMeter(private val limits: SparseSourceLpLimits, p
         if (!reserve(1L, 0L)) return false
         if (left.strict || right.strict || left.columns.isEmpty() || left.columns.size != right.columns.size ||
             !opposite(left.rhs, right.rhs)
-        ) return false
+        ) {
+            return false
+        }
         var nonzero = false
         for (entry in left.columns.indices) {
             if (!reserve(1L, 0L) || left.columns[entry] != right.columns[entry] ||
                 !opposite(left.coefficients[entry], right.coefficients[entry])
-            ) return false
+            ) {
+                return false
+            }
             nonzero = nonzero || !left.coefficients[entry].isZero
         }
         return nonzero

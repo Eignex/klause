@@ -2,9 +2,9 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.global.Inverse
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
-internal fun inverseAssignmentView(problem: Problem, stop: Cancellation): Problem? {
+internal fun inverseAssignmentView(problem: Problem, stop: ExecutionControl): Problem? {
     if (problem.numFactors > 4096 || stop()) return null
     val channels = ArrayList<Inverse>()
     for (factor in problem.factors) {

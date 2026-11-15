@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 @Suppress("TooGenericExceptionCaught") // Retire every owner while preserving primary and cleanup failures.
 internal class LpSolveSession(
@@ -17,7 +17,7 @@ internal class LpSolveSession(
 
     fun solve(
         model: LpModel,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         workLimit: Long = 0L,
         observer: LpCertificationObserver? = null,
         counterResults: LpCounterResults? = null,
@@ -55,7 +55,7 @@ internal class LpSolveSession(
     // A float solve whose optimum [floatAccept] admits, or null; it never continues into exact certification.
     fun solveFloat(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         workLimit: Long,
         observer: LpCertificationObserver?,
         floatAccept: (FloatLpResult) -> Boolean,
@@ -87,7 +87,7 @@ internal class LpSolveSession(
 
     fun openSolve(
         model: LpModel,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         workLimit: Long = 0L,
         observer: LpCertificationObserver? = null,
         floatAccept: ((FloatLpResult) -> Boolean)? = null,
@@ -130,7 +130,7 @@ internal class LpSolveSession(
     private suspend fun LpSolveCursor<CertifiedLpResult>.solveFloating(
         current: RetainedLpSolver,
         retained: Boolean,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         observer: LpCertificationObserver?,
         workLimit: Long,
     ): FloatingStage {
@@ -207,7 +207,7 @@ internal class LpSolveSession(
         return CertifiedLpResult(null, null, null, null, null, false, { null })
     }
 
-    private fun prepare(model: LpModel, cancellation: Cancellation, workLimit: Long): RetainedLpSolver? {
+    private fun prepare(model: LpModel, cancellation: ExecutionControl, workLimit: Long): RetainedLpSolver? {
         val state = requireNotNull(model.exactState) { "retained solves require immutable exact authority" }
         if (cancellation()) return null
         val previous = solver
@@ -233,8 +233,12 @@ internal class LpSolveSession(
         val proofs = certification
         certification = LpCertificationSession(context, pricing)
         for (owner in listOfNotNull(previous, proofs)) {
-            try { owner.close() } catch (cleanup: Throwable) {
-                if (failure == null) failure = cleanup else if (failure !== cleanup) failure.addSuppressed(cleanup)
+            try {
+                owner.close()
+            } catch (cleanup: Throwable) {
+                if (failure == null) failure = cleanup else if (failure !== cleanup) {
+                    failure.addSuppressed(cleanup)
+                }
             }
         }
         failure?.let { throw it }

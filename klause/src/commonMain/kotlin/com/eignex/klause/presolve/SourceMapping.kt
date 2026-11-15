@@ -7,7 +7,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceTransformation
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class ObjectiveAdjustment(
     val scale: BigFraction = BigFraction.ONE,
@@ -72,7 +72,7 @@ internal class SourceMapping(
     }
 }
 
-internal fun SourceMapping.retainedCoordinates(cancellation: Cancellation = Cancellation.Never): VarRemap? {
+internal fun SourceMapping.retainedCoordinates(cancellation: ExecutionControl = ExecutionControl.Never): VarRemap? {
     if (cancellation()) return null
     val captured = stages
     for (stage in captured) {

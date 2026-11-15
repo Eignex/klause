@@ -2,14 +2,14 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.LinearToleranceQualification
 import com.eignex.klause.solver.evidence.ToleranceLinearRow
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
-internal fun LinearSourceProblem.toleranceQualification(stop: Cancellation): LinearToleranceQualification? {
+internal fun LinearSourceProblem.toleranceQualification(stop: ExecutionControl): LinearToleranceQualification? {
     fun interrupted(): Boolean {
         stop.charge(1L)
         return stop()

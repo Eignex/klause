@@ -3,7 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.lp.optimization.floorSplit
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class LinearBranchHistory {
     private class Direction {
@@ -29,7 +29,8 @@ internal class LinearBranchHistory {
     }
 
     fun select(
-        candidates: List<Pair<SourceCoordinate, BigFraction>>, cancellation: Cancellation,
+        candidates: List<Pair<SourceCoordinate, BigFraction>>,
+        cancellation: ExecutionControl,
     ): Pair<SourceCoordinate, BigFraction>? {
         var selected = candidates.firstOrNull()
         var best = 0.0

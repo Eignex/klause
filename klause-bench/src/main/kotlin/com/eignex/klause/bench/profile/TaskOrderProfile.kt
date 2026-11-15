@@ -35,7 +35,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -102,7 +102,7 @@ internal object TaskOrderProfile {
         val thread = Thread.currentThread().threadId()
         val allocation = bean.getThreadAllocatedBytes(thread)
         val started = System.nanoTime()
-        val stop = Cancellation.after(5.seconds)
+        val stop = ExecutionControl.after(5.seconds)
         val model = if (arm.orders) withOrderPair(source) else source
         val prepared = PresolvePipeline.run(model, null, PresolveConfig.parse(arm.prepare),
             solutionSetSensitive = false, cancellation = stop, randomSeed = 1)

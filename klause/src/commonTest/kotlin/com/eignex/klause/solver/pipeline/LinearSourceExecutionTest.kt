@@ -28,7 +28,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.LinearSourceCheck
 import com.eignex.klause.solver.validation.LinearSourceWitness
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
@@ -139,7 +139,7 @@ class LinearSourceExecutionTest {
 
         val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
             FiniteSolveRequest(
-                shape, FiniteEngine.BACKTRACK, PresolveConfig(), false, false, Cancellation.Never,
+                shape, FiniteEngine.BACKTRACK, PresolveConfig(), false, false, ExecutionControl.Never,
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
                 randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
                 zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
@@ -177,7 +177,7 @@ class LinearSourceExecutionTest {
 
         val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
             FiniteSolveRequest(
-                shape, FiniteEngine.BACKTRACK, PresolveConfig.NONE, false, false, Cancellation.Never,
+                shape, FiniteEngine.BACKTRACK, PresolveConfig.NONE, false, false, ExecutionControl.Never,
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
                 randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
                 zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
@@ -206,7 +206,7 @@ class LinearSourceExecutionTest {
         )
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
-            maximize = true, boundCancellation = Cancellation { true },
+            maximize = true, boundCancellation = ExecutionControl { true },
         ))
 
         val result = SourceSetup.execute(SourceExecutionRequest(invocation,
@@ -232,7 +232,7 @@ class LinearSourceExecutionTest {
 
         val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
             FiniteSolveRequest(
-                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
                 randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
                 zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
@@ -262,7 +262,7 @@ class LinearSourceExecutionTest {
 
         val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
             FiniteSolveRequest(
-                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
                 randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
                 zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
@@ -316,7 +316,7 @@ class LinearSourceExecutionTest {
         )
 
         val checked = assertIs<LinearSourceCheck.Accepted>(
-            assertNotNull(invocation.linearSource).check(rebuilt, Cancellation.Never),
+            assertNotNull(invocation.linearSource).check(rebuilt, ExecutionControl.Never),
         )
 
         assertEquals(listOf(BigFraction.ofLong(3), exact), checked.witness.values)
@@ -433,7 +433,7 @@ class LinearSourceExecutionTest {
                 SourceAttachment(source, ProblemSettings()),
                 ExecutionOperation.SATISFY,
                 FiniteEngine.FIXED,
-                cancellation = Cancellation { true },
+                cancellation = ExecutionControl { true },
             ),
         )
 
@@ -496,7 +496,7 @@ class LinearSourceExecutionTest {
             SourceSetup.execute(
                 SourceExecutionRequest(invocation, finiteRequest = { shape ->
                     FiniteSolveRequest(
-                        shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+                        shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
                         presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
                         randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.OFF,
                         zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
@@ -550,7 +550,7 @@ class LinearSourceExecutionTest {
         val second = SourceSetup.execute(
             SourceExecutionRequest(
                 invocation,
-                theory = TheoryParams(cancellation = Cancellation { true }),
+                theory = TheoryParams(cancellation = ExecutionControl { true }),
             ),
         )
 
@@ -621,7 +621,7 @@ class LinearSourceExecutionTest {
         val result = SourceSetup.execute(
             SourceExecutionRequest(invocation, finiteRequest = { shape ->
             FiniteSolveRequest(
-                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
                 randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
                 zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
@@ -663,7 +663,7 @@ class LinearSourceExecutionTest {
         val result = SourceSetup.execute(
             SourceExecutionRequest(invocation, finiteRequest = { shape ->
             FiniteSolveRequest(
-                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
                 randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
                 zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
@@ -748,7 +748,7 @@ class LinearSourceExecutionTest {
         val result = SourceSetup.execute(
             SourceExecutionRequest(invocation, finiteRequest = { shape ->
             FiniteSolveRequest(
-                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
                 randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
                 zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
@@ -784,7 +784,7 @@ class LinearSourceExecutionTest {
             SourceExecutionRequest(invocation),
             SourceExecutionCallbacks(onLinearSourceIncumbent = points::add),
         ) { _, callbacks, bind ->
-            assertNotNull(bind).invoke(Cancellation { true }, true)
+            assertNotNull(bind).invoke(ExecutionControl { true }, true)
             callbacks.finite.onSample(Sample(booleanArrayOf(), longArrayOf(2)))
             SourceExecutionResult.Declined(invocation, TerminationReason.Cancelled)
         }
@@ -811,7 +811,7 @@ class LinearSourceExecutionTest {
         val result = SourceSetup.execute(
             SourceExecutionRequest(invocation, finiteRequest = { shape ->
             FiniteSolveRequest(
-                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
                 randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
                 zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,

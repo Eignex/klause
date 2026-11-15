@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.lattice
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
@@ -69,7 +69,7 @@ internal fun bareissEchelon(
     a: List<SparseIntRow>,
     cols: Int,
     rhsIn: Array<BigInt>? = null,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     limits: EchelonLimits? = null,
 ): BareissEchelon {
     val m = a.size
@@ -167,7 +167,7 @@ private fun combine(
     scaleTarget: BigInt,
     source: SparseIntRow,
     scaleSource: BigInt,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): SparseIntRow? {
     if (cancellation()) return null
     val ti = target.index

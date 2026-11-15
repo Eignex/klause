@@ -21,7 +21,7 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -43,9 +43,9 @@ class FinitePortfolioExecutorTest {
         val schedules = listOf(InitialProbePolicy.FAMILY_WORK, InitialProbePolicy.HEURISTIC_WORK,
             InitialProbePolicy.ALNS_WORK).map { policy ->
             val invocation = FinitePipeline.portfolioExecutor(source.bake(), scenario, objective, null, null,
-                null, null, prepared, Cancellation.after(1.seconds), numericalCompletion = false,
+                null, null, prepared, ExecutionControl.after(1.seconds), numericalCompletion = false,
                 probePolicy = policy)
-            invocation.use { it.minimize(Cancellation { true }, null) }.stats.portfolio
+            invocation.use { it.minimize(ExecutionControl { true }, null) }.stats.portfolio
         }
 
         assertEquals(schedules[0].arms.map { it.label }, schedules[1].arms.map { it.label })
@@ -68,7 +68,7 @@ class FinitePortfolioExecutorTest {
 
             Portfolio(workers, fixedBandit(4, 0)).also {
                 if (early) it.initialProbeRanks = heuristicSecondProbeRanks(workers)
-            }.use { it.minimize(Cancellation { visits.size >= 4 }) }
+            }.use { it.minimize(ExecutionControl { visits.size >= 4 }) }
 
             assertEquals(if (early) listOf(0, 2, 1, 3) else listOf(0, 1, 2, 3), visits)
         }
@@ -90,7 +90,7 @@ class FinitePortfolioExecutorTest {
 
             Portfolio(workers, fixedBandit(3, 2)).also {
                 it.initialProbeRanks = heuristicSecondProbeRanks(workers)
-            }.use { it.minimize(Cancellation { visits.size >= 2 }) }
+            }.use { it.minimize(ExecutionControl { visits.size >= 2 }) }
 
             assertEquals(listOf(0, 1), visits)
         }
@@ -112,7 +112,7 @@ class FinitePortfolioExecutorTest {
         Portfolio(workers, fixedBandit(3, 2), reseedStaleThreshold = 0).also {
             it.runTimeSource = clock
             it.initialProbeRanks = heuristicSecondProbeRanks(workers)
-        }.use { it.minimize(Cancellation { elapsed.sum() >= 8_000L }) }
+        }.use { it.minimize(ExecutionControl { elapsed.sum() >= 8_000L }) }
 
         assertEquals(listOf(0, 2, 1), visits.take(3))
         val owed = (elapsed.sum() - 200L) / 4
@@ -202,7 +202,7 @@ class FinitePortfolioExecutorTest {
             Portfolio(workers, fixedBandit(3, 0)).also {
                 it.initialProbeWeights = if (transfer) lpTransferredProbeWeights(workers)
                 else leadingProbeWeights(workers)
-            }.use { it.minimize(Cancellation { visits.size >= 3 }) }
+            }.use { it.minimize(ExecutionControl { visits.size >= 3 }) }
 
             assertEquals(listOf(0, 1, 2), visits)
         }
@@ -235,7 +235,7 @@ class FinitePortfolioExecutorTest {
             val observer = deferredLpProbes(workers)
 
             Portfolio(workers, fixedBandit(3, 1), onProgress = observer).use {
-                it.minimize(Cancellation { visits.size >= 3 })
+                it.minimize(ExecutionControl { visits.size >= 3 })
             }
 
             assertEquals(listOf(1, 2, 0), visits)
@@ -253,7 +253,7 @@ class FinitePortfolioExecutorTest {
         val observer = deferredLpProbes(workers)
 
         Portfolio(workers, fixedBandit(3, 1), onProgress = observer).use {
-            it.minimize(Cancellation { visits.size >= 3 })
+            it.minimize(ExecutionControl { visits.size >= 3 })
         }
 
         assertEquals(listOf(1, 0, 2), visits)
@@ -277,7 +277,7 @@ class FinitePortfolioExecutorTest {
 
         Portfolio(workers, fixedBandit(3, 1), reseedStaleThreshold = 0, onProgress = observer).also {
             it.runTimeSource = clock
-        }.use { it.minimize(Cancellation { elapsed.sum() >= 8_000L }) }
+        }.use { it.minimize(ExecutionControl { elapsed.sum() >= 8_000L }) }
 
         assertTrue(elapsed[0] >= (elapsed.sum() - 100L) / 2 - 100L)
     }
@@ -293,9 +293,9 @@ class FinitePortfolioExecutorTest {
             val trace = mutableListOf<PortfolioEvent>()
             val executor = FinitePipeline.portfolioExecutor(source.bake(), scenario, objective, null, null,
                 { _, event -> if (event is SearchEvent.PortfolioDiagnostic) trace += event.event },
-                null, prepared, Cancellation.Never)
+                null, prepared, ExecutionControl.Never)
 
-            executor.use { it.minimize(Cancellation.Never, null) }
+            executor.use { it.minimize(ExecutionControl.Never, null) }
             trace
         }
 
@@ -363,10 +363,10 @@ class FinitePortfolioExecutorTest {
         )
         val invocation = FinitePipeline.portfolioExecutor(
             source.bake(), scenario, objective, null, null, null,
-            null, prepared, Cancellation.Never,
+            null, prepared, ExecutionControl.Never,
         )
 
-        val result = invocation.use { it.minimize(Cancellation.Never, null) }
+        val result = invocation.use { it.minimize(ExecutionControl.Never, null) }
 
         assertFalse(result is MinimizeResult.Optimal)
     }
@@ -379,11 +379,11 @@ class FinitePortfolioExecutorTest {
         val scenario = PortfolioScenario(cores = 1, arms = 1, kind = Kind.CSP, engine = EngineMix.BACKTRACK, seed = 17)
         val invocation = assertIs<PortfolioInvocation>(
             FinitePipeline.portfolioExecutor(
-                problem, scenario, null, null, null, null, null, prepared, Cancellation.Never,
+                problem, scenario, null, null, null, null, null, prepared, ExecutionControl.Never,
             ),
         )
 
-        val result = invocation.use { it.solve(Cancellation.Never) }
+        val result = invocation.use { it.solve(ExecutionControl.Never) }
 
         val witness = assertIs<SolveResult.Sat>(result).assignment
         assertSame(prepared, invocation.preparedPlan)

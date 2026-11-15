@@ -22,7 +22,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.abs
@@ -33,34 +33,42 @@ import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact
 
 internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification<Sample, Unit> =
-    verifyRealCoordinates(model, sample, Cancellation.Never)
+    verifyRealCoordinates(model, sample, ExecutionControl.Never)
 
 internal fun verifyRealCoordinates(
     model: Problem,
     sample: Sample,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Verification<Sample, Unit> {
     cancellation.charge(1L)
     if (cancellation()) return Verification.Indeterminate("source coordinate check cancelled")
     if (model.factors.any { it is Distinct || it is AllDifferent } &&
         (sample.numIntVars != model.numIntVars || sample.numBoolVars != model.numBoolVars)
-    ) return Verification.Rejected("assignment does not cover distinctness coordinates")
+    ) {
+        return Verification.Rejected("assignment does not cover distinctness coordinates")
+    }
     for ((id, factor) in model.factors.withIndex()) {
         cancellation.charge(1)
         if (cancellation()) return Verification.Indeterminate("source coordinate check cancelled")
         if (factor !is Abs && factor !is AffineAbs && factor !is AllDifferent &&
             !(factor is Distinct && factor.variables.reals.isEmpty())
-        ) continue
+        ) {
+            continue
+        }
         if (sample.numIntVars != model.numIntVars) {
             return Verification.Rejected("assignment does not cover the integer variables")
         }
         val valid = when (factor) {
             is Abs -> sample.exactIntValue(factor.operand).abs() == sample.exactIntValue(factor.result)
+
             is AffineAbs -> factor.isSatisfied(sample::exactIntValue)
+
             is AllDifferent -> factor.isSatisfied(sample)
+
             is Distinct -> factor.isSatisfied(sample::exactIntValue, sample::boolValue) {
                 error("integer distinct operand has a real coordinate")
             }
+
             else -> false
         }
         if (cancellation()) return Verification.Indeterminate("real witness check cancelled")
@@ -75,7 +83,9 @@ internal fun verifyRealCoordinates(
             is Verification.Rejected -> return membership
             is Verification.Indeterminate -> return membership
         }
-    } else sample.exactReals ?: return Verification.Indeterminate("continuous values are not certified")
+    } else {
+        sample.exactReals ?: return Verification.Indeterminate("continuous values are not certified")
+    }
     if (reals.size != model.numRealVars) return Verification.Rejected("assignment does not cover the real variables")
     for (id in reals.indices) {
         cancellation.charge(1)
@@ -88,7 +98,9 @@ internal fun verifyRealCoordinates(
     }
     val witness = object : ExactWitness {
         override fun truth(boolVar: Int): Boolean = sample.boolValue(boolVar)
-        override fun at(column: Int): BigFraction = if (column < model.numRealVars) reals[column] else {
+        override fun at(column: Int): BigFraction = if (column < model.numRealVars) {
+            reals[column]
+        } else {
             BigFraction.of(sample.exactIntValue(column - model.numRealVars), BIG_ONE)
         }
     }
@@ -172,8 +184,11 @@ internal fun verifyRealCoordinates(
             val index = sample.exactIntValue(factor.idx)
             val position = if (index.fitsLong()) factor.position(index.toLongExact()) else null
             if (position == null) return Verification.Rejected("real factor $id has an invalid index")
-            val selected = if (factor.arrIsVars) reals[factor.entries[position]]
-                else checkNotNull(BigFraction.ofDouble(factor.constants[position]))
+            val selected = if (factor.arrIsVars) {
+                reals[factor.entries[position]]
+            } else {
+                checkNotNull(BigFraction.ofDouble(factor.constants[position]))
+            }
             if (selected != reals[factor.result]) return Verification.Rejected("real factor $id refutes the assignment")
             continue
         }
@@ -198,24 +213,30 @@ internal fun verifyRealCoordinates(
         if (cancellation()) return Verification.Indeterminate("source row check cancelled")
         if (!valid) return Verification.Rejected("real factor $id refutes the assignment")
     }
-    return if (cancellation()) Verification.Indeterminate("source coordinate check cancelled")
-    else Verification.Accepted(Candidate(sample, Unit))
+    return if (cancellation()) {
+        Verification.Indeterminate("source coordinate check cancelled")
+    } else {
+        Verification.Accepted(Candidate(sample, Unit))
+    }
 }
 
 private fun rationalPowerEquals(
     value: BigFraction,
     exponent: Int,
     expected: BigFraction,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Boolean? {
     cancellation.charge(1)
     if (cancellation()) return null
     val direct = when {
         exponent == 0 || value == BigFraction.ONE -> expected == BigFraction.ONE
+
         value.isZero -> expected.isZero
         value == BigFraction.MINUS_ONE -> expected ==
             if (exponent and 1 == 0) BigFraction.ONE else BigFraction.MINUS_ONE
+
         expected.isZero || (expected.signum() < 0) != (value.signum() < 0 && exponent and 1 != 0) -> false
+
         else -> null
     }
     if (direct != null) return direct.takeUnless { cancellation() }
@@ -230,7 +251,7 @@ private fun positivePowerEquals(
     value: BigInt,
     exponent: Int,
     expected: BigInt,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Boolean? {
     if (value == BIG_ONE) return (expected == BIG_ONE).takeUnless { cancellation() }
     val width = expected.magnitudeBitLength().toLong()

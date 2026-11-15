@@ -7,7 +7,7 @@ import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncoderSupport
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.conditionedLinearSupported
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
@@ -23,7 +23,7 @@ internal class SelectedEncoderRequest private constructor(
     val encoders: List<Encoder>,
     val fixedIntegers: Map<SourceIntId, BigInt>,
     val fixedBooleans: Map<SourceBoolId, Boolean>,
-    val cancellation: Cancellation,
+    val cancellation: ExecutionControl,
     val completeFiniteConditions: Boolean,
 ) {
     companion object {
@@ -34,7 +34,7 @@ internal class SelectedEncoderRequest private constructor(
             indices: List<Int>,
             fixedIntegers: Map<SourceIntId, BigInt>,
             fixedBooleans: Map<SourceBoolId, Boolean>,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
             completeFiniteConditions: Boolean,
             onDecline: (EncoderDecline) -> Unit,
         ): SelectedEncoderRequest? {
@@ -117,11 +117,11 @@ private fun PreparedFactorProjections.acceptsIntegerCondition(id: SourceIntId, v
     return value.fitsLong() && value.toLongExact() in domain
 }
 
-internal fun Cancellation.encodingPreparationScope(): Cancellation =
+internal fun ExecutionControl.encodingPreparationScope(): ExecutionControl =
     if (this is EncodingPreparationCancellation) this else EncodingPreparationCancellation(this)
 
 @OptIn(ExperimentalAtomicApi::class)
-private class EncodingPreparationCancellation(private val parent: Cancellation) : Cancellation {
+private class EncodingPreparationCancellation(private val parent: ExecutionControl) : ExecutionControl(parent) {
     private val stopped = AtomicBoolean(false)
 
     override fun isCancelled(): Boolean {
@@ -131,5 +131,6 @@ private class EncodingPreparationCancellation(private val parent: Cancellation) 
     }
 
     override fun deadline() = parent.deadline()
-    override fun workMeter() = parent.workMeter()
+    override val accounting get() = parent.accounting
+    override val admission get() = admissionFrom(parent)
 }

@@ -104,7 +104,7 @@ internal class RootLearnedRetirement {
                 budget.stopped()
             }
         }
-        val phase = if (cancelling) "Cancellation" else "Authorization"
+        val phase = if (cancelling) "ExecutionControl" else "Authorization"
         budget.note("Retirement${phase}Work", session.work - before)
         budget.note("Retirement$phase${result.status.name}")
         if (result.status == LearnedRetirementStatus.Deferred) return false

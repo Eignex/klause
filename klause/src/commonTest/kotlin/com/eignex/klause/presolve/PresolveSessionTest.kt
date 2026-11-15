@@ -19,7 +19,7 @@ import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PropagationCapability
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -80,7 +80,7 @@ class PresolveSessionTest {
             val budget = PresolveBudget(Long.MAX_VALUE)
             var reads = 0
             var applying = false
-            val token = budget.orSpent(Cancellation { applying && reads >= stopAfter })
+            val token = budget.orSpent(ExecutionControl { applying && reads >= stopAfter })
             val original = IntDomain(0, 256)
             val survivors = intDomainFromSurvivors(LongArray(129) { 2L * it })
             val target = object : IntDomain by survivors {
@@ -117,7 +117,7 @@ class PresolveSessionTest {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val session = PresolveSession(
             Problem(0, 1, arrayOf(original), emptyList()).bake(),
-            cancellation = budget.orSpent(Cancellation { budget.spent() >= 100 }),
+            cancellation = budget.orSpent(ExecutionControl { budget.spent() >= 100 }),
         )
 
         assertTrue(session.apply(PresolveDelta(domains = arrayOf(target))))
@@ -139,7 +139,7 @@ class PresolveSessionTest {
         ).bake()
         var stopped = false
         val session = PresolveSession(
-            base, BakeConfig(probeFailedLiterals = true), Cancellation { stopped },
+            base, BakeConfig(probeFailedLiterals = true), ExecutionControl { stopped },
         )
         stopped = true
         assertTrue(session.apply(PresolveDelta(domains = arrayOf(IntDomain(0, 10).excludeValue(3)))))
@@ -168,7 +168,7 @@ class PresolveSessionTest {
             val base = Problem(
                 0, size, Array(size) { IntDomain(0, 10) },
                 List(size) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.LE, 5) },
-            ).bake(budget.orSpent(Cancellation.Never))
+            ).bake(budget.orSpent(ExecutionControl.Never))
             val session = PresolveSession(base)
             val construction = budget.rootConstructionEntries
             val propagation = budget.rootPropagationWork
@@ -226,7 +226,7 @@ class PresolveSessionTest {
     fun `cancelled root views should retain pins without spending more work`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
         var cancelled = false
-        val token = budget.orSpent(Cancellation { cancelled })
+        val token = budget.orSpent(ExecutionControl { cancelled })
         val session = PresolveSession(unitBase(), cancellation = token)
         cancelled = true
         val spent = budget.spent()
@@ -353,7 +353,7 @@ class PresolveSessionTest {
     @Test
     fun `incremental views and materialization should keep the exhausted phase token`() {
         val budget = PresolveBudget(1)
-        val token = budget.orSpent(Cancellation.Never)
+        val token = budget.orSpent(ExecutionControl.Never)
         val session = PresolveSession(unitBase(), cancellation = token)
 
         val input = session.passInput()
@@ -361,8 +361,8 @@ class PresolveSessionTest {
 
         assertEquals(0L, budget.remaining())
         assertEquals(0L, budget.probeCalls)
-        assertSame(token.workMeter(), input.cancellation.workMeter())
-        assertSame(token.workMeter(), result.cancellation.workMeter())
+        assertSame(token.accounting, input.cancellation.accounting)
+        assertSame(token.accounting, result.cancellation.accounting)
         assertEquals(true, rootBool(result, 0))
         assertFalse(session.infeasible)
     }

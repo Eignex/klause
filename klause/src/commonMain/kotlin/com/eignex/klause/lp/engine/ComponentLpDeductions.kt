@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class ComponentLpDeductions(
     val primary: LpDeductionCertificate,
@@ -40,7 +40,7 @@ internal class ComponentLpDeductionCache(size: Int) {
         duals: DoubleArray,
         observer: LpCertificationObserver?,
         policy: LpCertificationPolicy,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         withAlternatives: Boolean,
         sharedMeter: MixedCertificateMeter?,
     ): ComponentLpDeductions? {
@@ -60,7 +60,9 @@ internal class ComponentLpDeductionCache(size: Int) {
             }
             if (state.model.objective.scale.value != BigFraction.ONE ||
                 !state.model.objective.externalConstant.value.isZero || !model.hasIntegralObjective()
-            ) return null
+            ) {
+                return null
+            }
             if (duals.size != model.m) return null
             val scaleBits = dualRoundingScaleBits(duals, inspect = meter::step) ?: return null
             meter.poll()
@@ -137,14 +139,24 @@ internal class ComponentLpDeductionCache(size: Int) {
             }
             val primary = CompositeDeduction(state, parts, children, owners, locals, bound)
             val alternatives = ArrayList<LpDeductionCertificate>()
-            for (index in children.indices) for (alternative in children[index].alternatives) {
+            for (index in children.indices) {
+                for (alternative in children[index].alternatives) {
                 meter.reserve(160L)
                 val alternativeBound = meter.add(
                     meter.add(bound, children[index].primary.exactObjectiveBound().negated()),
                     alternative.exactObjectiveBound(),
                 )
-                alternatives += CompositeDeduction(state, parts, children, owners, locals, alternativeBound,
-                    index, alternative)
+                alternatives += CompositeDeduction(
+                    state,
+                    parts,
+                    children,
+                    owners,
+                    locals,
+                    alternativeBound,
+                    index,
+                    alternative,
+                )
+            }
             }
             meter.poll()
             accepted = true

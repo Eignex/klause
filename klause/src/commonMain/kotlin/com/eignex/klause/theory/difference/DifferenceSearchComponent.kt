@@ -26,7 +26,7 @@ import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.linearTheoryModel
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 
 /**
@@ -120,10 +120,11 @@ class DifferenceSearchComponent private constructor(
         val numBools = relativeBranches?.numBools ?: model.numBoolVars
         if ((!guardPreparationComplete || guardSource !== source) && numBools > 0) {
             val owner = context.executionControls.cancellation
-            val preparationStop = object : Cancellation {
+            val preparationStop = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = stopped()
                 override fun deadline() = owner.deadline()
-                override fun workMeter() = owner.workMeter()
+                override val accounting get() = owner.accounting
+                override val admission get() = admissionFrom(owner)
             }
             guardPropagation = DifferenceGuardPropagation.create(source, numBools, preparationStop)
             if (stopped()) return abandon()
@@ -176,7 +177,7 @@ class DifferenceSearchComponent private constructor(
         val bools = BooleanArray(model.numBoolVars) { variable ->
             context.boolValue(variable) ?: return ComponentCheck.Indeterminate
         }
-        when (model.checkDifferenceBooleans(bools, Cancellation { context.cancelled() })) {
+        when (model.checkDifferenceBooleans(bools, ExecutionControl { context.cancelled() })) {
             false -> return ComponentCheck.Infeasible()
             null -> return ComponentCheck.Indeterminate
             true -> Unit
@@ -201,13 +202,20 @@ class DifferenceSearchComponent private constructor(
                     }
                     values
                 }
+
                 Potentials.Infeasible -> return ComponentCheck.Infeasible()
+
                 Potentials.Abandoned -> return ComponentCheck.Indeterminate
             }
         }
-        if (values.indices.any { variable -> model.intDomainOrNull(variable)?.let {
-                values[variable] !in it
-            } == true }) return ComponentCheck.Indeterminate
+        if (values.indices.any { variable ->
+                model.intDomainOrNull(variable)?.let {
+                    values[variable] !in it
+                } == true
+            }
+        ) {
+                return ComponentCheck.Indeterminate
+            }
         if (context.cancelled() || context.executionControls.exhausted) return ComponentCheck.Indeterminate
         assignment = Sample(bools, values)
         return ComponentCheck.Feasible
@@ -220,7 +228,7 @@ class DifferenceSearchComponent private constructor(
     }
 
     internal fun potentialHints(
-        stop: Cancellation,
+        stop: ExecutionControl,
         maxEdges: Int = MAX_HINT_EDGES,
     ): Pair<IntArray, SearchCandidateHints>? {
         val fragment = base ?: return null
@@ -258,7 +266,7 @@ class DifferenceSearchComponent private constructor(
         relativeBranches = null
     }
 
-    internal fun prepareRelativeBranches(stop: Cancellation): SearchBranchProposal? {
+    internal fun prepareRelativeBranches(stop: ExecutionControl): SearchBranchProposal? {
         if (model.numBoolVars == 0) return null
         val source = base ?: return null
         val branches = DifferenceRelativeBranches.create(source, model.numBoolVars, stop) ?: return null
@@ -437,6 +445,7 @@ class DifferenceSearchComponent private constructor(
     internal companion object {
         // Root cooperation is optional; keep its worst-case relaxation work small and deterministic.
         private const val MAX_ROOT_BOUND_RELAXATIONS = 65_536L
+
         // Hint incidences have a bounded private index; declining it leaves complete graph coverage intact.
         private const val MAX_HINT_EDGES = 65_536
 

@@ -29,7 +29,7 @@ import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.search.BooleanCoverageAttribution
 import com.eignex.klause.solver.search.BooleanProofContext
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.sun.management.OperatingSystemMXBean
 import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.buildJsonObject
@@ -67,7 +67,7 @@ object BooleanProofSchedulerProfile {
         require(!portfolioDriver || splits == (if (probeFirst) 1 else 2))
         val repeats = options.getValue("repeats").toInt().also { require(it in 1..6) }
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
-        val stop = Cancellation.after(120.seconds)
+        val stop = ExecutionControl.after(120.seconds)
         val source = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
         val bytes = CorpusFiles.open(CorpusFetcher.resolve(source.source)).use { it.readNBytes(1048577) }
@@ -257,7 +257,7 @@ object BooleanProofSchedulerProfile {
         val completed: Int get() = type.getMethod("getCompleted").invoke(target) as Int
         val size: Int get() = type.getMethod("getSize").invoke(target) as Int
         val work: Long get() = type.getMethod("getWork").invoke(target) as Long
-        fun run(stop: Cancellation, work: Long): SolveResult = type.getMethod("run", Cancellation::class.java,
+        fun run(stop: ExecutionControl, work: Long): SolveResult = type.getMethod("run", ExecutionControl::class.java,
             Long::class.javaPrimitiveType, Long::class.javaPrimitiveType, Long::class.javaPrimitiveType)
             .invoke(target, stop, work, 5000L, 150000L) as SolveResult
         override fun close() { type.getMethod("close").invoke(target) }

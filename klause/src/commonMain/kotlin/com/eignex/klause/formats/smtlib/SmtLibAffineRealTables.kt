@@ -7,7 +7,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
@@ -22,7 +22,7 @@ import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact
 import com.eignex.util.numbers.unaryMinus
 
-internal class SmtLibAffineRealTables(cancellation: Cancellation, entryLimit: Int = 65_536) {
+internal class SmtLibAffineRealTables(cancellation: ExecutionControl, entryLimit: Int = 65_536) {
     private class Scalar(val variable: Int, val value: Long)
     private class Case(val cube: List<Int>, val value: Long)
     private class Table(val variable: Int, val inputs: IntArray, val values: LongArray)
@@ -49,7 +49,9 @@ internal class SmtLibAffineRealTables(cancellation: Cancellation, entryLimit: In
         work.spend()
         if (Lit.variable(result) in declared || result == trueLiteral ||
             (trueLiteral >= 0 && result == Lit.negate(trueLiteral)) || result in conjunctions
-        ) return@capture
+        ) {
+            return@capture
+        }
         val cube = cube(operands, operands.size, trueLiteral) ?: return@capture
         work.spend(cube.size.toLong() + 1L)
         conjunctions[result] = cube
@@ -62,7 +64,9 @@ internal class SmtLibAffineRealTables(cancellation: Cancellation, entryLimit: In
         if (coefficient.den != BIG_ONE || term.constant.den != BIG_ONE || coefficient.num == BIG_ZERO ||
             coefficient.num.magnitudeBitLength() > Long.SIZE_BITS ||
             term.constant.num.magnitudeBitLength() > Long.SIZE_BITS
-        ) return@capture
+        ) {
+            return@capture
+        }
         val value = if (coefficient.num == BIG_ONE || coefficient.num == -BIG_ONE) {
             work.spend(2)
             if (coefficient.num == BIG_ONE) -term.constant.num else term.constant.num
@@ -145,8 +149,11 @@ internal class SmtLibAffineRealTables(cancellation: Cancellation, entryLimit: In
             val literal = literals[index]
             if (trueLiteral >= 0 && literal == trueLiteral) continue
             if (trueLiteral >= 0 && literal == Lit.negate(trueLiteral)) return null
-            val parts = if (Lit.variable(literal) in declared) listOf(literal)
-                else conjunctions[literal] ?: return null
+            val parts = if (Lit.variable(literal) in declared) {
+                listOf(literal)
+            } else {
+                conjunctions[literal] ?: return null
+            }
             for (part in parts) {
                 work.spend()
                 if (Lit.negate(part) in kept) return null
@@ -160,25 +167,31 @@ internal class SmtLibAffineRealTables(cancellation: Cancellation, entryLimit: In
 
     private fun singleInput(entries: List<Case>): Boolean {
         var input = -1
-        for (entry in entries) for (literal in entry.cube) {
+        for (entry in entries) {
+            for (literal in entry.cube) {
             work.spend()
             val variable = Lit.variable(literal)
             if (input >= 0 && input != variable) return false
             input = variable
+        }
         }
         return true
     }
 
     private fun table(variable: Int, entries: List<Case>, channels: Map<Int, Channel>? = null): Table? {
         val support = HashSet<Int>()
-        for (entry in entries) for (literal in entry.cube) {
+        for (entry in entries) {
+            for (literal in entry.cube) {
             work.spend()
             support.add(Lit.variable(literal))
             if (support.size > MAX_INPUTS) return null
         }
-        if (channels != null) for (input in support) {
+        }
+        if (channels != null) {
+            for (input in support) {
             work.spend()
             if (input !in channels) return null
+        }
         }
         work.spend(support.size.toLong() * (MAX_INPUTS + 2L) + 1L)
         val inputs = support.sorted().toIntArray()
@@ -250,7 +263,7 @@ internal class SmtLibAffineRealTables(cancellation: Cancellation, entryLimit: In
         )
     }
 
-    private class Work(val cancellation: Cancellation, private var remaining: Long) {
+    private class Work(val cancellation: ExecutionControl, private var remaining: Long) {
         fun poll() {
             if (cancellation()) throw PolynomialSourceInterrupted()
         }

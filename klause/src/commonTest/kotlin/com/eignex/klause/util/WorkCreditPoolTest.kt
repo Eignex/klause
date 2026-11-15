@@ -44,14 +44,14 @@ class WorkCreditPoolTest {
         val parent = WorkCreditPool(8)
         val held = assertNotNull(parent.reserve(8))
         val containing = object : ArithmeticWorkSource {
-            override fun isCancelled(): Boolean = parent.exhausted
+            override val exhausted get() = parent.exhausted
             override fun reserve(maximum: Int): WorkReservation? = parent.reserve(maximum)
         }
 
         assertNull(reserveWork(8, listOf(child), containing) {})
 
         assertEquals(8, assertNotNull(child.reserve(8)).capacity)
-        assertFalse(containing.isCancelled())
+        assertFalse(containing.exhausted)
         held.settle(0)
         assertEquals(8, assertNotNull(parent.reserve(8)).capacity)
     }
@@ -60,7 +60,7 @@ class WorkCreditPoolTest {
     fun `a failed containing reservation should return child credit`() {
         val child = WorkCreditPool(8)
         val containing = object : ArithmeticWorkSource {
-            override fun isCancelled(): Boolean = false
+            override val exhausted = false
             override fun reserve(maximum: Int): WorkReservation = error("reservation failed")
         }
 
@@ -75,7 +75,7 @@ class WorkCreditPoolTest {
         val child = WorkCreditPool(8)
         val parent = WorkCreditPool(8)
         val containing = object : ArithmeticWorkSource {
-            override fun isCancelled(): Boolean = parent.exhausted
+            override val exhausted get() = parent.exhausted
             override fun reserve(maximum: Int): WorkReservation? = parent.reserve(maximum)
         }
         val grant = assertNotNull(reserveWork(8, listOf(child), containing) { error("diagnostic failed") })

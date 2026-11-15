@@ -3,7 +3,7 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -34,7 +34,7 @@ class SourceRateRewardTest {
                         observed += event.progress
                         if (event.progress.arm == 1) stop = true
                     }
-                }, rewardPolicy = SourceRateReward(priceFamilies)).use { it.minimize(Cancellation { stop }) }
+                }, rewardPolicy = SourceRateReward(priceFamilies)).use { it.minimize(ExecutionControl { stop }) }
 
             val first = observed.single { it.arm == 0 }
             val peer = observed.single { it.arm == 1 }
@@ -126,7 +126,7 @@ class SourceRateRewardTest {
                         observed += event.progress
                         if (event.progress.arm == 1 && event.progress.phase == PortfolioPhase.IMPROVEMENT) stop = true
                     }
-                }, rewardPolicy = SourceRateReward()).use { it.minimize(Cancellation { stop }) }
+                }, rewardPolicy = SourceRateReward()).use { it.minimize(ExecutionControl { stop }) }
 
             val failed = observed.single { it.arm == 0 }
             val own = observed.filter { it.arm == 1 }
@@ -156,7 +156,7 @@ class SourceRateRewardTest {
                 val worker = trackingWorker("finder", 0, ScriptedSearch({ true }) {})
                 val result = Portfolio(listOf(worker), fixedBandit(1, 0), baseSliceWork = 1, maxSliceWork = 1,
                     reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(8),
-                    rewardPolicy = configured).use { it.minimize(Cancellation.Never) }
+                    rewardPolicy = configured).use { it.minimize(ExecutionControl.Never) }
 
                 assertEquals(1.0, result.stats.portfolio.arms.single().meanReward, 1e-12)
             }
@@ -172,11 +172,18 @@ class SourceRateRewardTest {
                 var slices = 0
                 val base = ScriptedSearch({ false }) {}
                 val proof = object : ResumableSearch by base {
-                    override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
-                        onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                    override fun runSlice(
+                        global: ExecutionControl,
+                        sliceMillis: Long,
+                        sliceNodes: Long,
+                        onIncumbent: (MinimizeResult.WithSample) -> Unit,
+                    ): MinimizeResult? {
                         base.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
-                        return if (++slices == 3) MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf()), 999.0)
-                        else null
+                        return if (++slices == 3) {
+                            MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf()), 999.0)
+                        } else {
+                            null
+                        }
                     }
                 }
                 val workers = listOf(
@@ -191,7 +198,7 @@ class SourceRateRewardTest {
                     reseedStaleThreshold = 0, phaseRetention = retention, diagnostics = PortfolioDiagnostics(32),
                     rewardPolicy = SourceRateReward(priceFamilies)).also {
                     it.includeRestartingProof = restarting
-                }.use { it.minimize(Cancellation.Never) }
+                }.use { it.minimize(ExecutionControl.Never) }
 
                 assertIs<MinimizeResult.Optimal>(result)
             }

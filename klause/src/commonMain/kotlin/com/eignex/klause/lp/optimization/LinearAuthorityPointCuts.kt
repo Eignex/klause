@@ -6,7 +6,7 @@ import com.eignex.klause.lp.cut.selectNonparallelCuts
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 import kotlin.math.abs
 import kotlin.math.sqrt
@@ -61,7 +61,7 @@ internal class LinearAuthorityPointCuts(
         counts[key] = (counts[key] ?: 0L) + amount
     }
 
-    private inner class Meter(private val cancellation: Cancellation) {
+    private inner class Meter(private val cancellation: ExecutionControl) {
         private val limit = minOf(65_536L, budget.funding?.availableWork ?: 65_536L)
         var work = 0L
         var allocation = 0L
@@ -95,7 +95,7 @@ internal class LinearAuthorityPointCuts(
         checked: Set<Int>,
         point: List<BigFraction>,
         installed: Set<Int>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         adoptCurrent: Boolean = false,
     ): Set<Int> {
         adoptedCurrent = false
@@ -158,7 +158,10 @@ internal class LinearAuthorityPointCuts(
             if ((integerOnly || aggregateOnly) && installed.isEmpty() && rows.size <= maximumCuts &&
                 checked.size == rows.size) {
                 if (!meter.charge(rows.size.toLong(), 128L + rows.size * 64L) ||
-                    rows.indices.any { it !in checked }) return installed
+                    rows.indices.any { it !in checked }
+                ) {
+                        return installed
+                    }
                 for (row in rows) {
                     visitedFamilies.add(row.family)
                     onCut(row.family, "POINT_ADOPTED_INSTALLED", 1L)
@@ -174,8 +177,13 @@ internal class LinearAuthorityPointCuts(
             val objectiveNorm = sqrt(objectiveNormSquared)
             val candidates = ArrayList<Scored>()
             val forced = ArrayList<Scored>()
-            if (!meter.charge(installed.size.toLong() + inactiveScans.size,
-                    128L + installed.size * 128L)) return installed
+            if (!meter.charge(
+                    installed.size.toLong() + inactiveScans.size,
+                    128L + installed.size * 128L,
+                )
+            ) {
+                    return installed
+                }
             val observedInactive = HashMap<Int, Int>()
             var support = 0
             for ((id, row) in rows.withIndex()) {
@@ -218,8 +226,11 @@ internal class LinearAuthorityPointCuts(
                     observe("ScoreUnavailable")
                     continue
                 }
-                val alignment = if (objectiveNorm > 0.0 && objectiveNorm.isFinite())
-                    abs(parallel) / (norm * objectiveNorm) else 0.0
+                val alignment = if (objectiveNorm > 0.0 && objectiveNorm.isFinite()) {
+                    abs(parallel) / (norm * objectiveNorm)
+                } else {
+                    0.0
+                }
                 val score = efficacy / sqrt(maxOf(1, size).toDouble()) + 0.01 * alignment
                 if (!score.isFinite()) {
                     observe("ScoreUnavailable")
@@ -232,16 +243,27 @@ internal class LinearAuthorityPointCuts(
                 }, 1L)
                 if (id in installed) {
                     if (projected != null) forced += Scored(id, projected, norm, score)
-                    observedInactive[id] = if (activity - checkNotNull(rhs) >= -CutPool.ACTIVE_TOLERANCE) 0
-                        else minOf(4, (inactiveScans[id] ?: 0) + 1)
+                    observedInactive[id] = if (activity - checkNotNull(rhs) >= -CutPool.ACTIVE_TOLERANCE) {
+                        0
+                    } else {
+                        minOf(4, (inactiveScans[id] ?: 0) + 1)
+                    }
                 } else if (efficacy >= CutPool.MIN_EFFICACY) {
                     candidates += Scored(id, checkNotNull(projected), norm, score)
                 }
             }
-            val selected = selectNonparallelCuts(candidates.sortedWith(compareByDescending<Scored> { it.score }
-                .thenBy { it.id }), minOf(1, maximumCuts - installed.size),
-                1.0 - CutPool.MIN_ORTHOGONALITY, forced) { a, b ->
-                if (!meter.charge(a.values.size.toLong() + b.values.size)) Double.POSITIVE_INFINITY else {
+            val selected = selectNonparallelCuts(
+                candidates.sortedWith(
+                    compareByDescending<Scored> { it.score }
+                        .thenBy { it.id },
+                ),
+                minOf(1, maximumCuts - installed.size),
+                1.0 - CutPool.MIN_ORTHOGONALITY,
+                forced,
+            ) { a, b ->
+                if (!meter.charge(a.values.size.toLong() + b.values.size)) {
+                    Double.POSITIVE_INFINITY
+                } else {
                     var dot = 0.0
                     for ((coordinate, value) in a.values) dot += value * (b.values[coordinate] ?: 0.0)
                     val cosine = abs(dot) / (a.norm * b.norm)

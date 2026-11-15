@@ -6,7 +6,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.propagation.OWN_ORIGIN
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class PrivateRebuildWarmClauses private constructor(
     val clauses: Array<Factor>,
@@ -27,7 +27,7 @@ internal class PrivateRebuildWarmClauses private constructor(
             fixed: Array<Boolean?>,
             byteLimit: Long,
             allowance: Long,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
         ): PrivateRebuildWarmClauses? {
             if (!session.canSimplifyRoot || cancellation()) return null
             var spent = 0L
@@ -43,15 +43,27 @@ internal class PrivateRebuildWarmClauses private constructor(
             var translated = 0
             var scratchBytes = 0L
             var normalizationWork = 0L
-            fun result(): PrivateRebuildWarmClauses? = if (cancellation()) null else {
-                PrivateRebuildWarmClauses(clauses.toTypedArray(), literals, bytes + scratchBytes, spent,
-                    translated, scratchBytes, normalizationWork)
+            fun result(): PrivateRebuildWarmClauses? = if (cancellation()) {
+                null
+            } else {
+                PrivateRebuildWarmClauses(
+                    clauses.toTypedArray(),
+                    literals,
+                    bytes + scratchBytes,
+                    spent,
+                    translated,
+                    scratchBytes,
+                    normalizationWork,
+                )
             }
             val projection = PrivateRebuildClauseProjection.prepare(rebuild, fixed.size, ::visit) ?: return result()
             for (index in 0 until session.learnedClauseCount) {
                 if (!visit(5L)) break
                 if (!session.isLearnedClause(index) || session.learnedClausePermanent(index) ||
-                    session.learnedClauseOrigin(index) != OWN_ORIGIN) continue
+                    session.learnedClauseOrigin(index) != OWN_ORIGIN
+                ) {
+                        continue
+                    }
                 val size = session.learnedClauseLiteralCount(index)
                 if ((size + 1L) * 512L > byteLimit - bytes - scratchBytes) continue
                 if (!visit(size * 3L + 1L)) break

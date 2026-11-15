@@ -2,14 +2,14 @@ package com.eignex.klause.arithmetic.transcendental
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ArithmeticExecution
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal class TranscendentalInterrupted : RuntimeException()
 internal class TranscendentalResourceLimit : RuntimeException()
 
 internal class TranscendentalArithmetic(
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     private val maximumBits: Int = 65536,
     private val maximumWork: Long? = null,
 ) {
@@ -37,6 +37,7 @@ internal class TranscendentalArithmetic(
         val productBits = bits(left) + bits(right) + 1
         if (productBits > maximumBits) throw TranscendentalResourceLimit()
         if (productBits > 4096) execution.boundary()
+        else execution.pollingCost((productBits / Long.SIZE_BITS).toInt())
     }
 
     fun add(left: BigFraction, right: BigFraction): BigFraction = execution.operation {

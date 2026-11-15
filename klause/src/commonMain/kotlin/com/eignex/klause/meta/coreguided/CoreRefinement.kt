@@ -8,7 +8,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.FactorProjectionProviders
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Bounded private refinement of a completed objective-query core. */
 enum class CoreRefinementMode {
@@ -27,12 +27,14 @@ internal object CoreRefinement {
         problem: BakedProblem,
         literals: IntArray,
         caller: Assumptions,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         charge: (Long) -> Unit,
     ): IntArray {
         if (literals.size !in 2..32 || problem.numBoolVars.toLong() + problem.numIntVars > 4_096L ||
             problem.numFactors > 4_096 || cancellation()
-        ) return literals
+        ) {
+            return literals
+        }
         val providers = problem.projectionProviders
         if (providers != null && providers != FactorProjectionProviders.Default) return literals
         var entries = problem.numBoolVars.toLong() + problem.numIntVars + problem.numFactors
@@ -53,10 +55,10 @@ internal object CoreRefinement {
             if (work > charged) charge(work - charged)
             charged = work
         }
-        val stop = Cancellation {
+        val stop = ExecutionControl {
             settle()
             charged >= 32_768L
-        } or cancellation
+        }.withAccounting(cancellation) or cancellation
         return try {
             session = PropagationSession(problem, stop, propagationCancelFloor = 0)
             var current = literals

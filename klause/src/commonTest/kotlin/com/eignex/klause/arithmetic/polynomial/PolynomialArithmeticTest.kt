@@ -1,7 +1,7 @@
 package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -153,7 +153,7 @@ class PolynomialArithmeticTest {
         val left = arithmetic.add(arithmetic.multiply(a, x), b)
         val right = arithmetic.add(arithmetic.multiply(b, x), a)
         var stopped = false
-        val limited = PolynomialArithmetic(Cancellation { stopped }, PolynomialLimits(maxMatrixCells = 0))
+        val limited = PolynomialArithmetic(ExecutionControl { stopped }, PolynomialLimits(maxMatrixCells = 0))
         val pending = limited.preparePrincipalSubresultants(left, right, 0)
 
         assertNull(pending.next())
@@ -165,7 +165,7 @@ class PolynomialArithmeticTest {
     @Test
     fun `solve cancellation should terminate prepared subresultants`() {
         var stopped = false
-        val counted = PolynomialArithmetic(Cancellation { stopped })
+        val counted = PolynomialArithmetic(ExecutionControl { stopped })
         val pending = counted.preparePrincipalSubresultants(arithmetic.power(x, 3), arithmetic.add(x, y), 0)
         assertNull(pending.next())
         stopped = true
@@ -179,15 +179,15 @@ class PolynomialArithmeticTest {
         val right = arithmetic.add(x, y)
         var plainCharges = 0L
         val plainMeter = WorkMeter { plainCharges += it }
-        val plain = PolynomialArithmetic(object : Cancellation {
+        val plain = PolynomialArithmetic(object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = plainMeter
+            override val accounting: WorkMeter get() = plainMeter
         })
         var observedCharges = 0L
         val observedMeter = WorkMeter { observedCharges += it }
-        val observed = PolynomialArithmetic(object : Cancellation {
+        val observed = PolynomialArithmetic(object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = observedMeter
+            override val accounting: WorkMeter get() = observedMeter
         })
         var lastLeft: Polynomial? = null
         var lastRight: Polynomial? = null
@@ -297,9 +297,9 @@ class PolynomialArithmeticTest {
         })
         var spent = 0L
         val meter = WorkMeter { spent += it }
-        val counted = PolynomialArithmetic(object : Cancellation {
+        val counted = PolynomialArithmetic(object : ExecutionControl() {
             override fun isCancelled(): Boolean = spent >= 8
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         })
 
         val quotient = counted.divideExact(dividend, Polynomial.ONE)
@@ -309,7 +309,7 @@ class PolynomialArithmeticTest {
 
     @Test
     fun `scalar exact division observes containing cancellation`() {
-        val stopped = PolynomialArithmetic(Cancellation { true })
+        val stopped = PolynomialArithmetic(ExecutionControl { true })
         for (dividend in listOf(Polynomial.ZERO, y)) {
             for (divisor in listOf(Polynomial.ONE, constant(-1), constant(3))) {
                 assertFailsWith<PolynomialInterrupted> { stopped.divideExact(dividend, divisor) }
@@ -346,15 +346,15 @@ class PolynomialArithmeticTest {
         )) {
             var eagerCharges = 0L
             val eagerMeter = WorkMeter { eagerCharges += it }
-            val eager = PolynomialArithmetic(object : Cancellation {
+            val eager = PolynomialArithmetic(object : ExecutionControl() {
                 override fun isCancelled(): Boolean = false
-                override fun workMeter(): WorkMeter = eagerMeter
+                override val accounting: WorkMeter get() = eagerMeter
             })
             var preparedCharges = 0L
             val preparedMeter = WorkMeter { preparedCharges += it }
-            val prepared = PolynomialArithmetic(object : Cancellation {
+            val prepared = PolynomialArithmetic(object : ExecutionControl() {
                 override fun isCancelled(): Boolean = false
-                override fun workMeter(): WorkMeter = preparedMeter
+                override val accounting: WorkMeter get() = preparedMeter
             })
 
             val immediate = eager.principalSubresultants(left, right, 1)
@@ -419,7 +419,10 @@ class PolynomialArithmeticTest {
     @Test
     fun `cancelled projection should publish no partial determinant`() {
         var work = 0
-        val cancelled = PolynomialArithmetic(Cancellation { ++work > 5 })
+        val cancelled = PolynomialArithmetic(object : ExecutionControl() {
+            override fun isCancelled(): Boolean = work > 5
+            override val accounting = WorkMeter { work += it.toInt() }
+        })
 
         assertFailsWith<PolynomialInterrupted> { cancelled.resultant(arithmetic.power(x, 3), arithmetic.add(x, y), 0) }
         assertTrue(work > 5)

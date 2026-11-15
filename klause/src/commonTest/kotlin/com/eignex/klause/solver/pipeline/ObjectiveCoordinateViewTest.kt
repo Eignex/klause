@@ -11,7 +11,7 @@ import com.eignex.klause.presolve.TransformationGuarantees
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -35,7 +35,7 @@ class ObjectiveCoordinateViewTest {
         val coordinates = FinitePipelinePreparation(privateProblem,
             LinearObjective(intCoefficients = longArrayOf(1, 0), constant = 1),
             { mapping.reconstructFrom(privateProblem, it) }, null).also { it.sourceMapping = mapping }
-        val view = assertNotNull(ObjectiveCoordinateView.create(preparation, coordinates, null, Cancellation.Never))
+        val view = assertNotNull(ObjectiveCoordinateView.create(preparation, coordinates, null, ExecutionControl.Never))
         val cases = listOf(
             Triple(Sample(booleanArrayOf(), longArrayOf(3, 0)), listOf(3L, 4L), 8.0),
             Triple(Sample(booleanArrayOf(), longArrayOf(Long.MAX_VALUE, 0)), null, null),
@@ -67,7 +67,7 @@ class ObjectiveCoordinateViewTest {
             LinearObjective(intCoefficients = longArrayOf(1)), { it }, null).also {
             it.sourceMapping = SourceMapping(source, privateProblem, TransformationGuarantees.IDENTITY)
         }
-        val view = assertNotNull(ObjectiveCoordinateView.create(preparation, coordinates, null, Cancellation.Never))
+        val view = assertNotNull(ObjectiveCoordinateView.create(preparation, coordinates, null, ExecutionControl.Never))
 
         for ((value, expected) in listOf(0L to null, 3L to 6.0)) {
             val result = view.proposal(Sample(booleanArrayOf(), longArrayOf(value)))
@@ -90,7 +90,7 @@ class ObjectiveCoordinateViewTest {
             it.sourceMapping = SourceMapping(foreign, privateProblem, TransformationGuarantees.IDENTITY)
         }
 
-        val view = ObjectiveCoordinateView.create(preparation, coordinates, null, Cancellation.Never)
+        val view = ObjectiveCoordinateView.create(preparation, coordinates, null, ExecutionControl.Never)
 
         assertNull(view)
     }

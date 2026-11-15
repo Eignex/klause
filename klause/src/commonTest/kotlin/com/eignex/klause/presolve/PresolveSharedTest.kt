@@ -12,7 +12,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration
@@ -76,7 +76,7 @@ class PresolveSharedTest {
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
             ),
-        ).bake(Cancellation.after(Duration.ZERO))
+        ).bake(ExecutionControl.after(Duration.ZERO))
 
         val rebuilt = PresolveShared.rebuildProblem(
             problem,
@@ -92,7 +92,7 @@ class PresolveSharedTest {
     fun `charges through a rebuilt problem should consume the originating allowance`() {
         val budget = PresolveBudget(1000)
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyList())
-            .bake(budget.orSpent(Cancellation.Never))
+            .bake(budget.orSpent(ExecutionControl.Never))
         val rebuilt = PresolveShared.rebuildProblem(problem, problem.factors.toList())
 
         val remaining = budget.remaining()
@@ -138,7 +138,7 @@ class PresolveSharedTest {
     @Test
     fun `a cancelled merge should return the base cliques unextended`() {
         val base = listOf(setOf(0, 1), setOf(1, 2), setOf(0, 2))
-        val merged = mergeCliques(base) { true }
+        val merged = mergeCliques(base, ExecutionControl { true })
 
         assertEquals(base.toSet(), merged.toSet())
     }

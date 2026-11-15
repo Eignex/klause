@@ -17,14 +17,14 @@ import com.eignex.klause.solver.result.QuadraticIncumbent
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.time.TimeSource
 
 internal fun PolynomialTheoryRequest.prepareSource(
     config: PresolveConfig,
     objective: LinearObjective?,
-    preparationStop: Cancellation,
-    containingStop: Cancellation,
+    preparationStop: ExecutionControl,
+    containingStop: ExecutionControl,
     budget: PresolveBudget?,
     solutionSetSensitive: Boolean = false,
 ): PreparedSource = PresolvePipeline.prepareSource(
@@ -34,7 +34,7 @@ internal fun PolynomialTheoryRequest.prepareSource(
 
 internal fun PolynomialTheoryRequest.afterSourcePreparation(
     prepared: PreparedSource,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): PolynomialTheoryRequest? {
     require(prepared.source === resolvedModel().source)
     val mark = TimeSource.Monotonic.markNow()
@@ -52,7 +52,9 @@ internal fun PolynomialTheoryRequest.afterSourcePreparation(
             return null
         }
         plan.polynomialRequest()
-    } else this
+    } else {
+        this
+    }
     prepared.elapsed += mark.elapsedNow()
     return PolynomialTheoryRequest(selected.problem, selected.preparedPlan, prepared, preparedPlan)
 }
@@ -60,7 +62,7 @@ internal fun PolynomialTheoryRequest.afterSourcePreparation(
 internal fun PolynomialTheoryRequest.reconstructSource(
     incumbent: QuadraticIncumbent,
     params: PolynomialTheoryParams,
-    verification: Cancellation,
+    verification: ExecutionControl,
 ): QuadraticIncumbent? {
     if (sourcePreparation?.changed != true) return incumbent
     return reconstructSource(incumbent.sample, params, verification)?.let { incumbent.copy(sample = it) }
@@ -69,7 +71,7 @@ internal fun PolynomialTheoryRequest.reconstructSource(
 internal fun PolynomialTheoryRequest.publishSource(
     result: QuadraticOptimizationResult,
     params: PolynomialTheoryParams,
-    verification: Cancellation,
+    verification: ExecutionControl,
 ): QuadraticOptimizationResult {
     if (sourcePreparation == null) return result
     val stats = preparationStats(result.stats)
@@ -93,7 +95,7 @@ internal fun PolynomialTheoryRequest.publishSource(
 internal fun PolynomialTheoryRequest.reconstructSource(
     sample: Sample,
     params: PolynomialTheoryParams,
-    verification: Cancellation,
+    verification: ExecutionControl,
 ): Sample? {
     val preparation = sourcePreparation?.takeIf { it.changed } ?: return sample
     val lifted = preparation.mapping.reconstructFrom(preparation.problem, sample)
@@ -102,7 +104,7 @@ internal fun PolynomialTheoryRequest.reconstructSource(
     return lifted.takeIf { checked == SourceEvidenceCheck.Checked }
 }
 
-internal fun PolynomialTheoryParams.sourceVerificationReason(verification: Cancellation): TerminationReason = when {
+internal fun PolynomialTheoryParams.sourceVerificationReason(verification: ExecutionControl): TerminationReason = when {
     timeout() -> TerminationReason.Timeout
     cancellation() -> TerminationReason.Cancelled
     verification() -> TerminationReason.BudgetExhausted

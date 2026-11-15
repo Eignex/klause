@@ -7,7 +7,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongHashSet
 import com.eignex.util.collections.MutableLongIntMap
@@ -22,7 +22,7 @@ internal object TuplePackingSubstitution {
 
     class Substitution(val problem: BakedProblem, val rebuild: SourceRebuilds, val choices: Int)
 
-    private class Meter(val cancellation: Cancellation, var remaining: Int) {
+    private class Meter(val cancellation: ExecutionControl, var remaining: Int) {
         fun visit(): Boolean {
             if (remaining <= 0 || cancellation()) return false
             remaining--
@@ -41,7 +41,7 @@ internal object TuplePackingSubstitution {
     fun substitute(
         problem: BakedProblem,
         objectiveIntVars: Set<Int>,
-        cancellation: Cancellation = problem.cancellation,
+        cancellation: ExecutionControl = problem.cancellation,
         limits: Limits = Limits(),
     ): Substitution? {
         val meter = Meter(cancellation, limits.work)
@@ -133,8 +133,13 @@ internal object TuplePackingSubstitution {
             val exactCover = capacity.size == packing.scope.size
             for (literals in capacity.values) {
                 if (!meter.visit()) return null
-                local.add(if (exactCover) Cardinality.exactlyOne(literals.toIntArray())
-                else Cardinality.atMostOne(literals.toIntArray()))
+                local.add(
+                    if (exactCover) {
+                        Cardinality.exactlyOne(literals.toIntArray())
+                    } else {
+                        Cardinality.atMostOne(literals.toIntArray())
+                    },
+                )
             }
             if (cancellation()) return null
             dropped.add(packing.distinctId)

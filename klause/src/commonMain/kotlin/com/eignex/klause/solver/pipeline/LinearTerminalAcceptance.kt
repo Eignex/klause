@@ -7,11 +7,11 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.LinearOptimizationResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun LinearOptimizationResult.verifyTerminal(
     original: SourceProofContext,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     verifier: SourceEvidenceVerifier = SourceEvidenceVerifier(original.withLinearAuthority()),
 ): Verification<Unit, Unit> {
     if (scope != original.scope) return Verification.Rejected("linear completion has a different source invocation")

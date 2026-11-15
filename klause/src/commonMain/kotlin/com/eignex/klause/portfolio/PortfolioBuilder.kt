@@ -23,7 +23,6 @@ import com.eignex.klause.solver.pipeline.ObjectiveCoordinateView
 import com.eignex.klause.solver.pipeline.PreparedSourceHints
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.SearchEvent
-import com.eignex.kumulant.core.Concurrency
 import com.eignex.util.concurrent.Mutex
 
 /**
@@ -176,12 +175,19 @@ object PortfolioBuilder {
                     scenario.lsPool == null && scenario.btPool == null
                 val worker = if (privateCoordinates) {
                     bounded.materializeObjectiveCoordinates(
-                        objectiveCoordinates, index, armId, seed, scenario.lsLambda, onEvent,
+                        objectiveCoordinates,
+                        index,
+                        armId,
+                        seed,
+                        scenario.lsLambda,
+                        onEvent,
                     )
-                } else bounded.materialize(
-                    problem, index, armId, seed, scenario.lsLambda, objective, selectedObjective,
-                    selectedSweep, onEvent, pools,
-                )
+                } else {
+                    bounded.materialize(
+                        problem, index, armId, seed, scenario.lsLambda, objective, selectedObjective,
+                        selectedSweep, onEvent, pools,
+                    )
+                }
                 worker.bindEvidence(ModelIdentity.of(problem, objective)).also {
                     it.role = plan.seats[armId]
                     it.earlyCoreTrial = config is CoreGuidedWorkerConfig && deferCore && scenario.earlyCoreAdmission

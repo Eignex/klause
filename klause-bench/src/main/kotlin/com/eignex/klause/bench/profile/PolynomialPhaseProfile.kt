@@ -25,30 +25,34 @@ import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.execute
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.parseBigInt
 import com.sun.management.ThreadMXBean
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.util.Base64
 import java.util.zip.GZIPInputStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 internal object PolynomialPhaseProfile {
     @JvmStatic
     fun main(args: Array<String>) {
         require(args.size in 1..10)
         val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.size == args.size - 1 && options.keys.all {
-            it in setOf("pipeline", "timeoutMs", "repeats", "prepared", "capture",
-                "maximumWork", "refinement", "feedback", "coupled")
-        })
+        require(
+            options.size == args.size - 1 && options.keys.all {
+                it in setOf(
+                    "pipeline", "timeoutMs", "repeats", "prepared", "capture",
+                    "maximumWork", "refinement", "feedback", "coupled",
+                )
+            },
+        )
         require(options["pipeline"] == null || options["pipeline"] in setOf("true", "both"))
         require(options["prepared"] == null || options["prepared"] == "true")
         require(options["prepared"] == null || options["pipeline"] == null)
@@ -61,8 +65,10 @@ internal object PolynomialPhaseProfile {
         val capture = options["capture"] != null
         require(options["coupled"] == null || options["coupled"] in setOf("true", "both", "matrix"))
         val coupled = options["coupled"] != null
-        require(options["coupled"] !in setOf("both", "matrix") ||
-            listOf("refinement", "feedback", "capture").none { options[it] == "both" })
+        require(
+            options["coupled"] !in setOf("both", "matrix") ||
+                listOf("refinement", "feedback", "capture").none { options[it] == "both" },
+        )
         val maximumWork = options["maximumWork"]?.toLong()?.also { require(it >= 0) }
         val preparedMode = options["prepared"] == "true"
         val pipelineMode = options["pipeline"] != null
@@ -74,9 +80,11 @@ internal object PolynomialPhaseProfile {
         require(timeoutMs > 0)
         val request = requestBytes(args[0])
         val cases = Json.decodeFromString<List<PhaseSource>>(request.decodeToString())
-        require(cases.size in 1..18 &&
-            cases.map { listOf(it.suite, it.problem, it.fixedIntegers, it.fixedBooleans) }.distinct().size ==
-                cases.size)
+        require(
+            cases.size in 1..18 &&
+                cases.map { listOf(it.suite, it.problem, it.fixedIntegers, it.fixedBooleans) }.distinct().size ==
+                cases.size,
+        )
         require(!preparedMode || cases.all { it.fixedIntegers.isEmpty() })
         require(!pipelineMode || cases.all { it.fixedBooleans.isEmpty() })
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
@@ -86,27 +94,44 @@ internal object PolynomialPhaseProfile {
         }
         out.resolve("request.json").writeBytes(request)
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
-        out.resolve("settings.json").writeText(Json.encodeToString(mapOf(
-            "revision" to Reports.readGitSha(),
-            "javaVersion" to System.getProperty("java.runtime.version"),
-            "javaCores" to Runtime.getRuntime().availableProcessors().toString(),
-            "jvmOptions" to ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "),
-            "containingTimeoutMs" to timeoutMs.toString(),
-            "repeats" to repeats.toString(),
-            "maximumWork" to maximumWork.toString(),
-            "diagnosticMaximumWork" to maximumWork.toString(),
-            "failureCapture" to options["capture"].toString(),
-            "cellRefinement" to options["refinement"].toString(),
-            "cellFeedback" to options["feedback"].toString(),
-            "coupledSections" to options["coupled"].toString(),
-            "requestEncoding" to args[0].substringBefore('='),
-            "sourceBytes" to if (cases.any { it.gzip64 != null }) "hash-pinned request or catalog" else "catalog",
-            "representationLimits" to "default",
-            "route" to if (preparedMode) "unconditioned prepared polynomial service; no CP root pins or publication"
-                else if (pipelineMode && directMode) "paired direct query and default MIXED pipeline/P1/seed3"
-                else if (pipelineMode) "source admission and default MIXED pipeline/P1/seed3"
-                else "direct normalized QfNraQuery; separate gate inspection",
-        )))
+        out.resolve("settings.json").writeText(
+            Json.encodeToString(
+                mapOf(
+                    "revision" to Reports.readGitSha(),
+                    "javaVersion" to System.getProperty("java.runtime.version"),
+                    "javaCores" to Runtime.getRuntime().availableProcessors().toString(),
+                    "jvmOptions" to ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "),
+                    "containingTimeoutMs" to timeoutMs.toString(),
+                    "repeats" to repeats.toString(),
+                    "maximumWork" to maximumWork.toString(),
+                    "diagnosticMaximumWork" to maximumWork.toString(),
+                    "failureCapture" to options["capture"].toString(),
+                    "cellRefinement" to options["refinement"].toString(),
+                    "cellFeedback" to options["feedback"].toString(),
+                    "coupledSections" to options["coupled"].toString(),
+                    "requestEncoding" to args[0].substringBefore('='),
+                    "sourceBytes" to if (cases.any {
+                            it.gzip64 !=
+                                null
+                        }
+                    ) {
+                        "hash-pinned request or catalog"
+                    } else {
+                        "catalog"
+                    },
+                    "representationLimits" to "default",
+                    "route" to if (preparedMode) {
+                        "unconditioned prepared polynomial service; no CP root pins or publication"
+                    } else if (pipelineMode && directMode) {
+                        "paired direct query and default MIXED pipeline/P1/seed3"
+                    } else if (pipelineMode) {
+                        "source admission and default MIXED pipeline/P1/seed3"
+                    } else {
+                        "direct normalized QfNraQuery; separate gate inspection"
+                    },
+                ),
+            ),
+        )
         val access = PhaseAccess()
         for ((index, source) in cases.withIndex()) {
             require(source.sha256.matches(Regex("[0-9a-f]{64}")))
@@ -126,53 +151,100 @@ internal object PolynomialPhaseProfile {
             }
             if (preparedMode) {
                 directory.resolve("prepared-trace.json").writeText(
-                    Json.encodeToString(access.measure(text, maximumWork, timeoutMs,
-                        prepared = true, capture = capture, fixedBooleans = source.fixedBooleans,
-                        refinement = refine, feedback = feedback,
-                        coupled = coupled)),
+                    Json.encodeToString(
+                        access.measure(
+                            text, maximumWork, timeoutMs,
+                            prepared = true, capture = capture, fixedBooleans = source.fixedBooleans,
+                            refinement = refine, feedback = feedback,
+                            coupled = coupled,
+                        ),
+                    ),
                 )
             } else if (directMode) {
                 directory.resolve("gate.json").writeText(Json.encodeToString(access.gate(text, timeoutMs)))
                 directory.resolve("trace.json").writeText(
-                    Json.encodeToString(access.measure(text, maximumWork, timeoutMs,
-                        capture = capture, fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans,
-                        refinement = refine, feedback = feedback, coupled = coupled)),
+                    Json.encodeToString(
+                        access.measure(
+                            text, maximumWork, timeoutMs,
+                            capture = capture, fixedIntegers = source.fixedIntegers,
+                            fixedBooleans = source
+                                .fixedBooleans,
+                            refinement = refine, feedback = feedback, coupled = coupled,
+                        ),
+                    ),
                 )
             }
             if (options["coupled"] in setOf("both", "matrix")) {
-                directory.resolve("coupled-control-trace.json").writeText(Json.encodeToString(
-                    access.measure(text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
-                        fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans,
-                        refinement = refine, feedback = feedback)))
+                directory.resolve("coupled-control-trace.json").writeText(
+                    Json.encodeToString(
+                        access.measure(
+                            text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
+                            fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans,
+                            refinement = refine, feedback = feedback,
+                        ),
+                    ),
+                )
             }
             if (options["coupled"] == "matrix") {
                 for ((name, preparation, joint) in listOf(
-                    Triple("single", false, false), Triple("prepared-support", true, false),
+                    Triple("single", false, false),
+                    Triple("prepared-support", true, false),
                     Triple("joint", false, true),
                 )) {
-                    directory.resolve("$name-trace.json").writeText(Json.encodeToString(
-                        access.measure(text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
-                            fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans,
-                            refinement = refine, feedback = feedback,
-                            coupled = true, coupledPreparation = preparation, coupledJoint = joint)))
+                    directory.resolve("$name-trace.json").writeText(
+                        Json.encodeToString(
+                            access.measure(
+                                text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
+                                fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans,
+                                refinement = refine, feedback = feedback,
+                                coupled = true, coupledPreparation = preparation, coupledJoint = joint,
+                            ),
+                        ),
+                    )
                 }
             }
             if (options["refinement"] == "both") {
-                directory.resolve("control-trace.json").writeText(Json.encodeToString(
-                    access.measure(text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
-                        fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans)))
+                directory.resolve("control-trace.json").writeText(
+                    Json.encodeToString(
+                        access.measure(
+                            text,
+                            maximumWork,
+                            timeoutMs,
+                            prepared = preparedMode,
+                            capture = capture,
+                            fixedIntegers = source.fixedIntegers,
+                            fixedBooleans = source.fixedBooleans,
+                        ),
+                    ),
+                )
             }
             if (options["feedback"] == "both") {
-                directory.resolve("feedback-control-trace.json").writeText(Json.encodeToString(
-                    access.measure(text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
-                        fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans, refinement = true)))
+                directory.resolve("feedback-control-trace.json").writeText(
+                    Json.encodeToString(
+                        access.measure(
+                            text,
+                            maximumWork,
+                            timeoutMs,
+                            prepared = preparedMode,
+                            capture = capture,
+                            fixedIntegers = source.fixedIntegers,
+                            fixedBooleans = source.fixedBooleans,
+                            refinement = true,
+                        ),
+                    ),
+                )
             }
             if (options["capture"] == "both") {
-                directory.resolve("plain-trace.json").writeText(Json.encodeToString(
-                    access.measure(text, maximumWork, timeoutMs, prepared = preparedMode,
-                        fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans,
-                        refinement = refine, feedback = feedback,
-                        coupled = coupled)))
+                directory.resolve("plain-trace.json").writeText(
+                    Json.encodeToString(
+                        access.measure(
+                            text, maximumWork, timeoutMs, prepared = preparedMode,
+                            fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans,
+                            refinement = refine, feedback = feedback,
+                            coupled = coupled,
+                        ),
+                    ),
+                )
             }
         }
     }
@@ -209,12 +281,19 @@ internal object PolynomialPhaseProfile {
         val source = try {
             SmtLib.parse(text, cancellation = observation)
         } catch (_: CancellationException) {
-            return PipelinePhaseTrace("Unknown", "Timeout", "source-admission", null,
-                "not started", "not started", observation.charges, 0, observation.stack)
+            return PipelinePhaseTrace(
+                "Unknown", "Timeout", "source-admission", null,
+                "not started", "not started", observation.charges, 0, observation.stack,
+            )
         }
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            source.source, ExecutionOperation.SATISFY, FiniteEngine.MIXED, cancellation = observation,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+                source.source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.MIXED,
+                cancellation = observation,
+            ),
+        )
         val plan = invocation.preparedPlan
         val model = plan?.model
         val polynomial = (invocation.route as? SourceProblemRoute.PolynomialTheory)?.request?.problem
@@ -227,17 +306,20 @@ internal object PolynomialPhaseProfile {
             polynomial?.let { polynomialCount(it, "totalRealCount") },
         )
         val preparedCharges = observation.charges
-        val completed = SourceSetup.execute(SourceExecutionRequest(
-            invocation, theory = TheoryParams(timeout = observation, randomSeed = 3),
-            polynomial = PolynomialTheoryParams(
-                timeout = observation,
-                strategy = PolynomialStrategyParams(
-                    backtrack = BacktrackParams(randomSeed = 3),
-                    localSearch = LocalSearchParams(randomSeed = 3),
+        val completed = SourceSetup.execute(
+            SourceExecutionRequest(
+                invocation,
+                theory = TheoryParams(timeout = observation, randomSeed = 3),
+                polynomial = PolynomialTheoryParams(
+                    timeout = observation,
+                    strategy = PolynomialStrategyParams(
+                        backtrack = BacktrackParams(randomSeed = 3),
+                        localSearch = LocalSearchParams(randomSeed = 3),
+                    ),
                 ),
+                cores = 1,
             ),
-            cores = 1,
-        ))
+        )
         if (completed is SourceExecutionResult.Declined || completed is SourceExecutionResult.Refuted) {
             return PipelinePhaseTrace(
                 if (completed is SourceExecutionResult.Refuted) "SourceRefuted" else "Unknown",
@@ -248,25 +330,29 @@ internal object PolynomialPhaseProfile {
         }
         if (completed is SourceExecutionResult.Linear) {
             val execution = checkNotNull(completed.result as? OpenTheoryExecution.Satisfy).result
-            return PipelinePhaseTrace(execution.javaClass.simpleName,
+            return PipelinePhaseTrace(
+                execution.javaClass.simpleName,
                 (execution as? OpenTheoryResult.Unknown)?.reason?.toString(), null, null,
                 "not a polynomial execution", execution.stats.toString(),
-                preparedCharges, observation.charges - preparedCharges, observation.stack, shape)
+                preparedCharges, observation.charges - preparedCharges, observation.stack, shape,
+            )
         }
         val execution = (completed as? SourceExecutionResult.Polynomial)?.result
             ?: error("source setup did not install polynomial satisfaction")
-        return PipelinePhaseTrace(execution.result.javaClass.simpleName,
+        return PipelinePhaseTrace(
+            execution.result.javaClass.simpleName,
             (execution.result as? OpenTheoryResult.Unknown)?.reason?.toString(),
             execution.resource?.toString(), execution.nativeResource,
             execution.stats.toString(), execution.result.stats.toString(),
-            preparedCharges, observation.charges - preparedCharges, observation.stack, shape)
+            preparedCharges, observation.charges - preparedCharges, observation.stack, shape,
+        )
     }
 
     private fun polynomialCount(source: PolynomialRealProblem, field: String): Int =
         source.javaClass.getDeclaredField(field).apply { isAccessible = true }.getInt(source)
 
-    private class DeadlineObservation(timeoutMs: Long) : Cancellation, WorkMeter {
-        private val clock = Cancellation.after(timeoutMs.milliseconds)
+    private class DeadlineObservation(timeoutMs: Long) : ExecutionControl() {
+        private val clock = ExecutionControl.after(timeoutMs.milliseconds)
         var charges = 0L
             private set
         var stack: List<String>? = null
@@ -274,8 +360,7 @@ internal object PolynomialPhaseProfile {
         var deadlineOverrunAtFirstPollNs: Long? = null
             private set
         override fun deadline() = checkNotNull(clock.deadline())
-        override fun workMeter(): WorkMeter = this
-        override fun charge(units: Long) { charges += units }
+        override val accounting = WorkMeter { units -> charges += units }
         override fun isCancelled(): Boolean {
             val stopped = clock()
             if (stopped && stack == null) {
@@ -309,8 +394,11 @@ internal object PolynomialPhaseProfile {
         private val prefix = "com.eignex.klause.theory.qfnra."
         private val parser = Class.forName("com.eignex.klause.formats.smtlib.SmtLibPolynomial")
         private val parse = parser.getMethod(
-            "parse", String::class.java, Cancellation::class.java,
-            Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType,
+            "parse",
+            String::class.java,
+            ExecutionControl::class.java,
+            Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
         )
         private val sourceType = Class.forName("com.eignex.klause.formats.smtlib.SmtLibPolynomialProblem")
         private val formula = sourceType.getMethod("getFormula")
@@ -321,12 +409,22 @@ internal object PolynomialPhaseProfile {
         private val conditionType = Class.forName(prefix + "PolynomialCondition")
         private val queryType = Class.forName(prefix + "QfNraQuery")
         private val query = queryType.getConstructor(
-            PolynomialRealFormula::class.java, Int::class.javaPrimitiveType,
-            Int::class.javaPrimitiveType, paramsType, conditionType,
+            PolynomialRealFormula::class.java,
+            Int::class.javaPrimitiveType,
+            Int::class.javaPrimitiveType,
+            paramsType,
+            conditionType,
         )
-        private val params = paramsType.getConstructor(Cancellation::class.java, Long::class.javaObjectType, limitsType,
-            Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType,
-            Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType)
+        private val params = paramsType.getConstructor(
+            ExecutionControl::class.java,
+            Long::class.javaObjectType,
+            limitsType,
+            Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+        )
         private val coupledStats = queryType.getMethod("getCoupledStats")
         private val coupledObserver = queryType.methods.single { it.name == "setCoupledConflictObserver" }
         private val condition = conditionType.getConstructor(Map::class.java, Map::class.java, Map::class.java)
@@ -351,37 +449,49 @@ internal object PolynomialPhaseProfile {
             it.name == "polynomialPointFixings"
         }
 
-        private fun parsed(text: String, token: Cancellation): Any =
+        private fun parsed(text: String, token: ExecutionControl): Any =
             parse.invoke(parser.getField("INSTANCE").get(null), text, token, true, false)
 
         fun gate(text: String, timeoutMs: Long = 60_000L): PhaseGate {
             var charges = 0L
             val meter = WorkMeter { charges += it }
-            val token = object : Cancellation {
-                private val timeout = Cancellation.after(timeoutMs.milliseconds)
+            val token = object : ExecutionControl() {
+                private val timeout = ExecutionControl.after(timeoutMs.milliseconds)
                 override fun isCancelled(): Boolean = timeout()
                 override fun deadline() = timeout.deadline()
-                override fun workMeter(): WorkMeter = meter
+                override val accounting: WorkMeter get() = meter
             }
             val source = parsed(text, token)
             val original = formula.invoke(source)
             val fixed = fixings.invoke(null, original, { check(!token()) })
             val arithmeticType = Class.forName("com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic")
-            val arithmetic = arithmeticType.getConstructor(Cancellation::class.java, limitsType)
+            val arithmetic = arithmeticType.getConstructor(ExecutionControl::class.java, limitsType)
                 .newInstance(token, limitsType.getConstructor().newInstance())
             val formulaType = Class.forName(prefix + "PolynomialFormula")
             val companion = formulaType.getField("Companion").get(null)
             val normalized = companion.javaClass.getMethod(
-                "normalize", PolynomialRealFormula::class.java, arithmeticType, Map::class.java,
+                "normalize",
+                PolynomialRealFormula::class.java,
+                arithmeticType,
+                Map::class.java,
             ).invoke(companion, original, arithmetic, fixed)
             val atoms = formulaType.getMethod("getAtoms").invoke(normalized) as List<*>
             val guides = formulaType.getMethod(
-                "conjunctiveAtoms", arithmeticType, Int::class.javaPrimitiveType, MutableList::class.java,
+                "conjunctiveAtoms",
+                arithmeticType,
+                Int::class.javaPrimitiveType,
+                MutableList::class.java,
             ).invoke(normalized, arithmetic, 128, ArrayList<Int>()) as? List<*>
             val nodes = formulaType.getDeclaredField("nodes").apply { isAccessible = true }.get(normalized) as List<*>
             val kinds = nodes.groupingBy { requireNotNull(it).javaClass.simpleName }.eachCount()
-            return PhaseGate(realCount.invoke(source) as Int, boolCount.invoke(source) as Int,
-                atoms.size, guides?.size, kinds, charges)
+            return PhaseGate(
+                realCount.invoke(source) as Int,
+                boolCount.invoke(source) as Int,
+                atoms.size,
+                guides?.size,
+                kinds,
+                charges,
+            )
         }
 
         fun measure(
@@ -399,18 +509,18 @@ internal object PolynomialPhaseProfile {
             coupledJoint: Boolean = true,
         ): PhaseTrace {
             require(!feedback || refinement)
-            val clock = Cancellation.after(timeoutMs.milliseconds)
+            val clock = ExecutionControl.after(timeoutMs.milliseconds)
             var charges = 0L
             var stop: List<String>? = null
             val meter = WorkMeter { charges += it }
-            val token = object : Cancellation {
+            val token = object : ExecutionControl() {
                 override fun isCancelled(): Boolean {
                     val stopped = clock()
                     if (stopped && stop == null) stop = Thread.currentThread().stackTrace.map { it.toString() }
                     return stopped
                 }
                 override fun deadline() = clock.deadline()
-                override fun workMeter(): WorkMeter = meter
+                override val accounting: WorkMeter get() = meter
             }
             var names: Map<String, String> = emptyMap()
             var originalNames: Map<String, String>? = null
@@ -430,12 +540,25 @@ internal object PolynomialPhaseProfile {
                     original.realVarNames.mapKeys { "real.${it.key}" }.mapValues { it.value.toString() } +
                         original.boolVarNames.mapKeys { "bool.${it.key}" }.mapValues { it.value.toString() }
                 }
-                val invocation = SourceSetup.prepare(SourceSetupRequest(
-                    parsed.source, ExecutionOperation.SATISFY, FiniteEngine.MIXED, cancellation = token,
-                ))
+                val invocation = SourceSetup.prepare(
+                    SourceSetupRequest(
+                        parsed.source,
+                        ExecutionOperation.SATISFY,
+                        FiniteEngine.MIXED,
+                        cancellation = token,
+                    ),
+                )
                 val problem = (invocation.route as? SourceProblemRoute.PolynomialTheory)?.request?.problem
-                    ?: return PhaseTrace(emptyList(), "NotPolynomial", invocation.route.javaClass.simpleName,
-                        null, 0, 0, charges, stop)
+                    ?: return PhaseTrace(
+                        emptyList(),
+                        "NotPolynomial",
+                        invocation.route.javaClass.simpleName,
+                        null,
+                        0,
+                        0,
+                        charges,
+                        stop,
+                    )
                 if (fixedBooleans.isNotEmpty()) {
                     val plan = requireNotNull(invocation.preparedPlan)
                     require(plan.belongsTo(parsed.source.originalSource))
@@ -450,6 +573,7 @@ internal object PolynomialPhaseProfile {
                 )
             } else {
                 val parsed = parsed(text, token)
+
                 @Suppress("UNCHECKED_CAST")
                 val booleans = sourceType.getMethod("getBoolVarNames").invoke(parsed) as Map<String, Int>
                 booleanFixings = booleanPins(booleans) { it }
@@ -470,6 +594,7 @@ internal object PolynomialPhaseProfile {
                 Triple(formula.invoke(parsed), boolCount.invoke(parsed) as Int, realCount.invoke(parsed) as Int)
             }
             val original = source.first
+
             @Suppress("UNCHECKED_CAST")
             val fixed = (fixings.invoke(null, original, { check(!token()) }) as Map<Int, BigFraction>) + integerFixings
             val preparationCharges = charges
@@ -478,12 +603,27 @@ internal object PolynomialPhaseProfile {
             val thread = Thread.currentThread().threadId()
             val allocationStart = allocationBean?.getThreadAllocatedBytes(thread)
             val queryStart = System.nanoTime()
-            val owner = query.newInstance(original, source.second, source.third,
-                params.newInstance(token, maximumWork, limitsType.getConstructor().newInstance(), refinement, feedback,
-                    coupled, coupledPreparation, coupledJoint),
-                condition.newInstance(booleanFixings, fixed, fixed))
-            val captured = if (capture) captureType.getConstructor().newInstance().also { setCapture.invoke(owner, it) }
-                else null
+            val owner = query.newInstance(
+                original,
+                source.second,
+                source.third,
+                params.newInstance(
+                    token,
+                    maximumWork,
+                    limitsType.getConstructor().newInstance(),
+                    refinement,
+                    feedback,
+                    coupled,
+                    coupledPreparation,
+                    coupledJoint,
+                ),
+                condition.newInstance(booleanFixings, fixed, fixed),
+            )
+            val captured = if (capture) {
+                captureType.getConstructor().newInstance().also { setCapture.invoke(owner, it) }
+            } else {
+                null
+            }
             var conflictPremises: Int? = null
             var conflictPreview: List<String>? = null
             var conflictPreviewComplete: Boolean? = null
@@ -537,14 +677,24 @@ internal object PolynomialPhaseProfile {
                     firstFeedback = feedbackReuse.invoke(owner)?.let(::feedbackTrace)
                 }
                 val stage = observed?.let {
-                    Triple(it.javaClass.getMethod("getSnapshots").invoke(it) as Long,
+                    Triple(
+                        it.javaClass.getMethod("getSnapshots").invoke(it) as Long,
                         it.javaClass.getMethod("getRegions").invoke(it) as Long,
-                        partialConflicts?.invoke(it) as? Long ?: 0L)
+                        partialConflicts?.invoke(it) as? Long ?: 0L,
+                    )
                 }
-                if (result != null || (checkpoints.size < 128 &&
-                        (calls <= 2 || projected != lastProjected || stage != lastStage))) {
-                    checkpoints += PhaseCheckpoint(calls, (System.nanoTime() - start) / 1_000_000,
-                        result?.javaClass?.simpleName ?: "Pending", snapshot.toString(), observed?.toString())
+                if (result != null || (
+                        checkpoints.size < 128 &&
+                            (calls <= 2 || projected != lastProjected || stage != lastStage)
+                        )
+                ) {
+                    checkpoints += PhaseCheckpoint(
+                        calls,
+                        (System.nanoTime() - start) / 1_000_000,
+                        result?.javaClass?.simpleName ?: "Pending",
+                        snapshot.toString(),
+                        observed?.toString(),
+                    )
                 }
                 lastProjected = projected
                 lastStage = stage
@@ -556,7 +706,8 @@ internal object PolynomialPhaseProfile {
             val snapshot = stats.invoke(owner)
             val nativeWork = snapshot.javaClass.getMethod("getWorkSpent").invoke(snapshot) as Long
             check(charges - preparationCharges == nativeWork) { "Native charge sum differs from snapshot" }
-            return PhaseTrace(checkpoints, result.javaClass.simpleName,
+            return PhaseTrace(
+                checkpoints, result.javaClass.simpleName,
                 result.javaClass.methods.singleOrNull { it.name == "getReason" }?.invoke(result)?.toString(),
                 result.javaClass.methods.singleOrNull { it.name == "getResource" }?.invoke(result)?.toString(),
                 nativeWork, charges - preparationCharges, preparationCharges, stop, source.second, source.third,
@@ -566,23 +717,41 @@ internal object PolynomialPhaseProfile {
                     (queryType.getMethod("getCheckedCells").invoke(owner) as List<*>).map {
                         cellTrace(requireNotNull(it))
                     }
-                } else null,
+                } else {
+                    null
+                },
                 cellRefinement = queryType.getMethod("getCellStats").invoke(owner)?.let { value ->
-                    listOf("Candidates", "CheckedCells", "RepeatedCandidates",
-                        "RepairedCoordinates", "Declined", "Work")
+                    listOf(
+                        "Candidates",
+                        "CheckedCells",
+                        "RepeatedCandidates",
+                        "RepairedCoordinates",
+                        "Declined",
+                        "Work",
+                    )
                         .associateWith { value.javaClass.getMethod("get$it").invoke(value).toString() }
                 },
                 cellFeedback = feedbackStats.invoke(owner)?.let { value ->
-                    listOf("Admitted", "Lookups", "Uses", "Reuses", "CrossRegionUses", "Evicted",
+                    listOf(
+                        "Admitted", "Lookups", "Uses", "Reuses", "CrossRegionUses", "Evicted",
                         "SnapshotReplacements", "ScopeDeclines", "MetadataVisits",
-                        "CandidateUses", "CandidateWork", "CandidateDeclines")
+                        "CandidateUses", "CandidateWork", "CandidateDeclines",
+                    )
                         .associateWith { value.javaClass.getMethod("get$it").invoke(value).toString() }
                 },
                 firstCellFeedbackReuse = firstFeedback,
                 firstCellFeedbackUse = firstUse,
                 coupledSections = coupledStats.invoke(owner)?.let { value ->
-                    listOf("Supports", "Combinations", "Conflicts", "RepeatedSupports", "Declined", "Work",
-                        "PreparedSupports", "JointSupports")
+                    listOf(
+                        "Supports",
+                        "Combinations",
+                        "Conflicts",
+                        "RepeatedSupports",
+                        "Declined",
+                        "Work",
+                        "PreparedSupports",
+                        "JointSupports",
+                    )
                         .associateWith { value.javaClass.getMethod("get$it").invoke(value).toString() }
                 },
                 firstCoupledConflictPremises = coupledPremises,
@@ -594,21 +763,37 @@ internal object PolynomialPhaseProfile {
                 conditionBooleans = booleanFixings.mapKeys { it.key.toString() }.mapValues { it.value.toString() },
                 originalSourceCoordinates = originalNames,
                 coordinateNamespace = if (prepared) "prepared-polynomial-model" else "raw-polynomial-source",
-                coordinateMapping = if (prepared) "original-to-prepared correspondence unavailable"
-                    else "named original declarations; lowering-only slots unnamed",
+                coordinateMapping = if (prepared) {
+                    "original-to-prepared correspondence unavailable"
+                } else {
+                    "named original declarations; lowering-only slots unnamed"
+                },
                 failureCapture = captured?.let { value ->
-                    listOf("Scope", "Context", "Operation", "FirstFailure", "FirstCadFailure",
-                        "FirstRefusal", "FirstSignConflict")
+                    listOf(
+                        "Scope",
+                        "Context",
+                        "Operation",
+                        "FirstFailure",
+                        "FirstCadFailure",
+                        "FirstRefusal",
+                        "FirstSignConflict",
+                    )
                         .associateWith { field ->
-                        @Suppress("UNCHECKED_CAST")
-                        (captureType.getMethod("get$field").invoke(value) as? Map<String, String>).orEmpty()
-                    }
+                            @Suppress("UNCHECKED_CAST")
+                            (captureType.getMethod("get$field").invoke(value) as? Map<String, String>).orEmpty()
+                        }
                 },
                 failureObservations = captured?.let { value ->
-                    listOf("Failures", "RepeatedFirstFailure", "RepetitionComplete",
-                        "InterruptedCapture", "CompletedCopySteps")
+                    listOf(
+                        "Failures",
+                        "RepeatedFirstFailure",
+                        "RepetitionComplete",
+                        "InterruptedCapture",
+                        "CompletedCopySteps",
+                    )
                         .associateWith { captureType.getMethod("get$it").invoke(value).toString() }
-                })
+                },
+            )
         }
 
         private fun cellTrace(cell: Any): Map<String, String> {
@@ -669,8 +854,10 @@ internal object PolynomialPhaseProfile {
                     val values = read(condition, kind) as Map<*, *>
                     if (values.size > 64) complete = false
                     result["$field.condition.$kind"] = values.entries.take(64).associate { (id, value) ->
-                        val wide = value is BigFraction && (value.num.magnitudeBitLength() > 4096 ||
-                            value.den.magnitudeBitLength() > 4096)
+                        val wide = value is BigFraction && (
+                            value.num.magnitudeBitLength() > 4096 ||
+                                value.den.magnitudeBitLength() > 4096
+                            )
                         if (wide) complete = false
                         id.toString() to if (wide) "[wide coefficient]" else value.toString()
                     }.toString()
@@ -684,10 +871,13 @@ internal object PolynomialPhaseProfile {
             val coefficients = read(candidate, "DefiningCoefficients") as List<*>
             var candidateComplete = coefficients.size <= 17
             fun fraction(value: BigFraction): String = if (value.num.magnitudeBitLength() > 4096 ||
-                value.den.magnitudeBitLength() > 4096) {
+                value.den.magnitudeBitLength() > 4096
+            ) {
                 candidateComplete = false
                 "[wide coefficient]"
-            } else value.toString()
+            } else {
+                value.toString()
+            }
             result["candidate.coefficients"] = coefficients.take(17).map { fraction(it as BigFraction) }.toString()
             result["candidate.root"] = read(candidate, "RootIndex").toString()
             result["candidate.lower"] = fraction(read(candidate, "LowerBound") as BigFraction)
@@ -706,7 +896,9 @@ internal object PolynomialPhaseProfile {
                 val number = if (fraction.num.magnitudeBitLength() > 96 || fraction.den.magnitudeBitLength() > 96) {
                     complete = false
                     "[wide coefficient]"
-                } else fraction.toString()
+                } else {
+                    fraction.toString()
+                }
                 val product = factors.entries.take(8).joinToString("*") { (variable, degree) -> "x$variable^$degree" }
                 if (product.isEmpty()) number else "$number*$product"
             }

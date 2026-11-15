@@ -6,7 +6,7 @@ import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.simplex.exact.RationalFeasibility
 import com.eignex.klause.simplex.exact.bigRationalMinimum
 import com.eignex.klause.simplex.exact.bigRationalOutcome
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal sealed interface LpReferenceResult {
     class Feasible(val witness: List<BigFraction>, val objective: LpReferenceObjective) : LpReferenceResult
@@ -33,7 +33,7 @@ internal sealed interface LpReferenceObjective {
 // A finite probe box can supply a feasible witness but cannot prove infeasibility or a bound for the
 // open model, so those claims decline.
 internal class LpReferenceAdapter(
-    private val cancellation: Cancellation = Cancellation.Never,
+    private val cancellation: ExecutionControl = ExecutionControl.Never,
     private val maxPivots: Int = Int.MAX_VALUE,
 ) {
     fun solve(model: LpModel, enforcedRows: BooleanArray? = null): LpReferenceResult {

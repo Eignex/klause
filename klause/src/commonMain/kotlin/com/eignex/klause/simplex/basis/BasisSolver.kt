@@ -1,6 +1,6 @@
 package com.eignex.klause.simplex.basis
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal enum class BasisRepairStop {
     CANCELLED,
@@ -9,7 +9,7 @@ internal enum class BasisRepairStop {
 }
 
 internal class BasisRepairControl(
-    private val cancellation: Cancellation = Cancellation.Never,
+    private val cancellation: ExecutionControl = ExecutionControl.Never,
     val maxWork: Long? = null,
 ) {
     var spentWork: Long = 0

@@ -23,7 +23,7 @@ import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -187,7 +187,7 @@ class LeafRealSolverTest {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 refactorUpdateLimit: Int,
                 iterationLimit: Int,
                 workLimit: Long,
@@ -307,7 +307,7 @@ class LeafRealSolverTest {
             )
             assertEquals(
                 LpVerdict.INDETERMINATE,
-                owner.solve(Sample(booleanArrayOf(), longArrayOf(2)), Cancellation { true }).verdict,
+                owner.solve(Sample(booleanArrayOf(), longArrayOf(2)), ExecutionControl { true }).verdict,
             )
             owner.releaseSolvers()
             assertEquals(listOf(BigFraction.ONE), owner.solve(Sample(booleanArrayOf(), longArrayOf(1))).exactReals)

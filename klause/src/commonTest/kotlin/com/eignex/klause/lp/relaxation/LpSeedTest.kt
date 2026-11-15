@@ -6,7 +6,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -30,7 +30,7 @@ class LpSeedTest {
         )
         val box = arrayOf(IntDomain(-1000, 1000), IntDomain(-1000, 1000))
 
-        val seed = assertNotNull(model.lpSeed(box, Cancellation.Never))
+        val seed = assertNotNull(model.lpSeed(box, ExecutionControl.Never))
 
         assertEquals(40L, seed.ints[0])
         assertEquals(42L, seed.ints[1])
@@ -46,7 +46,7 @@ class LpSeedTest {
             factors = arrayOf<Factor>(Linear(longArrayOf(27_300_000_000L), intArrayOf(0), LinearOp.LE, 0L)),
         )
 
-        val seed = model.lpSeed(arrayOf(IntDomain(-(1L shl 30), 1L shl 30)), Cancellation.Never)
+        val seed = model.lpSeed(arrayOf(IntDomain(-(1L shl 30), 1L shl 30)), ExecutionControl.Never)
 
         assertNull(seed)
     }

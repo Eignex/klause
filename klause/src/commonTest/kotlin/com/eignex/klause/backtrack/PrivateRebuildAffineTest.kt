@@ -7,7 +7,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -24,7 +24,7 @@ class PrivateRebuildAffineTest {
         val session = PropagationSession(Problem(72, 0, emptyArray(), clauses).bake())
         val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
         val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
-            Cancellation.Never, parity = captured))
+            ExecutionControl.Never, parity = captured))
         val privatePoint = BooleanArray(72) { it == 70 }
 
         val lifted = generation.reconstruct(Sample(privatePoint, longArrayOf()))

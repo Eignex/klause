@@ -4,7 +4,9 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
+import com.eignex.klause.solver.pipeline.QuadraticNativeScope
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,6 +17,48 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialTheoryServiceTest {
+    @Test
+    fun `a query should charge its supplied accounting owner`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= x 1))")
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        var charged = 0L
+        val control = ExecutionControl(accounting = WorkMeter { charged += it })
+
+        val result = service.invocation().use { it.check(cancellation = control) }
+
+        assertIs<QfNraResult.Satisfiable>(result)
+        assertTrue(charged > 0L)
+        assertEquals(result.stats.workSpent, charged)
+    }
+
+    @Test
+    fun `a resumed query should charge its current containing admission owner`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val first = QuadraticNativeScope(PolynomialTheoryParams(), concurrent = false)
+        val second = QuadraticNativeScope(PolynomialTheoryParams(), concurrent = false)
+        var current = first.polynomial
+        val control = object : ExecutionControl() {
+            override fun isCancelled(): Boolean = current()
+            override val accounting get() = current.accounting
+            override val admission get() = admissionFrom(current)
+        }
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        service.invocation(QfNraParams(cancellation = control)).use { invocation ->
+            val pending = invocation.prepareCheck()
+            assertNull(pending.next())
+            val prefix = first.work
+            current = second.polynomial
+
+            var result: QfNraResult? = null
+            while (result == null) result = pending.next()
+
+            assertIs<QfNraResult.Satisfiable>(result)
+            assertTrue(prefix > 0L && second.work > 0L)
+            assertEquals(prefix, first.work)
+            assertEquals(first.work + second.work, result.stats.workSpent)
+        }
+    }
+
     @Test
     fun `completed query should have no further elements`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= x 1))")
@@ -102,7 +146,7 @@ class PolynomialTheoryServiceTest {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= x 1))")
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
         var cancelled = false
-        service.invocation(QfNraParams(cancellation = Cancellation { cancelled })).use { invocation ->
+        service.invocation(QfNraParams(cancellation = ExecutionControl { cancelled })).use { invocation ->
             val pending = invocation.prepareCheck()
             assertNull(pending.next())
             cancelled = true
@@ -160,10 +204,14 @@ class PolynomialTheoryServiceTest {
     fun `widening a numeric condition discards its nonlinear refutation`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
-        val narrow = PolynomialCondition(lower = mapOf(0 to BigFraction.ZERO),
-            upper = mapOf(0 to BigFraction.ONE))
-        val wide = PolynomialCondition(lower = mapOf(0 to BigFraction.ZERO),
-            upper = mapOf(0 to BigFraction.ofLong(2)))
+        val narrow = PolynomialCondition(
+            lower = mapOf(0 to BigFraction.ZERO),
+            upper = mapOf(0 to BigFraction.ONE),
+        )
+        val wide = PolynomialCondition(
+            lower = mapOf(0 to BigFraction.ZERO),
+            upper = mapOf(0 to BigFraction.ofLong(2)),
+        )
 
         service.invocation().use { invocation ->
             assertIs<QfNraResult.Unsatisfiable>(invocation.check(narrow))
@@ -186,11 +234,17 @@ class PolynomialTheoryServiceTest {
 
         service.invocation().use { invocation ->
             for (pin in listOf(true, false, true)) {
-                val result = invocation.check(PolynomialCondition(
-                    bools = mapOf(0 to pin), lower = fixed, upper = fixed,
-                ))
+                val result = invocation.check(
+                    PolynomialCondition(
+                        bools = mapOf(0 to pin),
+                        lower = fixed,
+                        upper = fixed,
+                    ),
+                )
 
-                if (pin) assertIs<QfNraResult.Unsatisfiable>(result) else {
+                if (pin) {
+                    assertIs<QfNraResult.Unsatisfiable>(result)
+                } else {
                     val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
                     assertFalse(witness.boolValue(0))
                     assertEquals(BigFraction.ZERO, witness.realValue(0).rational)
@@ -225,10 +279,9 @@ class PolynomialTheoryServiceTest {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= x 1))")
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
         var charged = 0L
-        val token = object : Cancellation, WorkMeter {
+        val token = object : ExecutionControl() {
             override fun isCancelled() = false
-            override fun workMeter(): WorkMeter = this
-            override fun charge(units: Long) {
+            override val accounting = WorkMeter { units ->
                 charged += units
             }
         }
@@ -261,7 +314,7 @@ class PolynomialTheoryServiceTest {
         service.invocation().use { invocation ->
             assertEquals(
                 QfNraReason.Interrupted,
-                assertIs<QfNraResult.Unknown>(invocation.check(cancellation = Cancellation { true })).reason,
+                assertIs<QfNraResult.Unknown>(invocation.check(cancellation = ExecutionControl { true })).reason,
             )
         }
         service.invocation().use { assertIs<QfNraResult.Satisfiable>(it.check()) }
@@ -340,7 +393,7 @@ class PolynomialTheoryServiceTest {
 
         service.invocation().use { invocation ->
             assertIs<QfNraResult.Satisfiable>(invocation.check())
-            val cancelled = invocation.check(cancellation = Cancellation { true })
+            val cancelled = invocation.check(cancellation = ExecutionControl { true })
             val resumed = invocation.check()
 
             assertEquals(QfNraReason.Interrupted, assertIs<QfNraResult.Unknown>(cancelled).reason)
@@ -353,21 +406,19 @@ class PolynomialTheoryServiceTest {
         val source = SmtLibPolynomial.parse("(declare-const b Bool) (assert b)")
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
         var charges = 0L
-        val meter = object : Cancellation, WorkMeter {
+        val meter = object : ExecutionControl() {
             override fun isCancelled() = false
-            override fun workMeter(): WorkMeter = this
-            override fun charge(units: Long) { charges += units }
+            override val accounting = WorkMeter { units -> charges += units }
         }
         val invocation = service.invocation(QfNraParams(cancellation = meter))
         assertIs<QfNraResult.Satisfiable>(invocation.check())
 
-        val preferred = invocation.preferredBool(0, Cancellation.Never)
+        val preferred = invocation.preferredBool(0, ExecutionControl.Never)
         invocation.close()
 
         assertEquals(true, preferred)
         assertEquals(invocation.stats.workSpent, charges)
     }
-
 
     @Test
     fun `cancellation at retained witness publication should withhold the result`() {
@@ -375,10 +426,9 @@ class PolynomialTheoryServiceTest {
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
         var charges = 0L
         var stopAt = Long.MAX_VALUE
-        val token = object : Cancellation, WorkMeter {
+        val token = object : ExecutionControl() {
             override fun isCancelled() = charges >= stopAt
-            override fun workMeter(): WorkMeter = this
-            override fun charge(units: Long) { charges += units }
+            override val accounting = WorkMeter { units -> charges += units }
         }
 
         service.invocation(QfNraParams(cancellation = token)).use { invocation ->
@@ -391,7 +441,6 @@ class PolynomialTheoryServiceTest {
         }
     }
 
-
     @Test
     fun `closed invocation should discard Boolean witness preferences`() {
         val source = SmtLibPolynomial.parse("(declare-const b Bool) (assert b)")
@@ -400,6 +449,6 @@ class PolynomialTheoryServiceTest {
 
         invocation.close()
 
-        assertNull(invocation.preferredBool(0, Cancellation.Never))
+        assertNull(invocation.preferredBool(0, ExecutionControl.Never))
     }
 }

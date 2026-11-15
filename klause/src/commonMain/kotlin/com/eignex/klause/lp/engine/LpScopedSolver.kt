@@ -3,8 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
-import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.SchedulingCancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.workScheduled
 
 internal data class LpScopedMetrics(
@@ -34,7 +33,7 @@ internal data class LpScopedMetrics(
 @Suppress("TooGenericExceptionCaught") // Ownership boundaries preserve arbitrary primary and cleanup failures.
 internal class LpScopedSolver(
     initial: LpExactState,
-    private val cancellation: Cancellation = Cancellation.Never,
+    private val cancellation: ExecutionControl = ExecutionControl.Never,
     private val context: LpSolveContext = LpSolveContext.Production,
     private val refactorUpdateLimit: Int = DEFAULT_REFACTOR_UPDATE_LIMIT,
     private var iterationLimit: Int = 0,
@@ -56,11 +55,12 @@ internal class LpScopedSolver(
         var reported = LpSolveMetrics()
     }
     private var pendingFloat: PendingFloat? = null
-    private var floatInvocation: Cancellation = Cancellation.Never
-    private val floatInvocationToken = object : SchedulingCancellation {
+    private var floatInvocation: ExecutionControl = ExecutionControl.Never
+    private val floatInvocationToken = object : ExecutionControl() {
         override fun isCancelled(): Boolean = floatInvocation()
         override fun deadline() = floatInvocation.deadline()
-        override fun workMeter() = floatInvocation.workMeter()
+        override val accounting get() = floatInvocation.accounting
+        override val admission get() = admissionFrom(floatInvocation)
         override val workScheduled: Boolean get() = floatInvocation.workScheduled()
     }
     val floatPaused: Boolean get() = pendingFloat != null
@@ -96,7 +96,7 @@ internal class LpScopedSolver(
 
     val state: LpExactState get() = trail.state
     internal val proofPolicy: LpCertificationPolicy get() = context.certificationPolicy
-    internal val cancellationToken: Cancellation get() = cancellation
+    internal val cancellationToken: ExecutionControl get() = cancellation
     internal val checkedResultStorageDeclined: Boolean get() = checkedResults.storageDeclined
     var lastResult: CertifiedLpResult? = null
         private set
@@ -132,9 +132,9 @@ internal class LpScopedSolver(
         require(maxRetainedRows >= 0 && refactorUpdateLimit > 0 && iterationLimit >= 0 && workLimit >= 0L)
     }
 
-    fun prepare(token: Cancellation = cancellation): Boolean = prepare(token, null)
+    fun prepare(token: ExecutionControl = cancellation): Boolean = prepare(token, null)
 
-    fun prepare(token: Cancellation, workAllowance: Long?): Boolean {
+    fun prepare(token: ExecutionControl, workAllowance: Long?): Boolean {
         requireAvailable()
         if (closed || token() || state.model.m > maxRetainedRows) return false
         if (solver != null) return true
@@ -148,31 +148,31 @@ internal class LpScopedSolver(
         return true
     }
 
-    fun pausedDualProposal(token: Cancellation): DoubleArray? {
+    fun pausedDualProposal(token: ExecutionControl): DoubleArray? {
         requireAvailable()
         val pending = pendingFloat ?: return null
         if (closed || pending.cursor.isAdvancing || token()) return null
         return solver?.pausedDualProposal(token)
     }
 
-    fun partialPrimalGuidance(token: Cancellation): LpPrimalGuidance? {
+    fun partialPrimalGuidance(token: ExecutionControl): LpPrimalGuidance? {
         requireAvailable()
         if (closed || token()) return null
         return (solver as? ComponentLpSolverCapability)?.partialPrimalGuidance(token)
     }
 
-    fun push(token: Cancellation = cancellation): Boolean = edit(token) { it.push(token) }
+    fun push(token: ExecutionControl = cancellation): Boolean = edit(token) { it.push(token) }
 
     fun assertBound(
         column: Int,
         upper: Boolean,
         side: ExactLpSide,
         witness: Long,
-        token: Cancellation = cancellation,
+        token: ExecutionControl = cancellation,
     ): Boolean = edit(token) { it.assertBound(column, upper, side, witness, token) }
 
     @Suppress("TooGenericExceptionCaught") // Numerical refresh can retire factors before a cleanup failure.
-    fun assertBounds(assertions: List<LpBoundAssertion>, token: Cancellation = cancellation): LpBoundBatchResult {
+    fun assertBounds(assertions: List<LpBoundAssertion>, token: ExecutionControl = cancellation): LpBoundBatchResult {
         requireAvailable()
         if (closed || token()) return LpBoundBatchResult.Declined(0)
         val next = LpBoundTrail(state)
@@ -195,17 +195,18 @@ internal class LpScopedSolver(
         return result
     }
 
-    fun pop(targetDepth: Int, token: Cancellation = cancellation): Boolean = edit(token) { it.pop(targetDepth, token) }
+    fun pop(targetDepth: Int, token: ExecutionControl = cancellation): Boolean =
+        edit(token) { it.pop(targetDepth, token) }
 
-    fun resetRoot(token: Cancellation = cancellation): Boolean = edit(token) { it.resetRoot(token) }
+    fun resetRoot(token: ExecutionControl = cancellation): Boolean = edit(token) { it.resetRoot(token) }
 
-    fun resetRoot(initial: LpExactState, token: Cancellation = cancellation): Boolean {
+    fun resetRoot(initial: LpExactState, token: ExecutionControl = cancellation): Boolean {
         requireAvailable()
         if (initial.depth != 0) return false
         return adopt(initial, token)
     }
 
-    fun adopt(initial: LpExactState, token: Cancellation = cancellation): Boolean {
+    fun adopt(initial: LpExactState, token: ExecutionControl = cancellation): Boolean {
         requireAvailable()
         editAttempts++
         if (closed || token() || !state.sameMatrix(initial)) return false
@@ -219,13 +220,13 @@ internal class LpScopedSolver(
         return true
     }
 
-    fun replaceObjective(objective: ExactLpObjective, token: Cancellation = cancellation): Boolean =
+    fun replaceObjective(objective: ExactLpObjective, token: ExecutionControl = cancellation): Boolean =
         edit(token) { it.replaceObjective(objective, token) }
 
-    fun recenter(origins: List<ExactLpNumber>, token: Cancellation = cancellation): Boolean =
+    fun recenter(origins: List<ExactLpNumber>, token: ExecutionControl = cancellation): Boolean =
         edit(token) { it.recenter(origins, token) }
 
-    fun append(row: LpScopedRow, scoped: Boolean, token: Cancellation = cancellation): Boolean = edit(token, true) {
+    fun append(row: LpScopedRow, scoped: Boolean, token: ExecutionControl = cancellation): Boolean = edit(token, true) {
         state.model.m < maxRetainedRows && it.append(row, scoped, token)
     }
 
@@ -233,22 +234,23 @@ internal class LpScopedSolver(
         columns: List<LpStructuralColumn>,
         rows: List<LpScopedRow>,
         scoped: Boolean,
-        token: Cancellation = cancellation,
+        token: ExecutionControl = cancellation,
         permanentRows: Set<Long> = emptySet(),
     ): Boolean = edit(token, true) {
         rows.size <= maxRetainedRows - state.model.m && it.append(columns, rows, scoped, token, permanentRows)
     }
 
-    fun deactivate(id: Long, token: Cancellation = cancellation): Boolean = edit(token) { it.deactivate(id, token) }
+    fun deactivate(id: Long, token: ExecutionControl = cancellation): Boolean = edit(token) { it.deactivate(id, token) }
 
-    fun suspend(ids: Set<Long>, token: Cancellation = cancellation): Boolean = edit(token) { it.suspend(ids, token) }
+    fun suspend(ids: Set<Long>, token: ExecutionControl = cancellation): Boolean =
+        edit(token) { it.suspend(ids, token) }
 
     fun replaceRows(
         retired: Set<Long>,
         columns: List<LpStructuralColumn>,
         rows: List<LpScopedRow>,
         scoped: Boolean,
-        token: Cancellation = cancellation,
+        token: ExecutionControl = cancellation,
         permanentRows: Set<Long> = emptySet(),
         objective: ExactLpObjective? = null,
         assertions: List<LpBoundAssertion> = emptyList(),
@@ -257,9 +259,15 @@ internal class LpScopedSolver(
         it.replaceRows(retired, columns, rows, scoped, token, permanentRows, objective, assertions)
     }
 
-    fun compact(token: Cancellation = cancellation): Boolean = compact(LpLayoutRemap(state.model.n, state.rows), token)
+    fun compact(token: ExecutionControl = cancellation): Boolean = compact(
+        LpLayoutRemap(
+            state.model.n,
+            state.rows,
+        ),
+        token,
+    )
 
-    fun compact(remap: LpLayoutRemap, token: Cancellation = cancellation): Boolean =
+    fun compact(remap: LpLayoutRemap, token: ExecutionControl = cancellation): Boolean =
         edit(token, compaction = remap) { it.compact(remap, token) }
 
     val continuationLimits get() = ExactContinuationLimits(
@@ -272,7 +280,7 @@ internal class LpScopedSolver(
     @Suppress("TooGenericExceptionCaught")
     fun solve(
         warm: Basis? = null,
-        token: Cancellation = cancellation,
+        token: ExecutionControl = cancellation,
         counterResults: LpCounterResults? = null,
         continuationLimits: ExactContinuationLimits = this.continuationLimits,
         fullContinuation: Boolean = true,
@@ -326,7 +334,7 @@ internal class LpScopedSolver(
         columns: IntArray,
         splits: LongArray,
         allowance: Long,
-        token: Cancellation,
+        token: ExecutionControl,
         observe: (LpProbeMetrics) -> Unit,
     ): List<LpDirectionalGain>? {
         val reason = when {
@@ -343,7 +351,12 @@ internal class LpScopedSolver(
         }
         val current = solver as LpDirectionalProbeSolver
         val values = current.directionalGains(
-            pointModel, columns, splits, allowance, token, observe,
+            pointModel,
+            columns,
+            splits,
+            allowance,
+            token,
+            observe,
         )
         if (values != null) {
             val changed = when {
@@ -366,7 +379,7 @@ internal class LpScopedSolver(
         columns: IntArray,
         splits: LongArray,
         allowance: Long,
-        token: Cancellation,
+        token: ExecutionControl,
         observe: (LpProbeMetrics) -> Unit,
     ): List<LpDirectionalValues>? {
         val reason = when {
@@ -382,7 +395,12 @@ internal class LpScopedSolver(
             return null
         }
         return (solver as LpDirectionalValueSolver).directionalValues(
-            source, columns, splits, allowance, token, observe,
+            source,
+            columns,
+            splits,
+            allowance,
+            token,
+            observe,
         )
     }
 
@@ -390,7 +408,7 @@ internal class LpScopedSolver(
         pointModel: LpModel,
         columns: IntArray,
         allowance: Long,
-        token: Cancellation,
+        token: ExecutionControl,
         charge: (Long) -> Unit,
     ): List<LpDirectionalCost?>? {
         if (closed || workingActive || pendingFloat != null || state !== pointModel.exactState || token()) return null
@@ -399,7 +417,7 @@ internal class LpScopedSolver(
 
     fun solveFloat(
         warm: Basis? = null,
-        token: Cancellation = cancellation,
+        token: ExecutionControl = cancellation,
         allowance: LpFloatAllowance? = null,
     ): Pair<LpSolver, FloatLpResult?>? {
         require(warm == null || allowance == null) { "an explicit allowance requires retained factors" }
@@ -419,11 +437,19 @@ internal class LpScopedSolver(
                 solveStarted = true
                 val queryAllowance = allowance ?: if (current is ComponentLpSolver) {
                     LpFloatAllowance(workLimit, iterationLimit)
-                } else null
+                } else {
+                    null
+                }
                 observeFloatQuery(current, current === previous, queryAllowance, token, LpQueryRoute.SCOPED_FLOAT)
-                (if (warm == null) current.resolveBounds(
-                    queryAllowance,
-                ) else current.solve(warm)).also {
+                (
+                    if (warm == null) {
+                        current.resolveBounds(
+                            queryAllowance,
+                        )
+                    } else {
+                        current.solve(warm)
+                    }
+                    ).also {
                     lastFloatTermination = current.lastTermination
                 }
             } catch (primary: Throwable) {
@@ -446,7 +472,7 @@ internal class LpScopedSolver(
     fun advanceFloat(
         quantum: Long,
         allowance: LpFloatAllowance,
-        token: Cancellation = cancellation,
+        token: ExecutionControl = cancellation,
         retainFundingStop: Boolean = false,
     ): Pair<LpSolver, FloatLpResult?>? {
         requireAvailable()
@@ -486,8 +512,15 @@ internal class LpScopedSolver(
                 closeOwner(current)
                 return null
             }
-            observeFloatQuery(current, current === previous, allowance, token,
-                LpQueryRoute.SCOPED_CONTINUATION, quantum, retainFundingStop)
+            observeFloatQuery(
+                current,
+                current === previous,
+                allowance,
+                token,
+                LpQueryRoute.SCOPED_CONTINUATION,
+                quantum,
+                retainFundingStop,
+            )
             pending = PendingFloat(current.openSolve(allowance, retainFundingStop), allowance)
             pendingFloat = pending
         }
@@ -524,7 +557,7 @@ internal class LpScopedSolver(
         current: RetainedLpSolver,
         retained: Boolean,
         allowance: LpFloatAllowance?,
-        token: Cancellation,
+        token: ExecutionControl,
         route: LpQueryRoute,
         quantum: Long? = null,
         retainFundingStop: Boolean = false,
@@ -532,10 +565,12 @@ internal class LpScopedSolver(
         val observer = context.onQuery ?: return
         val model = state.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return
         check(querySequence < Long.MAX_VALUE) { "LP query sequence exhausted" }
-        val query = LpQueryObservation(checkNotNull(queryOwner), ++querySequence, model, retained,
+        val query = LpQueryObservation(
+            checkNotNull(queryOwner), ++querySequence, model, retained,
             allowance?.work ?: workLimit, null, 0.0, false, null, pricing, componentSplit,
             route, allowance != null, allowance?.iterations ?: iterationLimit, quantum, retainFundingStop,
-            refactorUpdateLimit, trackDegeneracy) { current.continuationBasis(model) }
+            refactorUpdateLimit, trackDegeneracy,
+        ) { current.continuationBasis(model) }
         try {
             observer(query)
         } finally {
@@ -561,7 +596,7 @@ internal class LpScopedSolver(
     }
 
     private inline fun edit(
-        token: Cancellation,
+        token: ExecutionControl,
         append: Boolean = false,
         compaction: LpLayoutRemap? = null,
         change: (LpBoundTrail) -> Boolean,
@@ -584,7 +619,7 @@ internal class LpScopedSolver(
         return true
     }
 
-    private fun adoptNumerical(next: LpExactState, token: Cancellation): Boolean {
+    private fun adoptNumerical(next: LpExactState, token: ExecutionControl): Boolean {
         val current = solver ?: return !token()
         if (next.canProjectWorkingModel(token)) return current.adopt(next, token)
         if (token()) return false
@@ -605,7 +640,7 @@ internal class LpScopedSolver(
 
     fun <T> withWorkingModel(
         working: LpWorkingModel,
-        token: Cancellation = cancellation,
+        token: ExecutionControl = cancellation,
         allowance: LpFloatAllowance? = null,
         block: (LpWorkingScope) -> T,
     ): T {
@@ -648,7 +683,7 @@ internal class LpScopedSolver(
     fun replaceObjective(
         objective: ExactLpObjective,
         baseRegion: LpExactState,
-        token: Cancellation = cancellation,
+        token: ExecutionControl = cancellation,
     ): Boolean {
         requireAvailable()
         if (closed || token() || baseRegion.depth != 0) return false
@@ -687,7 +722,7 @@ internal class LpScopedSolver(
 
     private fun replace(
         next: LpBoundTrail,
-        token: Cancellation,
+        token: ExecutionControl,
         append: Boolean,
         compaction: LpLayoutRemap? = null,
     ): Boolean {
@@ -718,7 +753,9 @@ internal class LpScopedSolver(
         if (append) solver?.let { recordPendingAppendSolve(it) }
         val warm = if (append) {
             (solver as? PersistentLpSolver)?.retainedBasis()?.extended(state.model, next.state.model)
-        } else null
+        } else {
+            null
+        }
         val expected = if (compaction != null) {
             // Seat the disappearing logicals in an isolated old-size owner before deleting their slots.
             val staging = prepared(state, token) ?: return false
@@ -735,8 +772,14 @@ internal class LpScopedSolver(
             IntArray(next.state.model.m) { next.state.model.n + it }
         }
         val initialComponents = componentSplit && solver == null && components == null && compaction == null
-        val replacement = prepared(next.state, token, append, warm, replacementWorkLimit,
-            allowComponents = initialComponents) ?: return false
+        val replacement = prepared(
+            next.state,
+            token,
+            append,
+            warm,
+            replacementWorkLimit,
+            allowComponents = initialComponents,
+        ) ?: return false
         var published = false
         var failure: Throwable? = null
         try {
@@ -773,12 +816,19 @@ internal class LpScopedSolver(
     private fun appendComponentRows(
         next: LpExactState,
         components: ComponentLpSolver,
-        token: Cancellation,
+        token: ExecutionControl,
     ): Boolean = try {
         components.appendLocalRows(next, token, workLimit) { part, childToken, childWork ->
-            newPersistentLpSolver(part, childToken, refactorUpdateLimit, iterationLimit,
-                childWork, trackDegeneracy, context.engineFactory,
-                componentPricing(part, next.model.n, components.rowOnlyRows))
+            newPersistentLpSolver(
+                part,
+                childToken,
+                refactorUpdateLimit,
+                iterationLimit,
+                childWork,
+                trackDegeneracy,
+                context.engineFactory,
+                componentPricing(part, next.model.n, components.rowOnlyRows),
+            )
         }
     } catch (primary: Throwable) {
         solver = null
@@ -887,7 +937,7 @@ internal class LpScopedSolver(
 
     private fun prepared(
         next: LpExactState,
-        token: Cancellation,
+        token: ExecutionControl,
         recordRejectedAppendWork: Boolean = false,
         warm: Basis? = null,
         workBudget: Long = workLimit,
@@ -915,37 +965,55 @@ internal class LpScopedSolver(
             if (workBudget > 0L && projection.work >= workBudget) return null
             candidate = if (allowComponents && warm == null) {
                 componentLpSolverOrNull(
-                    working, token, projection,
+                    working,
+                    token,
+                    projection,
                     { part, childToken, rowOnlyRows ->
                         val remaining = if (workBudget > 0L) workBudget - projection.work else 0L
                         if (workBudget > 0L && remaining <= 0L) throw LpProjectionStop()
-                        newPersistentLpSolver(part, childToken, refactorUpdateLimit, iterationLimit,
-                            remaining, trackDegeneracy, context.engineFactory,
-                            componentPricing(part, working.n, rowOnlyRows))
+                        newPersistentLpSolver(
+                            part,
+                            childToken,
+                            refactorUpdateLimit,
+                            iterationLimit,
+                            remaining,
+                            trackDegeneracy,
+                            context.engineFactory,
+                            componentPricing(part, working.n, rowOnlyRows),
+                        )
                     },
                     ::ComponentLpSolver,
                 )
-            } else null
+            } else {
+                null
+            }
             val remainingWork = if (workBudget > 0L) workBudget - projection.work else 0L
             if (workBudget > 0L && remainingWork <= 0L) return null
-            if (candidate == null) candidate = newPersistentLpSolver(
-                working,
-                token,
-                refactorUpdateLimit,
-                iterationLimit,
-                remainingWork,
-                trackDegeneracy,
-                context.engineFactory,
-                pricing,
-            )
+            if (candidate == null) {
+                candidate = newPersistentLpSolver(
+                    working,
+                    token,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    remainingWork,
+                    trackDegeneracy,
+                    context.engineFactory,
+                    pricing,
+                )
+            }
             createdOwners++
             peakOwners = maxOf(peakOwners, createdOwners - closedOwners)
             if (!candidate.adopt(next, token)) return null
             val basis = try {
                 when (val current = candidate) {
-                    is PersistentLpSolver -> if (warm == null) current.prepareLogicals(token) else
+                    is PersistentLpSolver -> if (warm == null) {
+                        current.prepareLogicals(token)
+                    } else {
                         current.prepareBasis(warm, token)
+                    }
+
                     is ComponentLpSolver -> current.prepareLogicals(token, remainingWork)
+
                     else -> null
                 }
             } finally {
@@ -953,9 +1021,15 @@ internal class LpScopedSolver(
                 constructionWork = saturated(constructionWork, candidate.lastMetrics.preparationOps)
                 preparationRefactorizations += candidate.lastRefactorizations
             } ?: return null
-            if (!basis.validFor(next.model) || (warm == null &&
-                    (basis.basicVars.indices.any { basis.basicVars[it] != next.model.n + it } ||
-                        basis.status.indices.any { (basis.status[it] == VarStatus.BASIC) != (it >= next.model.n) })) ||
+            if (!basis.validFor(next.model) || (
+                    warm == null &&
+                        (
+                            basis.basicVars.indices.any { basis.basicVars[it] != next.model.n + it } ||
+                                basis.status.indices.any {
+                                    (basis.status[it] == VarStatus.BASIC) != (it >= next.model.n)
+                                }
+                            )
+                    ) ||
                 token()
             ) {
                 return null
@@ -1005,9 +1079,8 @@ internal class LpScopedSolver(
         }
     }
 
-    private fun componentPricing(part: LpModel, columns: Int, rowOnlyRows: Int): LpPricingOptions {
-        return pricing.componentShare(part.n, columns, rowOnlyRows)
-    }
+    private fun componentPricing(part: LpModel, columns: Int, rowOnlyRows: Int): LpPricingOptions =
+        pricing.componentShare(part.n, columns, rowOnlyRows)
 
     override fun close() {
         requireAvailable()

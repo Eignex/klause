@@ -22,7 +22,7 @@ import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -46,9 +46,9 @@ class SingletonInequalityProjectionTest {
                 }
             }
             val problem = BakedProblem(0, 2, Array(2) { IntDomain(0, 10) }, listOf(factor), alreadyFolded = true)
-            val token = object : Cancellation {
+            val token = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = true
-                override fun workMeter(): WorkMeter = WorkMeter { work += it }
+                override val accounting: WorkMeter get() = WorkMeter { work += it }
             }
             val context = PresolveContext(cancellation = token)
             reads = 0
@@ -82,9 +82,9 @@ class SingletonInequalityProjectionTest {
                 }
             }
             val problem = BakedProblem(0, 2, Array(2) { IntDomain(0, 10) }, List(128) { factor }, alreadyFolded = true)
-            val token = object : Cancellation {
+            val token = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = memberships >= 8
-                override fun workMeter(): WorkMeter = WorkMeter { work += it }
+                override val accounting: WorkMeter get() = WorkMeter { work += it }
             }
             val context = PresolveContext(cancellation = token)
             memberships = 0
@@ -123,9 +123,9 @@ class SingletonInequalityProjectionTest {
                     List(count) { factor },
                     alreadyFolded = true,
                 )
-                val containing = object : Cancellation {
+                val containing = object : ExecutionControl() {
                     override fun isCancelled(): Boolean = reads >= 32
-                    override fun workMeter(): WorkMeter = WorkMeter { work += it }
+                    override val accounting: WorkMeter get() = WorkMeter { work += it }
                 }
                 val budget = PresolveBudget(0L)
                 val context = PresolveContext(cancellation = budget.preparationCancellation(containing))
@@ -163,7 +163,7 @@ class SingletonInequalityProjectionTest {
                 override val linearForm = LinearForm.Conjunction(listOf(row))
             }
             val problem = BakedProblem(0, 512, Array(512) { IntDomain(0, 10) }, listOf(factor), alreadyFolded = true)
-            val context = PresolveContext(cancellation = Cancellation { refs >= 32 })
+            val context = PresolveContext(cancellation = ExecutionControl { refs >= 32 })
             refs = 0
 
             val empty = when (lane) {
@@ -199,7 +199,7 @@ class SingletonInequalityProjectionTest {
                 }
                 val context = PresolveContext(
                     objectiveIntCoeffs = objective,
-                    cancellation = budget.orSpent(Cancellation.Never),
+                    cancellation = budget.orSpent(ExecutionControl.Never),
                 )
 
                 val empty = when (lane) {
@@ -227,9 +227,9 @@ class SingletonInequalityProjectionTest {
                     alreadyFolded = true,
                 )
                 var work = 0L
-                val containing = object : Cancellation {
+                val containing = object : ExecutionControl() {
                     override fun isCancelled(): Boolean = false
-                    override fun workMeter(): WorkMeter = WorkMeter { work += it }
+                    override val accounting: WorkMeter get() = WorkMeter { work += it }
                 }
                 val budget = PresolveBudget(0L)
                 val context = PresolveContext(
@@ -285,7 +285,7 @@ class SingletonInequalityProjectionTest {
                     openIntLo = booleanArrayOf(openBelow, openBelow, false),
                     alreadyFolded = true,
                 )
-                val context = PresolveContext(cancellation = Cancellation { reads >= 2 })
+                val context = PresolveContext(cancellation = ExecutionControl { reads >= 2 })
                 reads = 0
 
                 val delta = when (lane) {

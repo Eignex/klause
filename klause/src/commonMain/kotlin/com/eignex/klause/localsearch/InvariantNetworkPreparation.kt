@@ -1,6 +1,6 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.concurrent.Mutex
 
 internal class InvariantNetworkPreparation(
@@ -19,7 +19,7 @@ internal class InvariantNetworkPreparation(
             network
         }
 
-    fun get(cancellation: Cancellation): Boolean {
+    fun get(cancellation: ExecutionControl): Boolean {
         while (true) {
             val ready = lock.withLock {
                 if (complete) return@withLock true

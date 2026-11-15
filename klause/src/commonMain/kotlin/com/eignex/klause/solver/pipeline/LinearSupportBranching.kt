@@ -5,7 +5,7 @@ import com.eignex.klause.lp.optimization.LinearAuthorityCutViolation
 import com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.min
@@ -24,7 +24,7 @@ internal class LinearSupportBranching(
     fun select(
         result: SourceNumericalFeedbackResult,
         fractional: List<Pair<SourceCoordinate, BigFraction>>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): Pair<SourceCoordinate, BigFraction>? {
         consultations++
         fun fallback(): Pair<SourceCoordinate, BigFraction>? {
@@ -63,6 +63,7 @@ internal class LinearSupportBranching(
             if (cut.inequality.coefficients.keys.none { it in distances }) continue
             val violation = when (val evaluated = feedback.violation(available, cut)) {
                 is LinearAuthorityCutViolation.Available -> evaluated.value.toDouble()
+
                 is LinearAuthorityCutViolation.Unavailable -> when (evaluated.reason) {
                     LinearAuthorityCutViolation.Reason.NoPoint, LinearAuthorityCutViolation.Reason.Uncovered -> continue
                     else -> return fallback()

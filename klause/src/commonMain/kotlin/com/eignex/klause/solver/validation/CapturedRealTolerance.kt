@@ -20,7 +20,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 
@@ -45,7 +45,7 @@ internal fun verifyCapturedLinearTolerance(
     source: Problem,
     sample: Sample,
     policy: SourceTolerance,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Verification<Sample, Unit> {
     val reals = sample.exactReals
         ?: return Verification.Indeterminate("captured tolerance requires rational source coordinates")
@@ -56,7 +56,9 @@ internal fun verifyCapturedLinearTolerance(
         val upper = BigFraction.ofDouble(source.realUpper[id])
         if ((lower != null && reals[id] < lower - capturedSourceSlack(policy, lower)) ||
             (upper != null && reals[id] > upper + capturedSourceSlack(policy, upper))
-        ) return Verification.Rejected("captured source tolerance refutes a real declaration")
+        ) {
+            return Verification.Rejected("captured source tolerance refutes a real declaration")
+        }
     }
     for (factor in source.factors) {
         cancellation.charge(1)
@@ -68,7 +70,9 @@ internal fun verifyCapturedLinearTolerance(
         val form = if (factor is LinearIndicator) {
             if (sample.exactIntValue(factor.indicator) != bigIntOf(if (factor.whenOne) 1L else 0L)) continue
             LinearForm.Conjunction(listOf(factor.row))
-        } else factor.linearForm
+        } else {
+            factor.linearForm
+        }
         val rows = when (form) {
             is LinearForm.Conjunction -> form.rows
             is LinearForm.Disjunction -> form.rows
@@ -83,15 +87,18 @@ internal fun verifyCapturedLinearTolerance(
         if (cancellation()) return Verification.Indeterminate("captured tolerance row check cancelled")
         if (!valid) return Verification.Rejected("captured source tolerance refutes a real relation")
     }
-    return if (cancellation()) Verification.Indeterminate("captured tolerance check cancelled")
-    else Verification.Accepted(Candidate(sample, Unit))
+    return if (cancellation()) {
+        Verification.Indeterminate("captured tolerance check cancelled")
+    } else {
+        Verification.Accepted(Candidate(sample, Unit))
+    }
 }
 
 private fun toleranceRow(
     row: LinearRow,
     sample: Sample,
     policy: SourceTolerance,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Boolean? {
     if (row.strict || row.activator != LinearRow.ALWAYS || row.relation == LinearOp.NE) return null
     return slackedRow(row, sample, policy, cancellation)
@@ -101,7 +108,7 @@ private fun slackedRow(
     row: LinearRow,
     sample: Sample,
     policy: SourceTolerance,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Boolean? {
     val constants = row.constants
     val bound = when (constants) {
@@ -117,16 +124,24 @@ private fun slackedRow(
             is IntegralConstants -> BigFraction.of(constants.exactCoeff(index), BIG_ONE)
             is RealConstants -> BigFraction.ofDouble(if (index < constants.intCoefficients.size) {
                 constants.intCoefficients.at(index)
-            } else constants.realCoefficients.at(index - constants.intCoefficients.size)) ?: return null
+            } else {
+                constants.realCoefficients.at(index - constants.intCoefficients.size)
+            }
+            ) ?: return null
         }
         val reference = row.ref(index)
         val value = when {
             Term.isBool(reference) -> {
                 val literal = Term.lit(reference)
-                if (Lit.evaluate(literal, sample.boolValue(Lit.variable(literal)))) BigFraction.ONE
-                else BigFraction.ZERO
+                if (Lit.evaluate(literal, sample.boolValue(Lit.variable(literal)))) {
+                    BigFraction.ONE
+                } else {
+                    BigFraction.ZERO
+                }
             }
+
             Term.isInt(reference) -> BigFraction.of(sample.exactIntValue(Term.intVar(reference)), BIG_ONE)
+
             else -> requireNotNull(sample.exactReals)[Term.realVar(reference)]
         }
         val term = coefficient * value
@@ -152,7 +167,7 @@ private fun BigFraction.magnitude(): BigFraction = if (this < BigFraction.ZERO) 
 // A non-strict active row reads the slack, and a finite membership admits a value within the slack of a member.
 // A strict row, a disequality or a row whose activator is false has no slack to read, so it must hold exactly.
 // Factors over integers and Booleans alone are left to the engine that enforces them.
-internal fun capturedRealAcceptance(source: Problem, cancellation: Cancellation): FiniteSourceAcceptance? {
+internal fun capturedRealAcceptance(source: Problem, cancellation: ExecutionControl): FiniteSourceAcceptance? {
     val policy = source.semantics.effective.feasibilityTolerance
     if (policy == null || policy.isExact || source.numRealVars == 0) return null
     val relations = ArrayList<Factor>()
@@ -174,11 +189,13 @@ private fun acceptsWithinTolerance(
     relations: List<Factor>,
     sample: Sample,
     policy: SourceTolerance,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Boolean {
     if (sample.numRealVars != source.numRealVars || sample.numIntVars != source.numIntVars ||
         sample.numBoolVars != source.numBoolVars
-    ) return false
+    ) {
+        return false
+    }
     val reals = sample.exactReals ?: List(source.numRealVars) {
         BigFraction.ofDouble(sample.approximateRealValue(it)) ?: return false
     }
@@ -190,11 +207,15 @@ private fun acceptsWithinTolerance(
         val upper = BigFraction.ofDouble(source.realUpper[id])
         if ((lower != null && reals[id] < lower - capturedSourceSlack(policy, lower)) ||
             (upper != null && reals[id] > upper + capturedSourceSlack(policy, upper))
-        ) return false
+        ) {
+            return false
+        }
     }
     val witness = object : ExactWitness {
         override fun truth(boolVar: Int): Boolean = point.boolValue(boolVar)
-        override fun at(column: Int): BigFraction = if (column < source.numRealVars) reals[column] else {
+        override fun at(column: Int): BigFraction = if (column < source.numRealVars) {
+            reals[column]
+        } else {
             BigFraction.of(point.exactIntValue(column - source.numRealVars), BIG_ONE)
         }
     }
@@ -217,10 +238,12 @@ private fun acceptsWithinTolerance(
                 val member = checkNotNull(BigFraction.ofDouble(factor.valueAt(index)))
                 (reals[factor.variable] - member).magnitude() <= capturedSourceSlack(policy, member)
             }
-        } else when (val form = factor.linearForm) {
+        } else {
+            when (val form = factor.linearForm) {
             is LinearForm.Conjunction -> form.rows.all(::holds)
             is LinearForm.Disjunction -> form.rows.any(::holds)
             else -> false
+        }
         }
         if (!valid) return false
     }

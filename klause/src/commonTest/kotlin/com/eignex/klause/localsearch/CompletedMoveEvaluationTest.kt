@@ -7,7 +7,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -44,7 +44,7 @@ class CompletedMoveEvaluationTest {
         val evaluation = CompletedMoveEvaluation(
             state,
             LinearObjective(intCoefficients = longArrayOf(1, 1, 1), realCoefficients = doubleArrayOf(10.0)),
-            Cancellation.Never,
+            ExecutionControl.Never,
             mayAttempt = { true },
             complete = { candidate ->
                 calls++
@@ -100,7 +100,7 @@ class CompletedMoveEvaluationTest {
         val evaluation = CompletedMoveEvaluation(
             evaluated,
             objective,
-            Cancellation.Never,
+            ExecutionControl.Never,
             mayAttempt = { true },
             complete = { candidate ->
                 calls++
@@ -111,7 +111,7 @@ class CompletedMoveEvaluationTest {
         val expected = Cbls(pairSwapCap = 0, satisfiedSampleCount = 0).pickMove(baseline)
 
         val actual = Cbls(pairSwapCap = 0, satisfiedSampleCount = 0)
-            .pickMove(evaluated, Cancellation.Never, evaluation)
+            .pickMove(evaluated, ExecutionControl.Never, evaluation)
 
         assertEquals(expected, actual)
         assertEquals(baseline.rng.nextInt(), evaluated.rng.nextInt())
@@ -141,7 +141,7 @@ class CompletedMoveEvaluationTest {
         val evaluation = CompletedMoveEvaluation(
             state,
             LinearObjective(intCoefficients = longArrayOf(1)),
-            Cancellation.Never,
+            ExecutionControl.Never,
             mayAttempt = { true },
             complete = { candidate ->
                 calls++
@@ -176,7 +176,7 @@ class CompletedMoveEvaluationTest {
         val evaluation = CompletedMoveEvaluation(
             state,
             LinearObjective(intCoefficients = longArrayOf(1)),
-            Cancellation.Never,
+            ExecutionControl.Never,
             mayAttempt = { true },
             complete = { candidate ->
                 pins += candidate.intValue(0)
@@ -214,7 +214,7 @@ class CompletedMoveEvaluationTest {
         val evaluation = CompletedMoveEvaluation(
             state,
             LinearObjective(intCoefficients = longArrayOf(1)),
-            Cancellation.Never,
+            ExecutionControl.Never,
             mayAttempt = { true },
             complete = { candidate ->
                 calls++
@@ -256,7 +256,7 @@ class CompletedMoveEvaluationTest {
         val evaluation = CompletedMoveEvaluation(
             state,
             LinearObjective(intCoefficients = longArrayOf(1)),
-            Cancellation.Never,
+            ExecutionControl.Never,
             mayAttempt = { true },
             complete = { error("failed completion") },
             current = { initial },

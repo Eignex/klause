@@ -15,7 +15,7 @@ import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceIntegerRowAssumption
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.integerPinBounds
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 internal class LinearAuthorityQuery private constructor(
     private val source: SourceProofContext,
     val coordinates: List<SourceCoordinate>,
@@ -55,7 +55,9 @@ internal class LinearAuthorityQuery private constructor(
 
     companion object {
         fun prepare(
-            source: SourceProofContext, template: LinearAuthorityTemplate?, cancellation: Cancellation,
+            source: SourceProofContext,
+            template: LinearAuthorityTemplate?,
+            cancellation: ExecutionControl,
             maximumCutProofSteps: Int = 100_000,
             onCutWork: (Long) -> Unit = {},
             cutMask: Set<Int>? = null,
@@ -69,7 +71,9 @@ internal class LinearAuthorityQuery private constructor(
             val premises = numeric.premises
             val integerBounds = if (premises.values.any { it.integerPins.isNotEmpty() }) {
                 numeric.integerPinBounds(source.scope.condition, cancellation) ?: return null
-            } else null
+            } else {
+                null
+            }
             val cited = ArrayList<Pair<SourceInequality, SourceDerivation>>()
             val inactive = HashSet<Int>()
             var unconditional = true
@@ -93,12 +97,14 @@ internal class LinearAuthorityQuery private constructor(
                 (checkUnselectedCuts || cutMask == null || id in cutMask) &&
                     cuts[id].owners.none { it in inactive }
             }
-            val checks = if (active.isEmpty()) emptyList() else {
+            val checks = if (active.isEmpty()) {
+                emptyList()
+            } else {
                 SourceEvidenceVerifier(numeric.atScope(source.scope), maximumSteps = maximumCutProofSteps)
                     .verifyAll(active.map { id ->
                         val cut = cuts[id]
                         SourceEvidence(source.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)
-                    }, Cancellation {
+                    }, ExecutionControl {
                         cutVerificationWork++
                         cancellation()
                     })
@@ -121,7 +127,9 @@ internal class LinearAuthorityQuery private constructor(
                     cutFamilies[cited.size] = cut.family
                     activeCuts++
                     if (cut.mixed) activeMixedCuts++
-                } else inactive += cited.size
+                } else {
+                    inactive += cited.size
+                }
                 cited += cut.inequality to cut.derivation
             }
             for (evidence in consequences) {
@@ -137,14 +145,22 @@ internal class LinearAuthorityQuery private constructor(
             }
             for ((upper, bounds) in listOf(false to condition.lower, true to condition.upper)) {
                 val sign = if (upper) BigFraction.ONE else BigFraction.MINUS_ONE
-                for ((id, value) in bounds) cited += SourceInequality(mapOf(id to sign), value * sign) to
+                for ((id, value) in bounds) {
+                    cited += SourceInequality(mapOf(id to sign), value * sign) to
                     SourceDerivation.Assumption(id, upper)
+                }
             }
             val indices = template?.indices ?: coordinates.withIndex().associate { it.value to it.index }
-            val rows = if (template == null) cited.map { it.first.row(indices) }
-                else template.rows + cited.drop(template.rows.size).map { it.first.row(indices) }
-            val sign = if (source.scope.objective?.sense == ObjectiveSense.MINIMIZE) BigFraction.ONE
-                else BigFraction.MINUS_ONE
+            val rows = if (template == null) {
+                cited.map { it.first.row(indices) }
+            } else {
+                template.rows + cited.drop(template.rows.size).map { it.first.row(indices) }
+            }
+            val sign = if (source.scope.objective?.sense == ObjectiveSense.MINIMIZE) {
+                BigFraction.ONE
+            } else {
+                BigFraction.MINUS_ONE
+            }
             val costs = coordinates.map { sign * (numeric.objective[it] ?: BigFraction.ZERO) }
             return LinearAuthorityQuery(source, coordinates, cited, rows, inactive,
                 unconditional && (inactive.isEmpty() || retainMaskedCuts),

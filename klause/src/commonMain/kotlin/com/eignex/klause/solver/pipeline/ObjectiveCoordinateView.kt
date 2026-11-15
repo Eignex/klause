@@ -10,7 +10,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.fitsLong
 
 internal class ObjectiveCoordinateView private constructor(
@@ -25,7 +25,7 @@ internal class ObjectiveCoordinateView private constructor(
             canonical: FinitePipelinePreparation,
             coordinates: FinitePipelinePreparation,
             hints: PreparedSourceHints?,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
         ): ObjectiveCoordinateView? {
             val mapping = canonical.sourceMapping ?: return null
             val privateMapping = coordinates.sourceMapping ?: return null
@@ -33,22 +33,29 @@ internal class ObjectiveCoordinateView private constructor(
                 !mapping.guarantees.reconstructability || !privateMapping.guarantees.reconstructability ||
                 mapping.retainedCoordinates(cancellation) == null ||
                 privateMapping.retainedCoordinates(cancellation) == null
-            ) return null
+            ) {
+                return null
+            }
             val target = canonical.problem as? BakedProblem ?: return null
             val privateProblem = coordinates.problem as? BakedProblem ?: return null
             val targetObjective = canonical.objective ?: return null
             val privateObjective = coordinates.objective ?: return null
             // Presolve retains column slots. Only equal, discrete namespaces can share reconstructed proposals.
             if (listOf(mapping.source, target, privateProblem).any {
-                it.numBoolVars != target.numBoolVars || it.numIntVars != target.numIntVars || it.numRealVars != 0
-            }) return null
+                    it.numBoolVars != target.numBoolVars || it.numIntVars != target.numIntVars || it.numRealVars != 0
+                }
+            ) {
+                    return null
+                }
             val verifier = finiteWitnessVerifier(target, targetObjective, cancellation)
             return ObjectiveCoordinateView(
                 privateProblem, privateObjective, hints, ModelIdentity.of(target, targetObjective),
             ) { point ->
                 if (cancellation() || point.numBoolVars != privateProblem.numBoolVars ||
                     point.numIntVars != privateProblem.numIntVars || point.numRealVars != 0
-                ) return@ObjectiveCoordinateView null
+                ) {
+                    return@ObjectiveCoordinateView null
+                }
                 val lifted = try {
                     coordinates.reconstruct(point)
                 } catch (_: ArithmeticException) {
@@ -60,7 +67,9 @@ internal class ObjectiveCoordinateView private constructor(
                 val value = targetObjective.evaluate(sample)
                 if (verifier.verify(Candidate(sample, value)) is Verification.Accepted) {
                     MinimizeResult.BestFound(sample, value, TerminationReason.SearchExhausted)
-                } else null
+                } else {
+                    null
+                }
             }
         }
     }

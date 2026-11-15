@@ -22,10 +22,10 @@ import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSession
 import com.sun.management.ThreadMXBean
-import java.io.File
-import java.lang.management.ManagementFactory
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
 
 internal object MixedPbLocalityProfile {
     @JvmStatic

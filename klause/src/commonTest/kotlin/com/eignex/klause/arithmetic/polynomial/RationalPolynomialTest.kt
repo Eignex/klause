@@ -1,7 +1,7 @@
 package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -65,7 +65,7 @@ class RationalPolynomialTest {
 
     @Test
     fun `rational images should observe caller cancellation for every polynomial shape`() {
-        val caller = RationalPolynomialArithmetic(PolynomialArithmetic(Cancellation { true }))
+        val caller = RationalPolynomialArithmetic(PolynomialArithmetic(ExecutionControl { true }))
         for (polynomial in listOf(RationalPolynomial.ZERO, RationalPolynomial.ONE,
             RationalPolynomial.of(-1, 0, 1))
         ) {
@@ -80,9 +80,9 @@ class RationalPolynomialTest {
         val polynomial = RationalPolynomial.of(-1, 0, 0, 0, 1)
         var spent = 0L
         val meter = WorkMeter { spent += it }
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = spent >= 3
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
         val caller = RationalPolynomialArithmetic(PolynomialArithmetic(cancellation))
 

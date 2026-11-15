@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -249,7 +249,7 @@ class MixedDualBoundTest {
         val certificate = nodeDualCertificate(
             model,
             doubleArrayOf(0.0),
-            Cancellation { cancelled },
+            ExecutionControl { cancelled },
             observer,
             onAdditionalCertificate = { published = true },
         )
@@ -579,6 +579,6 @@ class MixedDualBoundTest {
         val source = LpBuilder().apply { addRealVar(0.25, 1.25, cost = 0.5) }.build(Sense.MINIMIZE)
         val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
 
-        assertNull(nodeDualCertificate(model, doubleArrayOf(), Cancellation { true }))
+        assertNull(nodeDualCertificate(model, doubleArrayOf(), ExecutionControl { true }))
     }
 }

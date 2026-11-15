@@ -12,7 +12,7 @@ import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.PolynomialTheoryInvocation
 import com.eignex.klause.theory.qfnra.QfNraResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class PolynomialExactNeighborhood(
     private val model: SharedPolynomialModel,
@@ -32,7 +32,7 @@ internal class PolynomialExactNeighborhood(
 
     override fun check(
         condition: ExactNeighborhoodCondition,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): ExactNeighborhoodResult {
         if (condition.cutoff != null && objectiveValue != null && objectiveValue >= condition.cutoff) {
             return ExactNeighborhoodResult.Refuted
@@ -51,7 +51,9 @@ internal class PolynomialExactNeighborhood(
                 val sample = certify(model.capture(result.assignment, fixed.bools, fixed.ints))
                 ExactNeighborhoodResult.Witness(sample)
             }
+
             is QfNraResult.Unsatisfiable -> ExactNeighborhoodResult.Refuted
+
             is QfNraResult.Unknown -> ExactNeighborhoodResult.Undecided
         }
     }

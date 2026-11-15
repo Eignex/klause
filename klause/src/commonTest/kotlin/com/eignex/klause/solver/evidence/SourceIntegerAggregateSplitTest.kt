@@ -1,10 +1,10 @@
 package com.eignex.klause.solver.evidence
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.lp.optimization.LinearPinnedRefutation
 import com.eignex.klause.lp.optimization.withLinearAuthority
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -106,7 +106,7 @@ class SourceIntegerAggregateSplitTest {
     @Test
     fun `cancelled aggregate coverage should supply no refutation`() {
         val result = SourceEvidenceVerifier(source).verify(
-            SourceEvidence(scope, SourceClaim.Refutation, proof()), Cancellation { true })
+            SourceEvidence(scope, SourceClaim.Refutation, proof()), ExecutionControl { true })
 
         assertIs<SourceEvidenceCheck.Unavailable>(result)
     }
@@ -119,7 +119,7 @@ class SourceIntegerAggregateSplitTest {
         val evidence = SourceEvidence(scope, SourceClaim.Refutation, derivation)
         var polls = 0
         assertEquals(SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(context).verify(evidence, Cancellation { polls++; false }))
+            SourceEvidenceVerifier(context).verify(evidence, ExecutionControl { polls++; false }))
 
         val result = SourceEvidenceVerifier(context, maximumSteps = polls - 1).verify(evidence)
 
@@ -146,9 +146,9 @@ class SourceIntegerAggregateSplitTest {
     fun `a custom witness checker should not bypass aggregate restrictions`() {
         val branch = scope.copy(condition = scope.condition.integerBound(below))
         val checker = object : SourceSemanticsChecker {
-            override fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation) =
+            override fun witness(sample: Sample, scope: SourceScope, cancellation: ExecutionControl) =
                 SourceEvidenceCheck.Checked
-            override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation) =
+            override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: ExecutionControl) =
                 SourceEvidenceCheck.Checked
         }
         val context = SourceProofContext(branch, setOf(x, y), emptyMap(), semanticsChecker = checker)

@@ -8,7 +8,7 @@ import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -154,7 +154,7 @@ class PolynomialCellFeedbackTest {
     fun `a parent stop during numeric lookup remains terminal`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
         var stopped = false
-        val parent = QfNraWork(QfNraParams(cancellation = Cancellation { stopped }))
+        val parent = QfNraWork(QfNraParams(cancellation = ExecutionControl { stopped }))
         val arithmetic = PolynomialArithmetic(parent)
         val algebraic = AlgebraicArithmetic(arithmetic)
         val snapshot = PolynomialFormula.normalize(source.formula, arithmetic)
@@ -414,7 +414,7 @@ class PolynomialCellFeedbackTest {
     fun `cancelled admission publishes no feedback`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
         var stopped = false
-        val arithmetic = PolynomialArithmetic(Cancellation { stopped })
+        val arithmetic = PolynomialArithmetic(ExecutionControl { stopped })
         val algebraic = AlgebraicArithmetic(arithmetic)
         val snapshot = PolynomialFormula.normalize(source.formula, arithmetic)
         val condition = PolynomialCondition()

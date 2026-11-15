@@ -19,7 +19,7 @@ import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.validation.floatingOptimumAcceptance
 import com.eignex.klause.theory.finiteLinearModel
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyDoubleArray
 
 internal class LeafRealSolver(
@@ -41,7 +41,7 @@ internal class LeafRealSolver(
 
     fun solve(
         sample: Sample,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         toleranceCheck: ((Sample) -> Boolean)? = null,
         workLimit: Long = 0L,
     ): LeafRealResult {
@@ -74,7 +74,7 @@ internal class LeafRealSolver(
 
     fun openSolve(
         sample: Sample,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         toleranceCheck: ((Sample) -> Boolean)? = null,
     ): LpSolveCursor<LeafRealResult> {
         check(!closed && activeSolve == null) { "real leaf solver is closed or suspended" }
@@ -112,7 +112,7 @@ internal class LeafRealSolver(
         }.also { activeSolve = it }
     }
 
-    private fun relaxation(sample: Sample, cancellation: Cancellation): LpRelaxation? {
+    private fun relaxation(sample: Sample, cancellation: ExecutionControl): LpRelaxation? {
         val pins = Array(problem.numIntVars) { variable ->
             val value = sample.intValue(variable)
             integers[variable]?.takeIf { it.min == value } ?: IntDomain(value, value)

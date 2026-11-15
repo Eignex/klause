@@ -54,7 +54,8 @@ class Xcsp3TableTest {
               <variables><var id="x">4294967296..4294967297</var></variables>
               <constraints><extension><list>x</list><conflicts>4294967296</conflicts></extension></constraints>
             </instance>
-        """.trimIndent())
+            """.trimIndent(),
+        )
 
         val result = BacktrackSolver(source.problem.bake()).solve(BacktrackParams())
 

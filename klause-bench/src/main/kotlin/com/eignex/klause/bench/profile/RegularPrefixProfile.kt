@@ -1,9 +1,9 @@
 package com.eignex.klause.bench.profile
 
-import com.eignex.klause.bench.metric.InstalledBuild
-import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.catalog.Format
+import com.eignex.klause.bench.metric.InstalledBuild
+import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.MiniZincCompatibility
 import com.eignex.klause.bench.runner.MiniZincRunner
@@ -23,7 +23,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -124,7 +124,7 @@ internal object RegularPrefixProfile {
         val codec = ProblemJson()
         out.resolve("source.json").writeText(codec.encodeToJsonElement(source).toString())
         for (mode in listOf("default", "aggressive")) {
-            val stop = Cancellation.after(12.seconds)
+            val stop = ExecutionControl.after(12.seconds)
             val budget = PresolveBudget(825_000_000L)
             val started = System.nanoTime()
             val prepared = FinitePipeline.prepare(

@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.search
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -271,7 +271,7 @@ class SearchBranchSelectionTest {
             override val branchKind = SearchBranchKind.Finite
             override fun nextBranch(context: SearchContext): List<SearchDecision>? = error("proposal was consulted")
         }
-        val session = SearchSession(emptyList(), cancellation = Cancellation { true }, proposals = listOf(proposal))
+        val session = SearchSession(emptyList(), cancellation = ExecutionControl { true }, proposals = listOf(proposal))
         val run = session.openRun(
             0,
             branchSelection = SearchBranchSelection.Priority(

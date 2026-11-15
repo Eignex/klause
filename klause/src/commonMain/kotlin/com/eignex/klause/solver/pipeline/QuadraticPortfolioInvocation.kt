@@ -16,7 +16,6 @@ import com.eignex.klause.portfolio.PortfolioTerminalCheck
 import com.eignex.klause.portfolio.PortfolioTerminalPublication
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.QuadraticEngineInvocation
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.quadraticEngineInvocation
@@ -32,11 +31,8 @@ import com.eignex.klause.solver.result.QuadraticObjectiveBound
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.ArithmeticCancellation
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.arithmeticSource
-import com.eignex.klause.util.withCheckpoint
 import com.eignex.util.concurrent.Mutex
 
 internal class QuadraticPortfolioInvocation(
@@ -54,12 +50,12 @@ internal class QuadraticPortfolioInvocation(
     private data class Value(val source: AlgebraicReal, val minimized: AlgebraicReal)
     private val identity = ModelIdentity.of(plan.originalSource, objective)
     private val expected = sourceInvocation
-    private val external = params.timeout or params.cancellation
-    private val verification = object : ArithmeticCancellation {
-        override fun arithmeticSource() = native.polynomial.arithmeticSource()?.withCheckpoint(this::isCancelled)
+    private val external = params.timeout.withAccounting(params.cancellation) or params.cancellation
+    private val verification = object : ExecutionControl() {
+        override val admission get() = native.polynomial.admission
         override fun isCancelled(): Boolean = native.stopped
         override fun deadline() = external.deadline()
-        override fun workMeter(): WorkMeter? = native.polynomial.workMeter()
+        override val accounting: WorkMeter? get() = native.polynomial.accounting
     }
     private val limits = PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells)
     private val evaluation = AlgebraicArithmetic(PolynomialArithmetic(verification, limits))
@@ -109,45 +105,73 @@ internal class QuadraticPortfolioInvocation(
                 val publication = sample.witnessCertificate?.quadraticPublication
                 if (publication == null) {
                     Verification.Indeterminate("quadratic witness has no actual source publication")
-                } else when (val checked = witness(
-                    QuadraticIncumbent(sample, publication.incumbent.value), evaluation,
-                )) {
+                } else {
+                    when (
+                        val checked = witness(
+                    QuadraticIncumbent(sample, publication.incumbent.value),
+                    AlgebraicArithmetic(PolynomialArithmetic(verification, limits)),
+                )
+                    ) {
                     SourceEvidenceCheck.Checked -> Verification.Accepted(candidate)
                     is SourceEvidenceCheck.Rejected -> Verification.Rejected(checked.reason)
                     is SourceEvidenceCheck.Unavailable -> Verification.Indeterminate(checked.reason)
                 }
-            })) { workers ->
+                }
+            }
+            ),
+        ) { workers ->
             val complete = workers.indices.filter { workers[it].family == ArmFamily.Backtrack }
             PortfolioInvocationPolicy(shares = DoubleArray(workers.size) {
                 if (it in complete) 0.5 / complete.size else 0.0
-            })
+            }
+            )
         }
-        val scalar = invocation.use { it.minimize(native.polynomial, null, incumbents,
-            PortfolioTerminalCheck { worker, search ->
-                val completed = (search as? QuadraticPortfolioSearch)?.completion
-                    ?: return@PortfolioTerminalCheck null
-                val checked = terminalLock.withLock { check(worker, completed) }
-                    ?: return@PortfolioTerminalCheck null
-                PortfolioTerminalPublication(checked) { if (terminal == null) terminal = completed }
-            }, onAccepted = { accepted ->
-                onAccepted?.invoke(AcceptedPortfolioIncumbent(accepted.version, accepted.assignment,
-                    QuadraticIncumbent(accepted.assignment, accepted.objective.source)))
-            }) }
+        val scalar = invocation.use {
+            it.minimize(
+                native.polynomial,
+                null,
+                incumbents,
+                PortfolioTerminalCheck { worker, search ->
+                    val completed = (search as? QuadraticPortfolioSearch)?.completion
+                        ?: return@PortfolioTerminalCheck null
+                    val checked = terminalLock.withLock { check(worker, completed) }
+                        ?: return@PortfolioTerminalCheck null
+                    PortfolioTerminalPublication(checked) { if (terminal == null) terminal = completed }
+                },
+                onAccepted = { accepted ->
+                    onAccepted?.invoke(
+                        AcceptedPortfolioIncumbent(
+                        accepted.version,
+                        accepted.assignment,
+                        QuadraticIncumbent(accepted.assignment, accepted.objective.source),
+                    )
+                    )
+                },
+            )
+        }
         terminal?.let { return it.withAcceptedValue().withPortfolioStats(scalar.stats) }
         val best = incumbents.exchange.current()?.let { QuadraticIncumbent(it.assignment, it.objective.source) }
-        val reason = if (params.timeout()) TerminationReason.Timeout else if (params.cancellation()) {
+        val reason = if (params.timeout()) {
+            TerminationReason.Timeout
+        } else if (params.cancellation()) {
             TerminationReason.Cancelled
-        } else TerminationReason.BudgetExhausted
-        return if (best == null) QuadraticOptimizationResult.Unknown(sharedBound, reason, sense, scalar.stats)
-            else QuadraticOptimizationResult.BestFound(best, sharedBound, reason, sense, scalar.stats)
+        } else {
+            TerminationReason.BudgetExhausted
+        }
+        return if (best == null) {
+            QuadraticOptimizationResult.Unknown(sharedBound, reason, sense, scalar.stats)
+        } else {
+            QuadraticOptimizationResult.BestFound(best, sharedBound, reason, sense, scalar.stats)
+        }
     }
 
     private fun QuadraticOptimizationResult.withAcceptedValue(): QuadraticOptimizationResult {
         val accepted = incumbents.exchange.current() ?: return this
-        fun retain(point: QuadraticIncumbent): QuadraticIncumbent =
-            if (point.sample === accepted.assignment) {
-                QuadraticIncumbent(point.sample, accepted.objective.source)
-            } else point
+        fun retain(point: QuadraticIncumbent): QuadraticIncumbent = if (point.sample === accepted.assignment) {
+            QuadraticIncumbent(point.sample, accepted.objective.source)
+        } else {
+            point
+        }
         return when (this) {
             is QuadraticOptimizationResult.Optimal -> copy(incumbent = attainingIncumbent ?: retain(incumbent))
             is QuadraticOptimizationResult.UnattainedLimit -> copy(incumbent = retain(incumbent))
@@ -184,7 +208,9 @@ internal class QuadraticPortfolioInvocation(
         certificate(result.bound.certificate, QuadraticClaim.Bound)?.let { return it }
         if (result.bound.strict ||
             terminalArithmetic.compare(result.incumbent.value, result.bound.value) != 0
-        ) return Verification.Rejected("quadratic optimum does not attain its bound")
+        ) {
+            return Verification.Rejected("quadratic optimum does not attain its bound")
+        }
         val checked = bound(result.bound.value, false)
         if (checked is Verification.Accepted) {
             incumbents.exchange.current()?.let { accepted ->

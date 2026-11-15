@@ -22,7 +22,7 @@ import com.eignex.klause.solver.pipeline.optimizeLinear
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
@@ -365,7 +365,7 @@ class CliModePublicationTest {
             result = OpenTheoryPipeline.optimizeLinear(
                 context,
                 TheoryParams(
-                    cancellation = Cancellation { values.size == 2 },
+                    cancellation = ExecutionControl { values.size == 2 },
                 ),
             ) { sample, value -> publication.publish(render(sample), SourceValue.Rational(value)) }
             returned = true
@@ -427,7 +427,7 @@ class CliModePublicationTest {
             objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
         )
         val context = SourceProofContext(scope, setOf(x), emptyMap(), mapOf(x to BigFraction.ONE))
-        val result = OpenTheoryPipeline.optimizeLinear(context, TheoryParams(cancellation = Cancellation { true }))
+        val result = OpenTheoryPipeline.optimizeLinear(context, TheoryParams(cancellation = ExecutionControl { true }))
         val output = SmtLibOutput()
         val publication = ArithmeticPublication(output)
 

@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigRationalConflict
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal enum class LpRootGuidancePhase { PREPARATION, FLOAT, CERTIFICATE, COMPLETE }
 
@@ -27,7 +27,7 @@ internal fun LpScopedSolver.advanceRootGuidance(
     quantum: Long,
     allowance: LpFloatAllowance,
     certificateLimits: ReconstructionLimits,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = proofPolicy,
 ): LpRootGuidance {

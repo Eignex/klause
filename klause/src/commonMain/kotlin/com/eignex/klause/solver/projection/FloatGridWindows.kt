@@ -10,7 +10,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.FloatInterval
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
@@ -24,7 +24,7 @@ internal fun prepareFloatGridColumns(
     source: Problem,
     requested: List<FloatGridVariable>,
     policy: FloatSemantics.Grid,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): List<FloatGridColumn>? {
     val positions = requested.withIndex().associate { it.value.source.index to it.index }
     val auxiliary = requested.filter { it.auxiliary }.mapTo(HashSet()) { it.source.index }
@@ -43,19 +43,32 @@ internal fun prepareFloatGridColumns(
         if (cancellation()) return null
         val definition = when (factor) {
             is ContinuousProduct -> FloatWindowDefinition(factor.result, intArrayOf(factor.a, factor.b), factor)
+
             is Power -> if (factor.base is Power.Coordinate.Real) {
-                FloatWindowDefinition((factor.result as Power.Coordinate.Real).id.index,
-                    intArrayOf(factor.base.id.index), factor)
-            } else null
+                FloatWindowDefinition(
+                    (factor.result as Power.Coordinate.Real).id.index,
+                    intArrayOf(factor.base.id.index),
+                    factor,
+                )
+            } else {
+                null
+            }
+
             is RealAbs -> FloatWindowDefinition(factor.result, intArrayOf(factor.operand), factor)
+
             is RealArrayMinMax -> FloatWindowDefinition(factor.result, factor.xs, factor)
+
             is RealElement -> FloatWindowDefinition(factor.result, factor.entries, factor)
+
             is Linear -> if (factor.op == LinearOp.EQ && factor.realConstants != null) {
                 val outputs = factor.realVars.filter { it in auxiliary }.distinct()
                 outputs.singleOrNull()?.let { output ->
                     FloatWindowDefinition(output, factor.realVars.filter { it != output }.toIntArray(), factor)
                 }
-            } else null
+            } else {
+                null
+            }
+
             else -> null
         }
         if (definition != null && definition.output in auxiliary) definitions += definition
@@ -123,13 +136,15 @@ private fun privateImage(
     definition: FloatWindowDefinition,
     source: Problem,
     columns: Map<Int, FloatGridColumn>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): FloatInterval? {
     fun range(id: Int): FloatInterval? = columns[id]?.coordinate?.let { FloatInterval(it.lower, it.upper) }
     fun interval(lower: Double, upper: Double): FloatInterval? =
         if (lower.isFinite() && upper.isFinite() && lower <= upper && (upper - lower).isFinite()) {
             FloatInterval(lower, upper)
-        } else null
+        } else {
+            null
+        }
     return when (val factor = definition.relation) {
         is ContinuousProduct -> {
             val a = range(factor.a) ?: return null
@@ -137,18 +152,27 @@ private fun privateImage(
             val corners = listOf(a.lo * b.lo, a.lo * b.hi, a.hi * b.lo, a.hi * b.hi)
             interval(corners.min(), corners.max())
         }
+
         is Power -> {
             val input = range((factor.base as Power.Coordinate.Real).id.index) ?: return null
             val first = input.lo.pow(factor.exponent)
             val last = input.hi.pow(factor.exponent)
-            interval(if (factor.exponent > 0 && factor.exponent and 1 == 0 && input.lo <= 0 && input.hi >= 0) 0.0
-                else minOf(first, last), maxOf(first, last))
+            interval(
+                if (factor.exponent > 0 && factor.exponent and 1 == 0 && input.lo <= 0 && input.hi >= 0) {
+                    0.0
+                } else {
+                    minOf(first, last)
+                },
+                maxOf(first, last),
+            )
         }
+
         is RealAbs -> {
             val input = range(factor.operand) ?: return null
             interval(if (input.lo <= 0 && input.hi >= 0) 0.0 else minOf(abs(input.lo), abs(input.hi)),
                 maxOf(abs(input.lo), abs(input.hi)))
         }
+
         is RealArrayMinMax -> {
             val inputs = ArrayList<FloatInterval>()
             for (input in factor.xs) {
@@ -159,6 +183,7 @@ private fun privateImage(
             interval(if (factor.max) inputs.maxOf { it.lo } else inputs.minOf { it.lo },
                 if (factor.max) inputs.maxOf { it.hi } else inputs.minOf { it.hi })
         }
+
         is RealElement -> if (factor.arrIsVars) {
             val inputs = ArrayList<FloatInterval>()
             for (input in factor.entries) {
@@ -167,7 +192,12 @@ private fun privateImage(
                 inputs += range(input) ?: return null
             }
             if (inputs.isEmpty()) null else interval(inputs.minOf { it.lo }, inputs.maxOf { it.hi })
-        } else if (factor.constants.isEmpty()) null else interval(factor.constants.min(), factor.constants.max())
+        } else if (factor.constants.isEmpty()) {
+            null
+        } else {
+            interval(factor.constants.min(), factor.constants.max())
+        }
+
         is Linear -> {
             val constants = factor.realConstants ?: return null
             var lower = constants.bound
@@ -178,7 +208,9 @@ private fun privateImage(
                 if (cancellation()) return null
                 val id = factor.realVars[index]
                 val coefficient = constants.realCoefficients.at(index)
-                if (id == definition.output) outputCoefficient += coefficient else {
+                if (id == definition.output) {
+                    outputCoefficient += coefficient
+                } else {
                     val input = range(id) ?: return null
                     val first = coefficient * input.lo
                     val last = coefficient * input.hi
@@ -196,12 +228,15 @@ private fun privateImage(
                 lower -= maxOf(first, last)
                 upper -= minOf(first, last)
             }
-            if (outputCoefficient == 0.0) null else {
+            if (outputCoefficient == 0.0) {
+                null
+            } else {
                 val first = lower / outputCoefficient
                 val last = upper / outputCoefficient
                 interval(minOf(first, last), maxOf(first, last))
             }
         }
+
         else -> null
     }
 }

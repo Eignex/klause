@@ -11,7 +11,7 @@ import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.presolve.asSampleLift
 import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.ScanMeter
 import com.eignex.util.collections.IntArrayList
 
@@ -62,7 +62,7 @@ internal object SingletonInequalityProjection {
     fun project(
         problem: BakedProblem,
         objectiveIntVars: Set<Int>,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): PassDelta {
         val scan = ScanMeter(cancellation)
         val result = Projection()
@@ -143,7 +143,7 @@ internal object SingletonInequalityProjection {
     fun projectSource(
         problem: Problem,
         objectiveIntVars: Set<Int>,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): SourceDelta {
         val scan = ScanMeter(cancellation)
         val result = Projection()

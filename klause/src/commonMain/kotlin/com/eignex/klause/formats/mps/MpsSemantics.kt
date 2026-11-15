@@ -9,7 +9,7 @@ import com.eignex.klause.ir.UndeclaredIntegerBounds
 import com.eignex.klause.ir.UndeclaredRealBounds
 import com.eignex.klause.ir.numericalSourceTolerance
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Decimal authority, wholly unranged declaration defaults and source feasibility slack. */
 val mpsSemantics: SourceSemantics = SourceSemantics(
@@ -23,7 +23,7 @@ val mpsSemantics: SourceSemantics = SourceSemantics(
 internal fun MpsModel.effectiveVariableBounds(
     policy: EffectiveSourceSemantics,
     numbers: MpsSourceNumbers,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): List<Pair<MpsSourceNumber?, MpsSourceNumber?>>? {
     val bounds = ArrayList<Pair<MpsSourceNumber?, MpsSourceNumber?>>(variables.size)
     for ((index, variable) in variables.withIndex()) {
@@ -45,7 +45,11 @@ internal fun MpsModel.effectiveVariableBounds(
         }
         bounds += if (original.first.finiteMps()?.fraction == replacement.first?.fraction &&
             original.second.finiteMps()?.fraction == replacement.second?.fraction
-        ) original else replacement
+        ) {
+            original
+        } else {
+            replacement
+        }
     }
     return bounds.takeUnless { cancellation() }
 }

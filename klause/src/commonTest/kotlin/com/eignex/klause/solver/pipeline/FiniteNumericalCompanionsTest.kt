@@ -22,7 +22,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.withRealDifferenceSystem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -51,16 +51,16 @@ class FiniteNumericalCompanionsTest {
         for (sharePoints in listOf(false, true)) for (arm in 0..1) {
             val events = mutableListOf<PortfolioLifecycleKind>()
             val companions = assertNotNull(FiniteNumericalCompanions.prepare(model, objective, params,
-                Cancellation.Never, cost, incumbentCompletionCheck = { _, _, _ -> true }).companions)
+                ExecutionControl.Never, cost, incumbentCompletionCheck = { _, _, _ -> true }).companions)
             companions.incumbents.exchange.offer(center, BigFraction.ofLong(4))
 
-            PortfolioInvocationResources(2, 1, 0, Cancellation.Never, null).use { resources ->
+            PortfolioInvocationResources(2, 1, 0, ExecutionControl.Never, null).use { resources ->
                 companions.factories(plan, 0, sharePoints).elementAt(arm)
                     .materialize(plan, resources.slots[arm]).use { worker ->
                         worker.onLifecycle = { kind, _ -> events += kind }
                         assertNotNull(worker.newResumableSearch(companions.incumbents::bound)).use { search ->
                             repeat(4) {
-                                if (!search.isDone) search.runSlice(Cancellation.Never, 1_000, 5_000) { }
+                                if (!search.isDone) search.runSlice(ExecutionControl.Never, 1_000, 5_000) { }
                             }
                         }
                     }
@@ -88,13 +88,13 @@ class FiniteNumericalCompanionsTest {
             objective, params).requirements.construction
         val events = mutableListOf<Pair<Long, JointRepairObservation>>()
         val companions = assertNotNull(FiniteNumericalCompanions.prepare(model, objective, params,
-            Cancellation.Never, cost, onObservation = { seed, event -> events += seed to event }).companions)
+            ExecutionControl.Never, cost, onObservation = { seed, event -> events += seed to event }).companions)
 
-        PortfolioInvocationResources(2, 1, 0, Cancellation.Never, null).use { resources ->
+        PortfolioInvocationResources(2, 1, 0, ExecutionControl.Never, null).use { resources ->
             val slot = resources.slots[1]
             companions.factories(plan, 0).last().materialize(plan, slot).use { worker ->
                 assertNotNull(worker.newResumableSearch { Double.POSITIVE_INFINITY }).use { search ->
-                    repeat(32) { if (!search.isDone) search.runSlice(Cancellation.Never, 1_000, 5_000) { } }
+                    repeat(32) { if (!search.isDone) search.runSlice(ExecutionControl.Never, 1_000, 5_000) { } }
                 }
             }
             assertTrue(events.isNotEmpty())
@@ -117,14 +117,14 @@ class FiniteNumericalCompanionsTest {
         val cost = finiteNumericalCompanionEligibility(model, PortfolioScenario.sequential(Kind.COP),
             objective, params).requirements.construction
         val companions = assertNotNull(FiniteNumericalCompanions.prepare(model, objective, params,
-            Cancellation.Never, cost).companions)
+            ExecutionControl.Never, cost).companions)
 
-        PortfolioInvocationResources(2, 1, 0, Cancellation.Never, null).use { resources ->
+        PortfolioInvocationResources(2, 1, 0, ExecutionControl.Never, null).use { resources ->
             companions.factories(plan, 0).first().materialize(plan, resources.slots[0]).use { worker ->
                 val search = assertNotNull(worker.newResumableSearch { Double.POSITIVE_INFINITY })
                 search.use {
                     repeat(32) {
-                        if (companions.objectiveBound == null) search.runSlice(Cancellation.Never, 1_000, 1) { }
+                        if (companions.objectiveBound == null) search.runSlice(ExecutionControl.Never, 1_000, 1) { }
                     }
                     assertFalse(search.isDone)
                     assertNotNull(companions.objectiveBound)
@@ -153,7 +153,7 @@ class FiniteNumericalCompanionsTest {
             val events = mutableListOf<SearchEvent.CompanionComparison>()
             lateinit var companions: FiniteNumericalCompanions
             companions = assertNotNull(FiniteNumericalCompanions.prepare(model, objective, params,
-                Cancellation.Never, cost, incumbentCompletionCheck = { sample, value, _ ->
+                ExecutionControl.Never, cost, incumbentCompletionCheck = { sample, value, _ ->
                     if (value < BigFraction.ofLong(4)) {
                         val pool = if (disposition == "dominated") center.copy(ints = LongArray(4)) else sample
                         if (disposition != "improving") companions.incumbents.exchange.offer(
@@ -163,10 +163,10 @@ class FiniteNumericalCompanionsTest {
                 }, onComparison = { events += it }).companions)
             companions.incumbents.exchange.offer(center, BigFraction.ofLong(4))
 
-            PortfolioInvocationResources(2, 1, 0, Cancellation.Never, null).use { resources ->
+            PortfolioInvocationResources(2, 1, 0, ExecutionControl.Never, null).use { resources ->
                 companions.factories(plan, 0).last().materialize(plan, resources.slots[1]).use { worker ->
                     assertNotNull(worker.newResumableSearch { 4.0 }).use { search ->
-                        repeat(32) { if (!search.isDone) search.runSlice(Cancellation.Never, 1_000, 5_000) { } }
+                        repeat(32) { if (!search.isDone) search.runSlice(ExecutionControl.Never, 1_000, 5_000) { } }
                     }
                 }
             }
@@ -193,18 +193,18 @@ class FiniteNumericalCompanionsTest {
             objective, params).requirements.construction
         for (adaptive in listOf(false, true)) {
             val companions = assertNotNull(FiniteNumericalCompanions.prepare(model, objective, params,
-                Cancellation.Never, cost, incumbentCompletionCheck = { _, _, _ -> true },
+                ExecutionControl.Never, cost, incumbentCompletionCheck = { _, _, _ -> true },
                 adaptiveRepair = adaptive).companions)
             val center = Sample(BooleanArray(0), longArrayOf(1, 1, 1), doubleArrayOf(0.0),
                 exactReals = listOf(BigFraction.ZERO))
             companions.incumbents.exchange.offer(center, BigFraction.ofLong(3))
             var result: MinimizeResult? = null
 
-            PortfolioInvocationResources(2, 1, 0, Cancellation.Never, null).use { resources ->
+            PortfolioInvocationResources(2, 1, 0, ExecutionControl.Never, null).use { resources ->
                 companions.factories(plan, 0).last().materialize(plan, resources.slots[1]).use { worker ->
                     assertNotNull(worker.newResumableSearch { 3.0 }).use { search ->
                         repeat(32) {
-                            if (!search.isDone) result = search.runSlice(Cancellation.Never, 1_000, 5_000) { }
+                            if (!search.isDone) result = search.runSlice(ExecutionControl.Never, 1_000, 5_000) { }
                         }
                         assertEquals(if (adaptive) 3L else 2L,
                             search.stats.smt.completeSearchStages?.get("jointRepairMaxFreedIntegers"))
@@ -230,11 +230,11 @@ class FiniteNumericalCompanionsTest {
             val clock = TestTimeSource()
 
             val result = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
-                plan, Cancellation.until(clock.markNow() + 30.seconds), numericalCompletion = true,
+                plan, ExecutionControl.until(clock.markNow() + 30.seconds), numericalCompletion = true,
                 numericalCompanions = TheoryParams(sourceIncumbentCompletion = afterImprovement),
                 fundedCompanions = true,
                 waitForCompanionImprovement = afterImprovement, adaptiveCompanionRepair = afterImprovement).use {
-                it.minimize(Cancellation { true }, null)
+                it.minimize(ExecutionControl { true }, null)
             }
 
             val stages = result.stats.smt.completeSearchStages.orEmpty()
@@ -255,7 +255,7 @@ class FiniteNumericalCompanionsTest {
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(companionAfterIncumbent = true)
         val events = mutableListOf<SearchEvent.WorkerAdmission>()
         val clock = TestTimeSource()
-        val lifetime = Cancellation.until(clock.markNow() + 5.seconds)
+        val lifetime = ExecutionControl.until(clock.markNow() + 5.seconds)
         val baseline = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
             plan, lifetime, numericalCompletion = true)
         val candidate = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null,
@@ -285,7 +285,7 @@ class FiniteNumericalCompanionsTest {
             val plan = model.prepareExecutionPlan(objective, preferFinite = true)
             val scenario = explicit.copy(companionAfterIncumbent = true)
             val clock = TestTimeSource()
-            val lifetime = Cancellation.until(clock.markNow() + 30.seconds)
+            val lifetime = ExecutionControl.until(clock.markNow() + 30.seconds)
             val baseline = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
                 plan, lifetime, numericalCompletion = true)
             val candidate = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
@@ -308,7 +308,7 @@ class FiniteNumericalCompanionsTest {
             val cost = finiteNumericalCompanionEligibility(model, PortfolioScenario.sequential(Kind.COP),
                 objective, TheoryParams()).requirements.construction
             val clock = TestTimeSource()
-            val cancellation = Cancellation {
+            val cancellation = ExecutionControl {
                 clock += 1.microseconds
                 !ready
             }
@@ -333,8 +333,8 @@ class FiniteNumericalCompanionsTest {
             val scenario = PortfolioScenario.sequential(Kind.COP).copy(companionAfterIncumbent = true)
 
             val result = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
-                plan, Cancellation.Never, numericalCompletion = true, numericalCompanions = TheoryParams()).use {
-                it.minimize(Cancellation { true }, null)
+                plan, ExecutionControl.Never, numericalCompletion = true, numericalCompanions = TheoryParams()).use {
+                it.minimize(ExecutionControl { true }, null)
             }
 
             val stages = result.stats.smt.completeSearchStages.orEmpty()
@@ -359,8 +359,8 @@ class FiniteNumericalCompanionsTest {
         })
 
         FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
-            plan, Cancellation.Never, numericalCompletion = true, numericalCompanions = TheoryParams()).use {
-            it.minimize(Cancellation.Never, null)
+            plan, ExecutionControl.Never, numericalCompletion = true, numericalCompanions = TheoryParams()).use {
+            it.minimize(ExecutionControl.Never, null)
         }
 
         assertTrue(observed.any { it.acceptedIncumbents > 0 })
@@ -437,10 +437,10 @@ class FiniteNumericalCompanionsTest {
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(companionIntegers = true)
         val executor = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null,
             { _, event -> if (event is SearchEvent.WorkerAdmission) events += event },
-            null, plan, Cancellation.Never, numericalCompletion = true, numericalCompanions = TheoryParams())
+            null, plan, ExecutionControl.Never, numericalCompletion = true, numericalCompanions = TheoryParams())
 
         executor.use { result ->
-            val completed = result.minimize(Cancellation.Never, null)
+            val completed = result.minimize(ExecutionControl.Never, null)
             assertEquals(0.0, assertIs<MinimizeResult.Optimal>(completed).objective)
         }
 
@@ -460,10 +460,10 @@ class FiniteNumericalCompanionsTest {
         val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val context = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
-            Cancellation.Never))
+            ExecutionControl.Never))
         val result = OpenTheoryPipeline.optimizeLinear(context)
 
-        val completed = finiteNumericalCompletion(result, context, Cancellation.Never)
+        val completed = finiteNumericalCompletion(result, context, ExecutionControl.Never)
 
         assertEquals(0.0, assertIs<MinimizeResult.Optimal>(completed).objective)
     }
@@ -474,10 +474,10 @@ class FiniteNumericalCompanionsTest {
             arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val context = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
-            Cancellation.Never))
+            ExecutionControl.Never))
         val result = OpenTheoryPipeline.optimizeLinear(context)
 
-        val completed = finiteNumericalCompletion(result, context, Cancellation.Never)
+        val completed = finiteNumericalCompletion(result, context, ExecutionControl.Never)
 
         assertIs<MinimizeResult.Infeasible>(completed)
     }
@@ -486,14 +486,14 @@ class FiniteNumericalCompanionsTest {
     fun `admitting numerical workers should append to the finite composition`() {
         val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
-            .withRealDifferenceSystem(Cancellation.Never)
+            .withRealDifferenceSystem(ExecutionControl.Never)
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val plan = model.prepareExecutionPlan(objective, preferFinite = true)
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val baseline = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
-            plan, Cancellation.Never, numericalCompletion = true)
+            plan, ExecutionControl.Never, numericalCompletion = true)
         val candidate = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
-            plan, Cancellation.Never, numericalCompletion = true, numericalCompanions = TheoryParams())
+            plan, ExecutionControl.Never, numericalCompletion = true, numericalCompanions = TheoryParams())
 
         baseline.use { before ->
             candidate.use { after -> assertEquals(before.resources.slots.size + 2, after.resources.slots.size) }
@@ -505,13 +505,13 @@ class FiniteNumericalCompanionsTest {
         val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val context = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
-            Cancellation.Never))
+            ExecutionControl.Never))
         val restricted = SourceProofContext(context.scope.copy(condition = SourceCondition(
             lower = mapOf(SourceCoordinate(SourceCoordinate.Kind.Integer, 0) to BigFraction.ONE))),
             context.coordinates, context.premises, context.objective, context.objectiveConstant)
         val result = OpenTheoryPipeline.optimizeLinear(restricted)
 
-        val completed = finiteNumericalCompletion(result, context, Cancellation.Never)
+        val completed = finiteNumericalCompletion(result, context, ExecutionControl.Never)
 
         assertIs<MinimizeResult.BestFound>(completed)
     }

@@ -2,7 +2,7 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class LpWorkingModel(val source: LpExactState, auxiliary: ExactLpModel) {
     val state = LpExactState(auxiliary)
@@ -65,7 +65,7 @@ private fun saturatedSum(vararg parts: Long): Long =
 internal class LpWorkingScope internal constructor(
     model: LpWorkingModel,
     private val owner: LpScopedSolver,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
 ) {
     var model: LpWorkingModel = model
         private set
@@ -121,7 +121,7 @@ internal class LpWorkingScope internal constructor(
 
     fun solve(
         warm: Basis? = null,
-        token: Cancellation = cancellation,
+        token: ExecutionControl = cancellation,
         continuationLimits: ExactContinuationLimits = owner.continuationLimits,
         fullContinuation: Boolean = true,
         observer: LpCertificationObserver? = null,

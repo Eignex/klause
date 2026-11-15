@@ -4,7 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.MutableIntLongMap
 import com.eignex.util.numbers.CheckedLongOverflowException
@@ -20,15 +20,21 @@ internal class SeparableObjectiveView private constructor(
         fun create(
             problem: BakedProblem,
             objective: LinearObjective,
-            cancellation: Cancellation = problem.cancellation,
+            cancellation: ExecutionControl = problem.cancellation,
         ): SeparableObjectiveView? {
             if (problem.semantics.isApproximate || problem.numRealVars != 0 ||
                 problem.numIntVars > 4096 || objective.intCoefficientValues.size > problem.numIntVars ||
                 objective.boolWeightValues.size > minOf(4096, problem.numBoolVars) ||
                 objective.realCoefficientValues.size > 4096 || objective.intCoefficientValues.isEmpty()
-            ) return null
-            cancellation.charge((objective.boolWeightValues.size + objective.intCoefficientValues.size +
-                objective.realCoefficientValues.size).toLong())
+            ) {
+                return null
+            }
+            cancellation.charge(
+                (
+                    objective.boolWeightValues.size + objective.intCoefficientValues.size +
+                objective.realCoefficientValues.size
+                ).toLong()
+            )
             if (cancellation() || objective.singleIntObjective() == null) return null
             return try {
                 val expanded = Expansion(problem, objective, cancellation).expand() ?: return null
@@ -45,7 +51,7 @@ internal class SeparableObjectiveView private constructor(
 private class Expansion(
     private val problem: BakedProblem,
     private val source: LinearObjective,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
 ) {
     private val definitions = HashMap<Int, MutableList<Linear>>()
     private val selected = HashMap<Int, Linear?>()
@@ -117,7 +123,9 @@ private class Expansion(
         if (variable !in 0 until problem.numIntVars ||
             !problem.intBounds.hasLower(variable) || !problem.intBounds.hasUpper(variable) ||
             coefficient == Long.MIN_VALUE || !active.add(variable)
-        ) stop()
+        ) {
+            stop()
+        }
         val definition = selected[variable]
         if (definition == null) {
             val merged = addExact(coefficients.getOrDefault(variable, 0L), coefficient)

@@ -1,6 +1,8 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.StopPolling
+import com.eignex.klause.util.pollStop
 
 internal class FinitePropagationInterrupted : RuntimeException()
 
@@ -9,34 +11,59 @@ internal interface InterruptiblePropagator : Propagator {
 }
 
 internal class FinitePropagationWork {
-    var cancellation: Cancellation = Cancellation.Never
+    private var current = ExecutionControl.Never
+    var cancellation: ExecutionControl
+        get() = current
         set(value) {
-            field = value
+            if (current === value && value is PropagationControl) return
+            current = value
+            never = value === ExecutionControl.Never
+            polling = value.stopPolling
             begin()
         }
     private var remaining = 63
-    private var metered = false
     private var never = true
+    private var polling: StopPolling? = null
+
+    fun <T> withCancellation(value: ExecutionControl, operation: () -> T): T {
+        val previous = current
+        val previousPolling = polling
+        val previousNever = never
+        cancellation = value
+        return try {
+            operation()
+        } finally {
+            current = previous
+            polling = previousPolling
+            never = previousNever
+            remaining = 63
+        }
+    }
 
     fun begin() {
         remaining = 63
-        metered = cancellation.workMeter() != null
-        never = cancellation === Cancellation.Never
     }
 
     fun check() {
         if (never) return
-        if (!metered && remaining-- > 0) return
-        checkNow()
+        val cursor = polling
+        if (cursor != null) {
+            if (cursor.due(1) && cancellation()) throw FinitePropagationInterrupted()
+            return
+        }
+        if (remaining-- > 0) return
+        remaining = 63
+        if (cancellation()) throw FinitePropagationInterrupted()
     }
 
     fun checkNow() {
         remaining = 63
-        if (cancellation()) throw FinitePropagationInterrupted()
+        if (cancellation.pollStop()) throw FinitePropagationInterrupted()
     }
 }
 
 internal fun PropagationState.checkFiniteWork() {
+    if (work >= workLimit) throw FinitePropagationInterrupted()
     finiteWork.check()
     work++
 }

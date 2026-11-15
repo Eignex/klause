@@ -18,7 +18,7 @@ import com.eignex.klause.solver.objective.minimizeInt
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.theory.qflra.QfLraSystem
 import com.eignex.klause.theory.qflra.toExactLpModel
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.koblas.SparseMatrix
 import java.nio.ByteBuffer
 import java.nio.file.Files
@@ -60,7 +60,7 @@ internal object BasisTraceCapture {
             "LP columns ${prepared.model.numVars} exceed capture limit"
         }
         val deadline = System.nanoTime() + CAPTURE_DEADLINE_NANOS
-        val token = Cancellation { System.nanoTime() >= deadline }
+        val token = ExecutionControl { System.nanoTime() >= deadline }
         var recorder: RecordingBasisSolver? = null
         val solver = RevisedSimplex(
             prepared.model,

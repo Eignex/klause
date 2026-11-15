@@ -6,7 +6,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import java.math.BigInteger
 
 internal data class LearnedResidualRestriction(
@@ -43,7 +43,7 @@ internal object LearnedResidualRestrictions {
 
     fun inspect(
         session: PropagationSession,
-        stop: Cancellation = Cancellation.Never,
+        stop: ExecutionControl = ExecutionControl.Never,
         maxTerms: Int = 1_000_000,
     ): LearnedResidualInspection {
         val count = session.learnedClauseCount

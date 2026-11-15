@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.formats.smtlib.SmtLib
-import kotlin.test.assertIs
 import org.junit.Test
+import kotlin.test.assertIs
 
 class SourceExecutionProjectionTest {
     @Test
@@ -12,10 +12,15 @@ class SourceExecutionProjectionTest {
             (declare-const x Real)
             (assert (>= x $huge))
             (assert (<= x 1.0))
-        """.trimIndent()).source
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            source, ExecutionOperation.SATISFY, FiniteEngine.MIXED,
-        ))
+            """.trimIndent(),
+        ).source
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+                source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.MIXED,
+            ),
+        )
 
         val result = assertIs<SourceExecutionResult.Linear>(SourceSetup.execute(SourceExecutionRequest(invocation)))
 
@@ -34,10 +39,15 @@ class SourceExecutionProjectionTest {
             (assert (or b (>= (* $tiny x) 0.1)))
             (assert (=> b (> n 5)))
             (assert (=> b (< n 3)))
-        """.trimIndent()).source
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            source, ExecutionOperation.SATISFY, FiniteEngine.MIXED,
-        ))
+            """.trimIndent(),
+        ).source
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+                source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.MIXED,
+            ),
+        )
 
         val result = assertIs<SourceExecutionResult.Linear>(SourceSetup.execute(SourceExecutionRequest(invocation)))
 

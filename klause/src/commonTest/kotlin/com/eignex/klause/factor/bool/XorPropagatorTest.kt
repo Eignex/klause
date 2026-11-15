@@ -11,8 +11,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.undoTo
-import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -49,6 +48,7 @@ class XorPropagatorTest {
         val r = problem.propagate(Assumptions(bools = mapOf(0 to false, 1 to false, 2 to false)))
         assertIs<PropagationResult.Unsat>(r)
     }
+
     @Test
     fun `complementary unassigned literals should retain their parity constant`() {
         for (target in 0..1) {
@@ -66,23 +66,36 @@ class XorPropagatorTest {
 
     @Test
     fun `signed and repeated literals should preserve their complete assignments`() {
-        val patterns = listOf(intArrayOf(0, 1), intArrayOf(0, 0), intArrayOf(0, 1, 2),
-            intArrayOf(0, 0, 3, 4), intArrayOf(1, 2, 5), intArrayOf(1, 1, 2, 3, 4))
-        for (literals in patterns) for (target in 0..1) for (mask in 0..7) {
+        val patterns = listOf(
+            intArrayOf(0, 1),
+            intArrayOf(0, 0),
+            intArrayOf(0, 1, 2),
+            intArrayOf(0, 0, 3, 4),
+            intArrayOf(1, 2, 5),
+            intArrayOf(1, 1, 2, 3, 4),
+        )
+        for (literals in patterns) {
+            for (target in 0..1) {
+                for (mask in 0..7) {
             val values = BooleanArray(3) { mask and (1 shl it) != 0 }
             val parity = literals.count { Lit.evaluate(it, values[Lit.variable(it)]) } and 1
             val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(Xor(literals, target)))
 
             val result = problem.propagate(Assumptions(bools = (0..2).associateWith { values[it] }))
 
-            if (parity == target) assertIs<PropagationResult.Implied>(result)
-            else assertIs<PropagationResult.Unsat>(result)
+            if (parity == target) {
+                assertIs<PropagationResult.Implied>(result)
+            } else {
+                assertIs<PropagationResult.Unsat>(result)
+            }
+        }
+            }
         }
     }
 
     @Test
     fun `interrupted parity reasons should withhold their pin and retry`() {
-        for (stopAfter in 1..12) {
+        for (stopAfter in 1..9) {
             val literals = IntArray(3) { Lit.make(it, true) }
             val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(Xor(literals, 1)))
             val state = PropagationState(problem, Assumptions.None)
@@ -90,16 +103,13 @@ class XorPropagatorTest {
             assertTrue(state.pinBool(0, false))
             assertTrue(state.pinBool(1, false))
             val propagator = XorPropagator(intArrayOf(0, 1, 2), intArrayOf(), literals, 1)
-            var polls = 0
-            state.finiteWork.cancellation = object : Cancellation {
-                override fun isCancelled(): Boolean = ++polls >= stopAfter
-                override fun workMeter(): WorkMeter = WorkMeter { }
-            }
+            state.workLimit = state.work + stopAfter - 1
 
             assertFailsWith<FinitePropagationInterrupted> { propagator.propagate(state, 0) }
 
             assertNull(state.boolValues[2])
-            state.finiteWork.cancellation = Cancellation.Never
+            state.workLimit = Long.MAX_VALUE
+            state.finiteWork.cancellation = ExecutionControl.Never
             assertTrue(propagator.propagate(state, 0))
             assertEquals(true, state.boolValues[2])
         }
@@ -186,13 +196,13 @@ class XorPropagatorTest {
         val state = PropagationState(problem, Assumptions.None)
         assertNull(state.runToFixpoint(allFactors = true))
         val propagator = XorPropagator(intArrayOf(0, 1, 2), intArrayOf(), literals, 1)
-        state.finiteWork.cancellation = Cancellation { true }
+        state.finiteWork.cancellation = ExecutionControl { true }
 
         assertFailsWith<FinitePropagationInterrupted> { propagator.propagate(state, 0) }
 
         assertNull(propagator.conflictReason(state, 0))
         for (column in 0..2) assertNull(state.boolValues[column])
-        state.finiteWork.cancellation = Cancellation.Never
+        state.finiteWork.cancellation = ExecutionControl.Never
         assertTrue(propagator.propagate(state, 0))
     }
 }

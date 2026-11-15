@@ -10,12 +10,12 @@ import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.sun.management.ThreadMXBean
-import java.io.File
-import java.lang.management.ManagementFactory
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
 
 internal object ProjectedCountProfile {
     @JvmStatic
@@ -112,7 +112,7 @@ internal object ProjectedCountProfile {
             val x = i * 2 + 1
             val y = x + 1
             appendLine("$x $y 0")
-            appendLine("-${x} -${y} 0")
+            appendLine("-$x -$y 0")
         }
         if (connected) for (i in 1 until pairs) appendLine("1 ${i * 2 + 1} 0")
     }

@@ -15,7 +15,7 @@ import com.eignex.klause.theory.EncoderProvider
 import com.eignex.klause.theory.EncoderSupport
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.linearTheoryModel
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
@@ -209,7 +209,7 @@ class SelectedEncoderRequestTest {
             }
         }).prepare(source)
         val request = assertNotNull(selected.requestEncoders(EncodingTarget.LINEAR, listOf(0),
-            cancellation = Cancellation { stopped }))
+            cancellation = ExecutionControl { stopped }))
         var decline: EncoderDecline? = null
         stopped = true
 
@@ -260,9 +260,9 @@ class SelectedEncoderRequestTest {
         var installed = 0
         var charged = 0L
         var decline: EncoderDecline? = null
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 2
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
         val selected = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
             val builtin = BuiltInEncoderProvider.select(factor, target)

@@ -4,7 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -151,7 +151,7 @@ class PolynomialSignPropagationTest {
         val formula = PolynomialFormula.normalize(source.formula, arithmetic)
         val atoms = assertNotNull(formula.conjunctiveAtoms(arithmetic, 128))
         var stopped = false
-        val interrupted = PolynomialArithmetic(Cancellation { stopped })
+        val interrupted = PolynomialArithmetic(ExecutionControl { stopped })
         val pending = preparePolynomialSignRefutation(atoms, source.realCount, interrupted)
         repeat(3) { assertNull(pending.next()) }
 

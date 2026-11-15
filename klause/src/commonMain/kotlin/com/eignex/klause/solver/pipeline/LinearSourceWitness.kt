@@ -10,10 +10,10 @@ import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun SourceProofContext.linearWitnessVerifier(
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): CandidateVerifier<Sample, Double?> = CandidateVerifier { candidate ->
     val witness = SourceEvidence(scope, SourceClaim.Witness(candidate.assignment), SourceDerivation.SourceWitness)
     when (val checked = SourceEvidenceVerifier(withLinearAuthority()).verify(witness, cancellation)) {

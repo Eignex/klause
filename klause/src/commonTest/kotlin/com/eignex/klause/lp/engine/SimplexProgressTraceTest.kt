@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -138,14 +138,25 @@ class SimplexProgressTraceTest {
         }.build(Sense.MINIMIZE)
         val engines = mutableListOf<RevisedSimplex>()
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
-                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean,
-                pricing: LpPricingOptions): PersistentLpSolver =
-                RevisedSimplex(model, cancellation, refactorUpdateLimit = refactorUpdateLimit,
-                    iterationLimit = iterationLimit, workLimit = workLimit, pricing = pricing).also {
-                    it.enableProgressTrace(profile = true)
-                    engines.add(it)
-                }
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: ExecutionControl,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver = RevisedSimplex(
+                model,
+                cancellation,
+                refactorUpdateLimit = refactorUpdateLimit,
+                iterationLimit = iterationLimit,
+                workLimit = workLimit,
+                pricing = pricing,
+            ).also {
+                it.enableProgressTrace(profile = true)
+                engines.add(it)
+            }
         }
         LpScopedSolver(LpExactState(requireNotNull(model.authoritativeModel())),
             context = LpSolveContext(engineFactory = factory)).use { owner ->
@@ -155,7 +166,9 @@ class SimplexProgressTraceTest {
                         assertTrue(owner.push())
                         assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(5L)), 1L))
                     }
+
                     2, 4 -> assertTrue(owner.pop(0))
+
                     3 -> {
                         assertTrue(owner.push())
                         assertTrue(owner.append(LpScopedRow(1L,
@@ -182,7 +195,7 @@ class SimplexProgressTraceTest {
             addVar(0L, 10L, cost = 1L)
             addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 4L)
         }.build(Sense.MINIMIZE)
-        RevisedSimplex(model, Cancellation { true }).use { solver ->
+        RevisedSimplex(model, ExecutionControl { true }).use { solver ->
             solver.enableProgressTrace(profile = true)
 
             assertNull(solver.solve())

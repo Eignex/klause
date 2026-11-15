@@ -12,23 +12,23 @@ import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.ExecutionOptions
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.SourceAttachment
-import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionPolicy
+import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.execute
-import com.eignex.klause.util.Cancellation
-import java.io.File
-import java.util.IdentityHashMap
-import kotlin.time.Duration.Companion.milliseconds
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.util.IdentityHashMap
+import kotlin.time.Duration.Companion.milliseconds
 
 internal object JointRepairLpCapture {
     private const val PIPELINE = "com.eignex.klause.solver.pipeline."
@@ -41,7 +41,7 @@ internal object JointRepairLpCapture {
         require(bytes.size <= 1_048_576 && sha256(bytes) == options.getValue("sha256"))
         out.mkdirs()
         out.resolve("source.mps").writeBytes(bytes)
-        val stop = Cancellation.after(timeout.milliseconds)
+        val stop = ExecutionControl.after(timeout.milliseconds)
         val source = requireNotNull(Mps.parse(bytes.decodeToString()).toLinearSourceProblem(cancellation = stop))
         val seed = options.getValue("seed").toLong()
         val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
@@ -68,7 +68,7 @@ internal object JointRepairLpCapture {
         val checker = Class.forName(PIPELINE + "FiniteIncumbentCompletionKt").methods.single {
             it.name == "incumbentCompletionCheck" && it.parameterTypes.first().simpleName == "PreparedLinearSource"
         }.invoke(null, original, field(preparation, "sourceMapping"))
-        val active = stop or Cancellation.after(4_000.milliseconds)
+        val active = stop or ExecutionControl.after(4_000.milliseconds)
         val params = TheoryParams(timeout = active, randomSeed = seed + 9,
             sourceLpWorkLimit = 500_000_000L, sourceLpAllocationLimit = 256L * 1024 * 1024,
             sourceIncumbentCompletion = true)

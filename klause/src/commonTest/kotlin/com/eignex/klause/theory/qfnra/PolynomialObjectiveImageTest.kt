@@ -5,7 +5,7 @@ import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -94,7 +94,7 @@ class PolynomialObjectiveImageTest {
             objective,
             source.boolCount,
             source.realCount,
-            QfNraParams(cancellation = Cancellation { true }),
+            QfNraParams(cancellation = ExecutionControl { true }),
         )
 
         assertEquals(QfNraReason.Interrupted, assertIs<PolynomialObjectiveResult.Unknown>(result).reason)
@@ -105,9 +105,9 @@ class PolynomialObjectiveImageTest {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (check-sat)")
         val objective = PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(0)), 2)
         var work = 0L
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
 
         val result = solvePolynomialObjectiveImage(

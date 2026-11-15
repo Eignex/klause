@@ -5,7 +5,7 @@ import com.eignex.klause.backtrack.selector.LastConflict
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.solver.result.SearchEvent
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /**
  * Curated [BacktrackParams] presets: named, ready-to-use configurations that bundle the
@@ -30,7 +30,7 @@ object BacktrackPresets {
         maxLearnedClauses: Int = 20_000,
         inprocess: Boolean = true,
         inprocessingCadence: Int = 4,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         onEvent: ((SearchEvent) -> Unit)? = null,
     ): BacktrackParams = BacktrackParams(
         randomSeed = randomSeed,
@@ -58,7 +58,7 @@ object BacktrackPresets {
     fun conflictDriven(
         randomSeed: Long? = null,
         lubyRestartBase: Long = 256L,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         onEvent: ((SearchEvent) -> Unit)? = null,
     ): BacktrackParams = BacktrackParams(
         randomSeed = randomSeed,

@@ -15,15 +15,15 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.util.Cancellation
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 
 class NumericalFrontierSnapshotTest {
     private val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
@@ -44,14 +44,14 @@ class NumericalFrontierSnapshotTest {
 
     @Test
     fun `aggregate inspection should visit only the requested retained query`() {
-        val journal = NumericalSelectionSnapshot(Cancellation.Never).journal()
+        val journal = NumericalSelectionSnapshot(ExecutionControl.Never).journal()
         val result = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityResult")
             .getDeclaredConstructor().newInstance()
         val record = journal.javaClass.declaredMethods.single { it.name == "record" && it.parameterCount == 6 }
         repeat(2) { record.invoke(journal, context, null, null, null, result, null) }
         val records = mutableListOf<JsonObject>()
 
-        NumericalAggregateSnapshot(Cancellation.Never, query = 1).inspect(journal, emit = records::add)
+        NumericalAggregateSnapshot(ExecutionControl.Never, query = 1).inspect(journal, emit = records::add)
 
         assertEquals(listOf("1"), records.filter { "originalQuery" in it }
             .map { it.getValue("originalQuery").jsonPrimitive.content })
@@ -60,10 +60,10 @@ class NumericalFrontierSnapshotTest {
 
     @Test
     fun `aggregate inspection should report an unavailable requested query without claiming a scan`() {
-        val journal = NumericalSelectionSnapshot(Cancellation.Never).journal()
+        val journal = NumericalSelectionSnapshot(ExecutionControl.Never).journal()
         val records = mutableListOf<JsonObject>()
 
-        NumericalAggregateSnapshot(Cancellation.Never, query = 5, maximumWork = 65_536L,
+        NumericalAggregateSnapshot(ExecutionControl.Never, query = 5, maximumWork = 65_536L,
             maximumAllocation = 1_048_576L).inspect(journal, emit = records::add)
 
         val summary = records.single()
@@ -81,7 +81,7 @@ class NumericalFrontierSnapshotTest {
 
     @Test
     fun `selection capture should expose empty journal limits`() {
-        val snapshot = NumericalSelectionSnapshot(Cancellation.Never)
+        val snapshot = NumericalSelectionSnapshot(ExecutionControl.Never)
         val journal = snapshot.journal()
 
         val capture = snapshot.capture(journal)
@@ -93,10 +93,10 @@ class NumericalFrontierSnapshotTest {
 
     @Test
     fun `point producer inspection should resolve production limits without a retained point`() {
-        val journal = NumericalSelectionSnapshot(Cancellation.Never).journal()
+        val journal = NumericalSelectionSnapshot(ExecutionControl.Never).journal()
         val records = mutableListOf<JsonObject>()
 
-        NumericalPointProducerSnapshot(Cancellation.Never).inspect(journal, records::add)
+        NumericalPointProducerSnapshot(ExecutionControl.Never).inspect(journal, records::add)
 
         val summary = records.single()
         assertEquals("0", summary.getValue("examinedQueries").jsonPrimitive.content)
@@ -106,10 +106,10 @@ class NumericalFrontierSnapshotTest {
 
     @Test
     fun `cancelled point producer inspection should distinguish its stop from capture limits`() {
-        val journal = NumericalSelectionSnapshot(Cancellation.Never).journal()
+        val journal = NumericalSelectionSnapshot(ExecutionControl.Never).journal()
         val records = mutableListOf<JsonObject>()
 
-        NumericalPointProducerSnapshot(Cancellation { true }).inspect(journal, records::add)
+        NumericalPointProducerSnapshot(ExecutionControl { true }).inspect(journal, records::add)
 
         val summary = records.single()
         assertEquals("true", summary.getValue("stopped").jsonPrimitive.content)
@@ -122,7 +122,7 @@ class NumericalFrontierSnapshotTest {
             lower = mapOf(integer to BigFraction.ONE))), context.coordinates, context.premises, context.objective)
         val sibling = evidence.copy(derivation = LinearPinnedObjective(evidence.derivation))
 
-        val inspected = NumericalSelectionSnapshot(Cancellation.Never).evidence(current, sibling)
+        val inspected = NumericalSelectionSnapshot(ExecutionControl.Never).evidence(current, sibling)
 
         assertEquals("Checked", inspected.getValue("freshNativeCheck").jsonPrimitive.content)
         assertEquals("1/2", inspected.getValue("value").jsonPrimitive.content)
@@ -130,7 +130,7 @@ class NumericalFrontierSnapshotTest {
 
     @Test
     fun `selection inspection should distinguish its stop from journal retention limits`() {
-        val snapshot = NumericalSelectionSnapshot(Cancellation { true })
+        val snapshot = NumericalSelectionSnapshot(ExecutionControl { true })
 
         val capture = snapshot.capture(snapshot.journal())
 
@@ -140,7 +140,7 @@ class NumericalFrontierSnapshotTest {
 
     @Test
     fun `a captured bound should retain its checked scope and original objective units`() {
-        val snapshot = NumericalFrontierSnapshot(context, Cancellation.Never, BigFraction.ofLong(2))
+        val snapshot = NumericalFrontierSnapshot(context, ExecutionControl.Never, BigFraction.ofLong(2))
 
         val result = snapshot.bound(evidence)
 
@@ -153,7 +153,7 @@ class NumericalFrontierSnapshotTest {
 
     @Test
     fun `a stronger captured claim should fail its certificate check`() {
-        val snapshot = NumericalFrontierSnapshot(context, Cancellation.Never)
+        val snapshot = NumericalFrontierSnapshot(context, ExecutionControl.Never)
         val forged = SourceEvidence(evidence.scope, SourceClaim.Bound(SourceValue.Rational(BigFraction.ONE)),
             evidence.derivation)
 
@@ -162,7 +162,7 @@ class NumericalFrontierSnapshotTest {
 
     @Test
     fun `a foreign captured revision should fail before certificate reuse`() {
-        val snapshot = NumericalFrontierSnapshot(context, Cancellation.Never)
+        val snapshot = NumericalFrontierSnapshot(context, ExecutionControl.Never)
         val foreign = SourceEvidence(evidence.scope.copy(revision = SourceRevision("foreign", "exact")),
             evidence.claim, evidence.derivation)
 

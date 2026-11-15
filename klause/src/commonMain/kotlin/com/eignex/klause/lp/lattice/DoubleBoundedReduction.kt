@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.lattice
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.compareTo
@@ -43,7 +43,7 @@ internal class DoubleBoundedReduction(val rows: List<DoubleBoundedRow>, val tran
 internal fun doubleBoundedReduction(
     rows: List<DoubleBoundedRow>,
     cols: Int,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): DoubleBoundedReduction? {
     if (cols == 0) return DoubleBoundedReduction(rows, UnimodularTransform(0))
     val hermite = hermiteNormalForm(rows.map(DoubleBoundedRow::coefficients), cols, cancellation) ?: return null

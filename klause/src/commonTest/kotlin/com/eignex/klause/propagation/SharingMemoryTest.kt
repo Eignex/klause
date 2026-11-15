@@ -7,7 +7,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.klause.util.SharingMemoryStatus
 import kotlin.test.Test
@@ -132,7 +132,7 @@ class SharingMemoryTest {
             lateinit var session: PropagationSession
             session = PropagationSession(Problem(32, 0, emptyArray(),
                 arrayOf(Clause(intArrayOf(62, 63)))), nativeSat = native,
-                cancellation = Cancellation { limit != Long.MAX_VALUE && session.work >= limit })
+                cancellation = ExecutionControl { limit != Long.MAX_VALUE && session.work >= limit })
             assertEquals(native, session.usesNativeSat)
             repeat(8) { session.addLearnedClause(Clause(intArrayOf(it * 2, it * 2 + 2)), 2) }
             val before = session.work

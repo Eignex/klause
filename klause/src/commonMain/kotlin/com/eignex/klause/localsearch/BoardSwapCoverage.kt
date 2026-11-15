@@ -2,7 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.global.AllDifferentInvariant
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
@@ -61,7 +61,7 @@ internal class BoardSwapCoverage {
         return cursor?.nextFactor(state)
     }
 
-    fun generate(state: LocalSearchState, factorId: Int, sink: MoveSink, cancellation: Cancellation): Boolean {
+    fun generate(state: LocalSearchState, factorId: Int, sink: MoveSink, cancellation: ExecutionControl): Boolean {
         if (!request(state)) return false
         val live = checkNotNull(cursor)
         val board = live.boardIndex(factorId)

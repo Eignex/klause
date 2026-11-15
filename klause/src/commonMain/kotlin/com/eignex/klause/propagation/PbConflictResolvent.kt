@@ -129,7 +129,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         }
         val a = acc.coefOf(pivot)
         val b = reason.coefOf(pivot)
-        // Cancellation needs opposite-sign coefficients on the pivot in the two constraints.
+        // ExecutionControl needs opposite-sign coefficients on the pivot in the two constraints.
         if (a == 0L || b == 0L || (a > 0L) == (b > 0L)) {
             decline("pivot-sign")
             return

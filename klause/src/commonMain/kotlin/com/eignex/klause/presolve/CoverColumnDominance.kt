@@ -6,7 +6,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 
 internal object CoverColumnDominance {
@@ -15,7 +15,7 @@ internal object CoverColumnDominance {
     private const val MAX_COMPARE_WORK = 1_000_000L
     private const val COMPARE_WORK_PER_ENTRY = 16L
 
-    private class Work(private val cancellation: Cancellation) {
+    private class Work(private val cancellation: ExecutionControl) {
         private var remaining = MAX_INDEX_WORK
         var entries = 0L
             private set
@@ -39,7 +39,7 @@ internal object CoverColumnDominance {
         var anchor = -1
     }
 
-    fun pins(problem: Problem, costs: Map<Int, Long>, cancellation: Cancellation): List<Factor> {
+    fun pins(problem: Problem, costs: Map<Int, Long>, cancellation: ExecutionControl): List<Factor> {
         if (costs.isEmpty() || problem.numBoolVars > MAX_COLUMNS || cancellation()) return emptyList()
         val work = Work(cancellation)
         var hasPositiveCost = false

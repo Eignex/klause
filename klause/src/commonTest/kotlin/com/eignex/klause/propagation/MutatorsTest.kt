@@ -4,7 +4,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -18,7 +18,7 @@ class MutatorsTest {
     fun `pending maintenance should preserve an unrelated cancellation latch`() {
         val state = freshState(255)
         state.finiteMutationInterruptible = true
-        state.finiteWork.cancellation = Cancellation {
+        state.finiteWork.cancellation = ExecutionControl {
             state.pendingFiniteMutation != null && state.holeHistHas(0, 16)
         }
         assertFailsWith<FinitePropagationInterrupted> {
@@ -39,7 +39,7 @@ class MutatorsTest {
             val state = freshState(255)
             state.undoLogging = logging
             state.finiteMutationInterruptible = true
-            state.finiteWork.cancellation = Cancellation {
+            state.finiteWork.cancellation = ExecutionControl {
                 state.pendingFiniteMutation != null && state.holeHistHas(0, 16)
             }
 
@@ -47,7 +47,7 @@ class MutatorsTest {
                 state.excludeInteriorIntValues(0, LongArray(128) { it.toLong() + 1 }) { null }
             }
             assertNotNull(state.pendingFiniteMutation)
-            state.finiteWork.cancellation = Cancellation.Never
+            state.finiteWork.cancellation = ExecutionControl.Never
             assertNull(state.runToFixpoint(allFactors = false))
 
             assertNull(state.pendingFiniteMutation)
@@ -62,7 +62,7 @@ class MutatorsTest {
         val root = state.mark()
         state.currentLevel = 1
         state.finiteMutationInterruptible = true
-        state.finiteWork.cancellation = Cancellation {
+        state.finiteWork.cancellation = ExecutionControl {
             state.pendingFiniteMutation != null && state.holeHistHas(0, 16)
         }
         assertFailsWith<FinitePropagationInterrupted> {
@@ -70,7 +70,7 @@ class MutatorsTest {
         }
 
         state.undoTo(root)
-        state.finiteWork.cancellation = Cancellation.Never
+        state.finiteWork.cancellation = ExecutionControl.Never
         assertNull(state.runToFixpoint(allFactors = false))
 
         assertNull(state.pendingFiniteMutation)

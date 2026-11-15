@@ -20,12 +20,12 @@ import com.eignex.klause.solver.evidence.SourceSemanticsChecker
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.evidence.sourceProofContext
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
 import kotlin.uuid.Uuid
 
-internal fun OpenTheoryRequest.linearAuthorityContext(cancellation: Cancellation): SourceProofContext? {
+internal fun OpenTheoryRequest.linearAuthorityContext(cancellation: ExecutionControl): SourceProofContext? {
     linearContext?.let { return it }
     val objective = objective ?: return null
     val original = preparedPlan.sourceModel ?: return null
@@ -44,7 +44,7 @@ internal fun OpenTheoryRequest.linearAuthorityContext(cancellation: Cancellation
 internal fun Problem.linearAuthorityContext(
     objective: LinearObjective,
     sense: ObjectiveSense,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     numericalIndicators: Boolean = false,
 ): SourceProofContext? {
     for (factor in factors) {
@@ -79,7 +79,7 @@ internal fun Problem.linearAuthorityContext(
     )
     val source = this
     val checker = object : SourceSemanticsChecker {
-        override fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck {
+        override fun witness(sample: Sample, scope: SourceScope, cancellation: ExecutionControl): SourceEvidenceCheck {
             val checked = affine.witness(sample, scope, cancellation)
             if (checked != SourceEvidenceCheck.Checked) return checked
             for (id in 0 until source.numIntVars) {
@@ -97,10 +97,14 @@ internal fun Problem.linearAuthorityContext(
             sample: Sample,
             value: SourceValue,
             scope: SourceScope,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
         ): SourceEvidenceCheck = affine.objectiveEquals(sample, value, scope, cancellation)
 
-        override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck {
+        override fun ray(
+            claim: SourceClaim.Ray,
+            scope: SourceScope,
+            cancellation: ExecutionControl,
+        ): SourceEvidenceCheck {
             val checked = witness(claim.sample, scope, cancellation)
             return if (checked == SourceEvidenceCheck.Checked) affine.ray(claim, scope, cancellation) else checked
         }

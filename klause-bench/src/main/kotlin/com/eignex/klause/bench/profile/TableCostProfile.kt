@@ -20,13 +20,13 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
-import com.eignex.klause.util.Cancellation
-import java.io.File
-import kotlin.time.Duration.Companion.seconds
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import kotlin.time.Duration.Companion.seconds
 
 internal object TableCostProfile {
     @JvmStatic
@@ -64,40 +64,47 @@ internal object TableCostProfile {
         }
         out.resolve("source.json").writeText(snapshot(problem, objective).toString())
         for (config in listOf("off", "default")) {
-            val stop = Cancellation.after(30.seconds)
+            val stop = ExecutionControl.after(30.seconds)
             val budget = PresolveBudget(1_650_000_000L)
             val start = System.nanoTime()
-            val prepared = FinitePipeline.prepare(FinitePipelineRequest(
-                problem, FiniteEngine.MIXED, objective,
-                presolveConfig = PresolveConfig.parse(config), explicitPresolveConfig = true,
-                cancellation = stop, solveCancellation = stop, presolveBudget = budget, randomSeed = 3L,
-            ))
+            val prepared = FinitePipeline.prepare(
+                FinitePipelineRequest(
+                    problem, FiniteEngine.MIXED, objective,
+                    presolveConfig = PresolveConfig.parse(config), explicitPresolveConfig = true,
+                    cancellation = stop, solveCancellation = stop, presolveBudget = budget, randomSeed = 3L,
+                ),
+            )
             val elapsed = System.nanoTime() - start
             val working = requireNotNull(prepared.objective)
-            out.resolve("prepared-$config.json").writeText(buildJsonObject {
-                put("revision", Reports.readGitSha())
-                put("sourceSha256", sha256(bytes))
-                put("java", System.getProperty("java.version"))
-                put("os", System.getProperty("os.name"))
-                put("arch", System.getProperty("os.arch"))
-                put("preparationNs", elapsed)
-                put("preparationWork", budget.spent())
-                put("preparationWorkAllowance", budget.allowance)
-                put("cancelled", stop())
-                put("infeasible", prepared.presolve?.infeasible == true)
-                put("searchExecuted", false)
-                put("sourceVerdictClaim", false)
-                put("working", snapshot(prepared.problem, working))
-                val getter = working.javaClass.methods.single { it.name.startsWith("getBinaryIntegerSource") }
-                val source = getter.invoke(working)
-                put("binaryIntegerSourcePresent", source != null)
-                if (source != null) {
-                    put("binaryIntegerSource", snapshot(
-                        source.javaClass.getMethod("getProblem").invoke(source) as Problem,
-                        source.javaClass.getMethod("getObjective").invoke(source) as LinearObjective,
-                    ))
-                }
-            }.toString())
+            out.resolve("prepared-$config.json").writeText(
+                buildJsonObject {
+                    put("revision", Reports.readGitSha())
+                    put("sourceSha256", sha256(bytes))
+                    put("java", System.getProperty("java.version"))
+                    put("os", System.getProperty("os.name"))
+                    put("arch", System.getProperty("os.arch"))
+                    put("preparationNs", elapsed)
+                    put("preparationWork", budget.spent())
+                    put("preparationWorkAllowance", budget.allowance)
+                    put("cancelled", stop())
+                    put("infeasible", prepared.presolve?.infeasible == true)
+                    put("searchExecuted", false)
+                    put("sourceVerdictClaim", false)
+                    put("working", snapshot(prepared.problem, working))
+                    val getter = working.javaClass.methods.single { it.name.startsWith("getBinaryIntegerSource") }
+                    val source = getter.invoke(working)
+                    put("binaryIntegerSourcePresent", source != null)
+                    if (source != null) {
+                        put(
+                            "binaryIntegerSource",
+                            snapshot(
+                                source.javaClass.getMethod("getProblem").invoke(source) as Problem,
+                                source.javaClass.getMethod("getObjective").invoke(source) as LinearObjective,
+                            ),
+                        )
+                    }
+                }.toString(),
+            )
         }
     }
 
@@ -116,34 +123,61 @@ internal object TableCostProfile {
         put("boolVars", problem.numBoolVars)
         put("intVars", problem.numIntVars)
         put("objective", objective.toString())
-        put("factorKinds", buildJsonObject {
-            problem.factors.groupingBy { it::class.simpleName ?: "anonymous" }.eachCount()
-                .forEach { (kind, count) -> put(kind, count) }
-        })
-        put("tableShapes", buildJsonObject {
-            problem.factors.filterIsInstance<Table>().groupingBy { "${it.arity}/${it.numTuples}/${it.hi != null}" }
-                .eachCount().forEach { (shape, count) -> put(shape, count) }
-        })
-        put("ternaryTables", buildJsonArray {
-            for ((index, table) in problem.factors.withIndex()) {
-                if (table !is Table || table.arity != 3) continue
-                add(buildJsonObject {
-                    put("factor", index)
-                    put("rows", table.numTuples)
-                    put("intervals", table.hi != null)
-                    put("columns", buildJsonArray {
-                        for (v in table.xs) add(buildJsonObject {
-                            put("id", v)
-                            put("domain", problem.intDomainOrNull(v).toString())
-                            put("weight", weights.getOrElse(v) { 0L })
-                            put("readers", buildJsonArray { readers[v].forEach { add(JsonPrimitive(it)) } })
-                        })
-                    })
-                    if (table.numTuples <= 64) {
-                        put("tuples", buildJsonArray { table.tuples.forEach { add(JsonPrimitive(it)) } })
-                    }
-                })
-            }
-        })
+        put(
+            "factorKinds",
+            buildJsonObject {
+                problem.factors.groupingBy { it::class.simpleName ?: "anonymous" }.eachCount()
+                    .forEach { (kind, count) -> put(kind, count) }
+            },
+        )
+        put(
+            "tableShapes",
+            buildJsonObject {
+                problem.factors.filterIsInstance<Table>().groupingBy { "${it.arity}/${it.numTuples}/${it.hi != null}" }
+                    .eachCount().forEach { (shape, count) -> put(shape, count) }
+            },
+        )
+        put(
+            "ternaryTables",
+            buildJsonArray {
+                for ((index, table) in problem.factors.withIndex()) {
+                    if (table !is Table || table.arity != 3) continue
+                    add(
+                        buildJsonObject {
+                            put("factor", index)
+                            put("rows", table.numTuples)
+                            put("intervals", table.hi != null)
+                            put(
+                                "columns",
+                                buildJsonArray {
+                                    for (v in table.xs) {
+                                        add(
+                                            buildJsonObject {
+                                                put("id", v)
+                                                put("domain", problem.intDomainOrNull(v).toString())
+                                                put("weight", weights.getOrElse(v) { 0L })
+                                                put(
+                                                    "readers",
+                                                    buildJsonArray {
+                                                        readers[v].forEach {
+                                                            add(
+                                                                JsonPrimitive(it),
+                                                            )
+                                                        }
+                                                    },
+                                                )
+                                            },
+                                        )
+                                    }
+                                },
+                            )
+                            if (table.numTuples <= 64) {
+                                put("tuples", buildJsonArray { table.tuples.forEach { add(JsonPrimitive(it)) } })
+                            }
+                        },
+                    )
+                }
+            },
+        )
     }
 }

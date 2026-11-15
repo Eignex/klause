@@ -1,8 +1,8 @@
 package com.eignex.klause.bench.metric
 
 import kotlinx.serialization.Serializable
-import java.io.InputStream
 import java.io.IOException
+import java.io.InputStream
 import java.io.OutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong

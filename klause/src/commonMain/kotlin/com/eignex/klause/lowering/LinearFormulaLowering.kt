@@ -2,9 +2,9 @@ package com.eignex.klause.lowering
 
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearRow
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
-internal class LinearFormulaLowering(private val cancellation: Cancellation) {
+internal class LinearFormulaLowering(private val cancellation: ExecutionControl) {
     fun relation(form: LinearForm): List<List<LinearRow>> {
         require(form !is LinearForm.Relaxation) { "a relaxation cannot enforce a source factor" }
         checkpoint(form.rows.size.toLong() + 1)

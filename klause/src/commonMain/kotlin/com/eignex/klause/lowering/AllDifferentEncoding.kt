@@ -12,12 +12,9 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.EncodingAffineExpression
 import com.eignex.klause.theory.EncodingLinearTerm
 import com.eignex.klause.theory.LinearEncodingFormula
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
-internal fun allDifferentLinearFormula(
-    factor: AllDifferent,
-    cancellation: Cancellation,
-): LinearEncodingFormula? {
+internal fun allDifferentLinearFormula(factor: AllDifferent, cancellation: ExecutionControl): LinearEncodingFormula? {
     if (cancellation()) return null
     fun comparison(terms: List<Pair<Int, BigFraction>>, op: LinearOp, bound: BigFraction) =
         LinearEncodingFormula.Comparison(EncodingAffineExpression(terms.map { (term, coefficient) ->
@@ -34,13 +31,21 @@ internal fun allDifferentLinearFormula(
                 listOf(a to BigFraction.ONE, b to BigFraction.ONE.negated()), LinearOp.NE, BigFraction.ZERO,
             ))
             for (position in intArrayOf(i, j)) {
-                if (factor.presents.isNotEmpty()) choices += comparison(
-                    listOf(Term.ofLit(factor.presents[position]) to BigFraction.ONE), LinearOp.EQ, BigFraction.ZERO,
+                if (factor.presents.isNotEmpty()) {
+                    choices += comparison(
+                    listOf(Term.ofLit(factor.presents[position]) to BigFraction.ONE),
+                    LinearOp.EQ,
+                    BigFraction.ZERO,
                 )
+                }
             }
-            for (value in factor.exceptSet) choices += comparison(
-                listOf(a to BigFraction.ONE), LinearOp.EQ, BigFraction.ofLong(value),
+            for (value in factor.exceptSet) {
+                choices += comparison(
+                listOf(a to BigFraction.ONE),
+                LinearOp.EQ,
+                BigFraction.ofLong(value),
             )
+            }
             clauses += LinearEncodingFormula.Or(choices)
         }
     }
@@ -50,7 +55,7 @@ internal fun allDifferentLinearFormula(
 internal fun allDifferentPolynomialFormula(
     factor: AllDifferent,
     integer: (Int) -> PolynomialExpression,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): PolynomialRealFormula? {
     if (cancellation()) return null
     val clauses = ArrayList<PolynomialRealFormula>()
@@ -67,9 +72,13 @@ internal fun allDifferentPolynomialFormula(
                 val boolean = PolynomialRealFormula.BooleanVariable(SourceBoolId(Lit.variable(literal)))
                 choices += if (Lit.isPositive(literal)) PolynomialRealFormula.Not(boolean) else boolean
             }
-            for (value in factor.exceptSet) choices += PolynomialRealFormula.Atom(
-                a, PolynomialRelation.EQ, PolynomialRealLowering.constant(BigFraction.ofLong(value)),
+            for (value in factor.exceptSet) {
+                choices += PolynomialRealFormula.Atom(
+                a,
+                PolynomialRelation.EQ,
+                PolynomialRealLowering.constant(BigFraction.ofLong(value)),
             )
+            }
             clauses += PolynomialRealFormula.Or(choices)
         }
     }

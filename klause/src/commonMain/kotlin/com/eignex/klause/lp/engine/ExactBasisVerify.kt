@@ -7,7 +7,7 @@ import com.eignex.klause.simplex.basis.RationalBasisOrder
 import com.eignex.klause.simplex.basis.RationalBasisSolve
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
@@ -196,7 +196,7 @@ internal fun verifyExactBasis(
     basis: Basis,
     rayRow: Int? = null,
     cache: ExactBasisCache = ExactBasisCache(),
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     limits: ExactBasisLimits = ExactBasisLimits(),
     observer: LpCertificationObserver? = null,
     primalOnly: Boolean = false,

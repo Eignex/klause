@@ -156,6 +156,7 @@ internal class VivificationPass(startCursor: Int = 0) : InprocessingPass {
             }
             preparing = false
         }
+        if (budget.stopped()) return
         while (attached < rows.size) {
             val row = rows[attached]
             if (!budget.visit(row.size * 2 + 1)) return
@@ -195,7 +196,7 @@ private fun vivifyClause(
     val priorCancelled = session.probeCancelled
     try {
         for (literal in literals) {
-            if (budget.stopped()) return null
+            if (budget.pollStopped()) return null
             when (budget.truth(literal)) {
                 true -> {
                     kept.add(literal)
@@ -219,6 +220,7 @@ private fun vivifyClause(
                 }
             }
         }
+        if (budget.stopped()) return null
         return result ?: kept.toIntArray().takeIf { it.size < literals.size }
     } finally {
         repeat(pushes) { session.popLast() }

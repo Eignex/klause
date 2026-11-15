@@ -1,12 +1,12 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveConfig
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -25,8 +25,8 @@ class PolynomialSourcePreparationTest {
         val request = source.pipelineRequest()
 
         val prepared = request.prepareSource(PresolveConfig.parse("off,+dependent-rows"), null,
-            Cancellation.Never, Cancellation.Never, null)
-        val rebuilt = assertNotNull(request.afterSourcePreparation(prepared, Cancellation.Never))
+            ExecutionControl.Never, ExecutionControl.Never, null)
+        val rebuilt = assertNotNull(request.afterSourcePreparation(prepared, ExecutionControl.Never))
 
         assertEquals(3, prepared.problem.factors.size)
         assertSame(source, prepared.source)

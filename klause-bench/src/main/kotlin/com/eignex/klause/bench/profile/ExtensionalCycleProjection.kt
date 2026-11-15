@@ -5,7 +5,7 @@ import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.Presolve
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.buildJsonArray
@@ -29,9 +29,9 @@ internal object ExtensionalCycleProjection {
         var work = 0L
         val meter = WorkMeter { work += it }
         val start = System.nanoTime()
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 8_388_608 || System.nanoTime() - start >= 60_000_000_000L
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
         fun visit(): Boolean {
             if (token()) return false
@@ -46,26 +46,43 @@ internal object ExtensionalCycleProjection {
                     source.xs.indices.filter { column -> sources.any { it !== source && source.xs[column] in it.xs } }
                 }
                 if (columns.any { it.size != 2 } || sources.indices.any { a ->
-                    (a + 1 until sources.size).any { b -> sources[a].xs.count { it in sources[b].xs } != 1 }
-                }) continue
+                        (a + 1 until sources.size).any { b -> sources[a].xs.count { it in sources[b].xs } != 1 }
+                    }
+                ) {
+                    continue
+                }
                 val beforeWork = work
                 val beforeTime = System.nanoTime()
                 val beforeAllocation = bean.getThreadAllocatedBytes(thread)
                 val projections = sources.indices.map { i ->
-                    project(sources[i], columns[i], Array(sources[i].arity) {
-                        problem.intDomainOrNull(sources[i].xs[it])
-                    }, ::visit)
+                    project(
+                        sources[i],
+                        columns[i],
+                        Array(sources[i].arity) {
+                            problem.intDomainOrNull(sources[i].xs[it])
+                        },
+                        ::visit,
+                    )
                 }
                 val ready = projections.filterNotNull()
                 val delta = if (ready.size == 3) {
                     Presolve.composeExtensional(problem.withFactors(ready.map { it.table }.toTypedArray()), token)
-                } else null
-                val consumed = if (delta != null && !token()) ready.map { projection ->
-                    val after = delta.addedFactors.filterIsInstance<Table>()
-                        .singleOrNull { it.xs.contentEquals(projection.table.xs) } ?: projection.table
-                    if (delta.infeasible) projection.counts.values.sum()
-                    else countUnsupported(projection, after, ::visit)
-                } else emptyList()
+                } else {
+                    null
+                }
+                val consumed = if (delta != null && !token()) {
+                    ready.map { projection ->
+                        val after = delta.addedFactors.filterIsInstance<Table>()
+                            .singleOrNull { it.xs.contentEquals(projection.table.xs) } ?: projection.table
+                        if (delta.infeasible) {
+                            projection.counts.values.sum()
+                        } else {
+                            countUnsupported(projection, after, ::visit)
+                        }
+                    }
+                } else {
+                    emptyList()
+                }
                 val row = buildJsonObject {
                     put("sourceSha256", sourceHash)
                     put("cluster", cluster.joinToString(","))
@@ -81,16 +98,27 @@ internal object ExtensionalCycleProjection {
                     put("removedSourceRows", consumed.joinToString(","))
                     put("replacedProjections", delta?.droppedIndices?.size ?: 0)
                     put("infeasible", delta?.infeasible ?: false)
-                    put("privateAllDifferentColumns", buildJsonArray {
-                        for (projection in ready) add(buildJsonObject {
-                            put("sourceScope", projection.source.xs.joinToString(","))
-                            put("projectedScope", projection.table.xs.joinToString(","))
-                            put("scope", projection.source.xs.filter { variable ->
-                                variable !in projection.table.xs && problem.factors.filterIsInstance<AllDifferent>()
-                                    .any { variable in it.vars }
-                            }.joinToString(","))
-                        })
-                    })
+                    put(
+                        "privateAllDifferentColumns",
+                        buildJsonArray {
+                            for (projection in ready) {
+                                add(
+                                    buildJsonObject {
+                                        put("sourceScope", projection.source.xs.joinToString(","))
+                                        put("projectedScope", projection.table.xs.joinToString(","))
+                                        put(
+                                            "scope",
+                                            projection.source.xs.filter { variable ->
+                                                variable !in projection.table.xs && problem.factors
+                                                    .filterIsInstance<AllDifferent>()
+                                                    .any { variable in it.vars }
+                                            }.joinToString(","),
+                                        )
+                                    },
+                                )
+                            }
+                        },
+                    )
                     put("sourceVerdictClaim", false)
                 }
                 writer.appendLine(row.toString())

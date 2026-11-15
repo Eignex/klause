@@ -1,7 +1,7 @@
 package com.eignex.klause.meta.alns
 
-import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.ElementResultDefinition
@@ -9,7 +9,7 @@ import com.eignex.klause.localsearch.InvariantNetwork
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.FunctionalObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -28,7 +28,7 @@ class RepairBlockClosureTest {
         val selector = SemanticBlockRemoval(SemanticBlockRemoval.Kind.Assignment, network)
 
         val closed = selector.closeControl(problem, FreedVars(intArrayOf(), intArrayOf(0)),
-            Assumptions.None, Cancellation.Never)
+            Assumptions.None, ExecutionControl.Never)
 
         assertContentEquals(intArrayOf(0, 2, 3), closed.ints)
         assertEquals(1, selector.lastSearchedInputs)
@@ -42,7 +42,7 @@ class RepairBlockClosureTest {
         val selector = SemanticBlockRemoval(SemanticBlockRemoval.Kind.Assignment, network)
 
         val closed = selector.closeControl(problem, FreedVars(intArrayOf(), intArrayOf(2)),
-            Assumptions.None, Cancellation.Never)
+            Assumptions.None, ExecutionControl.Never)
 
         assertContentEquals(intArrayOf(0, 1, 2), closed.ints)
         assertEquals(2, selector.lastSearchedInputs)
@@ -56,7 +56,7 @@ class RepairBlockClosureTest {
             InvariantNetwork(listOf(ElementResultDefinition(factor)), 4, 0))
 
         val closed = selector.closeControl(problem, FreedVars(intArrayOf(), intArrayOf(2)),
-            Assumptions.None, Cancellation.Never)
+            Assumptions.None, ExecutionControl.Never)
 
         assertContentEquals(intArrayOf(2, 3), closed.ints)
     }
@@ -69,7 +69,7 @@ class RepairBlockClosureTest {
         val selector = SemanticBlockRemoval(SemanticBlockRemoval.Kind.Assignment, network)
 
         val closed = selector.closeControl(problem, FreedVars(intArrayOf(), intArrayOf(0)),
-            Assumptions(ints = mapOf(1 to 2L)), Cancellation.Never)
+            Assumptions(ints = mapOf(1 to 2L)), ExecutionControl.Never)
 
         assertTrue(closed.isEmpty)
         assertEquals(RepairBlockDecline.BlockedPin, selector.lastDecline)

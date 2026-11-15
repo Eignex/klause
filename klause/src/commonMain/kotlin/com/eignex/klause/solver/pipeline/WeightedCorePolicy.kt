@@ -11,7 +11,7 @@ import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.math.abs
 
 private const val WEIGHTED_CORE_COLUMNS = 16_384
@@ -24,14 +24,16 @@ internal fun weightedCoreDefaultScenario(
     problem: Problem,
     objective: LinearObjective?,
     options: ExecutionOptions,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): PortfolioScenario {
     if (cancellation() || objective == null || scenario.cores != 1 || scenario.kind != Kind.COP ||
         scenario.engine != EngineMix.MIXED || scenario.explicitArms || options.explicitArms ||
         scenario.arms != PortfolioScenario.DEFAULT_ARMS || scenario.btPool != null || scenario.lsPool != null ||
         scenario.btEdit != null || scenario.annotationArm != null || scenario.diagnosticWorkLimit != null ||
         scenario.earlyCoreAdmission || scenario.coreRefinement != CoreRefinementMode.NONE
-    ) return scenario
+    ) {
+        return scenario
+    }
     val reader = options.reader()
     if (reader[ExecutionOption.coreEarly] != null || reader[ExecutionOption.coreRefinement] != null) return scenario
     if (problem.numBoolVars !in 1..WEIGHTED_CORE_COLUMNS || problem.factors.size > WEIGHTED_CORE_FACTORS ||
@@ -39,23 +41,30 @@ internal fun weightedCoreDefaultScenario(
         objective.boolWeightValues.size > problem.numBoolVars ||
         objective.intCoefficientValues.isNotEmpty() || objective.realCoefficientValues.isNotEmpty() ||
         objective.constant == Long.MIN_VALUE || abs(objective.constant) > WEIGHTED_CORE_SCALAR_MAGNITUDE
-    ) return scenario
+    ) {
+        return scenario
+    }
     var entriesLeft = WEIGHTED_CORE_ENTRIES
     for (factor in problem.factors) {
         cancellation.charge(1)
         if (cancellation()) return scenario
         val entries = when (factor) {
             is Clause -> factor.literals.size.toLong()
+
             is Cardinality -> factor.literals.size.toLong()
+
             is ReifiedCardinality -> factor.literals.size.toLong() + 1L
+
             is PseudoBoolean -> {
                 if (factor.integerConstants == null) return scenario
                 factor.literals.size.toLong()
             }
+
             is ReifiedPseudoBoolean -> {
                 if (factor.integerConstants == null) return scenario
                 factor.literals.size.toLong() + 1L
             }
+
             else -> return scenario
         }
         if (entries > entriesLeft) return scenario
@@ -71,8 +80,13 @@ internal fun weightedCoreDefaultScenario(
         if (weight > remaining) return scenario
         remaining -= weight
         if (weight == 0L) continue
-        if (first == 0L) first = weight else if (weight != first) varied = true
+        if (first == 0L) first = weight else if (weight != first) {
+            varied = true
+        }
     }
-    return if (varied) scenario.copy(earlyCoreAdmission = true, coreRefinement = CoreRefinementMode.REASONS)
-    else scenario
+    return if (varied) {
+        scenario.copy(earlyCoreAdmission = true, coreRefinement = CoreRefinementMode.REASONS)
+    } else {
+        scenario
+    }
 }

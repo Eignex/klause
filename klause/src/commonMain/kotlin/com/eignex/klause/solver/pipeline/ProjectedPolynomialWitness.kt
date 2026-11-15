@@ -18,12 +18,12 @@ import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.theory.qfnra.solveQfNra
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun checkProjectedPolynomialWitness(
     source: PolynomialRealProblem,
     point: Sample,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     limits: PolynomialLimits = PolynomialLimits(),
 ): SourceEvidenceCheck = try {
     val arithmetic = PolynomialArithmetic(cancellation, limits)
@@ -44,13 +44,15 @@ internal fun checkProjectedPolynomialWitness(
 private fun projectedPolynomialPoint(
     source: PolynomialRealProblem,
     point: Sample,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     arithmetic: PolynomialArithmetic,
     limits: PolynomialLimits,
 ): SourceEvidenceCheck {
     val algebraic = AlgebraicArithmetic(arithmetic)
     val values = point.algebraicReals ?: point.exactReals?.map(algebraic::rational)
-        ?: if (source.sourceRealCount == 0) emptyList() else {
+        ?: if (source.sourceRealCount == 0) {
+            emptyList()
+        } else {
             return SourceEvidenceCheck.Unavailable("polynomial witness has no exact source coordinates")
         }
     return checkProjectedPolynomialFormula(source.formula, source.totalBoolCount, source.totalRealCount,
@@ -63,7 +65,7 @@ internal fun checkProjectedPolynomialFormula(
     realCount: Int,
     booleans: BooleanArray,
     values: Map<Int, AlgebraicReal>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     arithmetic: PolynomialArithmetic,
     limits: PolynomialLimits,
 ): SourceEvidenceCheck {
@@ -73,8 +75,11 @@ internal fun checkProjectedPolynomialFormula(
     for ((id, value) in values) {
         arithmetic.step()
         val rational = value.rational
-        if (rational != null) fixed[id] = rational
-        else terms.addAll(polynomialRootCondition(id, value, arithmetic))
+        if (rational != null) {
+            fixed[id] = rational
+        } else {
+            terms.addAll(polynomialRootCondition(id, value, arithmetic))
+        }
     }
     val bools = booleans.indices.associateWith {
         arithmetic.step()
@@ -89,8 +94,10 @@ internal fun checkProjectedPolynomialFormula(
     return when (checked) {
         is QfNraResult.Unsatisfiable ->
             SourceEvidenceCheck.Rejected("polynomial source point has no feasible lowering extension")
+
         is QfNraResult.Unknown ->
             SourceEvidenceCheck.Unavailable("projected polynomial witness checking incomplete: ${checked.reason}")
+
         is QfNraResult.Satisfiable -> {
             for ((id, value) in values) {
                 if (algebraic.compare(value, checked.assignment.realValue(id)) != 0) {

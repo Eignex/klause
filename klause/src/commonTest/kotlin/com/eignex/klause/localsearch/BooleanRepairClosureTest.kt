@@ -12,7 +12,7 @@ import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -43,13 +43,13 @@ class BooleanRepairClosureTest {
             BoolFoldDefinition(output, intArrayOf(Lit.make(0, false)), true),
         ))?.network(0, output + 1)
         state.recompute()
-        val control = LocalSearchRunControl(Cancellation.Never)
+        val control = LocalSearchRunControl(ExecutionControl.Never)
         state.inspectionWork = control
         state.repairWork = control.repairWork
         val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)
         var polls = 0
 
-        val move = closure.close(state, Move.BoolFlip(0), Cancellation { ++polls > 16 })
+        val move = closure.close(state, Move.BoolFlip(0), ExecutionControl { ++polls > 16 })
         state.apply(assertNotNull(move))
 
         assertTrue((0 until output).all { state.assignment.boolValue(it) })
@@ -78,7 +78,7 @@ class BooleanRepairClosureTest {
         state.recompute()
         val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)
 
-        state.apply(assertNotNull(closure.close(state, Move.BoolFlip(0), Cancellation.Never)))
+        state.apply(assertNotNull(closure.close(state, Move.BoolFlip(0), ExecutionControl.Never)))
 
         assertTrue(state.assignment.boolValue(1))
         assertTrue(state.assignment.boolValue(2))
@@ -111,8 +111,8 @@ class BooleanRepairClosureTest {
         val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)
 
         val sink = MoveSink()
-        closure.closeInto(state, listOf(Move.BoolFlip(0)), sink, Cancellation.Never)
-        closure.closeInto(state, listOf(Move.BoolFlip(3)), sink, Cancellation.Never)
+        closure.closeInto(state, listOf(Move.BoolFlip(0)), sink, ExecutionControl.Never)
+        closure.closeInto(state, listOf(Move.BoolFlip(3)), sink, ExecutionControl.Never)
 
         assertEquals(Move.BoolFlip(3), sink.list.first())
     }
@@ -142,7 +142,7 @@ class BooleanRepairClosureTest {
         state.recompute()
         val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)
 
-        state.apply(assertNotNull(closure.close(state, Move.BoolFlip(0), Cancellation.Never)))
+        state.apply(assertNotNull(closure.close(state, Move.BoolFlip(0), ExecutionControl.Never)))
 
         assertFalse(state.assignment.boolValue(2))
         assertTrue(state.assignment.boolValue(3))
@@ -172,11 +172,11 @@ class BooleanRepairClosureTest {
         state.shaping.objective = LinearObjective(boolWeights = longArrayOf(0, 5, 1, 100))
         state.recompute()
         val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)
-        closure.closeInto(state, listOf(Move.BoolFlip(0)), MoveSink(), Cancellation.Never)
+        closure.closeInto(state, listOf(Move.BoolFlip(0)), MoveSink(), ExecutionControl.Never)
         state.shaping.objective = LinearObjective(boolWeights = longArrayOf(0, 1, 5, 100))
         val sink = MoveSink()
 
-        closure.closeInto(state, listOf(Move.BoolFlip(0)), sink, Cancellation.Never)
+        closure.closeInto(state, listOf(Move.BoolFlip(0)), sink, ExecutionControl.Never)
         state.apply(sink.list.single())
 
         assertTrue(state.assignment.boolValue(1))
@@ -245,7 +245,7 @@ class BooleanRepairClosureTest {
         state.recompute()
         val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)
 
-        val move = closure.close(state, Move.BoolFlip(0), Cancellation.Never)
+        val move = closure.close(state, Move.BoolFlip(0), ExecutionControl.Never)
 
         assertNull(move)
         assertFalse(state.assignment.boolValue(0))
@@ -276,7 +276,7 @@ class BooleanRepairClosureTest {
         val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)
 
         var polls = 0
-        val move = closure.close(state, Move.BoolFlip(0), Cancellation { ++polls >= 2 })
+        val move = closure.close(state, Move.BoolFlip(0), ExecutionControl { ++polls >= 2 })
 
         assertNull(move)
         assertTrue((0 until count).all { !state.assignment.boolValue(it) })
@@ -310,7 +310,7 @@ class BooleanRepairClosureTest {
         val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)
         val proposed = Move.Compound(listOf(Move.BoolFlip(0), Move.BoolFlip(0), Move.BoolFlip(1)))
 
-        state.apply(assertNotNull(closure.close(state, proposed, Cancellation.Never)))
+        state.apply(assertNotNull(closure.close(state, proposed, ExecutionControl.Never)))
 
         assertFalse(state.assignment.boolValue(0))
         assertTrue(state.assignment.boolValue(1))
@@ -367,7 +367,7 @@ class BooleanRepairClosureTest {
         assertNull(preparation.next())
 
         val closure = assertNotNull(preparation.asSequence().filterNotNull().first().closure)
-        state.apply(assertNotNull(closure.close(state, Move.BoolFlip(0), Cancellation.Never)))
+        state.apply(assertNotNull(closure.close(state, Move.BoolFlip(0), ExecutionControl.Never)))
 
         assertTrue((0 until count).all { state.assignment.boolValue(it) })
         assertFalse(state.assignment.boolValue(count))

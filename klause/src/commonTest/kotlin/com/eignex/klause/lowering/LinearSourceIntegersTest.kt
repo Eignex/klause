@@ -7,7 +7,7 @@ import com.eignex.klause.ir.LinearSourceTerm
 import com.eignex.klause.ir.LinearSourceVariable
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -32,7 +32,7 @@ class LinearSourceIntegersTest {
             ),
         )
 
-        val bounds = assertNotNull(source.integralRealBounds(Cancellation.Never))
+        val bounds = assertNotNull(source.integralRealBounds(ExecutionControl.Never))
 
         assertEquals(BigFraction.ofLong(2) to BigFraction.ofLong(5), bounds[1])
         assertEquals(BigFraction.ofLong(5) to BigFraction.ofLong(11), bounds[2])
@@ -47,7 +47,7 @@ class LinearSourceIntegersTest {
                 LinearSourceTerm(0, SemanticRational.ofLong(-1))), SemanticRational.ZERO, SemanticRational.ZERO)),
         )
 
-        val bounds = assertNotNull(source.integralRealBounds(Cancellation.Never))
+        val bounds = assertNotNull(source.integralRealBounds(ExecutionControl.Never))
 
         assertNull(bounds[1])
     }
@@ -62,7 +62,7 @@ class LinearSourceIntegersTest {
                 SemanticRational.ofLong(2), SemanticRational.ofLong(2), LinearSourceIndicator(0, true))),
         )
 
-        val bounds = assertNotNull(source.integralRealBounds(Cancellation.Never))
+        val bounds = assertNotNull(source.integralRealBounds(ExecutionControl.Never))
 
         assertNull(bounds[1])
     }
@@ -76,7 +76,7 @@ class LinearSourceIntegersTest {
                 LinearSourceTerm(0, SemanticRational.ofLong(-2))), SemanticRational.ZERO, SemanticRational.ZERO)),
         )
 
-        val bounds = assertNotNull(source.integralRealBounds(Cancellation.Never))
+        val bounds = assertNotNull(source.integralRealBounds(ExecutionControl.Never))
 
         assertNull(bounds[1])
     }
@@ -91,7 +91,7 @@ class LinearSourceIntegersTest {
                 LinearSourceTerm(0, SemanticRational.ofLong(-3))), wide, wide)),
         )
 
-        val bounds = assertNotNull(source.integralRealBounds(Cancellation.Never))
+        val bounds = assertNotNull(source.integralRealBounds(ExecutionControl.Never))
 
         assertEquals(BigFraction.ofLong(10_000_000_000_000_001L) to BigFraction.ofLong(10_000_000_000_000_004L),
             bounds[1])

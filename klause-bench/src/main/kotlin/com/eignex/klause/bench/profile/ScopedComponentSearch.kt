@@ -13,12 +13,12 @@ import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.parseBigInt
 import java.math.BigInteger
 
 internal class ComponentAllowance(
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     decisions: Long = 1_000_000L,
     maxVisits: Long = 4_000_000L,
     maxBytes: Long = 16L * 1024 * 1024,
@@ -28,7 +28,7 @@ internal class ComponentAllowance(
         private set
     var bytes = 0L
         private set
-    val stop = Cancellation { cancellation() || nodes.exhausted() || visits > maxVisits || bytes > maxBytes }
+    val stop = ExecutionControl { cancellation() || nodes.exhausted() || visits > maxVisits || bytes > maxBytes }
 
     fun visit(count: Long = 1L): Boolean {
         require(count >= 0L)

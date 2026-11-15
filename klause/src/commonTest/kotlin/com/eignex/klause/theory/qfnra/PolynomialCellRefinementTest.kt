@@ -6,11 +6,11 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -123,7 +123,7 @@ class PolynomialCellRefinementTest {
     fun `an enclosing stop interrupts cell production without a certificate`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
         var cancelled = false
-        val work = QfNraWork(QfNraParams(Cancellation { cancelled }))
+        val work = QfNraWork(QfNraParams(ExecutionControl { cancelled }))
         val refinement = PolynomialCellRefinement(source.formula, PolynomialCondition(), work,
             PolynomialLimits()) {}
         val normalized = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
@@ -181,7 +181,7 @@ class PolynomialCellRefinementTest {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
         var stopped = false
         val query = QfNraQuery(source.formula, 0, 1,
-            QfNraParams(Cancellation { stopped }, cellRefinement = true), PolynomialCondition())
+            QfNraParams(ExecutionControl { stopped }, cellRefinement = true), PolynomialCondition())
         query.checkedCellObserver = { stopped = true }
 
         var result: QfNraResult? = null

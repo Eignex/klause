@@ -9,7 +9,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,7 +24,7 @@ class ImpactTest {
             intDomains = arrayOf(IntDomain(0, 5)),
             factors = arrayOf<Factor>(),
         )
-        val session = PropagationSession(problem, Cancellation { true })
+        val session = PropagationSession(problem, ExecutionControl { true })
         val values = Impact(maxProbes = 8).values(session, VarRef.IntVar(0), Random(0L)).toList()
         assertEquals((0L..5L).toSet(), values.toSet(), "every value must still be offered; got $values")
     }
@@ -52,7 +52,7 @@ class ImpactTest {
         )
         var armed = false
         var polls = 0
-        val session = PropagationSession(problem, Cancellation { armed && polls++ >= 3 })
+        val session = PropagationSession(problem, ExecutionControl { armed && polls++ >= 3 })
         armed = true
         return session
     }

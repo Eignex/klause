@@ -6,13 +6,13 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.LinearOptimizationResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun LinearOptimizationResult.verifyRuntimeTerminal(
     expected: EngineInvocation,
     produced: EngineInvocation,
     original: SourceProofContext,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Verification<Unit, Unit> {
     if (!expected.matches(produced)) {
         return Verification.Rejected("linear completion belongs to another runtime invocation")

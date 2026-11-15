@@ -6,7 +6,7 @@ import com.eignex.klause.simplex.basis.BasisRepairControl
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -38,7 +38,7 @@ class LpDirectionalProbesTest {
             var decline: LpProbeDecline? = null
 
             val gains = parent.directionalGains(model, intArrayOf(0), longArrayOf(0), 1_000_000L,
-                Cancellation { cancelled }) {
+                ExecutionControl { cancelled }) {
                 charged += it.work
                 completed += it.completed
                 decline = it.decline
@@ -77,14 +77,14 @@ class LpDirectionalProbesTest {
                 RevisedSimplex(model, reuseProbeValues = reuse).use { parent ->
                     val point = assertNotNull(parent.solve())
                     val before = parent.lastMetrics
-                    val objective = parent.probeObjective(Cancellation.Never)
+                    val objective = parent.probeObjective(ExecutionControl.Never)
                     var charged = 0L
                     var solving = 0L
                     val numerical = ArrayList<LpProbeNumerical>()
                     val preflights = ArrayList<LpProbePreflight>()
 
                     val values = parent.directionalValues(LpProbeSource(model, point.basis), intArrayOf(0, 1),
-                        longArrayOf(0, 0), 1_000_000L, Cancellation.Never) {
+                        longArrayOf(0, 0), 1_000_000L, ExecutionControl.Never) {
                         charged += it.work
                         solving += it.solveWork
                         it.numerical?.let(numerical::add)
@@ -99,7 +99,7 @@ class LpDirectionalProbesTest {
                     assertEquals(if (reuse) 1 else 0, numerical.count { it.parentValues })
                     assertEquals(if (reuse) 1 else 0, preflights.count { it.parentValueWork > 0L })
                     assertEquals(before, parent.lastMetrics)
-                    assertEquals(objective, parent.probeObjective(Cancellation.Never))
+                    assertEquals(objective, parent.probeObjective(ExecutionControl.Never))
                     assertEquals(point.objective, assertNotNull(parent.resolveBounds()).objective, 1e-7)
                     parentWork.add(parent.lastMetrics.workOps)
                 }
@@ -132,7 +132,7 @@ class LpDirectionalProbesTest {
                 var seeded = 0
 
                 val gains = parent.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
-                    50_000L, Cancellation.Never) {
+                    50_000L, ExecutionControl.Never) {
                     charged += it.work
                     completed += it.completed
                     if (it.numerical?.parentValues == true) seeded++
@@ -176,7 +176,7 @@ class LpDirectionalProbesTest {
                 var reused = 0
 
                 val values = parent.directionalValues(LpProbeSource(model, point.basis), intArrayOf(0), longArrayOf(0),
-                    1_000_000L, Cancellation.Never) { if (it.numerical?.parentValues == true) reused++ }
+                    1_000_000L, ExecutionControl.Never) { if (it.numerical?.parentValues == true) reused++ }
 
                 results.add(assertNotNull(values).single())
                 assertEquals(if (reuse) 1 else 0, reused)
@@ -273,7 +273,7 @@ class LpDirectionalProbesTest {
                     var completed = 0
 
                     val values = parent.directionalValues(source, intArrayOf(0, 1), longArrayOf(0, 0),
-                        grant, Cancellation.Never) {
+                        grant, ExecutionControl.Never) {
                         charged += it.work
                         completed += it.completed
                         assertTrue(charged <= grant, "grant=$grant charged=$charged")
@@ -321,7 +321,7 @@ class LpDirectionalProbesTest {
                 var solving = 0L
                 var completed = 0
 
-                assertNull(probes.run(intArrayOf(0, 1), longArrayOf(0, 0), 10_000L, Cancellation.Never) {
+                assertNull(probes.run(intArrayOf(0, 1), longArrayOf(0, 0), 10_000L, ExecutionControl.Never) {
                     preflight = it.preflight ?: preflight
                     spent += it.work
                     solving += it.solveWork
@@ -354,7 +354,7 @@ class LpDirectionalProbesTest {
             var decline: LpProbeDecline? = null
 
             assertNull(parent.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
-                10_000L, Cancellation { cancelled }) {
+                10_000L, ExecutionControl { cancelled }) {
                 work += it.work
                 completed += it.completed
                 if (it.numerical?.factorCopy == true) copies++
@@ -398,7 +398,7 @@ class LpDirectionalProbesTest {
             val numerical = ArrayList<LpProbeNumerical>()
 
             val gains = assertNotNull(probes.run(intArrayOf(0, 1), longArrayOf(0, 0),
-                6_000L, Cancellation.Never) {
+                6_000L, ExecutionControl.Never) {
                 spent += it.work
                 completed += it.completed
                 it.numerical?.let(numerical::add)
@@ -434,7 +434,7 @@ class LpDirectionalProbesTest {
                 var independentWork = 0L
                 val independent = columns.map { column ->
                     assertNotNull(owner.directionalValues(source, intArrayOf(column), longArrayOf(0),
-                        1_000_000L, Cancellation.Never) { independentWork += it.work }).single()
+                        1_000_000L, ExecutionControl.Never) { independentWork += it.work }).single()
                 }
                 var pooledWork = 0L
                 val preflights = ArrayList<LpProbePreflight>()
@@ -442,7 +442,7 @@ class LpDirectionalProbesTest {
                 var decline: LpProbeDecline? = null
 
                 val result = owner.directionalValues(source, columns, longArrayOf(0, 0),
-                    independentWork - 1L, Cancellation.Never) {
+                    independentWork - 1L, ExecutionControl.Never) {
                         pooledWork += it.work
                         it.preflight?.let(preflights::add)
                         it.numerical?.let(numerical::add)
@@ -510,7 +510,7 @@ class LpDirectionalProbesTest {
                 var decline: LpProbeDecline? = null
 
                 val gains = owner.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
-                    1_000_000L, Cancellation { cancelled }) {
+                    1_000_000L, ExecutionControl { cancelled }) {
                     work += it.work
                     completed += it.completed
                     decline = it.decline
@@ -540,7 +540,7 @@ class LpDirectionalProbesTest {
             assertNotNull(owner.solve())
             var first: LpProbePreflight? = null
             assertNotNull(owner.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
-                1_000_000L, Cancellation.Never) { if (first == null) first = it.preflight })
+                1_000_000L, ExecutionControl.Never) { if (first == null) first = it.preflight })
             val preflight = assertNotNull(first)
             val beforePreflight = 1_000_000L - preflight.offeredWork
             for (stop in listOf(LpProbePreparationStop.WORKSPACE, LpProbePreparationStop.SCALARS)) {
@@ -555,7 +555,7 @@ class LpDirectionalProbesTest {
                 var decline: LpProbeDecline? = null
 
                 val gains = owner.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
-                    allowance, Cancellation.Never) {
+                    allowance, ExecutionControl.Never) {
                     work += it.work
                     solving += it.solveWork
                     completed += it.completed
@@ -615,7 +615,7 @@ class LpDirectionalProbesTest {
             var decline: LpProbeDecline? = null
 
             val gains = owner.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
-                1_000_000L, Cancellation.Never) { work += it.work; decline = it.decline }
+                1_000_000L, ExecutionControl.Never) { work += it.work; decline = it.decline }
 
             assertNull(gains)
             assertEquals(LpProbeDecline.CHILD, decline)
@@ -649,7 +649,7 @@ class LpDirectionalProbesTest {
                     var completed = 0
 
                     val values = owner.directionalValues(LpProbeSource(model, point.basis), intArrayOf(0, 1),
-                        longArrayOf(origin, origin), 1_000_000L, Cancellation.Never) { completed += it.completed }
+                        longArrayOf(origin, origin), 1_000_000L, ExecutionControl.Never) { completed += it.completed }
 
                     assertNotNull(values)
                     assertEquals((if (negative) -4.0 else 6.0) / scale, values[0].down, 1e-7)
@@ -677,7 +677,7 @@ class LpDirectionalProbesTest {
             var decline: LpProbeDecline? = null
 
             val gains = solver.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
-                1_000_000L, Cancellation { cancelled }) {
+                1_000_000L, ExecutionControl { cancelled }) {
                 work += it.work
                 completed += it.completed
                 decline = it.decline
@@ -709,7 +709,7 @@ class LpDirectionalProbesTest {
             var completed = 0
 
             val gains = owner.directionalGains(point, intArrayOf(0, 1), longArrayOf(0, 0),
-                1_000_000L, Cancellation.Never) { decline = it.decline; completed += it.completed }
+                1_000_000L, ExecutionControl.Never) { decline = it.decline; completed += it.completed }
 
             assertNotNull(gains, decline.toString())
             assertEquals(4, completed)
@@ -742,7 +742,7 @@ class LpDirectionalProbesTest {
 
                     val gains = assertNotNull(solver.directionalGains(
                         model, intArrayOf(0, 1), longArrayOf(origin, origin),
-                        1_000_000L, Cancellation.Never) { work += it.work; completed += it.completed })
+                        1_000_000L, ExecutionControl.Never) { work += it.work; completed += it.completed })
 
                     assertEquals(1.5 / scale, gains[0].down, 1e-7)
                     assertEquals(0.5 / scale, gains[0].up, 1e-7)
@@ -768,7 +768,7 @@ class LpDirectionalProbesTest {
                 var children = 0
                 var work = 0L
                 var completed = 0
-                val token = Cancellation { children == 2 }
+                val token = ExecutionControl { children == 2 }
                 val probes = LpDirectionalProbes(state, optimum.basis, 4.5) { child, grant, _, view ->
                     children++
                     RevisedSimplex(child, cancellation = token, workLimit = grant, initialScaling = view)
@@ -807,10 +807,10 @@ class LpDirectionalProbesTest {
 
                     val result = if (valueMode) {
                         solver.directionalValues(LpProbeSource(model, before.basis), intArrayOf(0, 1),
-                            longArrayOf(0, 0), 1_000_000L, Cancellation.Never) {}
+                            longArrayOf(0, 0), 1_000_000L, ExecutionControl.Never) {}
                     } else {
                         solver.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
-                            1_000_000L, Cancellation.Never) {}
+                            1_000_000L, ExecutionControl.Never) {}
                     }
                     assertNotNull(result)
 
@@ -865,7 +865,7 @@ class LpDirectionalProbesTest {
 
                     val observe: (LpProbeMetrics) -> Unit = { work += it.work; reason = it.decline }
                     val allowance = when (decline) { "unfunded" -> 1L; "zero" -> 0L; else -> 1_000_000L }
-                    val token = Cancellation { decline == "cancelled" }
+                    val token = ExecutionControl { decline == "cancelled" }
                     val gains = if (valueMode) {
                         solver.directionalValues(LpProbeSource(point, pointResult.basis), columns, splits,
                             allowance, token, observe)
@@ -899,7 +899,7 @@ class LpDirectionalProbesTest {
             var decline: LpProbeDecline? = null
 
             val values = owner.directionalValues(source, intArrayOf(0, 1), longArrayOf(0, 0),
-                1_000_000L, Cancellation.Never) { work += it.work; completed += it.completed; decline = it.decline }
+                1_000_000L, ExecutionControl.Never) { work += it.work; completed += it.completed; decline = it.decline }
 
             assertNull(values)
             assertEquals(LpProbeDecline.SPLIT, decline)
@@ -939,7 +939,7 @@ class LpDirectionalProbesTest {
                 probing = true
                 var work = 0L
 
-                val token = Cancellation { cancelled }
+                val token = ExecutionControl { cancelled }
                 val observe: (LpProbeMetrics) -> Unit = { work += it.work }
                 val gains = if (valueMode) {
                     solver.directionalValues(LpProbeSource(model, point.basis), intArrayOf(0, 1), longArrayOf(0, 0),
@@ -977,9 +977,9 @@ class LpDirectionalProbesTest {
                 }
                 val gains = if (valueMode) {
                     solver.directionalValues(LpProbeSource(model, point.basis), intArrayOf(0, 1), longArrayOf(0, 0),
-                        100L, Cancellation.Never, observe)
+                        100L, ExecutionControl.Never, observe)
                 } else solver.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
-                    100L, Cancellation.Never, observe)
+                    100L, ExecutionControl.Never, observe)
 
                 assertNull(gains)
                 assertTrue(work in 1L..100L)

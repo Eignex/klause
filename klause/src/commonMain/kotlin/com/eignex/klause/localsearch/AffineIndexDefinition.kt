@@ -5,7 +5,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
 
@@ -15,14 +15,14 @@ internal fun affineIndexDefinitions(
     factors: Array<Factor>,
     numIntVars: Int,
     definedHints: IntArray,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): List<AffineIndexDefinition> = AffineIndexInference(factors, numIntVars, definedHints, cancellation).infer()
 
 private class AffineIndexInference(
     private val factors: Array<Factor>,
     numIntVars: Int,
     private val definedHints: IntArray,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
 ) {
     private val hinted = BooleanArray(numIntVars)
     private val occurrences = arrayOfNulls<IntArrayList>(numIntVars)
@@ -51,7 +51,9 @@ private class AffineIndexInference(
                 if (factor.isIndexRead(v)) {
                     indexUse[v] = true
                     if (factor is Element) elementUse[v] = true
-                } else nonIndexCount[v]++
+                } else {
+                    nonIndexCount[v]++
+                }
             }
         }
         for (fid in factors.indices) {
@@ -116,6 +118,7 @@ private class AffineIndexInference(
             })
             is ReifiedLinear -> op == LinearOp.EQ && vars.size == 1 && vars[0] == v &&
                 integerConstants?.coeff(0) == 1L
+
             else -> false
         }
     }

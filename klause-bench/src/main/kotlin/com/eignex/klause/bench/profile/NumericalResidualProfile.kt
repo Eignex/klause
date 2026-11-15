@@ -19,7 +19,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -103,7 +103,7 @@ internal object NumericalResidualProfile {
         val probe = Probe()
         val solver = BacktrackSolver(problem.bake())
         set(solver, "lpSolveContext", probe.context)
-        val stop = Cancellation.after(2000.milliseconds)
+        val stop = ExecutionControl.after(2000.milliseconds)
         val params = BacktrackPresets.satOptimized(randomSeed = 3, cancellation = stop)
         val started = System.nanoTime()
         val result = solver.minimize(objective, params)
@@ -155,7 +155,7 @@ internal object NumericalResidualProfile {
         arguments[count] = -4
         @Suppress("SpreadOperator")
         val builder = constructor.newInstance(*arguments)
-        val stop = Cancellation.after(2000.milliseconds)
+        val stop = ExecutionControl.after(2000.milliseconds)
         val domains = PropagationSession(problem, cancellation = stop)
         val build = type.methods.single {
             it.name == "build" && it.parameterCount == 3 && it.parameterTypes.first().isInstance(domains)

@@ -13,7 +13,7 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Reject an unsupported construct with a clean [UnsupportedSmtException]. */
 internal fun smtUnsupported(msg: String): Nothing = throw UnsupportedSmtException(msg)
@@ -35,7 +35,7 @@ internal object Compiler {
         val strictBounds: Boolean,
         internal val settings: ProblemSettings = KlauseConfig.current.problemSettings(),
         internal val conditionalEqualities: SmtLibConditionalEquality = SmtLibConditionalEquality(),
-        internal val sourceCancellation: Cancellation = Cancellation.Never,
+        internal val sourceCancellation: ExecutionControl = ExecutionControl.Never,
         internal val semantics: EffectiveSourceSemantics = resolveSmtLibSemantics(unboundedIntLo, unboundedIntHi),
     ) :
         CnfLowering {

@@ -1,9 +1,9 @@
 package com.eignex.klause.formats.flatzinc
 
-import kotlin.test.Test
-import kotlin.test.assertFailsWith
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
+import kotlin.test.Test
+import kotlin.test.assertFailsWith
 
 @RunWith(Parameterized::class)
 class FlatZincGlobalLimitsTest(private val source: String) {

@@ -12,7 +12,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -27,7 +27,7 @@ class ProbingTest {
 
     private fun probed(problem: Problem): Problem {
         val baked = problem.bake()
-        return baked.withPassDelta(Presolve.probe(baked, cap, Cancellation.Never), BakeConfig.NONE)
+        return baked.withPassDelta(Presolve.probe(baked, cap, ExecutionControl.Never), BakeConfig.NONE)
     }
 
     private fun isFeasible(problem: Problem, ints: LongArray, bools: BooleanArray): Boolean {
@@ -117,7 +117,7 @@ class ProbingTest {
             ),
         )
         assertTrue(Lit.make(1, false) in units(probed(problem)))
-        val delta = Presolve.probe(problem.bake(), 1, Cancellation.Never)
+        val delta = Presolve.probe(problem.bake(), 1, ExecutionControl.Never)
         val forced = delta.addedFactors.filterIsInstance<Clause>().map { it.literals.single() }
         assertEquals(listOf(Lit.make(1, false)), forced)
     }
@@ -160,7 +160,7 @@ class ProbingTest {
             openIntHi = booleanArrayOf(true),
         )
 
-        val delta = Presolve.probeSource(problem, cap, Cancellation.Never)
+        val delta = Presolve.probeSource(problem, cap, ExecutionControl.Never)
 
         assertEquals(setOf(Lit.make(0, false)), sourceUnits(delta))
     }
@@ -180,7 +180,7 @@ class ProbingTest {
             openIntHi = booleanArrayOf(true),
         )
 
-        val delta = Presolve.probeSource(problem, cap, Cancellation.Never)
+        val delta = Presolve.probeSource(problem, cap, ExecutionControl.Never)
 
         assertTrue(Lit.make(0, false) in sourceUnits(delta))
     }
@@ -199,7 +199,7 @@ class ProbingTest {
             openIntHi = booleanArrayOf(true),
         )
 
-        val bounds = Presolve.probeSource(problem, cap, Cancellation.Never).bounds!!
+        val bounds = Presolve.probeSource(problem, cap, ExecutionControl.Never).bounds!!
 
         assertFalse(bounds.isOpenUpper(0))
         assertEquals(7L, bounds.upper(0))
@@ -217,8 +217,9 @@ class ProbingTest {
             openIntHi = booleanArrayOf(true),
         )
 
-        assertTrue(Presolve.probeSource(problem, cap, Cancellation.Never).isEmpty)
+        assertTrue(Presolve.probeSource(problem, cap, ExecutionControl.Never).isEmpty)
     }
+
     @Test
     fun `root fixed columns should not consume the candidate cap or emit redundant units`() {
         val problem = Problem(
@@ -231,7 +232,7 @@ class ProbingTest {
             ),
         ).bake()
 
-        val delta = Presolve.probe(problem, 1, Cancellation.Never)
+        val delta = Presolve.probe(problem, 1, ExecutionControl.Never)
 
         val forced = delta.addedFactors.filterIsInstance<Clause>().map { it.literals.single() }
         assertEquals(listOf(Lit.make(2, true)), forced)
@@ -242,7 +243,7 @@ class ProbingTest {
         val problem = Problem(16, 0, emptyArray(), emptyList()).bake()
         val budget = PresolveBudget(Long.MAX_VALUE)
 
-        val delta = Presolve.probe(problem, 4, budget.orSpent(Cancellation.Never))
+        val delta = Presolve.probe(problem, 4, budget.orSpent(ExecutionControl.Never))
 
         assertTrue(delta.isEmpty)
         assertEquals(0L, budget.rootConstructionEntries)
@@ -259,7 +260,7 @@ class ProbingTest {
             ),
         ).bake()
 
-        assertTrue(Presolve.probe(problem, 1, Cancellation.Never).isEmpty)
+        assertTrue(Presolve.probe(problem, 1, ExecutionControl.Never).isEmpty)
     }
 
     @Test
@@ -271,7 +272,7 @@ class ProbingTest {
         for (allowance in listOf(1L, 81L, 331L, 481L, 561L, 721L, 801L)) {
             val budget = PresolveBudget(allowance)
 
-            val delta = Presolve.probeSource(problem, cap, budget.orSpent(Cancellation.Never))
+            val delta = Presolve.probeSource(problem, cap, budget.orSpent(ExecutionControl.Never))
 
             assertTrue(delta.isEmpty, "allowance=$allowance")
             assertFalse(delta.infeasible)
@@ -290,7 +291,7 @@ class ProbingTest {
         )
         val budget = PresolveBudget(210)
 
-        val delta = Presolve.probeSource(problem, cap, budget.orSpent(Cancellation.Never))
+        val delta = Presolve.probeSource(problem, cap, budget.orSpent(ExecutionControl.Never))
 
         assertFalse(delta.infeasible)
         assertEquals(5L, delta.bounds!!.upper(0))
@@ -311,7 +312,7 @@ class ProbingTest {
         for (allowance in listOf(451L, 491L, 531L, 581L, 631L, 681L, 701L, 781L, 851L)) {
             val budget = PresolveBudget(allowance)
 
-            val delta = Presolve.probeSource(problem, 1, budget.orSpent(Cancellation.Never))
+            val delta = Presolve.probeSource(problem, 1, budget.orSpent(ExecutionControl.Never))
 
             assertTrue(delta.isEmpty, "allowance=$allowance")
             assertFalse(delta.infeasible)
@@ -329,9 +330,15 @@ class ProbingTest {
         var polls = 0
         var meterReads = 0
         val meter = WorkMeter { work += it }
-        val token = object : Cancellation {
-            override fun isCancelled(): Boolean { polls++; return false }
-            override fun workMeter(): WorkMeter { meterReads++; return meter }
+        val token = object : ExecutionControl() {
+            override fun isCancelled(): Boolean {
+                polls++;
+                return false
+            }
+            override val accounting: WorkMeter get() {
+                meterReads++;
+                return meter
+            }
         }
 
         val delta = Presolve.probeSource(problem, cap, token)
@@ -350,8 +357,8 @@ class ProbingTest {
         )
         val budget = PresolveBudget(Long.MAX_VALUE)
 
-        val metered = Presolve.probeSource(problem, cap, budget.orSpent(Cancellation.Never))
-        val unmetered = Presolve.probeSource(problem, cap, Cancellation.Never)
+        val metered = Presolve.probeSource(problem, cap, budget.orSpent(ExecutionControl.Never))
+        val unmetered = Presolve.probeSource(problem, cap, ExecutionControl.Never)
 
         assertEquals(5L, metered.bounds!!.upper(0))
         assertEquals(unmetered.bounds!!.upper(0), metered.bounds.upper(0))
@@ -368,9 +375,9 @@ class ProbingTest {
         var work = 0L
         var polls = 0
         val meter = WorkMeter { work += it }
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean { polls++; return work >= 451L }
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
 
         val delta = Presolve.probeSource(problem, cap, token)
@@ -388,7 +395,7 @@ class ProbingTest {
             List(128) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.LE, 1) },
         )
         var polls = 0
-        val token = Cancellation { ++polls == 3 }
+        val token = ExecutionControl { ++polls == 3 }
 
         val delta = Presolve.probeSource(problem, cap, token)
 
@@ -406,7 +413,7 @@ class ProbingTest {
         for (allowance in listOf(181L, 851L, 1011L)) {
             val budget = PresolveBudget(allowance)
 
-            val delta = Presolve.probeSource(problem, cap, budget.orSpent(Cancellation.Never))
+            val delta = Presolve.probeSource(problem, cap, budget.orSpent(ExecutionControl.Never))
 
             assertTrue(delta.isEmpty)
             assertFalse(delta.infeasible)
@@ -423,7 +430,7 @@ class ProbingTest {
         for (allowance in listOf(21801L, 22441L, 23081L)) {
             val budget = PresolveBudget(allowance)
 
-            val delta = Presolve.probeSource(problem, 1, budget.orSpent(Cancellation.Never))
+            val delta = Presolve.probeSource(problem, 1, budget.orSpent(ExecutionControl.Never))
 
             assertTrue(delta.isEmpty)
             assertFalse(delta.infeasible)

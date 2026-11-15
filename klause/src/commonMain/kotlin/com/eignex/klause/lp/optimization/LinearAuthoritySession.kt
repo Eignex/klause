@@ -22,7 +22,7 @@ import com.eignex.klause.lp.engine.advanceRootGuidance
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.SourceScope
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class LinearAuthoritySession(
     private val budget: SourceLpBudget,
@@ -44,11 +44,12 @@ internal class LinearAuthoritySession(
     private var completedPolicy: SparseSourceLpPolicy? = null
     private var lifetime: LpFloatAllowance? = null
     private var appendPending = false
-    private var currentToken: Cancellation = Cancellation.Never
-    private val token = object : Cancellation {
+    private var currentToken: ExecutionControl = ExecutionControl.Never
+    private val token = object : ExecutionControl() {
         override fun isCancelled(): Boolean = currentToken()
         override fun deadline() = currentToken.deadline()
-        override fun workMeter() = currentToken.workMeter()
+        override val accounting get() = currentToken.accounting
+        override val admission get() = admissionFrom(currentToken)
     }
     var preparations: Long = 0L
         private set
@@ -58,7 +59,7 @@ internal class LinearAuthoritySession(
     fun bind(
         packed: LinearAuthorityModel,
         costs: ExactLpObjective,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         build: () -> ExactLpModel?,
         authority: SourceScope? = null,
         allowance: LpFloatAllowance? = null,
@@ -108,7 +109,10 @@ internal class LinearAuthoritySession(
         if (sides != packed.columns || inactive != packed.inactiveRows || this.authority != authority) {
             var mappingWork = 0L
             var mappingAllocation = 0L
-            val suspended = if (sparse == null) packed.inactiveRows else checkNotNull(sparse)
+            val suspended = if (sparse == null) {
+                packed.inactiveRows
+            } else {
+                checkNotNull(sparse)
                 .emittedInactiveRows(packed.inactiveRows, token) { work, allocation ->
                     mappingWork += work
                     mappingAllocation += allocation
@@ -116,6 +120,7 @@ internal class LinearAuthoritySession(
                     budget.funding?.charge(0L, allocation)
                     budget.funding?.paused != true
                 }
+            }
             onLifecycle("InactiveRowMappingWork", mappingWork)
             onLifecycle("InactiveRowMappingAllocation", mappingAllocation)
             if (suspended == null) {
@@ -128,8 +133,15 @@ internal class LinearAuthoritySession(
             for ((id, column) in packed.columns.withIndex()) {
                 if (token()) return null
                 for ((upper, side) in listOf(false to column.bounds.lower, true to column.bounds.upper)) {
-                    if (side != null) assertions += LpBoundAssertion(id, upper, side,
-                        assertions.size.toLong(), bound.state.depth)
+                    if (side != null) {
+                        assertions += LpBoundAssertion(
+                        id,
+                        upper,
+                        side,
+                        assertions.size.toLong(),
+                        bound.state.depth,
+                    )
+                    }
                 }
             }
             val batch = bound.assertBounds(assertions, token)
@@ -153,10 +165,10 @@ internal class LinearAuthoritySession(
         costs: List<BigFraction>,
         constant: BigFraction,
         scope: SourceScope,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         policy: SparseSourceLpPolicy,
         observer: LpCertificationObserver,
-        consume: (LpRootGuidance, SparseSourceLp, Cancellation) -> T?,
+        consume: (LpRootGuidance, SparseSourceLp, ExecutionControl) -> T?,
     ): T? {
         if (cancellation()) {
             close()
@@ -182,7 +194,9 @@ internal class LinearAuthoritySession(
                 completed = null
                 completedPolicy = null
                 lifetime = null
-            } else close()
+            } else {
+                close()
+            }
             admission = budget.admitSparse(cancellation) { active ->
                 SparseSourceLp.prepare(packed.rows, packed.columns.map { it.copy(bounds = ExactLpBounds()) },
                     costs, constant, policy, active)
@@ -209,8 +223,12 @@ internal class LinearAuthoritySession(
             currentToken = active
             val funding = budget.funding
             if (funding?.paused == true) return@resumeSparse null
-            val profile = if (funding == null) policy.floating else lifetime ?: policy.funded(funding.remainingWork)
+            val profile = if (funding == null) {
+                policy.floating
+            } else {
+                lifetime ?: policy.funded(funding.remainingWork)
                 .also { lifetime = it }
+            }
             val emittedObjective = objective.takeIf { it.size == prepared.model.numVars } ?: ExactLpObjective(
                 costs.map(ExactLpNumber::of) + List(prepared.emittedRowCount) { zero }, ExactLpNumber.of(constant))
             val current = bind(packed, emittedObjective, active, { prepared.model }, scope, profile, appendRows)
@@ -266,7 +284,7 @@ internal class LinearAuthoritySession(
         }
     }
 
-    fun <T> withGuidance(cancellation: Cancellation, block: (Cancellation) -> T?): T? {
+    fun <T> withGuidance(cancellation: ExecutionControl, block: (ExecutionControl) -> T?): T? {
         val reservation = admission ?: return null
         return budget.resumeSparse(reservation, cancellation) { _, active -> block(active) }
     }

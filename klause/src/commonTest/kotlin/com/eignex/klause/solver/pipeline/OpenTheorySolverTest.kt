@@ -31,7 +31,7 @@ import com.eignex.klause.theory.difference.DifferenceSearchComponent
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ONE
@@ -273,7 +273,7 @@ class OpenTheorySolverTest {
             val budget = if (workLimited) PresolveBudget(0) else null
             val request = OpenTheoryRequest(parsed.model).withPresolve(
                 PresolveConfig.DEFAULT,
-                cancellation = budget?.orSpent(Cancellation.Never) ?: Cancellation { true },
+                cancellation = budget?.orSpent(ExecutionControl.Never) ?: ExecutionControl { true },
                 budget = budget,
             )
 
@@ -303,7 +303,7 @@ class OpenTheorySolverTest {
             val budget = if (workLimited) PresolveBudget(0) else null
             val request = OpenTheoryRequest(parsed.model).withPresolve(
                 PresolveConfig.DEFAULT,
-                cancellation = budget?.orSpent(Cancellation.Never) ?: Cancellation { true },
+                cancellation = budget?.orSpent(ExecutionControl.Never) ?: ExecutionControl { true },
                 budget = budget,
             )
 
@@ -325,12 +325,12 @@ class OpenTheorySolverTest {
         )
         val request = OpenTheoryRequest(parsed.model).withPresolve(
             PresolveConfig.DEFAULT,
-            cancellation = Cancellation { true },
+            cancellation = ExecutionControl { true },
         )
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged > 0L
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val result = OpenTheoryPipeline.engineFor(request).solve(TheoryParams(cancellation = stop))
@@ -365,7 +365,7 @@ class OpenTheorySolverTest {
         )
 
         val result = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY)
-            .solve(TheoryParams(cancellation = Cancellation { true }))
+            .solve(TheoryParams(cancellation = ExecutionControl { true }))
 
         assertEquals(TerminationReason.Cancelled, assertIs<OpenTheoryResult.Unknown>(result).reason)
         assertEquals(false, result.stats.run.timedOut)
@@ -516,7 +516,7 @@ class OpenTheorySolverTest {
         assertIs<OpenTheoryResult.Sat>(OpenTheoryEngine(parsed.model, sourceRoute(parsed.model)).solve())
 
         val stopped = OpenTheoryEngine(parsed.model, sourceRoute(parsed.model))
-            .solve(TheoryParams(cancellation = Cancellation { true }))
+            .solve(TheoryParams(cancellation = ExecutionControl { true }))
 
         assertIs<OpenTheoryResult.Unknown>(stopped)
     }
@@ -572,7 +572,7 @@ class OpenTheorySolverTest {
         val engine = OpenTheoryEngine(parsed.model, parsed.model.componentPlan().theoryPipeline)
         val witness = assertIs<OpenTheoryResult.Sat>(engine.solve()).assignment
 
-        assertIs<OpenTheoryResult.Unknown>(engine.solve(TheoryParams(cancellation = Cancellation { true })))
+        assertIs<OpenTheoryResult.Unknown>(engine.solve(TheoryParams(cancellation = ExecutionControl { true })))
 
         assertEquals("1/3", witness.realValue(0))
     }

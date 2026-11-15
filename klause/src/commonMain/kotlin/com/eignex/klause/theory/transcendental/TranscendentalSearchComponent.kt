@@ -13,7 +13,7 @@ import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.theory.qfnra.PolynomialCondition
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal data class TranscendentalSplit(
     val coordinate: Int,
@@ -98,7 +98,7 @@ internal class TranscendentalSearchComponent(
             return TranscendentalCheckResult.Refuted.also { outcome = it }
         }
         if (!context.consumeCheck() || context.cancelled()) return TranscendentalCheckResult.Unknown
-        return service.check(condition(context), Cancellation { context.cancelled() }).also { outcome = it }
+        return service.check(condition(context), ExecutionControl { context.cancelled() }).also { outcome = it }
     }
 
     private fun condition(context: SearchContext): TranscendentalCondition {

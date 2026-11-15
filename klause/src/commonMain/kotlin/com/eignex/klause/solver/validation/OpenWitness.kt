@@ -6,7 +6,7 @@ import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.fitsLong
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -26,13 +26,18 @@ internal fun refuteOpenWitness(model: Problem, sample: Sample): String? =
     }
 
 internal fun verifyOpenWitness(
-    model: Problem, sample: Sample, cancellation: Cancellation = Cancellation.Never,
+    model: Problem, sample: Sample, cancellation: ExecutionControl = ExecutionControl.Never,
 ): Verification<Sample, Unit> = if (cancellation()) {
     Verification.Indeterminate("open witness check cancelled")
-} else verifyOpenWitness(model, sample, cancellation, PropagationProblem(model))
+} else {
+    verifyOpenWitness(model, sample, cancellation, PropagationProblem(model))
+}
 
 internal fun verifyOpenWitness(
-    model: Problem, sample: Sample, cancellation: Cancellation, projection: PropagationProblem,
+    model: Problem,
+    sample: Sample,
+    cancellation: ExecutionControl,
+    projection: PropagationProblem,
 ): Verification<Sample, Unit> {
     require(projection.problem === model) { "witness projection belongs to a different source" }
     if (cancellation()) return Verification.Indeterminate("open witness check cancelled")

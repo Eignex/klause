@@ -12,7 +12,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -43,12 +43,12 @@ class ResumableSearchTest {
         var slices = 0
         var terminal: MinimizeResult? = null
         while (terminal == null && slices < 1_000_000) {
-            var checks = 0
-            val pauseAfterOnePoll = Cancellation { checks++ > 0 }
+            val before = handle.work
+            val pauseAfterWork = ExecutionControl { handle.work > before }
             terminal = if (handle.preparationPending) {
-                handle.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = 1L) { }
+                handle.runSlice(ExecutionControl.Never, sliceMillis = 60_000, sliceNodes = 1L) { }
             } else {
-                handle.runSlice(pauseAfterOnePoll, sliceMillis = 60_000) { }
+                handle.runSlice(pauseAfterWork, sliceMillis = 60_000) { }
             }
             slices++
         }
@@ -102,10 +102,10 @@ class ResumableSearchTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
         val handle = BacktrackSolver(problem.bake()).resumable(obj, BacktrackParams(randomSeed = 0L))
-        val first = handle.runSlice(Cancellation.Never, sliceMillis = 60_000) {}
+        val first = handle.runSlice(ExecutionControl.Never, sliceMillis = 60_000) {}
         assertIs<MinimizeResult.Optimal>(first)
         assertEquals(3.0, first.objectiveValue)
-        val again = handle.runSlice(Cancellation.Never, sliceMillis = 60_000) {}
+        val again = handle.runSlice(ExecutionControl.Never, sliceMillis = 60_000) {}
         assertEquals(first, again)
     }
 }

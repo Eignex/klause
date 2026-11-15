@@ -8,7 +8,7 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class LinearAuthorityModel private constructor(
     private val original: List<ExactRationalInequality>,
@@ -51,10 +51,13 @@ internal class LinearAuthorityModel private constructor(
     fun lift(
         multipliers: List<BigFraction>,
         target: List<BigFraction>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): List<BigFraction>? {
         if (multipliers.size != rows.size || target.size != columns.size ||
-            !multipliers.admittedSourcePoint() || !target.admittedSourcePoint()) return null
+            !multipliers.admittedSourcePoint() || !target.admittedSourcePoint()
+        ) {
+                return null
+            }
         val weights = MutableList(original.size) { BigFraction.ZERO }
         val residual = target.toMutableList()
         for (id in rows.indices) {
@@ -85,7 +88,7 @@ internal class LinearAuthorityModel private constructor(
         fun prepare(
             rows: List<ExactRationalInequality>,
             variables: Int,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
             inactive: Set<Int> = emptySet(),
         ): LinearAuthorityModel? {
             fun identity(conflict: List<BigFraction>? = null) = LinearAuthorityModel(
@@ -110,8 +113,14 @@ internal class LinearAuthorityModel private constructor(
                 if (!listOf(value).admittedSourcePoint()) return identity()
                 val bounds = if (coefficient < BigFraction.ZERO) lower else upper
                 val previous = bounds[column]
-                if (previous == null || if (coefficient < BigFraction.ZERO) value > previous.value
-                    else value < previous.value) bounds[column] = Side(id, value)
+                if (previous == null || if (coefficient < BigFraction.ZERO) {
+                    value > previous.value
+                } else {
+                    value < previous.value
+                }
+                ) {
+                    bounds[column] = Side(id, value)
+                }
             }
             for (column in lower.indices) {
                 if (cancellation()) return null

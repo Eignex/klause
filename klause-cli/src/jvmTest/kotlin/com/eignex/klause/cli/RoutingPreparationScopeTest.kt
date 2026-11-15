@@ -48,13 +48,13 @@ class RoutingPreparationScopeTest {
     fun `failed admission should release its routing meter`() {
         val common = CommonOptions().apply { engineParams += "presolve-work-limit=1" }
         val stop = common.routingPreparationCancellation()
-        assertNotNull(stop.workMeter())
+        assertNotNull(stop.accounting)
 
         assertFailsWith<IllegalArgumentException> {
             stop.use { throw IllegalArgumentException("admission failed") }
         }
 
-        assertNull(stop.workMeter())
+        assertNull(stop.accounting)
     }
 
     @Test

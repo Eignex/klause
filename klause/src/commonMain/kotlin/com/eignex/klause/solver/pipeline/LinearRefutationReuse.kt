@@ -17,14 +17,14 @@ import com.eignex.klause.solver.search.LearnedKind
 import com.eignex.klause.solver.search.LearnedLifecycle
 import com.eignex.klause.solver.search.LearnedStage
 import com.eignex.klause.solver.search.resolveSearchClauses
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal class LinearRefutationReuse(
     private val source: SourceProofContext,
     private val budget: SourceLpBudget,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
     private val maximumEntries: Int = 256,
     private val maximumBytes: Long = 1_048_576L,
     maximumAllocation: Long = 67_108_864L,
@@ -150,23 +150,29 @@ internal class LinearRefutationReuse(
         if (captured.bytes > maximumBytes) return false
         return when (proof) {
             is LinearPinnedRefutation -> support(proof.conflict, captured, depth + 1)
+
             is SourceDerivation.Premise -> {
                 captured.bytes += proof.id.length * 2L
                 captured.bytes <= maximumBytes
             }
+
             is SourceDerivation.Assumption -> {
                 captured.assumptions += Side(proof.coordinate, proof.upper)
                 true
             }
+
             is SourceDerivation.Combination -> {
                 val terms = proof.terms
                 spend(terms.size.toLong(), terms.size * 8L) && terms.all {
                     scalar(it.weight, captured) && support(it.derivation, captured, depth + 1)
                 }
             }
+
             is SourceDerivation.IntegerRounding -> support(proof.inequality, captured, depth + 1)
+
             is SourceDerivation.MixedIntegerRounding -> support(proof.inequality, captured, depth + 1) &&
                 proof.bounds.all { support(it, captured, depth + 1) }
+
             else -> false
         }
     }
@@ -209,7 +215,7 @@ internal class LinearRefutationReuse(
                 return SourceEvidenceCheck.Unavailable("refutation reuse verification stopped")
             }
             observe("Verifications")
-            return SourceEvidenceVerifier(checker.atScope(evidence.scope)).verify(evidence, Cancellation {
+            return SourceEvidenceVerifier(checker.atScope(evidence.scope)).verify(evidence, ExecutionControl {
                 ++proofPolls > 100_000 || !spend(1L)
             })
         } finally {
@@ -223,10 +229,15 @@ internal class LinearRefutationReuse(
         if (retired || maximumEntries == 0 || maximumBytes == 0L || evidence.claim != SourceClaim.Refutation ||
             evidence.scope.revision != source.scope.revision || evidence.scope.objective != source.scope.objective ||
             cancellation() || budget.funding?.paused == true
-        ) return
+        ) {
+            return
+        }
         val condition = evidence.scope.condition
         if (!spend(1L + 3L * source.coordinateCount, 192L * source.coordinateCount) ||
-            !condition.implies(source.scope.condition)) return
+            !condition.implies(source.scope.condition)
+        ) {
+                return
+            }
         val bools = condition.bools
         if (source.coordinates.any { it.kind == SourceCoordinate.Kind.Boolean && it.id !in bools }) return
         proofPolls = 0
@@ -250,11 +261,13 @@ internal class LinearRefutationReuse(
         observe("ReductionAttempts")
         when (verify(retained)) {
             SourceEvidenceCheck.Checked -> if (reduced != condition) observe("ReducedScopes")
+
             is SourceEvidenceCheck.Rejected -> {
                 observe("ReductionRejected")
                 if (reduced == condition || verify(evidence) != SourceEvidenceCheck.Checked) return
                 retained = evidence
             }
+
             is SourceEvidenceCheck.Unavailable -> {
                 observe("Unavailable")
                 return
@@ -298,8 +311,10 @@ internal class LinearRefutationReuse(
         if (size > 4096 || !spend(1L + size, 128L * size)) return null
         val literals = ArrayList<Int>()
         val openingBools = opening.bools
-        for ((id, value) in condition.bools) if (openingBools[id] != value) {
+        for ((id, value) in condition.bools) {
+            if (openingBools[id] != value) {
             literals += (id shl 1) or if (value) 1 else 0
+        }
         }
         for ((upper, bounds) in listOf(false to condition.lower, true to condition.upper)) {
             for ((coordinate, value) in bounds) {
@@ -323,7 +338,9 @@ internal class LinearRefutationReuse(
         val upper = opening.upper.toMutableMap()
         for (literal in clause) {
             val bound = predicates[literal xor 1]
-            if (bound == null) bools[literal ushr 1] = literal and 1 != 0 else {
+            if (bound == null) {
+                bools[literal ushr 1] = literal and 1 != 0
+            } else {
                 val bounds = if (bound.upper) upper else lower
                 val previous = bounds[bound.coordinate]
                 if (previous == null || if (bound.upper) bound.value < previous else bound.value > previous) {
@@ -346,8 +363,13 @@ internal class LinearRefutationReuse(
                 val bound = predicates[pivot xor 1] ?: continue
                 if (pivot xor 1 !in other) continue
                 observe("ResolutionCandidates")
-                if (!spend(clause.size.toLong() + other.size,
-                        256L * (clause.size + other.size + added.restrictions + entry.restrictions))) return
+                if (!spend(
+                        clause.size.toLong() + other.size,
+                        256L * (clause.size + other.size + added.restrictions + entry.restrictions),
+                    )
+                ) {
+                        return
+                    }
                 val resolved = resolveSearchClauses(clause, other, pivot) ?: continue
                 val required = condition(resolved)
                 if (required in scopes) continue
@@ -365,7 +387,9 @@ internal class LinearRefutationReuse(
                             observe("ResolutionProofs")
                         }
                     }
+
                     is SourceEvidenceCheck.Rejected -> observe("ResolutionRejected")
+
                     is SourceEvidenceCheck.Unavailable -> {
                         observe("Unavailable")
                         if (retired || cancellation() || budget.funding?.paused == true || proofPolls > 100_000) return
@@ -417,7 +441,9 @@ internal class LinearRefutationReuse(
                     if (unfixed) observe("ResolutionUnfixedHits")
                     return imported
                 }
+
                 is SourceEvidenceCheck.Rejected -> observe("Rejected")
+
                 is SourceEvidenceCheck.Unavailable -> {
                     observe("Unavailable")
                     if (retired || cancellation() || budget.funding?.paused == true || proofPolls > 100_000) return null
@@ -435,7 +461,10 @@ internal class LinearRefutationReuse(
         val upper = condition.upper
         val bools = condition.bools
         if (!spend(1L + lower.size + upper.size + bools.size, 48L * (lower.size + upper.size + bools.size)) ||
-            !condition.implies(source.scope.condition) || !(lower.values + upper.values).all(::admitted)) return null
+            !condition.implies(source.scope.condition) || !(lower.values + upper.values).all(::admitted)
+        ) {
+                return null
+            }
         for ((id, entry) in entries) {
             if (!spend(1L + entry.restrictions, 96L * entry.restrictions)) return null
             val required = entry.evidence.scope.condition
@@ -466,7 +495,9 @@ internal class LinearRefutationReuse(
                     return UnitExclusion(id, coordinate, threshold, isUpper, imported, required,
                         entry.depth > 0, unfixed)
                 }
+
                 is SourceEvidenceCheck.Rejected -> observe("UnitRejected")
+
                 is SourceEvidenceCheck.Unavailable -> {
                     observe("Unavailable")
                     if (retired || cancellation() || budget.funding?.paused == true || proofPolls > 100_000) return null

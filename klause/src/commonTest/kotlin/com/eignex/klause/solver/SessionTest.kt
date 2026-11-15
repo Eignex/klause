@@ -19,7 +19,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SampleResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
@@ -272,12 +272,12 @@ class SessionTest {
         session.push(Assumptions(bools = mapOf(0 to true)))
         val handle = assertNotNull(session.resumableSolve(BacktrackParams()))
         assertFailsWith<IllegalStateException> { session.pop() }
-        val result = assertIs<SolveResult.Sat>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+        val result = assertIs<SolveResult.Sat>(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L))
         session.pop()
         val other = assertNotNull(session.resumableSolve(BacktrackParams()))
         handle.close()
         assertFailsWith<IllegalStateException> { session.push(Assumptions.None) }
-        assertSame(result, handle.runSlice(Cancellation.Never, 0L, 0L))
+        assertSame(result, handle.runSlice(ExecutionControl.Never, 0L, 0L))
         other.close()
         session.push(Assumptions.None)
     }
@@ -289,7 +289,7 @@ class SessionTest {
         session.close()
         session.close()
         handle.close()
-        assertFailsWith<IllegalStateException> { handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) }
+        assertFailsWith<IllegalStateException> { handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) }
         assertFailsWith<IllegalStateException> { session.solve(BacktrackParams()) }
         assertFailsWith<IllegalStateException> { session.exactCount() }
         assertFailsWith<IllegalStateException> { session.push(Assumptions.None) }

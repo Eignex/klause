@@ -1,12 +1,12 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.NodeBudget
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class PortfolioWorkerSlot(
     val index: Int,
     val baseSeed: Long,
-    val cancellation: Cancellation,
+    val cancellation: ExecutionControl,
     val nodeBudget: NodeBudget?,
     private val count: Int,
     completeSlots: Set<Int>,
@@ -43,7 +43,7 @@ internal class PortfolioInvocationResources(
     count: Int,
     parallelism: Int,
     seed: Long,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     nodeBudget: NodeBudget?,
     completeSlots: Set<Int> = emptySet(),
 ) : AutoCloseable {
@@ -95,7 +95,10 @@ internal fun heuristicWorkerAllowances(count: Int, limit: Long, complete: Set<In
 
 private fun allocateNativeAllowance(amount: Long, indexes: List<Int>, result: LongArray) {
     for ((position, index) in indexes.withIndex()) {
-        result[index] = if (amount == Long.MAX_VALUE) Long.MAX_VALUE else
+        result[index] = if (amount == Long.MAX_VALUE) {
+            Long.MAX_VALUE
+        } else {
             amount / indexes.size + if (position < amount % indexes.size) 1L else 0L
+        }
     }
 }

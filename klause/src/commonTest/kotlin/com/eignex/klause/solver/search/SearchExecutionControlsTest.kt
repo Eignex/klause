@@ -2,7 +2,7 @@ package com.eignex.klause.solver.search
 
 import com.eignex.klause.solver.pipeline.OpenTheoryExecutionAccounting
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,12 +17,12 @@ class SearchExecutionControlsTest {
     @Test
     fun `invocation controls should preserve the caller meter and deadline`() {
         var charged = 0L
-        val deadline = Cancellation.after(1000.milliseconds)
+        val deadline = ExecutionControl.after(1000.milliseconds)
         val meter = WorkMeter { charged += it }
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = deadline()
             override fun deadline() = deadline.deadline()
-            override fun workMeter() = meter
+            override val accounting get() = meter
         }
         val session = SearchSession(emptyList(), executionControls = SearchExecutionControlAdapter(stop))
 
@@ -30,13 +30,13 @@ class SearchExecutionControlsTest {
         operation.charge(7)
 
         assertSame(stop, session.executionControls.cancellation)
-        assertSame(meter, operation.workMeter())
+        assertSame(meter, operation.accounting)
         assertEquals(7L, charged)
     }
 
     @Test
     fun `expired deadline should have a timeout cause`() {
-        val controls = SearchExecutionControlAdapter(Cancellation.after((-1).milliseconds))
+        val controls = SearchExecutionControlAdapter(ExecutionControl.after((-1).milliseconds))
         val session = SearchSession(emptyList(), executionControls = controls)
 
         assertIs<SearchResult.Indeterminate>(session.solve(1))
@@ -46,7 +46,7 @@ class SearchExecutionControlsTest {
 
     @Test
     fun `external cancellation should have a cancellation cause`() {
-        val controls = SearchExecutionControlAdapter(Cancellation { true })
+        val controls = SearchExecutionControlAdapter(ExecutionControl { true })
         val session = SearchSession(emptyList(), executionControls = controls)
 
         assertIs<SearchResult.Indeterminate>(session.solve(1))
@@ -159,7 +159,7 @@ class SearchExecutionControlsTest {
         var cancelled = false
         var firstCheck = true
         val checked = ArrayList<Boolean>()
-        val controls = SearchExecutionControlAdapter(Cancellation { cancelled })
+        val controls = SearchExecutionControlAdapter(ExecutionControl { cancelled })
         val component = object : SearchComponent {
             override fun check(context: SearchContext): ComponentCheck {
                 checked += checkNotNull(context.boolValue(0))
@@ -209,7 +209,7 @@ class SearchExecutionControlsTest {
     fun `native allowance exhaustion should precede concurrent external cancellation`() {
         val work = OpenTheoryWorkSink(0)
         work.hasAllowance()
-        val controls = SearchExecutionControlAdapter(Cancellation { true }, OpenTheoryExecutionAccounting(work))
+        val controls = SearchExecutionControlAdapter(ExecutionControl { true }, OpenTheoryExecutionAccounting(work))
 
         assertEquals(SearchStopCause.WorkAllowance, controls.stopCause)
     }

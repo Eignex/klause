@@ -15,7 +15,7 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ONE
@@ -38,7 +38,7 @@ class OpenExactNeighborhoodTest {
         val adapter = OpenExactNeighborhood(source, TheoryParams(maxInstructions = 1000, randomSeed = 17))
 
         val result = adapter.use {
-            it.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never)
+            it.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), ExecutionControl.Never)
         }
 
         val point = assertIs<ExactNeighborhoodResult.Witness>(result).sample
@@ -62,7 +62,7 @@ class OpenExactNeighborhoodTest {
             val adapter = OpenExactNeighborhood(source, TheoryParams())
 
             val result = adapter.search(adaptive = false, maximumMoves = 1).use { search ->
-                search.advance(Cancellation.Never, 1000)
+                search.advance(ExecutionControl.Never, 1000)
                 search.solveResult(TerminationReason.BudgetExhausted)
             }
 
@@ -90,11 +90,11 @@ class OpenExactNeighborhoodTest {
         }
 
         queries.use {
-            assertTrue(it.prepareBooleanCenter(Cancellation.Never))
+            assertTrue(it.prepareBooleanCenter(ExecutionControl.Never))
             assertEquals(true, it.rootBooleanValue(0))
             val condition = ExactNeighborhoodCondition(mapOf(0 to false), emptyMap(), emptyMap())
 
-            assertIs<ExactNeighborhoodResult.Refuted>(it.check(condition, Cancellation.Never))
+            assertIs<ExactNeighborhoodResult.Refuted>(it.check(condition, ExecutionControl.Never))
             assertEquals(true, it.rootBooleanValue(0))
         }
     }
@@ -113,12 +113,12 @@ class OpenExactNeighborhoodTest {
         val adapter = OpenExactNeighborhood(source, TheoryParams())
         val pinned = adapter.check(
             ExactNeighborhoodCondition(mapOf(0 to true), emptyMap(), emptyMap()),
-            Cancellation.Never,
+            ExecutionControl.Never,
         )
         assertTrue(assertIs<ExactNeighborhoodResult.Witness>(pinned).sample.boolValue(0))
 
         val result = adapter.search(adaptive = false, maximumMoves = 1).use { search ->
-            search.advance(Cancellation.Never, 1000)
+            search.advance(ExecutionControl.Never, 1000)
             search.solveResult(TerminationReason.BudgetExhausted)
         }
 
@@ -164,7 +164,7 @@ class OpenExactNeighborhoodTest {
                     mapOf(0 to third),
                     mapOf(0 to third),
                 ),
-                Cancellation.Never,
+                ExecutionControl.Never,
             )
         }
 
@@ -182,7 +182,7 @@ class OpenExactNeighborhoodTest {
         val source = Problem(0, 0, emptyArray(), emptyArray())
 
         val result = OpenExactNeighborhood(source, TheoryParams()).use {
-            it.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never)
+            it.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), ExecutionControl.Never)
         }
 
         assertNull(assertIs<ExactNeighborhoodResult.Witness>(result).sample.witnessCertificate)
@@ -213,11 +213,11 @@ class OpenExactNeighborhoodTest {
 
         val refused = adapter.check(
             ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to BigFraction.ZERO)),
-            Cancellation.Never,
+            ExecutionControl.Never,
         )
         val accepted = adapter.check(
             ExactNeighborhoodCondition(emptyMap(), mapOf(0 to third), mapOf(0 to third)),
-            Cancellation.Never,
+            ExecutionControl.Never,
         )
 
         assertIs<ExactNeighborhoodResult.Refuted>(refused)
@@ -242,14 +242,14 @@ class OpenExactNeighborhoodTest {
 
         val refused = adapter.check(
             ExactNeighborhoodCondition(emptyMap(), zero, zero, BigFraction.ZERO),
-            Cancellation.Never,
+            ExecutionControl.Never,
         )
         val accepted = adapter.check(
             ExactNeighborhoodCondition(emptyMap(), zero, zero, BigFraction.ONE),
-            Cancellation.Never,
+            ExecutionControl.Never,
         )
         val one = mapOf(0 to BigFraction.ONE)
-        val sibling = adapter.check(ExactNeighborhoodCondition(emptyMap(), one, one), Cancellation.Never)
+        val sibling = adapter.check(ExactNeighborhoodCondition(emptyMap(), one, one), ExecutionControl.Never)
 
         assertIs<ExactNeighborhoodResult.Refuted>(refused)
         val acceptedSample = assertIs<ExactNeighborhoodResult.Witness>(accepted).sample
@@ -276,10 +276,10 @@ class OpenExactNeighborhoodTest {
 
         val unknown = adapter.check(
             ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to huge)),
-            Cancellation.Never,
+            ExecutionControl.Never,
         )
         val zero = mapOf(0 to BigFraction.ZERO)
-        val sibling = adapter.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), Cancellation.Never)
+        val sibling = adapter.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), ExecutionControl.Never)
 
         assertIs<ExactNeighborhoodResult.Undecided>(unknown)
         val siblingSample = assertIs<ExactNeighborhoodResult.Witness>(sibling).sample
@@ -302,23 +302,23 @@ class OpenExactNeighborhoodTest {
 
         adapter.withCondition(
             ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE), emptyMap()),
-            Cancellation.Never,
+            ExecutionControl.Never,
         ) {
             assertIs<ExactNeighborhoodResult.Refuted>(
                 adapter.check(
                     ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to BigFraction.ZERO)),
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                 ),
             )
             assertIs<ExactNeighborhoodResult.Witness>(
                 adapter.check(
                     ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to BigFraction.ONE)),
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                 ),
             )
         }
         val zero = mapOf(0 to BigFraction.ZERO)
-        val sibling = adapter.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), Cancellation.Never)
+        val sibling = adapter.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), ExecutionControl.Never)
 
         val siblingSample = assertIs<ExactNeighborhoodResult.Witness>(sibling).sample
         assertEquals(BigFraction.ZERO, siblingSample.exactReals?.single())
@@ -339,12 +339,12 @@ class OpenExactNeighborhoodTest {
         val first = OpenExactNeighborhood(model, TheoryParams())
         val second = OpenExactNeighborhood(model, TheoryParams())
         val zero = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO), mapOf(0 to BigFraction.ZERO))
-        val witness = assertIs<ExactNeighborhoodResult.Witness>(first.check(zero, Cancellation.Never)).sample
+        val witness = assertIs<ExactNeighborhoodResult.Witness>(first.check(zero, ExecutionControl.Never)).sample
 
         first.close()
 
-        assertFailsWith<IllegalStateException> { first.check(zero, Cancellation.Never) }
-        assertIs<ExactNeighborhoodResult.Witness>(second.check(zero, Cancellation.Never))
+        assertFailsWith<IllegalStateException> { first.check(zero, ExecutionControl.Never) }
+        assertIs<ExactNeighborhoodResult.Witness>(second.check(zero, ExecutionControl.Never))
         assertEquals(BigFraction.ZERO, witness.exactReals?.single())
         second.close()
     }
@@ -362,15 +362,15 @@ class OpenExactNeighborhoodTest {
         )
         val adapter = OpenExactNeighborhood(model, TheoryParams())
         val free = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
-        assertIs<ExactNeighborhoodResult.Witness>(adapter.check(free, Cancellation.Never))
+        assertIs<ExactNeighborhoodResult.Witness>(adapter.check(free, ExecutionControl.Never))
         val before = adapter.work
 
         val interrupted = adapter.check(
             ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE), emptyMap()),
-            Cancellation { adapter.work > before + 1 },
+            ExecutionControl { adapter.work > before + 1 },
         )
         val zero = mapOf(0 to BigFraction.ZERO)
-        val sibling = adapter.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), Cancellation.Never)
+        val sibling = adapter.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), ExecutionControl.Never)
 
         assertIs<ExactNeighborhoodResult.Undecided>(interrupted)
         val siblingSample = assertIs<ExactNeighborhoodResult.Witness>(sibling).sample
@@ -402,8 +402,8 @@ class OpenExactNeighborhoodTest {
         val free = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
 
         adapter.use {
-            val interrupted = it.check(free, Cancellation { it.work >= 1 })
-            val sibling = it.check(free, Cancellation.Never)
+            val interrupted = it.check(free, ExecutionControl { it.work >= 1 })
+            val sibling = it.check(free, ExecutionControl.Never)
 
             assertIs<ExactNeighborhoodResult.Undecided>(interrupted)
             assertIs<ExactNeighborhoodResult.Undecided>(sibling)
@@ -418,8 +418,8 @@ class OpenExactNeighborhoodTest {
         val free = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
 
         adapter.use {
-            assertIs<ExactNeighborhoodResult.Witness>(it.check(free, Cancellation.Never))
-            val sibling = it.check(free, Cancellation.Never)
+            assertIs<ExactNeighborhoodResult.Witness>(it.check(free, ExecutionControl.Never))
+            val sibling = it.check(free, ExecutionControl.Never)
 
             assertIs<ExactNeighborhoodResult.Undecided>(sibling)
             assertEquals(1L, it.stats.openTheory.openBoolDecisions)
@@ -449,13 +449,13 @@ class OpenExactNeighborhoodTest {
         val adapter = OpenExactNeighborhood(model, TheoryParams())
         var firstWork = 0L
         var siblingWork = 0L
-        val first = object : Cancellation {
+        val first = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { firstWork += it }
+            override val accounting: WorkMeter get() = WorkMeter { firstWork += it }
         }
-        val sibling = object : Cancellation {
+        val sibling = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { siblingWork += it }
+            override val accounting: WorkMeter get() = WorkMeter { siblingWork += it }
         }
         val zero = mapOf(0 to BigFraction.ZERO)
         val half = mapOf(0 to BigFraction.ofLong(2).reciprocal())
@@ -493,15 +493,15 @@ class OpenExactNeighborhoodTest {
             realLower = doubleArrayOf(0.0),
             realUpper = doubleArrayOf(1.0),
         )
-        val adapter = OpenExactNeighborhood(model, TheoryParams(cancellation = Cancellation { cancelled }))
+        val adapter = OpenExactNeighborhood(model, TheoryParams(cancellation = ExecutionControl { cancelled }))
         val zero = mapOf(0 to BigFraction.ZERO)
         val condition = ExactNeighborhoodCondition(emptyMap(), zero, zero)
 
         adapter.use {
-            assertIs<ExactNeighborhoodResult.Witness>(it.check(condition, Cancellation.Never))
+            assertIs<ExactNeighborhoodResult.Witness>(it.check(condition, ExecutionControl.Never))
             val spent = it.work
             cancelled = true
-            val sibling = it.check(condition, Cancellation.Never)
+            val sibling = it.check(condition, ExecutionControl.Never)
 
             assertIs<ExactNeighborhoodResult.Undecided>(sibling)
             assertEquals(spent, it.work)
@@ -535,10 +535,10 @@ class OpenExactNeighborhoodTest {
             var preparedWork = 0L
             repeat(2) { attempt ->
                 var operations = 0L
-                val stop = object : Cancellation {
+                val stop = object : ExecutionControl() {
                     private val meter = WorkMeter { units -> if (adapter.sourcePrepared) operations += units }
                     override fun isCancelled(): Boolean = operations > 0
-                    override fun workMeter(): WorkMeter = meter
+                    override val accounting: WorkMeter get() = meter
                 }
                 val result = it.check(free, stop)
 
@@ -552,7 +552,7 @@ class OpenExactNeighborhoodTest {
                 }
             }
             val zero = mapOf(0 to BigFraction.ZERO)
-            val sibling = it.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), Cancellation.Never)
+            val sibling = it.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), ExecutionControl.Never)
 
             assertIs<ExactNeighborhoodResult.Witness>(sibling)
             assertTrue(preparedWork > 0)
@@ -584,12 +584,12 @@ class OpenExactNeighborhoodTest {
         val free = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
 
         adapter.use {
-            val interrupted = it.check(free, Cancellation { it.preparationWork > 0 })
+            val interrupted = it.check(free, ExecutionControl { it.preparationWork > 0 })
             assertIs<ExactNeighborhoodResult.Undecided>(interrupted)
             assertFalse(it.sourcePrepared)
             val spent = it.preparationWork
             val zero = mapOf(0 to BigFraction.ZERO)
-            val sibling = it.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), Cancellation.Never)
+            val sibling = it.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), ExecutionControl.Never)
 
             assertIs<ExactNeighborhoodResult.Witness>(sibling)
             assertTrue(it.sourcePrepared)
@@ -603,9 +603,9 @@ class OpenExactNeighborhoodTest {
         val adapter = OpenExactNeighborhood(model, TheoryParams(maxLeaves = 1))
         val free = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
 
-        val first = adapter.check(free, Cancellation.Never)
-        val second = adapter.check(free, Cancellation.Never)
-        val third = adapter.check(free, Cancellation.Never)
+        val first = adapter.check(free, ExecutionControl.Never)
+        val second = adapter.check(free, ExecutionControl.Never)
+        val third = adapter.check(free, ExecutionControl.Never)
 
         assertIs<ExactNeighborhoodResult.Witness>(first)
         assertIs<ExactNeighborhoodResult.Undecided>(second)
@@ -628,10 +628,10 @@ class OpenExactNeighborhoodTest {
 
         val refused = adapter.check(
             ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), threshold),
-            Cancellation.Never,
+            ExecutionControl.Never,
         )
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), threshold + BigFraction.ONE)
-        val accepted = adapter.check(condition, Cancellation.Never)
+        val accepted = adapter.check(condition, ExecutionControl.Never)
 
         assertIs<ExactNeighborhoodResult.Refuted>(refused)
         assertEquals(wide, assertIs<ExactNeighborhoodResult.Witness>(accepted).sample.exactIntValue(0))
@@ -660,7 +660,7 @@ class OpenExactNeighborhoodTest {
         )
         val search = OpenExactNeighborhood(model, TheoryParams()).search(false, maximumMoves = 4)
 
-        search.advance(Cancellation.Never, Long.MAX_VALUE)
+        search.advance(ExecutionControl.Never, Long.MAX_VALUE)
 
         val result = assertIs<SolveResult.Sat>(search.solveResult(TerminationReason.BudgetExhausted))
         assertEquals("1/3", result.assignment.exactReals?.single().toString())
@@ -678,7 +678,7 @@ class OpenExactNeighborhoodTest {
         )
         val search = OpenExactNeighborhood(model, TheoryParams()).search(true, maximumMoves = 3)
 
-        search.advance(Cancellation.Never, Long.MAX_VALUE)
+        search.advance(ExecutionControl.Never, Long.MAX_VALUE)
 
         val result = assertIs<SolveResult.Sat>(search.solveResult(TerminationReason.BudgetExhausted))
         assertEquals(wide, result.assignment.exactIntValue(0))
@@ -699,7 +699,7 @@ class OpenExactNeighborhoodTest {
         val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
         val search = OpenExactNeighborhood(model, TheoryParams(), objective).search(false, maximumMoves = 5)
 
-        search.advance(Cancellation.Never, Long.MAX_VALUE)
+        search.advance(ExecutionControl.Never, Long.MAX_VALUE)
 
         val result = assertIs<MinimizeResult.BestFound>(search.minimizeResult(TerminationReason.BudgetExhausted))
         assertTrue(objective.evaluateExact(result.sample) < BigFraction.ZERO)

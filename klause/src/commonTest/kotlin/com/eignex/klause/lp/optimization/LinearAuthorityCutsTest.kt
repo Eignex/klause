@@ -17,7 +17,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -29,20 +29,42 @@ import kotlin.test.assertTrue
 class LinearAuthorityCutsTest {
     private val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
     private val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
-    private val scope = SourceScope(SourceRevision("rounding", "exact-affine"),
-        objective = SourceObjective("sum", ObjectiveSense.MINIMIZE))
+    private val scope = SourceScope(
+        SourceRevision("rounding", "exact-affine"),
+        objective = SourceObjective("sum", ObjectiveSense.MINIMIZE),
+    )
 
     @Test
     fun `an unverified cut should withhold unconditional row layout admission`() {
-        val source = SourceProofContext(scope, setOf(x, y), mapOf(
-            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
-                y to BigFraction.ofLong(2)), BigFraction.ONE)),
-        ), emptyMap())
-        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val source = SourceProofContext(
+            scope,
+            setOf(x, y),
+            mapOf(
+                "row" to SourcePremise(
+                    SourceInequality(
+                        mapOf(
+                            x to BigFraction.ofLong(2),
+                            y to BigFraction.ofLong(2),
+                        ),
+                        BigFraction.ONE,
+                    ),
+                ),
+            ),
+            emptyMap(),
+        )
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never, cuts = true))
 
         for (checkUnselected in listOf(true, false)) {
-            val query = assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never,
-                maximumCutProofSteps = 1, cutMask = setOf(0), checkUnselectedCuts = checkUnselected))
+            val query = assertNotNull(
+                LinearAuthorityQuery.prepare(
+                    source,
+                    template,
+                    ExecutionControl.Never,
+                    maximumCutProofSteps = 1,
+                    cutMask = setOf(0),
+                    checkUnselectedCuts = checkUnselected,
+                ),
+            )
 
             assertTrue(1 in query.inactive)
             assertFalse(query.unconditionalRows)
@@ -51,18 +73,45 @@ class LinearAuthorityCutsTest {
 
     @Test
     fun `retired unselected candidates should spend no proof replay work`() {
-        val source = SourceProofContext(scope, setOf(x, y), mapOf(
-            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
-                y to BigFraction.ofLong(2)), BigFraction.ONE)),
-        ), emptyMap())
-        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val source = SourceProofContext(
+            scope,
+            setOf(x, y),
+            mapOf(
+                "row" to SourcePremise(
+                    SourceInequality(
+                        mapOf(
+                            x to BigFraction.ofLong(2),
+                            y to BigFraction.ofLong(2),
+                        ),
+                        BigFraction.ONE,
+                    ),
+                ),
+            ),
+            emptyMap(),
+        )
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never, cuts = true))
         var ordinaryWork = 0L
         var retiredWork = 0L
-        assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never,
-            cutMask = emptySet(), onCutWork = { ordinaryWork += it }))
+        assertNotNull(
+            LinearAuthorityQuery.prepare(
+                source,
+                template,
+                ExecutionControl.Never,
+                cutMask = emptySet(),
+                onCutWork = { ordinaryWork += it },
+            ),
+        )
 
-        assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never,
-            cutMask = emptySet(), checkUnselectedCuts = false, onCutWork = { retiredWork += it }))
+        assertNotNull(
+            LinearAuthorityQuery.prepare(
+                source,
+                template,
+                ExecutionControl.Never,
+                cutMask = emptySet(),
+                checkUnselectedCuts = false,
+                onCutWork = { retiredWork += it },
+            ),
+        )
 
         assertTrue(ordinaryWork > 0L)
         assertEquals(0L, retiredWork)
@@ -70,13 +119,32 @@ class LinearAuthorityCutsTest {
 
     @Test
     fun `query reuse should distinguish retired candidate proof checking`() {
-        val source = SourceProofContext(scope, setOf(x, y), mapOf(
-            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
-                y to BigFraction.ofLong(2)), BigFraction.ONE)),
-        ), emptyMap())
-        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
-        val retired = assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never,
-            cutMask = emptySet(), checkUnselectedCuts = false))
+        val source = SourceProofContext(
+            scope,
+            setOf(x, y),
+            mapOf(
+                "row" to SourcePremise(
+                    SourceInequality(
+                        mapOf(
+                            x to BigFraction.ofLong(2),
+                            y to BigFraction.ofLong(2),
+                        ),
+                        BigFraction.ONE,
+                    ),
+                ),
+            ),
+            emptyMap(),
+        )
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never, cuts = true))
+        val retired = assertNotNull(
+            LinearAuthorityQuery.prepare(
+                source,
+                template,
+                ExecutionControl.Never,
+                cutMask = emptySet(),
+                checkUnselectedCuts = false,
+            ),
+        )
 
         assertFalse(retired.matches(source, cuts = true, cutMask = emptySet()))
         assertTrue(retired.matches(source, cuts = true, cutMask = emptySet(), checkUnselectedCuts = false))
@@ -90,54 +158,102 @@ class LinearAuthorityCutsTest {
             Triple(BigFraction.ONE, true, BigFraction.ONE),
             Triple((half * half).negated(), false, BigFraction.MINUS_ONE),
         )) {
-            val source = SourceProofContext(scope, setOf(x, y), mapOf(
-                "row" to SourcePremise(SourceInequality(mapOf(x to half, y to BigFraction.ONE), rhs, strict)),
-            ), emptyMap())
+            val source = SourceProofContext(
+                scope,
+                setOf(x, y),
+                mapOf(
+                    "row" to SourcePremise(SourceInequality(mapOf(x to half, y to BigFraction.ONE), rhs, strict)),
+                ),
+                emptyMap(),
+            )
 
-            val cut = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never)).rows.single()
+            val cut = assertNotNull(LinearAuthorityCuts.prepare(source, ExecutionControl.Never)).rows.single()
 
             assertEquals(expected, cut.inequality.rhs)
-            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(SourceEvidence(scope,
-                SourceClaim.Consequence(cut.inequality), cut.derivation)))
+            assertEquals(
+                SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source).verify(
+                    SourceEvidence(
+                        scope,
+                        SourceClaim.Consequence(cut.inequality),
+                        cut.derivation,
+                    ),
+                ),
+            )
         }
     }
 
     @Test
     fun `single row rounding should strengthen a checked sparse objective bound`() {
-        val source = SourceProofContext(scope, setOf(x, y), mapOf(
-            "sum" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(-2),
-                y to BigFraction.ofLong(-2)), BigFraction.ofLong(-3))),
-            "x" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-            "y" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-        ), mapOf(x to BigFraction.ONE, y to BigFraction.ONE))
+        val source = SourceProofContext(
+            scope,
+            setOf(x, y),
+            mapOf(
+                "sum" to SourcePremise(
+                    SourceInequality(
+                        mapOf(
+                            x to BigFraction.ofLong(-2),
+                            y to BigFraction.ofLong(-2),
+                        ),
+                        BigFraction.ofLong(-3),
+                    ),
+                ),
+                "x" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "y" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            ),
+            mapOf(x to BigFraction.ONE, y to BigFraction.ONE),
+        )
 
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
-            val baseline = authority.advance(source, Cancellation.Never)
-            val result = authority.advance(source, Cancellation.Never, cuts = true)
+            val baseline = authority.advance(source, ExecutionControl.Never)
+            val result = authority.advance(source, ExecutionControl.Never, cuts = true)
 
-            assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
-                assertIs<SourceClaim.Bound>(assertNotNull(baseline.bound).claim).value)
-            assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
-                assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
-            assertEquals(SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+            assertEquals(
+                SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
+                assertIs<SourceClaim.Bound>(assertNotNull(baseline.bound).claim).value,
+            )
+            assertEquals(
+                SourceValue.Rational(BigFraction.ofLong(2)),
+                assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value,
+            )
+            assertEquals(
+                SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)),
+            )
             assertNull(result.split)
         }
     }
 
     @Test
     fun `cut rows should retract and reactivate with their integer guarded source owner`() {
-        val source = SourceProofContext(scope, setOf(x, y), mapOf(
-            "guarded" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2)),
-                BigFraction.ofLong(3)), emptyMap(), mapOf(y to BigFraction.ONE)),
-        ), mapOf(x to BigFraction.MINUS_ONE))
-        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
-        val enabled = source.atScope(scope.copy(condition = SourceCondition(
-            lower = mapOf(y to BigFraction.ONE), upper = mapOf(y to BigFraction.ONE))))
+        val source = SourceProofContext(
+            scope,
+            setOf(x, y),
+            mapOf(
+                "guarded" to SourcePremise(
+                    SourceInequality(
+                        mapOf(x to BigFraction.ofLong(2)),
+                        BigFraction.ofLong(3),
+                    ),
+                    emptyMap(),
+                    mapOf(y to BigFraction.ONE),
+                ),
+            ),
+            mapOf(x to BigFraction.MINUS_ONE),
+        )
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never, cuts = true))
+        val enabled = source.atScope(
+            scope.copy(
+                condition = SourceCondition(
+                    lower = mapOf(y to BigFraction.ONE),
+                    upper = mapOf(y to BigFraction.ONE),
+                ),
+            ),
+        )
 
-        val first = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, Cancellation.Never))
-        val sibling = assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never))
-        val restored = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, Cancellation.Never))
+        val first = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, ExecutionControl.Never))
+        val sibling = assertNotNull(LinearAuthorityQuery.prepare(source, template, ExecutionControl.Never))
+        val restored = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, ExecutionControl.Never))
 
         assertEquals(1, first.activeCuts)
         assertEquals(0, sibling.activeCuts)
@@ -146,19 +262,34 @@ class LinearAuthorityCutsTest {
         assertEquals(first.cited[1], sibling.cited[1])
         assertEquals(first.rows[1].rhs, restored.rows[1].rhs)
         val cut = first.cited[1]
-        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source).verify(
-            SourceEvidence(scope, SourceClaim.Consequence(cut.first), cut.second)))
+        assertIs<SourceEvidenceCheck.Rejected>(
+            SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.first), cut.second),
+            ),
+        )
     }
 
     @Test
     fun `separation should decline rows with an unfixed continuous activity`() {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-        val source = SourceProofContext(scope, setOf(x, real), mapOf(
-            "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
-                real to BigFraction.ONE), BigFraction.ofLong(3))),
-        ), mapOf(x to BigFraction.ONE))
+        val source = SourceProofContext(
+            scope,
+            setOf(x, real),
+            mapOf(
+                "mixed" to SourcePremise(
+                    SourceInequality(
+                        mapOf(
+                            x to BigFraction.ofLong(2),
+                            real to BigFraction.ONE,
+                        ),
+                        BigFraction.ofLong(3),
+                    ),
+                ),
+            ),
+            mapOf(x to BigFraction.ONE),
+        )
 
-        val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never))
+        val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, ExecutionControl.Never))
 
         assertTrue(cuts.rows.isEmpty())
         assertEquals(1L, cuts.observations["MixedMissingBounds"])
@@ -168,21 +299,44 @@ class LinearAuthorityCutsTest {
     fun `source aggregation should permit rounding after cancelling an unbounded continuous coordinate`() {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val half = BigFraction.ofLong(2).reciprocal()
-        val source = SourceProofContext(scope, setOf(x, y, real), mapOf(
-            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
-                real to BigFraction.ONE), BigFraction.ofLong(3))),
-            "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
-                real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-        ))
-        val proof = SourceDerivation.IntegerRounding(SourceDerivation.Combination(listOf(
-            SourceDerivation.Combination.Term(half, SourceDerivation.Premise("left")),
-            SourceDerivation.Combination.Term(half, SourceDerivation.Premise("right")),
-        )))
+        val source = SourceProofContext(
+            scope,
+            setOf(x, y, real),
+            mapOf(
+                "left" to SourcePremise(
+                    SourceInequality(
+                        mapOf(
+                            x to BigFraction.ofLong(2),
+                            real to BigFraction.ONE,
+                        ),
+                        BigFraction.ofLong(3),
+                    ),
+                ),
+                "right" to SourcePremise(
+                    SourceInequality(
+                        mapOf(
+                            y to BigFraction.ofLong(2),
+                            real to BigFraction.MINUS_ONE,
+                        ),
+                        BigFraction.ZERO,
+                    ),
+                ),
+            ),
+        )
+        val proof = SourceDerivation.IntegerRounding(
+            SourceDerivation.Combination(
+                listOf(
+                    SourceDerivation.Combination.Term(half, SourceDerivation.Premise("left")),
+                    SourceDerivation.Combination.Term(half, SourceDerivation.Premise("right")),
+                ),
+            ),
+        )
         val conclusion = SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE)
 
-        val individual = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never))
+        val individual = assertNotNull(LinearAuthorityCuts.prepare(source, ExecutionControl.Never))
         val check = SourceEvidenceVerifier(source).verify(
-            SourceEvidence(scope, SourceClaim.Consequence(conclusion), proof))
+            SourceEvidence(scope, SourceClaim.Consequence(conclusion), proof),
+        )
 
         assertTrue(individual.rows.isEmpty())
         assertEquals(2L, individual.observations["MixedMissingBounds"])
@@ -194,20 +348,45 @@ class LinearAuthorityCutsTest {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val half = BigFraction.ofLong(2).reciprocal()
         for ((leftStrict, rightStrict) in listOf(true to false, false to true)) {
-            val source = SourceProofContext(scope, setOf(x, y, real), mapOf(
-                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
-                    real to BigFraction.ONE), BigFraction.ofLong(4), leftStrict)),
-                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
-                    real to BigFraction.MINUS_ONE), BigFraction.ZERO, rightStrict)),
-            ))
-            val proof = SourceDerivation.IntegerRounding(SourceDerivation.Combination(listOf(
-                SourceDerivation.Combination.Term(half, SourceDerivation.Premise("left")),
-                SourceDerivation.Combination.Term(half, SourceDerivation.Premise("right")),
-            )))
+            val source = SourceProofContext(
+                scope,
+                setOf(x, y, real),
+                mapOf(
+                    "left" to SourcePremise(
+                        SourceInequality(
+                            mapOf(
+                                x to BigFraction.ofLong(2),
+                                real to BigFraction.ONE,
+                            ),
+                            BigFraction.ofLong(4),
+                            leftStrict,
+                        ),
+                    ),
+                    "right" to SourcePremise(
+                        SourceInequality(
+                            mapOf(
+                                y to BigFraction.ofLong(2),
+                                real to BigFraction.MINUS_ONE,
+                            ),
+                            BigFraction.ZERO,
+                            rightStrict,
+                        ),
+                    ),
+                ),
+            )
+            val proof = SourceDerivation.IntegerRounding(
+                SourceDerivation.Combination(
+                    listOf(
+                        SourceDerivation.Combination.Term(half, SourceDerivation.Premise("left")),
+                        SourceDerivation.Combination.Term(half, SourceDerivation.Premise("right")),
+                    ),
+                ),
+            )
             val conclusion = SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE)
 
             val check = SourceEvidenceVerifier(source).verify(
-                SourceEvidence(scope, SourceClaim.Consequence(conclusion), proof))
+                SourceEvidence(scope, SourceClaim.Consequence(conclusion), proof),
+            )
 
             assertEquals(SourceEvidenceCheck.Checked, check)
         }
@@ -219,28 +398,64 @@ class LinearAuthorityCutsTest {
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
         val pin = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
         val half = BigFraction.ofLong(2).reciprocal()
-        val source = SourceProofContext(scope, setOf(x, y, real, bool, pin), mapOf(
-            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
-                real to BigFraction.ONE), BigFraction.ofLong(3)), mapOf(0 to true)),
-            "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
-                real to BigFraction.MINUS_ONE), BigFraction.ZERO), emptyMap(), mapOf(pin to BigFraction.ONE)),
-        ))
-        val proof = SourceDerivation.IntegerRounding(SourceDerivation.Combination(listOf(
-            SourceDerivation.Combination.Term(half, SourceDerivation.Premise("left")),
-            SourceDerivation.Combination.Term(half, SourceDerivation.Premise("right")),
-        )))
+        val source = SourceProofContext(
+            scope,
+            setOf(x, y, real, bool, pin),
+            mapOf(
+                "left" to SourcePremise(
+                    SourceInequality(
+                        mapOf(
+                            x to BigFraction.ofLong(2),
+                            real to BigFraction.ONE,
+                        ),
+                        BigFraction.ofLong(3),
+                    ),
+                    mapOf(0 to true),
+                ),
+                "right" to SourcePremise(
+                    SourceInequality(
+                        mapOf(
+                            y to BigFraction.ofLong(2),
+                            real to BigFraction.MINUS_ONE,
+                        ),
+                        BigFraction.ZERO,
+                    ),
+                    emptyMap(),
+                    mapOf(pin to BigFraction.ONE),
+                ),
+            ),
+        )
+        val proof = SourceDerivation.IntegerRounding(
+            SourceDerivation.Combination(
+                listOf(
+                    SourceDerivation.Combination.Term(half, SourceDerivation.Premise("left")),
+                    SourceDerivation.Combination.Term(half, SourceDerivation.Premise("right")),
+                ),
+            ),
+        )
         val conclusion = SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE)
-        val established = SourceCondition(bools = mapOf(0 to true),
-            lower = mapOf(pin to BigFraction.ONE), upper = mapOf(pin to BigFraction.ONE))
-        for (condition in listOf(established, SourceCondition(lower = established.lower, upper = established.upper),
-            SourceCondition(bools = established.bools, lower = established.lower), established)) {
+        val established = SourceCondition(
+            bools = mapOf(0 to true),
+            lower = mapOf(pin to BigFraction.ONE),
+            upper = mapOf(pin to BigFraction.ONE),
+        )
+        for (condition in listOf(
+            established,
+            SourceCondition(lower = established.lower, upper = established.upper),
+            SourceCondition(bools = established.bools, lower = established.lower),
+            established,
+        )) {
             val scoped = source.atScope(scope.copy(condition = condition))
 
             val check = SourceEvidenceVerifier(scoped).verify(
-                SourceEvidence(scoped.scope, SourceClaim.Consequence(conclusion), proof))
+                SourceEvidence(scoped.scope, SourceClaim.Consequence(conclusion), proof),
+            )
 
-            if (condition == established) assertEquals(SourceEvidenceCheck.Checked, check)
-            else assertIs<SourceEvidenceCheck.Rejected>(check)
+            if (condition == established) {
+                assertEquals(SourceEvidenceCheck.Checked, check)
+            } else {
+                assertIs<SourceEvidenceCheck.Rejected>(check)
+            }
         }
     }
 
@@ -249,61 +464,127 @@ class LinearAuthorityCutsTest {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val half = BigFraction.ofLong(2).reciprocal()
-        val source = SourceProofContext(scope, setOf(x, y, real, residual), mapOf(
-            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
-                real to BigFraction.ONE, residual to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
-            "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
-                real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-            "bound" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-        ))
-        val combination = SourceDerivation.Combination(listOf(
-            SourceDerivation.Combination.Term(half, SourceDerivation.Premise("left")),
-            SourceDerivation.Combination.Term(half, SourceDerivation.Premise("right")),
-        ))
-        val conclusion = SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE,
-            residual to BigFraction.MINUS_ONE), BigFraction.ONE)
+        val source = SourceProofContext(
+            scope,
+            setOf(x, y, real, residual),
+            mapOf(
+                "left" to SourcePremise(
+                    SourceInequality(
+                        mapOf(
+                            x to BigFraction.ofLong(2),
+                            real to BigFraction.ONE,
+                            residual to BigFraction.MINUS_ONE,
+                        ),
+                        BigFraction.ofLong(3),
+                    ),
+                ),
+                "right" to SourcePremise(
+                    SourceInequality(
+                        mapOf(
+                            y to BigFraction.ofLong(2),
+                            real to BigFraction.MINUS_ONE,
+                        ),
+                        BigFraction.ZERO,
+                    ),
+                ),
+                "bound" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            ),
+        )
+        val combination = SourceDerivation.Combination(
+            listOf(
+                SourceDerivation.Combination.Term(half, SourceDerivation.Premise("left")),
+                SourceDerivation.Combination.Term(half, SourceDerivation.Premise("right")),
+            ),
+        )
+        val conclusion = SourceInequality(
+            mapOf(
+                x to BigFraction.ONE,
+                y to BigFraction.ONE,
+                residual to BigFraction.MINUS_ONE,
+            ),
+            BigFraction.ONE,
+        )
         for (bounds in listOf(emptyList(), listOf(SourceDerivation.Premise("bound")))) {
             val proof = SourceDerivation.MixedIntegerRounding(combination, bounds)
 
             val check = SourceEvidenceVerifier(source).verify(
-                SourceEvidence(scope, SourceClaim.Consequence(conclusion), proof))
+                SourceEvidence(scope, SourceClaim.Consequence(conclusion), proof),
+            )
 
-            if (bounds.isEmpty()) assertIs<SourceEvidenceCheck.Rejected>(check)
-            else assertEquals(SourceEvidenceCheck.Checked, check)
+            if (bounds.isEmpty()) {
+                assertIs<SourceEvidenceCheck.Rejected>(check)
+            } else {
+                assertEquals(SourceEvidenceCheck.Checked, check)
+            }
         }
     }
 
     @Test
     fun `mixed source rounding should strengthen a checked objective bound`() {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-        val source = SourceProofContext(scope, setOf(x, real), mapOf(
-            "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(-2),
-                real to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
-            "x" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-            "real" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-        ), mapOf(x to BigFraction.ONE, real to BigFraction.ONE))
-        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val source = SourceProofContext(
+            scope,
+            setOf(x, real),
+            mapOf(
+                "mixed" to SourcePremise(
+                    SourceInequality(
+                        mapOf(
+                            x to BigFraction.ofLong(-2),
+                            real to BigFraction.MINUS_ONE,
+                        ),
+                        BigFraction.ofLong(-3),
+                    ),
+                ),
+                "x" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "real" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            ),
+            mapOf(x to BigFraction.ONE, real to BigFraction.ONE),
+        )
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never, cuts = true))
         val cut = assertNotNull(template.cuts).rows.single()
-        assertEquals(SourceInequality(mapOf(x to BigFraction.MINUS_ONE, real to BigFraction.MINUS_ONE),
-            BigFraction.ofLong(-2)), cut.inequality)
-        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(SourceEvidence(scope,
-            SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        assertEquals(
+            SourceInequality(
+                mapOf(x to BigFraction.MINUS_ONE, real to BigFraction.MINUS_ONE),
+                BigFraction.ofLong(-2),
+            ),
+            cut.inequality,
+        )
+        assertEquals(
+            SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source).verify(
+                SourceEvidence(
+                    scope,
+                    SourceClaim.Consequence(cut.inequality),
+                    cut.derivation,
+                ),
+            ),
+        )
 
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
-            val baseline = authority.advance(source, Cancellation.Never)
+            val baseline = authority.advance(source, ExecutionControl.Never)
             val baselineObservations = authority.cutObservations()
-            val result = authority.advance(source, Cancellation.Never, cuts = true)
+            val result = authority.advance(source, ExecutionControl.Never, cuts = true)
 
-            assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
-                assertIs<SourceClaim.Bound>(assertNotNull(baseline.bound).claim).value)
-            assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
-                assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
-            assertEquals(SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+            assertEquals(
+                SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
+                assertIs<SourceClaim.Bound>(assertNotNull(baseline.bound).claim).value,
+            )
+            assertEquals(
+                SourceValue.Rational(BigFraction.ofLong(2)),
+                assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value,
+            )
+            assertEquals(
+                SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)),
+            )
             assertEquals(1L, authority.cutObservations()["numericalMaxActiveMixedCuts"])
             assertEquals(setOf(com.eignex.klause.lp.engine.CutFamily.SOURCE_MIXED_ROUNDING), result.cutBoundFamilies)
-            assertTrue((authority.cutObservations()["numericalCutLifecycleSOURCE_MIXED_ROUNDING_CHECKED_BOUND"]
-                ?: 0L) > 0L)
+            assertTrue(
+                (
+                    authority.cutObservations()["numericalCutLifecycleSOURCE_MIXED_ROUNDING_CHECKED_BOUND"]
+                        ?: 0L
+                    ) > 0L,
+            )
             assertEquals(null, authority.cutObservations()["numericalCutLifecycleSOURCE_MIXED_ROUNDING_BOUND_PRUNE"])
             assertTrue((baselineObservations["numericalCutLifecycleRECIPE_NO_CUT_FloatWork"] ?: 0L) > 0L)
             assertEquals(null, baselineObservations["numericalCutLifecycleSOURCE_MIXED_ROUNDING_FloatWork"])
@@ -313,34 +594,71 @@ class LinearAuthorityCutsTest {
     @Test
     fun `complementary mixed rounding should cite the available opposite bound`() {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-        val source = SourceProofContext(scope, setOf(x, real), mapOf(
-            "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
-                real to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
-            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
-        ))
+        val source = SourceProofContext(
+            scope,
+            setOf(x, real),
+            mapOf(
+                "mixed" to SourcePremise(
+                    SourceInequality(
+                        mapOf(
+                            x to BigFraction.ofLong(2),
+                            real to BigFraction.MINUS_ONE,
+                        ),
+                        BigFraction.ofLong(3),
+                    ),
+                ),
+                "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
+            ),
+        )
 
-        val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never, complementary = true))
+        val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, ExecutionControl.Never, complementary = true))
         val complementary = cuts.rows.single { it.inequality.coefficients == mapOf(x to BigFraction.ONE) }
 
         assertEquals(BigFraction.ofLong(2), complementary.inequality.rhs)
-        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(SourceEvidence(scope,
-            SourceClaim.Consequence(complementary.inequality), complementary.derivation)))
+        assertEquals(
+            SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source).verify(
+                SourceEvidence(
+                    scope,
+                    SourceClaim.Consequence(complementary.inequality),
+                    complementary.derivation,
+                ),
+            ),
+        )
         val missing = SourceProofContext(scope, source.coordinates, source.premises - "upper")
-        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(missing).verify(SourceEvidence(scope,
-            SourceClaim.Consequence(complementary.inequality), complementary.derivation)))
+        assertIs<SourceEvidenceCheck.Rejected>(
+            SourceEvidenceVerifier(missing).verify(
+                SourceEvidence(
+                    scope,
+                    SourceClaim.Consequence(complementary.inequality),
+                    complementary.derivation,
+                ),
+            ),
+        )
     }
 
     @Test
     fun `complementary mixed rounding should reuse the sole available side without duplicating rows`() {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-        val source = SourceProofContext(scope, setOf(x, real), mapOf(
-            "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
-                real to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
-            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-        ))
+        val source = SourceProofContext(
+            scope,
+            setOf(x, real),
+            mapOf(
+                "mixed" to SourcePremise(
+                    SourceInequality(
+                        mapOf(
+                            x to BigFraction.ofLong(2),
+                            real to BigFraction.MINUS_ONE,
+                        ),
+                        BigFraction.ofLong(3),
+                    ),
+                ),
+                "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            ),
+        )
 
-        val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never, complementary = true))
+        val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, ExecutionControl.Never, complementary = true))
 
         assertEquals(1, cuts.rows.size)
         assertEquals(null, cuts.observations["MixedComplementaryRetained"])
@@ -350,31 +668,77 @@ class LinearAuthorityCutsTest {
     fun `point directed rounding should combine established sides from different endpoints`() {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
-        val source = SourceProofContext(scope, setOf(x, real, other), mapOf(
-            "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
-                real to BigFraction.MINUS_ONE, other to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
-            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
-            "other lower" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-            "other upper" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ONE), BigFraction.ofLong(2))),
-        ))
+        val source = SourceProofContext(
+            scope,
+            setOf(x, real, other),
+            mapOf(
+                "mixed" to SourcePremise(
+                    SourceInequality(
+                        mapOf(
+                            x to BigFraction.ofLong(2),
+                            real to BigFraction.MINUS_ONE,
+                            other to BigFraction.MINUS_ONE,
+                        ),
+                        BigFraction.ofLong(3),
+                    ),
+                ),
+                "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
+                "other lower" to SourcePremise(
+                    SourceInequality(
+                        mapOf(other to BigFraction.MINUS_ONE),
+                        BigFraction.ZERO,
+                    ),
+                ),
+                "other upper" to SourcePremise(
+                    SourceInequality(
+                        mapOf(other to BigFraction.ONE),
+                        BigFraction
+                            .ofLong(2),
+                    ),
+                ),
+            ),
+        )
 
-        val cuts = assertNotNull(LinearAuthorityCuts.prepareAtPoint(source, Cancellation.Never,
-            mapOf(real to 2.0, other to 0.0), 65_536L))
-        val directed = cuts.rows.single { it.inequality.coefficients ==
-            mapOf(x to BigFraction.ONE, other to BigFraction.MINUS_ONE) }
+        val cuts = assertNotNull(
+            LinearAuthorityCuts.prepareAtPoint(
+                source,
+                ExecutionControl.Never,
+                mapOf(real to 2.0, other to 0.0),
+                65_536L,
+            ),
+        )
+        val directed = cuts.rows.single {
+            it.inequality.coefficients ==
+                mapOf(x to BigFraction.ONE, other to BigFraction.MINUS_ONE)
+        }
 
         assertEquals(BigFraction.ofLong(2), directed.inequality.rhs)
-        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(SourceEvidence(scope,
-            SourceClaim.Consequence(directed.inequality), directed.derivation)))
+        assertEquals(
+            SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source).verify(
+                SourceEvidence(
+                    scope,
+                    SourceClaim.Consequence(directed.inequality),
+                    directed.derivation,
+                ),
+            ),
+        )
     }
 
     @Test
     fun `mixed side variants should share the retained row and preparation limits`() {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val premises = (0 until 100).associate { index ->
-            "mixed/$index" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
-                real to BigFraction.MINUS_ONE), BigFraction.ofLong(3)))
+            "mixed/$index" to SourcePremise(
+                SourceInequality(
+                    mapOf(
+                        x to BigFraction.ofLong(2),
+                        real to BigFraction.MINUS_ONE,
+                    ),
+                    BigFraction.ofLong(3),
+                ),
+            )
         } + mapOf(
             "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
             "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
@@ -382,7 +746,7 @@ class LinearAuthorityCutsTest {
         val source = SourceProofContext(scope, setOf(x, real), premises)
 
         for (complementary in listOf(false, true)) {
-            val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never, complementary))
+            val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, ExecutionControl.Never, complementary))
 
             assertEquals(64, cuts.rows.size)
             assertTrue(cuts.work <= 65_536L)
@@ -393,71 +757,123 @@ class LinearAuthorityCutsTest {
     fun `mixed cuts should retract and reactivate with their Boolean source owner`() {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
-        val source = SourceProofContext(scope, setOf(x, real, bool), mapOf(
-            "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(-2),
-                real to BigFraction.MINUS_ONE), BigFraction.ofLong(-3)), mapOf(0 to true)),
-            "real" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-        ), mapOf(x to BigFraction.ONE, real to BigFraction.ONE))
-        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val source = SourceProofContext(
+            scope,
+            setOf(x, real, bool),
+            mapOf(
+                "mixed" to SourcePremise(
+                    SourceInequality(
+                        mapOf(
+                            x to BigFraction.ofLong(-2),
+                            real to BigFraction.MINUS_ONE,
+                        ),
+                        BigFraction.ofLong(-3),
+                    ),
+                    mapOf(0 to true),
+                ),
+                "real" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            ),
+            mapOf(x to BigFraction.ONE, real to BigFraction.ONE),
+        )
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never, cuts = true))
         val enabled = source.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to true))))
         val disabled = source.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to false))))
 
-        val first = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, Cancellation.Never))
-        val sibling = assertNotNull(LinearAuthorityQuery.prepare(disabled, template, Cancellation.Never))
-        val restored = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, Cancellation.Never))
+        val first = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, ExecutionControl.Never))
+        val sibling = assertNotNull(LinearAuthorityQuery.prepare(disabled, template, ExecutionControl.Never))
+        val restored = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, ExecutionControl.Never))
 
         assertEquals(1, first.activeMixedCuts)
         assertEquals(0, sibling.activeMixedCuts)
         assertEquals(1, restored.activeMixedCuts)
         assertEquals(first.cited, restored.cited)
         val cut = assertNotNull(template.cuts).rows.single()
-        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(disabled).verify(SourceEvidence(disabled.scope,
-            SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        assertIs<SourceEvidenceCheck.Rejected>(
+            SourceEvidenceVerifier(disabled).verify(
+                SourceEvidence(
+                    disabled.scope,
+                    SourceClaim.Consequence(cut.inequality),
+                    cut.derivation,
+                ),
+            ),
+        )
     }
 
     @Test
     fun `mixed cuts should require their source integer pin after retained template reuse`() {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-        val source = SourceProofContext(scope, setOf(x, y, real), mapOf(
-            "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
-                real to BigFraction.MINUS_ONE), BigFraction.ofLong(3)), emptyMap(), mapOf(y to BigFraction.ONE)),
-            "real" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-        ), mapOf(x to BigFraction.MINUS_ONE))
-        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
-        val enabled = source.atScope(scope.copy(condition = SourceCondition(
-            lower = mapOf(y to BigFraction.ONE), upper = mapOf(y to BigFraction.ONE))))
+        val source = SourceProofContext(
+            scope,
+            setOf(x, y, real),
+            mapOf(
+                "mixed" to SourcePremise(
+                    SourceInequality(
+                        mapOf(
+                            x to BigFraction.ofLong(2),
+                            real to BigFraction.MINUS_ONE,
+                        ),
+                        BigFraction.ofLong(3),
+                    ),
+                    emptyMap(),
+                    mapOf(y to BigFraction.ONE),
+                ),
+                "real" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            ),
+            mapOf(x to BigFraction.MINUS_ONE),
+        )
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never, cuts = true))
+        val enabled = source.atScope(
+            scope.copy(
+                condition = SourceCondition(
+                    lower = mapOf(y to BigFraction.ONE),
+                    upper = mapOf(y to BigFraction.ONE),
+                ),
+            ),
+        )
 
-        val first = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, Cancellation.Never))
-        val sibling = assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never))
-        val restored = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, Cancellation.Never))
+        val first = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, ExecutionControl.Never))
+        val sibling = assertNotNull(LinearAuthorityQuery.prepare(source, template, ExecutionControl.Never))
+        val restored = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, ExecutionControl.Never))
 
         assertEquals(1, first.activeMixedCuts)
         assertEquals(0, sibling.activeMixedCuts)
         assertEquals(1, restored.activeMixedCuts)
         assertTrue(source.premises.size in sibling.inactive)
         val cut = assertNotNull(template.cuts).rows.single()
-        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source).verify(SourceEvidence(scope,
-            SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        assertIs<SourceEvidenceCheck.Rejected>(
+            SourceEvidenceVerifier(source).verify(
+                SourceEvidence(
+                    scope,
+                    SourceClaim.Consequence(cut.inequality),
+                    cut.derivation,
+                ),
+            ),
+        )
     }
 
     @Test
     fun `cancelled separation should publish no retained rows`() {
         val source = SourceProofContext(scope, setOf(x), emptyMap(), emptyMap())
 
-        val cuts = LinearAuthorityCuts.prepare(source, Cancellation { true })
+        val cuts = LinearAuthorityCuts.prepare(source, ExecutionControl { true })
 
         assertNull(cuts)
     }
 
     @Test
     fun `cancelled separation should report its completed work`() {
-        val source = SourceProofContext(scope, setOf(x), mapOf(
-            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2)), BigFraction.ONE)),
-        ), emptyMap())
+        val source = SourceProofContext(
+            scope,
+            setOf(x),
+            mapOf(
+                "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2)), BigFraction.ONE)),
+            ),
+            emptyMap(),
+        )
         var polls = 0
         var work = 0L
 
-        val cuts = LinearAuthorityCuts.prepare(source, Cancellation { ++polls > 2 }) { work += it }
+        val cuts = LinearAuthorityCuts.prepare(source, ExecutionControl { ++polls > 2 }) { work += it }
 
         assertNull(cuts)
         assertTrue(work > 0)

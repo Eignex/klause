@@ -4,15 +4,15 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolvePreparationStage
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun <T> PresolveBudget?.observePreparation(
     stage: PresolvePreparationStage,
     lane: PresolveLane,
     input: Problem,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     output: (T) -> Problem = { input },
-    action: (Cancellation, PresolveInvocation?) -> T,
+    action: (ExecutionControl, PresolveInvocation?) -> T,
 ): T {
     var current = input
     return observe(stage.name, lane, { current.presolveSize() }, stage) { invocation ->

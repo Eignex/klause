@@ -27,7 +27,7 @@ import com.eignex.klause.solver.evidence.sourceProofContext
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 import com.eignex.klause.solver.result.QuadraticIncumbent
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -228,7 +228,7 @@ class QuadraticWitnessPublicationTest {
 
     @Test
     fun `verify should be unavailable when cancelled`() {
-        val cancelled = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { true }))
+        val cancelled = AlgebraicArithmetic(PolynomialArithmetic(ExecutionControl { true }))
 
         val checked = publication.verify(invocation, point, cancelled, sourceChecker)
 

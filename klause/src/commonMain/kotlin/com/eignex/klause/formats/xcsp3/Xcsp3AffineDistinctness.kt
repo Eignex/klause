@@ -5,7 +5,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lowering.LinRelation
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class AffineDistinctGroup(val vars: IntArray, val offsets: LongArray, val sourceRows: IntArray)
 
@@ -46,7 +46,7 @@ internal class Xcsp3AffineDistinctness(private val workLimit: Int = 1_000_000) {
         if (++edgeCount > MAX_EDGES || forward.size > MAX_ALTERNATIVES) stop()
     }
 
-    fun groups(cancellation: Cancellation): List<AffineDistinctGroup> {
+    fun groups(cancellation: ExecutionControl): List<AffineDistinctGroup> {
         if (stopped) return emptyList()
         val result = ArrayList<AffineDistinctGroup>()
         val visited = HashSet<Int>()
@@ -109,7 +109,7 @@ internal class Xcsp3AffineDistinctness(private val workLimit: Int = 1_000_000) {
         return result
     }
 
-    private fun spend(cancellation: Cancellation): Boolean {
+    private fun spend(cancellation: ExecutionControl): Boolean {
         cancellation.charge(1)
         return ++work <= workLimit && !cancellation()
     }
@@ -132,7 +132,10 @@ private fun subtractExact(left: Long, right: Long): Long? {
     return if (((left xor right) and (left xor difference)) < 0L) null else difference
 }
 
-internal fun Compiler.Builder.recoverAffineDistinctness(index: Xcsp3AffineDistinctness, cancellation: Cancellation) {
+internal fun Compiler.Builder.recoverAffineDistinctness(
+    index: Xcsp3AffineDistinctness,
+    cancellation: ExecutionControl,
+) {
     val removed = HashSet<Int>()
     for (group in index.groups(cancellation)) {
         if (cancellation()) break

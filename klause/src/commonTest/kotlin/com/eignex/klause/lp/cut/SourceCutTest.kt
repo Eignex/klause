@@ -29,7 +29,7 @@ import com.eignex.klause.lp.relaxation.layoutFor
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -248,7 +248,7 @@ class SourceCutTest {
         val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0, facts,
             conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)))
         val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)))
-        val columns = assertNotNull(CutColumnLayout.capture(map, 64L, Cancellation.Never) {})
+        val columns = assertNotNull(CutColumnLayout.capture(map, 64L, ExecutionControl.Never) {})
         var prepared: SourceCutPreparation? = null
         val first = assertNotNull(source.toCut(map, onPrepared = { prepared = it }, columnBinding = columns).orNull())
         assertTrue(assertNotNull(prepared).projection)
@@ -272,7 +272,7 @@ class SourceCutTest {
         val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0, facts,
             conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)))
         val map = CutSourceMap(modelToken, 0, listOf(null, CutColumnSource(x)))
-        val columns = assertNotNull(CutColumnLayout.capture(map, 64L, Cancellation.Never) {})
+        val columns = assertNotNull(CutColumnLayout.capture(map, 64L, ExecutionControl.Never) {})
         var prepared: SourceCutPreparation? = null
         assertNotNull(source.toCut(map, onPrepared = { prepared = it }, columnBinding = columns).orNull())
         assertTrue(assertNotNull(prepared).projection)
@@ -303,14 +303,14 @@ class SourceCutTest {
         val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0, facts,
             conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)))
         val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)), activePremises = guards.toSet())
-        val columns = assertNotNull(CutColumnLayout.capture(map, 64L, Cancellation.Never) {})
+        val columns = assertNotNull(CutColumnLayout.capture(map, 64L, ExecutionControl.Never) {})
         var prepared: SourceCutPreparation? = null
         assertNotNull(source.toCut(map, onPrepared = { prepared = it }, columnBinding = columns).orNull())
         assertTrue(assertNotNull(prepared).projection)
 
         for (missing in guards) {
             val current = CutSourceMap(modelToken, 1, map.columns, activePremises = (guards - missing).toSet())
-            val binding = assertNotNull(assertNotNull(columns.layoutFor(map)).bind(current, Cancellation.Never) {})
+            val binding = assertNotNull(assertNotNull(columns.layoutFor(map)).bind(current, ExecutionControl.Never) {})
             assertEquals(CutMapping.Declined(CutMappingDecline.INACTIVE_GUARD),
                 source.toCut(current, preparation = prepared, columnBinding = binding))
         }
@@ -324,11 +324,11 @@ class SourceCutTest {
         val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0, facts,
             conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)))
         val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)))
-        val columns = assertNotNull(CutColumnLayout.capture(map, 64L, Cancellation.Never) {})
+        val columns = assertNotNull(CutColumnLayout.capture(map, 64L, ExecutionControl.Never) {})
         var prepared: SourceCutPreparation? = null
         assertNotNull(source.toCut(map, onPrepared = { prepared = it }, columnBinding = columns).orNull())
         val current = CutSourceMap(Any(), 0, map.columns)
-        val binding = assertNotNull(assertNotNull(columns.layoutFor(map)).bind(current, Cancellation.Never) {})
+        val binding = assertNotNull(assertNotNull(columns.layoutFor(map)).bind(current, ExecutionControl.Never) {})
 
         assertEquals(CutMapping.Declined(CutMappingDecline.MODEL_SCOPE),
             source.toCut(current, preparation = prepared, columnBinding = binding))
@@ -342,12 +342,12 @@ class SourceCutTest {
         val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0, facts,
             assumptions = setOf("region"), conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)))
         val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)), assumptions = setOf("region"))
-        val columns = assertNotNull(CutColumnLayout.capture(map, 64L, Cancellation.Never) {})
+        val columns = assertNotNull(CutColumnLayout.capture(map, 64L, ExecutionControl.Never) {})
         var prepared: SourceCutPreparation? = null
         assertNotNull(source.toCut(map, onPrepared = { prepared = it }, columnBinding = columns).orNull())
         assertTrue(assertNotNull(prepared).projection)
         val current = CutSourceMap(modelToken, 1, map.columns)
-        val binding = assertNotNull(assertNotNull(columns.layoutFor(map)).bind(current, Cancellation.Never) {})
+        val binding = assertNotNull(assertNotNull(columns.layoutFor(map)).bind(current, ExecutionControl.Never) {})
 
         assertEquals(CutMapping.Declined(CutMappingDecline.MODEL_SCOPE),
             source.toCut(current, preparation = prepared, columnBinding = binding))
@@ -361,14 +361,14 @@ class SourceCutTest {
         val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0, facts,
             conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)))
         val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)))
-        val columns = assertNotNull(CutColumnLayout.capture(map, 64L, Cancellation.Never) {})
+        val columns = assertNotNull(CutColumnLayout.capture(map, 64L, ExecutionControl.Never) {})
         val limits = CutMappingLimits(terms = 8)
         var prepared: SourceCutPreparation? = null
         assertNotNull(source.toCut(map, limits, onPrepared = { prepared = it }, columnBinding = columns).orNull())
         assertTrue(assertNotNull(prepared).projection)
         val fixed = CutSourceMap(modelToken, 1, emptyList(), fixed = mapOf(x to BigFraction.ONE),
             activePremises = setOf(CutPremise.Fixed(x, BigFraction.ONE)))
-        val binding = assertNotNull(CutColumnLayout.capture(fixed, 64L, Cancellation.Never) {})
+        val binding = assertNotNull(CutColumnLayout.capture(fixed, 64L, ExecutionControl.Never) {})
 
         assertEquals(CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT),
             source.toCut(fixed, limits, prepared, columnBinding = binding))

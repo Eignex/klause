@@ -18,7 +18,7 @@ import com.eignex.klause.lp.engine.verifyExactBasis
 import com.eignex.klause.simplex.basis.RationalBasisLimits
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 // One residual owns its continuation and terminal result; changed exact rows retire both.
 internal class LinearResidualCompletion(
@@ -35,11 +35,12 @@ internal class LinearResidualCompletion(
     private var point: List<BigFraction>? = null
     private var floating: FloatLpResult? = null
     private var lifetime: LpFloatAllowance? = null
-    private var currentToken = Cancellation.Never
-    private val token = object : Cancellation {
+    private var currentToken = ExecutionControl.Never
+    private val token = object : ExecutionControl() {
         override fun isCancelled() = currentToken()
         override fun deadline() = currentToken.deadline()
-        override fun workMeter() = currentToken.workMeter()
+        override val accounting get() = currentToken.accounting
+        override val admission get() = admissionFrom(currentToken)
     }
     var paused = false
         private set
@@ -47,7 +48,7 @@ internal class LinearResidualCompletion(
     fun complete(
         residual: List<ExactRationalInequality>,
         variables: Int,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         observe: (String, Long) -> Unit,
         costs: List<BigFraction>? = null,
         small: () -> List<BigFraction>?,

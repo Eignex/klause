@@ -20,7 +20,7 @@ import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.bigIntOf
@@ -103,7 +103,7 @@ class DifferenceSearchComponentTest {
             factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)),
         )
         val component = DifferenceSearchComponent(model)
-        val hints = assertNotNull(component.potentialHints(Cancellation.Never)).second
+        val hints = assertNotNull(component.potentialHints(ExecutionControl.Never)).second
         val session = SearchSession(listOf(component))
         assertIs<ComponentResult.Consistent>(session.initialize())
 
@@ -121,7 +121,7 @@ class DifferenceSearchComponentTest {
             factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)),
         )
         val component = DifferenceSearchComponent(model)
-        val hints = assertNotNull(component.potentialHints(Cancellation.Never)).second
+        val hints = assertNotNull(component.potentialHints(ExecutionControl.Never)).second
         val session = SearchSession(listOf(component))
         assertIs<ComponentResult.Consistent>(session.initialize())
         assertEquals(true, hints.preferredBool(0))
@@ -185,13 +185,13 @@ class DifferenceSearchComponentTest {
             var limit = Long.MAX_VALUE
             var delivered = false
             val meter = WorkMeter { work += it }
-            val stop = object : Cancellation {
+            val stop = object : ExecutionControl() {
                 override fun isCancelled(): Boolean {
                     if (work < limit || (transient && delivered)) return false
                     delivered = true
                     return true
                 }
-                override fun workMeter(): WorkMeter = meter
+                override val accounting: WorkMeter get() = meter
             }
             val model = Problem(
                 numBoolVars = 1,
@@ -225,7 +225,7 @@ class DifferenceSearchComponentTest {
             factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)),
         )
         val component = DifferenceSearchComponent(model)
-        val hints = assertNotNull(component.potentialHints(Cancellation.Never)).second
+        val hints = assertNotNull(component.potentialHints(ExecutionControl.Never)).second
         val session = SearchSession(listOf(component))
         assertIs<ComponentResult.Consistent>(session.initialize())
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
@@ -247,7 +247,7 @@ class DifferenceSearchComponentTest {
                 factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)),
             )
             val component = DifferenceSearchComponent(model)
-            val hints = component.potentialHints(Cancellation.Never, maxEdges = capacity)
+            val hints = component.potentialHints(ExecutionControl.Never, maxEdges = capacity)
             val session = SearchSession(listOf(component))
             assertIs<ComponentResult.Consistent>(session.initialize())
 
@@ -261,7 +261,7 @@ class DifferenceSearchComponentTest {
     @Test
     fun `containing cancellation should withhold a retained potential preference`() {
         var stopped = false
-        val stop = Cancellation { stopped }
+        val stop = ExecutionControl { stopped }
         val model = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(10), null, null),
@@ -399,7 +399,7 @@ class DifferenceSearchComponentTest {
                 rootBounds(1, 0, 0),
                 DifferenceSearchComponent.withRootBounds(model, intArrayOf(1), intArrayOf(0)),
             ),
-            cancellation = Cancellation { ++polls >= 4 },
+            cancellation = ExecutionControl { ++polls >= 4 },
         )
 
         assertIs<ComponentResult.Indeterminate>(session.initialize())
@@ -589,7 +589,7 @@ class DifferenceSearchComponentTest {
                 factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, -1)),
             )
             val fragment = assertNotNull(differenceFragmentOf(model.factors, model.numIntVars, model.intBounds))
-            val closure = DifferenceGuardPropagation.create(fragment, 1, Cancellation.Never, maxEdges = capacity)
+            val closure = DifferenceGuardPropagation.create(fragment, 1, ExecutionControl.Never, maxEdges = capacity)
             val checker = DifferenceSearchComponent(model)
             val component = object : SearchComponent {
                 override fun propagate(context: SearchContext): ComponentResult =
@@ -614,9 +614,9 @@ class DifferenceSearchComponentTest {
     fun `containing guard preparation work exhaustion should publish no source implication`() {
         var work = 0L
         val meter = WorkMeter { work += it }
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 2L
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
         val model = Problem(
             numBoolVars = 1,
@@ -645,7 +645,7 @@ class DifferenceSearchComponentTest {
             var publicationPoll = 0
             for (cancel in listOf(false, true)) {
                 var polls = 0
-                val owner = Cancellation {
+                val owner = ExecutionControl {
                     polls++
                     cancel && (if (transient) polls == publicationPoll else polls >= publicationPoll)
                 }
@@ -658,7 +658,7 @@ class DifferenceSearchComponentTest {
                         return session.imply(literal, explanation)
                     }
                 }
-                val closure = assertNotNull(DifferenceGuardPropagation.create(fragment, 1, Cancellation.Never))
+                val closure = assertNotNull(DifferenceGuardPropagation.create(fragment, 1, ExecutionControl.Never))
 
                 val result = closure.propagate(fragment, longArrayOf(0, 0), context)
 

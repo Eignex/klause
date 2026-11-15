@@ -11,7 +11,7 @@ import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun Compiler.Builder.retainDeclarationBounds() {
     visitSmtDeclarationBounds(
@@ -29,7 +29,7 @@ internal fun smtPolynomialDeclarationBounds(
     semantics: EffectiveSourceSemantics,
     integers: Collection<Int>,
     reals: Collection<Int>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): List<PolynomialRealFormula> {
     val formulas = ArrayList<PolynomialRealFormula>()
     visitSmtDeclarationBounds(semantics, integers, reals, cancellation) { id, _, lower, value ->
@@ -46,7 +46,7 @@ private inline fun visitSmtDeclarationBounds(
     semantics: EffectiveSourceSemantics,
     integers: Collection<Int>,
     reals: Collection<Int>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     bound: (Int, Boolean, Boolean, SemanticRational) -> Unit,
 ) {
     val integerBounds = requireNotNull(semantics.effective.undeclaredIntegers)

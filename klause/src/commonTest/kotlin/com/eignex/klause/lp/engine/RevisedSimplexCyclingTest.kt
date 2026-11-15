@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -34,7 +34,7 @@ class RevisedSimplexCyclingTest {
                 if (warm) {
                     assertNotNull(solver.solve())
                     assertTrue(trail.replaceObjective(exact.objective))
-                    assertTrue(solver.adopt(trail.state, Cancellation.Never))
+                    assertTrue(solver.adopt(trail.state, ExecutionControl.Never))
                 }
 
                 val result = assertNotNull(if (warm) solver.resolveBounds() else solver.solvePrimal())
@@ -73,7 +73,7 @@ class RevisedSimplexCyclingTest {
         lateinit var solver: RevisedSimplex
         solver = RevisedSimplex(
             working,
-            cancellation = Cancellation { solver.lastPivots >= 6 },
+            cancellation = ExecutionControl { solver.lastPivots >= 6 },
             scalingOptions = LpScalingOptions(enabled = false),
         )
         solver.use {

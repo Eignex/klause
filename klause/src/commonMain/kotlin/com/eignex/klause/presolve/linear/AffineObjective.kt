@@ -2,14 +2,14 @@ package com.eignex.klause.presolve.linear
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.MutableIntLongMap
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.mulExact
 
-internal class AffineObjective(private val source: LinearObjective, private val cancellation: Cancellation) {
+internal class AffineObjective(private val source: LinearObjective, private val cancellation: ExecutionControl) {
     private val coefficients = MutableIntLongMap()
     private var constant = source.constant
     private var changed = false

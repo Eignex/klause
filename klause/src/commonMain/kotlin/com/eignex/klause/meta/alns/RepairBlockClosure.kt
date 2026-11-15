@@ -3,7 +3,7 @@ package com.eignex.klause.meta.alns
 import com.eignex.klause.localsearch.InvariantNetwork
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
@@ -13,7 +13,7 @@ internal enum class RepairBlockDecline {
 
 internal object RepairBlockInterrupted : RuntimeException()
 
-internal class RepairBlockWork(private val cancellation: Cancellation, private val limit: Int) {
+internal class RepairBlockWork(private val cancellation: ExecutionControl, private val limit: Int) {
     var visits = 0
         private set
     var decline: RepairBlockDecline? = null
@@ -82,8 +82,11 @@ internal object RepairBlockClosure {
         while (position < upstream.size) {
             val slot = upstream[position++]
             val movable = free(slot)
-            val writer = if (slot < bools) definitions?.boolWriter(slot) ?: -1
-            else definitions?.intWriter(slot - bools) ?: -1
+            val writer = if (slot < bools) {
+                definitions?.boolWriter(slot) ?: -1
+            } else {
+                definitions?.intWriter(slot - bools) ?: -1
+            }
             if (writer < 0) {
                 if (movable) {
                     leaves.add(slot)

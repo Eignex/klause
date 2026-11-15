@@ -4,7 +4,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.DynamicBits
 import kotlin.random.Random
 
@@ -15,7 +15,7 @@ internal class ClausePrimalWalk(
     private val pins: Assumptions,
     seed: Long?,
     private val nodeBudget: NodeBudget?,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ) {
     private val values = sample.bools
     private val occurrences = Array(values.size) { mutableSetOf<Int>() }
@@ -61,7 +61,7 @@ internal class ClausePrimalWalk(
         }
     }
 
-    fun begin(variable: Int, cancellation: Cancellation) {
+    fun begin(variable: Int, cancellation: ExecutionControl) {
         check(saved == null)
         saved = values.copyOf()
         visits += values.size
@@ -71,7 +71,7 @@ internal class ClausePrimalWalk(
         deriveUnits(cancellation)
     }
 
-    fun advance(cancellation: Cancellation, workLimit: Long): Boolean? {
+    fun advance(cancellation: ExecutionControl, workLimit: Long): Boolean? {
         val startWork = work
         while (!contradiction && unsatisfiedSize > 0 && trialMoves < values.size) {
             if (cancellation() || (workLimit >= 0L && work - startWork >= workLimit)) return null
@@ -165,7 +165,7 @@ internal class ClausePrimalWalk(
         }
     }
 
-    private fun deriveUnits(cancellation: Cancellation) {
+    private fun deriveUnits(cancellation: ExecutionControl) {
         visits += 2L * values.size + 2L * clauses.size + costs.size + pins.bools.size
         val assignments = IntArray(values.size) { -1 }
         val remaining = IntArray(clauses.size) { clauses[it].literals.size }

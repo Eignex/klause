@@ -15,7 +15,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.math.BigInteger
@@ -144,7 +144,7 @@ class EqualityKernelMoveTest {
     fun `cancellation discards an already computed private step`() {
         var cancelled = false
         var domains = 0
-        val stop = Cancellation { cancelled }
+        val stop = ExecutionControl { cancelled }
 
         val steps = EqualityKernelMove.steps(
             listOf(0, 1),
@@ -195,7 +195,7 @@ class EqualityKernelMoveTest {
         val move = Move.Compound(listOf(Move.IntSet(0, 1), Move.IntSet(1, 1)))
 
         val probe = assertNotNull(
-            EqualityKernelMove.probe(view, move, Cancellation.Never) { point, _ ->
+            EqualityKernelMove.probe(view, move, ExecutionControl.Never) { point, _ ->
             point.intValue(0) != point.intValue(1)
         }
         )
@@ -226,7 +226,7 @@ class EqualityKernelMoveTest {
             move,
             center,
             objective::evaluateExact,
-            Cancellation.Never,
+            ExecutionControl.Never,
         ) { _, _ -> true }
         )
 
@@ -250,14 +250,14 @@ class EqualityKernelMoveTest {
         val center = Sample(booleanArrayOf(), longArrayOf(0, 0))
         assertNull(view.load(center))
         val move = Move.Compound(listOf(Move.IntSet(0, 2), Move.IntSet(1, 2)))
-        val verify: (Sample, Cancellation) -> Boolean = { _, _ ->
+        val verify: (Sample, ExecutionControl) -> Boolean = { _, _ ->
             if (throws) error("failed source check")
             false
         }
 
         if (throws) {
             assertFailsWith<IllegalStateException> {
-                EqualityKernelMove.consume(view, move, center, objective::evaluateExact, Cancellation.Never, verify)
+                EqualityKernelMove.consume(view, move, center, objective::evaluateExact, ExecutionControl.Never, verify)
             }
         } else {
             assertNull(
@@ -266,7 +266,7 @@ class EqualityKernelMoveTest {
                 move,
                 center,
                 objective::evaluateExact,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 verify,
             )
             )

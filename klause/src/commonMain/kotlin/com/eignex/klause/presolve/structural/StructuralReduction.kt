@@ -6,10 +6,11 @@ import com.eignex.klause.ir.FactorReduction
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PassDelta
+import com.eignex.klause.presolve.PresolveScan
 import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.presolve.retainsStructure
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 
 internal object StructuralReduction {
@@ -22,8 +23,14 @@ internal object StructuralReduction {
      */
     fun reduce(
         problem: BakedProblem,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         preserveStructure: Boolean = false,
+    ): PassDelta = PresolveScan(cancellation).use { reduceWithin(problem, it, preserveStructure) }
+
+    private fun reduceWithin(
+        problem: BakedProblem,
+        cancellation: PresolveScan,
+        preserveStructure: Boolean,
     ): PassDelta {
         if (cancellation()) return PassDelta()
         val dropped = IntArrayList()
@@ -69,8 +76,14 @@ internal object StructuralReduction {
      */
     fun reduceSource(
         problem: Problem,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         preserveStructure: Boolean = false,
+    ): SourceDelta = PresolveScan(cancellation).use { reduceSourceWithin(problem, it, preserveStructure) }
+
+    private fun reduceSourceWithin(
+        problem: Problem,
+        cancellation: PresolveScan,
+        preserveStructure: Boolean,
     ): SourceDelta {
         if (cancellation()) return SourceDelta()
         val declared = problem.declaredIntDomains
@@ -116,7 +129,7 @@ internal object StructuralReduction {
 
     private val OPEN_PLACEHOLDER = IntDomain(0, 0)
 
-    private fun completeRewrite(reduction: FactorReduction.Rewrite, cancellation: Cancellation): Boolean {
+    private fun completeRewrite(reduction: FactorReduction.Rewrite, cancellation: PresolveScan): Boolean {
         for (factor in reduction.replacement) {
             if (!visit(cancellation)) return false
             for (v in factor.intVars) if (!visit(cancellation)) return false
@@ -126,10 +139,10 @@ internal object StructuralReduction {
         return !cancellation()
     }
 
-    private fun visit(cancellation: Cancellation): Boolean {
-        if (cancellation()) return false
+    private fun visit(cancellation: PresolveScan): Boolean {
+        if (cancellation.poll()) return false
         cancellation.charge(STRUCTURAL_WORK_WEIGHT)
-        return !cancellation()
+        return !cancellation.poll()
     }
 
     // Every factor is charged; hook candidates also pay for their columns.

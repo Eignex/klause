@@ -14,8 +14,11 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.remap
 import com.eignex.klause.ir.requireVariableCounts
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ArithmeticWorkSource
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkCreditPool
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.reserveWork
 
 internal class PolynomialObjectiveEvidence(
     val formula: PolynomialRealFormula,
@@ -69,7 +72,10 @@ internal fun solvePolynomialObjectiveImage(
     condition: PolynomialCondition = PolynomialCondition(),
 ): PolynomialObjectiveResult {
     val work = ObjectiveImageWork(params)
-    val arithmetic = PolynomialArithmetic(work, params.polynomialLimits)
+    val arithmetic = PolynomialArithmetic(work, params.polynomialLimits).also {
+        work.flush = it.execution::flush
+        work.pendingWork = { it.execution.admittedWork }
+    }
     val algebraic = AlgebraicArithmetic(arithmetic)
     return try {
         arithmetic.step()
@@ -107,12 +113,19 @@ internal fun solvePolynomialObjectiveImage(
         for (cell in 0..2L * roots.size) {
             arithmetic.step()
             val root = (cell / 2).toInt()
-            val value = if (cell and 1L != 0L) roots[root] else algebraic.rational(
+            val value = if (cell and 1L != 0L) {
+                roots[root]
+            } else {
+                algebraic.rational(
                 algebraic.sampleBetween(roots.getOrNull(root - 1), roots.getOrNull(root)),
             )
-            val query = PolynomialRealFormula.And(listOf(
-                image, algebraicFixing(imageVariable, value, arithmetic::step),
-            ))
+            }
+            val query = PolynomialRealFormula.And(
+                listOf(
+                image,
+                algebraicFixing(imageVariable, value, arithmetic::step),
+            )
+            )
             val fixing = value.rational?.let {
                 PolynomialCondition(lower = fixed + (0 to it), upper = fixed + (0 to it))
             } ?: PolynomialCondition(lower = fixed, upper = fixed)
@@ -126,7 +139,9 @@ internal fun solvePolynomialObjectiveImage(
                     result = PolynomialObjectiveResult.Unknown(checked.reason, work.snapshot(), checked.resource)
                     break
                 }
+
                 is QfNraResult.Unsatisfiable -> work.lifted = sum(work.lifted, checked.stats.liftedCells)
+
                 is QfNraResult.Satisfiable -> {
                     work.lifted = sum(work.lifted, checked.stats.liftedCells)
                     check(algebraic.compare(checked.assignment.realValue(0), value) == 0)
@@ -141,7 +156,9 @@ internal fun solvePolynomialObjectiveImage(
                         val atom = original.atoms[index]
                         if (atom.holds(algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates)))) {
                             PolynomialFormula.TRUE
-                        } else PolynomialFormula.FALSE
+                        } else {
+                            PolynomialFormula.FALSE
+                        }
                     }
                     val sourceBools = IntArray(boolCount) {
                         arithmetic.step()
@@ -157,7 +174,9 @@ internal fun solvePolynomialObjectiveImage(
                         cell and 1L != 0L -> PolynomialObjectiveResult.Optimum(
                             value, assignment, evidence, work.snapshot(),
                         )
+
                         cell == 0L -> PolynomialObjectiveResult.Unbounded(assignment, evidence, work.snapshot())
+
                         else -> PolynomialObjectiveResult.Infimum(
                             roots[root - 1], assignment, evidence, work.snapshot(),
                         )
@@ -224,17 +243,38 @@ internal fun algebraicFixing(
     ))
 }
 
-private class ObjectiveImageWork(private val params: QfNraParams) : Cancellation, WorkMeter {
+private class ObjectiveImageWork(private val params: QfNraParams) : ExecutionControl() {
     var projected: Long = 0
     var lifted: Long = 0
-    private var spent: Long = 0
+    var flush: () -> Unit = {}
+    var pendingWork: () -> Long = { 0L }
+    private val pool = WorkCreditPool(params.maximumWork)
+    private val pools = listOf(pool)
+    private val spent: Long get() = sum(pool.spent, pendingWork())
     val limitReached: Boolean get() = params.maximumWork?.let { spent >= it } == true
     override fun isCancelled(): Boolean = limitReached || params.cancellation()
     override fun deadline() = params.cancellation.deadline()
-    override fun workMeter(): WorkMeter = this
-    override fun charge(units: Long) {
+    override val accounting: WorkMeter = WorkMeter(::recordWork)
+    override val admission: ArithmeticWorkSource get() {
+        val parent = params.cancellation.admission
+        val parentMeter = params.cancellation.accounting
+        return object : ArithmeticWorkSource {
+            override val quotaOwner get() = parent?.quotaOwner
+            override val quotaRemaining get() = parent?.quotaRemaining
+            override val quotaAvailable get() = parent?.quotaAvailable
+            override val exhausted get() = limitReached || parent?.exhausted == true
+            override fun reserve(maximum: Int) = run {
+                flush()
+                val containing = parent
+                reserveWork(maximum, pools, containing) {
+                    if (containing?.metered != true) parentMeter?.charge(it.toLong())
+                }
+            }
+        }
+    }
+    private fun recordWork(units: Long) {
         require(units >= 0)
-        spent = sum(spent, units)
+        pool.debit(units)
         params.cancellation.charge(units)
     }
     fun snapshot(): QfNraStats = QfNraStats(projected, lifted, spent)

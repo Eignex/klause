@@ -22,7 +22,7 @@ import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SharingChannel
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -59,7 +59,7 @@ class BacktrackWorkerConfigTest {
                 pools = SharedPools(null, null, identity = ModelIdentity.of(problem, objective),
                     acceptedIncumbents = exchange))
             witnesses += worker.use { it.improvements({ cutoffReads++; Double.POSITIVE_INFINITY },
-                Cancellation.Never).mapNotNull { it.objectiveValue }.toList() }
+                ExecutionControl.Never).mapNotNull { it.objectiveValue }.toList() }
             reads += cutoffReads
         }
 
@@ -99,7 +99,7 @@ class BacktrackWorkerConfigTest {
                 pools = SharedPools(null, null, identity = identity,
                     acceptedIncumbents = IncumbentSource { reads++; exchange.current() }))
 
-            worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }
+            worker.use { it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never).last() }
 
             assertEquals(shouldRead, reads > 0)
         }
@@ -216,7 +216,7 @@ class BacktrackWorkerConfigTest {
             pools = allPools(),
         )
 
-        worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }
+        worker.use { it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never).last() }
 
         val sharing = assertNotNull(worker.sharingMeter).snapshot()
         assertTrue(SharingChannel.Clauses in sharing.channels)
@@ -244,8 +244,8 @@ class BacktrackWorkerConfigTest {
             )
 
             worker.use {
-                if (objective == null) it.solve(Cancellation.Never)
-                else it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last()
+                if (objective == null) it.solve(ExecutionControl.Never)
+                else it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never).last()
             }
 
             val stats = assertNotNull(worker.sharingMeter).snapshot()

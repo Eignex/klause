@@ -38,7 +38,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.validation.verifyOpenWitness
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.abs
@@ -106,7 +106,7 @@ internal class OpenPortfolio(
     )
 
     /** Run the portfolio until an arm settles the model or [cancellation] fires. */
-    fun solve(cancellation: Cancellation): OpenTheoryResult {
+    fun solve(cancellation: ExecutionControl): OpenTheoryResult {
         val stop = lifetime or cancellation
         if (stop() || preparedPlan.decline == PreparedPlanDecline.RESOURCE) {
             return OpenTheoryResult.Unknown(
@@ -170,7 +170,7 @@ internal class OpenPortfolio(
     fun minimize(
         objective: LinearObjective,
         minimizer: OpenTheoryMinimizer?,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): OpenTheoryOptimum {
         val stop = lifetime or cancellation
         if (stop() || preparedPlan.decline == PreparedPlanDecline.RESOURCE) {
@@ -363,7 +363,7 @@ internal class OpenPortfolio(
         override val stats: SolveStats get() = search.stats
         override val work: Long get() = search.work
 
-        override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? =
+        override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long): SolveResult? =
             search.runSlice(global, sliceMillis, sliceNodes)?.let { toSolveResult(it, invocation()) }
 
         override fun close() = search.close()
@@ -402,7 +402,7 @@ internal class OpenPortfolio(
         override val work: Long get() = descent.work
 
         override fun runSlice(
-            global: Cancellation,
+            global: ExecutionControl,
             sliceMillis: Long,
             sliceNodes: Long,
             onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -445,7 +445,7 @@ internal class OpenPortfolio(
 
     private fun localSearchFactories(
         firstArm: Int,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         objective: LinearObjective?,
     ): List<PortfolioArmFactory> {
         if (completeOnly) return emptyList()
@@ -495,7 +495,7 @@ internal class OpenPortfolio(
             LocalSearchModel.open(model, it)
         } ?: LocalSearchModel.open(model)
         if (!localSearchSupports(searchModel, completes = model.numRealVars > 0)) return emptyList()
-        val start = model.lpSeed(searchModel.domains, cancellation or Cancellation.after(SEED_BUDGET))
+        val start = model.lpSeed(searchModel.domains, cancellation or ExecutionControl.after(SEED_BUDGET))
         val profile = ProblemProfile.of(model, optimizing = objective != null)
         val recipes = LocalSearchCatalog.diverse(profile.kind, localSearchArms, profile.problemClass)
         return recipes.mapIndexed { i, recipe ->
@@ -584,7 +584,7 @@ internal fun openWitnessVerifier(
     model: Problem,
     objective: LinearObjective?,
     context: SourceProofContext? = null,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): CandidateVerifier<Sample, Double?> {
     val projection by lazy { PropagationProblem(model) }
     return openWitnessVerifier(model, objective, context, cancellation) { projection }
@@ -594,7 +594,7 @@ private fun openWitnessVerifier(
     model: Problem,
     objective: LinearObjective?,
     context: SourceProofContext?,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     projection: () -> PropagationProblem,
 ): CandidateVerifier<Sample, Double?> = CandidateVerifier { candidate ->
     val sample = candidate.assignment

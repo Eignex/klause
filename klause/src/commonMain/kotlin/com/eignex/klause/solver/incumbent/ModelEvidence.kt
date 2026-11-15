@@ -9,7 +9,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.matchSourceClaims
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class ModelIdentity private constructor(private val source: Any, private val objective: Any?) {
     val semantics = (source as? SourceSemanticsOwner)?.semantics
@@ -36,7 +36,7 @@ internal class EvidenceCertificate private constructor(
     val quadraticPublication: QuadraticWitnessPublication? = null,
 ) {
     fun verifyDerivation(
-        claim: SourceClaim, context: SourceProofContext, cancellation: Cancellation = Cancellation.Never,
+        claim: SourceClaim, context: SourceProofContext, cancellation: ExecutionControl = ExecutionControl.Never,
     ): SourceEvidenceCheck {
         val completed = completion ?: return SourceEvidenceCheck.Unavailable("completed derivation capture unavailable")
         if (completed.scope == null || completed.invocation?.hasUncapturedSourceRestrictions == true) {
@@ -178,7 +178,7 @@ internal class ModelEvidenceVerifier<A, V>(
 ) {
     fun verify(
         evidence: ModelEvidence<A, V>, scope: SourceScope? = null, invocation: EngineInvocation? = null,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): Verification<ModelEvidence<A, V>, Unit> {
         if (!model.matches(evidence.model)) {
             return Verification.Rejected("evidence belongs to a different model or objective")

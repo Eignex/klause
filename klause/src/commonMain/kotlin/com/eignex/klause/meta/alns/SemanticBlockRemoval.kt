@@ -9,7 +9,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.numbers.CheckedLongOverflowException
@@ -40,16 +40,24 @@ internal class SemanticBlockRemoval(
 
     override fun destroy(rng: Random, problem: BakedProblem, incumbent: Sample,
         objective: LinearObjective, fraction: Double,
-    ): FreedVars = destroy(rng, problem, incumbent, objective, fraction, Assumptions.None, Cancellation.Never)
+    ): FreedVars = destroy(rng, problem, incumbent, objective, fraction, Assumptions.None, ExecutionControl.Never)
 
-    override fun destroy(rng: Random, problem: BakedProblem, incumbent: Sample,
-        objective: LinearObjective, fraction: Double, assumptions: Assumptions, cancellation: Cancellation,
+    override fun destroy(
+        rng: Random,
+        problem: BakedProblem,
+        incumbent: Sample,
+        objective: LinearObjective,
+        fraction: Double,
+        assumptions: Assumptions,
+        cancellation: ExecutionControl,
     ): FreedVars = observed(cancellation) { work ->
         if (incumbent.numBoolVars != problem.numBoolVars || incumbent.numIntVars != problem.numIntVars ||
             incumbent.numRealVars != problem.numRealVars || problem.numRealVars != 0 ||
             problem.numBoolVars.toLong() + problem.numIntVars > Int.MAX_VALUE ||
             !fraction.isFinite() || fraction !in 0.0..1.0
-        ) work.stop(RepairBlockDecline.InvalidFrame)
+        ) {
+            work.stop(RepairBlockDecline.InvalidFrame)
+        }
         work.charge()
         if (problem.numFactors == 0) work.stop(RepairBlockDecline.NoShape)
         val nominal = (fraction * (problem.numBoolVars.toLong() + problem.numIntVars)).toInt().coerceAtLeast(1)
@@ -67,14 +75,17 @@ internal class SemanticBlockRemoval(
                     }
                     for (variable in factor.vars) roles.int(variable)
                 }
+
                 kind == Kind.Resource && factor is Cumulative -> {
                     if (factor.starts.size < 2) continue
                     resourceWindow(factor, incumbent, nominal, rng, roles, work)
                 }
+
                 kind == Kind.Placement && factor is Diffn -> {
                     if (factor.n < 2) continue
                     placementWindow(factor, incumbent, rng, roles, work)
                 }
+
                 else -> continue
             }
             var closed: ClosedRepairBlock
@@ -92,8 +103,11 @@ internal class SemanticBlockRemoval(
         work.stop(if (unsupported) RepairBlockDecline.UnsupportedShape else RepairBlockDecline.NoShape)
     }
 
-    fun closeControl(problem: BakedProblem, requested: FreedVars, assumptions: Assumptions,
-        cancellation: Cancellation,
+    fun closeControl(
+        problem: BakedProblem,
+        requested: FreedVars,
+        assumptions: Assumptions,
+        cancellation: ExecutionControl,
     ): FreedVars = observed(cancellation) { work ->
         val closed = RepairBlockClosure.close(problem, requested, definitions, assumptions,
             maxInputs, maxVariables, work)
@@ -103,7 +117,7 @@ internal class SemanticBlockRemoval(
         closed.freed
     }
 
-    private inline fun observed(cancellation: Cancellation, action: (RepairBlockWork) -> FreedVars): FreedVars {
+    private inline fun observed(cancellation: ExecutionControl, action: (RepairBlockWork) -> FreedVars): FreedVars {
         lastDecline = null
         lastSearchedInputs = 0
         lastRequested = null
@@ -226,7 +240,9 @@ internal class SemanticBlockRemoval(
                         factor.durationVars.getOrNull(index)?.let { it in inputs } == true ||
                         factor.resourceVars.getOrNull(index)?.let { it in inputs } == true ||
                         factor.presents.getOrNull(index)?.let { Lit.variable(it) in boolInputs } == true
-                    ) task(factor, index, roles)
+                    ) {
+                        task(factor, index, roles)
+                    }
                 }
             }
             if (kind == Kind.Placement && factor is Diffn) {
@@ -235,7 +251,9 @@ internal class SemanticBlockRemoval(
                     if (factor.xs[index] in inputs || factor.ys[index] in inputs ||
                         factor.widthVars?.get(index)?.let { it in inputs } == true ||
                         factor.heightVars?.get(index)?.let { it in inputs } == true
-                    ) rectangle(factor, index, roles)
+                    ) {
+                        rectangle(factor, index, roles)
+                    }
                 }
             }
         }

@@ -17,15 +17,15 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.sun.management.ThreadMXBean
-import java.io.File
-import java.lang.management.ManagementFactory
-import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * An existing catalog recipe replayed as a cold inner repair owner with the acquisition walk's definition sweep,
@@ -89,7 +89,7 @@ internal class StructuredInner private constructor(
     /** Repair one captured scope with [seed] under [budget], spending at most [allowance] decision equivalents. */
     fun repair(
         problem: BakedProblem, objective: LinearObjective, center: Sample, pins: Assumptions, freedBools: IntArray,
-        freedInts: IntArray, stop: Cancellation, budget: NodeBudget, seed: Long, allowance: Long,
+        freedInts: IntArray, stop: ExecutionControl, budget: NodeBudget, seed: Long, allowance: Long,
     ): Run {
         val started = System.nanoTime()
         val completion = if (problem.numRealVars == 0) null else
@@ -187,21 +187,21 @@ internal class StructuredInner private constructor(
 internal class RepairDescent(val sweep: DefinitionalSweep?, val directory: File) {
     fun continueFrom(
         problem: BakedProblem, objective: LinearObjective, repaired: Sample, seed: Long, owner: String, center: Int,
-        verify: (Sample, Cancellation) -> RepairOwnerReplay.PointCheck,
+        verify: (Sample, ExecutionControl) -> RepairOwnerReplay.PointCheck,
     ): JsonObject {
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
         val thread = Thread.currentThread().threadId()
         val started = System.nanoTime()
         val allocation = bean.getThreadAllocatedBytes(thread)
         val budget = NodeBudget(DESCENT_WORK)
-        val stop = Cancellation.after(2000.milliseconds)
+        val stop = ExecutionControl.after(2000.milliseconds)
         directory.mkdirs()
         val name = owner.replace(Regex("[^A-Za-z0-9-]"), "_")
         val descent = FiniteConflictSelection.descend(problem, objective, repaired, seed, sweep, stop, budget,
             directory.resolve("$name-$center.jsonl"))
         val elapsed = System.nanoTime() - started
         val bytes = bean.getThreadAllocatedBytes(thread) - allocation
-        val checked = verify(descent.sample, Cancellation.after(2000.milliseconds))
+        val checked = verify(descent.sample, ExecutionControl.after(2000.milliseconds))
         return buildJsonObject {
             put("declaredDescentRule", FiniteConflictSelection.DESCENT_RULE)
             put("maxDescentMoves", FiniteConflictSelection.DESCENT_MOVES)

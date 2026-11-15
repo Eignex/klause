@@ -15,7 +15,7 @@ import com.eignex.klause.portfolio.editing
 import com.eignex.klause.portfolio.spending
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SearchEvent
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Inputs for resolving a finite portfolio route into an execution or diagnostic plan. */
 class PortfolioPlanRequest(
@@ -106,8 +106,8 @@ class FixedBacktrackPlanRequest(
     val executionOptions: ExecutionOptions,
     /** Optional seed supplied by the frontend. */
     val randomSeed: Long?,
-    /** Cancellation shared by the solve route. */
-    val cancellation: Cancellation,
+    /** ExecutionControl shared by the solve route. */
+    val cancellation: ExecutionControl,
     /** One invocation-wide backtrack node allowance, if selected. */
     val nodeBudget: NodeBudget?,
     /** Advisory wall-clock budget for LP subcomponents. */
@@ -127,7 +127,7 @@ class FixedBacktrackPlanRequest(
         annotatedParams: BacktrackParams?,
         engineParams: List<String>,
         randomSeed: Long?,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         nodeBudget: NodeBudget?,
         solveBudgetMillis: Long?,
         lpConfig: LpConfig,

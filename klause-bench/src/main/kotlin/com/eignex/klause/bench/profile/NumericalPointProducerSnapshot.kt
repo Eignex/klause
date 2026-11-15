@@ -12,7 +12,7 @@ import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -20,7 +20,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-internal class NumericalPointProducerSnapshot(private val stop: Cancellation) {
+internal class NumericalPointProducerSnapshot(private val stop: ExecutionControl) {
     @Suppress("UNCHECKED_CAST")
     fun inspect(journal: Any, emit: (JsonObject) -> Unit) {
         val records = field(journal, "retained") as List<Any>
@@ -35,7 +35,7 @@ internal class NumericalPointProducerSnapshot(private val stop: Cancellation) {
         var allocation = 0L
         var examined = 0
         var limited = false
-        val active = Cancellation { stop() || work >= maximumWork || allocation >= maximumAllocation }
+        val active = ExecutionControl { stop() || work >= maximumWork || allocation >= maximumAllocation }
         val snapshot = NumericalSelectionSnapshot(active)
         for (record in records) {
             if (active()) break
@@ -49,30 +49,36 @@ internal class NumericalPointProducerSnapshot(private val stop: Cancellation) {
             }
             allocation += projectionAllocation
             var projected = point != null && point.size <= 8192 && projectionAllocation <= 1_048_576L
-            if (projected) for ((coordinate, value) in checkNotNull(point)) {
-                val words = (value.num.magnitudeBitLength().toLong() +
-                    value.den.magnitudeBitLength() + 63L) / 64L
-                val cost = 1L + words * words
-                if (active() || cost > 65_536L - projectionWork || cost > maximumWork - work) {
-                    projected = false
-                    break
+            if (projected) {
+                for ((coordinate, value) in checkNotNull(point)) {
+                    val words = (
+                        value.num.magnitudeBitLength().toLong() +
+                            value.den.magnitudeBitLength() + 63L
+                        ) / 64L
+                    val cost = 1L + words * words
+                    if (active() || cost > 65_536L - projectionWork || cost > maximumWork - work) {
+                        projected = false
+                        break
+                    }
+                    projectionWork += cost
+                    work += cost
+                    val number = value.toDouble()
+                    if (!number.isFinite()) {
+                        projected = false
+                        break
+                    }
+                    values[coordinate] = number
                 }
-                projectionWork += cost
-                work += cost
-                val number = value.toDouble()
-                if (!number.isFinite()) {
-                    projected = false
-                    break
-                }
-                values[coordinate] = number
             }
             if (!projected || active()) {
-                emit(buildJsonObject {
-                    put("originalQuery", field(record, "id") as Int)
-                    put("state", "point-unavailable")
-                    put("projectionWork", projectionWork)
-                    put("projectionModeledAllocation", projectionAllocation)
-                })
+                emit(
+                    buildJsonObject {
+                        put("originalQuery", field(record, "id") as Int)
+                        put("state", "point-unavailable")
+                        put("projectionWork", projectionWork)
+                        put("projectionModeledAllocation", projectionAllocation)
+                    },
+                )
                 continue
             }
             val numeric = field(record, "numeric") as SourceProofContext
@@ -90,8 +96,10 @@ internal class NumericalPointProducerSnapshot(private val stop: Cancellation) {
             val proofAllocation = cuts.size * (131_072L + numeric.premises.size * 64L)
             var proofAllocated = 0L
             var proofWork = 0L
-            val proofStop = Cancellation {
-                if (active() || proofWork >= 100_000L) true else {
+            val proofStop = ExecutionControl {
+                if (active() || proofWork >= 100_000L) {
+                    true
+                } else {
                     proofWork++
                     work++
                     false
@@ -105,60 +113,83 @@ internal class NumericalPointProducerSnapshot(private val stop: Cancellation) {
                 allocation += proofAllocation
                 proofAllocated = proofAllocation
                 cuts.map { cut ->
-                    verifier.verify(SourceEvidence(numeric.scope,
-                        SourceClaim.Consequence(field(cut, "inequality") as SourceInequality),
-                        field(cut, "derivation") as SourceDerivation), proofStop)
+                    verifier.verify(
+                        SourceEvidence(
+                            numeric.scope,
+                            SourceClaim.Consequence(field(cut, "inequality") as SourceInequality),
+                            field(cut, "derivation") as SourceDerivation,
+                        ),
+                        proofStop,
+                    )
                 }
             }
             examined++
-            emit(buildJsonObject {
-                put("originalQuery", field(record, "id") as Int)
-                put("scope", scope(numeric.scope))
-                put("producer", "production-point-source-pairs")
-                put("maximumGenerationWork", 65_536L)
-                put("maximumGenerationModeledAllocation", 1_048_576L)
-                put("maximumCandidates", 64)
-                put("projectionWork", projectionWork)
-                put("projectionModeledAllocation", projectionAllocation)
-                put("observations", buildJsonObject { observations.forEach { (key, value) -> put(key, value) } })
-                put("proofWork", proofWork)
-                put("proofModeledAllocation", proofAllocated)
-                put("proofChecksComplete", checks.none { it is SourceEvidenceCheck.Unavailable })
-                put("acceptedCandidates", checks.count { it == SourceEvidenceCheck.Checked })
-                put("rejectedCandidates", checks.count { it is SourceEvidenceCheck.Rejected })
-                put("candidates", buildJsonArray {
-                    cuts.forEachIndexed { index, cut -> add(buildJsonObject {
-                        val row = field(cut, "inequality") as SourceInequality
-                        put("coefficients", coefficients(row.coefficients))
-                        put("rhs", row.rhs.toString())
-                        put("strict", row.strict)
-                        put("freshNativeCheck", checks[index].toString())
-                        put("owners", buildJsonArray {
-                            (field(cut, "owners") as Set<Int>).sorted().forEach { add(JsonPrimitive(it)) }
-                        })
-                        put("derivation", snapshot.proof(field(cut, "derivation") as SourceDerivation))
-                    }) }
-                })
-                put("cumulativeWork", work)
-                put("cumulativeModeledAllocation", allocation)
-                put("lpQueries", 0)
-                put("installedIntoTraversal", false)
-                put("independentProofCheck", false)
-            })
+            emit(
+                buildJsonObject {
+                    put("originalQuery", field(record, "id") as Int)
+                    put("scope", scope(numeric.scope))
+                    put("producer", "production-point-source-pairs")
+                    put("maximumGenerationWork", 65_536L)
+                    put("maximumGenerationModeledAllocation", 1_048_576L)
+                    put("maximumCandidates", 64)
+                    put("projectionWork", projectionWork)
+                    put("projectionModeledAllocation", projectionAllocation)
+                    put("observations", buildJsonObject { observations.forEach { (key, value) -> put(key, value) } })
+                    put("proofWork", proofWork)
+                    put("proofModeledAllocation", proofAllocated)
+                    put("proofChecksComplete", checks.none { it is SourceEvidenceCheck.Unavailable })
+                    put("acceptedCandidates", checks.count { it == SourceEvidenceCheck.Checked })
+                    put("rejectedCandidates", checks.count { it is SourceEvidenceCheck.Rejected })
+                    put(
+                        "candidates",
+                        buildJsonArray {
+                            cuts.forEachIndexed { index, cut ->
+                                add(
+                                    buildJsonObject {
+                                        val row = field(cut, "inequality") as SourceInequality
+                                        put("coefficients", coefficients(row.coefficients))
+                                        put("rhs", row.rhs.toString())
+                                        put("strict", row.strict)
+                                        put("freshNativeCheck", checks[index].toString())
+                                        put(
+                                            "owners",
+                                            buildJsonArray {
+                                                (field(cut, "owners") as Set<Int>).sorted().forEach {
+                                                    add(
+                                                        JsonPrimitive(it),
+                                                    )
+                                                }
+                                            },
+                                        )
+                                        put("derivation", snapshot.proof(field(cut, "derivation") as SourceDerivation))
+                                    },
+                                )
+                            }
+                        },
+                    )
+                    put("cumulativeWork", work)
+                    put("cumulativeModeledAllocation", allocation)
+                    put("lpQueries", 0)
+                    put("installedIntoTraversal", false)
+                    put("independentProofCheck", false)
+                },
+            )
         }
-        emit(buildJsonObject {
-            put("summary", true)
-            put("capturedQueries", records.size)
-            put("examinedQueries", examined)
-            put("captureLimited", journal.javaClass.getDeclaredMethod("getLimited").invoke(journal) as Boolean)
-            put("stopped", active() || limited)
-            put("maximumWork", maximumWork)
-            put("maximumModeledAllocation", maximumAllocation)
-            put("work", work)
-            put("modeledAllocation", allocation)
-            put("lpQueries", 0)
-            put("wholeCliTimingClaim", false)
-            put("independentProofCheck", false)
-        })
+        emit(
+            buildJsonObject {
+                put("summary", true)
+                put("capturedQueries", records.size)
+                put("examinedQueries", examined)
+                put("captureLimited", journal.javaClass.getDeclaredMethod("getLimited").invoke(journal) as Boolean)
+                put("stopped", active() || limited)
+                put("maximumWork", maximumWork)
+                put("maximumModeledAllocation", maximumAllocation)
+                put("work", work)
+                put("modeledAllocation", allocation)
+                put("lpQueries", 0)
+                put("wholeCliTimingClaim", false)
+                put("independentProofCheck", false)
+            },
+        )
     }
 }

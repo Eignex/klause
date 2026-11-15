@@ -7,8 +7,9 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.ir.PolynomialRelation
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.serialArithmeticSource
 
 internal data class PolynomialCoupledStats(
     val supports: Long = 0,
@@ -36,7 +37,9 @@ internal class PolynomialCoupledSections(
     private var conflictCount = 0L
     private var repeatedCount = 0L
     private var declineCount = 0L
-    private var spentWork = 0L
+    private var completedWork = 0L
+    private var pendingWork: () -> Long = { 0L }
+    private val spentWork get() = completedWork + pendingWork()
     private var preparedCount = 0L
     private var jointCount = 0L
     val stats: PolynomialCoupledStats get() = PolynomialCoupledStats(
@@ -46,32 +49,41 @@ internal class PolynomialCoupledSections(
     val available: Boolean get() = spentWork < maximumWork
     private var parentStopped = false
     private val meter = WorkMeter {
-        spentWork += it
+        completedWork += it
         parent.charge(it)
     }
-    private val token = object : Cancellation {
+    private val token = object : ExecutionControl() {
         override fun isCancelled(): Boolean {
             if (parent()) parentStopped = true
             return parentStopped || spentWork >= maximumWork
         }
         override fun deadline() = parent.deadline()
-        override fun workMeter(): WorkMeter = meter
+        override val accounting: WorkMeter get() = meter
+        override val admission get() = serialArithmeticSource(
+            parent,
+            { maximumWork - spentWork },
+            { completedWork += it },
+        )
     }
-    private val arithmetic = PolynomialArithmetic(token, limits)
+    private val arithmetic = PolynomialArithmetic(token, limits).also {
+        pendingWork = { it.execution.admittedWork }
+    }
     private val algebraic = AlgebraicArithmetic(arithmetic)
 
     fun refute(required: List<PolynomialAtom>, identities: List<Long>, checked: MutableSet<List<Long>>): List<Int>? {
         if (!available || required.size > MAX_COUPLED_PREMISES) return null
         return try {
-            arithmetic.step()
-            val direct = required.mapIndexed { index, atom ->
+            arithmetic.execution.operation {
                 arithmetic.step()
-                PolynomialCoupledSupport(atom, setOf(index))
+                val direct = required.mapIndexed { index, atom ->
+                    arithmetic.step()
+                    PolynomialCoupledSupport(atom, setOf(index))
+                }
+                refuteSupports(direct, identities, checked, prepared = false)?.let { return it }
+                if (!prepareSupports) return null
+                val prepared = prepareCoupledSupport(direct, arithmetic) ?: return null
+                refuteSupports(prepared, identities, checked, prepared = true)
             }
-            refuteSupports(direct, identities, checked, prepared = false)?.let { return it }
-            if (!prepareSupports) return null
-            val prepared = prepareCoupledSupport(direct, arithmetic) ?: return null
-            refuteSupports(prepared, identities, checked, prepared = true)
         } catch (stop: PolynomialInterrupted) {
             if (parentStopped) throw stop
             declineCount++

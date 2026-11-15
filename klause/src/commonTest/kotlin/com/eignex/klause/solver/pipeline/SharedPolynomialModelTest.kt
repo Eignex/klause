@@ -24,7 +24,7 @@ import com.eignex.klause.theory.EncoderProvider
 import com.eignex.klause.theory.EncoderSupport
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.skema.SchemaDef
 import kotlin.test.Test
@@ -40,33 +40,78 @@ import kotlin.test.assertTrue
 class SharedPolynomialModelTest {
     @Test
     fun `an ineligible polynomial scope should install no supported prefix in either source order`() {
-        for (support in listOf(EncoderSupport.UNSUPPORTED, EncoderSupport.RELAXATION_ONLY,
-            EncoderSupport.CONDITIONED)) {
+        for (support in listOf(
+            EncoderSupport.UNSUPPORTED,
+            EncoderSupport.RELAXATION_ONLY,
+            EncoderSupport.CONDITIONED,
+        )) {
             for (reverse in listOf(false, true)) {
-                val row = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
-                    LinearOp.GE, BigFraction.ZERO)
-                val excluded = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
-                    LinearOp.LE, BigFraction.ONE)
+                val row = ExactLinear.of(
+                    intArrayOf(Term.ofRealVar(0)),
+                    listOf(BigFraction.ONE),
+                    LinearOp.GE,
+                    BigFraction.ZERO,
+                )
+                val excluded = ExactLinear.of(
+                    intArrayOf(Term.ofRealVar(0)),
+                    listOf(BigFraction.ONE),
+                    LinearOp.LE,
+                    BigFraction.ONE,
+                )
                 val factors = if (reverse) arrayOf<Factor>(excluded, row) else arrayOf<Factor>(row, excluded)
-                val source = Problem(1, 0, emptyArray(), factors, numRealVars = 1,
-                    realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+                val source = Problem(
+                    1,
+                    0,
+                    emptyArray(),
+                    factors,
+                    numRealVars = 1,
+                    realLower = doubleArrayOf(0.0),
+                    realUpper = doubleArrayOf(1.0),
+                )
                 var installed = 0
                 var decline: EncoderDecline? = null
-                val projections = FactorProjectionProviders(encoder = EncoderProvider { factor, _ ->
-                    if (factor === excluded) Encoder(support, requiredBooleans =
-                        if (support == EncoderSupport.CONDITIONED) mapOf(SourceBoolId(0) to true) else emptyMap())
-                    else Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
-                        installed++
-                        encoding.polynomial(PolynomialRealFormula.Constant(true))
-                        null
-                    }
-                }).prepare(source)
+                val projections = FactorProjectionProviders(
+                    encoder = EncoderProvider { factor, _ ->
+                        if (factor === excluded) {
+                            Encoder(
+                                support,
+                                requiredBooleans =
+                                if (support == EncoderSupport.CONDITIONED) {
+                                    mapOf(
+                                        SourceBoolId(
+                                            0,
+                                        ) to true,
+                                    )
+                                } else {
+                                    emptyMap()
+                                },
+                            )
+                        } else {
+                            Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
+                                installed++
+                                encoding.polynomial(PolynomialRealFormula.Constant(true))
+                                null
+                            }
+                        }
+                    },
+                ).prepare(source)
 
-                val model = SharedPolynomialModel.lower(source, null, projections, Cancellation.Never) { decline = it }
+                val model = SharedPolynomialModel.lower(
+                    source,
+                    null,
+                    projections,
+                    ExecutionControl.Never,
+                ) { decline = it }
 
                 assertNull(model)
-                assertEquals(if (support == EncoderSupport.CONDITIONED) EncoderDecline.CONDITIONS
-                    else EncoderDecline.UNSUPPORTED, decline)
+                assertEquals(
+                    if (support == EncoderSupport.CONDITIONED) {
+                        EncoderDecline.CONDITIONS
+                    } else {
+                        EncoderDecline.UNSUPPORTED
+                    },
+                    decline,
+                )
                 assertEquals(0, installed)
             }
         }
@@ -74,22 +119,32 @@ class SharedPolynomialModelTest {
 
     @Test
     fun `polynomial preflight exhaustion should retain spent work without installing a prefix`() {
-        val source = Problem(0, 0, emptyArray(), Array<Factor>(3) {
-            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.GE, BigFraction.ZERO)
-        }, numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            Array<Factor>(3) {
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.GE, BigFraction.ZERO)
+            },
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         var installed = 0
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 2
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
-        val projections = FactorProjectionProviders(encoder = EncoderProvider { _, _ ->
-            Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
-                installed++
-                encoding.polynomial(PolynomialRealFormula.Constant(true))
-                null
-            }
-        }).prepare(source)
+        val projections = FactorProjectionProviders(
+            encoder = EncoderProvider { _, _ ->
+                Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
+                    installed++
+                    encoding.polynomial(PolynomialRealFormula.Constant(true))
+                    null
+                }
+            },
+        ).prepare(source)
 
         val plan = source.preparePolynomialExecutionPlan(projections = projections, cancellation = stop)
 
@@ -101,20 +156,33 @@ class SharedPolynomialModelTest {
 
     @Test
     fun `a polynomial installer observing a transient stop should withhold its completed emissions`() {
-        val row = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
-            LinearOp.GE, BigFraction.ZERO)
-        val source = Problem(0, 0, emptyArray(), arrayOf(row), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val row = ExactLinear.of(
+            intArrayOf(Term.ofRealVar(0)),
+            listOf(BigFraction.ONE),
+            LinearOp.GE,
+            BigFraction.ZERO,
+        )
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(row),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         var stopNext = false
-        val stop = Cancellation { stopNext.also { stopNext = false } }
-        val projections = FactorProjectionProviders(encoder = EncoderProvider { _, _ ->
-            Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
-                encoding.polynomial(PolynomialRealFormula.Constant(true))
-                stopNext = true
-                encoding.cancellation()
-                null
-            }
-        }).prepare(source)
+        val stop = ExecutionControl { stopNext.also { stopNext = false } }
+        val projections = FactorProjectionProviders(
+            encoder = EncoderProvider { _, _ ->
+                Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
+                    encoding.polynomial(PolynomialRealFormula.Constant(true))
+                    stopNext = true
+                    encoding.cancellation()
+                    null
+                }
+            },
+        ).prepare(source)
 
         val plan = source.preparePolynomialExecutionPlan(projections = projections, cancellation = stop)
 
@@ -124,20 +192,30 @@ class SharedPolynomialModelTest {
 
     @Test
     fun `an admitted polynomial scope should still honor actual installer declines`() {
-        val source = Problem(0, 0, emptyArray(), Array<Factor>(2) {
-            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.GE, BigFraction.ZERO)
-        }, numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            Array<Factor>(2) {
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.GE, BigFraction.ZERO)
+            },
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         var installed = 0
         var decline: EncoderDecline? = null
-        val projections = FactorProjectionProviders(encoder = EncoderProvider { _, _ ->
-            Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
-                installed++
-                encoding.polynomial(PolynomialRealFormula.Constant(true))
-                EncoderDecline.UNSUPPORTED.takeIf { encoding.sourceFactorIndex == 1 }
-            }
-        }).prepare(source)
+        val projections = FactorProjectionProviders(
+            encoder = EncoderProvider { _, _ ->
+                Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
+                    installed++
+                    encoding.polynomial(PolynomialRealFormula.Constant(true))
+                    EncoderDecline.UNSUPPORTED.takeIf { encoding.sourceFactorIndex == 1 }
+                }
+            },
+        ).prepare(source)
 
-        val model = SharedPolynomialModel.lower(source, null, projections, Cancellation.Never) { decline = it }
+        val model = SharedPolynomialModel.lower(source, null, projections, ExecutionControl.Never) { decline = it }
 
         assertNull(model)
         assertEquals(EncoderDecline.UNSUPPORTED, decline)
@@ -146,16 +224,29 @@ class SharedPolynomialModelTest {
 
     @Test
     fun `a polynomial installer emitting no relation should not produce a model`() {
-        val row = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
-            LinearOp.GE, BigFraction.ZERO)
-        val source = Problem(0, 0, emptyArray(), arrayOf(row), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val row = ExactLinear.of(
+            intArrayOf(Term.ofRealVar(0)),
+            listOf(BigFraction.ONE),
+            LinearOp.GE,
+            BigFraction.ZERO,
+        )
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(row),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         var decline: EncoderDecline? = null
-        val projections = FactorProjectionProviders(encoder = EncoderProvider { _, _ ->
-            Encoder(EncoderSupport.EQUIVALENT) { _, _ -> null }
-        }).prepare(source)
+        val projections = FactorProjectionProviders(
+            encoder = EncoderProvider { _, _ ->
+                Encoder(EncoderSupport.EQUIVALENT) { _, _ -> null }
+            },
+        ).prepare(source)
 
-        val model = SharedPolynomialModel.lower(source, null, projections, Cancellation.Never) { decline = it }
+        val model = SharedPolynomialModel.lower(source, null, projections, ExecutionControl.Never) { decline = it }
 
         assertNull(model)
         assertEquals(EncoderDecline.UNSUPPORTED, decline)
@@ -163,23 +254,43 @@ class SharedPolynomialModelTest {
 
     @Test
     fun `a polynomial receiver should reject another source capture before installing`() {
-        val row = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
-            LinearOp.GE, BigFraction.ZERO)
-        val source = Problem(0, 0, emptyArray(), arrayOf(row), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
-        val foreign = Problem(0, 0, emptyArray(), arrayOf(row), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val row = ExactLinear.of(
+            intArrayOf(Term.ofRealVar(0)),
+            listOf(BigFraction.ONE),
+            LinearOp.GE,
+            BigFraction.ZERO,
+        )
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(row),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
+        val foreign = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(row),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         var installed = 0
-        val projections = FactorProjectionProviders(encoder = EncoderProvider { _, _ ->
-            Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
-                installed++
-                encoding.polynomial(PolynomialRealFormula.Constant(true))
-                null
-            }
-        }).prepare(foreign)
+        val projections = FactorProjectionProviders(
+            encoder = EncoderProvider { _, _ ->
+                Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
+                    installed++
+                    encoding.polynomial(PolynomialRealFormula.Constant(true))
+                    null
+                }
+            },
+        ).prepare(foreign)
 
         assertFailsWith<IllegalArgumentException> {
-            SharedPolynomialModel.lower(source, null, projections, Cancellation.Never) { }
+            SharedPolynomialModel.lower(source, null, projections, ExecutionControl.Never) { }
         }
         assertEquals(0, installed)
     }
@@ -188,8 +299,11 @@ class SharedPolynomialModelTest {
     fun `a polynomial source formula should retain its empty factor scope`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())
 
-        val model = assertNotNull(source.preparePolynomialExecutionPlan(
-            PolynomialRealFormula.Constant(false)).polynomialModel)
+        val model = assertNotNull(
+            source.preparePolynomialExecutionPlan(
+                PolynomialRealFormula.Constant(false),
+            ).polynomialModel,
+        )
         val result = model.service.invocation().use { it.check(PolynomialCondition()) }
 
         assertSame(source, model.source)
@@ -217,31 +331,37 @@ class SharedPolynomialModelTest {
 
     @Test
     fun `finite witness checks should share one completed bake`() {
-        val model = assertNotNull(Problem(0, 0, emptyArray(), emptyArray())
-            .preparePolynomialExecutionPlan(PolynomialRealFormula.Constant(true)).polynomialModel)
+        val model = assertNotNull(
+            Problem(0, 0, emptyArray(), emptyArray())
+                .preparePolynomialExecutionPlan(PolynomialRealFormula.Constant(true)).polynomialModel,
+        )
 
-        val first = model.finitePointCheck(null, Cancellation.Never)
+        val first = model.finitePointCheck(null, ExecutionControl.Never)
 
-        assertSame(first, model.finitePointCheck(null, Cancellation.Never))
+        assertSame(first, model.finitePointCheck(null, ExecutionControl.Never))
     }
 
     @Test
     fun `another finite projection should bake its own witness checker`() {
-        val model = assertNotNull(Problem(0, 0, emptyArray(), emptyArray())
-            .preparePolynomialExecutionPlan(PolynomialRealFormula.Constant(true)).polynomialModel)
-        val first = model.finitePointCheck(null, Cancellation.Never)
+        val model = assertNotNull(
+            Problem(0, 0, emptyArray(), emptyArray())
+                .preparePolynomialExecutionPlan(PolynomialRealFormula.Constant(true)).polynomialModel,
+        )
+        val first = model.finitePointCheck(null, ExecutionControl.Never)
 
-        val other = model.finitePointCheck(FactorProjectionProviders().prepare(model.finite), Cancellation.Never)
+        val other = model.finitePointCheck(FactorProjectionProviders().prepare(model.finite), ExecutionControl.Never)
 
         assertNotSame(first, other)
     }
 
     @Test
     fun `a bake cut short by cancellation should not be retained`() {
-        val model = assertNotNull(Problem(0, 0, emptyArray(), emptyArray())
-            .preparePolynomialExecutionPlan(PolynomialRealFormula.Constant(true)).polynomialModel)
-        val interrupted = model.finitePointCheck(null, Cancellation { true })
+        val model = assertNotNull(
+            Problem(0, 0, emptyArray(), emptyArray())
+                .preparePolynomialExecutionPlan(PolynomialRealFormula.Constant(true)).polynomialModel,
+        )
+        val interrupted = model.finitePointCheck(null, ExecutionControl { true })
 
-        assertNotSame(interrupted, model.finitePointCheck(null, Cancellation.Never))
+        assertNotSame(interrupted, model.finitePointCheck(null, ExecutionControl.Never))
     }
 }

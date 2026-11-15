@@ -12,7 +12,7 @@ import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.LpStatsSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** The solver pipeline selected once from a source [Problem]. */
 enum class ProblemPipeline {
@@ -113,7 +113,7 @@ fun Problem.pipelineRoute(
     objective: LinearObjective? = null,
     maximize: Boolean = false,
     routePureRealToTheory: Boolean = false,
-    boundCancellation: Cancellation = Cancellation.Never,
+    boundCancellation: ExecutionControl = ExecutionControl.Never,
     routeLinearToTheory: Boolean = false,
 ): SourceProblemRoute = sharedPipelineRoute(objective, maximize, boundCancellation, boundCancellation)
 
@@ -126,7 +126,7 @@ fun Problem.pipelineRoute(
     objective: LinearObjective? = null,
     maximize: Boolean = false,
     routePureRealToTheory: Boolean = false,
-    boundCancellation: Cancellation = Cancellation.Never,
+    boundCancellation: ExecutionControl = ExecutionControl.Never,
     routeLinearToTheory: Boolean = false,
     onLpStats: (LpStats) -> Unit,
 ): SourceProblemRoute = sharedPipelineRoute(
@@ -147,7 +147,7 @@ fun Problem.pipelineRoute(
     objective: LinearObjective? = null,
     maximize: Boolean = false,
     routePureRealToTheory: Boolean = false,
-    boundCancellation: Cancellation = Cancellation.Never,
+    boundCancellation: ExecutionControl = ExecutionControl.Never,
     routeLinearToTheory: Boolean = false,
     onLpStats: ((LpStats) -> Unit)? = null,
 ): SourceProblemRoute = sharedPipelineRoute(
@@ -169,8 +169,8 @@ fun Problem.pipelineRoute(
  */
 @Suppress("UNUSED_PARAMETER")
 fun Problem.pipelineRoute(
-    boundCancellation: Cancellation,
-    preparationCancellation: Cancellation,
+    boundCancellation: ExecutionControl,
+    preparationCancellation: ExecutionControl,
     objective: LinearObjective? = null,
     maximize: Boolean = false,
     routePureRealToTheory: Boolean = false,
@@ -190,8 +190,8 @@ fun Problem.pipelineRoute(
 private fun Problem.sharedPipelineRoute(
     objective: LinearObjective?,
     maximize: Boolean,
-    boundCancellation: Cancellation,
-    preparationCancellation: Cancellation,
+    boundCancellation: ExecutionControl,
+    preparationCancellation: ExecutionControl,
     providers: FactorProjectionProviders? = null,
     onLpStats: ((LpStats) -> Unit)? = null,
 ): SourceProblemRoute {
@@ -217,9 +217,9 @@ internal fun Problem.pipelineRoute(
     projections: PreparedFactorProjections,
     objective: LinearObjective?,
     maximize: Boolean,
-    boundCancellation: Cancellation,
-    preparationCancellation: Cancellation,
-    polynomialCancellation: Cancellation = preparationCancellation,
+    boundCancellation: ExecutionControl,
+    preparationCancellation: ExecutionControl,
+    polynomialCancellation: ExecutionControl = preparationCancellation,
     onLpStats: ((LpStats) -> Unit)? = null,
     routePureRealToTheory: Boolean = true,
 ): SourceProblemRoute = pipelineRouteObserved(
@@ -232,8 +232,8 @@ internal fun Problem.pipelineRoute(
 internal fun Problem.pipelineRoute(
     projections: PreparedFactorProjections,
     routePureRealToTheory: Boolean,
-    boundCancellation: Cancellation,
-    polynomialCancellation: Cancellation = boundCancellation,
+    boundCancellation: ExecutionControl,
+    polynomialCancellation: ExecutionControl = boundCancellation,
 ): SourceProblemRoute = pipelineRouteObserved(
     null, false, routePureRealToTheory, boundCancellation, null, false,
     projections.providers, projections, polynomialCancellation,
@@ -243,13 +243,13 @@ private fun Problem.pipelineRouteObserved(
     objective: LinearObjective?,
     maximize: Boolean,
     routePureRealToTheory: Boolean,
-    boundCancellation: Cancellation,
+    boundCancellation: ExecutionControl,
     onLpStats: ((LpStats) -> Unit)?,
     routeLinearToTheory: Boolean,
     providers: FactorProjectionProviders = FactorProjectionProviders.Default,
     projectionCapture: PreparedFactorProjections? = null,
-    polynomialCancellation: Cancellation = boundCancellation,
-    preparationCancellation: Cancellation = boundCancellation,
+    polynomialCancellation: ExecutionControl = boundCancellation,
+    preparationCancellation: ExecutionControl = boundCancellation,
 ): SourceProblemRoute {
     val selection = projectionCapture ?: providers.prepare(this)
     val exactSourceObjective = routeLinearToTheory || requiresExactObjectiveRoute(objective, preparationCancellation)
@@ -293,13 +293,16 @@ private fun Problem.pipelineRouteObserved(
     }
     val finiteIntegerRanges = routed.hasFiniteIntegerRanges()
     // Proved bounds decide whether a finite objective range exists, as they do for the finite lane itself.
-    val exactObjective = if (routed === this) exactSourceObjective else
+    val exactObjective = if (routed === this) {
+        exactSourceObjective
+    } else {
         routeLinearToTheory || routed.requiresExactObjectiveRoute(objective, preparationCancellation)
+    }
     val projections = selection.forEngineView(routed)
     val reuseInitial = initial != null && routed === this && initial.factorProjections === projections &&
         initial.objective === objective && initial.maximize == maximize
     val stopped = reuseInitial && preparationCancellation()
-    val preparationStop = if (stopped) Cancellation { true } or preparationCancellation else preparationCancellation
+    val preparationStop = if (stopped) ExecutionControl { true } or preparationCancellation else preparationCancellation
     val nativeFiniteAfterBounds = !exactObjective &&
         routed.nativeFiniteSource(projections, preparationStop)
     val finiteCompletion = nativeFiniteAfterBounds || (
@@ -378,7 +381,7 @@ private fun Problem.pipelineRouteObserved(
     }
 }
 
-private fun Problem.nativeFiniteSource(projections: PreparedFactorProjections, stop: Cancellation): Boolean {
+private fun Problem.nativeFiniteSource(projections: PreparedFactorProjections, stop: ExecutionControl): Boolean {
     if (numRealVars != 0) return false
     for (variable in 0 until numIntVars) {
         stop.charge(1)
@@ -409,7 +412,7 @@ private fun Problem.nativeFiniteSource(projections: PreparedFactorProjections, s
  *
  * A refutation the bounding derives is the model's verdict and travels as one; see [BoundedRouting].
  */
-private fun Problem.proveBounded(cancellation: Cancellation, lpStats: LpStatsSink?): BoundedRouting {
+private fun Problem.proveBounded(cancellation: ExecutionControl, lpStats: LpStatsSink?): BoundedRouting {
     if (hasFiniteIntegerRanges()) return BoundedRouting.Proved(this)
     val closed = when (val outcome = closeOpenBounds(cancellation, lpStats)) {
         OpenPresolveResult.Refuted -> return BoundedRouting.Refuted

@@ -34,7 +34,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingTarget
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigInt
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -76,7 +76,9 @@ class PreparedFactorProjections internal constructor(
         }
 
     internal fun prepareLpTemplates(
-        objective: LinearObjective?, token: Cancellation, reuseIndexes: Boolean = true,
+        objective: LinearObjective?,
+        token: ExecutionControl,
+        reuseIndexes: Boolean = true,
         reuseMetadata: Boolean = false,
         earned: Boolean = false,
         compileBoundRows: Boolean = false,
@@ -103,7 +105,9 @@ class PreparedFactorProjections internal constructor(
                     token.charge(LpPreparationAdmission.STORAGE_UNITS)
                     work += LpPreparationAdmission.STORAGE_UNITS
                     if (token()) null else demand.afterFailure(lpTemplateNamespace, problem)
-                } else prepared
+                } else {
+                    prepared
+                }
             }
         } finally {
             onWork(work)
@@ -113,7 +117,7 @@ class PreparedFactorProjections internal constructor(
         return next as? LpPreparationTemplates
     }
 
-    internal fun recordLpConstruction(completedUnits: Long, token: Cancellation, onWork: (Long) -> Unit): Boolean {
+    internal fun recordLpConstruction(completedUnits: Long, token: ExecutionControl, onWork: (Long) -> Unit): Boolean {
         if (completedUnits <= 0L || problem.numRealVars != 0 || !builtInRelaxation || token()) return false
         val cache = lpTemplateCache
         val previous = cache.load()
@@ -131,8 +135,13 @@ class PreparedFactorProjections internal constructor(
         val nextPaid = paid + minOf(completedUnits, Long.MAX_VALUE - paid)
         val next = try {
             token.charge(LpPreparationAdmission.STORAGE_UNITS)
-            if (token()) null else if (old == null) LpPreparationAdmission(lpTemplateNamespace, problem, nextPaid)
-            else LpPreparationAdmission(lpTemplateNamespace, problem, nextPaid, old.requiredUnits)
+            if (token()) {
+                null
+            } else if (old == null) {
+                LpPreparationAdmission(lpTemplateNamespace, problem, nextPaid)
+            } else {
+                LpPreparationAdmission(lpTemplateNamespace, problem, nextPaid, old.requiredUnits)
+            }
         } finally {
             onWork(LpPreparationAdmission.STORAGE_UNITS)
         }
@@ -156,7 +165,7 @@ class PreparedFactorProjections internal constructor(
         indices: List<Int>,
         fixedIntegers: Map<SourceIntId, BigInt> = emptyMap(),
         fixedBooleans: Map<SourceBoolId, Boolean> = emptyMap(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         completeFiniteConditions: Boolean = false,
         onDecline: (EncoderDecline) -> Unit = {},
     ): SelectedEncoderRequest? {
@@ -184,7 +193,12 @@ class PreparedFactorProjections internal constructor(
     internal val originalChecks: SelectedProjectionChecks? = if (problem.factors.indices.any { id ->
             requiresOriginalCheck(id) && problem.factors[id].variables.reals.isEmpty() &&
                 problem.factors[id] !is ObjectiveBoundFactor
-        }) SelectedProjectionChecks(this) else null
+        }
+    ) {
+            SelectedProjectionChecks(this)
+        } else {
+            null
+        }
 
     internal val requiresRealSourceCheck: Boolean = problem.factors.indices.any { id ->
         problem.factors[id].variables.reals.isNotEmpty() &&
@@ -199,13 +213,19 @@ class PreparedFactorProjections internal constructor(
     fun forProblem(problem: Problem): PreparedFactorProjections =
         if (this.problem === problem) this else providers.prepare(problem)
 
-    internal fun forEngineView(view: Problem): PreparedFactorProjections = if (view === problem) this else if (
+    internal fun forEngineView(view: Problem): PreparedFactorProjections = if (view === problem) {
+        this
+    } else if (
         view.numBoolVars == problem.numBoolVars && view.numIntVars == problem.numIntVars &&
         view.numRealVars == problem.numRealVars && view.numFactors == problem.numFactors &&
         view.factors.indices.all { view.factors[it] === problem.factors[it] }
-    ) projected(view, IntArray(view.numFactors) { it }).also {
+    ) {
+        projected(view, IntArray(view.numFactors) { it }).also {
         it.lpTemplateRows = lpTemplateRows
-    } else forProblem(view).inheritLpTemplates(this)
+    }
+    } else {
+        forProblem(view).inheritLpTemplates(this)
+    }
 
     internal fun projected(view: Problem, factorIndices: IntArray, remap: VarRemap? = null): PreparedFactorProjections {
         require(factorIndices.size == view.numFactors && factorIndices.all { it in problem.factors.indices }) {

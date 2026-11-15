@@ -10,7 +10,7 @@ import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.sourceCondition
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
@@ -24,11 +24,13 @@ internal class FiniteNumericalTrial(
     private val objective: LinearObjective,
     private val sense: ObjectiveSense,
     workLimit: Long,
-    private val stop: Cancellation,
+    private val stop: ExecutionControl,
 ) : AutoCloseable {
     private val fundingType = Class.forName("com.eignex.klause.lp.SourceLpFunding")
-    private val funding = fundingType.getDeclaredConstructor(Long::class.javaPrimitiveType,
-        Long::class.javaPrimitiveType).newInstance(workLimit, 8L * 1024 * 1024)
+    private val funding = fundingType.getDeclaredConstructor(
+        Long::class.javaPrimitiveType,
+        Long::class.javaPrimitiveType,
+    ).newInstance(workLimit, 8L * 1024 * 1024)
     private var budget: Any? = null
     private var authority: Any? = null
     private var publisher: Any? = null
@@ -49,13 +51,19 @@ internal class FiniteNumericalTrial(
     var outcome = "unavailable"
         private set
 
-    init { fundingType.getMethod("grant", Long::class.javaPrimitiveType).invoke(funding, workLimit) }
+    init {
+        fundingType.getMethod("grant", Long::class.javaPrimitiveType).invoke(funding, workLimit)
+    }
 
     val work: Long get() = field(funding, "spent") as Long
     val allocated: Long get() = field(funding, "allocated") as Long
 
-    fun acquire(center: Sample, pins: Assumptions, arm: String, cuts: Boolean,
-        checkSource: (Sample, Cancellation) -> Boolean,
+    fun acquire(
+        center: Sample,
+        pins: Assumptions,
+        arm: String,
+        cuts: Boolean,
+        checkSource: (Sample, ExecutionControl) -> Boolean,
     ) {
         fundingType.getMethod("charge", Long::class.javaPrimitiveType, Long::class.javaPrimitiveType)
             .invoke(funding, 1L + problem.numIntVars + problem.numFactors, 64L)
@@ -102,8 +110,12 @@ internal class FiniteNumericalTrial(
         val full = requestType.getField("Companion").get(null).let { companion ->
             companion.javaClass.getMethod("getFull").invoke(companion)
         }
-        publisher = publisherType.getDeclaredConstructor(fundingType, Cancellation::class.java,
-            Boolean::class.javaPrimitiveType, requestType).newInstance(funding, stop, true, full)
+        publisher = publisherType.getDeclaredConstructor(
+            fundingType,
+            ExecutionControl::class.java,
+            Boolean::class.javaPrimitiveType,
+            requestType,
+        ).newInstance(funding, stop, true, full)
         val acquisition = publisherType.methods.single { it.name == "acquire" }
             .invoke(publisher, authority, prepared, cutoff, cuts)
         feedback = field(acquisition, "feedback")
@@ -122,19 +134,35 @@ internal class FiniteNumericalTrial(
             val type = Class.forName("com.eignex.klause.solver.pipeline.FiniteNumericalRemoval")
             val kind = Class.forName("com.eignex.klause.solver.pipeline.FiniteNumericalRemoval\$Signal")
             val completion = Class.forName("com.eignex.klause.solver.pipeline.FiniteNumericalRemoval\$Completion")
-            selector = type.getDeclaredConstructor(BakedProblem::class.java, LinearObjective::class.java,
-                SourceProofContext::class.java, fundingType, kind, Assumptions::class.java,
-                Class.forName("com.eignex.klause.localsearch.InvariantNetwork"), completion)
-                .newInstance(problem, objective, source, funding,
+            selector = type.getDeclaredConstructor(
+                BakedProblem::class.java,
+                LinearObjective::class.java,
+                SourceProofContext::class.java,
+                fundingType,
+                kind,
+                Assumptions::class.java,
+                Class.forName("com.eignex.klause.localsearch.InvariantNetwork"),
+                completion,
+            )
+                .newInstance(
+                    problem,
+                    objective,
+                    source,
+                    funding,
                     kind.enumConstants.single {
                         it.toString() == if (refutation) "Refutation" else "Disagreement"
-                    }, Assumptions.None, null, completion.enumConstants.single {
+                    },
+                    Assumptions.None,
+                    null,
+                    completion.enumConstants.single {
                         it.toString() == if (arm.endsWith("-completed")) "SourceRows" else "None"
-                    })
+                    },
+                )
             type.methods.single { it.name == "accept" }
                 .invoke(selector, center, pins, prepared, cutoff, captured, support, stop)
         }
         val record = checkNotNull(field(captured, "query"))
+
         @Suppress("UNCHECKED_CAST")
         val point = field(record, "point") as Map<SourceCoordinate, BigFraction>?
         if (point == null) return
@@ -149,7 +177,9 @@ internal class FiniteNumericalTrial(
         rawPointNativeAccepted = checkSource(sample, stop)
         rawPointDisposition = if (rawPointNativeAccepted == true) {
             "original-source-feasible"
-        } else "source-check-declined"
+        } else {
+            "source-check-declined"
+        }
     }
 
     fun capture() = buildJsonObject {
@@ -164,29 +194,58 @@ internal class FiniteNumericalTrial(
         put("rankedInputs", selector?.let { get(it, "RankedInputs") as Int })
         put("guidanceUnavailableReason", selector?.let { get(it, "UnavailableReason") as String? })
         selector?.takeIf { get(it, "Completion").toString() == "SourceRows" }?.let { owner ->
-            put("completion", buildJsonObject {
-                put("rule", "planned domain steps through violated original source rows; supported compensators first")
-                put("lastDecline", get(owner, "LastDecline") as String?)
-                put("lastCompletedInputsBoolThenInt", JsonArray((get(owner, "LastCompletedInputs") as IntArray)
-                    .map(::JsonPrimitive)))
-                put("lastFilledInputs", get(owner, "LastFilledInputs") as Int)
-                put("packets", JsonArray((get(owner, "Packets") as List<*>).map { entry ->
-                    val packet = checkNotNull(entry)
-                    buildJsonObject {
-                        put("seed", coordinate(get(packet, "Seed") as SourceCoordinate))
-                        put("outcome", get(packet, "Outcome").toString())
-                        put("blockedRow", get(packet, "BlockedRow") as String?)
-                        put("members", JsonArray((get(packet, "Members") as List<*>).map { item ->
-                            val member = checkNotNull(item)
-                            buildJsonObject {
-                                put("coordinate", coordinate(get(member, "Coordinate") as SourceCoordinate))
-                                put("plannedValue", get(member, "Value").toString())
-                                put("addedByRow", get(member, "Row") as String?)
-                            }
-                        }))
-                    }
-                }))
-            })
+            put(
+                "completion",
+                buildJsonObject {
+                    put(
+                        "rule",
+                        "planned domain steps through violated original source rows; supported compensators first",
+                    )
+                    put("lastDecline", get(owner, "LastDecline") as String?)
+                    put(
+                        "lastCompletedInputsBoolThenInt",
+                        JsonArray(
+                            (get(owner, "LastCompletedInputs") as IntArray)
+                                .map(::JsonPrimitive),
+                        ),
+                    )
+                    put("lastFilledInputs", get(owner, "LastFilledInputs") as Int)
+                    put(
+                        "packets",
+                        JsonArray(
+                            (get(owner, "Packets") as List<*>).map { entry ->
+                                val packet = checkNotNull(entry)
+                                buildJsonObject {
+                                    put("seed", coordinate(get(packet, "Seed") as SourceCoordinate))
+                                    put("outcome", get(packet, "Outcome").toString())
+                                    put("blockedRow", get(packet, "BlockedRow") as String?)
+                                    put(
+                                        "members",
+                                        JsonArray(
+                                            (get(packet, "Members") as List<*>).map { item ->
+                                                val member = checkNotNull(item)
+                                                buildJsonObject {
+                                                    put(
+                                                        "coordinate",
+                                                        coordinate(
+                                                            get(
+                                                                member,
+                                                                "Coordinate",
+                                                            ) as SourceCoordinate,
+                                                        ),
+                                                    )
+                                                    put("plannedValue", get(member, "Value").toString())
+                                                    put("addedByRow", get(member, "Row") as String?)
+                                                }
+                                            },
+                                        ),
+                                    )
+                                }
+                            },
+                        ),
+                    )
+                },
+            )
         }
         budget?.let {
             put("sourceOperations", get(it, "Operations") as Int)
@@ -200,7 +259,9 @@ internal class FiniteNumericalTrial(
                 @Suppress("UNCHECKED_CAST")
                 val coordinates = field(it, "coordinates") as Set<SourceCoordinate>
                 put("supportCoordinates", JsonArray(coordinates.map(::coordinate)))
-            } else put("supportUnavailableReason", field(it, "reason").toString())
+            } else {
+                put("supportUnavailableReason", field(it, "reason").toString())
+            }
         }
         publisher?.let {
             val journal = checkNotNull(field(it, "journal"))

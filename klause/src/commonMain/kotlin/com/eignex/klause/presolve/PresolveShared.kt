@@ -7,7 +7,7 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
@@ -130,7 +130,7 @@ internal object PresolveShared {
         numBoolVars: Int = problem.numBoolVars,
         // Root deductions the [factors] alone do not imply, carried into the rebuild's own bake.
         seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,
-        cancellation: Cancellation = problem.cancellation,
+        cancellation: ExecutionControl = problem.cancellation,
     ): BakedProblem {
         // Inherit the pass-view mode: a pass fed a cheap already-folded input returns a cheap already-folded
         // output (the session re-folds via incremental propagation); an eager input yields an eager rebuild.

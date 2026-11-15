@@ -14,7 +14,7 @@ import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertIs
@@ -57,7 +57,7 @@ class LinearRuntimeTerminalAcceptanceTest {
     fun `matching runtime and original source should accept a checked strict limit`() {
         val result = OpenTheoryPipeline.optimizeLinear(source)
 
-        val checked = result.verifyRuntimeTerminal(expected, expected, source, Cancellation.Never)
+        val checked = result.verifyRuntimeTerminal(expected, expected, source, ExecutionControl.Never)
 
         assertIs<Verification.Accepted<Unit, Unit>>(checked)
     }
@@ -71,7 +71,7 @@ class LinearRuntimeTerminalAcceptanceTest {
         )
         val result = OpenTheoryPipeline.optimizeLinear(source)
 
-        val checked = result.verifyRuntimeTerminal(expected, produced, source, Cancellation.Never)
+        val checked = result.verifyRuntimeTerminal(expected, produced, source, ExecutionControl.Never)
 
         assertIs<Verification.Rejected>(checked)
     }
@@ -82,7 +82,7 @@ class LinearRuntimeTerminalAcceptanceTest {
         val produced = EngineInvocation(plan, ModelIdentity.of(model, other), other, scope = source.scope)
         val result = OpenTheoryPipeline.optimizeLinear(source)
 
-        val checked = result.verifyRuntimeTerminal(expected, produced, source, Cancellation.Never)
+        val checked = result.verifyRuntimeTerminal(expected, produced, source, ExecutionControl.Never)
 
         assertIs<Verification.Rejected>(checked)
     }
@@ -101,7 +101,7 @@ class LinearRuntimeTerminalAcceptanceTest {
         val produced = EngineInvocation(plan, ModelIdentity.of(other, objective), scope = source.scope)
         val result = OpenTheoryPipeline.optimizeLinear(source)
 
-        val checked = result.verifyRuntimeTerminal(expected, produced, source, Cancellation.Never)
+        val checked = result.verifyRuntimeTerminal(expected, produced, source, ExecutionControl.Never)
 
         assertIs<Verification.Rejected>(checked)
     }
@@ -111,7 +111,7 @@ class LinearRuntimeTerminalAcceptanceTest {
         val uncaptured = EngineInvocation(plan, ModelIdentity.of(model, objective))
         val result = OpenTheoryPipeline.optimizeLinear(source)
 
-        val checked = result.verifyRuntimeTerminal(uncaptured, uncaptured, source, Cancellation.Never)
+        val checked = result.verifyRuntimeTerminal(uncaptured, uncaptured, source, ExecutionControl.Never)
 
         assertIs<Verification.Indeterminate>(checked)
     }
@@ -130,7 +130,7 @@ class LinearRuntimeTerminalAcceptanceTest {
         )
         val cost = LinearObjective(intCoefficients = longArrayOf(1))
         val request = OpenTheoryRequest(integerModel, cost)
-        val original = assertNotNull(request.linearAuthorityContext(Cancellation.Never))
+        val original = assertNotNull(request.linearAuthorityContext(ExecutionControl.Never))
         val runtime = EngineInvocation(
             request.preparedPlan,
             ModelIdentity.of(integerModel, cost),
@@ -139,7 +139,7 @@ class LinearRuntimeTerminalAcceptanceTest {
         )
         val result = OpenTheoryPipeline.optimizeLinear(original)
 
-        val checked = result.verifyRuntimeTerminal(runtime, runtime, original, Cancellation.Never)
+        val checked = result.verifyRuntimeTerminal(runtime, runtime, original, ExecutionControl.Never)
 
         assertIs<Verification.Rejected>(checked)
     }

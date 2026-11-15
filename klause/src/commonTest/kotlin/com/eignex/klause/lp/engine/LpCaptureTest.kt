@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -21,7 +21,7 @@ class LpCaptureTest {
             .build(Sense.MINIMIZE).authoritativeModel())
         val capture = LpExactCapture.capture(model, LpReplaySettings("bounded", 1L), emptyList())
 
-        val bytes = assertNotNull(capture.encodeWithin(4096, 65_536, Cancellation.Never))
+        val bytes = assertNotNull(capture.encodeWithin(4096, 65_536, ExecutionControl.Never))
 
         assertContentEquals(capture.encode(), bytes)
         assertContentEquals(bytes, LpExactCapture.decode(bytes).encode())
@@ -33,9 +33,9 @@ class LpCaptureTest {
             .build(Sense.MINIMIZE).authoritativeModel())
         val capture = LpExactCapture.capture(model, LpReplaySettings("bounded", 1L), emptyList())
 
-        assertNull(capture.encodeWithin(0, 65_536, Cancellation.Never))
-        assertNull(capture.encodeWithin(4096, 8, Cancellation.Never))
-        assertNull(capture.encodeWithin(4096, 65_536, Cancellation { true }))
+        assertNull(capture.encodeWithin(0, 65_536, ExecutionControl.Never))
+        assertNull(capture.encodeWithin(4096, 8, ExecutionControl.Never))
+        assertNull(capture.encodeWithin(4096, 65_536, ExecutionControl { true }))
     }
 
     @Test
@@ -221,12 +221,12 @@ class LpCaptureTest {
         )
         val trail = LpBoundTrail(model)
         val first = assertNotNull(LpExactCapture.stateKey(trail.state))
-        assertTrue(trail.push(Cancellation.Never))
-        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(-1L)), 1L, Cancellation.Never))
+        assertTrue(trail.push(ExecutionControl.Never))
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(-1L)), 1L, ExecutionControl.Never))
         val weak = assertNotNull(LpExactCapture.stateKey(trail.state))
         assertTrue(trail.state.model.sameAuthority(model))
         assertFalse(first.contentEquals(weak))
-        assertTrue(trail.pop(0, Cancellation.Never))
+        assertTrue(trail.pop(0, ExecutionControl.Never))
         val popped = assertNotNull(LpExactCapture.stateKey(trail.state))
         assertTrue(trail.state.model.sameAuthority(model))
         assertFalse(first.contentEquals(popped))

@@ -14,7 +14,7 @@ import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -68,7 +68,7 @@ class LocalSearchEngineRestartTest {
             if (sliced) {
                 search.resumableSolve(params).use { handle ->
                     val counted = assertIs<InstructionSlicedSolve>(handle)
-                    while (!handle.isDone) counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 1L)
+                    while (!handle.isDone) counted.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L)
                 }
             } else {
                 assertTrue(search.samples(params, warm = null).toList().isEmpty())
@@ -186,7 +186,7 @@ class LocalSearchEngineRestartTest {
 
                 search.resumableSolve(LocalSearchParams(maxFlips = 12L, randomSeed = 7L)).use { handle ->
                     val counted = assertIs<InstructionSlicedSolve>(handle)
-                    while (!handle.isDone) counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 1L)
+                    while (!handle.isDone) counted.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L)
                     assertEquals(12L, handle.stats.ls.moves.sum.toLong())
                 }
                 trace
@@ -231,7 +231,7 @@ class LocalSearchEngineRestartTest {
             LinearObjective(intCoefficients = longArrayOf(-1)),
             LocalSearchParams(maxFlips = 4L, initialAssignment = Sample(BooleanArray(0), longArrayOf(3))),
         ).use { handle ->
-            assertIs<MinimizeResult.BestFound>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
+            assertIs<MinimizeResult.BestFound>(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {})
         }
 
         assertEquals(listOf(Sample(BooleanArray(0), longArrayOf(1)), Sample(BooleanArray(0), longArrayOf(2))), anchors)
@@ -264,7 +264,7 @@ class LocalSearchEngineRestartTest {
                 initialAssignment = Sample(booleanArrayOf(false, false), LongArray(0)),
             ),
         ).use { handle ->
-            assertIs<MinimizeResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
+            assertIs<MinimizeResult.Unknown>(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {})
         }
 
         assertTrue(anchors.isNotEmpty())
@@ -296,7 +296,7 @@ class LocalSearchEngineRestartTest {
             LinearObjective(boolWeights = longArrayOf(1)),
             LocalSearchParams(maxFlips = 3L, randomSeed = 3L),
         ).use { handle ->
-            assertIs<MinimizeResult.BestFound>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
+            assertIs<MinimizeResult.BestFound>(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {})
         }
 
         assertTrue(anchors.size > 1)

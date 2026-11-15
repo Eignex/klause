@@ -2,7 +2,7 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
@@ -18,7 +18,7 @@ class RefinementTest {
     @Test
     fun `refinement work cap should stop between cancellation polls`() {
         val cache = LpRefinementCache()
-        val meter = RefinementMeter(LpRefinementLimits(maxWork = 1L), cache, Cancellation.Never)
+        val meter = RefinementMeter(LpRefinementLimits(maxWork = 1L), cache, ExecutionControl.Never)
         meter.charge()
 
         val stopped = assertFailsWith<RefinementStop> { meter.charge() }
@@ -28,15 +28,16 @@ class RefinementTest {
     }
 
     @Test
-    fun `refinement should poll work metered cancellation on every charge`() {
+    fun `accounting should retain bounded refinement cancellation polling`() {
         var cancelled = false
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = cancelled
-            override fun workMeter(): WorkMeter = WorkMeter { }
+            override val accounting: WorkMeter get() = WorkMeter { }
         }
         val meter = RefinementMeter(LpRefinementLimits(), LpRefinementCache(), token)
         meter.charge()
         cancelled = true
+        repeat(63) { meter.charge() }
 
         val stopped = assertFailsWith<RefinementStop> { meter.charge() }
 
@@ -78,7 +79,7 @@ class RefinementTest {
                     LpRefinementRequest(owner, cache, limits),
                     doubleArrayOf(0.25),
                     doubleArrayOf(0.0),
-                    cancellation = Cancellation { cancelled },
+                    cancellation = ExecutionControl { cancelled },
                 )
 
                 assertEquals(expected, result.metrics.decline)
@@ -101,7 +102,7 @@ class RefinementTest {
             var adoptions = 0
             val factory = persistentDecorator { delegate ->
                 object : PersistentLpSolver by delegate {
-                    override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+                    override fun adopt(state: LpExactState, token: ExecutionControl): Boolean {
                         adoptions++
                         if (adoptions == 3) {
                             cancelled = cancelAtReplacement
@@ -124,7 +125,7 @@ class RefinementTest {
                     doubleArrayOf(0.25),
                     doubleArrayOf(0.0),
                     basis,
-                    cancellation = Cancellation { cancelled },
+                    cancellation = ExecutionControl { cancelled },
                 )
 
                 assertEquals(expected, result.metrics.decline)
@@ -206,7 +207,7 @@ class RefinementTest {
                 LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
                 doubleArrayOf(1.0),
                 doubleArrayOf(),
-                cancellation = Cancellation { true },
+                cancellation = ExecutionControl { true },
             )
 
             assertEquals(LpRefinementDecline.CANCELLED, result.metrics.decline)
@@ -258,7 +259,7 @@ class RefinementTest {
         object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 refactorUpdateLimit: Int,
                 iterationLimit: Int,
                 workLimit: Long,

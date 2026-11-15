@@ -1,7 +1,7 @@
 package com.eignex.klause.ir
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -14,7 +14,7 @@ class RetainedFactorsTest {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), arrayOf<Factor>(first, first, last))
         val target = source.withFactors(arrayOf(first, last))
 
-        val mapping = requireNotNull(RetainedFactors.between(source, target, Cancellation.Never))
+        val mapping = requireNotNull(RetainedFactors.between(source, target, ExecutionControl.Never))
 
         assertEquals(listOf(0, 2), mapping.sourceIndices().toList())
     }
@@ -25,7 +25,7 @@ class RetainedFactorsTest {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), arrayOf<Factor>(row, row))
         val target = source.withFactors(arrayOf(row)).withIntDomains(arrayOf(IntDomain(0, 2)))
 
-        assertNull(RetainedFactors.between(source, target, Cancellation.Never))
+        assertNull(RetainedFactors.between(source, target, ExecutionControl.Never))
     }
 
     @Test
@@ -34,7 +34,7 @@ class RetainedFactorsTest {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), arrayOf<Factor>(row, row))
         val target = source.withFactors(arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)))
 
-        assertNull(RetainedFactors.between(source, target, Cancellation.Never))
+        assertNull(RetainedFactors.between(source, target, ExecutionControl.Never))
     }
 
     @Test
@@ -42,6 +42,6 @@ class RetainedFactorsTest {
         val row = Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)
         val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), arrayOf<Factor>(row, row))
 
-        assertNull(RetainedFactors.between(source, source.withFactors(arrayOf(row)), Cancellation { true }))
+        assertNull(RetainedFactors.between(source, source.withFactors(arrayOf(row)), ExecutionControl { true }))
     }
 }

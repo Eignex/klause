@@ -8,15 +8,15 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
 
 class ChannelViewTest {
     @ParameterizedTest
@@ -24,7 +24,7 @@ class ChannelViewTest {
     fun `inverse role views expose the same small source swap neighborhood`(transpose: Boolean) {
         val source = Problem(0, 6, Array(6) { IntDomain(0, 2) },
             arrayOf(Inverse(intArrayOf(0, 1, 2), intArrayOf(3, 4, 5))))
-        val problem = if (transpose) assertNotNull(inverseAssignmentView(source, Cancellation.Never)) else source
+        val problem = if (transpose) assertNotNull(inverseAssignmentView(source, ExecutionControl.Never)) else source
         val model = LocalSearchModel.open(problem)
         val neighbors = HashSet<List<Long>>()
 
@@ -52,7 +52,7 @@ class ChannelViewTest {
             "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
         val maintained = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
 
-        val searched = ChannelView.SearchedValues.sweep(maintained, Cancellation.Never)
+        val searched = ChannelView.SearchedValues.sweep(maintained, ExecutionControl.Never)
 
         assertNull(searched)
         assertEquals(1, maintained.size)
@@ -63,7 +63,7 @@ class ChannelViewTest {
     fun `inverse role transposition preserves the grade at every source assignment`(bits: Int) {
         val source = Problem(0, 4, Array(4) { IntDomain(1, 2) },
             arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(2, 3), 1, 1)))
-        val view = assertNotNull(inverseAssignmentView(source, Cancellation.Never))
+        val view = assertNotNull(inverseAssignmentView(source, ExecutionControl.Never))
         val primal = LocalSearchState(LocalSearchModel.open(source), Random(0))
         val inverse = LocalSearchState(LocalSearchModel.open(view), Random(0))
 
@@ -84,7 +84,7 @@ class ChannelViewTest {
             arrayOf(Inverse(intArrayOf(0, 1, 2), intArrayOf(3, 4, 5), 4, 4)),
             impliedFactorMask = booleanArrayOf(true))
 
-        val view = assertNotNull(inverseAssignmentView(source, Cancellation.Never))
+        val view = assertNotNull(inverseAssignmentView(source, ExecutionControl.Never))
 
         assertSame(source.declaredIntDomains, view.declaredIntDomains)
         assertSame(source.semantics, view.semantics)
@@ -96,7 +96,7 @@ class ChannelViewTest {
         val source = Problem(0, 4, arrayOf(IntDomain(4, 5), IntDomain(4, 5),
             IntDomain(-2, -1), IntDomain(-2, -1)),
             arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(2, 3), -2, 4)))
-        val view = assertNotNull(inverseAssignmentView(source, Cancellation.Never))
+        val view = assertNotNull(inverseAssignmentView(source, ExecutionControl.Never))
         val state = LocalSearchState(LocalSearchModel.open(view), Random(0))
         for ((variable, value) in longArrayOf(5, 4, -1, -2).withIndex()) {
             state.assignment.setInt(variable, value)
@@ -112,7 +112,7 @@ class ChannelViewTest {
         val source = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(0, 1))))
 
-        assertNull(inverseAssignmentView(source, Cancellation.Never))
+        assertNull(inverseAssignmentView(source, ExecutionControl.Never))
     }
 
     @Test
@@ -121,7 +121,7 @@ class ChannelViewTest {
             arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(2, 3)),
                 Inverse(intArrayOf(2, 3), intArrayOf(4, 5))))
 
-        assertNull(inverseAssignmentView(source, Cancellation.Never))
+        assertNull(inverseAssignmentView(source, ExecutionControl.Never))
     }
 
     @Test
@@ -129,7 +129,7 @@ class ChannelViewTest {
         val source = parseFlatZinc("var 1..2: x; var 7..7: y; " +
             "constraint array_int_element(x, [7, 7], y) :: defines_var(y); solve satisfy;")
 
-        assertNull(inverseAssignmentView(source.problem, Cancellation.Never))
+        assertNull(inverseAssignmentView(source.problem, ExecutionControl.Never))
     }
 
     @Test
@@ -137,6 +137,6 @@ class ChannelViewTest {
         val source = Problem(0, 4, Array(4) { IntDomain(0, 1) },
             arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(2, 3))))
 
-        assertNull(inverseAssignmentView(source, Cancellation { true }))
+        assertNull(inverseAssignmentView(source, ExecutionControl { true }))
     }
 }

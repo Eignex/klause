@@ -4,12 +4,15 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntHashSet
 
 internal object RepairScope {
-    fun effective(requested: FreedVars, assumptions: Assumptions, sweep: DefinitionalSweep?,
-        cancellation: Cancellation,
+    fun effective(
+        requested: FreedVars,
+        assumptions: Assumptions,
+        sweep: DefinitionalSweep?,
+        cancellation: ExecutionControl,
     ): FreedVars? {
         val bools = sweep?.expandUnitBooleanScope(requested.bools, cancellation)
             ?: if (sweep == null) requested.bools else return null

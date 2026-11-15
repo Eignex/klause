@@ -7,7 +7,7 @@ import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import java.math.BigInteger
 
 internal object EqualityKernelMove {
@@ -25,7 +25,7 @@ internal object EqualityKernelMove {
         current: (Int) -> Long,
         domain: (Int) -> IntDomain,
         allowed: (Int) -> Boolean,
-        stop: Cancellation = Cancellation.Never,
+        stop: ExecutionControl = ExecutionControl.Never,
     ): List<Step> {
         require(columns.size == direction.size && rows.all { it.size == columns.size })
         if (stop() || rows.any { row ->
@@ -90,8 +90,8 @@ internal object EqualityKernelMove {
     fun probe(
         view: TrajectoryView,
         move: Move.Compound,
-        stop: Cancellation,
-        verify: (Sample, Cancellation) -> Boolean,
+        stop: ExecutionControl,
+        verify: (Sample, ExecutionControl) -> Boolean,
     ): Probe? {
         if (stop()) return null
         val inspection = view.state.inspectMove(move, view.objective)
@@ -106,8 +106,8 @@ internal object EqualityKernelMove {
         move: Move.Compound,
         center: Sample,
         score: (Sample) -> BigFraction,
-        stop: Cancellation,
-        verify: (Sample, Cancellation) -> Boolean,
+        stop: ExecutionControl,
+        verify: (Sample, ExecutionControl) -> Boolean,
     ): Applied? {
         if (stop()) return null
         try {

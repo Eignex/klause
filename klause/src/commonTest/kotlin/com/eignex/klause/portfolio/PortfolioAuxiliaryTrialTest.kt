@@ -4,7 +4,7 @@ import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.kumulant.bandit.UnivariateBandit
 import kotlin.random.Random
 import kotlin.test.Test
@@ -24,7 +24,7 @@ class PortfolioAuxiliaryTrialTest {
             override val stats: SolveStats get() = SolveStats.EMPTY
             override val work: Long get() = slices.toLong() * 5_000
             override fun runSlice(
-                global: Cancellation,
+                global: ExecutionControl,
                 sliceMillis: Long,
                 sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -42,7 +42,7 @@ class PortfolioAuxiliaryTrialTest {
 
         Portfolio.thompson(workers, maxSliceWork = 5_000L, reseedStaleThreshold = 0).use {
             it.incumbentProbeArms = setOf(1)
-            it.minimize(Cancellation { reached.size >= 20 })
+            it.minimize(ExecutionControl { reached.size >= 20 })
         }
 
         assertEquals(listOf(0, 1, 2), reached.take(3))
@@ -60,7 +60,7 @@ class PortfolioAuxiliaryTrialTest {
             override val stats: SolveStats get() = SolveStats.EMPTY
             override val work: Long get() = spent
             override fun runSlice(
-                global: Cancellation,
+                global: ExecutionControl,
                 sliceMillis: Long,
                 sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -82,7 +82,7 @@ class PortfolioAuxiliaryTrialTest {
 
         Portfolio.thompson(workers, maxSliceWork = 5_000L, reseedStaleThreshold = 1).use {
             it.incumbentProbeArms = setOf(1)
-            it.minimize(Cancellation { calls >= 15 })
+            it.minimize(ExecutionControl { calls >= 15 })
         }
 
         assertEquals(60_000L, search.work)
@@ -104,7 +104,7 @@ class PortfolioAuxiliaryTrialTest {
                 override val stats: SolveStats get() = SolveStats.EMPTY
                 override val work: Long get() = spent
                 override fun runSlice(
-                    global: Cancellation,
+                    global: ExecutionControl,
                     sliceMillis: Long,
                     sliceNodes: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -122,7 +122,7 @@ class PortfolioAuxiliaryTrialTest {
             Portfolio.thompson(workers, baseSliceWork = 7, maxSliceWork = maximum, reseedStaleThreshold = 0,
                 onProgress = events::add).use {
                 it.incumbentProbeArms = setOf(1)
-                it.minimize(Cancellation { reached.size >= expectedSlices + 3 })
+                it.minimize(ExecutionControl { reached.size >= expectedSlices + 3 })
             }
 
             assertEquals(expectedSlices, reached.count { it == 1 })
@@ -154,7 +154,7 @@ class PortfolioAuxiliaryTrialTest {
             it.runTimeSource = clock
         }
 
-        portfolio.use { it.minimize(Cancellation { reached.size >= 6 }) }
+        portfolio.use { it.minimize(ExecutionControl { reached.size >= 6 }) }
 
         assertEquals(listOf(0, 1, 1, 1, 0, 0), reached)
         assertEquals("trial-search-time", events.filterIsInstance<PortfolioEvent.WorkerExit>()
@@ -173,7 +173,7 @@ class PortfolioAuxiliaryTrialTest {
                 override val stats: SolveStats get() = SolveStats.EMPTY
                 override val work: Long get() = spent
                 override fun runSlice(
-                    global: Cancellation,
+                    global: ExecutionControl,
                     sliceMillis: Long,
                     sliceNodes: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -190,7 +190,7 @@ class PortfolioAuxiliaryTrialTest {
 
             Portfolio.thompson(workers, maxSliceWork = 5_000L, reseedStaleThreshold = 0).use {
                 it.incumbentProbeArms = setOf(1)
-                it.minimize(Cancellation { reached.size >= 30 })
+                it.minimize(ExecutionControl { reached.size >= 30 })
             }
 
             assertEquals(60_000L, search.work)
@@ -219,7 +219,7 @@ class PortfolioAuxiliaryTrialTest {
             it.runTimeSource = clock
         }
 
-        portfolio.use { it.minimize(Cancellation { reached.size >= 11 }) }
+        portfolio.use { it.minimize(ExecutionControl { reached.size >= 11 }) }
 
         assertEquals(8, reached.count { it == 1 })
         assertEquals(listOf(0, 0), reached.takeLast(2))
@@ -251,7 +251,7 @@ class PortfolioAuxiliaryTrialTest {
 
             Portfolio(workers, bandit, maxSliceWork = 5_000L, reseedStaleThreshold = 0).use {
                 it.incumbentProbeArms = setOf(2)
-                it.minimize(Cancellation { reached.count { arm -> arm < 2 } >= 30 })
+                it.minimize(ExecutionControl { reached.count { arm -> arm < 2 } >= 30 })
             }
 
             assertEquals(reached.filter { it < 2 }, updates)
@@ -266,7 +266,7 @@ class PortfolioAuxiliaryTrialTest {
             val probe = ScriptedSearch({ false }) {}
             val trial = object : ResumableSearch by probe {
                 override fun runSlice(
-                    global: Cancellation,
+                    global: ExecutionControl,
                     sliceMillis: Long,
                     sliceNodes: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -299,7 +299,7 @@ class PortfolioAuxiliaryTrialTest {
                 val proofBase = ScriptedSearch({ false }) { proofVisits++ }
                 val proof = object : ResumableSearch by proofBase {
                     override fun runSlice(
-                        global: Cancellation,
+                        global: ExecutionControl,
                         sliceMillis: Long,
                         sliceNodes: Long,
                         onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -320,7 +320,7 @@ class PortfolioAuxiliaryTrialTest {
                 it.runTimeSource = TestTimeSource()
             }.use {
                 it.incumbentProbeArms = setOf(if (admittedBeforeIncumbent) 0 else 2)
-                it.minimize(Cancellation { reached.size >= 16 })
+                it.minimize(ExecutionControl { reached.size >= 16 })
             }
             return reached
         }
@@ -343,7 +343,7 @@ class PortfolioAuxiliaryTrialTest {
             val finder = ScriptedSearch({ it == 0 }) {}
             val observedFinder = object : ResumableSearch by finder {
                 override fun runSlice(
-                    global: Cancellation,
+                    global: ExecutionControl,
                     sliceMillis: Long,
                     sliceNodes: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -370,7 +370,7 @@ class PortfolioAuxiliaryTrialTest {
                 it.runTimeSource = clock
             }
 
-            portfolio.use { it.minimize(Cancellation { allowances.size >= 2 }) }
+            portfolio.use { it.minimize(ExecutionControl { allowances.size >= 2 }) }
 
             assertEquals(listOf(7L, 7L), allowances)
         }
@@ -383,7 +383,7 @@ class PortfolioAuxiliaryTrialTest {
         val probe = ScriptedSearch({ false }) {}
         val observed = object : ResumableSearch by probe {
             override fun runSlice(
-                global: Cancellation,
+                global: ExecutionControl,
                 sliceMillis: Long,
                 sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -399,7 +399,7 @@ class PortfolioAuxiliaryTrialTest {
 
         Portfolio.thompson(workers, baseSliceWork = 7, maxSliceWork = 21, reseedStaleThreshold = 0).use {
             it.incumbentProbeArms = setOf(1)
-            it.minimize(Cancellation { finderSlices >= 2 })
+            it.minimize(ExecutionControl { finderSlices >= 2 })
         }
 
         assertEquals(List(36) { 7L }, allowances)

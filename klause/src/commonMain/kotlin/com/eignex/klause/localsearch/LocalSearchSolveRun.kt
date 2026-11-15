@@ -8,7 +8,7 @@ import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.withSourceSemantics
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 @Suppress("LongParameterList")
 internal class LocalSearchSolveRun(
@@ -27,21 +27,24 @@ internal class LocalSearchSolveRun(
     override val auxiliaryWork: Long get() = control.auxiliaryWork
 
     override fun runScheduledSlice(
-        global: Cancellation, sliceMillis: Long, sliceInstructions: Long, sliceWork: Long,
+        global: ExecutionControl,
+        sliceMillis: Long,
+        sliceInstructions: Long,
+        sliceWork: Long,
         instructionsPerWork: Double,
     ): SolveResult? = executeSlice(global, sliceMillis, sliceInstructions, sliceWork, instructionsPerWork)
 
-    override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? =
+    override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long): SolveResult? =
         executeSlice(global, sliceMillis, LocalSearchRunControl.instructionAllowance(sliceNodes), sliceNodes)
 
     override fun runInstructionSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceInstructions: Long,
     ): SolveResult? = executeSlice(global, sliceMillis, sliceInstructions, -1L)
 
     private fun executeSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceInstructions: Long,
         sliceNodes: Long,
@@ -54,7 +57,7 @@ internal class LocalSearchSolveRun(
     }
 
     private fun advance(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceInstructions: Long,
         sliceNodes: Long,

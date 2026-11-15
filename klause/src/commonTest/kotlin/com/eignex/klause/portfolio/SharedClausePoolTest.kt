@@ -7,7 +7,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.addLearnedClause
 import com.eignex.klause.solver.result.SharingChannel
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -566,7 +566,7 @@ class SharedClausePoolTest {
             val pool = SharedClausePool(measureMemory = true)
             val meter = SharingMeter()
             val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
-            val session = PropagationSession(problem, nativeSat = native, cancellation = Cancellation { cancelled })
+            val session = PropagationSession(problem, nativeSat = native, cancellation = ExecutionControl { cancelled })
             assertEquals(native, session.usesNativeSat)
             pool.publish(listOf(boolClause(0, 1)), origin = 2)
             exchange.onSearchStart(session)
@@ -597,7 +597,7 @@ class SharedClausePoolTest {
         val pool = SharedClausePool(measureMemory = true)
         val meter = SharingMeter()
         val exchange = PoolClauseExchange(pool, meter = meter)
-        val session = PropagationSession(problem, cancellation = Cancellation { cancelled })
+        val session = PropagationSession(problem, cancellation = ExecutionControl { cancelled })
         exchange.onSearchStart(session)
         assertEquals(1L, meter.snapshot().clauses.getValue("memorySampleComplete"))
         cancelled = true
@@ -761,13 +761,17 @@ class SharedClausePoolTest {
 
     @Test
     fun `cancelled reclamation leaves origins and stale consumer cursors intact`() {
-        for (cancelAt in listOf(0, 10, 35, 65)) {
+        val clauses = (0 until 4).map { boolClause(it * 10, it) }
+        val reference = SharedClausePool(cap = 4)
+        clauses.forEachIndexed { origin, clause -> reference.publish(listOf(clause), origin = origin) }
+        val completeWork = reference.reclaim().work
+        for (cancelAt in listOf(0L, completeWork / 3L, completeWork * 2L / 3L, completeWork - 1L)) {
             val pool = SharedClausePool(cap = 4)
-            repeat(4) { pool.publish(listOf(boolClause(it * 10, it)), origin = it) }
+            clauses.forEachIndexed { origin, clause -> pool.publish(listOf(clause), origin = origin) }
             val before = pool.drainSince(0)
-            var polls = 0
+            var work = 0L
 
-            val result = pool.reclaim(cancelled = { polls++ >= cancelAt })
+            val result = pool.reclaim(cancelled = { work >= cancelAt }, charge = { work++ })
 
             assertEquals(SharedClausePool.ReclamationStatus.CANCELLED, result.status)
             val after = pool.drainSince(0)
@@ -951,7 +955,7 @@ class SharedClausePoolTest {
         pool.publish(listOf(boolClause(0, 1)), origin = 2)
         var cancelled = false
         val session = PropagationSession(Problem(2, 0, emptyArray(), emptyList()),
-            cancellation = Cancellation { cancelled })
+            cancellation = ExecutionControl { cancelled })
         val exchange = PoolClauseExchange(pool, origin = 1)
         cancelled = true
         exchange.onSearchStart(session)

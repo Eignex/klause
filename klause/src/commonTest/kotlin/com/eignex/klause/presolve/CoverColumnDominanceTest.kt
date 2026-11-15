@@ -18,7 +18,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -49,7 +49,7 @@ class CoverColumnDominanceTest {
             val original = (0 until 8).filter { mask -> clauses.all { holds(it, mask) } }
             for (encoded in 0 until 64) {
                 val costs = (0..2).associateWith { ((encoded shr (2 * it)) and 3).toLong() - 1L }
-                val pins = CoverColumnDominance.pins(problem, costs, Cancellation.Never)
+                val pins = CoverColumnDominance.pins(problem, costs, ExecutionControl.Never)
                 val reduced = original.filter { mask -> pins.all { holds(it as Clause, mask) } }
                 assertTrue(reduced.isNotEmpty())
                 fun cost(mask: Int): Long = costs.entries.sumOf { (v, c) -> if (mask and (1 shl v) != 0) c else 0L }
@@ -64,7 +64,7 @@ class CoverColumnDominanceTest {
             val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
             val problem = Problem(3, 0, emptyArray(), listOf(clause))
 
-            val pins = CoverColumnDominance.pins(problem, costs, Cancellation.Never)
+            val pins = CoverColumnDominance.pins(problem, costs, ExecutionControl.Never)
 
             assertEquals(2, pins.size)
             val remaining = (0 until 8).filter { mask -> holds(clause, mask) && pins.all { holds(it as Clause, mask) } }
@@ -83,7 +83,7 @@ class CoverColumnDominanceTest {
         )) {
             val context = PresolveContext.of(objective)
 
-            val pins = CoverColumnDominance.pins(problem, context.objectiveBoolCoeffs, Cancellation.Never)
+            val pins = CoverColumnDominance.pins(problem, context.objectiveBoolCoeffs, ExecutionControl.Never)
 
             assertTrue(pins.isEmpty())
         }
@@ -93,7 +93,7 @@ class CoverColumnDominanceTest {
     fun `an absent replacement cost should mean zero`() {
         val problem = Problem(2, 0, emptyArray(), listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))))
 
-        val pins = CoverColumnDominance.pins(problem, mapOf(0 to 2L), Cancellation.Never)
+        val pins = CoverColumnDominance.pins(problem, mapOf(0 to 2L), ExecutionControl.Never)
 
         assertEquals(listOf(Lit.make(0, false)), pins.map { (it as Clause).literals.single() })
     }
@@ -111,14 +111,22 @@ class CoverColumnDominanceTest {
             )
             for (reader in readers) {
                 val problem = Problem(
-                    3, 0, emptyArray(),
+                    3,
+                    0,
+                    emptyArray(),
                     listOf(
-                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                    reader,
-                )
+                        Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                        reader,
+                    ),
                 )
 
-                assertTrue(CoverColumnDominance.pins(problem, mapOf(0 to 2L, 1 to 1L), Cancellation.Never).isEmpty())
+                assertTrue(
+                    CoverColumnDominance.pins(
+                        problem,
+                        mapOf(0 to 2L, 1 to 1L),
+                        ExecutionControl.Never,
+                    ).isEmpty(),
+                )
             }
         }
     }
@@ -132,7 +140,7 @@ class CoverColumnDominanceTest {
         factors.add(Clause(intArrayOf(Lit.make(1, true), Lit.make(3, true))))
         val problem = Problem(4, 0, emptyArray(), factors)
 
-        val pins = CoverColumnDominance.pins(problem, mapOf(0 to 2L, 1 to 1L, 2 to 3L, 3 to 3L), Cancellation.Never)
+        val pins = CoverColumnDominance.pins(problem, mapOf(0 to 2L, 1 to 1L, 2 to 3L, 3 to 3L), ExecutionControl.Never)
 
         assertTrue(pins.isEmpty())
     }
@@ -149,7 +157,7 @@ class CoverColumnDominanceTest {
         for (limit in 0L..100L) {
             val budget = PresolveBudget(limit)
 
-            val pins = CoverColumnDominance.pins(problem, costs, budget.orSpent(Cancellation.Never))
+            val pins = CoverColumnDominance.pins(problem, costs, budget.orSpent(ExecutionControl.Never))
 
             assertTrue(budget.spent() <= limit)
             val feasible = (0 until 16).filter { mask -> clauses.all { holds(it, mask) } }
@@ -164,11 +172,13 @@ class CoverColumnDominanceTest {
     @Test
     fun `an interrupted index should not overlook a late unsupported reader`() {
         val problem = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+            ),
         )
         for (limit in 0L..40L) {
             val budget = PresolveBudget(limit)
@@ -176,7 +186,7 @@ class CoverColumnDominanceTest {
             val pins = CoverColumnDominance.pins(
                 problem,
                 mapOf(0 to 2L, 1 to 1L),
-                budget.orSpent(Cancellation.Never),
+                budget.orSpent(ExecutionControl.Never),
             )
 
             assertTrue(pins.isEmpty())
@@ -186,14 +196,16 @@ class CoverColumnDominanceTest {
     @Test
     fun `both scheduled lanes should retain the supplied cancellation`() {
         val problem = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            ),
         )
         val context = PresolveContext(
             objectiveBoolCoeffs = mapOf(0 to 2L, 1 to 1L),
-            cancellation = Cancellation { true },
+            cancellation = ExecutionControl { true },
         )
 
         assertTrue(PresolvePass.DUAL_FIX.applySource(problem, context).isEmpty)
@@ -210,7 +222,7 @@ class CoverColumnDominanceTest {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val costs = (0 until width).associateWith { it.toLong() + 1L }
 
-        val pins = CoverColumnDominance.pins(problem, costs, budget.orSpent(Cancellation.Never))
+        val pins = CoverColumnDominance.pins(problem, costs, budget.orSpent(ExecutionControl.Never))
 
         assertTrue(pins.isEmpty())
         val indexEntries = 1L + width + width + 2L * width * (width - 1)
@@ -241,7 +253,7 @@ class CoverColumnDominanceTest {
         assertEquals(
             objective.evaluateLong(witness),
             document.fixedCost + document.softClauses
-            .filter { !holds(Clause(it.literals), mask) }.sumOf { it.weight }
+                .filter { !holds(Clause(it.literals), mask) }.sumOf { it.weight },
         )
         val assumptions = Assumptions.None.withBool(0, witness.boolValue(0)).withBool(1, witness.boolValue(1))
         assertFalse(source.problem.propagate(assumptions) is PropagationResult.Unsat)
@@ -270,8 +282,8 @@ class CoverColumnDominanceTest {
         assertEquals(
             listOf(1, 2, 3),
             (0 until 4).filter { mask ->
-            finite.problem.factors.all { holds(it as Clause, mask) }
-        }
+                finite.problem.factors.all { holds(it as Clause, mask) }
+            },
         )
     }
 

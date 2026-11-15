@@ -7,7 +7,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -36,7 +36,7 @@ class PortfolioProofCoverageTest {
                     it.runTimeSource = clock
                     it.improvementProofShare = share
                     it.includeRestartingProof = true
-                }.use { it.minimize(Cancellation { elapsed.sum() >= 6_400L }) }
+                }.use { it.minimize(ExecutionControl { elapsed.sum() >= 6_400L }) }
 
                 val owed = (elapsed.sum() - 100L) * share / 3
                 for (arm in 1..2) {
@@ -69,7 +69,7 @@ class PortfolioProofCoverageTest {
             Portfolio(workers, fixedBandit(2, 0), reseedStaleThreshold = 0).also {
                 it.runTimeSource = clock
                 it.includeRestartingProof = true
-            }.use { it.minimize(Cancellation { elapsed >= 8_000L }) }
+            }.use { it.minimize(ExecutionControl { elapsed >= 8_000L }) }
 
             assertEquals(1, visits[1], role)
         }
@@ -93,7 +93,7 @@ class PortfolioProofCoverageTest {
                     diagnostics = if (workDriven) PortfolioDiagnostics(64) else null).also {
                     it.runTimeSource = clock
                     it.improvementProofShare = share
-                }.use { it.minimize(Cancellation { elapsed.sum() >= 6_400L }) }
+                }.use { it.minimize(ExecutionControl { elapsed.sum() >= 6_400L }) }
 
                 val owed = (elapsed.sum() - 100L) * share / 2
                 for (arm in 1..2) {
@@ -127,7 +127,7 @@ class PortfolioProofCoverageTest {
         }
         val proof = object : ResumableSearch by proofBase {
             override fun runSlice(
-                global: Cancellation,
+                global: ExecutionControl,
                 sliceMillis: Long,
                 sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -135,7 +135,9 @@ class PortfolioProofCoverageTest {
                 proofBase.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
                 return if (visits[1] == 6) {
                     MinimizeResult.Optimal(Sample(BooleanArray(0), LongArray(0)), 999.0)
-                } else null
+                } else {
+                    null
+                }
             }
         }
         val workers = listOf(
@@ -145,7 +147,7 @@ class PortfolioProofCoverageTest {
 
         val result = Portfolio(workers, fixedBandit(2, 0), reseedStaleThreshold = 0).also {
             it.runTimeSource = clock
-        }.use { it.minimize(Cancellation { elapsed >= 3_000L }) }
+        }.use { it.minimize(ExecutionControl { elapsed >= 3_000L }) }
 
         assertIs<MinimizeResult.Optimal>(result)
         assertTrue(result.stats.portfolio.arms[0].meanReward > result.stats.portfolio.arms[1].meanReward)
@@ -166,7 +168,7 @@ class PortfolioProofCoverageTest {
 
         Portfolio(workers, fixedBandit(3, 0), reseedStaleThreshold = 0).also {
             it.runTimeSource = clock
-        }.use { it.minimize(Cancellation { elapsed.sum() >= 8_000L }) }
+        }.use { it.minimize(ExecutionControl { elapsed.sum() >= 8_000L }) }
 
         val owed = (elapsed.sum() - costs[0]) / 4
         assertTrue(elapsed[1] >= owed - costs.max(), "cheap proof worker received ${elapsed[1]} ms, owed $owed")
@@ -189,7 +191,7 @@ class PortfolioProofCoverageTest {
 
         Portfolio(workers, fixedBandit(2, 0), reseedStaleThreshold = 0).also {
             it.runTimeSource = clock
-        }.use { it.minimize(Cancellation { elapsed.sum() >= 8_000L }) }
+        }.use { it.minimize(ExecutionControl { elapsed.sum() >= 8_000L }) }
 
         assertEquals(1, visits[1])
     }
@@ -209,7 +211,7 @@ class PortfolioProofCoverageTest {
 
         Portfolio(workers, fixedBandit(3, 0), reseedStaleThreshold = 0).also {
             it.runTimeSource = clock
-        }.use { it.minimize(Cancellation { elapsed >= 600L }) }
+        }.use { it.minimize(ExecutionControl { elapsed >= 600L }) }
 
         assertEquals(listOf(0, 1, 2), visits.take(3))
         assertTrue(visits.drop(3).contains(1))
@@ -235,7 +237,7 @@ class PortfolioProofCoverageTest {
 
             Portfolio(workers, fixedBandit(2, 0), reseedStaleThreshold = 0).also {
                 it.runTimeSource = clock
-            }.use { it.minimize(Cancellation { elapsed >= 8_000L }) }
+            }.use { it.minimize(ExecutionControl { elapsed >= 8_000L }) }
 
             assertEquals(1, visits[1], role)
         }
@@ -263,7 +265,7 @@ class PortfolioProofCoverageTest {
 
         Portfolio(workers, fixedBandit(3, 0), reseedStaleThreshold = 0).also {
             it.runTimeSource = clock
-        }.use { it.minimize(Cancellation { elapsed.sum() >= 8_000L }) }
+        }.use { it.minimize(ExecutionControl { elapsed.sum() >= 8_000L }) }
 
         assertEquals(1, finished.closes)
         assertTrue(elapsed[2] >= (elapsed[0] - 500L + elapsed[2]) / 2 - 500L)

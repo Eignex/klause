@@ -19,7 +19,7 @@ import com.eignex.klause.theory.EncodingAttribution
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.TheoryEncoding
 import com.eignex.klause.theory.TheoryRealId
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 
@@ -48,7 +48,7 @@ internal class FactorPolynomialProjection(
 internal fun Problem.integerPolynomialProjection(
     original: Problem,
     projections: PreparedFactorProjections,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     onDecline: (EncoderDecline) -> Unit,
 ): FactorPolynomialProjection? {
     projections.requireSource(this)
@@ -157,7 +157,9 @@ internal fun Problem.integerPolynomialProjection(
                         PolynomialRealLowering.constant(BigFraction.ofLong(it)))
                 }
                 formulas += PolynomialRealFormula.Or(alternatives)
-            } else domain.forEachHole { bound(value, PolynomialRelation.NE, it) }
+            } else {
+                domain.forEachHole { bound(value, PolynomialRelation.NE, it) }
+            }
         }
         for (id in 0 until numRealVars) {
             checkpoint()
@@ -169,9 +171,15 @@ internal fun Problem.integerPolynomialProjection(
                 }
                 if ((endpoint == Double.POSITIVE_INFINITY && relation == PolynomialRelation.GE) ||
                     (endpoint == Double.NEGATIVE_INFINITY && relation == PolynomialRelation.LE)
-                ) formulas += PolynomialRealFormula.Constant(false)
-                else if (endpoint.isFinite()) formulas += PolynomialRealFormula.Atom(real(id), relation,
-                    PolynomialRealLowering.constant(requireNotNull(BigFraction.ofDouble(endpoint))))
+                ) {
+                    formulas += PolynomialRealFormula.Constant(false)
+                } else if (endpoint.isFinite()) {
+                    formulas += PolynomialRealFormula.Atom(
+                    real(id),
+                    relation,
+                    PolynomialRealLowering.constant(requireNotNull(BigFraction.ofDouble(endpoint))),
+                )
+                }
             }
         }
         val integers = (0 until numIntVars).associate { checkpoint(); "i$it" to it }

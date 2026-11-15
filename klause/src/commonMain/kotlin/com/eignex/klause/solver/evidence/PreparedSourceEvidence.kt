@@ -4,14 +4,14 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.pipeline.PreparedSourcePlan
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Bind optional capture to a prepared plan's original exact IR and explicit invocation pins. */
 fun PreparedSourcePlan.sourceResultCapture(
     revision: SourceRevision,
     assumptions: Assumptions = Assumptions.None,
     objectiveIdentity: String? = null,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): SourceResultCapture? {
     val original = originalSource as? Problem ?: return null
     if (!assumptions.deductions.isEmpty || assumptions.bools.keys.any { it !in 0 until sourceBoolCount } ||

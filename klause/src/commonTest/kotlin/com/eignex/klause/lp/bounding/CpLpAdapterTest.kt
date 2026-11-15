@@ -35,7 +35,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import kotlin.test.Test
@@ -68,15 +68,21 @@ class CpLpAdapterTest {
             shared.push(SearchDecision.IntAtLeast(0, 5))
 
             val child = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            val childValue = assertNotNull(engine.solveNode(child.model, null, Cancellation.Never)?.second).objective
+            val childValue = assertNotNull(
+                engine.solveNode(
+                    child.model,
+                    null,
+                    ExecutionControl.Never,
+                )?.second,
+            ).objective
             shared.popTo(1)
             val ancestor = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
             val ancestorValue = assertNotNull(
-                engine.solveNode(ancestor.model, null, Cancellation.Never)?.second,
+                engine.solveNode(ancestor.model, null, ExecutionControl.Never)?.second,
             ).objective
             shared.popTo(0)
             val root = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            val rootValue = assertNotNull(engine.solveNode(root.model, null, Cancellation.Never)?.second).objective
+            val rootValue = assertNotNull(engine.solveNode(root.model, null, ExecutionControl.Never)?.second).objective
 
             assertEquals(5.0, childValue)
             assertEquals(3.0, ancestorValue)
@@ -120,7 +126,7 @@ class CpLpAdapterTest {
                 val current = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
                 reclaimed = reclaimed || current.model.m < previousRows
                 if (lower <= 8L || reclaimed) {
-                    val result = assertNotNull(engine.solveNode(current.model, null, Cancellation.Never)?.second)
+                    val result = assertNotNull(engine.solveNode(current.model, null, ExecutionControl.Never)?.second)
                     val fresh = relaxer.build(cp.session)
                     val expected = RevisedSimplex(fresh.model).use { assertNotNull(it.solve()).objective }
                     assertEquals(expected, result.objective)
@@ -138,7 +144,7 @@ class CpLpAdapterTest {
             assertTrue(reclaimed)
             shared.popTo(0)
             val restored = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            val result = assertNotNull(engine.solveNode(restored.model, null, Cancellation.Never)?.second)
+            val result = assertNotNull(engine.solveNode(restored.model, null, ExecutionControl.Never)?.second)
             assertTrue(restored.model.m <= previousRows)
             assertEquals(rootColumns, restored.model.n)
             assertEquals(0L, assertNotNull(integerCertify(restored.model, result.duals)).objectiveBoundCeil(0))
@@ -165,7 +171,7 @@ class CpLpAdapterTest {
             val session = PropagationSession(problem)
             val relaxer = assertNotNull(engine.lpRelaxer)
             val base = assertNotNull(engine.nodeRelaxation(relaxer, session))
-            val point = assertNotNull(engine.solveNode(base.model, null, Cancellation.Never)?.second)
+            val point = assertNotNull(engine.solveNode(base.model, null, ExecutionControl.Never)?.second)
             val cut = AllDifferentSeparator().separate(CutContext(problem, base, point.primal, session)).single()
             assertEquals(Relation.LE, cut.rel)
             assertTrue(engine.cutPool.add(cut, base))
@@ -175,7 +181,7 @@ class CpLpAdapterTest {
                 session,
                 12.0,
                 sink,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 -1,
                 true,
                 learn = true,
@@ -209,10 +215,10 @@ class CpLpAdapterTest {
             session.implyIntAtLeast(1, 3)
             val relaxer = assertNotNull(engine.lpRelaxer)
             val base = assertNotNull(engine.nodeRelaxation(relaxer, session))
-            val point = assertNotNull(engine.solveNode(base.model, null, Cancellation.Never)?.second)
+            val point = assertNotNull(engine.solveNode(base.model, null, ExecutionControl.Never)?.second)
             val cut = AllDifferentSeparator().separate(CutContext(problem, base, point.primal, session)).single()
             val tightened = assertNotNull(engine.cpAdapter.cutRelaxation(base, session, listOf(cut)))
-            val result = assertNotNull(engine.solveNode(tightened.model, null, Cancellation.Never)?.second)
+            val result = assertNotNull(engine.solveNode(tightened.model, null, ExecutionControl.Never)?.second)
             val certificate = assertNotNull(integerCertify(tightened.model, result.duals))
             val reason = assertNotNull(LpExplanation.objectiveBoundReason(tightened, certificate, session))
 
@@ -220,7 +226,7 @@ class CpLpAdapterTest {
             assertTrue(reason.isNotEmpty())
             session.popToLevel(0)
             val sibling = assertNotNull(engine.nodeRelaxation(relaxer, session))
-            val siblingResult = assertNotNull(engine.solveNode(sibling.model, null, Cancellation.Never)?.second)
+            val siblingResult = assertNotNull(engine.solveNode(sibling.model, null, ExecutionControl.Never)?.second)
             assertEquals(4.0, siblingResult.objective)
             assertTrue((0 until sibling.model.m).all { sibling.sourceMap?.parent(it) == null })
         }
@@ -257,7 +263,7 @@ class CpLpAdapterTest {
                     5 -> shared.popTo(0)
                 }
                 val retained = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-                val result = assertNotNull(engine.solveNode(retained.model, null, Cancellation.Never)?.second)
+                val result = assertNotNull(engine.solveNode(retained.model, null, ExecutionControl.Never)?.second)
                 val fresh = relaxer.build(cp.session)
                 val expected = RevisedSimplex(fresh.model).use { simplex ->
                     val solved = assertNotNull(simplex.solve())
@@ -372,7 +378,7 @@ class CpLpAdapterTest {
             val relaxer = assertNotNull(engine.lpRelaxer)
             val relaxation = relaxer.build(session)
             assertTrue(relaxation.model.hasContinuous)
-            val simplex = engine.dualSimplex(relaxation.model, Cancellation.Never)
+            val simplex = engine.dualSimplex(relaxation.model, ExecutionControl.Never)
             try {
                 val result = assertNotNull(simplex.solve())
                 assertEquals(-3.5, result.objective)
@@ -406,7 +412,7 @@ class CpLpAdapterTest {
             search.push(SearchDecision.IntAtLeast(2, 2))
             val relaxer = assertNotNull(engine.lpRelaxer)
             val local = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            val simplex = engine.dualSimplex(local.model, Cancellation.Never)
+            val simplex = engine.dualSimplex(local.model, ExecutionControl.Never)
             val (baseResult, raw) = try {
                 val result = assertNotNull(simplex.solve())
                 result to simplex.gomoryCuts(8).single()
@@ -437,7 +443,7 @@ class CpLpAdapterTest {
             assertFalse(consumed.global)
             assertTrue(engine.cutPool.exportGlobalCuts().isEmpty())
             val applied = relaxer.build(cp.session, listOf(consumed))
-            val tightened = assertNotNull(engine.solveNode(applied.model, null, Cancellation.Never)?.second)
+            val tightened = assertNotNull(engine.solveNode(applied.model, null, ExecutionControl.Never)?.second)
             assertEquals(-3.0, tightened.objective)
 
             search.popTo(0)
@@ -504,7 +510,7 @@ class CpLpAdapterTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val sink = SolveStatsSink(backend = "cancelled")
         var cancelled = false
-        val token = Cancellation { cancelled }
+        val token = ExecutionControl { cancelled }
         LpEngine(
             problem,
             objective,

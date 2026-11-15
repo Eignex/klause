@@ -22,7 +22,7 @@ import com.eignex.klause.solver.search.SearchExecutionControls
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 
@@ -39,22 +39,22 @@ internal class AbsRealCompletion(private val source: Problem) {
 
     fun complete(
         sample: Sample,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         controls: SearchExecutionControls? = null,
         solveContext: LpSolveContext = LpSolveContext.Production,
     ): Completed {
         var work = 0L
-        val counted = object : Cancellation {
+        val counted = object : ExecutionControl() {
             override fun isCancelled(): Boolean = cancellation()
             override fun deadline() = cancellation.deadline()
-            override fun workMeter(): WorkMeter = WorkMeter { units ->
+            override val accounting: WorkMeter = WorkMeter { units ->
                 work = if (units > Long.MAX_VALUE - work) Long.MAX_VALUE else work + units
                 cancellation.charge(units)
             }
         }
         val containing = controls ?: SearchExecutionControlAdapter(cancellation)
         val metered = object : SearchExecutionControls by containing {
-            override val cancellation: Cancellation = counted
+            override val cancellation: ExecutionControl = counted
         }
         val result = completeWith(sample, counted, metered, solveContext)
         return Completed(if (counted()) Result.Undecided else result, work)
@@ -62,7 +62,7 @@ internal class AbsRealCompletion(private val source: Problem) {
 
     private fun completeWith(
         sample: Sample,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         controls: SearchExecutionControls,
         solveContext: LpSolveContext,
     ): Result {
@@ -95,10 +95,14 @@ internal class AbsRealCompletion(private val source: Problem) {
                 atoms = SearchAtomRegistry(model.numBoolVars), executionControls = controls)
             return when (session.initialize()) {
                 is ComponentResult.Conflict -> Result.Refuted
+
                 ComponentResult.Indeterminate -> Result.Undecided
+
                 ComponentResult.Consistent -> when (val result = session.solve(model.numBoolVars)) {
                     SearchResult.Exhausted -> Result.Refuted
+
                     SearchResult.Indeterminate -> Result.Undecided
+
                     is SearchResult.Satisfied -> {
                         val reals = List(source.numRealVars) { id ->
                             result.model.valueOf(SearchExactRealValue(SourceRealId(id))) ?: return Result.Undecided

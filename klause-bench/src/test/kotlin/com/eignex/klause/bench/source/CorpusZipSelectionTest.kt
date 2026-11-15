@@ -1,6 +1,10 @@
 package com.eignex.klause.bench.source
 
 import com.eignex.klause.bench.catalog.FetchMethod
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
+import org.tukaani.xz.LZMA2Options
+import org.tukaani.xz.XZOutputStream
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URI
@@ -15,10 +19,6 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
-import org.tukaani.xz.LZMA2Options
-import org.tukaani.xz.XZOutputStream
 
 class CorpusZipSelectionTest {
     @ParameterizedTest

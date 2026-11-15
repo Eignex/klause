@@ -26,7 +26,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.EncoderDecline
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigInt
@@ -143,7 +143,7 @@ class OpenTheoryMinimizer internal constructor(
     objective: LinearObjective,
     private val presolveConfig: PresolveConfig = PresolveConfig.DEFAULT,
     private val solutionSetSensitive: Boolean = false,
-    private val presolveCancellation: Cancellation = Cancellation.Never,
+    private val presolveCancellation: ExecutionControl = ExecutionControl.Never,
     private val presolveBudget: PresolveBudget? = null,
     private val projections: PreparedFactorProjections? = null,
 ) {
@@ -153,7 +153,7 @@ class OpenTheoryMinimizer internal constructor(
         objective,
         PresolveConfig.DEFAULT,
         false,
-        Cancellation.Never,
+        ExecutionControl.Never,
         null,
     )
 
@@ -220,7 +220,7 @@ class OpenTheoryMinimizer internal constructor(
 
     /** Minimizes the objective, tightening the bound until a round refutes it. */
     fun minimize(params: TheoryParams = TheoryParams()): OpenTheoryOptimum = descent(params).use { descent ->
-        checkNotNull(descent.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { _, _ -> }) {
+        checkNotNull(descent.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) { _, _ -> }) {
             "an unsliced descent never pauses"
         }
     }.withSourceSemantics(source.semantics)
@@ -281,7 +281,7 @@ class OpenTheoryMinimizer internal constructor(
          * paused.
          */
         fun runSlice(
-            global: Cancellation,
+            global: ExecutionControl,
             sliceMillis: Long,
             sliceWork: Long,
             onIncumbent: (OpenTheoryAssignment, BigInt) -> Unit,
@@ -308,7 +308,7 @@ class OpenTheoryMinimizer internal constructor(
 
         // Prepare the source and close its open sides once for the whole descent; null with the verdict set when
         // that alone decides the model.
-        private fun open(global: Cancellation): Opening? {
+        private fun open(global: ExecutionControl): Opening? {
             // Preparation is the descent's first phase, so the caller's stop reaches it and its own summary is
             // what a run refuted here has to report — there is no round behind it to carry one.
             sink.start()
@@ -361,10 +361,10 @@ class OpenTheoryMinimizer internal constructor(
             // invented box, so it refutes the model itself — which, with no witness yet, is infeasibility.
             var closingInterrupted = false
             val closingStop = prepared.budget?.orSpent(stop) ?: stop
-            val closingCancellation = object : Cancellation {
+            val closingCancellation = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = closingStop().also { if (it) closingInterrupted = true }
 
-                override fun workMeter(): WorkMeter? = closingStop.workMeter()
+                override val accounting: WorkMeter? get() = closingStop.accounting
             }
             val base = when (val closed = prepared.problem.closeOpenBounds(closingCancellation, sink.lp)) {
                 OpenPresolveResult.Refuted -> {
@@ -388,7 +388,7 @@ class OpenTheoryMinimizer internal constructor(
 
         // The next round: the model under a row refuting the better of the incumbent and the external bound, or
         // the model itself while there is neither.
-        private fun startRound(opened: Opening, global: Cancellation): ResumableOpenTheory {
+        private fun startRound(opened: Opening, global: ExecutionControl): ResumableOpenTheory {
             val own = incumbents.current()?.objective
             val external = externalBound()?.takeIf { terms.isNotEmpty() && (own == null || it < own) }
             roundBoundExternal = external != null
@@ -397,7 +397,9 @@ class OpenTheoryMinimizer internal constructor(
             // witness gives it a bound to state.
             val (spec, plan) = when {
                 terms.isEmpty() -> opened.base to opened.boundedPlan.forObjectiveRound(opened.base, appended = false)
+
                 bound == null -> opened.base to opened.boundedPlan.withoutAppendedFactor(opened.base)
+
                 else -> opened.base.boundedBy(bound - BIG_ONE).let { spec ->
                     spec to opened.boundedPlan.forObjectiveRound(spec, appended = true,
                         cancellation = presolveCancellation or params.cancellation or params.timeout or global)
@@ -533,7 +535,7 @@ class OpenTheoryMinimizer internal constructor(
             terms,
             coefficients,
             point,
-            (params.timeout or params.cancellation).shorten(0.5),
+            (params.timeout.withAccounting(params.cancellation) or params.cancellation).shorten(0.5),
             state.smt::observeSourceLp,
         )
         rayRefusedForEveryWitness = ray == false && model.statesOneBranch()

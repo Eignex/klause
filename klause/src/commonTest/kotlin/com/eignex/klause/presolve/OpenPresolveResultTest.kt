@@ -8,7 +8,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -141,7 +141,7 @@ class OpenPresolveResultTest {
 
     @Test
     fun `a spent allowance should close no open side`() {
-        val spent = PresolveBudget(0L).orSpent(Cancellation.Never)
+        val spent = PresolveBudget(0L).orSpent(ExecutionControl.Never)
 
         val result = assertIs<OpenPresolveResult.Tightened>(jointlyDetermined().closeOpenBounds(spent))
 

@@ -13,7 +13,7 @@ import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertSame
@@ -32,7 +32,7 @@ class NativeExecutionSemanticsTest {
         ))
 
         val completed = SourceSetup.execute(SourceExecutionRequest(invocation,
-            polynomial = PolynomialTheoryParams(cancellation = Cancellation { true })))
+            polynomial = PolynomialTheoryParams(cancellation = ExecutionControl { true })))
         val result = assertIs<SourceExecutionResult.Polynomial>(completed).result.result
 
         assertIs<OpenTheoryResult.Unknown>(result)
@@ -49,7 +49,7 @@ class NativeExecutionSemanticsTest {
         )).source.originalSource)
 
         val result = OpenTheoryPipeline.execute(source.pipelineRequest(), NonlinearIntegerTheoryParams(
-            polynomial = PolynomialTheoryParams(cancellation = Cancellation { true }),
+            polynomial = PolynomialTheoryParams(cancellation = ExecutionControl { true }),
         ), FiniteEngine.BACKTRACK).result
 
         assertIs<OpenTheoryResult.Unknown>(result)
@@ -66,7 +66,7 @@ class NativeExecutionSemanticsTest {
         )).source.originalSource)
 
         val result = OpenTheoryPipeline.execute(source.pipelineRequest(),
-            TranscendentalTheoryParams(cancellation = Cancellation { true }), FiniteEngine.BACKTRACK).result
+            TranscendentalTheoryParams(cancellation = ExecutionControl { true }), FiniteEngine.BACKTRACK).result
 
         assertIs<OpenTheoryResult.Unknown>(result)
         assertSame(source.semantics, result.semantics)

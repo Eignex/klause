@@ -2,7 +2,7 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.RationalBasisLimits
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -58,13 +58,13 @@ class ExactBasisVerifyTest {
         val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
         val cache = ExactBasisCache()
         val cases = listOf(
-            Triple(RationalBasisLimits(dimension = 0, work = 0L), Cancellation.Never, ExactBasisDecline.WORK),
+            Triple(RationalBasisLimits(dimension = 0, work = 0L), ExecutionControl.Never, ExactBasisDecline.WORK),
             Triple(
                 RationalBasisLimits(dimension = 0, time = Duration.ZERO),
-                Cancellation.Never,
+                ExecutionControl.Never,
                 ExactBasisDecline.TIME,
             ),
-            Triple(RationalBasisLimits(dimension = 0), Cancellation { true }, ExactBasisDecline.CANCELLED),
+            Triple(RationalBasisLimits(dimension = 0), ExecutionControl { true }, ExactBasisDecline.CANCELLED),
         )
         for ((limit, cancellation, reason) in cases) {
             val stopped = verifyExactBasis(
@@ -324,7 +324,7 @@ class ExactBasisVerifyTest {
             assertNull(checked.singularRank)
             assertEquals(reason, checked.metrics.decline)
         }
-        val cancelled = verifyExactBasis(model, basis, cancellation = Cancellation { true })
+        val cancelled = verifyExactBasis(model, basis, cancellation = ExecutionControl { true })
         assertEquals(ExactBasisDecline.CANCELLED, cancelled.metrics.decline)
         assertNull(cancelled.witness)
     }

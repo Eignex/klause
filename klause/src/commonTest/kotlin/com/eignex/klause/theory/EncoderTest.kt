@@ -48,7 +48,7 @@ import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -183,7 +183,7 @@ class EncoderTest {
                         mapOf(0 to BigFraction.ZERO),
                         mapOf(0 to BigFraction.ZERO),
                     ),
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                 ),
             )
             assertIs<ExactNeighborhoodResult.Undecided>(
@@ -193,7 +193,7 @@ class EncoderTest {
                         emptyMap(),
                         emptyMap(),
                     ),
-                    Cancellation { true },
+                    ExecutionControl { true },
                 ),
             )
             assertIs<ExactNeighborhoodResult.Witness>(
@@ -203,7 +203,7 @@ class EncoderTest {
                         mapOf(0 to BigFraction.ONE),
                         mapOf(0 to BigFraction.ONE),
                     ),
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                 ),
             ).sample
         }
@@ -384,7 +384,7 @@ class EncoderTest {
         }
         val fixed = Sample(BooleanArray(0), LongArray(0))
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
-        val token = Cancellation { cancelled }
+        val token = ExecutionControl { cancelled }
         val queries = FiniteExactNeighborhood(source.bake(providers), fixed, TheoryParams(), null) {}
 
         val witness = queries.use {
@@ -446,7 +446,7 @@ class EncoderTest {
             )).model
         var cancelled = false
         var entered = 0
-        val token = Cancellation { cancelled }
+        val token = ExecutionControl { cancelled }
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
                 val selected = BuiltInEncoderProvider.select(factor, target)
@@ -624,11 +624,11 @@ class EncoderTest {
         queries.use {
             val refuted = it.check(
                 ExactNeighborhoodCondition(mapOf(0 to true), emptyMap(), emptyMap()),
-                Cancellation.Never,
+                ExecutionControl.Never,
             )
             val sibling = it.check(
                 ExactNeighborhoodCondition(mapOf(0 to false), emptyMap(), emptyMap()),
-                Cancellation.Never,
+                ExecutionControl.Never,
             )
 
             assertIs<ExactNeighborhoodResult.Refuted>(refuted)
@@ -701,7 +701,7 @@ class EncoderTest {
         )
         var cancelled = false
         var installations = 0
-        val stop = Cancellation { cancelled }
+        val stop = ExecutionControl { cancelled }
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
                 val selected = BuiltInEncoderProvider.select(factor, target)

@@ -17,7 +17,7 @@ import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -52,7 +52,7 @@ class FiniteExactNeighborhoodTest {
 
         for (adaptive in listOf(false, true)) {
             val worker = finiteExactNeighborhoodWorker(source, point, null, null, adaptive, 17, 0)
-            val result = worker.use { it.solve(Cancellation.Never) }
+            val result = worker.use { it.solve(ExecutionControl.Never) }
 
             val witness = assertIs<SolveResult.Sat>(result).assignment
             assertEquals("1/3", witness.exactReals?.get(0).toString())
@@ -88,7 +88,7 @@ class FiniteExactNeighborhoodTest {
         val worker = finiteExactNeighborhoodWorker(source, point, null, null, false, 17, 0)
             .bindSource(SourceWorkerBinding(binding, provesResults = false))
 
-        val result = worker.use { it.solve(Cancellation.Never) }
+        val result = worker.use { it.solve(ExecutionControl.Never) }
 
         val sample = assertIs<SolveResult.Sat>(result).assignment
         val publication = assertIs<CompletedEnginePublication.Witness>(sample.witnessCertificate?.publication)

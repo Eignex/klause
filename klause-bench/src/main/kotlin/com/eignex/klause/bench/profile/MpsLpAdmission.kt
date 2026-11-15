@@ -15,10 +15,10 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpPlan
-import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.objective.LinearObjective
@@ -30,17 +30,17 @@ import com.eignex.klause.solver.pipeline.PreparedSourcePlan
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
-import com.eignex.klause.util.Cancellation
-import java.io.File
-import java.lang.management.ManagementFactory
-import java.util.Base64
-import kotlin.time.Duration.Companion.seconds
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import java.util.Base64
+import kotlin.time.Duration.Companion.seconds
 
 internal object MpsLpAdmission {
     @JvmStatic
@@ -67,21 +67,33 @@ internal object MpsLpAdmission {
         require(bytes.size <= 16 * 1024 * 1024 && sha256(bytes) == options.getValue("sha256"))
         out.resolve("source.mps").writeBytes(bytes)
         val parsed = Mps.parse(bytes.decodeToString())
-        val stop = Cancellation.after(20.seconds)
+        val stop = ExecutionControl.after(20.seconds)
         val original = requireNotNull(parsed.toLinearSourceProblem(cancellation = stop))
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            SourceAttachment(original, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK,
-            maximize = original.objective?.sense == ObjectiveSense.MAXIMIZE, cancellation = stop,
-        ))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+                SourceAttachment(original, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.BACKTRACK,
+                maximize = original.objective?.sense == ObjectiveSense.MAXIMIZE,
+                cancellation = stop,
+            ),
+        )
         val plan = requireNotNull(invocation.preparedPlan)
         val canonical = requireNotNull(plan.model)
         val sourceObjective = preparedObjective(plan)
         val budget = PresolveBudget(1_650_000_000L)
-        val preparation = FinitePipeline.prepare(FinitePipelineRequest(
-            canonical, FiniteEngine.BACKTRACK, sourceObjective,
-            cancellation = stop, solveCancellation = stop, presolveBudget = budget,
-            randomSeed = 3L, preparedPlan = plan,
-        ))
+        val preparation = FinitePipeline.prepare(
+            FinitePipelineRequest(
+                canonical,
+                FiniteEngine.BACKTRACK,
+                sourceObjective,
+                cancellation = stop,
+                solveCancellation = stop,
+                presolveBudget = budget,
+                randomSeed = 3L,
+                preparedPlan = plan,
+            ),
+        )
         check(preparation.presolve?.infeasible != true) { "preparation refuted source" }
         val problem = preparation.problem
         val objective = preparation.objective
@@ -106,10 +118,13 @@ internal object MpsLpAdmission {
             put("compiledBooleans", problem.numBoolVars)
             put("compiledReals", problem.numRealVars)
             put("compiledFactors", problem.factors.size)
-            put("factorKinds", buildJsonObject {
-                problem.factors.groupingBy { it::class.simpleName ?: "Factor" }.eachCount().toSortedMap()
-                    .forEach { (kind, count) -> put(kind, count) }
-            })
+            put(
+                "factorKinds",
+                buildJsonObject {
+                    problem.factors.groupingBy { it::class.simpleName ?: "Factor" }.eachCount().toSortedMap()
+                        .forEach { (kind, count) -> put(kind, count) }
+                },
+            )
             put("lpMaxTableauCells", problem.settings.lpMaxTableauCells)
             put("lpCeilingTableauCells", problem.settings.lpCeilingTableauCells)
             put("defaultAdmission", admission(problem, LpConfig.AUTO))
@@ -122,9 +137,12 @@ internal object MpsLpAdmission {
             put("jvmMaxHeapBytes", Runtime.getRuntime().maxMemory())
             put("os", System.getProperty("os.name"))
             put("arch", System.getProperty("os.arch"))
-            put("jvmOptions", buildJsonArray {
-                ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
-            })
+            put(
+                "jvmOptions",
+                buildJsonArray {
+                    ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
+                },
+            )
         }
         out.resolve("admission.json").writeText("$report\n")
         println(report)
@@ -145,7 +163,12 @@ internal object MpsLpAdmission {
         val factsType = Class.forName("com.eignex.klause.portfolio.ProblemFacts")
         val companion = factsType.getField("Companion").get(null)
         val facts = companion.javaClass.methods.single { it.name == "of" }.invoke(
-            companion, problem, ProblemProfile.of(problem, true), scenario.lpCeiling, objective, null,
+            companion,
+            problem,
+            ProblemProfile.of(problem, true),
+            scenario.lpCeiling,
+            objective,
+            null,
         )
         val compositionType = Class.forName("com.eignex.klause.portfolio.PortfolioComposition")
         val composition = compositionType.getField("INSTANCE").get(null)
@@ -155,32 +178,49 @@ internal object MpsLpAdmission {
         val first = get(selected, "FirstSolutionCount") as Int
         return buildJsonObject {
             put("firstSolutionCount", first)
-            put("arms", buildJsonArray {
-                arms.forEachIndexed { index, value ->
-                    val arm = requireNotNull(value)
-                    add(buildJsonObject {
-                        put("label", get(arm, "Label").toString())
-                        put("kind", arm.javaClass.simpleName)
-                        put("firstSolutionEligible", index < first)
-                        if (arm.javaClass.simpleName == "BacktrackWorkerConfig") {
-                            val recipe = get(arm, "Recipe") as BacktrackRecipe
-                            val params = recipe.build(1003L + index, null)
-                            val resolved = params.lpConfig?.let { LpAutoConfig.resolve(problem, it, params.lpPlan) }
-                                ?: params.lpPlan
-                            put("configuredLp", buildJsonObject {
-                                put("emphasis", params.lpConfig?.emphasis?.name)
-                                put("overrides", buildJsonObject {
-                                    params.lpConfig?.overrides?.forEach { (technique, enabled) ->
-                                        put(technique.id, enabled)
+            put(
+                "arms",
+                buildJsonArray {
+                    arms.forEachIndexed { index, value ->
+                        val arm = requireNotNull(value)
+                        add(
+                            buildJsonObject {
+                                put("label", get(arm, "Label").toString())
+                                put("kind", arm.javaClass.simpleName)
+                                put("firstSolutionEligible", index < first)
+                                if (arm.javaClass.simpleName == "BacktrackWorkerConfig") {
+                                    val recipe = get(arm, "Recipe") as BacktrackRecipe
+                                    val params = recipe.build(1003L + index, null)
+                                    val resolved = params.lpConfig?.let {
+                                        LpAutoConfig.resolve(
+                                            problem,
+                                            it,
+                                            params.lpPlan,
+                                        )
                                     }
-                                })
-                            })
-                            put("nodeBounding", resolved.bounding)
-                            put("plan", resolved.toString())
-                        }
-                    })
-                }
-            })
+                                        ?: params.lpPlan
+                                    put(
+                                        "configuredLp",
+                                        buildJsonObject {
+                                            put("emphasis", params.lpConfig?.emphasis?.name)
+                                            put(
+                                                "overrides",
+                                                buildJsonObject {
+                                                    params.lpConfig?.overrides?.forEach { (technique, enabled) ->
+                                                        put(technique.id, enabled)
+                                                    }
+                                                },
+                                            )
+                                        },
+                                    )
+                                    put("nodeBounding", resolved.bounding)
+                                    put("plan", resolved.toString())
+                                }
+                            },
+                        )
+                    }
+                },
+            )
         }
     }
 
@@ -203,7 +243,7 @@ internal object MpsLpAdmission {
         problem: Problem,
         objective: LinearObjective?,
         cone: Boolean,
-        stop: Cancellation,
+        stop: ExecutionControl,
         element: Boolean = false,
         elementIndexes: Set<Int>? = null,
         table: Boolean = false,
@@ -228,12 +268,19 @@ internal object MpsLpAdmission {
         val relaxer = constructor.newInstance(*values)
         val domainType = Class.forName("com.eignex.klause.lp.relaxation.RootDomains")
         val domains = domainType.constructors.single().newInstance(problem)
-        val build = type.methods.single { it.name == "build" && it.parameterCount == 3 &&
-            it.parameterTypes[0].simpleName == "RelaxationDomains" }
+        val build = type.methods.single {
+            it.name == "build" && it.parameterCount == 3 &&
+                it.parameterTypes[0].simpleName == "RelaxationDomains"
+        }
         return build.invoke(relaxer, domains, emptyList<Any>(), stop)
     }
 
-    private fun shape(problem: Problem, objective: LinearObjective?, cone: Boolean, stop: Cancellation): JsonObject {
+    private fun shape(
+        problem: Problem,
+        objective: LinearObjective?,
+        cone: Boolean,
+        stop: ExecutionControl,
+    ): JsonObject {
         val relaxation = rootRelaxation(problem, objective, cone, stop)
         val model = get(relaxation, "Model")
         val rows = get(model, "M") as Int
@@ -272,8 +319,7 @@ internal object MpsLpAdmission {
         }
     }
 
-    private fun optional(receiver: Any, name: String): Any? =
-        receiver.javaClass.getMethod("get$name").invoke(receiver)
+    private fun optional(receiver: Any, name: String): Any? = receiver.javaClass.getMethod("get$name").invoke(receiver)
 
     private fun get(receiver: Any, name: String): Any = requireNotNull(optional(receiver, name))
 }

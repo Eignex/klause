@@ -19,12 +19,12 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.pipeline.TheoryParams
-import com.eignex.klause.util.Cancellation
-import java.io.File
-import kotlin.time.Duration.Companion.seconds
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import kotlin.time.Duration.Companion.seconds
 
 internal object NumericalActiveRowsControls {
     fun run(out: File) {
@@ -59,11 +59,11 @@ internal object NumericalActiveRowsControls {
         out.resolve("$name-source.json").writeBytes(bytes)
         repeat(4) { round ->
             for (active in if (round % 2 == 0) listOf(false, true) else listOf(true, false)) {
-                val stop = Cancellation.after(10.seconds)
+                val stop = ExecutionControl.after(10.seconds)
                 val started = System.nanoTime()
                 val invocation = NumericalFrontierSnapshot.open(source,
                     params.copy(timeout = stop, cancellation = stop), frontier = frontier, activeRows = active)
-                val selection = if (round == 0) NumericalSelectionSnapshot(Cancellation.after(30.seconds)) else null
+                val selection = if (round == 0) NumericalSelectionSnapshot(ExecutionControl.after(30.seconds)) else null
                 val journal = selection?.attach(invocation)
                 val result = try {
                     NumericalFrontierSnapshot.run(invocation) { _, _ -> }
@@ -73,20 +73,20 @@ internal object NumericalActiveRowsControls {
                 val elapsed = System.nanoTime() - started
                 val progress = stats(invocation)
                 if (journal != null) {
-                    val inspection = NumericalSelectionSnapshot(Cancellation.after(10.seconds))
+                    val inspection = NumericalSelectionSnapshot(ExecutionControl.after(10.seconds))
                     val arm = if (active) "active" else "delayed"
                     Reports.writeJson(out.resolve("$name-$arm-states.json").path, inspection.capture(journal))
                     if (!active) {
                         val replayFile = out.resolve("$name-active-consultations.jsonl")
                         replayFile.writeText("")
-                        NumericalSelectionSnapshot(Cancellation.after(10.seconds)).replayActiveRows(journal) {
+                        NumericalSelectionSnapshot(ExecutionControl.after(10.seconds)).replayActiveRows(journal) {
                             replayFile.appendText(it.toString() + "\n")
                         }
                     }
                 }
                 val terminal = field(result, "terminal") as SourceEvidence?
                 val bound = field(result, "bound") as SourceEvidence?
-                val checkStop = Cancellation.after(10.seconds)
+                val checkStop = ExecutionControl.after(10.seconds)
                 val entry = buildJsonObject {
                     put("source", name)
                     put("sourceSha256", sha256(bytes))

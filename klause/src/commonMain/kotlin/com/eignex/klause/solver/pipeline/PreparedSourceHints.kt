@@ -13,7 +13,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class PreparedSourceHints(val sweep: DefinitionalSweep?, val objective: IncrementalObjective?)
 
@@ -21,7 +21,7 @@ internal fun PreparedSourceInvocation.heuristicHints(
     problem: Problem,
     objective: LinearObjective?,
     mapping: SourceMapping?,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     strategies: Set<ExecutionStrategy>,
     capabilities: ExecutionCapabilities,
 ): PreparedSourceHints? {
@@ -68,7 +68,9 @@ internal fun PreparedSourceInvocation.heuristicHints(
         if (stop()) return null
         stop.charge(1)
         val direct = hint.remap(coordinates)
-        val reconstructed = if (direct != null || reconstructions.isEmpty()) null else {
+        val reconstructed = if (direct != null || reconstructions.isEmpty()) {
+            null
+        } else {
             when (val original = hint.remap(planned)) {
                 is DefinitionHint.Linear -> original.reconstructed(reconstructions)
                 is DefinitionHint.Comparison -> original.reconstructed(reconstructions, stop)
@@ -95,7 +97,9 @@ internal fun PreparedSourceInvocation.heuristicHints(
         val allFolds = DefinitionalSweep.infer(problem, references.integers, references.folds, stop)
         if (stop()) return null
         DefinitionalSweep.withSource(problem, allFolds, hints, stop)
-    } else sweep
+    } else {
+        sweep
+    }
     if (stop()) return null
     val captureBooleanCosts = sweep == null && ExecutionStrategy.LOCAL_SEARCH in strategies &&
         problem.semantics.effective.format == SourceFormat.WCNF &&
@@ -106,7 +110,7 @@ internal fun PreparedSourceInvocation.heuristicHints(
 
 private fun SourceDefinitionReferences.foldsForMoves(
     objective: LinearObjective?,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): List<BoolFoldDefinition>? {
     if (objective == null) return emptyList()
     val weights = objective.boolWeights

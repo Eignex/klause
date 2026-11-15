@@ -23,13 +23,11 @@ import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.theory.qfnra.solveQfNra
-import com.eignex.klause.util.ArithmeticCancellation
 import com.eignex.klause.util.ArithmeticWorkSource
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkCreditPool
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.WorkReservation
-import com.eignex.klause.util.arithmeticSource
 import com.eignex.klause.util.reserveWork
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigInt
@@ -67,46 +65,56 @@ internal sealed interface TranscendentalCheckResult {
 
 internal class TranscendentalTheoryService(
     private val source: TranscendentalProblem,
-    private val cancellation: Cancellation = Cancellation.Never,
+    private val cancellation: ExecutionControl = ExecutionControl.Never,
     private val maximumWork: Long? = 100000,
     maximumBits: Int = 65536,
     private val polynomialLimits: PolynomialLimits = PolynomialLimits(),
 ) {
     private val pool = WorkCreditPool(maximumWork)
-    private val parentAccounting = cancellation.arithmeticSource()
     val work: Long get() = pool.spent
     var representationDeclined: Boolean = false
         private set
     val exhausted: Boolean get() = maximumWork?.let { work >= it } == true || representationDeclined
-    private var worker = Cancellation.Never
+    private var worker = ExecutionControl.Never
     private val meter = WorkMeter { units ->
         require(units >= 0)
         pool.debit(units)
         cancellation.charge(units)
     }
-    private val stop: ArithmeticCancellation = object : ArithmeticCancellation {
+    private val stop: ExecutionControl = object : ExecutionControl() {
         override fun isCancelled(): Boolean = cancellation() || worker() || exhausted
-        override fun workMeter(): WorkMeter = meter
+        override val accounting: WorkMeter get() = meter
         override fun deadline() = cancellation.deadline()
-        override fun arithmeticSource(): ArithmeticWorkSource? {
-            if (parentAccounting == null) return null
+        override val admission: ArithmeticWorkSource get() {
+            val parentAccounting = cancellation.admission
+            val parentMeter = cancellation.accounting
             return object : ArithmeticWorkSource {
-                override fun isCancelled(): Boolean = stop.isCancelled()
-                override fun reserve(maximum: Int): WorkReservation? =
-                    reserveWork(maximum, listOf(pool), parentAccounting) {}
+                override val quotaOwner get() = parentAccounting?.quotaOwner
+                override val quotaRemaining get() = parentAccounting?.quotaRemaining
+                override val quotaAvailable get() = parentAccounting?.quotaAvailable
+                override val exhausted get() = this@TranscendentalTheoryService.exhausted ||
+                    parentAccounting?.exhausted == true
+                override fun reserve(maximum: Int): WorkReservation? = reserveWork(
+                    maximum,
+                    listOf(pool),
+                    parentAccounting,
+                ) { if (parentAccounting?.metered != true) parentMeter?.charge(it.toLong()) }
             }
         }
     }
     private val transcendental = TranscendentalArithmetic(stop, maximumBits)
     private val arithmetic = ExactRealArithmetic(
-        transcendental, AlgebraicArithmetic(PolynomialArithmetic(stop, polynomialLimits)),
+        transcendental,
+        AlgebraicArithmetic(PolynomialArithmetic(stop, polynomialLimits)),
     )
 
-    init { require(maximumWork == null || maximumWork >= 0) }
+    init {
+        require(maximumWork == null || maximumWork >= 0)
+    }
 
     fun check(
         condition: TranscendentalCondition = TranscendentalCondition(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         maximumProposals: Int = 8,
     ): TranscendentalCheckResult {
         require(maximumProposals >= 0)
@@ -125,7 +133,7 @@ internal class TranscendentalTheoryService(
             representationDeclined = true
             TranscendentalCheckResult.Unknown
         } finally {
-            worker = Cancellation.Never
+            worker = ExecutionControl.Never
         }
     }
 
@@ -145,16 +153,24 @@ internal class TranscendentalTheoryService(
             fun addBounds(ids: Set<Int>, values: Map<Int, BigFraction>, relation: PolynomialRelation) {
                 for (id in ids) {
                     val value = requireNotNull(values[id])
-                    add(PolynomialRealFormula.Atom(PolynomialExpression.Variable(SourceRealId(id)), relation,
-                        PolynomialExpression.Constant.of(value.num, value.den)))
+                    add(
+                        PolynomialRealFormula.Atom(
+                            PolynomialExpression.Variable(SourceRealId(id)),
+                            relation,
+                            PolynomialExpression.Constant.of(value.num, value.den),
+                        ),
+                    )
                 }
             }
             addBounds(condition.lowerStrict, pins.lower, PolynomialRelation.GT)
             addBounds(condition.upperStrict, pins.upper, PolynomialRelation.LT)
         }
         val result = solveQfNra(
-            PolynomialRealFormula.And(listOf(relaxed) + strict), source.boolCount, relaxation.numericCount,
-            QfNraParams(stop, 4096, polynomialLimits), pins,
+            PolynomialRealFormula.And(listOf(relaxed) + strict),
+            source.boolCount,
+            relaxation.numericCount,
+            QfNraParams(stop, 4096, polynomialLimits),
+            pins,
         )
         if (result is QfNraResult.Unsatisfiable) return TranscendentalCheckResult.Refuted
         val bools = (result as? QfNraResult.Satisfiable)?.assignment?.bools
@@ -164,13 +180,18 @@ internal class TranscendentalTheoryService(
                 val value = result.assignment.realValue(id)
                 if (id in source.integerCoordinates) {
                     arithmetic.rational(BigFraction.of(arithmetic.algebraic.ceilInteger(value), BIG_ONE))
-                } else arithmetic.scalar(value)
+                } else {
+                    arithmetic.scalar(value)
+                }
             }
             certify(proposed, bools, condition)?.let { return TranscendentalCheckResult.Witness(it) }
         }
         val algebraicProposal = solveQfNra(
             PolynomialRealFormula.And(listOf(polynomialProposal(source.formula, transcendental)) + strict),
-            source.boolCount, source.numericCount, QfNraParams(stop, 4096, polynomialLimits), pins,
+            source.boolCount,
+            source.numericCount,
+            QfNraParams(stop, 4096, polynomialLimits),
+            pins,
         )
         if (algebraicProposal is QfNraResult.Satisfiable) {
             val proposed = List(source.numericCount) { id ->
@@ -188,13 +209,24 @@ internal class TranscendentalTheoryService(
                 val upper = pins.upper[id]
                 var point = BigFraction.ofLong(hints[attempt])
                 if (lower != null && upper != null) {
-                    val part = BigFraction.ofLong(when (attempt % 4) { 0 -> 4; 1 -> 6; 2 -> 2; else -> 7 })
+                    val part = BigFraction.ofLong(
+                        when (attempt % 4) {
+                            0 -> 4
+                            1 -> 6
+                            2 -> 2
+                            else -> 7
+                        },
+                    )
                     val width = transcendental.add(upper, lower.negated())
-                    point = transcendental.add(lower,
-                        transcendental.divide(transcendental.multiply(width, part), BigFraction.ofLong(8)))
+                    point = transcendental.add(
+                        lower,
+                        transcendental.divide(transcendental.multiply(width, part), BigFraction.ofLong(8)),
+                    )
+                } else if (lower != null && point <= lower) {
+                    point = lower + BigFraction.ONE
+                } else if (upper != null && point >= upper) {
+                    point = upper - BigFraction.ONE
                 }
-                else if (lower != null && point <= lower) point = lower + BigFraction.ONE
-                else if (upper != null && point >= upper) point = upper - BigFraction.ONE
                 if (id in source.integerCoordinates) point = BigFraction.of(point.ceilInteger(), BIG_ONE)
                 arithmetic.rational(point)
             }
@@ -213,8 +245,11 @@ internal class TranscendentalTheoryService(
         if (pins.bools.any { (id, value) -> bools[id] != value }) return null
         fun obey(bounds: Map<Int, BigFraction>, strict: Set<Int>, lower: Boolean): Boolean = bounds.all { (id, value) ->
             val comparison = arithmetic.compare(values[id], arithmetic.rational(value))
-            comparison != null && if (lower) comparison > 0 || (comparison == 0 && id !in strict)
-            else comparison < 0 || (comparison == 0 && id !in strict)
+            comparison != null && if (lower) {
+                comparison > 0 || (comparison == 0 && id !in strict)
+            } else {
+                comparison < 0 || (comparison == 0 && id !in strict)
+            }
         }
         if (!obey(pins.lower, condition.lowerStrict, true) || !obey(pins.upper, condition.upperStrict, false)) {
             return null

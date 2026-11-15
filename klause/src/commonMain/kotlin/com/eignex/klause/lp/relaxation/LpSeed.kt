@@ -4,7 +4,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.newLpSolver
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.CheckedLongOverflowException
 import kotlin.math.roundToLong
 
@@ -16,7 +16,7 @@ import kotlin.math.roundToLong
  * Only a seed: nothing here claims the point satisfies anything, so it suits a search that verifies whatever it
  * reports. The relaxation is built over [domains] as a box, which is what lets it serve a model with open sides.
  */
-internal fun Problem.lpSeed(domains: Array<IntDomain>, cancellation: Cancellation): Sample? {
+internal fun Problem.lpSeed(domains: Array<IntDomain>, cancellation: ExecutionControl): Sample? {
     // Rows that read a column's declared range, a reified row's big-M among them, need one even on an open column;
     // the box stands in for it, which only bounds where the seed is looked for.
     val boxed = withIntDomains(domains)

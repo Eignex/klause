@@ -5,7 +5,7 @@ import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.koblas.SparseMatrix
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -123,7 +123,7 @@ class RevisedSimplexPricingTest {
             scalingOptions = LpScalingOptions(enabled = false),
             basisSolverFactory = { columns -> KotlinBasisSolver(columns).also { matrix = columns } },
         ).use { solver ->
-            assertNotNull(solver.prepareLogicals(Cancellation.Never))
+            assertNotNull(solver.prepareLogicals(ExecutionControl.Never))
             assertEquals(6.0, solver.columnDot(doubleArrayOf(3.0), 0))
 
             matrix.values[0] = -4.0
@@ -188,7 +188,7 @@ class RevisedSimplexPricingTest {
                 ))),
             )
 
-            assertTrue(solver.adopt(trail.state, Cancellation.Never))
+            assertTrue(solver.adopt(trail.state, ExecutionControl.Never))
             val second = assertNotNull(solver.resolveBounds())
             val certified = certifyLpResult(assertNotNull(trail.state.toWorkingModel()), solver, second)
 

@@ -14,7 +14,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.buildJsonArray
@@ -48,10 +48,10 @@ internal object ExtensionalCompositionProfile {
         val preparationStart = System.nanoTime()
         var preparationWork = 0L
         val preparationMeter = WorkMeter { preparationWork += it }
-        val preparationToken = object : Cancellation {
+        val preparationToken = object : ExecutionControl() {
             override fun isCancelled(): Boolean = preparationWork >= preparationWorkLimit ||
                 System.nanoTime() - preparationStart >= 90_000_000_000L
-            override fun workMeter(): WorkMeter = preparationMeter
+            override val accounting: WorkMeter get() = preparationMeter
         }
         val preparation = if (options["prepared"] == "true") {
             PresolvePipeline.run(source, null, PresolveConfig.DEFAULT, sensitive, preparationToken)
@@ -133,9 +133,9 @@ internal object ExtensionalCompositionProfile {
             for ((name, factors) in samples) repeat(3) { iteration ->
                 var work = 0L
                 val meter = WorkMeter { work += it }
-                val token = object : Cancellation {
+                val token = object : ExecutionControl() {
                     override fun isCancelled(): Boolean = false
-                    override fun workMeter(): WorkMeter = meter
+                    override val accounting: WorkMeter get() = meter
                 }
                 val allocation = bean.getThreadAllocatedBytes(thread)
                 val start = System.nanoTime()

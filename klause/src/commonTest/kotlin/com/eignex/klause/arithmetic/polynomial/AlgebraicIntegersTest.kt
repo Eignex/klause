@@ -1,7 +1,7 @@
 package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.minus
@@ -79,7 +79,7 @@ class AlgebraicIntegersTest {
     @Test
     fun `cancelled integer extraction should publish no result`() {
         val value = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
-        val cancelled = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { true }))
+        val cancelled = AlgebraicArithmetic(PolynomialArithmetic(ExecutionControl { true }))
 
         assertFailsWith<PolynomialInterrupted> { cancelled.exactInteger(value) }
     }

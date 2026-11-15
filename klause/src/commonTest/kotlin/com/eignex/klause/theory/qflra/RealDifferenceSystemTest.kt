@@ -13,7 +13,7 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.exactForm
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -46,7 +46,7 @@ class RealDifferenceSystemTest {
         )
 
         val point = assertIs<RealDifferenceSystem.Result.Feasible>(
-            system.check(intArrayOf(), Cancellation.Never),
+            system.check(intArrayOf(), ExecutionControl.Never),
         ).point.single()
 
         assertTrue(point > BigFraction.ZERO)
@@ -81,7 +81,7 @@ class RealDifferenceSystemTest {
             )
 
             val point = assertIs<RealDifferenceSystem.Result.Feasible>(
-                system.check(intArrayOf(), Cancellation.Never),
+                system.check(intArrayOf(), ExecutionControl.Never),
             ).point.single()
 
             assertEquals(BigFraction.of(bigIntOf(if (coefficient > 0) 1 else -1), bigIntOf(3)), point)
@@ -126,7 +126,7 @@ class RealDifferenceSystemTest {
                 ),
             )
 
-            val result = system.check(intArrayOf(1, 1), Cancellation.Never)
+            val result = system.check(intArrayOf(1, 1), ExecutionControl.Never)
 
             if (reverse == -0.5) {
                 val conflict = assertIs<RealDifferenceSystem.Result.Infeasible>(result)
@@ -136,8 +136,8 @@ class RealDifferenceSystemTest {
                 assertTrue(point[0] - point[1] < BigFraction.of(bigIntOf(1), bigIntOf(2)))
                 assertTrue(point[1] - point[0] <= BigFraction.of(bigIntOf(-1), bigIntOf(4)))
             }
-            assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(1, -1), Cancellation.Never))
-            assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(-1, 1), Cancellation.Never))
+            assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(1, -1), ExecutionControl.Never))
+            assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(-1, 1), ExecutionControl.Never))
         }
     }
 
@@ -169,12 +169,12 @@ class RealDifferenceSystemTest {
         )
 
         val conflict = assertIs<RealDifferenceSystem.Result.Infeasible>(
-            system.check(intArrayOf(0), Cancellation.Never),
+            system.check(intArrayOf(0), ExecutionControl.Never),
         )
 
         assertContentEquals(intArrayOf(Lit.make(0, true)), conflict.clause)
-        assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(1), Cancellation.Never))
-        assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(-1), Cancellation.Never))
+        assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(1), ExecutionControl.Never))
+        assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(-1), ExecutionControl.Never))
     }
 
     @Test
@@ -218,9 +218,9 @@ class RealDifferenceSystemTest {
             factors = emptyArray(),
         )
         var spent = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = spent > 0L
-            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+            override val accounting: WorkMeter get() = WorkMeter { spent += it }
         }
 
         val system = RealDifferenceSystem.prepare(model, emptyList(), stop)
@@ -260,7 +260,7 @@ class RealDifferenceSystemTest {
 
         for (truth in listOf(1, 0, 1)) {
             val point = assertIs<RealDifferenceSystem.Result.Feasible>(
-                system.check(intArrayOf(truth), Cancellation.Never),
+                system.check(intArrayOf(truth), ExecutionControl.Never),
             ).point.single()
 
             assertTrue(if (truth == 1) point <= BigFraction.ZERO else point > BigFraction.ZERO)
@@ -314,12 +314,12 @@ class RealDifferenceSystemTest {
                 ),
             )
 
-            val result = system.check(intArrayOf(1, 1, 1), Cancellation.Never)
+            val result = system.check(intArrayOf(1, 1, 1), ExecutionControl.Never)
 
             val conflict = assertIs<RealDifferenceSystem.Result.Infeasible>(result)
             assertContentEquals(intArrayOf(Lit.make(0, false), Lit.make(1, false)), conflict.clause)
-            assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(1, -1, 1), Cancellation.Never))
-            assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(-1, 1, 1), Cancellation.Never))
+            assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(1, -1, 1), ExecutionControl.Never))
+            assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(-1, 1, 1), ExecutionControl.Never))
         }
     }
 
@@ -335,7 +335,12 @@ class RealDifferenceSystemTest {
         )
         val system = assertNotNull(RealDifferenceSystem.prepare(model, emptyList()))
 
-        val conflict = assertIs<RealDifferenceSystem.Result.Infeasible>(system.check(intArrayOf(), Cancellation.Never))
+        val conflict = assertIs<RealDifferenceSystem.Result.Infeasible>(
+            system.check(
+                intArrayOf(),
+                ExecutionControl.Never,
+            ),
+        )
 
         assertContentEquals(intArrayOf(), conflict.clause)
     }
@@ -353,10 +358,10 @@ class RealDifferenceSystemTest {
         val system = assertNotNull(RealDifferenceSystem.prepare(model, emptyList()))
         var polls = 0
 
-        val result = system.check(intArrayOf(), Cancellation { ++polls > 1 })
+        val result = system.check(intArrayOf(), ExecutionControl { ++polls > 1 })
 
         assertIs<RealDifferenceSystem.Result.Interrupted>(result)
-        assertIs<RealDifferenceSystem.Result.Infeasible>(system.check(intArrayOf(), Cancellation.Never))
+        assertIs<RealDifferenceSystem.Result.Infeasible>(system.check(intArrayOf(), ExecutionControl.Never))
     }
 
     @Test

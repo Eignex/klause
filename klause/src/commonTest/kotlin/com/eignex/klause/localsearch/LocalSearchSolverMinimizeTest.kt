@@ -7,7 +7,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -95,7 +95,7 @@ class LocalSearchSolverMinimizeTest {
             LocalSearchParams(
                 maxFlips = Long.MAX_VALUE,
                 randomSeed = 0L,
-                cancellation = { ++polls >= 2_000 },
+                cancellation = ExecutionControl { ++polls >= 2_000 },
             ),
         ).assignment
         assertNotNull(sample)
@@ -130,7 +130,7 @@ class LocalSearchSolverMinimizeTest {
         )
         val solver = LocalSearchSolver(problem.bake(), greedyRepairOnRestart = false)
         var polls = 0
-        val cancellation = Cancellation { ++polls > 100 }
+        val cancellation = ExecutionControl { ++polls > 100 }
         val result = solver.minimize(
             LinearObjective(boolWeights = LongArray(n) { 1L }),
             LocalSearchParams(maxFlips = Long.MAX_VALUE, randomSeed = 7L, cancellation = cancellation),

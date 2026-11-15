@@ -1,14 +1,14 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Source, operation and selected plan retained through one invocation's construction and execution. */
 class PreparedSourceInvocation internal constructor(
     internal val request: SourceSetupRequest,
     /** Existing source route selected once by library setup. */
     val route: SourceProblemRoute,
-    internal val cancellation: Cancellation,
+    internal val cancellation: ExecutionControl,
     internal val linearSource: PreparedLinearSource? = null,
 ) {
     /** Canonical source attachment whose identity and interpretation bound this invocation. */

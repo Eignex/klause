@@ -13,7 +13,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class PreparedLinearSource(
     val view: LinearSourceView,
@@ -25,7 +25,7 @@ internal class PreparedLinearSource(
 internal fun prepareLinearSource(
     request: SourceSetupRequest,
     source: LinearSourceProblem,
-    stop: Cancellation,
+    stop: ExecutionControl,
     onLpStats: ((LpStats) -> Unit)?,
 ): PreparedSourceInvocation {
     if (request.objective != null || request.quadraticObjective != null) {

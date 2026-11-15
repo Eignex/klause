@@ -8,7 +8,7 @@ import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.complemented
 import com.eignex.klause.ir.impliedLinearRows
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Rows whose activators are fixed by root unit clauses. */
 internal fun rootFixedReifiedRows(factors: List<Factor>): List<Linear> =
@@ -22,7 +22,7 @@ internal fun rootFixedReifiedRows(factors: List<Factor>): List<Linear> =
 internal fun presolveLinearRows(
     factors: List<Factor>,
     activatedOnly: Boolean = false,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): List<Linear> {
     val fixed = HashMap<Int, Boolean>()
     val conflicting = HashSet<Int>()

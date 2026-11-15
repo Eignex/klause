@@ -53,7 +53,7 @@ import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.solver.validation.LinearSourceCheck
 import com.eignex.klause.solver.validation.capturedRealAcceptance
 import com.eignex.klause.solver.validation.permitsToleranceOptimum
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.time.Duration
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
@@ -70,10 +70,10 @@ class FiniteSolveRequest(
     val explicitPresolveConfig: Boolean,
     /** Whether the caller needs the exact solution set. */
     val solutionSetSensitive: Boolean,
-    /** Cancellation shared by every engine worker. */
-    val cancellation: Cancellation,
-    /** Cancellation applying only while the model is prepared. */
-    val presolveCancellation: Cancellation = cancellation,
+    /** ExecutionControl shared by every engine worker. */
+    val cancellation: ExecutionControl,
+    /** ExecutionControl applying only while the model is prepared. */
+    val presolveCancellation: ExecutionControl = cancellation,
     /** Optional budget allocated to preparation. */
     val presolveBudget: PresolveBudget?,
     /** Portfolio worker count. */
@@ -179,8 +179,8 @@ class FiniteSolveRequest(
         presolveConfig: PresolveConfig,
         explicitPresolveConfig: Boolean,
         solutionSetSensitive: Boolean,
-        cancellation: Cancellation,
-        presolveCancellation: Cancellation = cancellation,
+        cancellation: ExecutionControl,
+        presolveCancellation: ExecutionControl = cancellation,
         presolveBudget: PresolveBudget?,
         cores: Int,
         engineParams: List<String>,
@@ -383,8 +383,8 @@ internal class FiniteExecutionRequest(
     val lpConfig: LpConfig,
     /** Entering-column policy for exactly zero-objective LP solves. */
     val zeroObjectivePricing: LpZeroObjectivePricing,
-    /** Cancellation shared by every engine worker. */
-    val cancellation: Cancellation,
+    /** ExecutionControl shared by every engine worker. */
+    val cancellation: ExecutionControl,
     /** Invocation-wide node allowance. */
     val nodeBudget: NodeBudget?,
     /** Advisory wall-clock allowance supplied to fixed-backtrack LP components. */
@@ -494,11 +494,13 @@ private fun FinitePipeline.execute(
     callbacks: FiniteExecutionCallbacks,
 ): FiniteExecutionResult = if (request.sourceControls != null) {
     executeSourceFinite(request, callbacks).withCompleteSearch(request.sourceControls is SourceFiniteControls.Backtrack)
-} else when (request.engine) {
+} else {
+    when (request.engine) {
     FiniteEngine.FIXED -> executeFixed(request, callbacks).withCompleteSearch(true)
 
     FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH, FiniteEngine.MIXED, FiniteEngine.ALNS ->
         executePortfolio(request, callbacks)
+}
 }
 
 private fun FiniteExecutionResult.withCompleteSearch(value: Boolean): FiniteExecutionResult {
@@ -595,8 +597,11 @@ internal fun FinitePipeline.solve(
         val coordinateStop = coordinateRequest.solveCancellation
         val coordinates = prepare(coordinateRequest)
         val hints = request.objectiveCoordinateHints(coordinates, coordinateStop)
-        val view = if (hints == null) null else
+        val view = if (hints == null) {
+            null
+        } else {
             ObjectiveCoordinateView.create(preparation, coordinates, hints, stop)
+        }
         preparationElapsed = preparationStart.elapsedNow()
         val previous = preparation
         preparation = FinitePipelinePreparation(
@@ -614,7 +619,9 @@ internal fun FinitePipeline.solve(
             it.executionPlan = previous.executionPlan
         }
         view
-    } else null
+    } else {
+        null
+    }
     val invocation = request.shape.sourceInvocation
     val linearSource = invocation?.linearSource
     val permitsToleranceOptimum = invocation?.let {
@@ -634,15 +641,22 @@ internal fun FinitePipeline.solve(
                     request.toleranceCheck?.invoke(sample) != false
             },
             permitsToleranceOptimum =
-                permitsToleranceOptimum &&
-                    (request.toleranceCheck == null || request.toleranceCheck.permitsToleranceOptimum()),
-            objective = if (linearSource.view.source.objective == null) null else { sample ->
+            permitsToleranceOptimum &&
+                (request.toleranceCheck == null || request.toleranceCheck.permitsToleranceOptimum()),
+            objective = if (linearSource.view.source.objective == null) {
+                null
+            } else {
+                { sample ->
                 val checked = linearSource.check(sample, stop) as? LinearSourceCheck.Accepted
                 checked?.witness?.objective?.let { value ->
                     val scaled = value * linearSource.view.objectiveScale
-                    if (linearSource.view.source.objective.sense == ObjectiveSense.MAXIMIZE)
-                        scaled.negated() else scaled
+                    if (linearSource.view.source.objective.sense == ObjectiveSense.MAXIMIZE) {
+                        scaled.negated()
+                    } else {
+                        scaled
+                    }
                 }
+            }
             },
         )
     }
@@ -661,7 +675,11 @@ internal fun FinitePipeline.solve(
             // completion in the incomplete workers would refuse the points the complete ones publish.
             executionOptions = if (linearSource == null &&
                 (invocation == null || gridPublication != null || !sourceCheck.permitsToleranceOptimum())
-            ) request.executionOptions else request.executionOptions.withNumericalCompletion(),
+            ) {
+                request.executionOptions
+            } else {
+                request.executionOptions.withNumericalCompletion()
+            },
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
             lpConfig = request.lpConfig,
@@ -687,7 +705,9 @@ internal fun FinitePipeline.solve(
                             { sample -> score(preparation.reconstruct(sample)) }
                         })
                 }
-            } else null,
+            } else {
+                null
+            },
             sourceInvocation = request.shape.sourceInvocation,
             sourceMapping = preparation.sourceMapping,
             sourceControls = request.sourceControls,
@@ -701,9 +721,13 @@ internal fun FinitePipeline.solve(
             },
             onImprovement = { improvement ->
                 if (gridPublication != null) {
-                    gridPublication.onImprovement(preparation.reconstruct(improvement.sample),
-                        improvement.workerLabel, improvement.elapsedMs)
-                } else callbacks.onImprovement(
+                    gridPublication.onImprovement(
+                        preparation.reconstruct(improvement.sample),
+                        improvement.workerLabel,
+                        improvement.elapsedMs,
+                    )
+                } else {
+                    callbacks.onImprovement(
                     FiniteSolveImprovement(
                         preparation.reconstruct(improvement.sample),
                         improvement.workerLabel,
@@ -711,6 +735,7 @@ internal fun FinitePipeline.solve(
                         improvement.objective,
                     ),
                 )
+                }
             },
         ),
     )
@@ -727,7 +752,7 @@ internal fun FinitePipeline.solve(
 }
 
 private fun FiniteSolveRequest.preparationRequest(
-    stop: Cancellation,
+    stop: ExecutionControl,
     protectObjective: Boolean = false,
 ): FinitePipelineRequest {
     val preparationStop = if (shape.sourceInvocation == null) presolveCancellation else presolveCancellation or stop
@@ -744,7 +769,9 @@ private fun FiniteSolveRequest.preparationRequest(
         cancellation = preparationStop,
         solveCancellation = if (protectObjective) {
             presolveBudget?.orSpent(preparationStop or stop) ?: (preparationStop or stop)
-        } else stop,
+        } else {
+            stop
+        },
         presolveBudget = presolveBudget, zeroObjectivePricing = zeroObjectivePricing, randomSeed = randomSeed,
         sourcePreparation = sourcePreparation,
         numericalLp = lpSolveContext.numericalDeductions,
@@ -753,12 +780,14 @@ private fun FiniteSolveRequest.preparationRequest(
 
 private fun FiniteSolveRequest.objectiveCoordinateHints(
     coordinates: FinitePipelinePreparation,
-    stop: Cancellation,
+    stop: ExecutionControl,
 ): PreparedSourceHints? {
     val plan = coordinates.executionPlan ?: return null
     if (coordinates.presolve?.infeasible == true || plan.decline != null || stop() ||
         !plan.capabilities.admission(ExecutionStrategy.LOCAL_SEARCH, operation).runnable
-    ) return null
+    ) {
+        return null
+    }
     val invocation = shape.sourceInvocation ?: return PreparedSourceHints(
         shape.definitionalSweep, shape.localSearchObjective,
     )
@@ -771,7 +800,9 @@ private fun FiniteSolveRequest.objectiveCoordinateHints(
 private fun FiniteSolveRequest.admitsObjectiveCoordinates(preparation: FinitePipelinePreparation): Boolean {
     if (!shape.optimize || engine != FiniteEngine.MIXED || cores != 1 || explicitPresolveConfig ||
         shape.localSearchObjective != null || executionOptions.explicitArms || preparation.problem.numRealVars != 0
-    ) return false
+    ) {
+        return false
+    }
     // Without Element alternatives the primary and full neighborhoods offer the same repairs.
     if (preparation.problem.factors.none { it is Diffn } || preparation.problem.factors.any { it is Element }) {
         return false
@@ -885,6 +916,7 @@ private fun executeSourceFinite(
         is SourceFiniteControls.Backtrack -> BacktrackSolver(request.problem, request.lpSolveContext).solve(
             controls.params.copy(cancellation = controls.cancellation or request.cancellation),
         )
+
         is SourceFiniteControls.LocalSearch -> LocalSearchSolver(
             request.problem,
             completion = if (request.problem.numRealVars > 0) LeafRealCompletion(request.problem, null) else null,
@@ -916,6 +948,7 @@ private fun executeSourceMinimum(
         is SourceFiniteControls.Backtrack -> BacktrackSolver(request.problem, request.lpSolveContext).minimize(
             objective, controls.params.copy(cancellation = controls.cancellation or request.cancellation),
         )
+
         is SourceFiniteControls.LocalSearch -> LocalSearchSolver(
             request.problem,
             completion = if (request.problem.numRealVars > 0) LeafRealCompletion(request.problem, objective) else null,
@@ -943,7 +976,9 @@ private fun executeSourceMinimum(
 private fun executeFixed(request: FiniteExecutionRequest, callbacks: FiniteExecutionCallbacks): FiniteExecutionResult {
     val options = if (request.optimize && request.problem.fixedCumulativeScheduling()) {
         ExecutionOptions(ExecutionOption.costAwarePropagation(true)).overriddenBy(request.executionOptions)
-    } else request.executionOptions
+    } else {
+        request.executionOptions
+    }
     val plan = FinitePipeline.planFixedBacktrack(
         FixedBacktrackPlanRequest(
             annotatedParams = request.searchHints?.toBacktrackParams(
@@ -980,7 +1015,9 @@ private fun Problem.fixedCumulativeScheduling(): Boolean {
         if (factor !is Cumulative) continue
         if (factor.presents.isNotEmpty() || factor.durationVars.isNotEmpty() ||
             factor.resourceVars.isNotEmpty() || factor.capacityVar >= 0
-        ) return false
+        ) {
+            return false
+        }
         found = true
     }
     return found
@@ -1150,12 +1187,19 @@ private fun executePortfolio(
     }
     val probePolicy = when (val probes = request.executionOptions.reader()[ExecutionOption.portfolioProbes]) {
         null, "ordinary" -> InitialProbePolicy.ORDINARY
+
         "leader-half" -> InitialProbePolicy.LEADER_HALF
+
         "lp-transfer" -> InitialProbePolicy.LP_TRANSFER
+
         "heuristic-second" -> InitialProbePolicy.HEURISTIC_SECOND
+
         "family-work" -> InitialProbePolicy.FAMILY_WORK
+
         "heuristic-work" -> InitialProbePolicy.HEURISTIC_WORK
+
         "alns-work" -> InitialProbePolicy.ALNS_WORK
+
         else -> pipelineConfigError(
             "portfolio-probes expects ordinary|leader-half|lp-transfer|heuristic-second|family-work|" +
                 "heuristic-work|alns-work, got `$probes`")

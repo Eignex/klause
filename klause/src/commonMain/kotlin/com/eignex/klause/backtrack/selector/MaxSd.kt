@@ -2,8 +2,6 @@ package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.WorkMeter
 import kotlin.random.Random
 
 /**
@@ -46,19 +44,8 @@ internal class MaxSd(
         observations.probeOrders++
         val start = session.work
         val priorCancelled = session.probeCancelled
-        var capped = false
-        val token = probeWorkLimit?.let { limit ->
-            object : Cancellation {
-                private val meter = WorkMeter { }
-                override fun workMeter(): WorkMeter = meter
-                override fun isCancelled(): Boolean {
-                    if (session.work - start >= limit) capped = true
-                    return capped
-                }
-            }
-        } ?: Cancellation.Never
         return try {
-            session.withCancellation(token) {
+            session.withWorkLimit(probeWorkLimit) {
                 probeAndOrder(
                     session, varRef, rng, maxProbes, ascending = false, observations = observations,
                     scoreVisit = if (probeWorkLimit == null) null else session::visitValueScore,
@@ -66,7 +53,7 @@ internal class MaxSd(
             }
         } finally {
             observations.probeWork += session.work - start
-            if (capped) {
+            if (probeWorkLimit?.let { session.work - start >= it } == true) {
                 observations.cappedOrders++
                 if (!session.cancelRequested) session.probeCancelled = priorCancelled
             }

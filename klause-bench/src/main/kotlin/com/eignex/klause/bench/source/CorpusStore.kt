@@ -13,9 +13,7 @@ import java.nio.file.StandardOpenOption.WRITE
 import java.util.concurrent.ConcurrentHashMap
 
 internal class CorpusStore(private val root: File, private val workspace: File = root) {
-    fun ensure(id: String, fetch: (File) -> Unit): File {
-        return locked(id) { cached(id, fetch) }
-    }
+    fun ensure(id: String, fetch: (File) -> Unit): File = locked(id) { cached(id, fetch) }
 
     fun member(id: String, relative: String, fetch: (File) -> File): File = locked(id) {
         require(relative.split('/').none { it.isEmpty() || it == "." || it == ".." })

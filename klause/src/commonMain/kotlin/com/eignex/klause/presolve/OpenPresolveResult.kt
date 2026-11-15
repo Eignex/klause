@@ -16,7 +16,7 @@ import com.eignex.klause.lp.tightenOpenIntBounds
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 
 /** What the open-model presolve phase concluded. */
@@ -84,7 +84,7 @@ fun Problem.presolveOpen(
     config: PresolveConfig = PresolveConfig.DEFAULT,
     objective: LinearObjective? = null,
     solutionSetSensitive: Boolean = false,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     budget: PresolveBudget? = null,
 ): OpenPresolveResult {
     val preparationCancellation = budget?.orSpent(cancellation) ?: cancellation
@@ -130,7 +130,7 @@ fun Problem.presolveOpen(
  * through leaves the bounds it had already proved — every one of them sound on its own.
  */
 internal fun Problem.closeOpenBounds(
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     lpStats: LpStatsSink? = null,
 ): OpenPresolveResult {
     val problem = this
@@ -227,7 +227,7 @@ private fun roundIntegerRow(row: Linear): Linear {
 private fun fillFromStructure(
     tightened: Array<OpenIntBounds>,
     rows: List<Linear>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Array<OpenIntBounds> {
     if (tightened.none { it.lo == null || it.hi == null }) return tightened
     val structural = structuralIntBounds(tightened.size, rows, cancellation) ?: return tightened

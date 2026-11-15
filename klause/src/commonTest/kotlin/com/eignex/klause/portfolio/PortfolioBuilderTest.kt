@@ -42,7 +42,7 @@ import com.eignex.klause.solver.pipeline.PortfolioPlan
 import com.eignex.klause.solver.pipeline.PortfolioPlanRequest
 import com.eignex.klause.solver.pipeline.planPortfolio
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -55,28 +55,46 @@ import kotlin.test.assertTrue
 class PortfolioBuilderTest {
     @Test
     fun `a native factory should guide its first descent from accepted canonical incumbents`() {
-        val problem = Problem(8, 0, emptyArray(), arrayOf<Factor>(
-            Cardinality(IntArray(8) { Lit.make(it, true) }, min = 3, max = 8),
-        )).bake()
+        val problem = Problem(
+            8,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(
+                Cardinality(IntArray(8) { Lit.make(it, true) }, min = 3, max = 8),
+            ),
+        ).bake()
         val objective = LinearObjective(boolWeights = longArrayOf(7L, 3L, 5L, 9L, 1L, 8L, 2L, 6L))
         val canonical = IncumbentExchange.minimizing<Sample>().apply {
             offer(Sample(BooleanArray(8) { it < 3 }, longArrayOf()), 15.0)
         }
         var reads = 0
         val recipe = BacktrackRecipe("guided") { _, onEvent ->
-            BacktrackParams(variableSelector = InputOrder, valueSelector = SolutionGuided(IndomainMin),
+            BacktrackParams(
+                variableSelector = InputOrder,
+                valueSelector = SolutionGuided(IndomainMin),
                 phaseSaving = true,
                 lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false),
-                onEvent = onEvent)
+                onEvent = onEvent,
+            )
         }
-        val scenario = PortfolioScenario(cores = 1, arms = 1, kind = Kind.COP, engine = EngineMix.BACKTRACK,
-            btPool = listOf({ recipe }))
-        val factory = PortfolioBuilder.factories(problem, scenario, objective, null, null, null,
+        val scenario = PortfolioScenario(
+            cores = 1,
+            arms = 1,
+            kind = Kind.COP,
+            engine = EngineMix.BACKTRACK,
+            btPool = listOf({ recipe }),
+        )
+        val factory = PortfolioBuilder.factories(
+            problem, scenario, objective, null, null, null,
             ProblemProfile.of(problem, true), numericalCompletion = false,
-            acceptedIncumbents = IncumbentSource { reads++; canonical.current() }).single()
+            acceptedIncumbents = IncumbentSource {
+                reads++
+                canonical.current()
+            },
+        ).single()
 
         val first = factory.materialize(0, 0L, null).use {
-            it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).first()
+            it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never).first()
         }
 
         assertTrue(reads > 0)
@@ -86,18 +104,24 @@ class PortfolioBuilderTest {
     @Test
     fun `materialized workers select the pool layout from integer coordinates`() {
         for (integerCount in listOf(0, 1)) {
-            val problem = Problem(2, integerCount, Array(integerCount) { IntDomain(0, 1) },
-                listOf(Clause(intArrayOf(0, 2)))).bake()
+            val problem = Problem(
+                2,
+                integerCount,
+                Array(integerCount) { IntDomain(0, 1) },
+                listOf(Clause(intArrayOf(0, 2))),
+            ).bake()
             val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK, sharingMemory = true)
             val workers = PortfolioBuilder.build(problem, scenario)
 
             try {
-                workers.forEach { it.solve(Cancellation.Never) }
+                workers.forEach { it.solve(ExecutionControl.Never) }
 
                 val expected = if (integerCount == 0) 1L else 0L
-                assertTrue(workers.all {
-                    requireNotNull(it.sharingMeter).snapshot().clauses.getValue("peakPoolBooleanOnly") == expected
-                })
+                assertTrue(
+                    workers.all {
+                        requireNotNull(it.sharingMeter).snapshot().clauses.getValue("peakPoolBooleanOnly") == expected
+                    },
+                )
             } finally {
                 workers.forEach { it.close() }
             }
@@ -106,16 +130,29 @@ class PortfolioBuilderTest {
 
     @Test
     fun `materialized workers enforce the configured shared byte limit`() {
-        val problem = Problem(2, 0, emptyArray(), listOf(
-            Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)),
-            Clause(intArrayOf(1, 2)), Clause(intArrayOf(1, 3)),
-        )).bake()
-        val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
-            sharingMemory = true, sharingMemoryBytes = 0L)
+        val problem = Problem(
+            2,
+            0,
+            emptyArray(),
+            listOf(
+                Clause(intArrayOf(0, 2)),
+                Clause(intArrayOf(0, 3)),
+                Clause(intArrayOf(1, 2)),
+                Clause(intArrayOf(1, 3)),
+            ),
+        ).bake()
+        val scenario = PortfolioScenario(
+            1,
+            2,
+            Kind.CSP,
+            EngineMix.BACKTRACK,
+            sharingMemory = true,
+            sharingMemoryBytes = 0L,
+        )
         val workers = PortfolioBuilder.build(problem, scenario)
 
         try {
-            workers.forEach { it.solve(Cancellation.Never) }
+            workers.forEach { it.solve(ExecutionControl.Never) }
             val samples = workers.map { requireNotNull(it.sharingMeter).snapshot().clauses }
             assertTrue(samples.any { (it["seenDeclined"] ?: 0L) + (it["poolDeclined"] ?: 0L) > 0L })
             assertTrue(samples.all { it.getValue("peakPoolOwnedBytes") == 0L })
@@ -128,13 +165,20 @@ class PortfolioBuilderTest {
     fun `memory observation is independently controlled through materialized workers`() {
         for (enabled in listOf(false, true)) {
             val problem = Problem(2, 0, emptyArray(), listOf(Clause(intArrayOf(0, 2)))).bake()
-            val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
-                diagnosticWorkLimit = 1000L, sharingMemory = enabled, sharingMemoryWork = 1L)
+            val scenario = PortfolioScenario(
+                1,
+                2,
+                Kind.CSP,
+                EngineMix.BACKTRACK,
+                diagnosticWorkLimit = 1000L,
+                sharingMemory = enabled,
+                sharingMemoryWork = 1L,
+            )
             val workers = PortfolioBuilder.build(problem, scenario)
 
             try {
                 for (worker in workers) {
-                    worker.solve(Cancellation.Never)
+                    worker.solve(ExecutionControl.Never)
                     val stats = requireNotNull(worker.sharingMeter).snapshot().clauses
                     if (enabled) {
                         assertTrue(stats.getValue("accountingWork") > 0L)
@@ -159,8 +203,10 @@ class PortfolioBuilderTest {
 
         try {
             assertEquals(baseline.map { it.label }, early.map { it.label })
-            assertEquals(baseline.filter { it.label != "bt/core-guided" }.map { it.improvementOnly },
-                early.filter { it.label != "bt/core-guided" }.map { it.improvementOnly })
+            assertEquals(
+                baseline.filter { it.label != "bt/core-guided" }.map { it.improvementOnly },
+                early.filter { it.label != "bt/core-guided" }.map { it.improvementOnly },
+            )
             val ordinary = baseline.single { it.label == "bt/core-guided" }
             val candidate = early.single { it.label == "bt/core-guided" }
             assertTrue(ordinary.improvementOnly)
@@ -184,7 +230,7 @@ class PortfolioBuilderTest {
 
         try {
             val core = workers.single { it.label == "bt/core-guided" }
-            requireNotNull(core.newResumableSearch({ Double.POSITIVE_INFINITY }, Cancellation.Never)).use {
+            requireNotNull(core.newResumableSearch({ Double.POSITIVE_INFINITY }, ExecutionControl.Never)).use {
                 assertEquals(2_000L, it.stats.coreGuided.activeMillisLimit)
             }
         } finally {
@@ -192,30 +238,52 @@ class PortfolioBuilderTest {
         }
     }
 
-
     @Test
     fun `private objective coordinates should use the full slot beside the canonical primary`() {
-        val source = Problem(0, 5, arrayOf(
-            IntDomain(0, 5), IntDomain(1, 6), IntDomain(0, 5), IntDomain(0, 0), IntDomain(0, 0),
-        ), listOf(
-            Linear(longArrayOf(1, -1), intArrayOf(1, 0), LinearOp.EQ, 1),
-            Diffn(intArrayOf(0, 2), intArrayOf(3, 4), longArrayOf(1, 1), longArrayOf(1, 1)),
-        ))
+        val source = Problem(
+            0,
+            5,
+            arrayOf(
+                IntDomain(0, 5),
+                IntDomain(1, 6),
+                IntDomain(0, 5),
+                IntDomain(0, 0),
+                IntDomain(0, 0),
+            ),
+            listOf(
+                Linear(longArrayOf(1, -1), intArrayOf(1, 0), LinearOp.EQ, 1),
+                Diffn(intArrayOf(0, 2), intArrayOf(3, 4), longArrayOf(1, 1), longArrayOf(1, 1)),
+            ),
+        )
         val sourceObjective = LinearObjective(intCoefficients = longArrayOf(0, 1, 0, 0, 0))
         val preparations = listOf(true, false).map { rewrite ->
-            FinitePipeline.prepare(FinitePipelineRequest(
-                source, FiniteEngine.MIXED, sourceObjective, PresolveConfig.parse("off,+affine"),
-                transformObjective = rewrite,
-            ))
+            FinitePipeline.prepare(
+                FinitePipelineRequest(
+                    source,
+                    FiniteEngine.MIXED,
+                    sourceObjective,
+                    PresolveConfig.parse("off,+affine"),
+                    transformObjective = rewrite,
+                ),
+            )
         }
         val canonical = preparations[0]
-        val view = assertNotNull(ObjectiveCoordinateView.create(canonical, preparations[1], null, Cancellation.Never))
+        val view = assertNotNull(
+            ObjectiveCoordinateView.create(
+                canonical,
+                preparations[1],
+                null,
+                ExecutionControl.Never,
+            ),
+        )
         val problem = canonical.executableProblem()
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemProfile.of(problem, true)
         val baseline = PortfolioBuilder.factories(problem, scenario, canonical.objective, null, null, null, profile)
-        val factories = PortfolioBuilder.factories(problem, scenario, canonical.objective, null, null, null,
-            profile, false, objectiveCoordinates = view)
+        val factories = PortfolioBuilder.factories(
+            problem, scenario, canonical.objective, null, null, null,
+            profile, false, objectiveCoordinates = view,
+        )
 
         val workers = factories.mapIndexed { index, factory -> factory.materialize(index, 3L, null) }
 
@@ -347,7 +415,7 @@ class PortfolioBuilderTest {
             val worker = factory.materialize(0, 3L, null)
 
             worker.use {
-                val result = worker.solve(Cancellation.Never, maxInstructions = 10_000)
+                val result = worker.solve(ExecutionControl.Never, maxInstructions = 10_000)
 
                 assertFalse("exact-neighborhood" in worker.label)
                 assertNotNull(assertIs<SolveResult.Sat>(result).assignment.exactReals)
@@ -389,7 +457,7 @@ class PortfolioBuilderTest {
             val worker = factory.materialize(0, 3L, NodeBudget(10_000))
 
             worker.use {
-                val result = worker.solve(Cancellation.Never, maxInstructions = 10_000)
+                val result = worker.solve(ExecutionControl.Never, maxInstructions = 10_000)
 
                 val sample = assertIs<SolveResult.Sat>(result).assignment
                 assertNull(sample.exactReals)
@@ -433,7 +501,7 @@ class PortfolioBuilderTest {
         val worker = factory.materialize(0, 3L, NodeBudget(0))
 
         worker.use {
-            val result = worker.solve(Cancellation.Never, maxInstructions = 10_000)
+            val result = worker.solve(ExecutionControl.Never, maxInstructions = 10_000)
 
             assertIs<SolveResult.Unknown>(result)
             assertEquals(0, checks)
@@ -511,7 +579,11 @@ class PortfolioBuilderTest {
         val worker = PortfolioBuilder.build(problem, scenario, objective = LinearObjective()).single()
 
         worker.use {
-            val result = it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never, maxInstructions = 0).last()
+            val result = it.improvements(
+                { Double.POSITIVE_INFINITY },
+                ExecutionControl.Never,
+                maxInstructions = 0,
+            ).last()
 
             assertEquals(
                 setOf("preparation", "seeding", "selection", "application", "publication", "other"),
@@ -639,7 +711,7 @@ class PortfolioBuilderTest {
         val scenario = PortfolioScenario(cores = 1, arms = 1, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH)
         val worker = PortfolioBuilder.build(continuous, scenario).single()
 
-        val result = worker.solve(Cancellation.Never, maxInstructions = 10_000)
+        val result = worker.solve(ExecutionControl.Never, maxInstructions = 10_000)
 
         assertNotNull(assertIs<SolveResult.Sat>(result).assignment.exactReals)
     }

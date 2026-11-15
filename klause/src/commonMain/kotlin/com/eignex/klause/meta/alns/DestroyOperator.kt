@@ -7,7 +7,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
@@ -37,7 +37,7 @@ internal fun interface DestroyOperator {
         objective: LinearObjective,
         fraction: Double,
         assumptions: Assumptions,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): FreedVars = destroy(rng, problem, incumbent, objective, fraction)
 
     companion object {

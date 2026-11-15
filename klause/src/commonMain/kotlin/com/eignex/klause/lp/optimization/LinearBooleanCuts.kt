@@ -8,7 +8,7 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal data class LinearBooleanCutLimits(
@@ -38,7 +38,8 @@ internal object LinearBooleanCutPreparation {
     private fun stop(reason: String): Nothing = throw Stop(reason)
 
     fun prepare(
-        source: SourceProofContext, cancellation: Cancellation,
+        source: SourceProofContext,
+        cancellation: ExecutionControl,
         onCost: (Long, Long) -> Unit = { _, _ -> },
         limits: LinearBooleanCutLimits = LinearBooleanCutLimits(),
     ): LinearBooleanCuts {
@@ -57,7 +58,10 @@ internal object LinearBooleanCutPreparation {
         fun number(value: BigFraction): BigFraction {
             reserve(1L, 64L + (limits.scalarBits + 7L) / 4L)
             if (value.num.magnitudeBitLength() > limits.scalarBits ||
-                value.den.magnitudeBitLength() > limits.scalarBits) stop("width")
+                value.den.magnitudeBitLength() > limits.scalarBits
+            ) {
+                    stop("width")
+                }
             return value
         }
         fun derive(terms: List<Pair<Row, BigFraction>>): Derived {
@@ -77,8 +81,11 @@ internal object LinearBooleanCutPreparation {
             val nonzero = coefficients.filterValues { !it.isZero }
             if (nonzero.size > limits.support) stop("support")
             val first = nonzero.entries.minWithOrNull(compareBy({ it.key.kind.ordinal }, { it.key.id }))?.value
-            val scale = if (first == null) BigFraction.ONE else
+            val scale = if (first == null) {
+                BigFraction.ONE
+            } else {
                 number((if (first < BigFraction.ZERO) first.negated() else first).reciprocal())
+            }
             reserve(1L + nonzero.size, 128L + nonzero.size * 64L)
             val row = SourceInequality(nonzero.mapValues { (_, value) -> number(value * scale) },
                 number(rhs * scale), strict)
@@ -101,7 +108,10 @@ internal object LinearBooleanCutPreparation {
                 reserve(1L, 64L)
                 val row = premise.inequality
                 if (row.supportSize > limits.support || premise.guards.size > 1 ||
-                    premise.integerPins.isNotEmpty()) continue
+                    premise.integerPins.isNotEmpty()
+                ) {
+                        continue
+                    }
                 reserve(row.supportSize.toLong(), row.supportSize * 48L)
                 if (row.coefficients.keys.any { it.kind != SourceCoordinate.Kind.Real || it !in coordinates }) {
                     continue
@@ -151,7 +161,10 @@ internal object LinearBooleanCutPreparation {
                     val strict = (left.row.rhs < rhs || left.row.strict) && (right.row.rhs < rhs || right.row.strict)
                     val common = SourceInequality(key, rhs, strict)
                     if (unconditional.any { it.row.coefficients == key && stronger(it.row, common) } ||
-                        retained.any { (it.claim as SourceClaim.Consequence).inequality == common }) continue
+                        retained.any { (it.claim as SourceClaim.Consequence).inequality == common }
+                    ) {
+                            continue
+                        }
                     if (retained.size >= limits.candidates) stop("candidates")
                     reserve(1L + key.size, 256L + key.size * 64L)
                     retained += SourceEvidence(source.scope, SourceClaim.Consequence(common),

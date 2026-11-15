@@ -3,7 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,7 +19,7 @@ class SourceDefinitionReferencesTest {
         ))
         val coordinates = VarRemap(intArrayOf(1, 0, -1), intArrayOf(-1, 0))
 
-        val projected = assertNotNull(references.remapped(coordinates, Cancellation.Never))
+        val projected = assertNotNull(references.remapped(coordinates, ExecutionControl.Never))
 
         assertEquals(listOf(0), projected.integers.toList())
         assertEquals(0, projected.folds.single().out)
@@ -32,9 +32,9 @@ class SourceDefinitionReferencesTest {
             BoolFoldDefinition(2, intArrayOf(Lit.make(0, true), Lit.make(1, false)), true),
         ))
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 2
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val projected = references.remapped(VarRemap(intArrayOf(0, 1, 2), intArrayOf()), stop)

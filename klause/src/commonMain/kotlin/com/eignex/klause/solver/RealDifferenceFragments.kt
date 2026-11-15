@@ -16,13 +16,13 @@ import com.eignex.klause.propagation.difference.DifferenceIndexGuard
 import com.eignex.klause.propagation.difference.DifferenceSystem
 import com.eignex.klause.propagation.withAppendedFactor
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
 
 internal fun BakedProblem.withRealDifferenceSystem(
-    stop: Cancellation,
+    stop: ExecutionControl,
     onInterrupted: () -> Unit = {},
 ): BakedProblem {
     if (numRealVars !in 1..10000 || semantics.isApproximate) return this
@@ -32,7 +32,7 @@ internal fun BakedProblem.withRealDifferenceSystem(
 
 private class RealDifferenceFragment(
     private val model: Problem,
-    private val stop: Cancellation,
+    private val stop: ExecutionControl,
     private val onInterrupted: () -> Unit,
 ) {
     private class Edge(
@@ -114,14 +114,17 @@ private class RealDifferenceFragment(
                     add(target, source, bound.negated(), !row.strict, Lit.negate(guard))
                 }
             }
+
             LinearOp.GE -> {
                 add(target, source, bound.negated(), row.strict, guard)
                 if (guard != DifferenceEdge.ALWAYS) add(source, target, bound, !row.strict, Lit.negate(guard))
             }
+
             LinearOp.EQ -> {
                 add(source, target, bound, guard = guard)
                 add(target, source, bound.negated(), guard = guard)
             }
+
             LinearOp.NE -> Unit
         }
         return true

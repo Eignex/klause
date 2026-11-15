@@ -16,7 +16,7 @@ import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.LongHashSet
 import com.eignex.util.numbers.CheckedLongOverflowException
@@ -34,7 +34,7 @@ import kotlin.math.floor
  * tightens the search's objective lower bound to the returned value. Bounded by [SHAVE_MAX_ITERS] and
  * [token].
  */
-internal fun LpEngine.shaveObjectiveLb(objectiveVar: Int, ascending: Boolean, token: Cancellation): Long? {
+internal fun LpEngine.shaveObjectiveLb(objectiveVar: Int, ascending: Boolean, token: ExecutionControl): Long? {
     if (!ascending || objectiveVar < 0 || lpRelaxer == null) return null
     val root = PropagationSession(problem)
     if (root.isUnsatAtRoot) return null
@@ -66,7 +66,7 @@ internal class ShavedBound(val varId: Int, val lo: Long, val hi: Long)
  * for the caller to apply to the root. **Sound:** each tightening is backed by a proof that the
  * shaved-off values are infeasible. Bounded by [SHAVE_MAX_ITERS] total probes across all variables.
  */
-internal fun LpEngine.shaveVariableBounds(token: Cancellation): List<ShavedBound> {
+internal fun LpEngine.shaveVariableBounds(token: ExecutionControl): List<ShavedBound> {
     if (lpRelaxer == null) return emptyList()
     val root = PropagationSession(problem, token)
     if (root.isUnsatAtRoot) return emptyList()
@@ -80,10 +80,14 @@ internal fun LpEngine.shaveVariableBounds(token: Cancellation): List<ShavedBound
         if (lo >= hi) continue
         while (lo < hi && probes++ < SHAVE_MAX_ITERS && !token() &&
             infeasibleUnder(v, lo, atMost = true, token = token)
-        ) lo += 1
+            ) {
+                lo += 1
+            }
         while (hi > lo && probes++ < SHAVE_MAX_ITERS && !token() &&
             infeasibleUnder(v, hi, atMost = false, token = token)
-        ) hi -= 1
+            ) {
+                hi -= 1
+            }
         if (lo != d.min || hi != d.max) out.add(ShavedBound(v, lo, hi))
     }
     return out
@@ -107,7 +111,7 @@ internal fun LpEngine.shaveVariableBounds(token: Cancellation): List<ShavedBound
  * cannot optimise this `−a·x` objective (it leaves the dual-feasible start, so [LpSolver.solve]
  * returns the trivial point). A failed/unbounded primal solve just keeps the constraint.
  */
-internal fun LpEngine.redundantConstraints(token: Cancellation): List<Int> {
+internal fun LpEngine.redundantConstraints(token: ExecutionControl): List<Int> {
     if (lpRelaxer == null) return emptyList()
     val removed = IntHashSet()
     var probes = 0
@@ -150,7 +154,7 @@ internal fun LpEngine.redundantConstraints(token: Cancellation): List<Int> {
  * the pair is already coupled — no `O(n²)` pair scan); each pair is probed once. Bounded by
  * [SHAVE_MAX_ITERS] and [token].
  */
-internal fun LpEngine.impliedEqualities(token: Cancellation): List<Linear> {
+internal fun LpEngine.impliedEqualities(token: ExecutionControl): List<Linear> {
     if (lpRelaxer == null) return emptyList()
     val out = ArrayList<Linear>()
     val probed = LongHashSet()
@@ -183,10 +187,15 @@ internal fun LpEngine.impliedEqualities(token: Cancellation): List<Linear> {
  *  empty / infeasible / unbounded / fails. Uses
  *  the primal pass: the dual simplex cannot optimise an arbitrary objective (it leaves its dual-feasible
  *  start). */
-private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: Cancellation): Double? {
+private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: ExecutionControl): Double? {
     val selected = projections?.forEngineView(prob)
-    val session = PropagationSession(if (selected == null) PropagationProblem(prob)
-        else PropagationProblem(prob, selected))
+    val session = PropagationSession(
+        if (selected == null) {
+            PropagationProblem(prob)
+        } else {
+            PropagationProblem(prob, selected)
+        },
+    )
     if (session.isUnsatAtRoot) return null
     val relaxation = try {
         primalRelaxer(LinearObjective(intCoefficients = coeffs), prob, selected)
@@ -214,12 +223,12 @@ private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: Cancellati
 
 /** Safe upper bound on `max(coeffs·x)` over [prob] — `max(c·x) = −min(−c·x)`, so [safeMin] of the negated
  *  objective negated back. Null on the same failure cases. */
-private fun LpEngine.safeMax(prob: Problem, coeffs: LongArray, token: Cancellation): Double? =
+private fun LpEngine.safeMax(prob: Problem, coeffs: LongArray, token: ExecutionControl): Double? =
     safeMin(prob, LongArray(coeffs.size) { -coeffs[it] }, token)?.let { -it }
 
 /** Safe lower bound on `min(coeffs·x)` built straight from the *declared* domains ([RootDomains]) with no
  *  [PropagationSession] bake — the no-bake analog of [safeMin], for pre-bake OBBT on wide domains. */
-private fun LpEngine.safeMinNoBake(coeffs: LongArray, token: Cancellation): Double? {
+private fun LpEngine.safeMinNoBake(coeffs: LongArray, token: ExecutionControl): Double? {
     val relaxation = try {
         primalRelaxer(LinearObjective(intCoefficients = coeffs)).build(RootDomains(problem), cancellation = token)
     } catch (_: CheckedLongOverflowException) {
@@ -246,7 +255,7 @@ private fun LpEngine.safeMinNoBake(coeffs: LongArray, token: Cancellation): Doub
 }
 
 /** Safe upper bound on `max(coeffs·x)` over the declared domains — `max = −min(−·)`. See [safeMinNoBake]. */
-private fun LpEngine.safeMaxNoBake(coeffs: LongArray, token: Cancellation): Double? =
+private fun LpEngine.safeMaxNoBake(coeffs: LongArray, token: ExecutionControl): Double? =
     safeMinNoBake(LongArray(coeffs.size) { -coeffs[it] }, token)?.let { -it }
 
 /**
@@ -259,7 +268,7 @@ private fun LpEngine.safeMaxNoBake(coeffs: LongArray, token: Cancellation): Doub
  * points, so no feasible value is removed. Bounded by [OBBT_MAX_VARS] variables, spent on the widest
  * domains first — see [widestFirst].
  */
-internal fun LpEngine.rootLpBoundsNoBake(token: Cancellation, minimumSpan: Long = 0L): List<ShavedBound> {
+internal fun LpEngine.rootLpBoundsNoBake(token: ExecutionControl, minimumSpan: Long = 0L): List<ShavedBound> {
     if (lpRelaxer == null || token()) return emptyList()
     val n = problem.numIntVars
     val out = ArrayList<ShavedBound>()
@@ -298,7 +307,7 @@ private fun LpEngine.widestFirst(n: Int, minimumSpan: Long): List<Int> {
  *  infinite incumbent, so `pruneNode` fires only on a genuine, certified infeasibility (the same sound
  *  oracle [shaveVariableBounds] leans on). A true result proves the whole problem has no solution. Bake
  *  propagation already reports its own infeasibility, so a root already Unsat is left to that path. */
-internal fun LpEngine.rootInfeasible(token: Cancellation): Boolean {
+internal fun LpEngine.rootInfeasible(token: ExecutionControl): Boolean {
     if (lpRelaxer == null || token()) return false
     val s = PropagationSession(problem)
     if (s.isUnsatAtRoot) return false
@@ -311,7 +320,7 @@ internal fun LpEngine.rootInfeasible(token: Cancellation): Boolean {
  *  defers to propagation whenever propagation already proves the root Unsat). A certified-infeasible
  *  relaxation contains every integer solution, so a true result proves the problem infeasible over its
  *  domains: the same verdict the root bake would grind out, reached in one LP solve. */
-internal fun LpEngine.rootLpInfeasibleNoBake(token: Cancellation): Boolean {
+internal fun LpEngine.rootLpInfeasibleNoBake(token: ExecutionControl): Boolean {
     val relaxer = lpRelaxer ?: return false
     if (token()) return false
     val model = try {
@@ -373,7 +382,7 @@ internal fun LpEngine.rootRelaxationSize(): RootRelaxationSize? {
 /** Whether a fresh root with `v ≤ bound` (or `v ≥ bound` when not [atMost]) is provably infeasible —
  *  propagation Unsat, or an LP infeasibility at an infinite incumbent (so `pruneNode` fires only on a
  *  genuine infeasibility). Sound: a true result proves every solution lies strictly past [bound]. */
-private fun LpEngine.infeasibleUnder(v: Int, bound: Long, atMost: Boolean, token: Cancellation): Boolean {
+private fun LpEngine.infeasibleUnder(v: Int, bound: Long, atMost: Boolean, token: ExecutionControl): Boolean {
     val s = PropagationSession(problem, token)
     if (s.isUnsatAtRoot || s.fixpointCancelled || token()) return false
     val assumed = if (atMost) s.implyIntAtMost(v, bound) else s.implyIntAtLeast(v, bound)

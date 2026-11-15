@@ -1,17 +1,17 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealFiniteDomain
-import com.eignex.klause.factor.arithmetic.ExactLinear
-import com.eignex.klause.factor.arithmetic.LinearIndicator
-import com.eignex.klause.lp.finiteRelaxationSupported
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.finiteRelaxationSupported
 import com.eignex.klause.lp.hasCompleteGuardedLpCompletion
 import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.PreparedFactorProjections

@@ -14,7 +14,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -245,7 +245,7 @@ class NodeBudgetTest {
         val workers = PortfolioBuilder.build(php(5, 4).bake(), scenario)
 
         val results = try {
-            workers.map { it.solve(Cancellation.Never) }
+            workers.map { it.solve(ExecutionControl.Never) }
         } finally {
             workers.forEach { it.close() }
         }
@@ -268,8 +268,8 @@ class NodeBudgetTest {
         val workers = PortfolioBuilder.build(php(5, 4).bake(), scenario)
 
         val result = try {
-            assertIs<SolveResult.Unknown>(workers[0].solve(Cancellation { true }))
-            workers[1].solve(Cancellation.Never)
+            assertIs<SolveResult.Unknown>(workers[0].solve(ExecutionControl { true }))
+            workers[1].solve(ExecutionControl.Never)
         } finally {
             workers.forEach { it.close() }
         }

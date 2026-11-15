@@ -4,7 +4,7 @@ import com.eignex.klause.lp.engine.reconstructRational
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.SourceCoordinate
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntIndexedCollection
 import com.eignex.util.numbers.BIG_ONE
@@ -30,8 +30,8 @@ internal fun recoverLinearPrimal(
     point: List<BigFraction>,
     rows: List<ExactRationalInequality>,
     inactive: Set<Int>,
-    cancellation: Cancellation,
-    complete: (List<ExactRationalInequality>, IntIndexedCollection, Cancellation) -> List<BigFraction>?,
+    cancellation: ExecutionControl,
+    complete: (List<ExactRationalInequality>, IntIndexedCollection, ExecutionControl) -> List<BigFraction>?,
     observe: (String, Long) -> Unit,
     limits: LinearPrimalRecoveryLimits = LinearPrimalRecoveryLimits(),
     progress: LinearPrimalRecoveryProgress = LinearPrimalRecoveryProgress(),
@@ -76,10 +76,14 @@ internal fun recoverLinearPrimal(
         }
         val reconstructed = point.mapIndexed { id, value ->
             meter.reserve(1L, 32L)
-            if (coordinates[id].kind != SourceCoordinate.Kind.Real || endpoints[id]) value else {
+            if (coordinates[id].kind != SourceCoordinate.Kind.Real || endpoints[id]) {
+                value
+            } else {
                 val floating = value.toDouble()
                 val exactFloating = BigFraction.ofDouble(floating)?.let(meter::number)
-                if (exactFloating != value) value else {
+                if (exactFloating != value) {
+                    value
+                } else {
                     val part = reconstructRational(floating, onStep = { meter.reserve(1L) })
                     part?.let { meter.number(BigFraction.of(bigIntOf(it.numerator), bigIntOf(it.denominator))) }
                         ?: value
@@ -178,7 +182,9 @@ internal fun recoverLinearPrimal(
         if (meter.satisfies(recovered, active)) {
             observe("PrimalRecoveryResidual", 1L)
             recovered
-        } else null
+        } else {
+            null
+        }
     } catch (stop: LinearPrimalStop) {
         progress.pending = false
         observe("PrimalRecovery${stop.reason}", 1L)
@@ -197,8 +203,8 @@ internal fun refineLinearPrimal(
     rows: List<ExactRationalInequality>,
     inactive: Set<Int>,
     costs: List<BigFraction>,
-    cancellation: Cancellation,
-    complete: (List<ExactRationalInequality>, List<BigFraction>, Cancellation) -> List<BigFraction>?,
+    cancellation: ExecutionControl,
+    complete: (List<ExactRationalInequality>, List<BigFraction>, ExecutionControl) -> List<BigFraction>?,
     observe: (String, Long) -> Unit,
 ): List<BigFraction>? {
     val progress = LinearPrimalRecoveryProgress()
@@ -240,7 +246,9 @@ internal fun refineLinearPrimal(
             }
             if (columns.isEmpty()) {
                 if (if (row.strict) rhs <= BigFraction.ZERO else rhs < BigFraction.ZERO) return null
-            } else residual += ExactRationalInequality(columns.toIntArray(), coefficients, rhs, row.strict)
+            } else {
+                residual += ExactRationalInequality(columns.toIntArray(), coefficients, rhs, row.strict)
+            }
         }
         val refined = complete(residual, objective, cancellation) ?: return null
         if (refined.size != members.size) return null
@@ -269,7 +277,7 @@ internal fun refineLinearPrimal(
 
 private class LinearPrimalMeter(
     private val limits: LinearPrimalRecoveryLimits,
-    private val token: Cancellation,
+    private val token: ExecutionControl,
     private val progress: LinearPrimalRecoveryProgress,
 ) {
 

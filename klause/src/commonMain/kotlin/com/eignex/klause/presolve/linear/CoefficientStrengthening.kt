@@ -18,7 +18,7 @@ import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.PresolveShared
 import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.presolve.equivalentPseudoBoolean
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.addExact
@@ -43,7 +43,7 @@ internal object CoefficientStrengthening {
      */
     fun strengthenCoefficients(
         problem: Problem,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         ranges: ColumnRanges? = null,
     ): PassDelta {
         val dropped = IntArrayList()

@@ -14,7 +14,7 @@ import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.RetainedLinearEncoding
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.time.TimeSource
 
 /** An open source model after the shared preparation phase, with the route selected from the result. */
@@ -49,10 +49,10 @@ internal fun Problem.prepareOpenSource(
     objective: LinearObjective? = null,
     config: PresolveConfig = PresolveConfig.DEFAULT,
     solutionSetSensitive: Boolean = false,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     budget: PresolveBudget? = null,
     projections: PreparedFactorProjections? = null,
-    presolveCancellation: Cancellation = cancellation,
+    presolveCancellation: ExecutionControl = cancellation,
     capturedPlan: ComponentPlan? = null,
 ): OpenSourcePreparation {
     projections?.requireSource(this)
@@ -81,7 +81,7 @@ internal fun Problem.prepareOpenSource(
 internal fun PreparedSource.planned(
     model: Problem,
     projections: PreparedFactorProjections? = null,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     capturedPlan: ComponentPlan? = null,
 ): OpenSourcePreparation.Planned = budget.observePreparation(
     PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, model, cancellation,

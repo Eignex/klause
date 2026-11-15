@@ -103,6 +103,7 @@ internal class SharedClausePool(
         val budget = Budget(maxWork, maxScratchEntries, cancelled, charge)
         var published = 0
         try {
+            budget.checkpoint()
             for (c in batch) {
                 budget.step()
                 if (booleanOnly && c.atomQuads.isNotEmpty()) {
@@ -119,6 +120,7 @@ internal class SharedClausePool(
                 if (store.append(c, isGlobal, origin, budget, softLimitBytes ?: Long.MAX_VALUE)) published++
                 else declined++
             }
+            budget.checkpoint()
         } catch (_: Stopped) {
             deferred++
         }
@@ -134,8 +136,12 @@ internal class SharedClausePool(
         val before = store.ownedBytes
         val budget = Budget(maxWork, maxScratchEntries, cancelled, charge)
         val status = try {
-            if (store.size == 0) ReclamationStatus.UNCHANGED else {
+            budget.checkpoint()
+            if (store.size == 0) {
+                ReclamationStatus.UNCHANGED
+            } else {
                 compact(budget)
+                budget.checkpoint()
                 ReclamationStatus.RECLAIMED
             }
         } catch (_: Stopped) {
@@ -159,28 +165,33 @@ internal class SharedClausePool(
         }
     }
 
-    internal fun drainSinceFunded(
-        cursor: Long,
-        cancelled: () -> Boolean,
-        charge: () -> Unit,
-    ): Drained? = lock.withLock {
-        val from = if (generationOf(cursor) == generation) indexOf(cursor) else 0
-        val size = store.size
-        val count = (size - from).coerceAtLeast(0)
-        if (count.toLong() * 4L + 3L > reclamationWork || count.toLong() * 2L > reclamationScratchEntries) {
-            return@withLock null
+    internal fun drainSinceFunded(cursor: Long, cancelled: () -> Boolean, charge: () -> Unit): Drained? =
+        lock.withLock {
+            val from = if (generationOf(cursor) == generation) indexOf(cursor) else 0
+            val size = store.size
+            val count = (size - from).coerceAtLeast(0)
+            if (count.toLong() * 4L + 3L > reclamationWork || count.toLong() * 2L > reclamationScratchEntries) {
+                return@withLock null
+            }
+            val budget = Budget(reclamationWork, reclamationScratchEntries, cancelled, charge)
+            try {
+                budget.checkpoint()
+                budget.reserve(count.toLong() * 2L)
+                val clauses = List(count) {
+                    budget.step()
+                    store.clause(from + it)
+                }
+                val origins = IntArray(count) {
+                    budget.step()
+                    store.origins[from + it]
+                }
+                budget.step()
+                budget.checkpoint()
+                Drained(clauses, origins, cursorOf(generation, size))
+            } catch (_: Stopped) {
+                null
+            }
         }
-        val budget = Budget(reclamationWork, reclamationScratchEntries, cancelled, charge)
-        try {
-            budget.reserve(count.toLong() * 2L)
-            val clauses = List(count) { budget.step(); store.clause(from + it) }
-            val origins = IntArray(count) { budget.step(); store.origins[from + it] }
-            budget.step()
-            Drained(clauses, origins, cursorOf(generation, size))
-        } catch (_: Stopped) {
-            null
-        }
-    }
 
     private fun exceedsLimit(clause: SharedClause, budget: Budget): Boolean {
         val limit = softLimitBytes ?: return false
@@ -202,6 +213,7 @@ internal class SharedClausePool(
             replacement.append(store.clause(i), store.global[i], store.origins[i], budget)
         }
         budget.step()
+        budget.checkpoint()
         store = replacement
     }
 
@@ -232,6 +244,7 @@ internal class SharedClausePool(
             replacement.origins[next++] = store.origins[i]
         }
         budget.step()
+        budget.checkpoint()
         store = replacement
         generation++
         compactions++
@@ -379,13 +392,19 @@ internal class SharedClausePool(
     ) {
         var work = 0L
         var scratchEntries = 0
+        private var countdown = 0
 
         init { require(maxWork >= 0L && maxScratchEntries >= 0) }
 
         fun step() {
-            if (work >= maxWork || cancelled()) throw Stopped()
+            if (work >= maxWork) throw Stopped()
+            if (countdown-- <= 0) checkpoint()
             charge()
             work++
+        }
+
+        fun checkpoint() {
+            countdown = 255
             if (cancelled()) throw Stopped()
         }
 
@@ -395,6 +414,7 @@ internal class SharedClausePool(
             var remaining = entries
             while (remaining-- > 0L) step()
             scratchEntries += entries.toInt()
+            checkpoint()
         }
     }
 

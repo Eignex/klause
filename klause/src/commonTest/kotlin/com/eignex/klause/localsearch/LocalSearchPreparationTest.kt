@@ -9,7 +9,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -40,13 +40,13 @@ class LocalSearchPreparationTest {
         expired = false
         val preparation = LocalSearchPreparation(problem, emptyArray())
 
-        assertNull(preparation.get(Cancellation { expired }))
+        assertNull(preparation.get(ExecutionControl { expired }))
         assertEquals(256, visits.sum())
-        val completed = assertNotNull(preparation.get(Cancellation.Never))
+        val completed = assertNotNull(preparation.get(ExecutionControl.Never))
 
         assertContentEquals(IntArray(512) { it }, completed.boolOccurrences[0])
         assertTrue(visits.all { it == 2 })
-        assertSame(completed, preparation.get(Cancellation { true }))
+        assertSame(completed, preparation.get(ExecutionControl { true }))
     }
 
     @Test
@@ -118,7 +118,7 @@ class LocalSearchPreparationTest {
         )
         val preparation = LocalSearchPreparation(problem, arrayOf(IntDomain(0, 5)))
 
-        val completed = assertNotNull(preparation.get(Cancellation.Never))
+        val completed = assertNotNull(preparation.get(ExecutionControl.Never))
 
         assertContentEquals(intArrayOf(0, 2), completed.boolOccurrences[0])
         assertContentEquals(intArrayOf(1), completed.intOccurrences[0])

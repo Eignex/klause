@@ -34,7 +34,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.math.abs
 import kotlin.test.Test
@@ -169,12 +169,12 @@ class LocalSearchEngineCompletionTest {
             LocalSearchParams(maxInstructions = 5,
                 initialAssignment = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(0.0))),
         ).use { handle ->
-            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L) {})
+            assertNull(handle.runSlice(ExecutionControl { expired }, Long.MAX_VALUE, -1L) {})
             assertFalse(handle.isDone)
             expired = false
 
             val best = assertIs<MinimizeResult.BestFound>(
-                handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
+                handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {})
 
             assertEquals(listOf(2L, 2L), attempted)
             assertEquals(2L, best.sample.intValue(0))
@@ -387,12 +387,12 @@ class LocalSearchEngineCompletionTest {
         var polls = 0
 
         search.resumableSolve(LocalSearchParams(maxFlips = 1L, initialAssignment = initial)).use { handle ->
-            val paused = handle.runSlice(Cancellation { ++polls >= 3 }, Long.MAX_VALUE, -1L)
+            val paused = handle.runSlice(ExecutionControl { ++polls >= 3 }, Long.MAX_VALUE, -1L)
 
             assertNull(paused)
             assertFalse(handle.isDone)
             assertEquals(0.0, handle.stats.ls.moves.sum)
-            val result = assertIs<SolveResult.Sat>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+            val result = assertIs<SolveResult.Sat>(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L))
             assertEquals(initial, result.assignment)
         }
     }
@@ -416,10 +416,10 @@ class LocalSearchEngineCompletionTest {
             LinearObjective(intCoefficients = longArrayOf(1)),
             LocalSearchParams(maxFlips = 1L, initialAssignment = initial),
         ).use { handle ->
-            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L) { found += it.sample })
+            assertNull(handle.runSlice(ExecutionControl { expired }, Long.MAX_VALUE, -1L) { found += it.sample })
             assertEquals(0.0, handle.stats.ls.moves.sum)
             expired = false
-            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { found += it.sample }
+            val result = handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) { found += it.sample }
 
             assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
             assertEquals(listOf(initial), found)
@@ -823,11 +823,11 @@ class LocalSearchEngineCompletionTest {
             LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
             LocalSearchParams(maxInstructions = 4, initialAssignment = initial),
         ).use { handle ->
-            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1) { found += it.sample })
+            assertNull(handle.runSlice(ExecutionControl { expired }, Long.MAX_VALUE, -1) { found += it.sample })
             assertTrue(found.isEmpty())
             expired = false
 
-            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { found += it.sample }
+            val result = handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { found += it.sample }
 
             val best = assertIs<MinimizeResult.BestFound>(result)
             assertEquals(initial, best.sample)
@@ -1128,11 +1128,11 @@ class LocalSearchEngineCompletionTest {
             LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
             LocalSearchParams(maxInstructions = 5, initialAssignment = initial),
         ).use { handle ->
-            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L) {})
+            assertNull(handle.runSlice(ExecutionControl { expired }, Long.MAX_VALUE, -1L) {})
             assertEquals(initial, checkNotNull(live).assignment.snapshot())
             expired = false
 
-            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {}
+            val result = handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {}
 
             assertEquals(1.0, assertIs<MinimizeResult.BestFound>(result).objective)
             assertEquals(1, probes)
@@ -1161,11 +1161,11 @@ class LocalSearchEngineCompletionTest {
             LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
             LocalSearchParams(maxInstructions = 3, initialAssignment = initial),
         ).use { handle ->
-            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1) { found += it.sample })
+            assertNull(handle.runSlice(ExecutionControl { expired }, Long.MAX_VALUE, -1) { found += it.sample })
             assertEquals(listOf(initial), found)
             expired = false
 
-            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { found += it.sample }
+            val result = handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { found += it.sample }
 
             assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
             assertEquals(listOf(initial), found)

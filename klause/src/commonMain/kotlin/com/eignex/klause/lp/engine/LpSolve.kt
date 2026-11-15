@@ -7,7 +7,8 @@ import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactSimplexBound
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.PollStride
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
@@ -97,7 +98,7 @@ internal class CertifiedLpResult(
 internal fun solveAndCertify(
     model: ExactLpModel,
     warm: ExactLpBasis? = null,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     context: LpSolveContext = LpSolveContext.Production,
     counterResults: LpCounterResults? = null,
     pricing: LpPricingOptions = LpPricingOptions(),
@@ -134,7 +135,7 @@ internal fun solveAndCertify(
 
 internal fun certifyBoundConflict(
     state: LpExactState,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     policy: LpCertificationPolicy,
     observer: LpCertificationObserver?,
     claim: LpClaim,
@@ -142,7 +143,9 @@ internal fun certifyBoundConflict(
     val conflict = state.conflict ?: return null
     val observation = observer as? LpClaimObservation ?: observer?.let { LpClaimObservation(claim, it) }
     fun stopped(): Boolean = cancellation().also { if (it) observation?.refuse("CANCELLED") }
-    val accepted = if (stopped()) null else {
+    val accepted = if (stopped()) {
+        null
+    } else {
         observation?.observe(LpCertifier.EXACT_FARKAS, true, LpCertifierCost.Reported)
         policy.acceptNullable(LpCertifier.EXACT_FARKAS, conflict)?.takeUnless { stopped() }.also {
             if (it == null && !stopped()) observation?.refuse("POLICY_REFUSED")
@@ -170,7 +173,7 @@ internal fun certifyBoundConflict(
 internal fun solveAndCertify(
     model: LpModel,
     warm: Basis? = null,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     workLimit: Long = 0L,
     componentSplit: Boolean = true,
     observer: LpCertificationObserver? = null,
@@ -228,7 +231,7 @@ private fun sourceCertifiedResult(
     model: LpModel,
     authoritative: LpModel,
     result: CertifiedLpResult,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     counterResults: LpCounterResults?,
     policy: LpCertificationPolicy,
 ): CertifiedLpResult {
@@ -250,7 +253,7 @@ private fun sourceCertifiedResult(
 private fun solveProjectedAndCertify(
     model: LpModel,
     warm: Basis?,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     workLimit: Long,
     componentSplit: Boolean,
     observer: LpCertificationObserver?,
@@ -309,7 +312,7 @@ private fun solveProjectedAndCertify(
 private fun certifyAuthoritativeSolve(
     model: LpModel,
     warm: Basis?,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     workLimit: Long,
     componentSplit: Boolean,
     observer: LpCertificationObserver?,
@@ -352,7 +355,7 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
         model: LpModel,
         solver: LpSolver,
         result: FloatLpResult?,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         observer: LpCertificationObserver?,
         counterResults: LpCounterResults?,
         refinementLimits: LpRefinementLimits = LpRefinementLimits(),
@@ -371,7 +374,7 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
     fun acceptFloat(
         model: LpModel,
         result: FloatLpResult?,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         observer: LpCertificationObserver?,
         floatAccept: (FloatLpResult) -> Boolean,
         floatOffset: Double,
@@ -387,7 +390,7 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
         model: LpModel,
         solver: LpSolver,
         result: FloatLpResult?,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         observer: LpCertificationObserver?,
         counterResults: LpCounterResults?,
         refinementLimits: LpRefinementLimits,
@@ -453,7 +456,7 @@ internal fun certifyLpResult(
     model: LpModel,
     solver: LpSolver,
     result: FloatLpResult?,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
     counterResults: LpCounterResults? = null,
@@ -497,7 +500,7 @@ private fun certifyLpResultWithin(
     model: LpModel,
     solver: LpSolver,
     result: FloatLpResult?,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
     counterResults: LpCounterResults? = null,
@@ -547,11 +550,28 @@ private fun certifyLpResultWithin(
             val direct = certifyLpBound(model, result.duals, observer, policy)
                 ?: (solver as? ComponentLpSolverCapability)?.exactBound(observer, policy)
             val checked = if (direct == null && !stopped()) {
-                certifyLpBoundOnly(model, result.duals, ReconstructionLimits(), cancellation,
-                    observer, policy, result.basis)
-            } else null
-            val certified = CertifiedLpResult(result, direct ?: checked?.bound, null, null, null,
-                model.hasIntegralObjective(), { null }, reconstruction = checked?.metrics)
+                certifyLpBoundOnly(
+                    model,
+                    result.duals,
+                    ReconstructionLimits(),
+                    cancellation,
+                    observer,
+                    policy,
+                    result.basis,
+                )
+            } else {
+                null
+            }
+            val certified = CertifiedLpResult(
+                result,
+                direct ?: checked?.bound,
+                null,
+                null,
+                null,
+                model.hasIntegralObjective(),
+                { null },
+                reconstruction = checked?.metrics,
+            )
             if (!stopped()) counterResults?.remember(model, certified, policy)
             return if (stopped()) CertifiedLpResult(null, null, null, null, null, false, { null }) else certified
         }
@@ -859,8 +879,13 @@ private fun certifyLpResultWithin(
         }
     }
     if (result == null &&
-        (if (claim == LpClaim.ATTAINED_OPTIMUM) numericalWitness == null || numericalBound == null
-        else claim.needsMore(numericalBound, numericalWitness)) &&
+        (
+            if (claim == LpClaim.ATTAINED_OPTIMUM) {
+            numericalWitness == null || numericalBound == null
+        } else {
+            claim.needsMore(numericalBound, numericalWitness)
+        }
+        ) &&
         ray == null && numericalConflict == null && conflict == null && !stopped()
     ) {
         refine()
@@ -889,7 +914,9 @@ private fun certifyLpResultWithin(
         // refinement that can prove the optimum.
         if (claim == LpClaim.ATTAINED_OPTIMUM && witness != null && bound?.value != witness.objective &&
             !stopped()
-        ) refine()
+        ) {
+            refine()
+        }
     }
     if (continued == null) {
         capturedTarget?.let {
@@ -1067,16 +1094,25 @@ private fun LpModel.objectiveMultipliers(multipliers: List<BigFraction>): List<B
 internal fun exactLagrangian(
     model: LpModel,
     multipliers: List<BigFraction>,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): BigFraction? {
-    if (multipliers.size != model.m || !model.finiteExactInput()) return null
+    if (cancellation() || multipliers.size != model.m || !model.finiteExactInput()) return null
+    val stride = PollStride()
     val y = model.objectiveMultipliers(multipliers)
     var value = model.exactConstant()
-    for (i in 0 until model.m) value += y[i] * model.exactRhs(i)
+    for (i in 0 until model.m) {
+        if (stride.due() && cancellation()) return null
+        value += y[i] * model.exactRhs(i)
+    }
     for (j in 0 until model.numVars) {
-        if (cancellation()) return null
+        if (stride.due() && cancellation()) return null
         var reduced = model.exactCost(j)
-        model.forEachRationalColumn(j) { row, a -> reduced -= y[row] * a }
+        var stopped = false
+        model.forEachRationalColumn(j) { row, a ->
+            if (stride.due() && cancellation()) stopped = true
+            if (!stopped) reduced -= y[row] * a
+        }
+        if (stopped) return null
         if (reduced.signum() > 0) {
             val side = model.exactBounds(j).lower ?: return null
             value += reduced * side.number.value
@@ -1086,7 +1122,7 @@ internal fun exactLagrangian(
             value += reduced * side.number.value
         }
     }
-    return model.sourceObjective(value)
+    return if (cancellation()) null else model.sourceObjective(value)
 }
 
 internal fun certifyLpFarkas(
@@ -1491,7 +1527,9 @@ internal class LpCounterResults {
         val exact = model.exactState
         if (exact != null && state === exact && acceptedBy === policy &&
             policy === ProductionLpCertificationPolicy
-        ) return evidence
+        ) {
+            return evidence
+        }
         val current = if (exact == null) keyOf(model) else null
         if (policy !== ProductionLpCertificationPolicy || current == null ||
             key?.contentEquals(current) != true || acceptedBy !== policy || state !== model.exactState
@@ -1577,7 +1615,7 @@ private fun floatOptimum(
     result: FloatLpResult,
     floatAccept: (FloatLpResult) -> Boolean,
     offset: Double,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     observer: LpCertificationObserver?,
 ): FloatLpResult? {
     val verdict = provenFloatOptimum(model, result, offset, cancellation, observer)
@@ -1607,7 +1645,7 @@ private fun provenFloatOptimum(
     model: LpModel,
     result: FloatLpResult,
     offset: Double,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     observer: LpCertificationObserver?,
 ): FloatDualVerdict {
     if (floatDualFeasible(model, result, offset)) return FloatDualVerdict.ACCEPTED

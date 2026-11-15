@@ -24,7 +24,7 @@ import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -262,7 +262,7 @@ class NativeSourceExecutionTest {
                 SourceAttachment(source, ProblemSettings()),
                 ExecutionOperation.SATISFY,
                 FiniteEngine.BACKTRACK,
-                cancellation = Cancellation { stopped },
+                cancellation = ExecutionControl { stopped },
             ),
         )
         stopped = true
@@ -297,7 +297,7 @@ class NativeSourceExecutionTest {
                 SourceAttachment(source, ProblemSettings()),
                 ExecutionOperation.SATISFY,
                 FiniteEngine.BACKTRACK,
-                cancellation = Cancellation.after(Duration.ZERO),
+                cancellation = ExecutionControl.after(Duration.ZERO),
             ),
         )
 

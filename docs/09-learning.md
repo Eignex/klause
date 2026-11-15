@@ -559,8 +559,9 @@ root continues a pending window before branching while its row, heap or cleanup
 state advances, taking each further attempt inside the same slice until the slice
 expires. Each attempt keeps the same bounded work and scratch allowance and
 debits the containing slice. Cleanup polls cancellation before every bounded
-mutation. Its first 64 polls read the session and caller tokens; later polls read
-them once per 64, so a request arriving mid-window is observed within that many steps. A completed pass waits for the next restart before
+mutation. Worker cleanup contributes to the worker's shared countdown. Unbound
+cleanup reads the session and caller tokens on its first 64 polls and then once
+per 64 polls. A completed pass waits for the next restart before
 aging tiers again; an unfunded attempt permits search to proceed. Continuation
 reads existing ranking state without adding retained storage. Reaching the active
 quota still completes the pending pass; it does not start another tier epoch.
@@ -883,6 +884,11 @@ before admitting more work. Separate containing and per-class debt-added and
 debt-repaid counters retain those charges without adding work. Reseeding resets
 cursors without forgiving that debt.
 Time and work cancellation retain no partial probe.
+Optional scalar visits check remaining work directly. Unbound scans poll external
+stops within 256 visits. Worker probes, attachment and retirement contribute to
+the worker's 1,024-unit countdown;
+entry and return of the containing inprocessing invocation check its full stop.
+Unbound controls check at each probe and attachment boundary.
 Attachment and root publication are required cleanup once a consequence is admitted:
 local ceilings stop later optional work and retain the cleanup's overspend as debt.
 The containing invocation still cancels them. An interrupted root attachment keeps

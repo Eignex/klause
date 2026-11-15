@@ -23,7 +23,7 @@ import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class LpSourceEdit(
     val sourceState: LpExactState,
@@ -42,7 +42,10 @@ internal class LpSourceEdit(
     fun isCurrent(): Boolean = valid()
     fun commit() = publish()
 
-    fun boundAssertions(nextWitness: Long, cancellation: Cancellation = Cancellation.Never): List<LpBoundAssertion>? {
+    fun boundAssertions(
+        nextWitness: Long,
+        cancellation: ExecutionControl = ExecutionControl.Never,
+    ): List<LpBoundAssertion>? {
         val before = sourceState
         if (nextWitness < 0L || bounds.size != before.model.n + columns.size || !isCurrent() || cancellation()) {
             return null
@@ -115,7 +118,9 @@ internal class LpRetainedSources(
             }
             val origin = if (variable >= 0) source.origin.value else BigFraction.ZERO
             val next = ExactLpBounds(
-                if (previous != null && lastLower == lower) previous.lower else {
+                if (previous != null && lastLower == lower) {
+                    previous.lower
+                } else {
                     ExactLpSide(ExactLpNumber.of(BigFraction.ofLong(lower) - origin))
                 },
                 when {
@@ -199,7 +204,7 @@ internal class LpRetainedSources(
     fun prepare(
         state: LpExactState,
         domains: RelaxationDomains,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         onEmissionWork: ((Long) -> Unit)? = null,
     ): LpSourceEdit? {
         require(state.depth >= depth && state.model.n == columns.size)
@@ -270,24 +275,30 @@ internal class LpRetainedSources(
                         val prepared = if (!fragment.colIsBool[local] && fragment.colRealId[local] < 0) {
                             relaxer.preparationTemplates?.bound(fragment.colVarId[local])
                                 ?.compatibleColumn(current, cancellation)
-                        } else null
+                        } else {
+                            null
+                        }
                         checkCancellation(cancellation)
                         if (prepared != null) boundTemplates++
                         prepared ?: current
                     } else {
-                        source.column(local).copy(bounds = ExactLpBounds(
-                            ExactLpSide(ExactLpNumber.of(0L)),
-                            ExactLpSide(ExactLpNumber.of(fragment.colPresentUpper[local])),
-                        ))
+                        source.column(local).copy(
+                            bounds = ExactLpBounds(
+                                ExactLpSide(ExactLpNumber.of(0L)),
+                                ExactLpSide(ExactLpNumber.of(fragment.colPresentUpper[local])),
+                            ),
+                        )
                     }
                     val cost = source.objective.cost(local)
                     mapped[local] = staged.size
                     keys[key] = staged.size
-                    staged.add(Column(
-                        column, cost, fragment.colVarId[local], fragment.colIsBool[local],
-                        fragment.colRealId[local], fragment.colRealSign[local], fragment.colReq[local]?.copyOf(),
-                        fragment.colPresentUpper[local], definition,
-                    ))
+                    staged.add(
+                        Column(
+                            column, cost, fragment.colVarId[local], fragment.colIsBool[local],
+                            fragment.colRealId[local], fragment.colRealSign[local], fragment.colReq[local]?.copyOf(),
+                            fragment.colPresentUpper[local], definition,
+                        ),
+                    )
                     added.add(LpStructuralColumn(column, cost))
                     constant += cost.value * column.origin.value
                 }
@@ -316,8 +327,12 @@ internal class LpRetainedSources(
                 check(lastId < Long.MAX_VALUE)
                 val id = ++lastId
                 val row = LpScopedRow(
-                    id, rowTerms[local].sortedBy { it.first }, rhs[local], source.column(source.n + local),
-                    source.row(local), source.objective.cost(source.n + local),
+                    id,
+                    rowTerms[local].sortedBy { it.first },
+                    rhs[local],
+                    source.column(source.n + local),
+                    source.row(local),
+                    source.objective.cost(source.n + local),
                 )
                 rows.add(row)
                 rowIds[local] = id
@@ -359,11 +374,16 @@ internal class LpRetainedSources(
         }
         changes.forEach { reference(it.previous, 1) }
         owned += changes.sumOf { (it.previous?.storageUnits ?: 0L) + 3L }
-        val objective = if (added.isEmpty()) null else ExactLpObjective(
-            List(state.model.n) { state.model.objective.cost(it) } + added.map { it.cost } +
-                List(state.model.m) { state.model.objective.cost(state.model.n + it) } + rows.map { it.cost },
-            ExactLpNumber.of(constant), sense = Sense.MINIMIZE,
-        )
+        val objective = if (added.isEmpty()) {
+            null
+        } else {
+            ExactLpObjective(
+                List(state.model.n) { state.model.objective.cost(it) } + added.map { it.cost } +
+                    List(state.model.m) { state.model.objective.cost(state.model.n + it) } + rows.map { it.cost },
+                ExactLpNumber.of(constant),
+                sense = Sense.MINIMIZE,
+            )
+        }
         return LpSourceEdit(
             state, retired, added, rows, permanent, objective, liveBounds(staged, domains), emittedExtent,
             identify = { staged[it].cpSource() },
@@ -386,7 +406,7 @@ internal class LpRetainedSources(
         }
     }
 
-    private fun checkCancellation(cancellation: Cancellation) {
+    private fun checkCancellation(cancellation: ExecutionControl) {
         if (cancellation()) throw LpAssemblyCancelled()
     }
 
@@ -394,7 +414,7 @@ internal class LpRetainedSources(
 
     fun prepareCompaction(
         state: LpExactState,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         retainedOverhead: Long = 0L,
     ): LpSourceCompaction? {
         require(state.model.n == columns.size && state.depth == depth)
@@ -419,9 +439,13 @@ internal class LpRetainedSources(
         fun binding(previous: Binding?): Binding? = previous?.let {
             extent += it.columns.size + it.rows.size
             check(it.rows.all { id -> indices[id]?.let { row -> remap.row(row) >= 0 } == true })
-            Binding(it.emission, IntArray(it.columns.size) { index ->
-                remap.column(it.columns[index]).also { column -> check(column >= 0) }
-            }, it.rows)
+            Binding(
+                it.emission,
+                IntArray(it.columns.size) { index ->
+                    remap.column(it.columns[index]).also { column -> check(column >= 0) }
+                },
+                it.rows,
+            )
         }
         val next = Array(bindings.size) { binding(bindings[it]) }
         val changes = trail.map { Change(it.depth, it.index, binding(it.previous)) }
@@ -452,7 +476,7 @@ internal class LpRetainedSources(
         }
     }
 
-    private fun compactionView(state: LpExactState, cancellation: Cancellation): CompactionView? {
+    private fun compactionView(state: LpExactState, cancellation: ExecutionControl): CompactionView? {
         val rows = state.rows
         val kept = ArrayList<Int>()
         var removed = 0L
@@ -469,50 +493,66 @@ internal class LpRetainedSources(
         }
         val storage = state.model.layoutStorage
         val numeric = rows.storageWeight(storage).retireColumns(columns.size - kept.size)
-        return CompactionView(columns, columnUses, rows, storage, kept,
-            LpLayoutWeight(numeric.retained, numeric.retired + removed), removed,
-            kept.mapNotNullTo(HashSet()) { columns[it].definition })
+        return CompactionView(
+            columns,
+            columnUses,
+            rows,
+            storage,
+            kept,
+            LpLayoutWeight(numeric.retained, numeric.retired + removed),
+            removed,
+            kept.mapNotNullTo(HashSet()) { columns[it].definition },
+        )
     }
 
-    private fun Column.cpSource(): CutSource? = if (variable < 0) null else {
+    private fun Column.cpSource(): CutSource? = if (variable < 0) {
+        null
+    } else {
         CutSource(if (boolean) CutSourceKind.BOOLEAN else CutSourceKind.INTEGER, variable)
     }
 
     private fun columnKey(fragment: LpRelaxation, column: Int, epoch: Long): ColumnKey = when {
         fragment.colVarId[column] >= 0 -> ColumnKey.Source(
-            if (fragment.colIsBool[column]) CutSourceKind.BOOLEAN else CutSourceKind.INTEGER, fragment.colVarId[column],
+            if (fragment.colIsBool[column]) CutSourceKind.BOOLEAN else CutSourceKind.INTEGER,
+            fragment.colVarId[column],
         )
+
         fragment.colRealId[column] >= 0 -> ColumnKey.Source(
-            CutSourceKind.REAL, fragment.colRealId[column], fragment.colRealSign[column],
+            CutSourceKind.REAL,
+            fragment.colRealId[column],
+            fragment.colRealSign[column],
         )
+
         fragment.colPresence[column] != null -> ColumnKey.Defined(requireNotNull(fragment.colPresence[column]))
+
         else -> ColumnKey.Anonymous(epoch, column)
     }
 
     fun liveBounds(domains: RelaxationDomains): List<ExactLpBounds> = liveBounds(columns, domains)
 
-    private fun liveBounds(
-        columns: List<Column>,
-        domains: RelaxationDomains,
-    ): List<ExactLpBounds> = columns.map { column ->
-        when {
-            column.variable >= 0 && column.boolean -> {
-                val pin = domains.boolValue(column.variable)
-                column.bounds(if (pin == true) 1L else 0L, if (pin == false) 0L else 1L)
-            }
-            column.variable >= 0 -> {
-                val domain = domains.intDomain(column.variable)
-                column.bounds(domain.min, domain.max, domains.honorsOpenSides && column.source.bounds.upper == null)
-            }
-            column.required != null -> {
-                val present = column.required.indices.step(2).all {
-                    domains.intDomain(column.required[it].toInt()).contains(column.required[it + 1])
+    private fun liveBounds(columns: List<Column>, domains: RelaxationDomains): List<ExactLpBounds> =
+        columns.map { column ->
+            when {
+                column.variable >= 0 && column.boolean -> {
+                    val pin = domains.boolValue(column.variable)
+                    column.bounds(if (pin == true) 1L else 0L, if (pin == false) 0L else 1L)
                 }
-                column.bounds(0L, if (present) column.presentUpper else 0L)
+
+                column.variable >= 0 -> {
+                    val domain = domains.intDomain(column.variable)
+                    column.bounds(domain.min, domain.max, domains.honorsOpenSides && column.source.bounds.upper == null)
+                }
+
+                column.required != null -> {
+                    val present = column.required.indices.step(2).all {
+                        domains.intDomain(column.required[it].toInt()).contains(column.required[it + 1])
+                    }
+                    column.bounds(0L, if (present) column.presentUpper else 0L)
+                }
+
+                else -> column.source.bounds
             }
-            else -> column.source.bounds
         }
-    }
 
     fun relaxation(state: LpExactState, domains: RelaxationDomains): LpRelaxation {
         require(state.model.n == columns.size)
@@ -545,10 +585,14 @@ internal class LpRetainedSources(
             }
             hulls.addAll(fragment.hullFactorIds.toList())
             for (circuit in fragment.circuitArcs) {
-                circuits.add(CircuitArcModel(
-                    circuit.n, circuit.tails, circuit.heads,
-                    IntArray(circuit.cols.size) { binding.columns[circuit.cols[it]] },
-                ))
+                circuits.add(
+                    CircuitArcModel(
+                        circuit.n,
+                        circuit.tails,
+                        circuit.heads,
+                        IntArray(circuit.cols.size) { binding.columns[circuit.cols[it]] },
+                    ),
+                )
             }
         }
         val presence = List(columns.size) { if (it in producers) columns[it].definition else null }
@@ -568,7 +612,11 @@ internal class LpRetainedSources(
 
     companion object {
         fun emptyModel(): ExactLpModel = ExactLpModel(
-            emptyList(), emptyList(), emptyList(), emptyList(), ExactLpObjective(emptyList()),
+            emptyList(),
+            emptyList(),
+            emptyList(),
+            emptyList(),
+            ExactLpObjective(emptyList()),
         )
     }
 }

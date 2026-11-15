@@ -26,7 +26,7 @@ import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -37,48 +37,80 @@ import kotlin.test.assertTrue
 class AffineEliminationTest {
     @Test
     fun `unit affine views should retain native comparison disjunctions and source reconstruction`() {
-        for (finite in listOf(false, true)) for (scale in listOf(-1, 1)) for (op in LinearOp.entries) {
-            val source = Problem(0, 3, Array(3) { IntDomain(-4, 4) }, listOf(
-                Linear(intArrayOf(1, -scale), intArrayOf(0, 1), LinearOp.EQ, 2),
-                ComparisonClause(intArrayOf(0, 0, 2), arrayOf(op, LinearOp.EQ, LinearOp.EQ),
-                    longArrayOf(2, 0, 1)),
-            ))
-            val reduced: Problem
-            val reconstruct: (Sample) -> Sample
-            if (finite) {
-                val baked = source.bake()
-                val delta = AffineSingletons.eliminateAffineSingletons(baked, objectiveIntVars = setOf(1, 2),
-                    pivotOrder = AffinePivotOrder.REWRITE_COST)
-                reduced = baked.withPassDelta(delta, BakeConfig.NONE)
-                reconstruct = assertNotNull(delta.reconstruct)
-            } else {
-                val delta = AffineSingletons.eliminateSourceAffineSingletons(source, objectiveIntVars = setOf(1, 2),
-                    pivotOrder = AffinePivotOrder.REWRITE_COST)
-                reduced = assertNotNull(source.withSourcePassDelta(delta))
-                reconstruct = assertNotNull(delta.rebuild.asSampleLift())
-            }
+        for (finite in listOf(false, true)) {
+            for (scale in listOf(-1, 1)) {
+                for (op in LinearOp.entries) {
+                    val source = Problem(
+                        0,
+                        3,
+                        Array(3) { IntDomain(-4, 4) },
+                        listOf(
+                            Linear(intArrayOf(1, -scale), intArrayOf(0, 1), LinearOp.EQ, 2),
+                            ComparisonClause(
+                                intArrayOf(0, 0, 2),
+                                arrayOf(op, LinearOp.EQ, LinearOp.EQ),
+                                longArrayOf(2, 0, 1),
+                            ),
+                        ),
+                    )
+                    val reduced: Problem
+                    val reconstruct: (Sample) -> Sample
+                    if (finite) {
+                        val baked = source.bake()
+                        val delta = AffineSingletons.eliminateAffineSingletons(
+                            baked,
+                            objectiveIntVars = setOf(1, 2),
+                            pivotOrder = AffinePivotOrder.REWRITE_COST,
+                        )
+                        reduced = baked.withPassDelta(delta, BakeConfig.NONE)
+                        reconstruct = assertNotNull(delta.reconstruct)
+                    } else {
+                        val delta = AffineSingletons.eliminateSourceAffineSingletons(
+                            source,
+                            objectiveIntVars = setOf(1, 2),
+                            pivotOrder = AffinePivotOrder.REWRITE_COST,
+                        )
+                        reduced = assertNotNull(source.withSourcePassDelta(delta))
+                        reconstruct = assertNotNull(delta.rebuild.asSampleLift())
+                    }
 
-            assertEquals(1, reduced.factors.count { it is ComparisonClause })
-            for (y in listOf(-2L, 0L, 2L)) for (z in listOf(0L, 1L)) {
-                val point = Sample(BooleanArray(0), longArrayOf(0, y, z))
-                val lifted = reconstruct(point)
+                    assertEquals(1, reduced.factors.count { it is ComparisonClause })
+                    for (y in listOf(-2L, 0L, 2L)) {
+                        for (z in listOf(0L, 1L)) {
+                            val point = Sample(BooleanArray(0), longArrayOf(0, y, z))
+                            val lifted = reconstruct(point)
 
-                assertEquals(scale * y + 2, lifted.ints[0])
-                assertEquals(isFeasible(source, lifted), isFeasible(reduced, point), "$finite $scale $op $y $z")
+                            assertEquals(scale * y + 2, lifted.ints[0])
+                            assertEquals(
+                                isFeasible(source, lifted),
+                                isFeasible(reduced, point),
+                                "$finite $scale $op $y $z",
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 
     @Test
     fun `ordinary pivot policies should retain comparison clause translations`() {
-        val source = Problem(0, 2, Array(2) { IntDomain(-4, 4) }, listOf(
-            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 2),
-            ComparisonClause(intArrayOf(0), arrayOf(LinearOp.NE), longArrayOf(0)),
-        ))
+        val source = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(-4, 4) },
+            listOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 2),
+                ComparisonClause(intArrayOf(0), arrayOf(LinearOp.NE), longArrayOf(0)),
+            ),
+        )
 
         for (order in listOf(AffinePivotOrder.MARKOWITZ, AffinePivotOrder.STABLE_ID)) {
-            val delta = AffineSingletons.eliminateSourceAffineSingletons(source, objectiveIntVars = setOf(1),
-                pivotOrder = order)
+            val delta = AffineSingletons.eliminateSourceAffineSingletons(
+                source,
+                objectiveIntVars = setOf(1),
+                pivotOrder = order,
+            )
 
             assertTrue(delta.isEmpty)
         }
@@ -86,64 +118,93 @@ class AffineEliminationTest {
 
     @Test
     fun `rewriting an asserted definition through a channel should preserve both channel branches`() {
-        for (finite in listOf(false, true)) for (op in LinearOp.entries) {
-            val source = Problem(1, 3, Array(3) { IntDomain(0, 4) }, listOf(
-                Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
-                ReifiedLinear(0, intArrayOf(2, -1), intArrayOf(0, 1), op, 2),
-            ))
-            val reduced: Problem
-            val reconstruct: (Sample) -> Sample
-            if (finite) {
-                val baked = source.bake()
-                val delta = AffineSingletons.eliminateAffineSingletons(baked, objectiveIntVars = setOf(1, 2),
-                    pivotOrder = AffinePivotOrder.REWRITE_COST)
-                assertFalse(delta.isEmpty)
-                reduced = baked.withPassDelta(delta, BakeConfig.NONE)
-                reconstruct = assertNotNull(delta.reconstruct)
-            } else {
-                val delta = AffineSingletons.eliminateSourceAffineSingletons(source, objectiveIntVars = setOf(1, 2),
-                    pivotOrder = AffinePivotOrder.REWRITE_COST)
-                assertFalse(delta.isEmpty)
-                reduced = assertNotNull(source.withSourcePassDelta(delta))
-                reconstruct = assertNotNull(delta.rebuild.asSampleLift())
-            }
-
-            for ((a, b) in listOf(0L to 0L, 0L to 1L, 1L to 1L)) for (truth in listOf(false, true)) {
-                val sum = a + 2 * b
-                val holds = when (op) {
-                    LinearOp.LE -> sum <= 2
-                    LinearOp.EQ -> sum == 2L
-                    LinearOp.GE -> sum >= 2
-                    LinearOp.NE -> sum != 2L
+        for (finite in listOf(false, true)) {
+            for (op in LinearOp.entries) {
+                val source = Problem(
+                    1,
+                    3,
+                    Array(3) { IntDomain(0, 4) },
+                    listOf(
+                        Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                        ReifiedLinear(0, intArrayOf(2, -1), intArrayOf(0, 1), op, 2),
+                    ),
+                )
+                val reduced: Problem
+                val reconstruct: (Sample) -> Sample
+                if (finite) {
+                    val baked = source.bake()
+                    val delta = AffineSingletons.eliminateAffineSingletons(
+                        baked,
+                        objectiveIntVars = setOf(1, 2),
+                        pivotOrder = AffinePivotOrder.REWRITE_COST,
+                    )
+                    assertFalse(delta.isEmpty)
+                    reduced = baked.withPassDelta(delta, BakeConfig.NONE)
+                    reconstruct = assertNotNull(delta.reconstruct)
+                } else {
+                    val delta = AffineSingletons.eliminateSourceAffineSingletons(
+                        source,
+                        objectiveIntVars = setOf(1, 2),
+                        pivotOrder = AffinePivotOrder.REWRITE_COST,
+                    )
+                    assertFalse(delta.isEmpty)
+                    reduced = assertNotNull(source.withSourcePassDelta(delta))
+                    reconstruct = assertNotNull(delta.rebuild.asSampleLift())
                 }
-                val point = Sample(booleanArrayOf(truth), longArrayOf(0, a, b))
 
-                assertEquals(holds == truth, isFeasible(reduced, point))
-                if (holds == truth) assertTrue(isFeasible(source, reconstruct(point)))
+                for ((a, b) in listOf(0L to 0L, 0L to 1L, 1L to 1L)) {
+                    for (truth in listOf(false, true)) {
+                        val sum = a + 2 * b
+                        val holds = when (op) {
+                            LinearOp.LE -> sum <= 2
+                            LinearOp.EQ -> sum == 2L
+                            LinearOp.GE -> sum >= 2
+                            LinearOp.NE -> sum != 2L
+                        }
+                        val point = Sample(booleanArrayOf(truth), longArrayOf(0, a, b))
+
+                        assertEquals(holds == truth, isFeasible(reduced, point))
+                        if (holds == truth) assertTrue(isFeasible(source, reconstruct(point)))
+                    }
+                }
             }
         }
     }
 
     @Test
     fun `a conditional equality should not supply an asserted affine pivot`() {
-        val source = Problem(1, 2, Array(2) { IntDomain(0, 4) },
-            listOf(ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1)))
+        val source = Problem(
+            1,
+            2,
+            Array(2) { IntDomain(0, 4) },
+            listOf(ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1)),
+        )
 
-        val delta = AffineSingletons.eliminateSourceAffineSingletons(source,
-            pivotOrder = AffinePivotOrder.REWRITE_COST)
+        val delta = AffineSingletons.eliminateSourceAffineSingletons(
+            source,
+            pivotOrder = AffinePivotOrder.REWRITE_COST,
+        )
 
         assertTrue(delta.isEmpty)
     }
 
     @Test
     fun `an overflowing channel coefficient should retain the asserted definition`() {
-        val source = Problem(1, 3, Array(3) { IntDomain(0, 4) }, listOf(
-            Linear(intArrayOf(1, -2, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
-            ReifiedLinear(0, longArrayOf(Long.MAX_VALUE), intArrayOf(0), LinearOp.LE, 1),
-        ))
+        val source = Problem(
+            1,
+            3,
+            Array(3) { IntDomain(0, 4) },
+            listOf(
+                Linear(intArrayOf(1, -2, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                ReifiedLinear(0, longArrayOf(Long.MAX_VALUE), intArrayOf(0), LinearOp.LE, 1),
+            ),
+        )
 
-        val delta = AffineSingletons.eliminateSourceAffineSingletons(source, objectiveIntVars = setOf(1, 2),
-            pivotOrder = AffinePivotOrder.REWRITE_COST)
+        val delta = AffineSingletons.eliminateSourceAffineSingletons(
+            source,
+            objectiveIntVars = setOf(1, 2),
+            pivotOrder = AffinePivotOrder.REWRITE_COST,
+        )
 
         assertTrue(delta.isEmpty)
     }
@@ -154,11 +215,17 @@ class AffineEliminationTest {
             longArrayOf(1, -1) to Long.MIN_VALUE,
             longArrayOf(1, Long.MIN_VALUE) to 0L,
         )) {
-            val source = Problem(0, 2, arrayOf(IntDomain(Long.MIN_VALUE, Long.MIN_VALUE + 1), IntDomain(0, 1)),
-                listOf(Linear(coefficients, intArrayOf(0, 1), LinearOp.EQ, bound)))
+            val source = Problem(
+                0,
+                2,
+                arrayOf(IntDomain(Long.MIN_VALUE, Long.MIN_VALUE + 1), IntDomain(0, 1)),
+                listOf(Linear(coefficients, intArrayOf(0, 1), LinearOp.EQ, bound)),
+            )
 
-            val delta = AffineSingletons.eliminateSourceAffineSingletons(source,
-                pivotOrder = AffinePivotOrder.REWRITE_COST)
+            val delta = AffineSingletons.eliminateSourceAffineSingletons(
+                source,
+                pivotOrder = AffinePivotOrder.REWRITE_COST,
+            )
 
             assertTrue(delta.isEmpty)
         }
@@ -166,22 +233,35 @@ class AffineEliminationTest {
 
     @Test
     fun `overflowing carried bounds should retain the source definition`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(-2, 0), IntDomain(Long.MIN_VALUE, -Long.MAX_VALUE)),
-            listOf(Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, Long.MAX_VALUE)))
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(-2, 0), IntDomain(Long.MIN_VALUE, -Long.MAX_VALUE)),
+            listOf(Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, Long.MAX_VALUE)),
+        )
 
-        val delta = AffineSingletons.eliminateSourceAffineSingletons(source, objectiveIntVars = setOf(1),
-            pivotOrder = AffinePivotOrder.REWRITE_COST)
+        val delta = AffineSingletons.eliminateSourceAffineSingletons(
+            source,
+            objectiveIntVars = setOf(1),
+            pivotOrder = AffinePivotOrder.REWRITE_COST,
+        )
 
         assertTrue(delta.isEmpty)
     }
 
     @Test
     fun `wide residue intermediates should not exclude representable source values`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(0, Long.MAX_VALUE), IntDomain(-1, 1)),
-            listOf(Linear(longArrayOf(2, Long.MAX_VALUE), intArrayOf(0, 1), LinearOp.EQ, Long.MAX_VALUE)))
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, Long.MAX_VALUE), IntDomain(-1, 1)),
+            listOf(Linear(longArrayOf(2, Long.MAX_VALUE), intArrayOf(0, 1), LinearOp.EQ, Long.MAX_VALUE)),
+        )
 
-        val delta = AffineSingletons.eliminateAffineSingletons(source.bake(),
-            pivotOrder = AffinePivotOrder.REWRITE_COST)
+        val delta = AffineSingletons.eliminateAffineSingletons(
+            source.bake(),
+            pivotOrder = AffinePivotOrder.REWRITE_COST,
+        )
 
         assertTrue(delta.isEmpty)
     }
@@ -514,7 +594,7 @@ class AffineEliminationTest {
         val delta = Presolve.eliminateSourceAffineSingletons(
             problem,
             emptySet(),
-            Cancellation.Never,
+            ExecutionControl.Never,
             AffinePivotOrder.MARKOWITZ,
         )
 
@@ -539,7 +619,7 @@ class AffineEliminationTest {
         val delta = Presolve.eliminateSourceAffineSingletons(
             problem,
             emptySet(),
-            Cancellation.Never,
+            ExecutionControl.Never,
             AffinePivotOrder.MARKOWITZ,
         )
 
@@ -563,7 +643,7 @@ class AffineEliminationTest {
         val delta = Presolve.eliminateSourceAffineSingletons(
             problem,
             setOf(1),
-            Cancellation.Never,
+            ExecutionControl.Never,
             AffinePivotOrder.MARKOWITZ,
         )
 

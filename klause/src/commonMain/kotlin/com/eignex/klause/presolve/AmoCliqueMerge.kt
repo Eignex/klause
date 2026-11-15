@@ -6,7 +6,7 @@ import com.eignex.klause.factor.bool.internals.maximalPersistentAmoCliques
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.MutableIntObjectMap
@@ -35,7 +35,7 @@ internal object AmoCliqueMerge {
     /** A clique of at least this size is worth materialising; size 2 is already a single binary clause. */
     private const val MIN_CLIQUE_SIZE = 3
 
-    fun mergeAmoCliques(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta {
+    fun mergeAmoCliques(problem: Problem, cancellation: ExecutionControl = ExecutionControl.Never): PassDelta {
         val factors = problem.factors
         val cliques = maximalPersistentAmoCliques(factors.asList(), cancellation)
             .filter { it.size >= MIN_CLIQUE_SIZE }

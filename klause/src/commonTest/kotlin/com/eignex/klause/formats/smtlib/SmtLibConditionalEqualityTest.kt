@@ -18,7 +18,7 @@ import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.io.StringCharSource
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -152,7 +152,7 @@ class SmtLibConditionalEqualityTest {
         var observedBuilder: Compiler.Builder? = null
         var sourceIntegers = Int.MAX_VALUE
         var completionPolls = 0
-        val stop = Cancellation {
+        val stop = ExecutionControl {
             val current = observedBuilder
             current != null && current.nextInt > sourceIntegers &&
                 (sourceIntegers until current.nextInt).all(images::isDefined) && ++completionPolls == 2

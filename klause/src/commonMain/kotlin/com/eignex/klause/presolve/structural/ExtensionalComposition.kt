@@ -4,7 +4,7 @@ import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.presolve.PassDelta
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 
@@ -26,7 +26,7 @@ internal object ExtensionalComposition {
         val cyclicCells: Int = 65_536,
     )
 
-    private class Meter(val cancellation: Cancellation, val limits: Limits) {
+    private class Meter(val cancellation: ExecutionControl, val limits: Limits) {
         var remaining = limits.work
         var pairRemaining = Int.MAX_VALUE
         var retained = 0
@@ -46,11 +46,7 @@ internal object ExtensionalComposition {
         override fun equals(other: Any?): Boolean = other is Tuple && values.contentEquals(other.values)
     }
 
-    fun reduce(
-        factors: Array<Factor>,
-        cancellation: Cancellation,
-        limits: Limits = Limits(),
-    ): PassDelta {
+    fun reduce(factors: Array<Factor>, cancellation: ExecutionControl, limits: Limits = Limits()): PassDelta {
         val meter = Meter(cancellation, limits)
         val occurrences = HashMap<Int, MutableList<Table>>()
         for (factor in factors) {
@@ -111,7 +107,8 @@ internal object ExtensionalComposition {
 
     private fun intersectCycles(target: Table, neighbors: List<Table>, meter: Meter): ExtensionalIntersection? {
         var current = target
-        for (a in neighbors.indices) for (b in a + 1 until neighbors.size) {
+        for (a in neighbors.indices) {
+            for (b in a + 1 until neighbors.size) {
             meter.pairRemaining = Int.MAX_VALUE
             if (meter.cyclicAttempts >= meter.limits.cyclicAttempts || !meter.visit()) {
                 return if (current === target) null else ExtensionalIntersection.Restricted(current)
@@ -133,6 +130,7 @@ internal object ExtensionalComposition {
             if (next.tuples.size > meter.limits.retainedCells - meter.retained) continue
             meter.retained += next.tuples.size
             current = next
+        }
         }
         return if (current === target) null else ExtensionalIntersection.Restricted(current)
     }
@@ -193,8 +191,11 @@ internal object ExtensionalComposition {
             }
         }
         if (kept.size == left.tuples.size) return null
-        return if (kept.isEmpty()) ExtensionalIntersection.Refuted
-        else ExtensionalIntersection.Restricted(Table(left.xs, kept.toLongArray()))
+        return if (kept.isEmpty()) {
+            ExtensionalIntersection.Refuted
+        } else {
+            ExtensionalIntersection.Restricted(Table(left.xs, kept.toLongArray()))
+        }
     }
 
     internal const val MAX_SCOPE = 64

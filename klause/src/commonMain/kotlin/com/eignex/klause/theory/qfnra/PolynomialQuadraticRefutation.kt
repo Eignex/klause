@@ -16,41 +16,49 @@ import com.eignex.klause.simplex.exact.BigFraction
 internal fun preparePolynomialQuadraticRefutation(
     atoms: List<PolynomialAtom>,
     arithmetic: PolynomialArithmetic,
-): Iterator<Boolean?> = arithmetic.execution.iterator(sequence {
-    val control = QuadraticControl(maximumMatrixCells = null, execution = arithmetic.execution)
-    val candidates = QuadraticCandidates(control)
-    val checker = QuadraticCertification(control)
-    for (atom in atoms) {
-        for (objective in quadraticOrientations(atom, arithmetic)) {
-            val model = quadraticModel(objective.polynomial, arithmetic) ?: continue
-            if (!checker.positiveSemidefinite(model)) continue
-            if (quadraticConflict(model, objective.relation == PolynomialRelation.LT, candidates, checker)) {
-                yield(true)
-                return@sequence
-            }
-            yield(null)
-            val coordinates = objective.polynomial.variables
-            for (premise in atoms) {
-                arithmetic.step()
-                val row = quadraticAffineRow(premise, coordinates, arithmetic) ?: continue
-                try {
-                    val size = model.dimension.toLong() + 2
-                    arithmetic.matrixCells(size, size)
-                } catch (_: PolynomialResourceLimit) {
-                    continue
-                }
-                val constrained = QuadraticModel(model.linear, model.hessian, model.constant, listOf(row))
-                if (quadraticConflict(constrained, objective.relation == PolynomialRelation.LT, candidates, checker)) {
+): Iterator<Boolean?> = arithmetic.execution.iterator(
+    sequence {
+        val control = QuadraticControl(maximumMatrixCells = null, execution = arithmetic.execution)
+        val candidates = QuadraticCandidates(control)
+        val checker = QuadraticCertification(control)
+        for (atom in atoms) {
+            for (objective in quadraticOrientations(atom, arithmetic)) {
+                val model = quadraticModel(objective.polynomial, arithmetic) ?: continue
+                if (!checker.positiveSemidefinite(model)) continue
+                if (quadraticConflict(model, objective.relation == PolynomialRelation.LT, candidates, checker)) {
                     yield(true)
                     return@sequence
                 }
                 yield(null)
+                val coordinates = objective.polynomial.variables
+                for (premise in atoms) {
+                    arithmetic.step()
+                    val row = quadraticAffineRow(premise, coordinates, arithmetic) ?: continue
+                    try {
+                        val size = model.dimension.toLong() + 2
+                        arithmetic.matrixCells(size, size)
+                    } catch (_: PolynomialResourceLimit) {
+                        continue
+                    }
+                    val constrained = QuadraticModel(model.linear, model.hessian, model.constant, listOf(row))
+                    if (quadraticConflict(
+                            constrained,
+                            objective.relation == PolynomialRelation.LT,
+                            candidates,
+                            checker,
+                        )
+                    ) {
+                        yield(true)
+                        return@sequence
+                    }
+                    yield(null)
+                }
             }
+            yield(null)
         }
-        yield(null)
-    }
-    yield(false)
-}.iterator())
+        yield(false)
+    }.iterator(),
+)
 
 private fun quadraticOrientations(atom: PolynomialAtom, arithmetic: PolynomialArithmetic): List<PolynomialAtom> {
     arithmetic.step()
@@ -68,7 +76,10 @@ private fun quadraticModel(polynomial: Polynomial, arithmetic: PolynomialArithme
     var quadratic = false
     for (term in terms) {
         arithmetic.step()
-        val degree = term.monomial.variables.sumOf { arithmetic.step(); term.monomial.exponent(it).toLong() }
+        val degree = term.monomial.variables.sumOf {
+            arithmetic.step()
+            term.monomial.exponent(it).toLong()
+        }
         if (degree > 2) return null
         if (degree == 2L) quadratic = true
     }
@@ -80,11 +91,20 @@ private fun quadraticModel(polynomial: Polynomial, arithmetic: PolynomialArithme
     } catch (_: PolynomialResourceLimit) {
         return null
     }
-    val ids = coordinates.withIndex().associate { arithmetic.step(); it.value to it.index }
-    val linear = MutableList(coordinates.size) { arithmetic.step(); BigFraction.ZERO }
+    val ids = coordinates.withIndex().associate {
+        arithmetic.step()
+        it.value to it.index
+    }
+    val linear = MutableList(coordinates.size) {
+        arithmetic.step()
+        BigFraction.ZERO
+    }
     val hessian = List(coordinates.size) {
         arithmetic.step()
-        MutableList(coordinates.size) { arithmetic.step(); BigFraction.ZERO }
+        MutableList(coordinates.size) {
+            arithmetic.step()
+            BigFraction.ZERO
+        }
     }
     for (term in terms) {
         arithmetic.step()
@@ -97,8 +117,10 @@ private fun quadraticModel(polynomial: Polynomial, arithmetic: PolynomialArithme
                 hessian[i][j] += term.coefficient
                 hessian[j][i] += term.coefficient
             }
+
             term.monomial.exponent(variables.single()) == 2 ->
                 hessian[i][i] += term.coefficient * BigFraction.ofLong(2)
+
             else -> linear[i] += term.coefficient
         }
     }
@@ -117,7 +139,10 @@ private fun quadraticAffineRow(
         PolynomialRelation.NE -> return null
     }
     val reversed = atom.relation == PolynomialRelation.GE || atom.relation == PolynomialRelation.GT
-    val coefficients = MutableList(coordinates.size) { arithmetic.step(); BigFraction.ZERO }
+    val coefficients = MutableList(coordinates.size) {
+        arithmetic.step()
+        BigFraction.ZERO
+    }
     for (term in atom.polynomial.terms) {
         arithmetic.step()
         val variable = term.monomial.variables.singleOrNull()

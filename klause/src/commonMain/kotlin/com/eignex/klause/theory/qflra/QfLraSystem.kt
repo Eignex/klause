@@ -33,7 +33,7 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SourceBoundAtom
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.time.TimeSource
 
 internal class QfLraSystem(private val model: Problem) {
@@ -235,7 +235,7 @@ internal class LiveQfLraSystem(
 
     fun assertComparisons(
         comparisons: List<PremisedSmtComparison>,
-        stop: Cancellation,
+        stop: ExecutionControl,
         committed: (Int) -> Unit,
     ): Boolean {
         if (lp.state == null) return false
@@ -270,7 +270,7 @@ internal class LiveQfLraSystem(
         return !stop() && (batch.flush() || batch.conflict)
     }
 
-    fun affineImplication(comparison: ExactComparison, stop: Cancellation): PartialLinearImplication? {
+    fun affineImplication(comparison: ExactComparison, stop: ExecutionControl): PartialLinearImplication? {
         stop.charge(comparison.terms.size.toLong() + 1L)
         if (stop()) return null
         val key = preparedTerms[comparison.ordered]?.positive ?: return null

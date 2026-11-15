@@ -6,7 +6,7 @@ data class SearchComponentStop(
     val site: Site,
     /** Stop visible before the runner reports a fallback representation decline. */
     val stopCause: SearchStopCause?,
-    /** Cancellation observed at the terminal boundary. */
+    /** ExecutionControl observed at the terminal boundary. */
     val cancelled: Boolean,
     /** Whether the traversal recorded unresolved coverage before producing this terminal. */
     val unresolvedCoverage: Boolean,
@@ -37,7 +37,7 @@ data class SearchComponentStop(
         Restart,
         /** Shared propagation during restart. */
         RestartPropagation,
-        /** Cancellation lifecycle callback. */
-        Cancellation,
+        /** ExecutionControl lifecycle callback. */
+        ExecutionControl,
     }
 }

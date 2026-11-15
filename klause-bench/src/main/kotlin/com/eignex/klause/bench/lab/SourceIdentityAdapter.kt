@@ -12,12 +12,12 @@ import com.eignex.lab.bench.BenchResources
 import com.eignex.lab.bench.BenchResult
 import com.eignex.lab.bench.BenchStatus
 import com.eignex.lab.bench.BenchSuite
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.InterruptedIOException
 import java.nio.file.Files
 import java.security.MessageDigest
 import java.util.HexFormat
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /** Plain-byte identities for selected, hash-verified lab inputs without model execution. */
 fun main(args: Array<String>) {

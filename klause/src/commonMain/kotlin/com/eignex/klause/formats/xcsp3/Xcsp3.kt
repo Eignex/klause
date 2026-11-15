@@ -12,7 +12,7 @@ import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceSemanticsOwner
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.io.CharSource
 import com.eignex.util.io.StringCharSource
 
@@ -48,14 +48,14 @@ object Xcsp3 {
         text: String,
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
         semanticOverrides: SemanticOverrides = SemanticOverrides(),
-    ): Xcsp3Problem = parse(text, settings, semanticOverrides, Cancellation.Never)
+    ): Xcsp3Problem = parse(text, settings, semanticOverrides, ExecutionControl.Never)
 
     /** Decode and lower XCSP3 [text]; [recoveryCancellation] stops optional collective recovery. */
     fun parse(
         text: String,
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
         semanticOverrides: SemanticOverrides = SemanticOverrides(),
-        recoveryCancellation: Cancellation,
+        recoveryCancellation: ExecutionControl,
     ): Xcsp3Problem = parse(StringCharSource(text), settings, semanticOverrides, recoveryCancellation)
 
     /** Decode and lower a streamed XCSP3 [source], retaining only bounded subtrees. */
@@ -63,7 +63,7 @@ object Xcsp3 {
         source: CharSource,
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
         semanticOverrides: SemanticOverrides = SemanticOverrides(),
-    ): Xcsp3Problem = parse(source, settings, semanticOverrides, Cancellation.Never)
+    ): Xcsp3Problem = parse(source, settings, semanticOverrides, ExecutionControl.Never)
 
     /** Decode and lower a streamed XCSP3 [source]; [recoveryCancellation] stops optional collective recovery. */
     @Suppress("SwallowedException")
@@ -71,7 +71,7 @@ object Xcsp3 {
         source: CharSource,
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
         semanticOverrides: SemanticOverrides = SemanticOverrides(),
-        recoveryCancellation: Cancellation,
+        recoveryCancellation: ExecutionControl,
     ): Xcsp3Problem = try {
         Compiler.Builder(settings, xcsp3Semantics.resolve(semanticOverrides), recoveryCancellation).run {
             val reader = XmlReader(source)

@@ -6,7 +6,7 @@ import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.LongArrayList
 import com.eignex.util.collections.LongHashSet
 import com.eignex.util.numbers.BIG_ONE
@@ -16,14 +16,14 @@ import com.eignex.util.numbers.toLongExact
 internal fun lowerGridFiniteDomain(
     factor: RealFiniteDomain,
     column: FloatGridColumn,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): List<Factor>? = lowerGridFiniteValues(factor.size, factor::valueAt, column, cancellation)
 
 internal fun lowerGridFiniteValues(
     size: Int,
     valueAt: (Int) -> Double,
     column: FloatGridColumn,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): List<Factor>? {
     val admitted = LongArrayList()
     val seen = LongHashSet()
@@ -46,5 +46,7 @@ internal fun lowerGridFiniteValues(
     if (cancellation()) return null
     return if (admitted.isEmpty()) {
         listOf(Linear(longArrayOf(1L), intArrayOf(column.coordinate.variable), LinearOp.LE, -1L))
-    } else listOf(Table(intArrayOf(column.coordinate.variable), admitted.toLongArray()))
+    } else {
+        listOf(Table(intArrayOf(column.coordinate.variable), admitted.toLongArray()))
+    }
 }

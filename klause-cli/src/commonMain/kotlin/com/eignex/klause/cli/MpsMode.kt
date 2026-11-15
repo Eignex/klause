@@ -15,7 +15,7 @@ import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.LinearSourceWitness
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.io.openTextFile
 import com.eignex.util.io.useSource
 import com.eignex.util.numbers.BIG_ONE
@@ -90,7 +90,7 @@ private class MpsOutputState(val effectiveDeclarations: Boolean = false) {
     var exactSourceWitness: Boolean? = null
 }
 
-private fun MpsModel.fitsMpsReconstructionBudget(stop: Cancellation): Boolean {
+private fun MpsModel.fitsMpsReconstructionBudget(stop: ExecutionControl): Boolean {
     if (variables.size > 4096) return false
     var remaining = 32768L - variables.size - objective.indices.size
     if (remaining < 0L) return false
@@ -106,7 +106,7 @@ private fun MpsModel.fitsMpsReconstructionBudget(stop: Cancellation): Boolean {
 internal fun renderMpsSourceWitness(
     witness: LinearSourceWitness,
     reconstruct: Boolean,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): String {
     val variables = witness.source.variables
     val original = witness.values
@@ -122,7 +122,7 @@ internal fun renderMpsSourceWitness(
 private fun checkedIntegralMpsSource(
     witness: LinearSourceWitness,
     original: List<BigFraction>,
-    stop: Cancellation,
+    stop: ExecutionControl,
 ): LinearSourceWitness? {
     if (stop()) return null
     val variables = witness.source.variables

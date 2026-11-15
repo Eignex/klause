@@ -16,7 +16,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.random.Random
 import kotlin.test.Test
@@ -35,7 +35,7 @@ class DefinitionalSweepTest {
         )))
 
         val objective = assertIs<FunctionalObjective>(sweep.functionalObjective(
-            LinearObjective(longArrayOf(0, 0, 7)), Cancellation.Never, captureBooleanCosts = true,
+            LinearObjective(longArrayOf(0, 0, 7)), ExecutionControl.Never, captureBooleanCosts = true,
         ))
 
         assertNull(objective.booleanCostSweep)
@@ -49,7 +49,7 @@ class DefinitionalSweepTest {
         )))
 
         val objective = assertIs<FunctionalObjective>(sweep.functionalObjective(
-            LinearObjective(longArrayOf(3, 0, 7)), Cancellation.Never, captureBooleanCosts = true,
+            LinearObjective(longArrayOf(3, 0, 7)), ExecutionControl.Never, captureBooleanCosts = true,
         ))
 
         assertNull(objective.booleanCostSweep)
@@ -64,7 +64,7 @@ class DefinitionalSweepTest {
         )))
 
         val objective = assertIs<FunctionalObjective>(sweep.functionalObjective(
-            LinearObjective(longArrayOf(0, 0, 7)), Cancellation.Never, captureBooleanCosts = true,
+            LinearObjective(longArrayOf(0, 0, 7)), ExecutionControl.Never, captureBooleanCosts = true,
         ))
 
         assertNull(objective.booleanCostSweep)
@@ -130,9 +130,9 @@ class DefinitionalSweepTest {
         val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(10, 20)),
             arrayOf(Element(0, 1, longArrayOf(10, 20), arrIsVars = false, indexOffset = 0)))
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 23
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val view = DefinitionalSweep.infer(problem, intArrayOf(1), emptyList(), stop)
@@ -151,7 +151,7 @@ class DefinitionalSweepTest {
         assignment.setInt(0, 2)
         assignment.setInt(1, 3)
 
-        val sweep = assertNotNull(DefinitionalSweep.withSource(problem, inferred, source, Cancellation.Never))
+        val sweep = assertNotNull(DefinitionalSweep.withSource(problem, inferred, source, ExecutionControl.Never))
         sweep.sweep(assignment, problem.finiteIntDomains(), problem.factors)
 
         assertEquals(6L, assignment.intValue(2))
@@ -162,13 +162,13 @@ class DefinitionalSweepTest {
     fun `interrupted definition inference should discard the view without poisoning a fresh call`() {
         val problem = Problem(0, 5, Array(5) { IntDomain(0, 16) }, labsShapedFactors())
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 8
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val interrupted = DefinitionalSweep.infer(problem, intArrayOf(2, 3, 4), emptyList(), stop)
-        val fresh = DefinitionalSweep.infer(problem, intArrayOf(2, 3, 4), emptyList(), Cancellation.Never)
+        val fresh = DefinitionalSweep.infer(problem, intArrayOf(2, 3, 4), emptyList(), ExecutionControl.Never)
 
         assertNull(interrupted)
         assertEquals(8L, charged)
@@ -181,9 +181,9 @@ class DefinitionalSweepTest {
         val sweep = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(2, 3, 4)))
         val canonical = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 0, 1))
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 8
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val objective = sweep.functionalObjective(canonical, stop)
@@ -206,8 +206,8 @@ class DefinitionalSweepTest {
         )
         var polls = 0
 
-        assertNull(sweep.expandUnitBooleanScope(intArrayOf(0), Cancellation { ++polls == 2 }))
-        val expanded = assertNotNull(sweep.expandUnitBooleanScope(intArrayOf(0), Cancellation.Never))
+        assertNull(sweep.expandUnitBooleanScope(intArrayOf(0), ExecutionControl { ++polls == 2 }))
+        val expanded = assertNotNull(sweep.expandUnitBooleanScope(intArrayOf(0), ExecutionControl.Never))
 
         assertEquals((0..300).toList(), expanded.toList())
     }

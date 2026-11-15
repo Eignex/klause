@@ -15,7 +15,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -112,17 +112,20 @@ class ImplicationGraphTest {
             ),
         )
 
-        val delta = Presolve.reduceSourceImplicationGraph(problem, Cancellation.Never, emptySet())
+        val delta = Presolve.reduceSourceImplicationGraph(problem, ExecutionControl.Never, emptySet())
 
         val reduced = assertNotNull(problem.withSourcePassDelta(delta))
         assertTrue(reduced.factors.none { 1 in it.boolVars })
         val lifted = booleanArrayOf(true, false).also { delta.rebuild.rebuildInto(it) }
         assertEquals(listOf(true, true), lifted.toList())
     }
+
     @Test
     fun `unused and root fixed columns should not starve equivalence harvesting`() {
         val problem = Problem(
-            8, 0, emptyArray(),
+            8,
+            0,
+            emptyArray(),
             listOf(
                 Clause(intArrayOf(Lit.make(4, true))),
                 Clause(intArrayOf(Lit.make(4, false), Lit.make(5, true))),
@@ -142,7 +145,7 @@ class ImplicationGraphTest {
         val problem = Problem(16, 0, emptyArray(), emptyList()).bake()
         val budget = PresolveBudget(Long.MAX_VALUE)
 
-        val delta = Presolve.reduceImplicationGraph(problem, 4, budget.orSpent(Cancellation.Never))
+        val delta = Presolve.reduceImplicationGraph(problem, 4, budget.orSpent(ExecutionControl.Never))
 
         assertTrue(delta.isEmpty)
         assertEquals(0L, budget.rootConstructionEntries)
@@ -152,13 +155,19 @@ class ImplicationGraphTest {
     fun `graph construction and SCC discovery should stop at the next metered visit`() {
         val pairs = listOf(0 to 1, 1 to 0) + (2 until 16).map { 2 to (it + 1) }
         val problem = Problem(
-            17, 0, emptyArray(),
+            17,
+            0,
+            emptyArray(),
             pairs.map { (a, b) -> Clause(intArrayOf(Lit.make(a, false), Lit.make(b, true))) },
         )
         for (allowance in listOf(1L, 31L, 491L, 681L, 1001L)) {
             val budget = PresolveBudget(allowance)
 
-            val delta = Presolve.reduceSourceImplicationGraph(problem, budget.orSpent(Cancellation.Never), emptySet())
+            val delta = Presolve.reduceSourceImplicationGraph(
+                problem,
+                budget.orSpent(ExecutionControl.Never),
+                emptySet(),
+            )
 
             assertTrue(delta.isEmpty, "allowance=$allowance")
             assertTrue(delta.rebuild.isEmpty)
@@ -170,14 +179,18 @@ class ImplicationGraphTest {
     fun `interrupted reachability should keep the candidate clause and its implications`() {
         val pairs = listOf(0 to 9) + (0 until 8).map { it to (it + 1) }
         val problem = Problem(
-            10, 0, emptyArray(),
+            10,
+            0,
+            emptyArray(),
             pairs.map { (a, b) -> Clause(intArrayOf(Lit.make(a, false), Lit.make(b, true))) },
         )
         for (allowance in listOf(1851L, 1901L, 1951L)) {
             val budget = PresolveBudget(allowance)
 
             val delta = Presolve.reduceSourceImplicationGraph(
-                problem, budget.orSpent(Cancellation.Never), (0 until 10).toSet(),
+                problem,
+                budget.orSpent(ExecutionControl.Never),
+                (0 until 10).toSet(),
             )
 
             assertTrue(delta.isEmpty, "allowance=$allowance")
@@ -191,14 +204,16 @@ class ImplicationGraphTest {
     @Test
     fun `external cancellation during graph analysis should publish no incomplete merges`() {
         val problem = Problem(
-            128, 0, emptyArray(),
+            128,
+            0,
+            emptyArray(),
             listOf(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(0, true))),
             ),
         )
         var polls = 0
-        val token = Cancellation { ++polls == 5 }
+        val token = ExecutionControl { ++polls == 5 }
 
         val delta = Presolve.reduceSourceImplicationGraph(problem, token, emptySet())
 

@@ -9,16 +9,16 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.parseBigInt
-import java.math.BigInteger
-import java.security.MessageDigest
-import java.util.HexFormat
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import java.math.BigInteger
+import java.security.MessageDigest
+import java.util.HexFormat
 
 @Serializable
 internal data class ResidualCutoff(
@@ -87,7 +87,7 @@ internal object ResidualSnapshots {
         sourceIdentity: JsonObject,
         preparationIdentity: JsonObject,
         cutoff: ResidualCutoff?,
-        stop: Cancellation,
+        stop: ExecutionControl,
         maxBytes: Int,
     ): ResidualCapture {
         if (stop()) return ResidualCapture(null, "interrupted")
@@ -178,7 +178,7 @@ internal object ResidualSnapshots {
             mapping.binarySearch(v).let { local -> if (local < 0) -1 else local }
         }
         require(snapshot.preparedToResidual == inverse) { "inverse mapping mismatch" }
-        val clauses = sourceClauses(prepared, snapshot.values, Cancellation.Never)
+        val clauses = sourceClauses(prepared, snapshot.values, ExecutionControl.Never)
         require(snapshot.residualClauses == clauses) { "residual clauses mismatch" }
         require(snapshot.sourceComponents == components(clauses.map { clause -> clause.map(Lit::variable) })) {
             "source membership mismatch"
@@ -190,7 +190,7 @@ internal object ResidualSnapshots {
             snapshot.boolWeights, snapshot.values, clauses,
         ).toString()) { "isolated objective mismatch" }
         val all = enforcing(prepared, snapshot.values, snapshot.learned, snapshot.boolWeights,
-            snapshot.objectiveConstant, snapshot.activeCutoff, Cancellation.Never)
+            snapshot.objectiveConstant, snapshot.activeCutoff, ExecutionControl.Never)
         require(snapshot.enforcingComponents == components(all.map(::support))) { "enforcing membership mismatch" }
         val remapping = VarRemap(inverse.toIntArray(), IntArray(0))
         val expected = model(mapping.size, all.map { it.remap(remapping) })
@@ -228,7 +228,7 @@ internal object ResidualSnapshots {
         return vertices.groupBy(::root).values.map { it.sorted() }.sortedBy { it.first() }
     }
 
-    private fun sourceClauses(prepared: Problem, values: List<Boolean?>, stop: Cancellation): List<List<Int>> =
+    private fun sourceClauses(prepared: Problem, values: List<Boolean?>, stop: ExecutionControl): List<List<Int>> =
         prepared.factors.mapNotNull { factor ->
             check(!stop()) { "interrupted" }
             val clause = factor as Clause
@@ -245,7 +245,7 @@ internal object ResidualSnapshots {
         weights: List<Long>,
         constant: Long,
         cutoff: ResidualCutoff?,
-        stop: Cancellation,
+        stop: ExecutionControl,
     ): List<Factor> {
         val factors = prepared.factors.toMutableList()
         for (entry in learned) {

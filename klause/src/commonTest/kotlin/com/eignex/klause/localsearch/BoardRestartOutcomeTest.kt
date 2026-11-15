@@ -15,7 +15,7 @@ import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -219,7 +219,7 @@ class BoardRestartOutcomeTest {
                     maxFlips = 2L, randomSeed = seed,
                     initialAssignment = Sample(BooleanArray(0), LongArray(32) { if (it == 1) 1L else 0L }),
                 ),
-            ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+            ).use { handle -> handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
         }
 
         assertEquals(8, outcomes.size)
@@ -250,12 +250,12 @@ class BoardRestartOutcomeTest {
             ),
         ).use { handle ->
             assertNull(handle.runSlice(
-                Cancellation { policy.incumbents.isNotEmpty() && ++polls >= 3 }, Long.MAX_VALUE, -1L,
+                ExecutionControl { policy.incumbents.isNotEmpty() && ++polls >= 3 }, Long.MAX_VALUE, -1L,
             ) {})
             assertNull(policy.lastBoardRestartOutcome)
             assertEquals(0L, policy.changedBoardRestarts + policy.declinedBoardRestarts)
 
-            val result = assertNotNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
+            val result = assertNotNull(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {})
 
             assertNotNull(policy.lastBoardRestartOutcome)
             assertEquals(1.0, result.stats.ls.boardRestartChanges.sum + result.stats.ls.boardRestartDeclines.sum)
@@ -285,7 +285,7 @@ class BoardRestartOutcomeTest {
                 LinearObjective(), LocalSearchParams(
                     maxFlips = 2L, randomSeed = seed, initialAssignment = Sample(BooleanArray(0), longArrayOf(0, 1, 2)),
                 ),
-            ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+            ).use { handle -> handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
         }
 
         assertEquals(8, outcomes.size)
@@ -325,7 +325,7 @@ class BoardRestartOutcomeTest {
                 maxFlips = 3L, randomSeed = 7L, initialAssignment = Sample(BooleanArray(0), longArrayOf(0, 1, 2)),
             ),
         ).use { handle ->
-            val result = assertNotNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
+            val result = assertNotNull(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {})
 
             assertEquals(BoardRestartOutcome.DeclinedUnchanged, policy.lastBoardRestartOutcome)
             assertEquals(3.0, result.stats.ls.boardRestartDeclines.sum)

@@ -4,7 +4,7 @@ import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.ir.PolynomialRealFormula
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -29,12 +29,12 @@ internal object PolynomialWitnessProbeProfile {
         Reports.writeJson(File(out, "provenance.json").path, InstalledBuild.reference)
         File(out, "settings.json").writeText(
             buildJsonObject {
-            put("revision", Reports.readGitSha())
-            put("javaCores", Runtime.getRuntime().availableProcessors())
-            put("jvmOptions", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
-            put("containingTimeoutMs", 60000)
-            put("completionBoundary", "query-probe-completed")
-        }.toString() + "\n"
+                put("revision", Reports.readGitSha())
+                put("javaCores", Runtime.getRuntime().availableProcessors())
+                put("jvmOptions", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
+                put("containingTimeoutMs", 60000)
+                put("completionBoundary", "query-probe-completed")
+            }.toString() + "\n",
         )
         val access = ProbeAccess()
         for ((index, source) in cases.withIndex()) {
@@ -61,7 +61,7 @@ internal object PolynomialWitnessProbeProfile {
         private val parse = parser.getMethod(
             "parse",
             String::class.java,
-            Cancellation::class.java,
+            ExecutionControl::class.java,
             Boolean::class.javaPrimitiveType,
             Boolean::class.javaPrimitiveType,
         )
@@ -73,9 +73,16 @@ internal object PolynomialWitnessProbeProfile {
         private val paramsType = Class.forName(prefix + "QfNraParams")
         private val conditionType = Class.forName(prefix + "PolynomialCondition")
         private val queryType = Class.forName(prefix + "QfNraQuery")
-        private val params = paramsType.getConstructor(Cancellation::class.java, Long::class.javaObjectType, limitsType,
-            Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType,
-            Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType)
+        private val params = paramsType.getConstructor(
+            ExecutionControl::class.java,
+            Long::class.javaObjectType,
+            limitsType,
+            Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+        )
         private val condition = conditionType.getConstructor(Map::class.java, Map::class.java, Map::class.java)
         private val query = queryType.getConstructor(
             PolynomialRealFormula::class.java,
@@ -109,7 +116,7 @@ internal object PolynomialWitnessProbeProfile {
         }
 
         fun measure(text: String, observed: Boolean, chargeStacks: Boolean = false): ProbeRecord {
-            val source = parse.invoke(parser.getField("INSTANCE").get(null), text, Cancellation.Never, false, false)
+            val source = parse.invoke(parser.getField("INSTANCE").get(null), text, ExecutionControl.Never, false, false)
             val sourceFormula = formula.invoke(source)
             val fixed = fixings.invoke(null, sourceFormula, {})
             val stops = ArrayList<ProbeStop>()
@@ -118,19 +125,19 @@ internal object PolynomialWitnessProbeProfile {
             val charges = LinkedHashMap<String, Long>()
             val meter = if (observed && chargeStacks) {
                 WorkMeter { units ->
-                val frames = Thread.currentThread().stackTrace.filter {
-                    it.className.startsWith("com.eignex.klause.") &&
-                        !it.className.startsWith("com.eignex.klause.bench.") &&
-                        !it.className.startsWith("com.eignex.klause.util.") &&
-                        it.className != prefix + "QfNraWork"
-                }.joinToString("\n") { it.toString() }
-                charges[frames] = (charges[frames] ?: 0L) + units
-            }
+                    val frames = Thread.currentThread().stackTrace.filter {
+                        it.className.startsWith("com.eignex.klause.") &&
+                            !it.className.startsWith("com.eignex.klause.bench.") &&
+                            !it.className.startsWith("com.eignex.klause.util.") &&
+                            it.className != prefix + "QfNraWork"
+                    }.joinToString("\n") { it.toString() }
+                    charges[frames] = (charges[frames] ?: 0L) + units
+                }
             } else {
                 null
             }
-            val observer = object : Cancellation {
-                override fun workMeter(): WorkMeter? = meter
+            val observer = object : ExecutionControl() {
+                override val accounting: WorkMeter? get() = meter
                 override fun isCancelled(): Boolean {
                     val current = owner
                     if (observed && current != null && !captured) {
@@ -143,7 +150,7 @@ internal object PolynomialWitnessProbeProfile {
                 }
             }
             val settings = params.newInstance(
-                observer or Cancellation.after(60.seconds),
+                observer or ExecutionControl.after(60.seconds),
                 null,
                 limitsType.getConstructor().newInstance(),
                 false,

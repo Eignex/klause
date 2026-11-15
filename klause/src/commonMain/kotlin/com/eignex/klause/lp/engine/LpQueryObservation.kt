@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal enum class LpQueryRoute { SESSION, SCOPED_FLOAT, SCOPED_CONTINUATION }
 
@@ -36,7 +36,7 @@ internal class LpQueryObservation(
         valueLimit: Int,
         byteLimit: Int,
         maxRetainedRows: Int,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): ByteArray? {
         require(valueLimit >= 0 && byteLimit >= 0 && maxRetainedRows >= 0)
         val current = model

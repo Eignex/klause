@@ -27,7 +27,7 @@ import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncoderProvider
 import com.eignex.klause.theory.EncoderSupport
 import com.eignex.klause.theory.EncodingTarget
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -59,7 +59,7 @@ class LeafRealCompletionTest {
         val completion = LeafRealCompletion(
             problem,
             objective = null,
-        ).complete(candidate(2, 0.4999999), Cancellation.Never)
+        ).complete(candidate(2, 0.4999999), ExecutionControl.Never)
 
         val witness = assertIs<Completion.Witness>(completion)
         assertEquals(BigFraction.ofDouble(0.5), witness.sample.exactReals?.get(0))
@@ -69,7 +69,10 @@ class LeafRealCompletionTest {
     @Test
     fun `a refutation should name the rows its proof combines`() {
         // k = 0 forces x = 2.5 through the first row, which the second row's x ≤ 1 forbids.
-        val completion = LeafRealCompletion(problem, objective = null).complete(candidate(0, 1.0), Cancellation.Never)
+        val completion = LeafRealCompletion(problem, objective = null).complete(
+            candidate(0, 1.0),
+            ExecutionControl.Never,
+        )
 
         val refuted = assertIs<Completion.Refuted>(completion)
         assertEquals(setOf(0, 1), refuted.factors.toSet())
@@ -79,9 +82,9 @@ class LeafRealCompletionTest {
     fun `repeated completion should validate each candidate's finite pins`() {
         val completion = LeafRealCompletion(problem, objective = null)
 
-        val first = completion.complete(candidate(2, 0.4), Cancellation.Never)
-        val rejected = completion.complete(candidate(0, 0.4), Cancellation.Never)
-        val repeated = completion.complete(candidate(2, 0.4), Cancellation.Never)
+        val first = completion.complete(candidate(2, 0.4), ExecutionControl.Never)
+        val rejected = completion.complete(candidate(0, 0.4), ExecutionControl.Never)
+        val repeated = completion.complete(candidate(2, 0.4), ExecutionControl.Never)
 
         assertEquals(BigFraction.ofDouble(0.5), assertIs<Completion.Witness>(first).sample.exactReals?.single())
         assertIs<Completion.Refuted>(rejected)
@@ -92,8 +95,8 @@ class LeafRealCompletionTest {
     fun `a cancelled preparation should leave a later completion available`() {
         val completion = LeafRealCompletion(problem, objective = null)
 
-        val stopped = completion.complete(candidate(2, 0.4), Cancellation { true })
-        val resumed = completion.complete(candidate(2, 0.4), Cancellation.Never)
+        val stopped = completion.complete(candidate(2, 0.4), ExecutionControl { true })
+        val resumed = completion.complete(candidate(2, 0.4), ExecutionControl.Never)
 
         assertIs<Completion.Undecided>(stopped)
         assertEquals(BigFraction.ofDouble(0.5), assertIs<Completion.Witness>(resumed).sample.exactReals?.single())
@@ -101,14 +104,20 @@ class LeafRealCompletionTest {
 
     @Test
     fun `conditioned completion should install the current integer operand`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 1)),
-            arrayOf(RealProduct(0, 0, 1, 1.0, 1.0)), numRealVars = 2,
-            realLower = doubleArrayOf(1.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 1)),
+            arrayOf(RealProduct(0, 0, 1, 1.0, 1.0)),
+            numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
+        )
         val completion = LeafRealCompletion(source, objective = null)
 
         for (pin in listOf(0L, 1L, 0L)) {
             val sample = Sample(booleanArrayOf(), longArrayOf(pin), doubleArrayOf(1.0, 0.5))
-            val result = completion.complete(sample, Cancellation.Never)
+            val result = completion.complete(sample, ExecutionControl.Never)
 
             assertEquals(BigFraction.ofLong(pin), assertIs<Completion.Witness>(result).sample.exactReals?.get(1))
         }
@@ -116,19 +125,26 @@ class LeafRealCompletionTest {
 
     @Test
     fun `custom linear encoders should retain candidate-specific declines`() {
-        val projections = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-            val selected = BuiltInEncoderProvider.select(factor, target)
-            if (target != EncodingTarget.LINEAR) selected else {
-                Encoder(EncoderSupport.CONDITIONED, listOf(SourceIntId(0))) { view, encoding ->
-                    if (encoding.fixedInteger(SourceIntId(0)) == bigIntOf(0)) EncoderDecline.UNSUPPORTED
-                    else selected.install(view, encoding)
+        val projections = FactorProjectionProviders(
+            encoder = EncoderProvider { factor, target ->
+                val selected = BuiltInEncoderProvider.select(factor, target)
+                if (target != EncodingTarget.LINEAR) {
+                    selected
+                } else {
+                    Encoder(EncoderSupport.CONDITIONED, listOf(SourceIntId(0))) { view, encoding ->
+                        if (encoding.fixedInteger(SourceIntId(0)) == bigIntOf(0)) {
+                            EncoderDecline.UNSUPPORTED
+                        } else {
+                            selected.install(view, encoding)
+                        }
+                    }
                 }
-            }
-        }).prepare(problem)
+            },
+        ).prepare(problem)
         val encoding = LinearCompletionEncoding(projections)
 
-        val accepted = encoding.modelFor(candidate(2, 0.5), Cancellation.Never)
-        val declined = encoding.modelFor(candidate(0, 0.5), Cancellation.Never)
+        val accepted = encoding.modelFor(candidate(2, 0.5), ExecutionControl.Never)
+        val declined = encoding.modelFor(candidate(0, 0.5), ExecutionControl.Never)
 
         assertNotNull(accepted)
         assertNull(declined)
@@ -160,7 +176,7 @@ class LeafRealCompletionTest {
 
         val cp = leafRealFeasibility(source.model, objective, sample, context = context, toleranceCheck = check)
         val completion = LeafRealCompletion(source.model, objective, check, context)
-            .complete(sample, Cancellation.Never)
+            .complete(sample, ExecutionControl.Never)
 
         assertEquals(LpVerdict.TOLERANCE_OPTIMUM, cp.verdict)
         val witness = assertIs<Completion.Witness>(completion)
@@ -183,7 +199,7 @@ class LeafRealCompletionTest {
 
         for (check in checks) {
             val completion = LeafRealCompletion(problem, objective, check, context)
-                .complete(candidate(2, 0.4), Cancellation.Never)
+                .complete(candidate(2, 0.4), ExecutionControl.Never)
 
             assertTrue(assertIs<Completion.Undecided>(completion).work > 0L)
         }
@@ -197,7 +213,7 @@ class LeafRealCompletionTest {
             LinearObjective(realCoefficients = doubleArrayOf(1.0)),
             toleranceCheck = { ++calls == 1 },
         )
-            .complete(candidate(2, 0.4), Cancellation.Never)
+            .complete(candidate(2, 0.4), ExecutionControl.Never)
 
         assertIs<Completion.Undecided>(completion)
         assertEquals(2, calls)
@@ -214,7 +230,7 @@ class LeafRealCompletionTest {
                 true
             },
         )
-            .complete(candidate(2, 0.4), Cancellation { stopped })
+            .complete(candidate(2, 0.4), ExecutionControl { stopped })
 
         assertTrue(assertIs<Completion.Undecided>(completion).work > 0L)
     }
@@ -230,16 +246,18 @@ class LeafRealCompletionTest {
         val linear = assertNotNull(parsed.toLinearSourceProblem())
         val objective = source.objective!!.toLinearObjective().negated()
         val check: (Sample) -> Boolean = { sample ->
-            linear.checkMpsWitness(source.columns.mapNotNull {
-                if (it.real) BigFraction.ofDouble(sample.reals[it.id]) else BigFraction.ofLong(sample.ints[it.id])
-            }) != null
+            linear.checkMpsWitness(
+                source.columns.mapNotNull {
+                    if (it.real) BigFraction.ofDouble(sample.reals[it.id]) else BigFraction.ofLong(sample.ints[it.id])
+                },
+            ) != null
         }
 
         for (tolerance in listOf(false, true)) {
             for (pin in listOf(0L, 1L, 0L)) {
                 val sample = Sample(booleanArrayOf(), longArrayOf(pin), doubleArrayOf(0.5))
                 val completion = LeafRealCompletion(source.model, objective, check.takeIf { tolerance })
-                    .complete(sample, Cancellation.Never)
+                    .complete(sample, ExecutionControl.Never)
 
                 val witness = assertIs<Completion.Witness>(completion).sample
                 assertEquals(pin, witness.ints.single())

@@ -8,7 +8,8 @@ import com.eignex.klause.ir.impliedLinearRows
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkMeter
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
@@ -34,18 +35,16 @@ internal object EqualityKernelReplay {
         view: TrajectoryView,
         file: File,
         score: (Sample) -> BigFraction,
-        cancellation: Cancellation = Cancellation.Never,
-        verify: (Sample, Cancellation) -> Boolean,
+        cancellation: ExecutionControl = ExecutionControl.Never,
+        verify: (Sample, ExecutionControl) -> Boolean,
     ): Map<String, IntArray> {
         val started = System.nanoTime()
         val allocated = trajectoryThreadBytes()
         var work = 0L
-        val clock = Cancellation.after(2.seconds) or cancellation
-        val stop = object : Cancellation {
+        val clock = ExecutionControl.after(2.seconds) or cancellation
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= MAX_WORK || clock()
-            override fun charge(units: Long) {
-                work += units
-            }
+            override val accounting = WorkMeter { units -> work += units }
         }
         val matrix = matrix(view, stop)
         val center = view.reconstruct(view.state.assignment.snapshot())
@@ -136,7 +135,7 @@ internal object EqualityKernelReplay {
         return consumedScopes
     }
 
-    private fun matrix(view: TrajectoryView, stop: Cancellation): Matrix? {
+    private fun matrix(view: TrajectoryView, stop: ExecutionControl): Matrix? {
         val state = view.state
         if (state.problem.semantics.effective.feasibilityTolerance?.isExact == false) return null
         val sparse = ArrayList<Map<Int, BigInteger>>()
@@ -167,7 +166,7 @@ internal object EqualityKernelReplay {
         return Matrix(columns, sparse.map { row -> Array(columns.size) { row[columns[it]] ?: zero } })
     }
 
-    private fun hermite(matrix: Matrix, stop: Cancellation): List<Array<BigInteger>>? {
+    private fun hermite(matrix: Matrix, stop: ExecutionControl): List<Array<BigInteger>>? {
         val rowType = Class.forName("com.eignex.klause.lp.lattice.SparseIntRow")
         val constructor = rowType.constructors.single()
         val rows = matrix.rows.map { row ->
@@ -199,7 +198,7 @@ internal object EqualityKernelReplay {
         return result
     }
 
-    private fun network(matrix: Matrix, view: TrajectoryView, stop: Cancellation): List<Array<BigInteger>>? {
+    private fun network(matrix: Matrix, view: TrajectoryView, stop: ExecutionControl): List<Array<BigInteger>>? {
         val incidence = matrix.columns.indices.map { column ->
             matrix.rows.indices.filter {
                 matrix.rows[it][column] != zero
@@ -284,8 +283,8 @@ internal object EqualityKernelReplay {
         matrix: Matrix,
         direction: Array<BigInteger>,
         view: TrajectoryView,
-        stop: Cancellation,
-        check: (Sample, Cancellation) -> Boolean,
+        stop: ExecutionControl,
+        check: (Sample, ExecutionControl) -> Boolean,
         improving: (Move, Sample) -> Unit,
     ) = buildJsonArray {
         val state = view.state

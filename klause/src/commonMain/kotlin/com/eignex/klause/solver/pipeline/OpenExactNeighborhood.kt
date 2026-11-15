@@ -22,7 +22,7 @@ import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.EncodedTheoryFactor
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
@@ -35,30 +35,36 @@ internal class OpenExactNeighborhood(
     private val objective: LinearObjective? = null,
     preparedSource: PreparedSourcePlan? = null,
     private val invocation: () -> EngineInvocation? = { null },
-) : ExactNeighborhoodCompletion, AutoCloseable {
+) : ExactNeighborhoodCompletion,
+    AutoCloseable {
     private val basePreparation = preparedSource
-    private val witnessProjection = PropagationProblem(model,
-        preparedSource?.factorProjections?.forEngineView(model) ?: model.selectedFactorProjections())
+    private val witnessProjection = PropagationProblem(
+        model,
+        preparedSource?.factorProjections?.forEngineView(model) ?: model.selectedFactorProjections(),
+    )
     private var prepared: PreparedSourcePlan? = null
     private var components: PreparedSearchComponents? = null
     private var encodingPreparationWork = 0L
 
-    private fun prepare(stop: Cancellation): PreparedSearchComponents? {
+    private fun prepare(stop: ExecutionControl): PreparedSearchComponents? {
         components?.let { return it }
         if (stop()) return null
-        val construction = object : Cancellation {
+        val construction = object : ExecutionControl() {
             override fun isCancelled(): Boolean = stop()
             override fun deadline() = stop.deadline()
-            override fun workMeter(): WorkMeter = WorkMeter { units ->
+            override val accounting: WorkMeter = WorkMeter { units ->
                 encodingPreparationWork += units
                 stop.charge(units)
             }
         }
         val retained = prepared ?: basePreparation?.takeUnless { it.decline == PreparedPlanDecline.RESOURCE }
-        val source = (retained ?: model.prepareExecutionPlan(
-            basePreparation?.factorProjections?.providers ?: model.selectedFactorProjections().providers,
-            objective, cancellation = construction,
-        )).prepareConditionedLinearQuery(construction) ?: return null
+        val source = (
+            retained ?: model.prepareExecutionPlan(
+                basePreparation?.factorProjections?.providers ?: model.selectedFactorProjections().providers,
+                objective,
+                cancellation = construction,
+            )
+            ).prepareConditionedLinearQuery(construction) ?: return null
         if (stop()) return null
         val projection = requireNotNull(source.execution.finiteLinear)
         val working = projection.model
@@ -73,8 +79,11 @@ internal class OpenExactNeighborhood(
     private val queries = RetainedLinearQueries(model, params, objective, hints = { stop, state ->
         val source = prepared
         val projection = source?.execution?.finiteLinear
-        if (projection == null) SearchCandidateHints.None
-        else state.candidateHints(projection.ownership, projection.model, stop)
+        if (projection == null) {
+            SearchCandidateHints.None
+        } else {
+            state.candidateHints(projection.ownership, projection.model, stop)
+        }
     }, open = ::open)
     val exhausted: Boolean get() = queries.exhausted
     val declined: Boolean get() = queries.declined
@@ -89,47 +98,79 @@ internal class OpenExactNeighborhood(
         }
     }
 
-    private fun open(stop: Cancellation, state: OpenTheorySolveState): PlannedSearch? {
+    private fun open(stop: ExecutionControl, state: OpenTheorySolveState): PlannedSearch? {
         val source = prepare(stop) ?: return null
         if (!source.prepareSource(stop)) return null
-        return source.open(maxChecks = params.maxLeaves, cancellation = stop,
+        return source.open(
+            maxChecks = params.maxLeaves,
+            cancellation = stop,
             learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
-            smtStats = state.smt, theorySolveStop = stop, openHintFlips = params.openHintFlips)
+            smtStats = state.smt,
+            theorySolveStop = stop,
+            openHintFlips = params.openHintFlips,
+        )
     }
 
-    fun <T> withCondition(condition: ExactNeighborhoodCondition, cancellation: Cancellation, action: () -> T): T =
+    fun <T> withCondition(condition: ExactNeighborhoodCondition, cancellation: ExecutionControl, action: () -> T): T =
         queries.withCondition(condition, cancellation, action)
 
     override fun check(
         condition: ExactNeighborhoodCondition,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): ExactNeighborhoodResult {
         val result = queries.check(condition, cancellation)
         if (result !is ExactNeighborhoodResult.Witness) return result
-        if ((params.timeout or params.cancellation or cancellation)()) return ExactNeighborhoodResult.Undecided
+        if ((
+                params.timeout.withAccounting(
+                    cancellation,
+                ) or params.cancellation or cancellation
+                )()
+        ) {
+            return ExactNeighborhoodResult.Undecided
+        }
         val sample = result.sample
         val checked = try {
             if (sample.exactInts?.any { !it.fitsLong() } == true ||
                 model.factors.any { it is ExactSearchRow || it is EncodedTheoryFactor }
             ) {
-                verifyRealCoordinates(model, sample, params.timeout or params.cancellation or cancellation)
+                verifyRealCoordinates(
+                    model,
+                    sample,
+                    params.timeout.withAccounting(cancellation) or params.cancellation or cancellation,
+                )
             } else {
-                verifyOpenWitness(model, sample,
-                    params.timeout or params.cancellation or cancellation, witnessProjection)
+                verifyOpenWitness(
+                    model,
+                    sample,
+                    params.timeout.withAccounting(cancellation) or params.cancellation or cancellation,
+                    witnessProjection,
+                )
             }
         } catch (_: CancellationException) {
             return ExactNeighborhoodResult.Undecided
         }
-        if (checked !is Verification.Accepted || (params.timeout or params.cancellation or cancellation)()) {
+        if (checked !is Verification.Accepted || (
+                params.timeout.withAccounting(
+                    cancellation,
+                ) or params.cancellation or cancellation
+                )()
+        ) {
             return ExactNeighborhoodResult.Undecided
         }
         sample.witnessCertificate = invocation()?.let { binding ->
-            require(binding.model.matches(ModelIdentity.of(model, objective)) &&
-                (binding.sourceModel.sameModel(ModelIdentity.of(model)) || binding.preparedPlan.model === model)) {
+            require(
+                binding.model.matches(ModelIdentity.of(model, objective)) &&
+                    (binding.sourceModel.sameModel(ModelIdentity.of(model)) || binding.preparedPlan.model === model),
+            ) {
                 "neighborhood witness invocation has a different source objective"
             }
-            EvidenceCertificate.published(CompletedEnginePublication.Witness(binding, sample,
-                binding.executionObjective?.evaluateExact(sample)?.toDouble()))
+            EvidenceCertificate.published(
+                CompletedEnginePublication.Witness(
+                    binding,
+                    sample,
+                    binding.executionObjective?.evaluateExact(sample)?.toDouble(),
+                ),
+            )
         }
         return result
     }
@@ -145,15 +186,16 @@ internal class OpenExactNeighborhood(
         nativeWork: () -> Long = { work },
         completionStats: () -> SolveStats = { stats },
         onClose: () -> Unit = ::close,
-    ): ExactNeighborhood =
-        ExactNeighborhood(model.numBoolVars, centers(), completion, objective,
-            coordinateValues = { sample -> coordinates(sample) }, adaptive = adaptive, seed = seed,
-            nodeBudget = params.nodeBudget?.allowance, maximumMoves = minOf(maximumMoves, params.maxFlips),
-            maximumInstructions = params.maxInstructions ?: Long.MAX_VALUE,
-            maximumImprovementMoves = maximumImprovementMoves, nativeWork = nativeWork,
-            completionStats = completionStats, onClose = onClose,
-            prepareBooleanCenter = if (completion === this) queries::prepareBooleanCenter else null,
-            rootBooleanValue = queries::rootBooleanValue)
+    ): ExactNeighborhood = ExactNeighborhood(
+        model.numBoolVars, centers(), completion, objective,
+        coordinateValues = { sample -> coordinates(sample) }, adaptive = adaptive, seed = seed,
+        nodeBudget = params.nodeBudget?.allowance, maximumMoves = minOf(maximumMoves, params.maxFlips),
+        maximumInstructions = params.maxInstructions ?: Long.MAX_VALUE,
+        maximumImprovementMoves = maximumImprovementMoves, nativeWork = nativeWork,
+        completionStats = completionStats, onClose = onClose,
+        prepareBooleanCenter = if (completion === this) queries::prepareBooleanCenter else null,
+        rootBooleanValue = queries::rootBooleanValue,
+    )
 
     private fun coordinates(sample: Sample): List<BigFraction> =
         List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) } + sample.exactReals.orEmpty()
@@ -170,15 +212,17 @@ internal class OpenExactNeighborhood(
             BigFraction.ofDouble(model.realLower[id])?.let { centers[coordinate] = greater(centers[coordinate], it) }
             BigFraction.ofDouble(model.realUpper[id])?.let { centers[coordinate] = lesser(centers[coordinate], it) }
         }
-        for (factor in model.factors) for (row in factor.linearRows) {
-            if (row.size != 1 || row.activator >= 0 || row.relation != LinearOp.EQ) continue
-            val constants = row.constants as? IntegralConstants ?: continue
-            val coefficient = constants.exactCoeff(0)
-            if (coefficient == bigIntOf(0)) continue
-            val value = BigFraction.of(constants.exactBound, coefficient)
-            val ref = row.ref(0)
-            if (Term.isInt(ref) && value.den == BIG_ONE) centers[Term.intVar(ref)] = value
-            if (Term.isReal(ref)) centers[model.numIntVars + Term.realVar(ref)] = value
+        for (factor in model.factors) {
+            for (row in factor.linearRows) {
+                if (row.size != 1 || row.activator >= 0 || row.relation != LinearOp.EQ) continue
+                val constants = row.constants as? IntegralConstants ?: continue
+                val coefficient = constants.exactCoeff(0)
+                if (coefficient == bigIntOf(0)) continue
+                val value = BigFraction.of(constants.exactBound, coefficient)
+                val ref = row.ref(0)
+                if (Term.isInt(ref) && value.den == BIG_ONE) centers[Term.intVar(ref)] = value
+                if (Term.isReal(ref)) centers[model.numIntVars + Term.realVar(ref)] = value
+            }
         }
         return centers
     }
@@ -187,20 +231,31 @@ internal class OpenExactNeighborhood(
 internal fun LinearObjective.below(value: BigFraction): ExactSearchRow {
     val refs = ArrayList<Int>()
     val coefficients = ArrayList<BigFraction>()
-    for (id in boolWeightValues.indices) if (boolWeightValues[id] != 0L) {
-        refs += Term.ofLit(Lit.make(id, true))
-        coefficients += BigFraction.ofLong(boolWeightValues[id])
+    for (id in boolWeightValues.indices) {
+        if (boolWeightValues[id] != 0L) {
+            refs += Term.ofLit(Lit.make(id, true))
+            coefficients += BigFraction.ofLong(boolWeightValues[id])
+        }
     }
-    for (id in intCoefficientValues.indices) if (intCoefficientValues[id] != 0L) {
-        refs += Term.ofIntVar(id)
-        coefficients += BigFraction.ofLong(intCoefficientValues[id])
+    for (id in intCoefficientValues.indices) {
+        if (intCoefficientValues[id] != 0L) {
+            refs += Term.ofIntVar(id)
+            coefficients += BigFraction.ofLong(intCoefficientValues[id])
+        }
     }
-    for (id in realCoefficientValues.indices) if (realCoefficientValues[id] != 0.0) {
-        refs += Term.ofRealVar(id)
-        coefficients += requireNotNull(BigFraction.ofDouble(realCoefficientValues[id]))
+    for (id in realCoefficientValues.indices) {
+        if (realCoefficientValues[id] != 0.0) {
+            refs += Term.ofRealVar(id)
+            coefficients += requireNotNull(BigFraction.ofDouble(realCoefficientValues[id]))
+        }
     }
-    return ExactSearchRow.of(refs.toIntArray(), coefficients, LinearOp.LE,
-        value - BigFraction.ofLong(constant), strict = true)
+    return ExactSearchRow.of(
+        refs.toIntArray(),
+        coefficients,
+        LinearOp.LE,
+        value - BigFraction.ofLong(constant),
+        strict = true,
+    )
 }
 
 private fun greater(left: BigFraction, right: BigFraction): BigFraction = if (left >= right) left else right

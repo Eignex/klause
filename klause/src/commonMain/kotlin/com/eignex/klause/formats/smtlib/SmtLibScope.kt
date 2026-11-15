@@ -1,9 +1,9 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
-internal class SmtLibScope(private val cancellation: Cancellation) {
+internal class SmtLibScope(private val cancellation: ExecutionControl) {
     private class Signature(val parameters: List<Sort>, val result: Sort)
     private class Locals(val values: Map<String, Sort>, val parent: Locals?) {
         fun get(name: String): Sort? {
@@ -207,7 +207,7 @@ internal class SmtLibScope(private val cancellation: Cancellation) {
         (expected == Sort.REAL && actual == Sort.INT)
 }
 
-internal fun SExpr.factorSourceSymbols(cancellation: Cancellation): SExpr {
+internal fun SExpr.factorSourceSymbols(cancellation: ExecutionControl): SExpr {
     val work = ArrayDeque<Pair<SExpr, Boolean>>()
     val values = ArrayDeque<SExpr>()
     work.addLast(this to false)

@@ -16,7 +16,7 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
@@ -32,12 +32,24 @@ class RetainedLinearQueriesTest {
     @Test
     fun `unpinned retained query should select its prepared component preference`() {
         val model = Problem(
-            1, 0, emptyArray(), arrayOf(
+            1,
+            0,
+            emptyArray(),
+            arrayOf(
                 Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0), LinearOp.EQ, 0.0),
-                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
-                    doubleArrayOf(1.0, 2.0), LinearOp.LE, 0.0),
+                ReifiedRealLinear(
+                    0,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 2.0),
+                    LinearOp.LE,
+                    0.0,
+                ),
             ),
-            numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(0.0, 0.0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(0.0, 0.0),
         )
         val plan = model.componentPlan()
         val queries = RetainedLinearQueries(model, TheoryParams(), null) { stop, state ->
@@ -45,7 +57,10 @@ class RetainedLinearQueriesTest {
         }
 
         queries.use {
-            val result = it.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never)
+            val result = it.check(
+                ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()),
+                ExecutionControl.Never,
+            )
 
             assertEquals(true, assertIs<ExactNeighborhoodResult.Witness>(result).sample.boolValue(0))
             assertEquals(1L, it.stats.openHints.usage.componentSelections)
@@ -56,14 +71,29 @@ class RetainedLinearQueriesTest {
     fun `retained query caller preference should precede its component preference`() {
         val model = Problem(1, 0, emptyArray(), emptyArray())
         var componentCalls = 0
-        val queries = RetainedLinearQueries(model, TheoryParams(), null,
-            hints = { _, _ -> SearchCandidateHints { false } }) { _, _ ->
-            PlannedSearch(SearchSession(emptyList()), null, null, SearchInvocationResources(),
-                SearchCandidateHints { componentCalls++; true })
+        val queries = RetainedLinearQueries(
+            model,
+            TheoryParams(),
+            null,
+            hints = { _, _ -> SearchCandidateHints { false } },
+        ) { _, _ ->
+            PlannedSearch(
+                SearchSession(emptyList()),
+                null,
+                null,
+                SearchInvocationResources(),
+                SearchCandidateHints {
+                    componentCalls++
+                    true
+                },
+            )
         }
 
         queries.use {
-            val result = it.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never)
+            val result = it.check(
+                ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()),
+                ExecutionControl.Never,
+            )
 
             assertEquals(false, assertIs<ExactNeighborhoodResult.Witness>(result).sample.boolValue(0))
             assertEquals(0, componentCalls)
@@ -83,12 +113,20 @@ class RetainedLinearQueriesTest {
             }
         }
         val queries = RetainedLinearQueries(model, TheoryParams(), null) { _, _ ->
-            PlannedSearch(SearchSession(listOf(component)), null, null, SearchInvocationResources(),
-                SearchCandidateHints { true })
+            PlannedSearch(
+                SearchSession(listOf(component)),
+                null,
+                null,
+                SearchInvocationResources(),
+                SearchCandidateHints { true },
+            )
         }
 
         queries.use {
-            val result = it.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never)
+            val result = it.check(
+                ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()),
+                ExecutionControl.Never,
+            )
 
             assertEquals(false, assertIs<ExactNeighborhoodResult.Witness>(result).sample.boolValue(0))
             assertEquals(listOf(true, false), checked)
@@ -99,13 +137,18 @@ class RetainedLinearQueriesTest {
     fun `fully pinned retained query should not consult component preferences`() {
         val model = Problem(1, 0, emptyArray(), emptyArray())
         val queries = RetainedLinearQueries(model, TheoryParams(), null) { _, _ ->
-            PlannedSearch(SearchSession(emptyList()), null, null, SearchInvocationResources(),
-                SearchCandidateHints { error("a pinned Boolean has no split") })
+            PlannedSearch(
+                SearchSession(emptyList()),
+                null,
+                null,
+                SearchInvocationResources(),
+                SearchCandidateHints { error("a pinned Boolean has no split") },
+            )
         }
 
         queries.use {
             val condition = ExactNeighborhoodCondition(mapOf(0 to false), emptyMap(), emptyMap())
-            val result = it.check(condition, Cancellation.Never)
+            val result = it.check(condition, ExecutionControl.Never)
 
             assertEquals(false, assertIs<ExactNeighborhoodResult.Witness>(result).sample.boolValue(0))
             assertEquals(0L, it.stats.openHints.usage.componentConsultations)
@@ -122,20 +165,29 @@ class RetainedLinearQueriesTest {
                 live = true
                 return ComponentResult.Consistent
             }
-            override fun retract(decisionLevel: Int) { live = false }
-            override fun close() { live = false }
+            override fun retract(decisionLevel: Int) {
+                live = false
+            }
+            override fun close() {
+                live = false
+            }
         }
         val resources = SearchInvocationResources().apply { ownComponent(component) }
         val queries = RetainedLinearQueries(model, TheoryParams(), null) { stop, _ ->
-            PlannedSearch(SearchSession(listOf(component)), null, null, resources,
-                SearchCandidateHints { true.takeIf { live && !stop() } }).also { search = it }
+            PlannedSearch(
+                SearchSession(listOf(component)),
+                null,
+                null,
+                resources,
+                SearchCandidateHints { true.takeIf { live && !stop() } },
+            ).also { search = it }
         }
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
-        assertIs<ExactNeighborhoodResult.Witness>(queries.check(condition, Cancellation.Never))
+        assertIs<ExactNeighborhoodResult.Witness>(queries.check(condition, ExecutionControl.Never))
 
         assertNull(search.candidateHints.preferredBool(0))
-        assertIs<ExactNeighborhoodResult.Undecided>(queries.check(condition, Cancellation { true }))
-        assertIs<ExactNeighborhoodResult.Witness>(queries.check(condition, Cancellation.Never))
+        assertIs<ExactNeighborhoodResult.Undecided>(queries.check(condition, ExecutionControl { true }))
+        assertIs<ExactNeighborhoodResult.Witness>(queries.check(condition, ExecutionControl.Never))
         queries.close()
 
         assertNull(search.candidateHints.preferredBool(0))
@@ -153,8 +205,8 @@ class RetainedLinearQueriesTest {
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
 
         queries.use {
-            assertIs<ExactNeighborhoodResult.Witness>(it.check(condition, Cancellation.Never))
-            assertIs<ExactNeighborhoodResult.Undecided>(it.check(condition, Cancellation.Never))
+            assertIs<ExactNeighborhoodResult.Witness>(it.check(condition, ExecutionControl.Never))
+            assertIs<ExactNeighborhoodResult.Undecided>(it.check(condition, ExecutionControl.Never))
 
             assertEquals(1L, budget.spent)
         }
@@ -185,10 +237,10 @@ class RetainedLinearQueriesTest {
         }
 
         queries.use {
-            assertFalse(it.prepareBooleanCenter(Cancellation { true }))
+            assertFalse(it.prepareBooleanCenter(ExecutionControl { true }))
             assertEquals(0, openings)
-            assertTrue(it.prepareBooleanCenter(Cancellation.Never))
-            assertTrue(it.prepareBooleanCenter(Cancellation.Never))
+            assertTrue(it.prepareBooleanCenter(ExecutionControl.Never))
+            assertTrue(it.prepareBooleanCenter(ExecutionControl.Never))
 
             assertEquals(1, openings)
             assertEquals(true, it.rootBooleanValue(0))
@@ -214,7 +266,7 @@ class RetainedLinearQueriesTest {
             })
         }
         val prepared = PreparedSearchRegistrations(source, listOf(registration))
-        val declines = listOf<(Cancellation) -> PlannedSearch?>(
+        val declines = listOf<(ExecutionControl) -> PlannedSearch?>(
             { stop -> prepared.open(Long.MAX_VALUE, stop, SearchLearnedDbParams(), null, null) },
             { null },
         )
@@ -226,9 +278,10 @@ class RetainedLinearQueriesTest {
             }
 
             queries.use {
-                assertFalse(it.prepareBooleanCenter(Cancellation.Never))
+                assertFalse(it.prepareBooleanCenter(ExecutionControl.Never))
                 val result = it.check(
-                    ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never,
+                    ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()),
+                    ExecutionControl.Never,
                 )
 
                 assertEquals(ExactNeighborhoodResult.Undecided, result)
@@ -249,7 +302,7 @@ class RetainedLinearQueriesTest {
         }
 
         queries.use {
-            assertFalse(it.prepareBooleanCenter(Cancellation { stopped }))
+            assertFalse(it.prepareBooleanCenter(ExecutionControl { stopped }))
 
             assertFalse(it.declined)
             assertFalse(it.exhausted)
@@ -288,7 +341,7 @@ class RetainedLinearQueriesTest {
         }
 
         val failure = assertFailsWith<IllegalArgumentException> {
-            queries.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never)
+            queries.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), ExecutionControl.Never)
         }
         queries.close()
 
@@ -326,10 +379,13 @@ class RetainedLinearQueriesTest {
             assertIs<ExactNeighborhoodResult.Refuted>(
                 it.check(
                     ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to BigFraction.ZERO)),
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                 ),
             )
-            val result = it.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never)
+            val result = it.check(
+                ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()),
+                ExecutionControl.Never,
+            )
 
             val sample = assertIs<ExactNeighborhoodResult.Witness>(result).sample
             assertEquals("1/3", sample.exactReals?.single().toString())
@@ -355,13 +411,13 @@ class RetainedLinearQueriesTest {
 
         queries.use {
             for ((condition, stop) in listOf(
-                ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to huge)) to Cancellation.Never,
+                ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to huge)) to ExecutionControl.Never,
                 ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE), emptyMap()) to
-                    Cancellation { true },
+                    ExecutionControl { true },
             )) {
                 assertIs<ExactNeighborhoodResult.Undecided>(it.check(condition, stop))
                 val zero = mapOf(0 to BigFraction.ZERO)
-                val result = it.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), Cancellation.Never)
+                val result = it.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), ExecutionControl.Never)
 
                 val sample = assertIs<ExactNeighborhoodResult.Witness>(result).sample
                 assertEquals(BigFraction.ZERO, sample.exactReals?.single())
@@ -379,8 +435,8 @@ class RetainedLinearQueriesTest {
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
 
         queries.use {
-            assertIs<ExactNeighborhoodResult.Witness>(it.check(condition, Cancellation.Never))
-            assertIs<ExactNeighborhoodResult.Undecided>(it.check(condition, Cancellation.Never))
+            assertIs<ExactNeighborhoodResult.Witness>(it.check(condition, ExecutionControl.Never))
+            assertIs<ExactNeighborhoodResult.Undecided>(it.check(condition, ExecutionControl.Never))
 
             assertEquals(1L, it.work)
         }

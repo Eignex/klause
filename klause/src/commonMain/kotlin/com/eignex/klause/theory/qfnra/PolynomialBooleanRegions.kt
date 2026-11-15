@@ -213,7 +213,9 @@ internal class PolynomialBooleanRegions(
             val checking = propagation.prepare(added)
             var conflict: Boolean? = null
             while (conflict == null) {
-                checkOwner?.let { onPartialCheck?.invoke(it, required) }
+                checkOwner?.let { owner ->
+                    arithmetic.execution.handoff { onPartialCheck?.invoke(owner, required) }
+                }
                 conflict = checking.next()
                 if (conflict == null) yield(null)
             }
@@ -226,7 +228,7 @@ internal class PolynomialBooleanRegions(
                     it.partialConflicts++
                     it.partialConflictPremises += premises.size
                 }
-                onConflict?.invoke(required.toList())
+                onConflict?.let { observer -> arithmetic.execution.handoff { observer(required.toList()) } }
             } else {
                 for (premise in premises) {
                     arithmetic.step()

@@ -13,7 +13,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 
 internal class ClausePrimalProjection private constructor(
@@ -36,15 +36,15 @@ internal class ClausePrimalProjection private constructor(
             source: Problem,
             assumptions: Assumptions,
             nativeSat: Boolean?,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
             charge: (Long) -> Unit,
         ): Preparation {
             if (cancellation()) return Preparation()
             val meter = WorkMeter(charge)
-            val token = object : Cancellation {
+            val token = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = cancellation()
                 override fun deadline() = cancellation.deadline()
-                override fun workMeter(): WorkMeter = meter
+                override val accounting: WorkMeter get() = meter
             }
             val session = PropagationSession(source, token, nativeSat = nativeSat != false)
             val seeded = session.seed(assumptions)

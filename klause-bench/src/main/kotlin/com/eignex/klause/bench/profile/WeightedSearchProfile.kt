@@ -19,14 +19,14 @@ import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
-import java.io.File
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.TimeSource
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 internal object WeightedSearchProfile {
     private val type = Class.forName("com.eignex.klause.meta.coreguided.CoreGuidedSearch")
@@ -59,7 +59,7 @@ internal object WeightedSearchProfile {
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         val opened = System.nanoTime()
-        val stop = Cancellation.after(timeout.milliseconds)
+        val stop = ExecutionControl.after(timeout.milliseconds)
         val bytes = trajectorySourceBytes(suite, problem, hash, null)
         out.resolve("source.$format").writeBytes(bytes)
         val source: Problem
@@ -119,7 +119,7 @@ internal object WeightedSearchProfile {
                 }.toString())
                 output.flush()
             }
-            val observing = stop or Cancellation { observe("bound"); false }
+            val observing = stop or ExecutionControl { observe("bound"); false }
             val params = BacktrackParams(randomSeed = seed, cancellation = observing,
                 objectiveLowerBoundSink = { observe("bound") })
             var result: MinimizeResult? = null

@@ -16,7 +16,7 @@ import com.eignex.klause.propagation.baked
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.validation.verifyRealCoordinates
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -30,7 +30,7 @@ class FloatGridFiniteDomainTest {
             BigFraction.ZERO, BigFraction.ONE)
         val values = doubleArrayOf(3.0, 1.0, 3.0, 0.0, 1.0)
 
-        val lowered = assertNotNull(lowerGridFiniteValues(values.size, { values[it] }, column, Cancellation.Never))
+        val lowered = assertNotNull(lowerGridFiniteValues(values.size, { values[it] }, column, ExecutionControl.Never))
 
         assertContentEquals(longArrayOf(3, 1, 0), assertIs<Table>(lowered.single()).tuples)
     }
@@ -41,10 +41,10 @@ class FloatGridFiniteDomainTest {
             numRealVars = 1, realLower = doubleArrayOf(0.125), realUpper = doubleArrayOf(0.125),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
         val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
-            listOf(FloatGridVariable(SourceRealId(0), buckets = 3, preserveBuckets = true))), Cancellation.Never))
+            listOf(FloatGridVariable(SourceRealId(0), buckets = 3, preserveBuckets = true))), ExecutionControl.Never))
 
         val point = BacktrackSolver(prepared.problem.bake()).enumerate().first()
-        val original = assertNotNull(prepared.mapping.reconstruct(prepared.problem, point, Cancellation.Never))
+        val original = assertNotNull(prepared.mapping.reconstruct(prepared.problem, point, ExecutionControl.Never))
 
         assertEquals(0, prepared.mapping.sourceFactor(0))
         assertEquals(BigFraction.ofLong(8).reciprocal(), assertNotNull(original.exactReals).single())
@@ -58,10 +58,10 @@ class FloatGridFiniteDomainTest {
         ), numRealVars = 2, realLower = doubleArrayOf(-1.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(5, 1000)).resolve())
         val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
-            listOf(FloatGridVariable(SourceRealId(0)), FloatGridVariable(SourceRealId(1)))), Cancellation.Never))
+            listOf(FloatGridVariable(SourceRealId(0)), FloatGridVariable(SourceRealId(1)))), ExecutionControl.Never))
 
         val points = BacktrackSolver(prepared.problem.bake()).enumerate().map { point ->
-            assertNotNull(prepared.mapping.reconstruct(prepared.problem, point, Cancellation.Never))
+            assertNotNull(prepared.mapping.reconstruct(prepared.problem, point, ExecutionControl.Never))
         }.toList()
 
         assertEquals(setOf(BigFraction.ofLong(-1), BigFraction.ofLong(2).reciprocal()),
@@ -76,10 +76,10 @@ class FloatGridFiniteDomainTest {
             numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(5, 1000)).resolve())
         val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(
-            FloatGridRequest(source, listOf(FloatGridVariable(SourceRealId(0)))), Cancellation.Never))
+            FloatGridRequest(source, listOf(FloatGridVariable(SourceRealId(0)))), ExecutionControl.Never))
 
         val points = BacktrackSolver(prepared.problem.bake()).enumerate().map { point ->
-            assertNotNull(prepared.mapping.reconstruct(prepared.problem, point, Cancellation.Never))
+            assertNotNull(prepared.mapping.reconstruct(prepared.problem, point, ExecutionControl.Never))
         }.toList()
 
         assertEquals(setOf(BigFraction.ofLong(-1), BigFraction.ofLong(2).reciprocal()),
@@ -95,7 +95,7 @@ class FloatGridFiniteDomainTest {
             numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(2, 1000)).resolve())
         val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(
-            FloatGridRequest(source, listOf(FloatGridVariable(SourceRealId(0)))), Cancellation.Never))
+            FloatGridRequest(source, listOf(FloatGridVariable(SourceRealId(0)))), ExecutionControl.Never))
 
         val privateResult = prepared.problem.baked
 

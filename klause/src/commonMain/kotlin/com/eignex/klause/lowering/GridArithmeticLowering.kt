@@ -1,7 +1,7 @@
 package com.eignex.klause.lowering
 
 import com.eignex.klause.factor.arithmetic.GridArithmetic
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal const val GRID_ARITHMETIC_ENCODING_LIMIT = 4096L
 
@@ -9,7 +9,7 @@ internal fun GridArithmetic.encodingSize(): Long = inputs.groupBy { it.variable 
     size * roles.minOf { it.buckets }
 }
 
-internal fun gridArithmeticTuples(relation: GridArithmetic, cancellation: Cancellation): List<LongArray>? {
+internal fun gridArithmeticTuples(relation: GridArithmetic, cancellation: ExecutionControl): List<LongArray>? {
     require(relation.encodingSize() <= GRID_ARITHMETIC_ENCODING_LIMIT)
     val inputs = relation.inputs.groupBy { it.variable }.mapValues { (_, roles) -> roles.minOf { it.buckets } }
         .toList()

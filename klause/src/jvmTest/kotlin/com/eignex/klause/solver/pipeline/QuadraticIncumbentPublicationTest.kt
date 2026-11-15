@@ -12,7 +12,7 @@ import com.eignex.klause.solver.evidence.quadraticEngineInvocation
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.Test
@@ -91,7 +91,7 @@ class QuadraticIncumbentPublicationTest(
         )
         assertIs<SourceEvidenceCheck.Checked>(
             publication.verify(expected, point, AlgebraicArithmetic()) {
-                checkQuadraticSourceWitness(plan, it, Cancellation.Never, PolynomialLimits())
+                checkQuadraticSourceWitness(plan, it, ExecutionControl.Never, PolynomialLimits())
             },
         )
     }

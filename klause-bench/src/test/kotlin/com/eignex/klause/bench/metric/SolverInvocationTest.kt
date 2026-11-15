@@ -11,7 +11,6 @@ import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.bench.source.SourceStaging
 import com.github.luben.zstd.ZstdOutputStreamNoFinalizer
-
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
@@ -43,8 +42,14 @@ class SolverInvocationTest {
     }
 
     @ParameterizedTest
-    @CsvSource("auto,true,true", "auto,false,false", "true,true,true", "true,false,true",
-        "false,true,false", "false,false,false")
+    @CsvSource(
+        "auto,true,true",
+        "auto,false,false",
+        "true,true,true",
+        "true,false,true",
+        "false,true,false",
+        "false,false,false",
+    )
     fun `explicit verbosity should control logging without changing solver parameters`(
         requested: String,
         companion: Boolean,
@@ -52,15 +57,28 @@ class SolverInvocationTest {
     ) {
         val root = Files.createTempDirectory("solver-command").toFile()
         try {
-            val executable = root.resolve("klause-cli").apply { writeText("fixture"); setExecutable(true) }
+            val executable = root.resolve("klause-cli").apply {
+                writeText("fixture")
+                setExecutable(true)
+            }
             val source = root.resolve("source.cnf")
-            val ref = ProblemRef("source", Format.DIMACS, ProblemSource.Prepared(source), Category.CSP,
-                Expected.Unknown)
+            val ref = ProblemRef(
+                "source",
+                Format.DIMACS,
+                ProblemSource.Prepared(source),
+                Category.CSP,
+                Expected.Unknown,
+            )
             val entry = ResolvedProblem(ref, lazy { error("command construction must not parse the source") })
-            val parameters = if (companion) listOf("companion-integers=true", "source-incumbent-completion=true")
-                else emptyList()
-            val settings = SolverInvocation.Settings(params = parameters,
-                verbose = requested.takeUnless { it == "auto" }?.toBooleanStrict())
+            val parameters = if (companion) {
+                listOf("companion-integers=true", "source-incumbent-completion=true")
+            } else {
+                emptyList()
+            }
+            val settings = SolverInvocation.Settings(
+                params = parameters,
+                verbose = requested.takeUnless { it == "auto" }?.toBooleanStrict(),
+            )
 
             val command = SolverInvocation.klauseCommand(entry, settings, Budget(1000), false, source, executable)
 
@@ -83,21 +101,33 @@ class SolverInvocationTest {
 
             val staging = SourceStaging.parse(target)
             val result = SolverInvocation.withSourceInput(packed, Budget(10_000), staging = staging) {
-                    plain, remaining ->
+                    plain,
+                    remaining,
+                ->
                 staged = plain
                 assertEquals(body, plain.readText())
                 assertEquals(staging.directory.canonicalFile, plain.parentFile.parentFile.canonicalFile)
                 assertTrue(remaining.timeoutMillis in 1..10_000)
-                SolverInvocation.Result(true, null, 2L, proven = false,
-                    stats = emptyMap(), rawOutput = "sat", command = plain.path, elapsedMs = 3L)
+                SolverInvocation.Result(
+                    true,
+                    null,
+                    2L,
+                    proven = false,
+                    stats = emptyMap(),
+                    rawOutput = "sat",
+                    command = plain.path,
+                    elapsedMs = 3L,
+                )
             }
 
             assertFalse(assertNotNull(staged).exists())
             assertEquals(body, CorpusFiles.readText(packed))
             assertEquals(3L, result.elapsedMs)
             assertEquals(2L, result.timeToBestMs)
-            assertTrue(listOf("sourceDecodeMs", "sourceCleanupMs", "sourceCliMs", "sourceInvocationMs")
-                .all { it in result.stats })
+            assertTrue(
+                listOf("sourceDecodeMs", "sourceCleanupMs", "sourceCliMs", "sourceInvocationMs")
+                    .all { it in result.stats },
+            )
         } finally {
             root.deleteRecursively()
         }
@@ -112,7 +142,10 @@ class SolverInvocationTest {
             var ticks = 0L
 
             val result = SolverInvocation.withSourceInput(packed, Budget(5), nanoTime = { ticks++ * 1_000_000 }) {
-                    _, _ -> error("deadline exhausted")
+                    _,
+                    _,
+                ->
+                error("deadline exhausted")
             }
 
             assertNull(result.feasible)
@@ -136,8 +169,19 @@ class SolverInvocationTest {
             val failure = assertFailsWith<SolverInvocation.Failure> {
                 SolverInvocation.withSourceInput(packed, Budget(10_000)) { plain, _ ->
                     staged = plain
-                    throw SolverInvocation.Failure(SolverInvocation.Result(null, null, null, proven = false,
-                        stats = mapOf("exit" to "2"), rawOutput = "partial", command = "cli", elapsedMs = 3), "failed")
+                    throw SolverInvocation.Failure(
+                        SolverInvocation.Result(
+                            null,
+                            null,
+                            null,
+                            proven = false,
+                            stats = mapOf("exit" to "2"),
+                            rawOutput = "partial",
+                            command = "cli",
+                            elapsedMs = 3,
+                        ),
+                        "failed",
+                    )
                 }
             }
 
@@ -145,8 +189,10 @@ class SolverInvocationTest {
             assertEquals("partial", failure.result.rawOutput)
             assertEquals("2", failure.result.stats["exit"])
             assertEquals(3L, failure.result.elapsedMs)
-            assertTrue(listOf("sourceDecodeMs", "sourceCleanupMs", "sourceCliMs", "sourceInvocationMs")
-                .all { it in failure.result.stats })
+            assertTrue(
+                listOf("sourceDecodeMs", "sourceCleanupMs", "sourceCliMs", "sourceInvocationMs")
+                    .all { it in failure.result.stats },
+            )
         } finally {
             root.deleteRecursively()
         }
@@ -159,8 +205,12 @@ class SolverInvocationTest {
             Thread.currentThread().interrupt()
 
             val failure = assertFailsWith<SolverInvocation.Failure> {
-                SolverInvocation.withSourceInput(File("missing.cnf.zst"), Budget(10_000),
-                    staging = SourceStaging.parse(target), decoderIdentity = { error("cancelled identity") }) { _, _ ->
+                SolverInvocation.withSourceInput(
+                    File("missing.cnf.zst"),
+                    Budget(10_000),
+                    staging = SourceStaging.parse(target),
+                    decoderIdentity = { error("cancelled identity") },
+                ) { _, _ ->
                     error("cancelled source")
                 }
             }
@@ -180,17 +230,30 @@ class SolverInvocationTest {
         val packed = File("original.cnf.zst")
         var nanos = 0L
 
-        val result = SolverInvocation.withSourceInput(packed, Budget(1000), nanoTime = { nanos },
-            staging = SourceStaging.CLI, decoderIdentity = { checkActive ->
+        val result = SolverInvocation.withSourceInput(
+            packed,
+            Budget(1000),
+            nanoTime = { nanos },
+            staging = SourceStaging.CLI,
+            decoderIdentity = { checkActive ->
                 nanos = 3_000_000
                 checkActive()
                 mapOf("sourceDecoderSha256" to "identity")
-            }) { input, remaining ->
+            },
+        ) { input, remaining ->
             assertEquals(packed, input)
             assertEquals(997L, remaining.timeoutMillis)
             nanos += 12_000_000
-            SolverInvocation.Result(null, null, null, proven = false,
-                stats = emptyMap(), rawOutput = "unknown", command = "cli", elapsedMs = 10)
+            SolverInvocation.Result(
+                null,
+                null,
+                null,
+                proven = false,
+                stats = emptyMap(),
+                rawOutput = "unknown",
+                command = "cli",
+                elapsedMs = 10,
+            )
         }
 
         assertEquals("cli", result.stats["sourceStaging"])
@@ -208,12 +271,17 @@ class SolverInvocationTest {
     fun `decoder identity exhaustion supplies no solver verdict`() {
         var nanos = 0L
 
-        val result = SolverInvocation.withSourceInput(File("original.cnf.zst"), Budget(5), nanoTime = { nanos },
-            staging = SourceStaging.CLI, decoderIdentity = { checkActive ->
+        val result = SolverInvocation.withSourceInput(
+            File("original.cnf.zst"),
+            Budget(5),
+            nanoTime = { nanos },
+            staging = SourceStaging.CLI,
+            decoderIdentity = { checkActive ->
                 nanos = 5_000_000
                 checkActive()
                 emptyMap()
-            }) { _, _ -> error("deadline exhausted") }
+            },
+        ) { _, _ -> error("deadline exhausted") }
 
         assertNull(result.feasible)
         assertEquals("true", result.stats["sourcePreparationBudgetExhausted"])
@@ -227,7 +295,10 @@ class SolverInvocationTest {
     fun `source observation setup spends the containing allowance`(unavailable: Boolean) {
         var nanos = 0L
 
-        val result = SolverInvocation.withSourceInput(File("input.cnf"), Budget(1000), nanoTime = { nanos },
+        val result = SolverInvocation.withSourceInput(
+            File("input.cnf"),
+            Budget(1000),
+            nanoTime = { nanos },
             observeHarness = {
                 val observation = SourceHarnessObservation { SourceHarnessCounters(nanos, threadId = 1) }
                 nanos += 3_000_000
@@ -237,8 +308,15 @@ class SolverInvocationTest {
         ) { _, remaining ->
             assertEquals(997L, remaining.timeoutMillis)
             nanos += 10_000_000
-            SolverInvocation.Result(true, null, null, proven = false,
-                stats = emptyMap(), rawOutput = "sat", command = "cli")
+            SolverInvocation.Result(
+                true,
+                null,
+                null,
+                proven = false,
+                stats = emptyMap(),
+                rawOutput = "sat",
+                command = "cli",
+            )
         }
 
         assertEquals("3", result.stats["sourceObservationSetupMs"])
@@ -252,7 +330,10 @@ class SolverInvocationTest {
         var nanos = 0L
         var reads = 0
 
-        val result = SolverInvocation.withSourceInput(File("input.cnf"), Budget(1000), nanoTime = { nanos },
+        val result = SolverInvocation.withSourceInput(
+            File("input.cnf"),
+            Budget(1000),
+            nanoTime = { nanos },
             observeHarness = {
                 SourceHarnessObservation {
                     reads++
@@ -262,8 +343,15 @@ class SolverInvocationTest {
             },
         ) { _, _ ->
             nanos = 10_000_000
-            SolverInvocation.Result(true, null, null, proven = false,
-                stats = emptyMap(), rawOutput = "sat", command = "cli")
+            SolverInvocation.Result(
+                true,
+                null,
+                null,
+                proven = false,
+                stats = emptyMap(),
+                rawOutput = "sat",
+                command = "cli",
+            )
         }
 
         assertEquals("2", result.stats["sourceObservationFinishMs"])
@@ -276,7 +364,10 @@ class SolverInvocationTest {
         var nanos = 0L
         var reads = 0
 
-        val result = SolverInvocation.withSourceInput(File("input.cnf"), Budget(1000), nanoTime = { nanos },
+        val result = SolverInvocation.withSourceInput(
+            File("input.cnf"),
+            Budget(1000),
+            nanoTime = { nanos },
             observeHarness = {
                 SourceHarnessObservation {
                     reads++
@@ -286,8 +377,15 @@ class SolverInvocationTest {
             },
         ) { _, remaining ->
             assertEquals(998L, remaining.timeoutMillis)
-            SolverInvocation.Result(true, null, null, proven = false,
-                stats = emptyMap(), rawOutput = "sat", command = "cli")
+            SolverInvocation.Result(
+                true,
+                null,
+                null,
+                proven = false,
+                stats = emptyMap(),
+                rawOutput = "sat",
+                command = "cli",
+            )
         }
 
         assertEquals("2", result.stats["sourcePreparationMs"])
@@ -297,21 +395,33 @@ class SolverInvocationTest {
     @Test
     fun `ordinary invocation omits optional harness counters`() {
         val result = SolverInvocation.withSourceInput(File("input.cnf"), Budget(1000)) { _, _ ->
-            SolverInvocation.Result(true, null, null, proven = false,
-                stats = emptyMap(), rawOutput = "sat", command = "cli")
+            SolverInvocation.Result(
+                true,
+                null,
+                null,
+                proven = false,
+                stats = emptyMap(),
+                rawOutput = "sat",
+                command = "cli",
+            )
         }
 
-        assertTrue(result.stats.keys.none {
-            it.contains("ThreadCpu") || it.contains("GcCount") ||
-                it.contains("GcTime") || it.startsWith("sourceObservation")
-        })
+        assertTrue(
+            result.stats.keys.none {
+                it.contains("ThreadCpu") || it.contains("GcCount") ||
+                    it.contains("GcTime") || it.startsWith("sourceObservation")
+            },
+        )
     }
 
     @Test
     fun `exhausted preparations retain harness observations without a solver verdict`() {
         var nanos = 0L
 
-        val result = SolverInvocation.withSourceInput(File("input.cnf"), Budget(5), nanoTime = { nanos },
+        val result = SolverInvocation.withSourceInput(
+            File("input.cnf"),
+            Budget(5),
+            nanoTime = { nanos },
             observeHarness = {
                 val observation = SourceHarnessObservation { SourceHarnessCounters(nanos, threadId = 1) }
                 nanos = 5_000_000
@@ -330,12 +440,25 @@ class SolverInvocationTest {
         var nanos = 0L
 
         val failure = assertFailsWith<SolverInvocation.Failure> {
-            SolverInvocation.withSourceInput(File("input.cnf"), Budget(1000), nanoTime = { nanos },
+            SolverInvocation.withSourceInput(
+                File("input.cnf"),
+                Budget(1000),
+                nanoTime = { nanos },
                 observeHarness = { SourceHarnessObservation { SourceHarnessCounters(nanos, threadId = 1) } },
             ) { _, _ ->
                 nanos = 7_000_000
-                throw SolverInvocation.Failure(SolverInvocation.Result(null, null, null, proven = false,
-                    stats = emptyMap(), rawOutput = "partial", command = "cli"), "failed")
+                throw SolverInvocation.Failure(
+                    SolverInvocation.Result(
+                        null,
+                        null,
+                        null,
+                        proven = false,
+                        stats = emptyMap(),
+                        rawOutput = "partial",
+                        command = "cli",
+                    ),
+                    "failed",
+                )
             }
         }
 
@@ -349,8 +472,16 @@ class SolverInvocationTest {
 
         val result = SolverInvocation.withSourceInput(File("input.cnf"), Budget(1000), nanoTime = { nanos }) { _, _ ->
             nanos = 12_000_000
-            SolverInvocation.Result(true, null, null, proven = false,
-                stats = emptyMap(), rawOutput = "sat", command = "cli", elapsedMs = 10)
+            SolverInvocation.Result(
+                true,
+                null,
+                null,
+                proven = false,
+                stats = emptyMap(),
+                rawOutput = "sat",
+                command = "cli",
+                elapsedMs = 10,
+            )
         }
 
         assertEquals("0", result.stats["sourceDecodeMs"])
@@ -375,7 +506,6 @@ class SolverInvocationTest {
             root.deleteRecursively()
         }
     }
-
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
@@ -640,8 +770,11 @@ class SolverInvocationTest {
         )
         val stdout = metadata.entries.joinToString("\n") { prefix + it.key + "=" + it.value } + "\n"
 
-        val result = SolverInvocation.invoke(listOf("fake"), mode,
-            startProcess = { FakeProcess("".byteInputStream(), stdout = stdout) })
+        val result = SolverInvocation.invoke(
+            listOf("fake"),
+            mode,
+            startProcess = { FakeProcess("".byteInputStream(), stdout = stdout) },
+        )
 
         metadata.forEach { (key, value) -> assertEquals(value, result.stats[key], key) }
         assertNull(result.feasible)
@@ -820,7 +953,10 @@ class SolverInvocationTest {
 
         assertEquals(
             "ls/a quarantined: int 3 = 7 conflicts | bt/b quarantined: claimed infeasible against a verified incumbent",
-            StderrDiagnostics().apply { stderr.forEach(::accept); finish() }.quarantines,
+            StderrDiagnostics().apply {
+                stderr.forEach(::accept)
+                finish()
+            }.quarantines,
         )
         val unrelated = StderrDiagnostics().apply {
             "WARNING: Using incubator modules\n".forEach(::accept)
@@ -864,17 +1000,22 @@ class SolverInvocationTest {
         val directory = Files.createTempDirectory("cli-stderr-").toFile()
         val trace = "x".repeat(20_000) + "\r\n% WARNING: portfolio arm ls/a quarantined: conflict\n"
         try {
-            val result = SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.SMT_LIB,
+            val result = SolverInvocation.invoke(
+                listOf("fake"),
+                SolverInvocation.Dialect.SMT_LIB,
                 captureDirectory = directory,
-                startProcess = { FakeProcess(trace.byteInputStream(), stdout = "sat\n") })
+                startProcess = { FakeProcess(trace.byteInputStream(), stdout = "sat\n") },
+            )
 
             assertEquals(trace, directory.resolve("cli.stderr").readText())
             assertEquals("ls/a quarantined: conflict", result.stats[SolverInvocation.QUARANTINED])
             assertEquals(StderrCapture.RECORD_CAP, assertNotNull(result.stderr).length)
             assertFalse(result.stderrComplete)
             assertTrue(assertNotNull(result.stderrCapture).artifactComplete)
-            assertEquals(result.stderrCapture,
-                Reports.json.decodeFromString<StderrCaptureStatus>(directory.resolve("cli.stderr.json").readText()))
+            assertEquals(
+                result.stderrCapture,
+                Reports.json.decodeFromString<StderrCaptureStatus>(directory.resolve("cli.stderr.json").readText()),
+            )
         } finally {
             directory.deleteRecursively()
         }
@@ -884,8 +1025,11 @@ class SolverInvocationTest {
     fun `a fake process refusal beyond the prefix remains unsupported`() {
         val trace = "x".repeat(20_000) + "\nklause MPS: declined\n"
 
-        val result = SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.PB_COMPETITION,
-            startProcess = { FakeProcess(trace.byteInputStream(), exit = 2) })
+        val result = SolverInvocation.invoke(
+            listOf("fake"),
+            SolverInvocation.Dialect.PB_COMPETITION,
+            startProcess = { FakeProcess(trace.byteInputStream(), exit = 2) },
+        )
 
         assertEquals("MPS: declined", result.stats["unsupported"])
         assertEquals("2", result.stats["exit"])
@@ -900,17 +1044,22 @@ class SolverInvocationTest {
         val trace = "klause MPS: declined\n" + " ".repeat(20_000) + diagnostic
         try {
             val failure = assertFailsWith<SolverInvocation.Failure> {
-                SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.PB_COMPETITION,
+                SolverInvocation.invoke(
+                    listOf("fake"),
+                    SolverInvocation.Dialect.PB_COMPETITION,
                     captureDirectory = directory,
-                    startProcess = { FakeProcess(trace.byteInputStream(), exit = 7) })
+                    startProcess = { FakeProcess(trace.byteInputStream(), exit = 7) },
+                )
             }
 
             assertNull(failure.result.stats["unsupported"])
             assertEquals("7", failure.result.stats["exit"])
             assertEquals(trace, directory.resolve("cli.stderr").readText())
             assertTrue(assertNotNull(failure.result.stderrCapture).artifactComplete)
-            assertEquals(failure.result.stderrCapture,
-                Reports.json.decodeFromString<StderrCaptureStatus>(directory.resolve("cli.stderr.json").readText()))
+            assertEquals(
+                failure.result.stderrCapture,
+                Reports.json.decodeFromString<StderrCaptureStatus>(directory.resolve("cli.stderr.json").readText()),
+            )
         } finally {
             directory.deleteRecursively()
         }
@@ -921,9 +1070,12 @@ class SolverInvocationTest {
         val directory = Files.createTempDirectory("cli-stderr-").toFile()
         directory.resolve("cli.stderr").mkdir()
         try {
-            val result = SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.PB_COMPETITION,
+            val result = SolverInvocation.invoke(
+                listOf("fake"),
+                SolverInvocation.Dialect.PB_COMPETITION,
                 captureDirectory = directory,
-                startProcess = { FakeProcess("klause MPS: declined\n".byteInputStream(), exit = 2) })
+                startProcess = { FakeProcess("klause MPS: declined\n".byteInputStream(), exit = 2) },
+            )
 
             assertEquals("MPS: declined", result.stats["unsupported"])
             assertTrue(result.stderrComplete)
@@ -940,16 +1092,21 @@ class SolverInvocationTest {
     fun `a killed fake process cannot claim a complete stderr artifact`() {
         val directory = Files.createTempDirectory("cli-stderr-").toFile()
         try {
-            val result = SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.SMT_LIB,
+            val result = SolverInvocation.invoke(
+                listOf("fake"),
+                SolverInvocation.Dialect.SMT_LIB,
                 captureDirectory = directory,
-                startProcess = { FakeProcess("partial\n".byteInputStream(), timeout = true) })
+                startProcess = { FakeProcess("partial\n".byteInputStream(), timeout = true) },
+            )
 
             assertEquals("hard-timeout", result.stats["killed"])
             assertFalse(result.stderrComplete)
             assertTrue(assertNotNull(result.stderrCapture).processKilled)
             assertFalse(result.stderrCapture.artifactComplete)
-            assertEquals(result.stderrCapture,
-                Reports.json.decodeFromString<StderrCaptureStatus>(directory.resolve("cli.stderr.json").readText()))
+            assertEquals(
+                result.stderrCapture,
+                Reports.json.decodeFromString<StderrCaptureStatus>(directory.resolve("cli.stderr.json").readText()),
+            )
         } finally {
             directory.deleteRecursively()
         }
@@ -965,8 +1122,11 @@ class SolverInvocationTest {
         }
 
         val failure = assertFailsWith<SolverInvocation.Failure> {
-            SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.PB_COMPETITION,
-                startProcess = { FakeProcess(stream, exit = 2) })
+            SolverInvocation.invoke(
+                listOf("fake"),
+                SolverInvocation.Dialect.PB_COMPETITION,
+                startProcess = { FakeProcess(stream, exit = 2) },
+            )
         }
 
         assertNull(failure.result.stats["unsupported"])
@@ -978,12 +1138,15 @@ class SolverInvocationTest {
     fun `a completion marker failure remains visible in the solve metadata`() {
         val directory = Files.createTempDirectory("cli-stderr-").toFile()
         try {
-            val result = SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.SMT_LIB,
+            val result = SolverInvocation.invoke(
+                listOf("fake"),
+                SolverInvocation.Dialect.SMT_LIB,
                 captureDirectory = directory,
                 startProcess = {
                     directory.resolve("cli.stderr.json").mkdir()
                     FakeProcess("complete\n".byteInputStream())
-                })
+                },
+            )
 
             assertTrue(result.stderrComplete)
             assertNotNull(assertNotNull(result.stderrCapture).metadataFailure)
@@ -999,9 +1162,12 @@ class SolverInvocationTest {
         directory.resolve("cli.stdout").mkdir()
         try {
             val failure = assertFailsWith<SolverInvocation.Failure> {
-                SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.SMT_LIB,
+                SolverInvocation.invoke(
+                    listOf("fake"),
+                    SolverInvocation.Dialect.SMT_LIB,
                     captureDirectory = directory,
-                    startProcess = { FakeProcess("complete\n".byteInputStream()) })
+                    startProcess = { FakeProcess("complete\n".byteInputStream()) },
+                )
             }
 
             assertNull(failure.result.stats["killed"])
@@ -1023,11 +1189,18 @@ class SolverInvocationTest {
             }
         }
 
-        val result = SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.SMT_LIB,
+        val result = SolverInvocation.invoke(
+            listOf("fake"),
+            SolverInvocation.Dialect.SMT_LIB,
             startProcess = {
-                FakeProcess("partial\n".byteInputStream(), timeout = true,
-                    stdoutStream = stdout, onDestroy = { killed.countDown() })
-            })
+                FakeProcess(
+                    "partial\n".byteInputStream(),
+                    timeout = true,
+                    stdoutStream = stdout,
+                    onDestroy = { killed.countDown() },
+                )
+            },
+        )
 
         assertEquals("hard-timeout", result.stats["killed"])
         assertTrue(assertNotNull(result.stats["outputCaptureFailure"]).contains("pipe closed by kill"))

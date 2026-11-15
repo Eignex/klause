@@ -16,7 +16,7 @@ import com.eignex.klause.localsearch.schedule.RoundAccumulator
 import com.eignex.klause.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.localsearch.schedule.StallSchedule
 import com.eignex.klause.localsearch.scoring.MoveScoring
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Temperature a Metropolis acceptance falls back to when the schedule axis supplies none. */
 private const val DEFAULT_METROPOLIS_TEMPERATURE = 1.0
@@ -149,14 +149,14 @@ class SourceDrivenStrategy(
     private var repairAlternativeSink: MoveSink? = null
 
     /** Pick the next move to apply, or `null` when this pick has no accepted candidate. */
-    fun pickMove(state: LocalSearchState): Move? = pickMove(state, Cancellation.Never)
+    fun pickMove(state: LocalSearchState): Move? = pickMove(state, ExecutionControl.Never)
 
-    internal fun pickMove(state: LocalSearchState, cancellation: Cancellation): Move? =
+    internal fun pickMove(state: LocalSearchState, cancellation: ExecutionControl): Move? =
         pickMove(state, cancellation, null)
 
     internal fun pickMove(
         state: LocalSearchState,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         evaluation: CompletedMoveEvaluation?,
     ): Move? {
         state.boardCoverage.beginPick(state)
@@ -168,7 +168,7 @@ class SourceDrivenStrategy(
 
     private fun pickCollectedMove(
         state: LocalSearchState,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         evaluation: CompletedMoveEvaluation?,
     ): Move? {
         evaluation?.begin()
@@ -199,8 +199,13 @@ class SourceDrivenStrategy(
         }
 
         val greedyFallback = evaluation != null && feasibleAcceptance == AcceptanceRule.GreedyDescent
-        var completionSeed = collectMoves(state, cancellation, stalled,
-            if (evaluation == null || greedyFallback) state.cost else 0L, completionSeeds = evaluation != null)
+        var completionSeed = collectMoves(
+            state,
+            cancellation,
+            stalled,
+            if (evaluation == null || greedyFallback) state.cost else 0L,
+            completionSeeds = evaluation != null,
+        )
         if (state.boardCoverage.consulted && cancellation()) return null
         if (evaluation != null) {
             if (greedyFallback) {
@@ -224,7 +229,8 @@ class SourceDrivenStrategy(
                     }
                     if (seed != null) {
                         completionSeed = CompletionSeed(
-                            if (seed.source.pool == Pool.NoiseEligible) noiseSink else scoreSink, seed.cap,
+                            if (seed.source.pool == Pool.NoiseEligible) noiseSink else scoreSink,
+                            seed.cap,
                         )
                     }
                 }
@@ -236,7 +242,7 @@ class SourceDrivenStrategy(
 
     private fun collectMoves(
         state: LocalSearchState,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         stalled: Boolean,
         phaseCost: Long,
         completionSeeds: Boolean,
@@ -289,7 +295,9 @@ class SourceDrivenStrategy(
                         it.compoundTally = state.compoundTally
                         raw.alternativeRepairs = it
                     }
-                } else null
+                } else {
+                    null
+                }
                 generate(cs, state, raw, cancellation)
                 closure.closeInto(state, raw.list, sink, cancellation)
                 if (alternatives != null) closure.closeInto(state, alternatives.list, alternativeSink, cancellation)
@@ -303,11 +311,18 @@ class SourceDrivenStrategy(
         return completionSeed
     }
 
-    private fun generate(cs: ConfiguredSource, state: LocalSearchState, sink: MoveSink, cancellation: Cancellation) {
+    private fun generate(
+        cs: ConfiguredSource,
+        state: LocalSearchState,
+        sink: MoveSink,
+        cancellation: ExecutionControl,
+    ) {
         val source = cs.source
         if (source is SatisfiedStructured) {
             source.generate(state, sink, cancellation, retainCoverage = state.boardCoverage.requested)
-        } else source.generate(state, sink)
+        } else {
+            source.generate(state, sink)
+        }
     }
 
     private fun selectMove(
@@ -322,8 +337,10 @@ class SourceDrivenStrategy(
         if (evaluation != null) {
             val primary = ccNoise + ccScore
             val alternatives = if (primary.any { score(state, it) < 0.0 }) emptyList() else ccAlternative
-            evaluation.prepare(primary + alternatives,
-                deterministic = feasibleAcceptance == AcceptanceRule.GreedyDescent) { score(state, it) }
+            evaluation.prepare(
+                primary + alternatives,
+                deterministic = feasibleAcceptance == AcceptanceRule.GreedyDescent,
+            ) { score(state, it) }
         }
         fun admitted(moves: List<Move>): List<Move> =
             if (evaluation == null) moves else moves.filter { evaluation.sample(it) != null }
@@ -344,7 +361,9 @@ class SourceDrivenStrategy(
                 noiseMoves.minOfOrNull { grade(it) } ?: Double.POSITIVE_INFINITY,
                 primaryScoreMoves.minOfOrNull { grade(it) } ?: Double.POSITIVE_INFINITY,
             )
-            if (bestPrimary < 0.0) primaryScoreMoves else {
+            if (bestPrimary < 0.0) {
+                primaryScoreMoves
+            } else {
                 primaryScoreMoves + alternatives.filter { grade(it) < bestPrimary }
             }
         }
@@ -373,10 +392,14 @@ class SourceDrivenStrategy(
         val productive = evaluation?.productiveMove
         if (effectiveAcceptance == AcceptanceRule.GreedyDescent && productive != null &&
             (productive in noiseMoves || productive in scoreMoves)
-        ) return productive
+        ) {
+            return productive
+        }
         if (evaluation != null && effectiveAcceptance == AcceptanceRule.GreedyDescent &&
             noiseMoves.none { grade(it) < 0.0 } && scoreMoves.none { grade(it) < 0.0 }
-        ) return null
+        ) {
+            return null
+        }
         val move = effectiveAcceptance.choose(state.rng, noiseMoves, scoreMoves, temperature) { grade(it) }
         if (effectiveAcceptance is AcceptanceRule.Metropolis && noiseMoves.isNotEmpty()) schedule.temperature?.step()
         return move

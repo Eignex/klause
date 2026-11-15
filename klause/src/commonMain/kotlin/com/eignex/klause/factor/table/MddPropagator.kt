@@ -5,10 +5,10 @@ import com.eignex.klause.factor.table.internals.MddExplainer
 import com.eignex.klause.factor.table.internals.MddIncrementalState
 import com.eignex.klause.factor.table.internals.MddTransitionIndex
 import com.eignex.klause.factor.table.internals.allEventWatches
-import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.ExtensionalSupportCounts
 import com.eignex.klause.propagation.ExtensionalSupportProvider
 import com.eignex.klause.propagation.InterruptiblePropagator
+import com.eignex.klause.propagation.PropagationState
 
 internal class MddPropagator(
     val boolVars: IntArray,

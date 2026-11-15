@@ -6,7 +6,7 @@ import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.defaultExecutionCapabilities
 import com.eignex.klause.solver.search.ComponentCheck
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class SelectedProjectionChecks(
     selection: PreparedFactorProjections,
@@ -20,10 +20,13 @@ internal class SelectedProjectionChecks(
     private val available = factors.all {
         source.factors[it].defaultExecutionCapabilities().propagationCheck == AssignmentCheckCapability.EXACT
     }
-    private val original = if (factors.isEmpty() || !available) null else
+    private val original = if (factors.isEmpty() || !available) {
+        null
+    } else {
         source.withFactors(Array(factors.size) { source.factors[factors[it]] })
+    }
 
-    fun check(session: PropagationSession, cancellation: Cancellation): ComponentCheck {
+    fun check(session: PropagationSession, cancellation: ExecutionControl): ComponentCheck {
         if (!available) return ComponentCheck.Indeterminate
         val model = original ?: return ComponentCheck.Feasible
         if (cancellation()) return ComponentCheck.Indeterminate
@@ -39,14 +42,16 @@ internal class SelectedProjectionChecks(
         }
         return if (result == ComponentCheck.Feasible && (checker.fixpointCancelled || cancellation())) {
             ComponentCheck.Indeterminate
-        } else result
+        } else {
+            result
+        }
     }
 
     private fun checkPoint(
         booleans: Int,
         session: PropagationSession,
         checker: PropagationSession,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): ComponentCheck {
         if (checker.isUnsatAtRoot) return ComponentCheck.Infeasible()
         for (id in 0 until booleans) {

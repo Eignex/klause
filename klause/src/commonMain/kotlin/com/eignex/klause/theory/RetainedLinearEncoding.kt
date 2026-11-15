@@ -3,14 +3,14 @@ package com.eignex.klause.theory
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RetainedFactors
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class RetainedLinearEncoding(
     private val mapping: RetainedFactors,
     private val target: EncodingTarget,
     private val encoded: Problem,
 ) {
-    fun model(target: EncodingTarget, indices: List<Int>, cancellation: Cancellation): Problem? {
+    fun model(target: EncodingTarget, indices: List<Int>, cancellation: ExecutionControl): Problem? {
         if (target != this.target) return null
         if (encoded.numRealVars != mapping.source.numRealVars) return null
         val targetIds = IntArray(mapping.source.numFactors) { -1 }

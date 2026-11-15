@@ -14,7 +14,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.undoTo
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -45,7 +45,7 @@ class CyclicTableCompositionTest {
             assertNull(state.runToFixpoint(allFactors = true))
         }
         val pairwise = ExtensionalComposition.reduce(
-            factors, Cancellation.Never, ExtensionalComposition.Limits(cyclicAttempts = 0),
+            factors, ExecutionControl.Never, ExtensionalComposition.Limits(cyclicAttempts = 0),
         )
         assertTrue(pairwise.isEmpty)
 
@@ -77,7 +77,7 @@ class CyclicTableCompositionTest {
         val target = Table(intArrayOf(0, 1), longArrayOf(0, 0, 0, 1, 1, 0, 1, 1, 2, 2))
         val left = Table(intArrayOf(0, 2), longArrayOf(0, 0, 1, 1, 2, 0))
         val right = Table(intArrayOf(1, 2), longArrayOf(0, 0, 1, 1, 2, 1))
-        val delta = ExtensionalComposition.reduce(arrayOf(target, left, right), Cancellation.Never)
+        val delta = ExtensionalComposition.reduce(arrayOf(target, left, right), ExecutionControl.Never)
         val table = delta.addedFactors.filterIsInstance<Table>().single { it.xs.contentEquals(target.xs) }
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 2) }, arrayOf<Factor>(table))
         val state = PropagationState(problem, Assumptions.None)
@@ -99,7 +99,7 @@ class CyclicTableCompositionTest {
             ExtensionalComposition.Limits(cyclicCells = 1),
             ExtensionalComposition.Limits(retainedCells = 0),
         )) {
-            val delta = ExtensionalComposition.reduce(arrayOf(target, left, right), Cancellation.Never, limits)
+            val delta = ExtensionalComposition.reduce(arrayOf(target, left, right), ExecutionControl.Never, limits)
 
             assertTrue(delta.isEmpty)
             assertFalse(delta.infeasible)
@@ -127,7 +127,7 @@ class CyclicTableCompositionTest {
         val right = Table(intArrayOf(1, 2, 5), longArrayOf(0, 0, 8, 1, 1, 9))
         val distinct = AllDifferent(intArrayOf(3, 4, 5))
 
-        val delta = ExtensionalComposition.reduce(arrayOf(target, left, right, distinct), Cancellation.Never)
+        val delta = ExtensionalComposition.reduce(arrayOf(target, left, right, distinct), ExecutionControl.Never)
 
         assertFalse(3 in delta.droppedIndices)
         assertContentEquals(longArrayOf(0, 0, 7, 1, 1, 9),
@@ -200,7 +200,7 @@ class CyclicTableCompositionTest {
             val left = Table(intArrayOf(0, 2), longArrayOf(0, 0, 1, 1))
             val right = Table(intArrayOf(1, 2), longArrayOf(0, 1, 1, 0))
 
-            val delta = ExtensionalComposition.reduce(arrayOf(target, left, right), Cancellation.Never)
+            val delta = ExtensionalComposition.reduce(arrayOf(target, left, right), ExecutionControl.Never)
 
             assertTrue(delta.isEmpty)
             assertFalse(delta.infeasible)

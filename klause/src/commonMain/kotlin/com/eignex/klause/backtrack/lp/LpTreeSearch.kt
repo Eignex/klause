@@ -38,7 +38,7 @@ import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSolveParams
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 
 // Only a primal candidate: exhausting the probe proves no verdict, bound or unbounded direction.
@@ -46,10 +46,10 @@ internal class LpTreeSeed(val sample: Sample)
 
 internal fun LpEngine.lbTreeSearch(
     objective: LinearObjective,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     assumptions: Assumptions = Assumptions.None,
     toleranceCheck: ((Sample) -> Boolean)? = null,
-    complete: ((Sample, Cancellation, Long) -> LeafRealResult)? = null,
+    complete: ((Sample, ExecutionControl, Long) -> LeafRealResult)? = null,
     nodeBudget: NodeBudget? = null,
 ): LpTreeSeed? {
     if (lpRelaxer == null || cancellation() || params.cancellation()) return null
@@ -66,7 +66,7 @@ internal fun LpEngine.lbTreeSearch(
         primalPropagationWork += current - propagationWork
         propagationWork = current
     }
-    val token = object : Cancellation {
+    val token = object : ExecutionControl() {
         override fun isCancelled(): Boolean {
             accountPropagation()
             return stop() || (params.lpPlan.rootBudgetFraction > 0.0 &&
@@ -74,14 +74,17 @@ internal fun LpEngine.lbTreeSearch(
                 lpWorkAllowanceSpent(sink.lp.standaloneWork)
         }
         override fun deadline() = stop.deadline()
-        override fun workMeter() = stop.workMeter()
+        override val accounting get() = stop.accounting
+        override val admission get() = admissionFrom(stop)
     }
     val dive = forObjective(objective, token, rootProbe = true)
     try {
         return dive.use {
             val leafSolver = if (problem.numRealVars > 0 && complete == null) {
                 LeafRealSolver(problem, objective, params.lpPlan.componentSplit, sink.lp, solveContext, pricingOptions)
-            } else null
+            } else {
+                null
+            }
             leafSolver.use {
                 val relaxer = dive.lpRelaxer ?: return null
                 val cp = CpSearchComponent(PropagationSession(problem, token), branching = CpBranching.None)
@@ -95,6 +98,7 @@ internal fun LpEngine.lbTreeSearch(
                 var bestValue: BigFraction? = null
                 var best: Sample? = null
                 val tried = HashSet<String>()
+
                 // A leaf of this tree passed its own propagation; only its real columns still need the exact LP.
                 fun offer(discrete: Sample): Boolean {
                     if (token()) return false
@@ -136,7 +140,9 @@ internal fun LpEngine.lbTreeSearch(
                 dive.cpAdapter.branching = {
                     val fractional = split?.takeIf { problem.numRealVars > 0 && !it.boolean }
                     val alternatives = fractional?.nearestIntegerAlternatives()
-                    if (alternatives != null) alternatives else {
+                    if (alternatives != null) {
+                        alternatives
+                    } else {
                         val variable = (0 until problem.numIntVars).firstOrNull { session.intDomain(it).valueCount > 1 }
                         if (variable == null) {
                             null
@@ -179,7 +185,9 @@ internal fun LpEngine.lbTreeSearch(
                             result?.takeIf { it.optimal }?.primal
                                 ?.takeIf { it.size == model.n && it.all(Double::isFinite) }
                                 ?.map { requireNotNull(BigFraction.ofDouble(it)) }
-                        } else null
+                        } else {
+                            null
+                        }
                         if (point == null) return SearchNodeDisposition.Expand
                         dive.noteNodeOverhead(point.size.toLong())
                         targets = relaxation.colVarId.indices.mapNotNull { column ->
@@ -197,7 +205,9 @@ internal fun LpEngine.lbTreeSearch(
                             if (relaxation.colIsBool[column]) {
                                 if (session.boolValue(variable) != null || value <= BigFraction.ZERO ||
                                     value >= BigFraction.ONE
-                                ) continue
+                                ) {
+                                    continue
+                                }
                             } else {
                                 val upper = value.ceilLong() ?: continue
                                 val domain = session.intDomain(variable)
@@ -243,7 +253,9 @@ private fun LpFractionalBranch.nearestIntegerAlternatives(): List<SearchDecision
     val up = SearchDecision.IntAtLeast(variable, upper)
     return if (BigFraction.ofLong(upper) - value < value - BigFraction.ofLong(lower)) {
         listOf(up, down)
-    } else listOf(down, up)
+    } else {
+        listOf(down, up)
+    }
 }
 
 internal class LpRootNodeResult(val model: LpModel, val float: FloatLpResult?)
@@ -252,7 +264,7 @@ internal class LpRootNodeResult(val model: LpModel, val float: FloatLpResult?)
 internal fun LpEngine.solveRootNode(
     dive: LpEngine,
     original: LpModel,
-    token: Cancellation,
+    token: ExecutionControl,
     root: Boolean,
 ): LpRootNodeResult {
     val parentWork = dive.nodeQueryWorkBudget() ?: dive.nodeWorkBudget()
@@ -298,7 +310,7 @@ internal fun LpEngine.solveRootNode(
     return LpRootNodeResult(model, attempt?.second)
 }
 
-internal fun rootCrashBasis(model: LpModel, token: Cancellation, nodeWorkLimit: Long): CrashBasisAttempt =
+internal fun rootCrashBasis(model: LpModel, token: ExecutionControl, nodeWorkLimit: Long): CrashBasisAttempt =
     triangularCrashBasis(model, token, rootCrashWorkLimit(nodeWorkLimit))
 
 internal fun solveRootNodeWithCrash(

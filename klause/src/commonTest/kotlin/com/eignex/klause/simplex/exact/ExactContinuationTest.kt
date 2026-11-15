@@ -1,6 +1,6 @@
 package com.eignex.klause.simplex.exact
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -97,7 +97,7 @@ class ExactContinuationTest {
         val probe = ExactContinuation(initial)
         assertNotNull(probe.resume().values)
         var checks = 0
-        assertNotNull(probe.resume(replacement = changed, cancellation = Cancellation {
+        assertNotNull(probe.resume(replacement = changed, cancellation = ExecutionControl {
             checks++
             false
         }).values)
@@ -113,7 +113,7 @@ class ExactContinuationTest {
 
             val cancelled = session.resume(
                 replacement = changed,
-                cancellation = Cancellation { ++observed == cancelAt },
+                cancellation = ExecutionControl { ++observed == cancelAt },
             )
             if (cancelled.metrics.phase != ContinuationPhase.PROMOTION) continue
             val retained = session.resume()
@@ -284,7 +284,7 @@ class ExactContinuationTest {
             lowerStrict = listOf(true),
         )
 
-        val result = ExactContinuation(input).resume(cancellation = Cancellation { true })
+        val result = ExactContinuation(input).resume(cancellation = ExecutionControl { true })
 
         assertEquals(ContinuationDecline.CANCELLED, result.metrics.decline)
         assertNull(result.values)
@@ -418,7 +418,7 @@ class ExactContinuationTest {
         )
         val session = ExactContinuation(input)
 
-        val cancelled = session.resume(cancellation = Cancellation { true })
+        val cancelled = session.resume(cancellation = ExecutionControl { true })
         val resumed = session.resume()
 
         assertEquals(ContinuationDecline.CANCELLED, cancelled.metrics.decline)

@@ -36,8 +36,11 @@ internal fun preparePolynomialConsequenceRefutation(
         maximumTerms += terms.size
         for (term in terms) {
             arithmetic.step()
-            maximumBits = maxOf(maximumBits, term.coefficient.num.magnitudeBitLength(),
-                term.coefficient.den.magnitudeBitLength())
+            maximumBits = maxOf(
+                maximumBits,
+                term.coefficient.num.magnitudeBitLength(),
+                term.coefficient.den.magnitudeBitLength(),
+            )
         }
         yield(null)
     }
@@ -79,9 +82,13 @@ private class PolynomialConsequenceRefutation(
             val stripped = ArrayList<PolynomialAtom>()
             for (row in rows) {
                 arithmetic.step()
-                stripped.add(if (row.relation == PolynomialRelation.EQ) {
-                    PolynomialAtom(stripNonzero(row.polynomial), row.relation)
-                } else row)
+                stripped.add(
+                    if (row.relation == PolynomialRelation.EQ) {
+                        PolynomialAtom(stripNonzero(row.polynomial), row.relation)
+                    } else {
+                        row
+                    },
+                )
                 yield(null)
             }
             if (!admitted(stripped)) break
@@ -135,8 +142,11 @@ private class PolynomialConsequenceRefutation(
                 for (variable in term.monomial.variables) {
                     arithmetic.step()
                     val degree = term.monomial.exponent(variable)
-                    if (captureDegrees) inputDegrees[variable] = maxOf(inputDegrees[variable] ?: 0, degree)
-                    else if (degree > (inputDegrees[variable] ?: 0)) return false
+                    if (captureDegrees) {
+                        inputDegrees[variable] = maxOf(inputDegrees[variable] ?: 0, degree)
+                    } else if (degree > (inputDegrees[variable] ?: 0)) {
+                        return false
+                    }
                 }
             }
         }
@@ -164,10 +174,12 @@ private class PolynomialConsequenceRefutation(
         }
         if (powers.isEmpty()) return polynomial
         val divisor = Monomial.of(powers)
-        return Polynomial.of(terms.map { term ->
-            repeat(term.monomial.variables.size + powers.size + 1) { arithmetic.step() }
-            PolynomialTerm(checkNotNull(term.monomial.quotient(divisor)), term.coefficient)
-        })
+        return Polynomial.of(
+            terms.map { term ->
+                repeat(term.monomial.variables.size + powers.size + 1) { arithmetic.step() }
+                PolynomialTerm(checkNotNull(term.monomial.quotient(divisor)), term.coefficient)
+            },
+        )
     }
 
     private data class Pivot(val row: Int, val variable: Int, val term: PolynomialTerm, val rank: List<Int>)
@@ -179,19 +191,37 @@ private class PolynomialConsequenceRefutation(
             if (atom.relation != PolynomialRelation.EQ) continue
             val terms = atom.polynomial.terms
             val occurrences = HashMap<Int, Int>()
-            for (term in terms) for (variable in term.monomial.variables) {
-                arithmetic.step()
-                occurrences[variable] = (occurrences[variable] ?: 0) + 1
+            for (term in terms) {
+                for (variable in term.monomial.variables) {
+                    arithmetic.step()
+                    occurrences[variable] = (occurrences[variable] ?: 0) + 1
+                }
             }
-            for (term in terms) for (variable in term.monomial.variables) {
-                arithmetic.step()
-                if (variable in used || occurrences[variable] != 1 || term.monomial.exponent(variable) != 1) continue
-                val rank = listOf(term.monomial.variables.size, inputDegrees.getValue(variable),
-                    terms.size, index, variable)
-                val previous = best
-                if (previous == null || rank.indices.firstOrNull { arithmetic.step(); rank[it] != previous.rank[it] }
-                        ?.let { rank[it] < previous.rank[it] } == true
-                ) best = Pivot(index, variable, term, rank)
+            for (term in terms) {
+                for (variable in term.monomial.variables) {
+                    arithmetic.step()
+                    if (variable in used || occurrences[variable] != 1 || term.monomial.exponent(variable) !=
+                        1
+                    ) {
+                        continue
+                    }
+                    val rank = listOf(
+                        term.monomial.variables.size,
+                        inputDegrees.getValue(variable),
+                        terms.size,
+                        index,
+                        variable,
+                    )
+                    val previous = best
+                    if (previous == null || rank.indices.firstOrNull {
+                            arithmetic.step()
+                            rank[it] != previous.rank[it]
+                        }
+                            ?.let { rank[it] < previous.rank[it] } == true
+                    ) {
+                        best = Pivot(index, variable, term, rank)
+                    }
+                }
             }
         }
         return best
@@ -254,8 +284,9 @@ private class PolynomialConsequenceRefutation(
         arithmetic.step()
         val sum = (coefficients[monomial] ?: BigFraction.ZERO) + value
         if (!admitted(sum)) return false
-        if (sum.isZero) coefficients.remove(monomial)
-        else {
+        if (sum.isZero) {
+            coefficients.remove(monomial)
+        } else {
             if (monomial !in coefficients && coefficients.size >= limit) return false
             coefficients[monomial] = sum
         }
@@ -311,7 +342,10 @@ private class PolynomialConsequenceRefutation(
     }
 
     private fun reflected(center: Monomial, side: Monomial): Monomial? {
-        for (variable in side.variables) { arithmetic.step(); if (center.exponent(variable) == 0) return null }
+        for (variable in side.variables) {
+            arithmetic.step()
+            if (center.exponent(variable) == 0) return null
+        }
         val powers = LinkedHashMap<Int, Int>()
         for (variable in center.variables) {
             arithmetic.step()
@@ -337,15 +371,29 @@ private class PolynomialConsequenceRefutation(
         for (variable in monomial.variables) {
             arithmetic.step()
             var factor = signs[variable] ?: ALL
-            if (monomial.exponent(variable) and 1 == 0) factor = (factor and ZERO) or
-                if (factor and (NEGATIVE or POSITIVE) == 0) 0 else POSITIVE
+            if (monomial.exponent(variable) and 1 == 0) {
+                factor = (factor and ZERO) or
+                    if (factor and (NEGATIVE or POSITIVE) == 0) 0 else POSITIVE
+            }
             product = (if ((product or factor) and ZERO != 0) ZERO else 0) or
-                (if ((product and NEGATIVE != 0 && factor and POSITIVE != 0) ||
-                    (product and POSITIVE != 0 && factor and NEGATIVE != 0)
-                ) NEGATIVE else 0) or
-                (if ((product and NEGATIVE != 0 && factor and NEGATIVE != 0) ||
-                    (product and POSITIVE != 0 && factor and POSITIVE != 0)
-                ) POSITIVE else 0)
+                (
+                    if ((product and NEGATIVE != 0 && factor and POSITIVE != 0) ||
+                        (product and POSITIVE != 0 && factor and NEGATIVE != 0)
+                    ) {
+                        NEGATIVE
+                    } else {
+                        0
+                    }
+                    ) or
+                (
+                    if ((product and NEGATIVE != 0 && factor and NEGATIVE != 0) ||
+                        (product and POSITIVE != 0 && factor and POSITIVE != 0)
+                    ) {
+                        POSITIVE
+                    } else {
+                        0
+                    }
+                    )
         }
         return product
     }
@@ -366,7 +414,9 @@ private fun negate(signs: Int): Int = (signs and ZERO) or
 private fun addSigns(left: Int, right: Int): Int {
     if ((left and NEGATIVE != 0 && right and POSITIVE != 0) ||
         (left and POSITIVE != 0 && right and NEGATIVE != 0)
-    ) return ALL
+    ) {
+        return ALL
+    }
     return (left and right and ZERO) or ((left or right) and (NEGATIVE or POSITIVE))
 }
 

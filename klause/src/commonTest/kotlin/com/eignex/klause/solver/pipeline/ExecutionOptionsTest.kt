@@ -9,7 +9,7 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.meta.coreguided.CoreRefinementMode
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -279,7 +279,7 @@ class ExecutionOptionsTest {
                 ExecutionOption.dryRunSolver(true),
                 ExecutionOption.variableSelector(VarSelectorKind.LINUCB),
             ),
-            randomSeed = 99L, cancellation = Cancellation.Never, nodeBudget = null, solveBudgetMillis = null,
+            randomSeed = 99L, cancellation = ExecutionControl.Never, nodeBudget = null, solveBudgetMillis = null,
             lpConfig = LpConfig.OFF, zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, onEvent = null,
         )
 

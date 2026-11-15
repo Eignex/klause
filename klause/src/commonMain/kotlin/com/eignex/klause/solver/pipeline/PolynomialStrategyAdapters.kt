@@ -11,7 +11,7 @@ import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Finite strategy controls for polynomial satisfaction and finite-objective optimization. */
 data class PolynomialStrategyParams(
@@ -32,17 +32,20 @@ internal class PolynomialStrategyAdapters(
     private val model: SharedPolynomialModel,
     private val scope: PolynomialInvocationScope,
     private val params: PolynomialStrategyParams,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
     private val parallelism: Int,
 ) {
     fun solve(engine: FiniteEngine): SolveResult = if (usesPortfolio(engine)) {
         portfolio(engine).use { it.solve(cancellation) }
-    } else standalone(engine) { it.solve(engine) }
+    } else {
+        standalone(engine) { it.solve(engine) }
+    }
 
-    fun minimize(objective: LinearObjective, engine: FiniteEngine): MinimizeResult =
-        if (usesPortfolio(engine)) {
-            portfolio(engine, objective).use { it.minimize(cancellation) }
-        } else standalone(engine, objective) { it.minimize(objective, engine) }
+    fun minimize(objective: LinearObjective, engine: FiniteEngine): MinimizeResult = if (usesPortfolio(engine)) {
+        portfolio(engine, objective).use { it.minimize(cancellation) }
+    } else {
+        standalone(engine, objective) { it.minimize(objective, engine) }
+    }
 
     private fun usesPortfolio(engine: FiniteEngine): Boolean = engine == FiniteEngine.MIXED ||
         (engine != FiniteEngine.FIXED && parallelism > 1)
@@ -57,10 +60,18 @@ internal class PolynomialStrategyAdapters(
         return PortfolioInvocationResources(1, 1, params.localSearch.randomSeed ?: 0,
             cancellation, budget, if (complete) setOf(0) else emptySet()).use { resources ->
             val slot = resources.slots.single()
-            val execution = if (complete) params.backtrack.withAssumptions(params.assumptions).assumptions
-                else params.localSearch.withAssumptions(params.assumptions).assumptions
-            val binding = EngineInvocation(plan, ModelIdentity.of(model.source, objective), objective,
-                params.assumptions, execution)
+            val execution = if (complete) {
+                params.backtrack.withAssumptions(params.assumptions).assumptions
+            } else {
+                params.localSearch.withAssumptions(params.assumptions).assumptions
+            }
+            val binding = EngineInvocation(
+                plan,
+                ModelIdentity.of(model.source, objective),
+                objective,
+                params.assumptions,
+                execution,
+            )
             action(PolynomialWorkerAdapter(model, scope.worker(slot), params, binding, scope.workerCancellation(slot)))
         }
     }
@@ -88,7 +99,9 @@ internal class PolynomialStrategyAdapters(
             val family = when (arm) { 0 -> ArmFamily.Backtrack; 1 -> ArmFamily.LocalSearch; else -> ArmFamily.Lns }
             val executionAssumptions = if (arm == 0) {
                 params.backtrack.withAssumptions(params.assumptions).assumptions
-            } else params.localSearch.withAssumptions(params.assumptions).assumptions
+            } else {
+                params.localSearch.withAssumptions(params.assumptions).assumptions
+            }
             val workerBinding = EngineInvocation(plan, identity, objective, params.assumptions, executionAssumptions)
             PortfolioArmFactory(plan, arm, family, binding = {
                 SourceWorkerBinding(workerBinding, provesResults = it.permitsSourceProofs)

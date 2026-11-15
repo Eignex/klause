@@ -11,7 +11,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.BranchingConflict
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 
 internal enum class ConflictGuidanceStatus {
@@ -49,7 +49,7 @@ internal class ConflictSupportedRemoval(
     private var observed = 0
     private var closed = false
     private var supportsInvocation = true
-    private var cancellation: Cancellation = Cancellation.Never
+    private var cancellation: ExecutionControl = ExecutionControl.Never
     private var externalCutoff = Double.POSITIVE_INFINITY
     private var localCutoff = Double.POSITIVE_INFINITY
     private var localIncumbent: Sample? = null
@@ -122,7 +122,7 @@ internal class ConflictSupportedRemoval(
         if (!closed && cancellation()) discard(ConflictGuidanceStatus.Cancelled)
     }
 
-    fun begin(incumbent: Sample, pins: Assumptions, cutoff: Double, token: Cancellation) {
+    fun begin(incumbent: Sample, pins: Assumptions, cutoff: Double, token: ExecutionControl) {
         check(!closed)
         discard(ConflictGuidanceStatus.Unavailable)
         if (!supportsInvocation) {
@@ -249,7 +249,7 @@ internal class ConflictSupportedRemoval(
         objective: LinearObjective,
         fraction: Double,
         assumptions: Assumptions,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): FreedVars {
         if (!closed && assumptions != callerAssumptions) discard(ConflictGuidanceStatus.Incompatible)
         if (!closed && cancellation()) discard(ConflictGuidanceStatus.Cancelled)
@@ -295,7 +295,7 @@ internal class ConflictSupportedRemoval(
         capped = false
         hasSupport = false
         center = null
-        cancellation = Cancellation.Never
+        cancellation = ExecutionControl.Never
         localIncumbent = null
         externalCutoff = Double.POSITIVE_INFINITY
         localCutoff = Double.POSITIVE_INFINITY

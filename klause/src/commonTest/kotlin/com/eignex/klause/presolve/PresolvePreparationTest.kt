@@ -4,7 +4,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolvePreparationStage
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,9 +16,9 @@ class PresolvePreparationTest {
     fun `a required operation token should restore its containing meter after preparation`() {
         val budget = PresolveBudget(0L)
         val meter = WorkMeter { }
-        val containing = object : Cancellation {
+        val containing = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
         val problem = Problem(0, 0, emptyArray(), emptyList())
 
@@ -26,16 +26,16 @@ class PresolvePreparationTest {
             PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, problem, containing,
         ) { observed, _ -> observed }
 
-        assertSame(meter, token.workMeter())
+        assertSame(meter, token.accounting)
     }
 
     @Test
     fun `containing work should be forwarded once without spending the elective allowance`() {
         val budget = PresolveBudget(0L)
         var work = 0L
-        val containing = object : Cancellation {
+        val containing = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
         val problem = Problem(0, 0, emptyArray(), emptyList())
 
@@ -55,9 +55,9 @@ class PresolvePreparationTest {
     fun `an interrupted required operation should retain its containing work`() {
         val budget = PresolveBudget(0L)
         var work = 0L
-        val containing = object : Cancellation {
+        val containing = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 3L
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
         val problem = Problem(0, 0, emptyArray(), emptyList())
 
@@ -81,7 +81,7 @@ class PresolvePreparationTest {
         val problem = Problem(0, 0, emptyArray(), emptyList())
 
         budget.observePreparation(
-            PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, problem, Cancellation.Never,
+            PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, problem, ExecutionControl.Never,
         ) { outer, _ ->
             outer.charge(2L)
             budget.observePreparation(
@@ -98,15 +98,15 @@ class PresolvePreparationTest {
     fun `a composed preparation token should retain native work attribution`() {
         val budget = PresolveBudget(0L)
         var work = 0L
-        val containing = object : Cancellation {
+        val containing = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
         val problem = Problem(0, 0, emptyArray(), emptyList())
 
         budget.observePreparation(
             PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, problem, containing,
-        ) { token, _ -> (token or Cancellation.Never).charge(7L) }
+        ) { token, _ -> (token or ExecutionControl.Never).charge(7L) }
 
         assertEquals(7L, budget.preparationStages.single().nativeWork)
         assertEquals(7L, work)

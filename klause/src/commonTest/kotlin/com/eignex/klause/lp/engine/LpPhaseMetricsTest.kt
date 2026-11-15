@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -48,7 +48,7 @@ class LpPhaseMetricsTest {
 
         val result = solveAndCertify(
             model,
-            cancellation = Cancellation { cancelled },
+            cancellation = ExecutionControl { cancelled },
             observer = phaseObserver(events),
             floatAccept = {
                 cancelled = true

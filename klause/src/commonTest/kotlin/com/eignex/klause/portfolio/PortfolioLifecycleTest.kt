@@ -21,7 +21,7 @@ import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -135,7 +135,7 @@ class PortfolioLifecycleTest {
             } else {
                 val tracked = CountingResumableSolve(2)
                 val handle = object : ResumableSolve by tracked {
-                    override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
+                    override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long): SolveResult? {
                         clock += 5.milliseconds
                         slices++
                         return tracked.runSlice(global, sliceMillis, sliceNodes)
@@ -153,7 +153,7 @@ class PortfolioLifecycleTest {
             val portfolio = Portfolio.thompson(listOf(worker)).also { it.runTimeSource = clock }
 
             val stats = portfolio.use {
-                val stop = Cancellation { slices >= 2 }
+                val stop = ExecutionControl { slices >= 2 }
                 if (optimize) it.minimize(stop).stats else it.solve(stop).stats
             }
 
@@ -178,7 +178,7 @@ class PortfolioLifecycleTest {
         val result = Portfolio.thompson(
             listOf(trackingWorker("failed", 7, spending).also { it.family = ArmFamily.LocalSearch }),
             reseedStaleThreshold = 1,
-        ).use { it.minimize(Cancellation { slices >= 3 }) }
+        ).use { it.minimize(ExecutionControl { slices >= 3 }) }
 
         assertEquals(sample, assertIs<MinimizeResult.BestFound>(result).sample)
         val arm = result.stats.portfolio.arms.single()
@@ -216,7 +216,7 @@ class PortfolioLifecycleTest {
                         )
 
                         override fun runSlice(
-                            global: Cancellation,
+                            global: ExecutionControl,
                             sliceMillis: Long,
                             sliceNodes: Long,
                             onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -248,7 +248,7 @@ class PortfolioLifecycleTest {
                 .also { it.family = ArmFamily.LocalSearch }
 
             val result = Portfolio.thompson(listOf(worker), reseedStaleThreshold = threshold).use {
-                it.minimize(Cancellation { slices >= 14 })
+                it.minimize(ExecutionControl { slices >= 14 })
             }
 
             assertIs<MinimizeResult.BestFound>(result)
@@ -278,7 +278,7 @@ class PortfolioLifecycleTest {
             val result = Portfolio(listOf(worker), fixedBandit(1, 0),
                 baseSliceWork = 1, maxSliceWork = 1, reseedStaleThreshold = 1,
                 diagnostics = PortfolioDiagnostics(10),
-            ).use { it.minimize(Cancellation { slices >= 3 }) }
+            ).use { it.minimize(ExecutionControl { slices >= 3 }) }
 
             assertEquals(2, opened)
             assertEquals(3.0 + clauses, result.stats.portfolio.arms.single().credit["Glue"], "clauses=$clauses")
@@ -301,7 +301,7 @@ class PortfolioLifecycleTest {
                     SolveResult.Unknown(TerminationReason.BudgetExhausted, stats)
                 }
             }
-            val token = Cancellation { calls >= 3 }
+            val token = ExecutionControl { calls >= 3 }
 
             val result = Portfolio.thompson(listOf(worker)).use {
                 if (optimize) it.minimize(token).stats else it.solve(token).stats
@@ -371,7 +371,7 @@ class PortfolioLifecycleTest {
 
         val failure = assertFailsWith<IllegalStateException> {
             portfolio.minimize(
-                Cancellation.Never,
+                ExecutionControl.Never,
                 null,
                 PortfolioIncumbents.floating(),
                 onAccepted = { error("accepted output failure") },
@@ -397,7 +397,7 @@ class PortfolioLifecycleTest {
             override val stats: SolveStats get() = SolveStats.EMPTY
             override val isDone: Boolean get() = activeRuns == 2
             override fun runSlice(
-                global: Cancellation,
+                global: ExecutionControl,
                 sliceMillis: Long,
                 sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -415,7 +415,7 @@ class PortfolioLifecycleTest {
             bandit,
         )
         var polls = 0
-        assertIs<MinimizeResult.Optimal>(portfolio.minimize(Cancellation { ++polls > 20 }))
+        assertIs<MinimizeResult.Optimal>(portfolio.minimize(ExecutionControl { ++polls > 20 }))
         assertEquals(1, dirtyRuns)
         assertEquals(2, activeRuns)
         assertEquals(1, dirty.closes)
@@ -434,7 +434,7 @@ class PortfolioLifecycleTest {
         )
         var polls = 0
         val portfolio = Portfolio.thompson(listOf(trackingWorker("failed", 0, failed)))
-        assertIs<MinimizeResult.Unknown>(portfolio.minimize(Cancellation { ++polls > 20 }))
+        assertIs<MinimizeResult.Unknown>(portfolio.minimize(ExecutionControl { ++polls > 20 }))
         assertEquals(1, runs)
         assertEquals(1, failed.closes)
     }
@@ -482,7 +482,7 @@ class PortfolioLifecycleTest {
         val paused = TrackingResumableSearch(null, onRun = { cancelled = true })
         val portfolio = Portfolio.thompson(listOf(trackingWorker("paused", 0, paused)))
 
-        assertIs<MinimizeResult.Unknown>(portfolio.minimize(Cancellation { cancelled }))
+        assertIs<MinimizeResult.Unknown>(portfolio.minimize(ExecutionControl { cancelled }))
 
         assertEquals(1, paused.closes)
     }
@@ -554,7 +554,7 @@ class PortfolioLifecycleTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1L))
         val worker = PortfolioWorker.of("pinned", 0, session, BacktrackParams(), objective)
 
-        val result = Portfolio.thompson(listOf(worker)).use { it.minimize(Cancellation.Never) }
+        val result = Portfolio.thompson(listOf(worker)).use { it.minimize(ExecutionControl.Never) }
 
         assertEquals(1.0, assertIs<MinimizeResult.Optimal>(result).objectiveValue)
     }
@@ -575,7 +575,7 @@ class PortfolioLifecycleTest {
         val worker = PortfolioWorker.of("opening", 0, solver.session(), BacktrackParams(), LinearObjective())
         val portfolio = Portfolio.thompson(listOf(worker, trackingWorker("sibling", 1, sibling)))
 
-        val result = portfolio.use { it.minimize(Cancellation.Never) }
+        val result = portfolio.use { it.minimize(ExecutionControl.Never) }
 
         assertIs<MinimizeResult.Optimal>(result)
         assertEquals(1, openings)
@@ -605,7 +605,7 @@ class PortfolioLifecycleTest {
             PortfolioWorker.of("sibling", 1, sibling.session(), BacktrackParams()).also { it.improvementOnly = true },
         )
 
-        val result = Portfolio.thompson(workers).use { it.solve(Cancellation.Never) }
+        val result = Portfolio.thompson(workers).use { it.solve(ExecutionControl.Never) }
 
         assertIs<SolveResult.Sat>(result)
         assertEquals(1, openings)

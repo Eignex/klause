@@ -40,7 +40,7 @@ import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderProvider
 import com.eignex.klause.theory.EncoderSupport
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -93,7 +93,7 @@ class SourceExecutionTest {
             presolveConfig = PresolveConfig.NONE, cores = 1).withPortfolioLpQueryObserver { worker, _, query ->
             workers += worker
             captures += query.pricing.tieSeed to assertNotNull(query.captureExactWithin(
-                "source-query", 4096, 65_536, 4096, Cancellation.Never))
+                "source-query", 4096, 65_536, 4096, ExecutionControl.Never))
         }.withPortfolioGuidanceObserver { worker, observation ->
             guidanceWorkers += worker
             guidanceKinds += observation.kind
@@ -126,10 +126,10 @@ class SourceExecutionTest {
         val original = source.pipelineRequest()
         val budget = PresolveBudget(1_000_000)
         val preparation = original.prepareSource(
-            PresolveConfig.parse("off,+bve"), null, Cancellation.Never, Cancellation.Never, budget,
+            PresolveConfig.parse("off,+bve"), null, ExecutionControl.Never, ExecutionControl.Never, budget,
         )
 
-        val prepared = original.afterSourcePreparation(preparation, Cancellation.Never)
+        val prepared = original.afterSourcePreparation(preparation, ExecutionControl.Never)
 
         assertNotNull(prepared)
         assertTrue(preparation.changed)
@@ -217,8 +217,8 @@ class SourceExecutionTest {
         ), numRealVars = 2, realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0))
         val original = source.pipelineRequest()
         val preparation = original.prepareSource(PresolveConfig.parse("off,+bve"), null,
-            Cancellation.Never, Cancellation.Never, null)
-        val prepared = assertNotNull(original.afterSourcePreparation(preparation, Cancellation.Never))
+            ExecutionControl.Never, ExecutionControl.Never, null)
+        val prepared = assertNotNull(original.afterSourcePreparation(preparation, ExecutionControl.Never))
         val sample = Sample(booleanArrayOf(false, false), LongArray(0), doubleArrayOf(1.0, 1.0),
             exactReals = listOf(BigFraction.ONE, BigFraction.ONE))
         val params = PolynomialTheoryParams(maximumWork = 1)
@@ -247,7 +247,7 @@ class SourceExecutionTest {
             ))
 
             val result = assertIs<SourceExecutionResult.Linear>(SourceSetup.execute(SourceExecutionRequest(
-                invocation, theory = TheoryParams(timeout = Cancellation.after(30.seconds)),
+                invocation, theory = TheoryParams(timeout = ExecutionControl.after(30.seconds)),
             )))
 
             val satisfy = assertIs<OpenTheoryExecution.Satisfy>(result.result)
@@ -355,7 +355,7 @@ class SourceExecutionTest {
             SourceSetup.execute(
                 SourceExecutionRequest(invocation, finiteRequest = { shape ->
                     FiniteSolveRequest(
-                        shape, FiniteEngine.MIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+                        shape, FiniteEngine.MIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
                         presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
                         randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.OFF,
                         zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
@@ -503,7 +503,7 @@ class SourceExecutionTest {
                 SourceAttachment(source),
                 ExecutionOperation.SATISFY,
                 FiniteEngine.BACKTRACK,
-                cancellation = Cancellation { stopped },
+                cancellation = ExecutionControl { stopped },
             ),
         )
         stopped = true
@@ -571,7 +571,7 @@ class SourceExecutionTest {
                 SourceExecutionRequest(first, finiteRequest = {
                     FiniteSolveRequest(
                         second.finiteShape(), FiniteEngine.FIXED, PresolveConfig.NONE,
-                        false, false, Cancellation.Never, presolveBudget = null, cores = 1,
+                        false, false, ExecutionControl.Never, presolveBudget = null, cores = 1,
                         executionOptions = ExecutionOptions.parse(emptyList()), randomSeed = 17,
                         defaultArms = 1, lpConfig = LpConfig.OFF,
                         zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
@@ -660,7 +660,7 @@ class SourceExecutionTest {
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
                 SourceAttachment(source), ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-                cancellation = Cancellation.after(Duration.ZERO),
+                cancellation = ExecutionControl.after(Duration.ZERO),
             ),
         )
 

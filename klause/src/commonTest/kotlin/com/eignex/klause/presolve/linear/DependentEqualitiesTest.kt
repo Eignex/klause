@@ -24,7 +24,7 @@ import com.eignex.klause.lp.lattice.LATTICE_WORK_WEIGHT
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.shl
@@ -47,7 +47,7 @@ class DependentEqualitiesTest {
 
     private fun problem(vararg factors: Factor) = Problem(0, 3, Array(3) { IntDomain(0, 10) }, factors.toList())
 
-    private fun dropped(p: Problem) = DependentEqualities.dropImplied(p, Cancellation.Never)
+    private fun dropped(p: Problem) = DependentEqualities.dropImplied(p, ExecutionControl.Never)
 
     @Test
     fun `pure real blocks should drop dependent equalities at exact fractional and wide scales`() {
@@ -326,7 +326,7 @@ class DependentEqualitiesTest {
         val p = Problem(0, 17, Array(17) { IntDomain(0, 1) }, factors)
         val budget = PresolveBudget(1)
 
-        val delta = DependentEqualities.dropImplied(p, budget.orSpent(Cancellation.Never))
+        val delta = DependentEqualities.dropImplied(p, budget.orSpent(ExecutionControl.Never))
 
         assertTrue(delta.isEmpty)
         assertFalse(delta.infeasible)

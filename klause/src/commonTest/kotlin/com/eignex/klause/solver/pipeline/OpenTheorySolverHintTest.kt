@@ -20,7 +20,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.followedBy
 import com.eignex.klause.theory.difference.DifferenceSearchComponent
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -44,7 +44,7 @@ class OpenTheorySolverHintTest {
         )
         val planned = model.componentPlan().search(model, emptyMap())
         val component = assertIs<DifferenceSearchComponent>(planned.theory)
-        val hints = assertNotNull(component.potentialHints(Cancellation.Never)).second
+        val hints = assertNotNull(component.potentialHints(ExecutionControl.Never)).second
         assertIs<ComponentResult.Consistent>(planned.session.initialize())
         assertNull(planned.candidateHints.preferredBool(0))
         assertEquals(true, hints.preferredBool(0))
@@ -54,7 +54,7 @@ class OpenTheorySolverHintTest {
         assertNull(hints.preferredBool(0))
         model.componentPlan().search(model, emptyMap()).use { sibling ->
             val siblingComponent = assertIs<DifferenceSearchComponent>(sibling.theory)
-            val siblingHints = assertNotNull(siblingComponent.potentialHints(Cancellation.Never)).second
+            val siblingHints = assertNotNull(siblingComponent.potentialHints(ExecutionControl.Never)).second
             assertIs<ComponentResult.Consistent>(sibling.session.initialize())
             assertEquals(true, siblingHints.preferredBool(0))
             assertNull(sibling.candidateHints.preferredBool(0))
@@ -202,7 +202,7 @@ class OpenTheorySolverHintTest {
                 3,
                 intArrayOf(1, 2),
                 primitive,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 maxClauses = capacity,
             )
             val session = SearchSession(listOf(ClauseSearchComponent(clauses)))
@@ -237,14 +237,14 @@ class OpenTheorySolverHintTest {
         )
         val planned = model.componentPlan().search(model, emptyMap())
         val component = assertIs<DifferenceSearchComponent>(planned.theory)
-        val (variables, primitive) = assertNotNull(component.potentialHints(Cancellation.Never))
+        val (variables, primitive) = assertNotNull(component.potentialHints(ExecutionControl.Never))
         val hints = assertNotNull(
             SourceConjunctionHints.create(
                 model.factors.filterIsInstance<Clause>(),
                 model.numBoolVars,
                 variables,
                 primitive,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 available = component::potentialHintAvailable,
                 knownBool = component::potentialHintBool,
             ),
@@ -312,19 +312,19 @@ class OpenTheorySolverHintTest {
             model,
             emptyMap(),
             Long.MAX_VALUE,
-            Cancellation.Never,
+            ExecutionControl.Never,
             SearchLearnedDbParams(),
             stats,
         )
         val component = assertIs<DifferenceSearchComponent>(planned.theory)
-        val (variables, primitive) = assertNotNull(component.potentialHints(Cancellation.Never))
+        val (variables, primitive) = assertNotNull(component.potentialHints(ExecutionControl.Never))
         val hints = assertNotNull(
             SourceConjunctionHints.create(
                 model.factors.filterIsInstance<Clause>(),
                 model.numBoolVars,
                 variables,
                 primitive,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 usage = stats.hintUsage,
                 available = component::potentialHintAvailable,
                 knownBool = component::potentialHintBool,
@@ -375,7 +375,7 @@ class OpenTheorySolverHintTest {
         val model = clausedDifferenceModel()
         val plan = model.componentPlan()
         val state = OpenTheorySolveState(hinted(minSplits = 3))
-        val hints = state.candidateHints(plan, model, Cancellation.Never)
+        val hints = state.candidateHints(plan, model, ExecutionControl.Never)
 
         hints.preferredBool(0)
         hints.preferredBool(1)
@@ -435,7 +435,7 @@ class OpenTheorySolverHintTest {
         val model = clausedDifferenceModel()
         val state = OpenTheorySolveState(hinted())
 
-        val hints = state.candidateHints(model.componentPlan(), model, Cancellation { true })
+        val hints = state.candidateHints(model.componentPlan(), model, ExecutionControl { true })
 
         assertNull(hints.preferredBool(0))
         assertEquals(1L, state.hints.draws)
@@ -448,7 +448,7 @@ class OpenTheorySolverHintTest {
         val model = refutedClauseModel()
         val state = OpenTheorySolveState(hinted(flips = 64))
 
-        state.candidateHints(model.componentPlan(), model, Cancellation.Never).preferredBool(0)
+        state.candidateHints(model.componentPlan(), model, ExecutionControl.Never).preferredBool(0)
 
         val charged = state.work.snapshot().openWork
         assertTrue(charged > 0)

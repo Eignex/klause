@@ -35,7 +35,7 @@ import com.eignex.klause.theory.transcendental.TranscendentalCondition
 import com.eignex.klause.theory.transcendental.TranscendentalSearchComponent
 import com.eignex.klause.theory.transcendental.TranscendentalTheoryService
 import com.eignex.klause.theory.transcendental.TranscendentalWitness
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.kumulant.stat.summary.SumResult
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.fitsLong
@@ -50,7 +50,7 @@ internal class TranscendentalWorkerAdapter(
     private val binding: EngineInvocation? = null,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val started = TimeSource.Monotonic.markNow()
-    private val external = params.timeout or params.cancellation
+    private val external = params.timeout.withAccounting(params.cancellation) or params.cancellation
     private val nodeBudget = params.nodeBudget ?: params.strategy.backtrack.nodeBudget
         ?: params.strategy.localSearch.nodeBudget
     private var nativeService: TranscendentalTheoryService? = null
@@ -63,7 +63,7 @@ internal class TranscendentalWorkerAdapter(
     }
     private var closedWork = 0L
     private var closedDecline = false
-    private val stop = external or Cancellation { service.exhausted || nodeBudget?.allowance?.exhausted() == true }
+    private val stop = external or ExecutionControl { service.exhausted || nodeBudget?.allowance?.exhausted() == true }
     private val root = assumptions()
     private var strategyStats = SolveStats.EMPTY
     private var decisions = 0L
@@ -128,12 +128,17 @@ internal class TranscendentalWorkerAdapter(
             PortfolioWorker.ofSolve("bt+exact-transcendental", arm, resumable = { completeHandle() }) { global, _ ->
                 completeHandle().use { requireNotNull(it.runSlice(global, Long.MAX_VALUE, -1)) }
             }
-        } else exactNeighborhoodWorker(
-            if (arm == 2) "alns+exact-transcendental" else "ls+exact-transcendental", arm,
-            objective = null, lifetime = external or params.strategy.localSearch.cancellation,
-            timeout = params.timeout, exhausted = { service.exhausted || nodeBudget?.allowance?.exhausted() == true },
+        } else {
+            exactNeighborhoodWorker(
+            if (arm == 2) "alns+exact-transcendental" else "ls+exact-transcendental",
+            arm,
+            objective = null,
+            lifetime = external or params.strategy.localSearch.cancellation,
+            timeout = params.timeout,
+            exhausted = { service.exhausted || nodeBudget?.allowance?.exhausted() == true },
             open = { neighborhood(arm == 2) },
         )
+        }
         return worker.bindEvidence(requireNotNull(binding).model, provesResults = arm == 0)
     }
 
@@ -143,10 +148,10 @@ internal class TranscendentalWorkerAdapter(
             override val canReseed: Boolean get() = false
             private var closed = false
             private var result: SolveResult? = null
-            private var global = Cancellation.Never
-            private var deadline = Cancellation.Never
+            private var global = ExecutionControl.Never
+            private var deadline = ExecutionControl.Never
             private var end = Long.MAX_VALUE
-            private val lifetime = stop or params.strategy.backtrack.cancellation or Cancellation { global() }
+            private val lifetime = stop or params.strategy.backtrack.cancellation or ExecutionControl { global() }
             private var component: TranscendentalSearchComponent? = null
             private var session: SearchSession? = null
             private var run: SearchRun? = null
@@ -160,7 +165,9 @@ internal class TranscendentalWorkerAdapter(
                     SearchSolveParams(minOf(params.strategy.backtrack.maxDecisions,
                         params.strategy.backtrack.maxInstructions ?: Long.MAX_VALUE)),
                     decisionBudget = SearchDecisionBudget {
-                        if (nodeBudget?.allowance?.exhausted() == true) false else {
+                        if (nodeBudget?.allowance?.exhausted() == true) {
+                            false
+                        } else {
                             nodeBudget?.allowance?.spend()
                             true
                         }
@@ -183,14 +190,17 @@ internal class TranscendentalWorkerAdapter(
                 search = SearchStats(nodes = SumResult(decisions.toDouble())))
             override val work: Long get() = nativeWork + minOf(decisions, Long.MAX_VALUE - nativeWork)
 
-            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
+            override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long): SolveResult? {
                 result?.let { return it }
                 check(!closed) { "transcendental traversal is closed" }
                 this.global = global
                 if (lifetime()) return finish(SolveResult.Unknown(terminationReason(), stats))
                 if (sliceNodes == 0L || sliceMillis == 0L) return null
-                deadline = if (sliceMillis == Long.MAX_VALUE) Cancellation.Never
-                    else Cancellation.after(sliceMillis.milliseconds)
+                deadline = if (sliceMillis == Long.MAX_VALUE) {
+                    ExecutionControl.Never
+                } else {
+                    ExecutionControl.after(sliceMillis.milliseconds)
+                }
                 end = if (sliceNodes < 0) Long.MAX_VALUE else work + minOf(sliceNodes, Long.MAX_VALUE - work)
                 return try {
                     if (run == null) {
@@ -200,29 +210,36 @@ internal class TranscendentalWorkerAdapter(
                                 is TranscendentalCheckResult.Witness -> return finish(SolveResult.Sat(
                                     capture(checked.value), stats))
                                 TranscendentalCheckResult.Refuted -> return finish(SolveResult.Unsat(stats = stats))
+
                                 TranscendentalCheckResult.Unknown -> {
                                     if (lifetime()) return finish(SolveResult.Unknown(terminationReason(), stats))
                                     openTraversal(rootUnknown = true)
                                 }
                             }
-                        } else openTraversal()
+                        } else {
+                            openTraversal()
+                        }
                     }
                     when (val event = requireNotNull(run).next()) {
                         is SearchRunEvent.Satisfied -> finish(SolveResult.Sat(
                             capture(requireNotNull(event.model.valueOf(requireNotNull(component).witnessKey))), stats))
                         SearchRunEvent.Exhausted -> finish(SolveResult.Unsat(stats = stats))
+
                         SearchRunEvent.Paused -> null
+
                         else -> finish(SolveResult.Unknown(terminationReason(), stats))
                     }
                 } finally {
-                    this.global = Cancellation.Never
-                    deadline = Cancellation.Never
+                    this.global = ExecutionControl.Never
+                    deadline = ExecutionControl.Never
                 }
             }
             private fun terminationReason(): TerminationReason =
                 if (global() && !stop() && !params.strategy.backtrack.cancellation()) {
                     TerminationReason.Cancelled
-                } else reason()
+                } else {
+                    reason()
+                }
 
             private fun finish(value: SolveResult): SolveResult = value.also { result = it }
             override fun close() {
@@ -231,14 +248,14 @@ internal class TranscendentalWorkerAdapter(
                 run = null
                 session = null
                 component = null
-                global = Cancellation.Never
-                deadline = Cancellation.Never
+                global = ExecutionControl.Never
+                deadline = ExecutionControl.Never
             }
         }
     }
 
     private fun search(): OpenTheoryResult = completeHandle().use { handle ->
-        when (val result = requireNotNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1))) {
+        when (val result = requireNotNull(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1))) {
             is SolveResult.Sat -> OpenTheoryResult.Sat(TranscendentalAssignment(result.assignment), result.stats)
             is SolveResult.Unsat -> OpenTheoryResult.Unsat(result.stats)
             is SolveResult.Unknown -> OpenTheoryResult.Unknown(result.reason, result.stats)
@@ -258,11 +275,14 @@ internal class TranscendentalWorkerAdapter(
         neighborhood.advance(stop or params.strategy.localSearch.cancellation, Long.MAX_VALUE)
         val result = neighborhood.solveResult(reason())
         strategyStats = strategyStats.mergedWith(result.stats)
-        if (result is SolveResult.Sat) OpenTheoryResult.Sat(TranscendentalAssignment(result.assignment), result.stats)
-        else OpenTheoryResult.Unknown(reason(), SolveStats.EMPTY)
+        if (result is SolveResult.Sat) {
+            OpenTheoryResult.Sat(TranscendentalAssignment(result.assignment), result.stats)
+        } else {
+            OpenTheoryResult.Unknown(reason(), SolveStats.EMPTY)
+        }
     }
 
-    override fun check(condition: ExactNeighborhoodCondition, cancellation: Cancellation): ExactNeighborhoodResult {
+    override fun check(condition: ExactNeighborhoodCondition, cancellation: ExecutionControl): ExactNeighborhoodResult {
         require(condition.cutoff == null) { "transcendental satisfaction has no objective cutoff" }
         val pins = root.rational
         if (condition.bools.any { (id, value) -> pins.bools[id]?.let { it != value } == true }) {
@@ -298,9 +318,15 @@ internal class TranscendentalWorkerAdapter(
         }
         val finite = if (integers.all { it.fitsLong() }) {
             LongArray(integers.size) { integers[it].toLongExact() }
-        } else longArrayOf()
-        return Sample(witness.bools, finite,
-            approximate, exactInts = integers, symbolicReals = reals,
+        } else {
+            longArrayOf()
+        }
+        return Sample(
+            witness.bools,
+            finite,
+            approximate,
+            exactInts = integers,
+            symbolicReals = reals,
             exactReals = reals.mapNotNull { it.rational }.takeIf { it.size == reals.size },
             algebraicReals = reals.mapNotNull { it.algebraic }.takeIf { it.size == reals.size }).also { sample ->
             binding?.let {
@@ -329,6 +355,7 @@ internal class TranscendentalWorkerAdapter(
         while (pending.isNotEmpty() && !stop()) {
             when (val node = pending.removeLast()) {
                 is TranscendentalFormula.And -> pending.addAll(node.operands)
+
                 is TranscendentalFormula.Atom -> if (node.relation == PolynomialRelation.EQ) {
                     for ((target, value) in listOf(node.left to node.right, node.right to node.left)) {
                         if (target is TranscendentalExpression.Variable && value is TranscendentalExpression.Constant) {
@@ -336,26 +363,35 @@ internal class TranscendentalWorkerAdapter(
                         }
                     }
                 }
+
                 else -> Unit
             }
         }
         for (id in values.indices) {
             val lower = root.rational.lower[id]
             val upper = root.rational.upper[id]
-            if (lower != null && lower == upper) values[id] = lower
-            else if (lower != null && values[id] <= lower) values[id] = lower + BigFraction.ONE
-            else if (upper != null && values[id] >= upper) values[id] = upper - BigFraction.ONE
+            if (lower != null && lower == upper) {
+                values[id] = lower
+            } else if (lower != null && values[id] <= lower) {
+                values[id] = lower + BigFraction.ONE
+            } else if (upper != null && values[id] >= upper) {
+                values[id] = upper - BigFraction.ONE
+            }
         }
         return values
     }
 
     private fun reason(): TerminationReason = when {
         params.timeout() -> TerminationReason.Timeout
+
         params.cancellation() -> TerminationReason.Cancelled
+
         (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) &&
             params.strategy.localSearch.cancellation() -> TerminationReason.Cancelled
+
         (engine == FiniteEngine.BACKTRACK || engine == FiniteEngine.FIXED || engine == FiniteEngine.MIXED) &&
             params.strategy.backtrack.cancellation() -> TerminationReason.Cancelled
+
         else -> TerminationReason.BudgetExhausted
     }
 }

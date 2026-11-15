@@ -6,7 +6,7 @@ import com.eignex.klause.lp.lattice.hermiteNormalForm
 import com.eignex.klause.lp.lattice.sparseIntRow
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
@@ -177,7 +177,7 @@ internal fun exactMixedEchelonHermite(
     source: List<ExactMixedBoundedRow>,
     realColumns: Int,
     integerColumns: Int,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): ExactMixedEchelonHermite? {
     val columns = realColumns + integerColumns
     val rows = source.map { row ->

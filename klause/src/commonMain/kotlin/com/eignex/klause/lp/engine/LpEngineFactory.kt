@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Entering-column policy for feasibility solves with an exactly zero objective. */
 enum class LpZeroObjectivePricing {
@@ -26,7 +26,7 @@ internal data class LpPricingOptions(
 internal interface LpEngineFactory {
     fun newGeneralSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         workLimit: Long,
         pricing: LpPricingOptions,
     ): LpSolver
@@ -47,7 +47,7 @@ internal interface LpEngineFactory {
 
     fun newTableauSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         iterationLimit: Int,
         workLimit: Long,
         trackDegeneracy: Boolean,
@@ -56,7 +56,7 @@ internal interface LpEngineFactory {
 
     fun newPersistentSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         refactorUpdateLimit: Int,
         iterationLimit: Int,
         workLimit: Long,
@@ -68,7 +68,7 @@ internal interface LpEngineFactory {
 internal object ProductionLpEngineFactory : LpEngineFactory {
     override fun newGeneralSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         workLimit: Long,
         pricing: LpPricingOptions,
     ): LpSolver = RevisedSimplex(model, cancellation, workLimit = workLimit, pricing = pricing)
@@ -85,7 +85,7 @@ internal object ProductionLpEngineFactory : LpEngineFactory {
 
     override fun newTableauSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         iterationLimit: Int,
         workLimit: Long,
         trackDegeneracy: Boolean,
@@ -101,7 +101,7 @@ internal object ProductionLpEngineFactory : LpEngineFactory {
 
     override fun newPersistentSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         refactorUpdateLimit: Int,
         iterationLimit: Int,
         workLimit: Long,

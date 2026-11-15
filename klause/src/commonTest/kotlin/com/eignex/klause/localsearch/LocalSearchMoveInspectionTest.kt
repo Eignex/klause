@@ -11,7 +11,7 @@ import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -115,7 +115,7 @@ class LocalSearchMoveInspectionTest {
             val params = LocalSearchParams(maxFlips = 4, randomSeed = 7)
             engine.resumable(LinearObjective(intCoefficients = longArrayOf(1)), params).use { run ->
                 val sliced = run as InstructionSlicedSearch
-                while (sliced.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, slice) {} == null) {
+                while (sliced.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, slice) {} == null) {
                     check(values.size < 100)
                 }
             }

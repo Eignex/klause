@@ -2,7 +2,7 @@ package com.eignex.klause.solver.incumbent
 
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -20,7 +20,7 @@ class IncumbentExchangeTest {
         })
         val subscription = exchange.subscribe()
 
-        exchange.withBufferedOffers(Cancellation.Never, events::add, { it() }) {
+        exchange.withBufferedOffers(ExecutionControl.Never, events::add, { it() }) {
             exchange.offerFromWorker("first", 4) { it() }
             exchange.offerFromWorker("best", 2) { it() }
             exchange.offerFromWorker("later", 3) { it() }
@@ -48,7 +48,7 @@ class IncumbentExchangeTest {
             })
             exchange.offer("standing", 5)
 
-            exchange.withBufferedOffers(Cancellation.Never, events::add, { it() }) {
+            exchange.withBufferedOffers(ExecutionControl.Never, events::add, { it() }) {
                 exchange.offerFromWorker("proposal", 1) { it() }
             }
 
@@ -67,7 +67,7 @@ class IncumbentExchangeTest {
             Verification.Accepted(candidate)
         })
 
-        exchange.withBufferedOffers(Cancellation.Never, events::add, { it() }) {
+        exchange.withBufferedOffers(ExecutionControl.Never, events::add, { it() }) {
             exchange.offerFromWorker("queued", 3) { it() }
             assertIs<Publication.Installed<String, Int>>(exchange.offer("public", 1))
             assertEquals(listOf("public"), checked)
@@ -85,7 +85,7 @@ class IncumbentExchangeTest {
         val exchange = minimizing()
 
         assertFailsWith<IllegalStateException> {
-            exchange.withBufferedOffers(Cancellation.Never, events::add, { it() }) {
+            exchange.withBufferedOffers(ExecutionControl.Never, events::add, { it() }) {
                 exchange.offerFromWorker("discard", 1.0) { it() }
                 error("query failed")
             }
@@ -109,7 +109,7 @@ class IncumbentExchangeTest {
                 Verification.Accepted(candidate)
             })
 
-            exchange.withBufferedOffers(Cancellation { expired }, events::add, { it() }) {
+            exchange.withBufferedOffers(ExecutionControl { expired }, events::add, { it() }) {
                 exchange.offerFromWorker("expired", 1) { it() }
                 expired = !duringCheck
             }
@@ -130,11 +130,11 @@ class IncumbentExchangeTest {
         val events = mutableListOf<IncumbentOfferEvent>()
 
         assertFailsWith<IllegalStateException> {
-            exchange.withBufferedOffers(Cancellation.Never, events::add, { it() }) {
+            exchange.withBufferedOffers(ExecutionControl.Never, events::add, { it() }) {
                 exchange.offerFromWorker("bad", 1) { it() }
             }
         }
-        exchange.withBufferedOffers(Cancellation.Never, events::add, { it() }) {
+        exchange.withBufferedOffers(ExecutionControl.Never, events::add, { it() }) {
             exchange.offerFromWorker("good", 2) { it() }
         }
 

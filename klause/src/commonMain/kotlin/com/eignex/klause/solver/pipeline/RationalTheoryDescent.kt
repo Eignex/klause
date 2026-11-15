@@ -28,7 +28,7 @@ import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -50,11 +50,11 @@ internal class RationalTheoryDescent(
                 (
                     (
                         publicationInvocation.sourceModel.sameModel(ModelIdentity.of(source)) ||
-                    publicationInvocation.preparedPlan.model === source
-                    ) &&
-                    publicationInvocation.model.matches(ModelIdentity.of(source, objective)) &&
-                    publicationInvocation.scope == context?.scope
-                ),
+                            publicationInvocation.preparedPlan.model === source
+                        ) &&
+                        publicationInvocation.model.matches(ModelIdentity.of(source, objective)) &&
+                        publicationInvocation.scope == context?.scope
+                    ),
         ) {
             "rational witness publication has a different source invocation"
         }
@@ -74,8 +74,16 @@ internal class RationalTheoryDescent(
     fun linearSnapshot(): LinearOptimizationResult? = linearResult ?: linear?.let { invocation ->
         val result = invocation.snapshot(TerminationReason.BudgetExhausted)
         val captured = requireNotNull(context)
-        LinearOptimizationResult(captured.scope, null, result.bound, result.incumbent, result.value,
-            result.reason, result.stats, captured.semantics)
+        LinearOptimizationResult(
+            captured.scope,
+            null,
+            result.bound,
+            result.incumbent,
+            result.value,
+            result.reason,
+            result.stats,
+            captured.semantics,
+        )
     }
     private var round: ResumableOpenTheory? = null
     private var incumbent: Sample? = null
@@ -92,7 +100,7 @@ internal class RationalTheoryDescent(
     override val work: Long get() = linear?.work ?: state.work.spent
 
     override fun runSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceNodes: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -113,14 +121,17 @@ internal class RationalTheoryDescent(
                 BigFraction.ONE
             }
             val completed = invocation.runSlice(global, sliceMillis, sliceNodes) { sample, exact ->
-                attestWitness(sample, global or params.timeout or params.cancellation)
+                attestWitness(
+                    sample,
+                    global or params.timeout.withAccounting(params.cancellation) or params.cancellation,
+                )
                 onIncumbent(
                     MinimizeResult.BestFound(
-                    sample,
-                    (exact * sign).toDouble(),
-                    TerminationReason.BudgetExhausted,
-                    stats,
-                )
+                        sample,
+                        (exact * sign).toDouble(),
+                        TerminationReason.BudgetExhausted,
+                        stats,
+                    ),
                 )
             } ?: return null
             val sourceContext = requireNotNull(context)
@@ -185,7 +196,11 @@ internal class RationalTheoryDescent(
             if (advanced && (work >= endWork || deadline?.hasPassedNow() == true)) return null
             val current = round ?: run {
                 external()?.let { (sample, _) ->
-                    if (!proofDeclined || retainChecked(sample, global or params.timeout or params.cancellation)) {
+                    if (!proofDeclined || retainChecked(
+                            sample,
+                            global or params.timeout.withAccounting(params.cancellation) or params.cancellation,
+                        )
+                    ) {
                         val exact = objective.evaluateExact(sample)
                         if (value == null || exact < requireNotNull(value)) {
                             incumbent = sample
@@ -204,13 +219,13 @@ internal class RationalTheoryDescent(
                 if (route == ProblemPipeline.UNSUPPORTED_OPEN || route == ProblemPipeline.FINITE_CP) {
                     return finish(TerminationReason.Unsupported)
                 }
-                val engine = OpenTheoryEngine(model, route, PresolveConfig.NONE, true, Cancellation.Never, null)
+                val engine = OpenTheoryEngine(model, route, PresolveConfig.NONE, true, ExecutionControl.Never, null)
                 ResumableOpenTheory(
                     engine,
                     params.copy(
-                    maxLeaves = (params.maxLeaves - state.work.snapshot().openTheoryChecks).coerceAtLeast(0),
-                ),
-                    state
+                        maxLeaves = (params.maxLeaves - state.work.snapshot().openTheoryChecks).coerceAtLeast(0),
+                    ),
+                    state,
                 )
                     .also { round = it }
             }
@@ -229,7 +244,11 @@ internal class RationalTheoryDescent(
                     val exact = objective.evaluateExact(sample)
                     check(value == null || exact < requireNotNull(value))
                     val standing = checkedIncumbent
-                    if (proofDeclined && !retainChecked(sample, global or params.timeout or params.cancellation)) {
+                    if (proofDeclined && !retainChecked(
+                            sample,
+                            global or params.timeout.withAccounting(params.cancellation) or params.cancellation,
+                        )
+                    ) {
                         return finish(
                             if (params.timeout()) {
                                 TerminationReason.Timeout
@@ -242,17 +261,20 @@ internal class RationalTheoryDescent(
                     }
                     incumbent = sample
                     value = exact
-                    attestWitness(sample, global or params.timeout or params.cancellation)
+                    attestWitness(
+                        sample,
+                        global or params.timeout.withAccounting(params.cancellation) or params.cancellation,
+                    )
                     if (proofDeclined) linearResult = partial(TerminationReason.BudgetExhausted)
                     if (!proofDeclined || checkedIncumbent !== standing) {
                         publish(
                             MinimizeResult.BestFound(
-                            sample,
-                            exact.toDouble(),
-                            TerminationReason.BudgetExhausted,
-                            stats,
-                        ),
-                            onIncumbent
+                                sample,
+                                exact.toDouble(),
+                                TerminationReason.BudgetExhausted,
+                                stats,
+                            ),
+                            onIncumbent,
                         )
                     }
                 }
@@ -293,7 +315,7 @@ internal class RationalTheoryDescent(
         invocation.scope == context?.scope &&
         context?.scope?.condition?.implies(invocation.executionCondition) == true
 
-    private fun attestWitness(sample: Sample, cancellation: Cancellation) {
+    private fun attestWitness(sample: Sample, cancellation: ExecutionControl) {
         val original = witnessContext ?: source.linearAuthorityContext(
             LinearObjective(),
             ObjectiveSense.MINIMIZE,
@@ -309,15 +331,15 @@ internal class RationalTheoryDescent(
         sample.witnessCertificate = publicationInvocation?.let { binding ->
             EvidenceCertificate.published(
                 CompletedEnginePublication.Witness(
-                binding,
-                sample,
-                objective.evaluateExact(sample).toDouble(),
-            )
+                    binding,
+                    sample,
+                    objective.evaluateExact(sample).toDouble(),
+                ),
             )
         }
     }
 
-    private fun retainChecked(sample: Sample, cancellation: Cancellation): Boolean {
+    private fun retainChecked(sample: Sample, cancellation: ExecutionControl): Boolean {
         val original = requireNotNull(context)
         val evidence = SourceEvidence(original.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)
         if (SourceEvidenceVerifier(original.withLinearAuthority()).verify(evidence, cancellation) !=
@@ -360,9 +382,9 @@ internal class RationalTheoryDescent(
             source
         } else {
             source.withFactors(
-            source.factors + rows,
-            source.impliedFactorMask?.let { it + BooleanArray(rows.size) },
-        )
+                source.factors + rows,
+                source.impliedFactorMask?.let { it + BooleanArray(rows.size) },
+            )
         }
     }
 
@@ -419,12 +441,12 @@ internal class RationalTheoryDescent(
         round = null
         if (proofDeclined && result == null) {
             linearResult = partial(
-            if (params.timeout()) {
-                TerminationReason.Timeout
-            } else {
-                TerminationReason.Cancelled
-            },
-        )
+                if (params.timeout()) {
+                    TerminationReason.Timeout
+                } else {
+                    TerminationReason.Cancelled
+                },
+            )
         }
         closed = true
     }

@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertFailsWith
@@ -16,7 +16,7 @@ class LpQueryObservationTest {
         query.release()
 
         assertFailsWith<IllegalStateException> {
-            query.captureExactWithin("expired", 4096, 65_536, 4096, Cancellation.Never)
+            query.captureExactWithin("expired", 4096, 65_536, 4096, ExecutionControl.Never)
         }
     }
 

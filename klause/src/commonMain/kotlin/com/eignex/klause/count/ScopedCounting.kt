@@ -8,11 +8,11 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.conditionedRoot
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun BakedProblem.countingScope(assumptions: Assumptions): BakedProblem {
     if (assumptions.isEmpty && assumptions.deductions.isEmpty) return this
-    val conditioned = conditionedRoot(assumptions, Cancellation.Never)
+    val conditioned = conditionedRoot(assumptions, ExecutionControl.Never)
     // Hashing rebuilds source rows, so Boolean restrictions must survive outside the root cache.
     val deductions = conditioned.rootDeductions as? PropagationResult.Implied ?: return conditioned
     val pins = Array(deductions.boolKeys.size) {

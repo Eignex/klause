@@ -7,7 +7,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -344,18 +344,18 @@ class PolynomialWitnessSupportsTest {
         val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
             .conjunctiveAtoms(PolynomialArithmetic(), 128))
         var completed = 0L
-        val counter = object : Cancellation {
+        val counter = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { completed += it }
+            override val accounting: WorkMeter get() = WorkMeter { completed += it }
         }
         assertNotNull(PolynomialWitnessSupports(PolynomialArithmetic(counter), 2048, 8, 4096, 4).point(
             atoms, atoms.map { it.polynomial.terms }, source.realCount, emptyMap(), { true }, { true },
         ))
         for (limit in listOf(1L, completed / 2, completed - 1)) {
             var spent = 0L
-            val cancellation = object : Cancellation {
+            val cancellation = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = spent >= limit
-                override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+                override val accounting: WorkMeter get() = WorkMeter { spent += it }
             }
 
             assertFailsWith<PolynomialInterrupted> {

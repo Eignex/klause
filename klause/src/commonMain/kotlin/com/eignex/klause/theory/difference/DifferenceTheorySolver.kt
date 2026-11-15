@@ -7,17 +7,17 @@ import com.eignex.klause.arithmetic.difference.potentialSample
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.PreparedFactorProjections
-import com.eignex.klause.solver.selectedFactorProjections
-import com.eignex.klause.theory.EncodingTarget
-import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.differenceFragmentOf
 import com.eignex.klause.solver.search.SearchExplanation
+import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.supportsCompleteDifferenceTheory
+import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.Theory
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.theory.linearTheoryModel
+import com.eignex.klause.util.ExecutionControl
 
 /** Complete open integer difference-logic solver. */
 class DifferenceTheorySolver(
@@ -40,7 +40,7 @@ class DifferenceTheorySolver(
 
     override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<Sample> {
         if (!context.consumeCheck()) return TheoryCheck.Cancelled
-        when (encoded.checkDifferenceBooleans(bools, Cancellation { context.cancelled() })) {
+        when (encoded.checkDifferenceBooleans(bools, ExecutionControl { context.cancelled() })) {
             false -> return TheoryCheck.Infeasible()
             null -> return TheoryCheck.Cancelled
             true -> Unit
@@ -64,7 +64,10 @@ class DifferenceTheorySolver(
                 model.intDomainOrNull(variable)?.let { values[variable] !in it } == true ||
                     context.intLowerBound(variable)?.let { values[variable] < it } == true ||
                     context.intUpperBound(variable)?.let { values[variable] > it } == true
-            }) return TheoryCheck.Cancelled
+            }
+        ) {
+                return TheoryCheck.Cancelled
+            }
         return TheoryCheck.Sat(Sample(bools.copyOf(), values))
     }
 

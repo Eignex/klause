@@ -30,7 +30,7 @@ import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.search.BranchingConflict
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -217,7 +217,7 @@ object ConditionalComponentTrace {
         consumer: ((ResidualProbeContext) -> JsonObject)?,
     ): JsonObject {
         val prepareStart = System.nanoTime()
-        val stop = Cancellation.after(settings.prepareMillis.milliseconds)
+        val stop = ExecutionControl.after(settings.prepareMillis.milliseconds)
         val prepared = FinitePipeline.prepare(FinitePipelineRequest(
             input.problem, FiniteEngine.BACKTRACK, input.objective,
             cancellation = stop, solveCancellation = stop, presolveBudget = PresolveBudget(PRESOLVE_ALLOWANCE),
@@ -255,7 +255,7 @@ object ConditionalComponentTrace {
         val deadline = settings.searchMillis * 1_000_000
         val base = BacktrackPresets.satOptimized(
             randomSeed = settings.seed,
-            cancellation = Cancellation { System.nanoTime() - start - recorder.traceNanos > deadline },
+            cancellation = ExecutionControl { System.nanoTime() - start - recorder.traceNanos > deadline },
         )
         val params = base.copy(variableSelector = TracingSelector(base.variableSelector, recorder),
             improvedSolutionSink = { sample, _ -> recorder.onIncumbent(sample) })
@@ -368,21 +368,21 @@ object ConditionalComponentTrace {
                 if (w < 0) isolated += w
             }
         }
-        val childStop = Cancellation.after(settings.probeMillis.milliseconds)
+        val childStop = ExecutionControl.after(settings.probeMillis.milliseconds)
         val children = componentVars.indices.sortedBy { probe.clauses[it].size }.map { i ->
             solveResidual(componentVars[i], probe.clauses[i], weights, childStop, settings.seed)
         }
         val joint = solveResidual(
             componentVars.flatMap { it.toList() }.sorted().toIntArray(), probe.clauses.flatten(), weights,
-            Cancellation.after(settings.probeMillis.milliseconds), settings.seed,
+            ExecutionControl.after(settings.probeMillis.milliseconds), settings.seed,
         )
         val jointLp = solveResidual(
             joint.vars, probe.clauses.flatten(), weights,
-            Cancellation.after(settings.probeMillis.milliseconds), settings.seed,
+            ExecutionControl.after(settings.probeMillis.milliseconds), settings.seed,
         ) { it.copy(lpConfig = LpConfig(LpEmphasis.DEFAULT)) }
         val jointOrdered = solveResidual(
             joint.vars, probe.clauses.flatten(), weights,
-            Cancellation.after(settings.probeMillis.milliseconds), settings.seed,
+            ExecutionControl.after(settings.probeMillis.milliseconds), settings.seed,
         ) { it.copy(objectiveGuidedValues = true) }
         val childOptima = children.map { (it.result as? MinimizeResult.Optimal)?.objectiveValue?.toLong() }
         val childSum = if (childOptima.all { it != null }) childOptima.sumOf { it ?: 0L } else null
@@ -440,7 +440,7 @@ object ConditionalComponentTrace {
         vars: IntArray,
         clauses: List<IntArray>,
         weights: LongArray,
-        stop: Cancellation,
+        stop: ExecutionControl,
         seed: Long,
         control: (BacktrackParams) -> BacktrackParams = { it },
     ): ResidualRun = ResidualReplayControls.solve(vars, clauses.map(::Clause), weights, stop, seed, control)
@@ -803,7 +803,7 @@ object ConditionalComponentTrace {
             val keys = roots.map { r -> components.getValue(r).let { it.h1 to it.h2 } }
             val seenAtCapture = keys.map { k -> seen[k]?.let { it.sightings to it.reencounters } ?: (0 to 0) }
             val snapshot = captureContext?.let { context ->
-                val stop = Cancellation { System.nanoTime() >= observationDeadline }
+                val stop = ExecutionControl { System.nanoTime() >= observationDeadline }
                 context.budget.retain { remaining ->
                     when {
                         numBool > ResidualSnapshots.MAX_COORDINATES -> ResidualCapture(null, "coordinate-limit")
@@ -853,7 +853,7 @@ object ConditionalComponentTrace {
         }
 
         private fun observeEnforcing(session: PropagationSession, components: Map<Int, Component>) {
-            val inspection = LearnedResidualRestrictions.inspect(session, Cancellation {
+            val inspection = LearnedResidualRestrictions.inspect(session, ExecutionControl {
                 System.nanoTime() >= observationDeadline
             })
             permanentRetentionEntries += inspection.entries.count { it.permanentRetention }

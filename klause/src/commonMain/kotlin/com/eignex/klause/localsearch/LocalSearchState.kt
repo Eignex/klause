@@ -4,7 +4,6 @@ import com.eignex.klause.factor.DEFAULT_VIOLATION_SOFT_CAP
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.IntDomain
@@ -24,9 +23,11 @@ import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
-import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.ExactIntegerSum
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.StopPolling
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.pollStop
 import com.eignex.util.arrays.emptyDoubleArray
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.arrays.emptyLongArray
@@ -87,6 +88,7 @@ class LocalSearchState private constructor(
             }
         }
     }
+
     /** A search over the finite model [problem]. */
     constructor(
         problem: BakedProblem,
@@ -257,42 +259,58 @@ class LocalSearchState private constructor(
     private var definitionTraversal: DefinitionTraversal? = null
     private var definitionValues: DefinitionValues? = null
     private var moveActive = false
-    private var scoringCancellation: Cancellation = Cancellation.Never
+    private var scoringCancellation: ExecutionControl = ExecutionControl.Never
     private var scoringCountdown = 0
+    private var scoringPolling: StopPolling? = null
     private var restoringProbe = false
 
-    internal fun scoringPick(cancellation: Cancellation, pick: () -> Move?): Move? {
+    internal fun scoringPick(cancellation: ExecutionControl, pick: () -> Move?): Move? {
         scoringCancellation = cancellation
+        scoringPolling = cancellation.stopPolling
         scoringCountdown = 0
         return try {
+            if (cancellation.pollStop()) return null
             val timer = phaseTimer
-            if (timer == null) pick() else timer.measureScoringPick(pick)
+            val selected = if (timer == null) pick() else timer.measureScoringPick(pick)
+            if (cancellation.pollStop()) null else selected
         } catch (_: LocalSearchScoringInterrupted) {
             null
         } finally {
-            scoringCancellation = Cancellation.Never
+            scoringCancellation = ExecutionControl.Never
+            scoringPolling = null
         }
     }
 
     internal fun checkScoringWork() {
-        if (moveActive || scoringCancellation === Cancellation.Never) return
+        if (moveActive || scoringCancellation === ExecutionControl.Never) return
         inspectionWork?.charge(1L)
-        if (scoringCountdown-- > 0) return
+        val polling = scoringPolling
+        if (polling != null) {
+            if (!polling.due(1)) return
+        } else if (scoringCountdown-- > 0) return
         scoringCountdown = LOCAL_SEARCH_OPERATION_BATCH - 1
         if (scoringCancellation()) throw LocalSearchScoringInterrupted
     }
 
     private fun checkProbeWork() {
-        if (probeActive && !restoringProbe && scoringCancellation !== Cancellation.Never) {
+        if (probeActive && !restoringProbe && scoringCancellation !== ExecutionControl.Never) {
             inspectionWork?.charge(1L)
+            val polling = scoringPolling
+            if (polling != null) {
+                if (!polling.due(1)) return
+            } else if (scoringCountdown-- > 0) return
+            scoringCountdown = LOCAL_SEARCH_OPERATION_BATCH - 1
             if (scoringCancellation()) throw LocalSearchScoringInterrupted
         }
     }
 
     private fun checkObjectiveProbeWork() {
-        val active = probeActive && !restoringProbe && scoringCancellation !== Cancellation.Never
+        val active = probeActive && !restoringProbe && scoringCancellation !== ExecutionControl.Never
         if (active) inspectionWork?.charge(1L)
-        if (scoringCountdown-- > 0) return
+        val polling = scoringPolling
+        if (polling != null) {
+            if (!polling.due(1)) return
+        } else if (scoringCountdown-- > 0) return
         scoringCountdown = LOCAL_SEARCH_OPERATION_BATCH - 1
         if (active && scoringCancellation()) throw LocalSearchScoringInterrupted
     }
@@ -780,17 +798,22 @@ class LocalSearchState private constructor(
         if (feedsDefinitions(move)) return evaluateMove(move, scored).objectiveDelta
         return when (scored) {
             is LinearObjective -> linearObjectiveDelta(move, scored)
+
             is FunctionalObjective -> {
                 val indexed = booleanDelta.takeIf { booleanDeltaOf === scored }
                 if (indexed != null) {
                     indexed.delta(assignment, move, ::checkScoringWork).also {
                         phaseTimer?.recordObjectiveScoring("indexed")
                     }
-                } else scored.deltaIfApplied(assignment, move).also {
+                } else {
+                    scored.deltaIfApplied(assignment, move).also {
                     phaseTimer?.recordObjectiveScoring("generic")
                 }
+                }
             }
+
             is IncrementalObjective -> scored.deltaIfApplied(assignment, move)
+
             else -> null
         }
     }
@@ -1111,7 +1134,9 @@ class LocalSearchState private constructor(
         if (assignment.intValue(cell) == value) return true
         if (value !in rootDomains[cell] || !eligibility.allowsInt(cell) ||
             problem.numBoolVars + cell in probeSlotSet
-        ) return false
+        ) {
+            return false
+        }
         return true
     }
 
@@ -1466,7 +1491,9 @@ class LocalSearchState private constructor(
             if (factor.variables.reals.isEmpty() &&
                 (projection.selection?.capabilities(id) ?: factor.executionCapabilities()).assignmentCheck ==
                 AssignmentCheckCapability.EXACT
-            ) return null
+            ) {
+                return null
+            }
         }
         work?.charge(problem.numBoolVars.toLong() + problem.numIntVars + problem.numRealVars)
         return assignment.snapshot()
@@ -1508,7 +1535,9 @@ class LocalSearchState private constructor(
         val indexed = booleanDelta.takeIf { booleanDeltaOf === objective }
         val oldExactObjective = if (indexed == null) {
             (objective as? FunctionalObjective)?.let(::committedValue)
-        } else null
+        } else {
+            null
+        }
         val oldObjective = if (
             objective != null && objective !is LinearObjective && objective !is FunctionalObjective
         ) {
@@ -1553,15 +1582,20 @@ class LocalSearchState private constructor(
             val weighted = if (weights.allocated) weightedDegreeDelta(checkNotNull(degBefore)) else delta.toDouble()
             val objectiveDelta = when {
                 feasibleObjective && cost > 0L -> Double.POSITIVE_INFINITY
+
                 objective is LinearObjective -> probeLinearObjectiveDelta(objective)
+
                 indexed != null -> indexed.difference(
                     assignment, probeSlots, savedValuesScratch, ::checkObjectiveProbeWork,
                 ).also { phaseTimer?.recordObjectiveScoring("indexed") }
+
                 objective is FunctionalObjective ->
                     (objective.evaluateExact(assignment) - checkNotNull(oldExactObjective)).toDouble().also {
                         phaseTimer?.recordObjectiveScoring("generic")
                     }
+
                 objective == null -> 0.0
+
                 else -> objective.evaluate(assignment) - oldObjective
             }
             val breaks = if (move is Move.Compound) newlyViolated else breakCount

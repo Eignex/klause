@@ -15,7 +15,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.conditionedRoot
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -117,7 +117,7 @@ class TableValueSubstitutionTest {
             val budget = PresolveBudget(limit)
 
             val delta = TableValueSubstitution.reduce(problem,
-                context.withCancellation(budget.orSpent(Cancellation.Never)))
+                context.withCancellation(budget.orSpent(ExecutionControl.Never)))
 
             assertTrue(delta.isEmpty)
             assertTrue(budget.spent() <= limit)
@@ -200,7 +200,7 @@ class TableValueSubstitutionTest {
         val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1023)), listOf(table)).bake()
         val budget = PresolveBudget(Long.MAX_VALUE)
         val context = PresolveContext.of(LinearObjective(intCoefficients = longArrayOf(1, 0)),
-            transformObjective = true).withCancellation(budget.orSpent(Cancellation.Never))
+            transformObjective = true).withCancellation(budget.orSpent(ExecutionControl.Never))
 
         val delta = TableValueSubstitution.reduce(problem, context)
 
@@ -212,7 +212,7 @@ class TableValueSubstitutionTest {
     fun `captured opening pins should reject a cheaper unavailable value`() {
         val table = Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 0, 2, 0))
         val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 0)), listOf(table)).bake()
-        val conditioned = source.conditionedRoot(Assumptions.None.withInt(0, 1), Cancellation.Never)
+        val conditioned = source.conditionedRoot(Assumptions.None.withInt(0, 1), ExecutionControl.Never)
         val context = PresolveContext.of(LinearObjective(intCoefficients = longArrayOf(1, 0)),
             transformObjective = true)
 

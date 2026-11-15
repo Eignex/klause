@@ -13,7 +13,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.prepareOpenSource
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolvePreparationStage
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -123,7 +123,7 @@ class PreparedSourceTest {
 
         val prepared = PresolvePipeline.prepareSource(
             aggregatable(),
-            cancellation = parent.orSpent(Cancellation.Never),
+            cancellation = parent.orSpent(ExecutionControl.Never),
             presolveBudget = parent,
         )
 

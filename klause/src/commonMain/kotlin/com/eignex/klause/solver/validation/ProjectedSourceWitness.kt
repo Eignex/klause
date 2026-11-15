@@ -6,32 +6,39 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun verifyProjectedSourceWitness(
     source: Problem,
     integerChecker: BakedProblem,
     sample: Sample,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     points: FinitePointCheck = FinitePointCheck(integerChecker),
     toleranceCheck: ((Sample) -> Boolean)?,
 ): Verification<Sample, Unit> {
     if (cancellation()) return Verification.Indeterminate("source verification cancelled")
     if (sample.numBoolVars != source.numBoolVars || sample.numIntVars != source.numIntVars ||
         sample.numRealVars != source.numRealVars
-    ) return Verification.Rejected("assignment does not cover original source coordinates")
+    ) {
+        return Verification.Rejected("assignment does not cover original source coordinates")
+    }
     for (id in 0 until source.numIntVars) {
         cancellation.charge(1)
         if (cancellation()) return Verification.Indeterminate("source bounds check cancelled")
         val value = sample.intValue(id)
         if (value < source.intBounds.lower(id) || value > source.intBounds.upper(id) ||
             source.intDomainOrNull(id)?.let { value !in it } == true
-        ) return Verification.Rejected("assignment violates an original integer declaration")
+        ) {
+            return Verification.Rejected("assignment violates an original integer declaration")
+        }
     }
     checkProjectedRealBounds(source, sample, cancellation)?.let { return it }
     val policy = source.semantics.effective.feasibilityTolerance
-    val checked = if (policy == null || policy.isExact) verifyRealCoordinates(source, sample, cancellation)
-        else verifyCapturedLinearTolerance(source, sample, policy, cancellation)
+    val checked = if (policy == null || policy.isExact) {
+        verifyRealCoordinates(source, sample, cancellation)
+    } else {
+        verifyCapturedLinearTolerance(source, sample, policy, cancellation)
+    }
     if (cancellation()) return Verification.Indeterminate("source verification cancelled")
     when (checked) {
         is Verification.Accepted -> Unit
@@ -51,7 +58,7 @@ internal fun verifyProjectedSourceWitness(
 private fun checkProjectedRealBounds(
     source: Problem,
     sample: Sample,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Verification<Nothing, Nothing>? {
     for (id in 0 until source.numRealVars) {
         cancellation.charge(1)

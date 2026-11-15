@@ -5,7 +5,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.selectedFactorProjections
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntHashSet
 
@@ -28,13 +28,18 @@ class PropagationProblem private constructor(
         selection.requireSource(problem)
     }
 
-    internal fun bakeRetainedView(view: Problem, factorIndices: IntArray, cancellation: Cancellation): BakedProblem {
-        require(view.numBoolVars == problem.numBoolVars && view.numIntVars == problem.numIntVars &&
-            view.numRealVars == problem.numRealVars && factorIndices.size == view.numFactors &&
-            factorIndices.indices.all { index ->
-                val original = factorIndices[index]
-                original in problem.factors.indices && view.factors[index] === problem.factors[original]
-            }
+    internal fun bakeRetainedView(
+        view: Problem,
+        factorIndices: IntArray,
+        cancellation: ExecutionControl,
+    ): BakedProblem {
+        require(
+            view.numBoolVars == problem.numBoolVars && view.numIntVars == problem.numIntVars &&
+                view.numRealVars == problem.numRealVars && factorIndices.size == view.numFactors &&
+                factorIndices.indices.all { index ->
+                    val original = factorIndices[index]
+                    original in problem.factors.indices && view.factors[index] === problem.factors[original]
+                },
         ) { "retained propagation view differs from its original coordinates or factors" }
         val captured = selection ?: problem.selectedFactorProjections()
         return view.bake(captured.projected(view, factorIndices), cancellation)
@@ -48,8 +53,10 @@ class PropagationProblem private constructor(
     val propagators: Array<out Propagator> by lazy {
         preparedPropagators ?: run {
             val preparation = FactorProjectionPreparation()
-            Array(problem.numFactors) { selection?.propagator(it, preparation)
-                ?: problem.factors[it].propagatorProjection(preparation) }
+            Array(problem.numFactors) {
+                selection?.propagator(it, preparation)
+                    ?: problem.factors[it].propagatorProjection(preparation)
+            }
         }
     }
 

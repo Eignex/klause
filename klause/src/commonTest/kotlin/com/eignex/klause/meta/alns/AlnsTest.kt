@@ -41,7 +41,7 @@ import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.random.Random
 import kotlin.test.Test
@@ -63,10 +63,16 @@ class AlnsTest {
         val best = selectOptimum()
         val worse = Sample(BooleanArray(SELECT_WEIGHTS.size) { true }, LongArray(0))
         val trace = RepairTrace("ALNS accepted nonbest centers")
-        val alns = Alns(inner = bootstrapAt(problem, best),
-            destroyOperators = listOf(DestroyOperator.Random), repairOperators = listOf(RepairOperator { worse }),
-            acceptance = AcceptanceCriterion.RandomWalk, minDestroyFraction = 1.0, maxDestroyFraction = 1.0,
-            maxIterations = 2, flipsPerIteration = 1)
+        val alns = Alns(
+            inner = bootstrapAt(problem, best),
+            destroyOperators = listOf(DestroyOperator.Random),
+            repairOperators = listOf(RepairOperator { worse }),
+            acceptance = AcceptanceCriterion.RandomWalk,
+            minDestroyFraction = 1.0,
+            maxDestroyFraction = 1.0,
+            maxIterations = 2,
+            flipsPerIteration = 1,
+        )
         alns.repairTrace = trace
 
         alns.minimize(selectObjective, LocalSearchParams(initialAssignment = best, randomSeed = 7))
@@ -112,7 +118,7 @@ class AlnsTest {
 
                 val result = if (retained) {
                     alns.resumable(selectObjective, params).use {
-                        assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE) {})
+                        assertNotNull(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE) {})
                     }
                 } else {
                     alns.minimize(selectObjective, params)
@@ -145,7 +151,7 @@ class AlnsTest {
             )
 
             val result = handle.use {
-                assertNotNull(it.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+                assertNotNull(it.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 50) {})
             }
 
             assertEquals(50L, handle.chargedInstructions)
@@ -196,7 +202,7 @@ class AlnsTest {
 
             val result = handle.use {
                 assertNotNull(
-                    it.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 8) { found ->
+                    it.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 8) { found ->
                         incumbents += objective.evaluate(found.sample)
                     },
                 )
@@ -226,7 +232,7 @@ class AlnsTest {
             override val isDone: Boolean get() = false
             override val stats: SolveStats get() = SolveStats(search = SearchStats(nodes = SumResult(13.0 + cpCloses)))
             override fun runSlice(
-                global: Cancellation,
+                global: ExecutionControl,
                 sliceMillis: Long,
                 sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -241,7 +247,7 @@ class AlnsTest {
         val ls = object : ResumableSearch by cp {
             override val stats: SolveStats get() = SolveStats(ls = LocalSearchStats(moves = SumResult(7.0 + lsCloses)))
             override fun runSlice(
-                global: Cancellation,
+                global: ExecutionControl,
                 sliceMillis: Long,
                 sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -279,14 +285,14 @@ class AlnsTest {
             flipsPerIteration = 50,
         )
         val handle = assertIs<InstructionSlicedSearch>(alns.resumable(selectObjective, LocalSearchParams()))
-        assertNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+        assertNull(handle.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 50) {})
         exchange.offer(Sample(BooleanArray(0), LongArray(0)), 1000.0)
-        assertNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+        assertNull(handle.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 50) {})
         val seed = selectOptimum()
         exchange.offer(seed, selectObjective.evaluate(seed))
-        assertNull(handle.runInstructionSlice(Cancellation { true }, Long.MAX_VALUE, 50) {})
+        assertNull(handle.runInstructionSlice(ExecutionControl { true }, Long.MAX_VALUE, 50) {})
         assertEquals(0, cpCloses)
-        val result = assertNotNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+        val result = assertNotNull(handle.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 50) {})
         handle.close()
         handle.close()
 
@@ -496,8 +502,8 @@ class AlnsTest {
         }
         val handle = alns.resumable(objective, LocalSearchParams(initialAssignment = seed))
 
-        val first = handle.runSlice(Cancellation { checked && ++polls >= 3 }, Long.MAX_VALUE) {}
-        val result = handle.use { first ?: assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE) {}) }
+        val first = handle.runSlice(ExecutionControl { checked && ++polls >= 3 }, Long.MAX_VALUE) {}
+        val result = handle.use { first ?: assertNotNull(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE) {}) }
 
         assertEquals(seed, result.assignment)
     }
@@ -512,7 +518,7 @@ class AlnsTest {
             override val isDone: Boolean get() = false
             override val stats: SolveStats get() = SolveStats.EMPTY
             override fun runSlice(
-                global: Cancellation,
+                global: ExecutionControl,
                 sliceMillis: Long,
                 sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -537,12 +543,12 @@ class AlnsTest {
         }
         val alns = Alns(inner, backtrack = backtrack, pooledIncumbents = exchange, maxIterations = 0)
         val handle = alns.resumable(selectObjective, LocalSearchParams())
-        assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE) {})
+        assertNull(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE) {})
         val seed = selectOptimum()
         exchange.offer(seed, selectObjective.evaluate(seed))
 
         val failure = assertFailsWith<IllegalStateException> {
-            handle.runSlice(Cancellation.Never, Long.MAX_VALUE) {}
+            handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE) {}
         }
         handle.close()
         alns.resumable(selectObjective, LocalSearchParams()).close()
@@ -590,8 +596,8 @@ class AlnsTest {
         )
 
         alns.resumable(objective, LocalSearchParams()).use { handle ->
-            val first = handle.runSlice(Cancellation { expanding && ++polls >= 2 }, Long.MAX_VALUE) {}
-            val result = assertNotNull(first ?: handle.runSlice(Cancellation.Never, Long.MAX_VALUE) {})
+            val first = handle.runSlice(ExecutionControl { expanding && ++polls >= 2 }, Long.MAX_VALUE) {}
+            val result = assertNotNull(first ?: handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE) {})
 
             assertEquals(8L, result.stats.alns.outerAllowance)
             assertEquals(1, destroys)
@@ -694,7 +700,7 @@ class AlnsTest {
                     override val stats: SolveStats
                         get() = SolveStats(search = SearchStats(nodes = SumResult(slices * 13.0)))
                     override fun runSlice(
-                        global: Cancellation,
+                        global: ExecutionControl,
                         sliceMillis: Long,
                         sliceNodes: Long,
                         onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -720,9 +726,9 @@ class AlnsTest {
         val callbacks = mutableListOf<Sample>()
         val handle = assertIs<InstructionSlicedSearch>(alns.resumable(selectObjective, LocalSearchParams()))
 
-        assertNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) { callbacks += it.sample })
+        assertNull(handle.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 50) { callbacks += it.sample })
         val result = assertNotNull(
-            handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) { callbacks += it.sample },
+            handle.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 50) { callbacks += it.sample },
         )
         handle.close()
 
@@ -751,13 +757,13 @@ class AlnsTest {
                     override val stats: SolveStats
                         get() = SolveStats(ls = LocalSearchStats(moves = SumResult(slices * 7.0)))
                     override fun runSlice(
-                        global: Cancellation,
+                        global: ExecutionControl,
                         sliceMillis: Long,
                         sliceNodes: Long,
                         onIncumbent: (MinimizeResult.WithSample) -> Unit,
                     ): MinimizeResult? = error("instruction slice required")
                     override fun runInstructionSlice(
-                        global: Cancellation,
+                        global: ExecutionControl,
                         sliceMillis: Long,
                         sliceInstructions: Long,
                         onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -781,9 +787,9 @@ class AlnsTest {
         val handle = assertIs<InstructionSlicedSearch>(alns.resumable(selectObjective, LocalSearchParams()))
         val bootstrap = assertIs<IncumbentBootstrapSearch>(handle)
 
-        assertNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+        assertNull(handle.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 50) {})
         assertTrue(bootstrap.bootstrapPending)
-        val result = assertNotNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+        val result = assertNotNull(handle.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 50) {})
 
         assertFalse(bootstrap.bootstrapPending)
         assertSame(sample, result.assignment)
@@ -831,10 +837,16 @@ class AlnsTest {
         val handle = assertIs<InstructionSlicedSearch>(alns.resumable(selectObjective, LocalSearchParams()))
 
         repeat(2) {
-            assertNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) { callbacks += it.sample })
+            assertNull(
+                handle.runInstructionSlice(
+                    ExecutionControl.Never,
+                    Long.MAX_VALUE,
+                    50,
+                ) { callbacks += it.sample },
+            )
         }
         val result = assertNotNull(
-            handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) { callbacks += it.sample },
+            handle.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 50) { callbacks += it.sample },
         )
 
         assertEquals(listOf(initial) + repairs.take(2), incumbents)
@@ -872,8 +884,8 @@ class AlnsTest {
         )
         val handle = assertIs<InstructionSlicedSearch>(alns.resumable(LinearObjective(), LocalSearchParams()))
 
-        assertNull(handle.runInstructionSlice(Cancellation { expired }, Long.MAX_VALUE, 50) {})
-        assertNotNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+        assertNull(handle.runInstructionSlice(ExecutionControl { expired }, Long.MAX_VALUE, 50) {})
+        assertNotNull(handle.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 50) {})
 
         assertEquals(2, handles.size)
         assertSame(handles[0], handles[1])
@@ -907,7 +919,7 @@ class AlnsTest {
 
             val result = if (resumable) {
                 alns.resumable(selectObjective, params).use {
-                    assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE) {})
+                    assertNotNull(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE) {})
                 }
             } else {
                 alns.minimize(selectObjective, params)
@@ -930,7 +942,7 @@ class AlnsTest {
                 override val isDone: Boolean get() = false
                 override val stats: SolveStats get() = SolveStats.EMPTY
                 override fun runSlice(
-                    global: Cancellation,
+                    global: ExecutionControl,
                     sliceMillis: Long,
                     sliceNodes: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -950,7 +962,7 @@ class AlnsTest {
         val handle = alns.resumable(selectObjective, LocalSearchParams())
 
         val failure = assertFailsWith<IllegalArgumentException> {
-            handle.runSlice(Cancellation.Never, Long.MAX_VALUE) { throw IllegalArgumentException("callback") }
+            handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE) { throw IllegalArgumentException("callback") }
         }
         handle.close()
         alns.resumable(selectObjective, LocalSearchParams()).close()
@@ -969,7 +981,7 @@ class AlnsTest {
             override val isDone: Boolean get() = false
             override val stats: SolveStats get() = SolveStats.EMPTY
             override fun runSlice(
-                global: Cancellation,
+                global: ExecutionControl,
                 sliceMillis: Long,
                 sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -997,7 +1009,7 @@ class AlnsTest {
         val alns = Alns(inner = inner, backtrack = backtrack)
         val handle = alns.resumable(selectObjective, LocalSearchParams())
 
-        assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+        assertNull(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 50) {})
         val failure = assertFailsWith<IllegalStateException> { handle.close() }
         handle.close()
         alns.resumable(selectObjective, LocalSearchParams()).close()
@@ -1058,8 +1070,8 @@ class AlnsTest {
             alns.resumable(selectObjective, LocalSearchParams(maxInstructions = 120)),
         )
 
-        repeat(2) { assertNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {}) }
-        val result = assertNotNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+        repeat(2) { assertNull(handle.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 50) {}) }
+        val result = assertNotNull(handle.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 50) {})
 
         assertEquals(listOf(50L, 50L, 20L), allowances)
         assertEquals(120L, result.stats.alns.outerAllowance)
@@ -1144,11 +1156,11 @@ class AlnsTest {
                 assumptions: Assumptions,
                 decisionBudget: Long,
                 cutoff: Double,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
             ) {
                 cumulativeNodes += 5
             }
-            override fun runSlice(cancellation: Cancellation, millis: Long, work: Long) =
+            override fun runSlice(cancellation: ExecutionControl, millis: Long, work: Long) =
                 RepairSearchStep(incumbent, TerminationReason.SearchExhausted)
         }
         val context = RepairContext(
@@ -1178,14 +1190,25 @@ class AlnsTest {
         for (sample in listOf(null, incumbent)) {
             var observed: MinimizeResult? = null
             val retained = object : RepairSearch {
-                override fun begin(assumptions: Assumptions, decisionBudget: Long, cutoff: Double,
-                    cancellation: Cancellation) = Unit
-                override fun runSlice(cancellation: Cancellation, millis: Long, work: Long) =
+                override fun begin(
+                    assumptions: Assumptions,
+                    decisionBudget: Long,
+                    cutoff: Double,
+                    cancellation: ExecutionControl,
+                ) = Unit
+                override fun runSlice(cancellation: ExecutionControl, millis: Long, work: Long) =
                     RepairSearchStep(sample, TerminationReason.SearchExhausted)
             }
-            val context = RepairContext(NoFeasibleLs(problem), LocalSearchParams(), selectObjective,
-                Assumptions.None, incumbent, FreedVars(intArrayOf(0), IntArray(0)), repairSearch = retained,
-                recordRepairResult = { observed = it })
+            val context = RepairContext(
+                NoFeasibleLs(problem),
+                LocalSearchParams(),
+                selectObjective,
+                Assumptions.None,
+                incumbent,
+                FreedVars(intArrayOf(0), IntArray(0)),
+                repairSearch = retained,
+                recordRepairResult = { observed = it },
+            )
 
             val repaired = BacktrackRepair().repair(context)
 
@@ -1331,7 +1354,7 @@ class AlnsTest {
             solver.openRepair(objective, BacktrackParams()).use { handle ->
                 val context = RepairContext(
                     inner = LocalSearchSolver(problem),
-                    params = LocalSearchParams(randomSeed = 0L, cancellation = Cancellation { true }),
+                    params = LocalSearchParams(randomSeed = 0L, cancellation = ExecutionControl { true }),
                     objective = objective,
                     pinAssumptions = Assumptions.None,
                     incumbent = Sample(booleanArrayOf(true, false, false, false), LongArray(0)),
@@ -1424,7 +1447,7 @@ class AlnsTest {
         }
         val alns = Alns(inner = NoFeasibleLs(problem), backtrack = backtrack)
 
-        val result = alns.minimize(selectObjective, LocalSearchParams(cancellation = Cancellation { expired }))
+        val result = alns.minimize(selectObjective, LocalSearchParams(cancellation = ExecutionControl { expired }))
 
         assertEquals(TerminationReason.Cancelled, (result as MinimizeResult.Unknown).reason)
     }
@@ -1455,8 +1478,8 @@ class AlnsTest {
         )
 
         val result = handle.use {
-            assertNull(it.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
-            assertNotNull(it.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+            assertNull(it.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 50) {})
+            assertNotNull(it.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 50) {})
         }
 
         assertEquals(80L, result.stats.alns.outerAllowance)

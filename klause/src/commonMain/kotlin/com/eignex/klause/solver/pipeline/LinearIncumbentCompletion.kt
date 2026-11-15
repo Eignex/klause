@@ -22,7 +22,7 @@ import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.search.SearchInvocationResources
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.magnitudeBitLength
@@ -30,7 +30,7 @@ import kotlin.time.TimeSource
 
 internal class LinearIncumbentCompletion(
     private val budget: SourceLpBudget,
-    private val originalCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
+    private val originalCheck: ((Sample, BigFraction, ExecutionControl) -> Boolean)? = null,
     private val shared: LinearIncumbentSharing? = null,
     private val observe: (String, Long) -> Unit,
 ) : AutoCloseable {
@@ -47,7 +47,7 @@ internal class LinearIncumbentCompletion(
     private val attempts = ArrayList<Attempt>()
     private var closed = false
 
-    fun complete(source: SourceProofContext, seed: Sample, cancellation: Cancellation): Sample? {
+    fun complete(source: SourceProofContext, seed: Sample, cancellation: ExecutionControl): Sample? {
         val started = TimeSource.Monotonic.markNow()
         return try {
             completeSeed(source, seed, cancellation)
@@ -56,7 +56,7 @@ internal class LinearIncumbentCompletion(
         }
     }
 
-    private fun completeSeed(source: SourceProofContext, seed: Sample, cancellation: Cancellation): Sample? {
+    private fun completeSeed(source: SourceProofContext, seed: Sample, cancellation: ExecutionControl): Sample? {
         check(!closed)
         if (cancellation()) return null
         if (seed.exactReals != null) return seed
@@ -113,8 +113,13 @@ internal class LinearIncumbentCompletion(
             attempt.point = point
         }
         val query = requireNotNull(attempt.query)
-        val values = recoverLinearPrimal(query.coordinates, requireNotNull(attempt.point), query.rows,
-            query.inactive, token, complete = recovery@{ rows, columns, active ->
+        val values = recoverLinearPrimal(
+            query.coordinates,
+            requireNotNull(attempt.point),
+            query.rows,
+            query.inactive,
+            token,
+            complete = recovery@{ rows, columns, active ->
                 val allocation = 32L * columns.size
                 if (active() || budget.funding?.remainingAllocation?.let { allocation > it } == true) {
                     return@recovery null
@@ -127,12 +132,24 @@ internal class LinearIncumbentCompletion(
                 val residual = attempt.residual ?: LinearResidualCompletion(budget, SparseSourceLpPolicy())
                     .also { attempt.residual = it }
                 residual.complete(rows, columns.size, active, ::recoveryCost, costs = objective) {
-                    if (objective != null) null else LinearAuthorityLp(budget).use { completion ->
-                        completion.solve(rows, costs, BigFraction.ZERO, active,
-                            claim = LpClaim.FEASIBLE_COMPLETION)?.result?.exactPrimal?.take(columns.size)
+                    if (objective != null) {
+                        null
+                    } else {
+                        LinearAuthorityLp(budget).use { completion ->
+                            completion.solve(
+                                rows,
+                                costs,
+                                BigFraction.ZERO,
+                                active,
+                                claim = LpClaim.FEASIBLE_COMPLETION,
+                            )?.result?.exactPrimal?.take(columns.size)
+                        }
                     }
                 }.also { attempt.progress.pending = residual.paused }
-            }, observe = ::recoveryCost, progress = attempt.progress)
+            },
+            observe = ::recoveryCost,
+            progress = attempt.progress,
+        )
         if (values == null) {
             if (budget.funding?.exhausted == true || (!token() && !attempt.progress.pending)) {
                 observe("Unavailable", 1L)
@@ -143,8 +160,12 @@ internal class LinearIncumbentCompletion(
         val reals = query.coordinates.indices.filter {
             query.coordinates[it].kind == SourceCoordinate.Kind.Real
         }.map { values[it] }
-        val proposed = seed.copy(reals = DoubleArray(reals.size) { reals[it].toDouble() }, exactReals = reals,
-            algebraicReals = null, symbolicReals = null)
+        val proposed = seed.copy(
+            reals = DoubleArray(reals.size) { reals[it].toDouble() },
+            exactReals = reals,
+            algebraicReals = null,
+            symbolicReals = null,
+        )
         val checking = metered(cancellation, checking = true)
         val evidence = SourceEvidence(source.scope, SourceClaim.Witness(proposed), SourceDerivation.SourceWitness)
         val authority = source.withLinearAuthority()
@@ -165,14 +186,16 @@ internal class LinearIncumbentCompletion(
         return point
     }
 
-    private fun seedPoint(query: LinearAuthorityQuery, seed: Sample, token: Cancellation): List<BigFraction>? {
+    private fun seedPoint(query: LinearAuthorityQuery, seed: Sample, token: ExecutionControl): List<BigFraction>? {
         val point = ArrayList<BigFraction>(query.coordinates.size)
         for (coordinate in query.coordinates) {
             if (token()) return null
             // Floating coordinates guide reconstruction; source checks establish exact authority.
             val value = if (coordinate.kind == SourceCoordinate.Kind.Integer) {
                 BigFraction.of(seed.exactIntValue(coordinate.id), BIG_ONE)
-            } else BigFraction.ofDouble(seed.approximateRealValue(coordinate.id)) ?: BigFraction.ZERO
+            } else {
+                BigFraction.ofDouble(seed.approximateRealValue(coordinate.id)) ?: BigFraction.ZERO
+            }
             val bits = maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
             budget.observe(preparation = 1L + bits / 64L)
             budget.funding?.charge(0L, 64L + bits / 4L)
@@ -181,12 +204,14 @@ internal class LinearIncumbentCompletion(
         return point.takeUnless { token() }
     }
 
-    private fun prepare(source: SourceProofContext, seed: Sample, token: Cancellation): LinearAuthorityQuery? {
+    private fun prepare(source: SourceProofContext, seed: Sample, token: ExecutionControl): LinearAuthorityQuery? {
         if (!source.affineObjectiveAvailable || !source.linearCoordinatesSupported() ||
             source.coordinates.count { it.kind == SourceCoordinate.Kind.Boolean } != seed.numBoolVars ||
             source.coordinates.count { it.kind == SourceCoordinate.Kind.Integer } != seed.numIntVars ||
             source.coordinates.count { it.kind == SourceCoordinate.Kind.Real } != seed.numRealVars
-        ) return null
+        ) {
+            return null
+        }
         var condition = source.scope.condition
         for (coordinate in source.coordinates) {
             if (token()) return null
@@ -196,12 +221,17 @@ internal class LinearIncumbentCompletion(
                     if (condition.bools[coordinate.id]?.let { it != value } == true) return null
                     condition = condition.pin(coordinate.id, value)
                 }
+
                 SourceCoordinate.Kind.Integer -> {
                     val value = BigFraction.of(seed.exactIntValue(coordinate.id), BIG_ONE)
                     if (condition.lower[coordinate]?.let { it > value } == true ||
-                        condition.upper[coordinate]?.let { it < value } == true) return null
+                        condition.upper[coordinate]?.let { it < value } == true
+                    ) {
+                        return null
+                    }
                     condition = condition.bound(coordinate, value, upper = false).bound(coordinate, value, upper = true)
                 }
+
                 SourceCoordinate.Kind.Real -> Unit
             }
         }
@@ -225,19 +255,20 @@ internal class LinearIncumbentCompletion(
         observe(stage, count)
     }
 
-    fun checking(cancellation: Cancellation): Cancellation = metered(cancellation, checking = true)
+    fun checking(cancellation: ExecutionControl): ExecutionControl = metered(cancellation, checking = true)
 
-    private fun metered(cancellation: Cancellation, checking: Boolean): Cancellation = object : Cancellation {
-        private val meter = WorkMeter { units ->
-            if (checking) budget.observe(boundCertification = units) else budget.observe(preparation = units)
+    private fun metered(cancellation: ExecutionControl, checking: Boolean): ExecutionControl =
+        object : ExecutionControl() {
+            private val meter = WorkMeter { units ->
+                if (checking) budget.observe(boundCertification = units) else budget.observe(preparation = units)
+            }
+            override fun isCancelled(): Boolean {
+                charge(1L)
+                return closed || cancellation() || budget.funding?.paused == true
+            }
+            override fun deadline() = cancellation.deadline()
+            override val accounting: WorkMeter get() = meter
         }
-        override fun isCancelled(): Boolean {
-            charge(1L)
-            return closed || cancellation() || budget.funding?.paused == true
-        }
-        override fun deadline() = cancellation.deadline()
-        override fun workMeter(): WorkMeter = meter
-    }
 
     private fun finish(attempt: Attempt, point: Sample?): Sample? {
         attempt.checked = point

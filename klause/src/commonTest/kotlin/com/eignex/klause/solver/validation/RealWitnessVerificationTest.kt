@@ -14,7 +14,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
@@ -29,9 +29,9 @@ class RealWitnessVerificationTest {
         val point = Sample(booleanArrayOf(), longArrayOf(), reals = doubleArrayOf(0.0, 1.0, 1.0),
             exactReals = listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.ONE))
         var work = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 7L
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
 
         val checked = verifyRealCoordinates(source, point, stop)
@@ -60,7 +60,7 @@ class RealWitnessVerificationTest {
             val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(base.toDouble(), result.toDouble()),
                 exactReals = listOf(base, result))
 
-            assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, point, Cancellation.Never))
+            assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, point, ExecutionControl.Never))
         }
     }
 
@@ -74,7 +74,7 @@ class RealWitnessVerificationTest {
             val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(base.toDouble(), base.toDouble()),
                 exactReals = listOf(base, base))
 
-            assertIs<Verification.Rejected>(verifyRealCoordinates(source, point, Cancellation.Never))
+            assertIs<Verification.Rejected>(verifyRealCoordinates(source, point, ExecutionControl.Never))
         }
     }
 
@@ -87,9 +87,9 @@ class RealWitnessVerificationTest {
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0, 8.0),
             exactReals = listOf(BigFraction.ofLong(2), BigFraction.ofLong(8)))
         var work = 0L
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 4L
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
 
         val result = verifyRealCoordinates(source, point, token)
@@ -104,9 +104,9 @@ class RealWitnessVerificationTest {
             numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
         for (active in listOf(false, true)) {
             var stopped = false
-            val token = object : Cancellation {
+            val token = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = stopped
-                override fun workMeter(): WorkMeter = WorkMeter { if (it > 1) stopped = true }
+                override val accounting: WorkMeter get() = WorkMeter { if (it > 1) stopped = true }
             }
             val point = Sample(booleanArrayOf(), longArrayOf(if (active) 1 else 0), doubleArrayOf(1.0),
                 exactReals = listOf(BigFraction.ONE))

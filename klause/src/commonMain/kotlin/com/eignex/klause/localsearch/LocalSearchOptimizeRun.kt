@@ -7,7 +7,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.withSourceSemantics
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class LocalSearchOptimizeRun(
     private val params: LocalSearchParams,
@@ -23,7 +23,7 @@ internal class LocalSearchOptimizeRun(
     override val auxiliaryWork: Long get() = control.auxiliaryWork
 
     override fun runScheduledSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceInstructions: Long,
         sliceWork: Long,
@@ -34,7 +34,7 @@ internal class LocalSearchOptimizeRun(
     )
 
     override fun runSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceNodes: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -43,14 +43,14 @@ internal class LocalSearchOptimizeRun(
     )
 
     override fun runInstructionSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceInstructions: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
     ): MinimizeResult? = executeSlice(global, sliceMillis, sliceInstructions, -1L, onIncumbent)
 
     private fun executeSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceInstructions: Long,
         sliceNodes: Long,
@@ -64,7 +64,7 @@ internal class LocalSearchOptimizeRun(
     }
 
     private fun advance(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceInstructions: Long,
         sliceNodes: Long,
@@ -85,7 +85,9 @@ internal class LocalSearchOptimizeRun(
             }
             // The suspended loop checks its containing allowance before making another move.
             control.allowCompletion()
-        } else if (!control.hasSliceAllowance) return null
+        } else if (!control.hasSliceAllowance) {
+            return null
+        }
         started = true
         val live = checkNotNull(cursor)
         while (live.hasNext()) {

@@ -17,7 +17,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolveSizeStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -37,7 +37,7 @@ class PresolveStructuralImpactTest {
                         Table(intArrayOf(1, 3), longArrayOf(0, 0, 1, 1, 2, 2)),
                     ))
                 val budget = PresolveBudget(1_000_000)
-                val token = budget.orSpent(Cancellation.Never)
+                val token = budget.orSpent(ExecutionControl.Never)
                 val config = PresolveConfig.parse(if (lane == "rebuilt") "off,+affine,+bce" else "off,+affine")
                     .withEffort(preserveStructure = preserve, structuralImpactLimit = 1024)
                 val context = PresolveContext(presolveBudget = budget)
@@ -107,7 +107,7 @@ class PresolveStructuralImpactTest {
         val budget = PresolveBudget(1000)
 
         invocation.recordStructuralImpact(source, intArrayOf(0), emptyList(), SourceRebuilds.NONE,
-            5, budget.orSpent(Cancellation.Never))
+            5, budget.orSpent(ExecutionControl.Never))
 
         assertEquals(5L, budget.spent())
         assertEquals(5L, invocation.structuralImpact["Visits"])
@@ -141,7 +141,7 @@ class PresolveStructuralImpactTest {
         val budget = PresolveBudget(1)
 
         val delta = AffineSingletons.eliminateSourceAffineSingletons(
-            source, cancellation = budget.orSpent(Cancellation.Never), preserveStructure = true,
+            source, cancellation = budget.orSpent(ExecutionControl.Never), preserveStructure = true,
         )
 
         assertTrue(delta.isEmpty)
@@ -156,7 +156,7 @@ class PresolveStructuralImpactTest {
         val budget = PresolveBudget(2)
 
         invocation.recordStructuralImpact(source, intArrayOf(0), emptyList(), SourceRebuilds.NONE,
-            100, budget.orSpent(Cancellation.Never))
+            100, budget.orSpent(ExecutionControl.Never))
 
         assertEquals(2L, budget.spent())
         assertEquals(0L, invocation.structuralImpact["Complete"])
@@ -169,7 +169,7 @@ class PresolveStructuralImpactTest {
         val budget = PresolveBudget(1000)
 
         invocation.recordStructuralImpact(source, intArrayOf(), emptyList(), SourceRebuilds.NONE,
-            0, budget.orSpent(Cancellation.Never))
+            0, budget.orSpent(ExecutionControl.Never))
 
         assertEquals(0L, budget.spent())
         assertTrue(invocation.structuralImpact.isEmpty())

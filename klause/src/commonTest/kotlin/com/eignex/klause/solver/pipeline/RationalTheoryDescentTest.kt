@@ -22,7 +22,7 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -50,7 +50,7 @@ class RationalTheoryDescentTest {
             source.linearAuthorityContext(
                 objective,
                 ObjectiveSense.MINIMIZE,
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
         val binding = EngineInvocation(
@@ -68,7 +68,7 @@ class RationalTheoryDescentTest {
             context,
             publicationInvocation = binding,
         ).use {
-            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { point -> candidate = point }
+            it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { point -> candidate = point }
         }
 
         val point = assertNotNull(candidate)
@@ -95,7 +95,7 @@ class RationalTheoryDescentTest {
         var candidate: MinimizeResult.WithSample? = null
 
         RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8)).use {
-            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { point -> candidate = point }
+            it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { point -> candidate = point }
         }
 
         assertNull(assertNotNull(candidate).sample.witnessCertificate)
@@ -115,7 +115,7 @@ class RationalTheoryDescentTest {
         val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
 
         val result = RationalTheoryDescent(source, objective, TheoryParams()).use {
-            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _ -> }
+            it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _ -> }
         }
 
         assertEquals(-2.0, assertIs<MinimizeResult.Optimal>(result).objective)
@@ -145,7 +145,7 @@ class RationalTheoryDescentTest {
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
         val descent = RationalTheoryDescent(source, objective, TheoryParams())
 
-        val result = descent.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _ -> } }
+        val result = descent.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _ -> } }
 
         assertIs<MinimizeResult.BestFound>(result)
         assertIs<SourceClaim.Limit>(assertNotNull(descent.linearResult?.terminal).claim)
@@ -172,7 +172,7 @@ class RationalTheoryDescentTest {
         var accepted = false
 
         RationalTheoryDescent(source, objective, TheoryParams()).use {
-            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { candidate ->
+            it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { candidate ->
                 accepted = openWitnessVerifier(source, objective).verify(
                     Candidate(
                         candidate.sample,
@@ -204,7 +204,7 @@ class RationalTheoryDescentTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val descent = RationalTheoryDescent(source, objective, TheoryParams())
 
-        val paused = descent.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { _ -> }
+        val paused = descent.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) { _ -> }
         descent.close()
 
         assertNull(paused)
@@ -231,7 +231,7 @@ class RationalTheoryDescentTest {
         val descent = RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8))
 
         val result = descent.use {
-            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { point -> candidate = point }
+            it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { point -> candidate = point }
         }
 
         val witness = assertNotNull(candidate)
@@ -263,7 +263,7 @@ class RationalTheoryDescentTest {
 
         for (params in listOf(TheoryParams(openWorkLimit = 1), TheoryParams(openWorkLimit = 8, maxLeaves = 1))) {
             val result = RationalTheoryDescent(source, objective, params).use {
-                it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _ -> }
+                it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _ -> }
             }
 
             val unknown = assertIs<MinimizeResult.Unknown>(result)
@@ -289,11 +289,11 @@ class RationalTheoryDescentTest {
         val descent = RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8))
 
         descent.use {
-            val paused = it.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { point -> candidate = point }
+            val paused = it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) { point -> candidate = point }
             assertNull(paused)
             assertNull(candidate)
             assertEquals(1L, it.work)
-            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { point -> candidate = point }
+            it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { point -> candidate = point }
         }
 
         assertNotNull(candidate)
@@ -324,7 +324,7 @@ class RationalTheoryDescentTest {
         }
 
         descent.use {
-            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { point ->
+            it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { point ->
                 values += objective.evaluateExact(point.sample)
             }
         }
@@ -349,11 +349,11 @@ class RationalTheoryDescentTest {
         val descent = RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8))
 
         assertFailsWith<IllegalStateException> {
-            descent.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { error("publication failed") }
+            descent.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { error("publication failed") }
         }
 
         assertFailsWith<IllegalStateException> {
-            descent.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _ -> }
+            descent.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _ -> }
         }
         descent.close()
     }
@@ -374,7 +374,7 @@ class RationalTheoryDescentTest {
             source.linearAuthorityContext(
                 objective,
                 ObjectiveSense.MINIMIZE,
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
@@ -392,7 +392,7 @@ class RationalTheoryDescentTest {
         )
         val descent = RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8), scoped)
 
-        descent.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _ -> } }
+        descent.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _ -> } }
 
         val partial = assertNotNull(descent.linearResult)
         assertEquals(scoped.scope, partial.scope)
@@ -424,7 +424,7 @@ class RationalTheoryDescentTest {
         var published: MinimizeResult.WithSample? = null
 
         RationalTheoryDescent(source, objective, TheoryParams(maxDecisions = 4, openWorkLimit = 32)).use {
-            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { candidate -> published = candidate }
+            it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { candidate -> published = candidate }
         }
 
         val candidate = assertNotNull(published)

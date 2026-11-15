@@ -1,7 +1,7 @@
 package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -80,9 +80,9 @@ class AffineLineEvaluationTest {
         var spent = 0L
         var limit = Long.MAX_VALUE
         val meter = WorkMeter { spent += it }
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = spent >= limit
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
         val counted = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
         val line = AffineLineEvaluation(
@@ -102,7 +102,7 @@ class AffineLineEvaluationTest {
     @Test
     fun `completed line images should still obey caller cancellation`() {
         var cancelled = false
-        val counted = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { cancelled }))
+        val counted = AlgebraicArithmetic(PolynomialArithmetic(ExecutionControl { cancelled }))
         val line = AffineLineEvaluation(listOf(BigFraction.ZERO), listOf(BigFraction.ONE), counted)
         val point = line.at(algebraic.roots(RationalPolynomial.of(-2, 0, 1)).last())
         val source = polynomial.power(Polynomial.variable(0), 2)

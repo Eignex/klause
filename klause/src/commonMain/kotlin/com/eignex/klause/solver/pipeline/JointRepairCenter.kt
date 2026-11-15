@@ -5,14 +5,14 @@ import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal class JointRepairCenter(
     private val model: Problem,
     private val budget: SourceLpBudget,
-    private val stop: Cancellation,
+    private val stop: ExecutionControl,
     private val eligible: (Int) -> Boolean,
 ) {
     class Step(val condition: ExactNeighborhoodCondition, val coordinate: Int,
@@ -36,7 +36,10 @@ internal class JointRepairCenter(
             val coordinate = assumption.coordinate
             val id = coordinate.id
             if (coordinate.kind != SourceCoordinate.Kind.Integer || id !in 0 until model.numIntVars ||
-                !eligible(id)) continue
+                !eligible(id)
+            ) {
+                    continue
+                }
             val before = captured.lower[id] ?: continue
             if (captured.upper[id] != before || before.den != BIG_ONE) continue
             val bits = before.num.magnitudeBitLength().toLong() + before.den.magnitudeBitLength()
@@ -59,22 +62,30 @@ internal class JointRepairCenter(
     }
 
     fun apply(step: Step, centers: MutableList<BigFraction>, bools: BooleanArray,
-        condition: ExactNeighborhoodCondition, cancellation: Cancellation): Boolean {
+        condition: ExactNeighborhoodCondition, cancellation: ExecutionControl): Boolean {
         if (step.condition !== condition || condition.cutoff != null || cancellation() ||
-            step.coordinate !in 0 until model.numIntVars || !eligible(step.coordinate)) return false
+            step.coordinate !in 0 until model.numIntVars || !eligible(step.coordinate)
+        ) {
+                return false
+            }
         val entries = condition.bools.size.toLong() + condition.lower.size + condition.upper.size
         if (entries > MAX_ENTRIES || !pay(1L + entries, 64L)) return false
         for ((id, value) in condition.bools) {
             if (stop() || cancellation() || id !in bools.indices || bools[id] != value) return false
         }
-        for (bounds in listOf(condition.lower, condition.upper)) for ((id, value) in bounds) {
+        for (bounds in listOf(condition.lower, condition.upper)) {
+            for ((id, value) in bounds) {
             if (id !in 0 until model.numIntVars || id !in centers.indices) return false
             val bits = value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength()
             if (bits > MAX_SCALAR_BITS || !pay(1L + bits * bits / 64L) || cancellation()) return false
             if (centers[id] != value || condition.lower[id] != condition.upper[id]) return false
         }
+        }
         if (step.coordinate !in centers.indices || centers[step.coordinate] != step.before ||
-            !pay(1L, 64L) || cancellation() || !legal(step.coordinate, step.after)) return false
+            !pay(1L, 64L) || cancellation() || !legal(step.coordinate, step.after)
+        ) {
+                return false
+            }
         centers[step.coordinate] = step.after
         return true
     }

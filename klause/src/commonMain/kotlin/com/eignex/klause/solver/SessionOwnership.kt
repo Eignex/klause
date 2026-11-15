@@ -1,7 +1,7 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 @Suppress("TooGenericExceptionCaught") // The search failure remains primary when releasing ownership also fails.
 private class HandleOwnership<T : Any>(private val source: AutoCloseable, private val release: () -> Unit) {
@@ -38,7 +38,9 @@ private class HandleOwnership<T : Any>(private val source: AutoCloseable, privat
 }
 
 private open class OwnedSearch(protected val source: ResumableSearch, release: () -> Unit) :
-    ResumableSearch by source, ReseedGuard, SliceWorkAccounting {
+    ResumableSearch by source,
+    ReseedGuard,
+    SliceWorkAccounting {
     override val repaidWork: Long? get() = (source as? SliceWorkAccounting)?.repaidWork
     override val canReseed: Boolean get() = (source as? ReseedGuard)?.canReseed != false
     override val canContinuePreparation: Boolean get() = (source as? ReseedGuard)?.canContinuePreparation == true
@@ -48,13 +50,13 @@ private open class OwnedSearch(protected val source: ResumableSearch, release: (
     protected fun advance(action: () -> MinimizeResult?): MinimizeResult? = ownership.advance(action)
 
     override fun runSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
     ): MinimizeResult? = advance { source.runSlice(global, sliceMillis, onIncumbent) }
 
     override fun runSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceNodes: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -64,12 +66,13 @@ private open class OwnedSearch(protected val source: ResumableSearch, release: (
 }
 
 private class OwnedInstructionSearch(private val instructionSource: InstructionSlicedSearch, release: () -> Unit) :
-    OwnedSearch(instructionSource, release), InstructionSlicedSearch {
+    OwnedSearch(instructionSource, release),
+    InstructionSlicedSearch {
     override val chargedInstructions: Long get() = instructionSource.chargedInstructions
     override val auxiliaryWork: Long get() = instructionSource.auxiliaryWork
 
     override fun runScheduledSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceInstructions: Long,
         sliceWork: Long,
@@ -77,12 +80,17 @@ private class OwnedInstructionSearch(private val instructionSource: InstructionS
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
     ): MinimizeResult? = advance {
         instructionSource.runScheduledSlice(
-            global, sliceMillis, sliceInstructions, sliceWork, instructionsPerWork, onIncumbent,
+            global,
+            sliceMillis,
+            sliceInstructions,
+            sliceWork,
+            instructionsPerWork,
+            onIncumbent,
         )
     }
 
     override fun runInstructionSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceInstructions: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -99,25 +107,32 @@ private open class OwnedSolve(protected val source: ResumableSolve, release: () 
 
     protected fun advance(action: () -> SolveResult?): SolveResult? = ownership.advance(action)
 
-    override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? =
+    override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long): SolveResult? =
         advance { source.runSlice(global, sliceMillis, sliceNodes) }
 
     override fun close() = ownership.close()
 }
 
 private class OwnedInstructionSolve(private val instructionSource: InstructionSlicedSolve, release: () -> Unit) :
-    OwnedSolve(instructionSource, release), InstructionSlicedSolve {
+    OwnedSolve(instructionSource, release),
+    InstructionSlicedSolve {
     override val auxiliaryWork: Long get() = instructionSource.auxiliaryWork
 
     override fun runScheduledSlice(
-        global: Cancellation, sliceMillis: Long, sliceInstructions: Long, sliceWork: Long,
+        global: ExecutionControl,
+        sliceMillis: Long,
+        sliceInstructions: Long,
+        sliceWork: Long,
         instructionsPerWork: Double,
     ): SolveResult? = advance {
         instructionSource.runScheduledSlice(global, sliceMillis, sliceInstructions, sliceWork, instructionsPerWork)
     }
 
-    override fun runInstructionSlice(global: Cancellation, sliceMillis: Long, sliceInstructions: Long): SolveResult? =
-        advance { instructionSource.runInstructionSlice(global, sliceMillis, sliceInstructions) }
+    override fun runInstructionSlice(
+        global: ExecutionControl,
+        sliceMillis: Long,
+        sliceInstructions: Long,
+    ): SolveResult? = advance { instructionSource.runInstructionSlice(global, sliceMillis, sliceInstructions) }
 }
 
 internal fun ownSolve(source: ResumableSolve, release: () -> Unit): ResumableSolve =

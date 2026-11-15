@@ -3,7 +3,7 @@ package com.eignex.klause.solver.evidence
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -200,7 +200,7 @@ class SourceMappingEvidenceTest {
         val projected = mapping.project(
             SourceClaim.Refutation,
             context,
-            Cancellation.Never,
+            ExecutionControl.Never,
             SourceProofAllowance(3, 128),
         )
 
@@ -223,7 +223,7 @@ class SourceMappingEvidenceTest {
         val mapping = SourceMappingEvidence(source, payload, listOf(transformation))
         var polls = 0
 
-        val checked = mapping.verify(SourceClaim.Refutation, context, Cancellation { ++polls == 3 })
+        val checked = mapping.verify(SourceClaim.Refutation, context, ExecutionControl { ++polls == 3 })
 
         assertIs<SourceEvidenceCheck.Unavailable>(checked)
     }

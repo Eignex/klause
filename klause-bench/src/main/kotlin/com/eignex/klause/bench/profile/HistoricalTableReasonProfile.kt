@@ -26,7 +26,7 @@ import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchConflictResolution
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -86,7 +86,7 @@ internal object HistoricalTableReasonProfile {
             val controlStart = System.nanoTime()
             val controlBefore = bean.getThreadAllocatedBytes(thread)
             val program = parseFlatZinc(source)
-            val stop = Cancellation.after(2.seconds)
+            val stop = ExecutionControl.after(2.seconds)
             val preparation = FinitePipeline.prepare(
                 FinitePipelineRequest(
                 program.problem,
@@ -135,7 +135,7 @@ internal object HistoricalTableReasonProfile {
     }
 
     private fun invoke(source: String, route: Int, enabled: Boolean): JsonObject {
-        val stop = Cancellation.after(2.seconds)
+        val stop = ExecutionControl.after(2.seconds)
         val program = parseFlatZinc(source)
         val original = program.problem
         val preparation = if (route > 0) {
@@ -165,7 +165,7 @@ internal object HistoricalTableReasonProfile {
                 null
             } else {
                 Class.forName("com.eignex.klause.presolve.SourceMappingKt")
-                .getDeclaredMethod("retainedCoordinates", captured.javaClass, Cancellation::class.java)
+                .getDeclaredMethod("retainedCoordinates", captured.javaClass, ExecutionControl::class.java)
                 .invoke(null, captured, stop) as VarRemap?
             }
         }

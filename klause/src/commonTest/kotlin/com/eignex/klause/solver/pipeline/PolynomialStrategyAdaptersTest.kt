@@ -25,7 +25,7 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.theory.qfnra.QfNraParams
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -207,7 +207,7 @@ class PolynomialStrategyAdaptersTest {
                     invocation,
                     PolynomialStrategyParams(),
                     EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source)),
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                 ).solve(FiniteEngine.BACKTRACK),
             )
         }
@@ -234,7 +234,7 @@ class PolynomialStrategyAdaptersTest {
                     invocation,
                     PolynomialStrategyParams(localSearch = LocalSearchParams(maxFlips = 2)),
                     EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source)),
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                 ).solve(FiniteEngine.LOCAL_SEARCH),
             )
         }
@@ -262,7 +262,7 @@ class PolynomialStrategyAdaptersTest {
                     ModelIdentity.of(source),
                     sourceAssumptions = params.assumptions,
                 )
-                val result = PolynomialWorkerAdapter(shared, invocation, params, binding, Cancellation.Never)
+                val result = PolynomialWorkerAdapter(shared, invocation, params, binding, ExecutionControl.Never)
                     .solve(FiniteEngine.BACKTRACK)
                 if (pin == 0L) assertIs<SolveResult.Unsat>(result) else assertIs<SolveResult.Sat>(result)
             }
@@ -272,8 +272,8 @@ class PolynomialStrategyAdaptersTest {
     @Test
     fun `pure real heuristic arms should repair coordinates before publishing algebraic witnesses`() {
         val input = SmtLibPolynomial.parse(
-                "(declare-const x Real) (assert (= (* x x) 2))",
-            ).realSource()
+            "(declare-const x Real) (assert (= (* x x) 2))",
+        ).realSource()
         val request = input.pipelineRequest()
         val params = PolynomialTheoryParams(
             strategy = PolynomialStrategyParams(
@@ -295,11 +295,11 @@ class PolynomialStrategyAdaptersTest {
     @Test
     fun `pure real heuristic arms should respect cancellation and exhausted node allowances`() {
         val input = SmtLibPolynomial.parse(
-                "(declare-const x Real) (assert (= (* x x) 2))",
-            ).realSource()
+            "(declare-const x Real) (assert (= (* x x) 2))",
+        ).realSource()
         val request = input.pipelineRequest()
         val controls = listOf(
-            LocalSearchParams(cancellation = Cancellation { true }),
+            LocalSearchParams(cancellation = ExecutionControl { true }),
             LocalSearchParams(nodeBudget = NodeBudget(0)),
         )
 
@@ -423,8 +423,11 @@ class PolynomialStrategyAdaptersTest {
         shared.service.invocation(QfNraParams(maximumWork = initial + 10)).use { invocation ->
             val params = PolynomialStrategyParams(backtrack = BacktrackParams(valueSelector = IndomainMin))
             val result = PolynomialWorkerAdapter(
-                shared, invocation, params,
-                EngineInvocation(request.preparedPlan, ModelIdentity.of(shared.source)), Cancellation.Never,
+                shared,
+                invocation,
+                params,
+                EngineInvocation(request.preparedPlan, ModelIdentity.of(shared.source)),
+                ExecutionControl.Never,
             ).solve(FiniteEngine.BACKTRACK)
 
             assertTrue(assertIs<SolveResult.Sat>(result).assignment.boolValue(0))

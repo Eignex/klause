@@ -22,7 +22,7 @@ import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -52,6 +52,7 @@ class PresolverTest {
                     PresolveLane.SOURCE -> Presolver.runSource(problem, config, context).also {
                         assertTrue(it.infeasible)
                     }.passesFired
+
                     PresolveLane.FINITE -> Presolver.run(problem.bake(), config, context).also {
                         assertTrue(it.infeasible)
                     }.passesFired
@@ -117,7 +118,9 @@ class PresolverTest {
 
             val reduced = if (schedule == "source") {
                 Presolver.runSource(problem, config, context).problem
-            } else Presolver.run(problem.bake(), config, context).problem
+            } else {
+                Presolver.run(problem.bake(), config, context).problem
+            }
 
             val row = reduced.factors.filterIsInstance<Linear>().single()
             assertEquals(listOf(-1L), (0 until row.size).map { row.coeff(it) })
@@ -143,8 +146,11 @@ class PresolverTest {
             )
             val context = PresolveContext(presolveBudget = budget)
 
-            val reduced = if (schedule == "source") Presolver.runSource(problem, config, context).problem
-            else Presolver.run(problem.bake(), config, context).problem
+            val reduced = if (schedule == "source") {
+                Presolver.runSource(problem, config, context).problem
+            } else {
+                Presolver.run(problem.bake(), config, context).problem
+            }
 
             val row = reduced.factors.filterIsInstance<Linear>().single { it.op == LinearOp.LE }
             assertEquals(listOf(1L, 1L, 1L), (0 until row.size).map { row.coeff(it) })
@@ -165,8 +171,11 @@ class PresolverTest {
                 "off,+sparsify,+structural" + if (schedule == "rebuilt") ",+bce" else "",
             )
 
-            val reduced = if (schedule == "source") Presolver.runSource(problem, config).problem
-            else Presolver.run(problem.bake(), config).problem
+            val reduced = if (schedule == "source") {
+                Presolver.runSource(problem, config).problem
+            } else {
+                Presolver.run(problem.bake(), config).problem
+            }
 
             assertTrue(reduced.factors.filterIsInstance<Linear>().any {
                 it.vars.contentEquals(intArrayOf(3)) &&
@@ -190,8 +199,11 @@ class PresolverTest {
             )
             val context = PresolveContext(presolveBudget = budget)
 
-            val reduced = if (schedule == "source") Presolver.runSource(problem, config, context).problem
-            else Presolver.run(problem.bake(), config, context).problem
+            val reduced = if (schedule == "source") {
+                Presolver.runSource(problem, config, context).problem
+            } else {
+                Presolver.run(problem.bake(), config, context).problem
+            }
 
             assertTrue((reduced as? BakedProblem)?.rootIntDomain(3)?.max == 2L ||
                 reduced.factors.filterIsInstance<Linear>().any {
@@ -220,8 +232,11 @@ class PresolverTest {
             )
             val config = PresolveConfig.parse("off,+strengthen,+sparsify,+bve")
 
-            val fired = if (lane == PresolveLane.SOURCE) Presolver.runSource(problem, config, context).passesFired
-            else Presolver.run(problem.bake(), config, context).passesFired
+            val fired = if (lane == PresolveLane.SOURCE) {
+                Presolver.runSource(problem, config, context).passesFired
+            } else {
+                Presolver.run(problem.bake(), config, context).passesFired
+            }
 
             assertEquals(listOf(PresolvePass.ELIMINATE_BOOL_VARS), fired)
             assertEquals(1, budget.passCalls["sparsify"])
@@ -480,7 +495,7 @@ class PresolverTest {
             ),
         )
         val baked = problem.bake()
-        val pre = Presolver.run(baked, PresolveConfig.DEFAULT, cancellation = { true })
+        val pre = Presolver.run(baked, PresolveConfig.DEFAULT, cancellation = ExecutionControl { true })
         assertSame(baked, pre.problem)
         val s = Sample(BooleanArray(0), longArrayOf(3, 1, 0))
         assertSame(s, pre.reconstruct(s))
@@ -517,7 +532,7 @@ class PresolverTest {
             reducibleChain().bake(),
             PresolveConfig.parse(PresolvePass.FUSE_LINEAR_BOUNDS.id),
             PresolveContext.EMPTY.withPresolveBudget(budget),
-            budget.orSpent(Cancellation.Never),
+            budget.orSpent(ExecutionControl.Never),
         )
 
         assertTrue(budget.spent() > 0L)
@@ -532,7 +547,7 @@ class PresolverTest {
             problem,
             PresolveConfig.DEFAULT,
             PresolveContext.EMPTY.withPresolveBudget(budget),
-            budget.orSpent(Cancellation.Never),
+            budget.orSpent(ExecutionControl.Never),
         )
 
         assertSame(problem, presolved.problem)

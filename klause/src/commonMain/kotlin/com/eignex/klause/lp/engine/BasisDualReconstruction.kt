@@ -5,7 +5,7 @@ import com.eignex.klause.simplex.basis.RationalBasisFactors
 import com.eignex.klause.simplex.basis.RationalBasisSolve
 import com.eignex.klause.simplex.basis.RationalBasisStats
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.numbers.magnitudeBitLength
 import kotlin.math.abs
@@ -56,7 +56,7 @@ private class BasisDualRun(
     private var decline: String? = null
     private var factorWorkLeft = 0L
     private var factorAllocationLeft = 0L
-    private val token = Cancellation { meter.poll(); false }
+    private val token = ExecutionControl { meter.poll(); false }
 
     init {
         meter.phase = ReconstructionPhase.BASIS

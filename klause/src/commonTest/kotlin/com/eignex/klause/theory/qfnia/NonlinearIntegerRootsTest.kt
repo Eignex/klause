@@ -4,7 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.NonlinearIntegerProblem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
@@ -33,7 +33,7 @@ class NonlinearIntegerRootsTest {
         for ((atom, expected) in cases) {
             val store = NonlinearIntegerRootStore(problem("(declare-const n Int) (declare-const q Int) (assert $atom)"))
 
-            val admission = store.admit(Cancellation.Never, PolynomialLimits()) {}
+            val admission = store.admit(ExecutionControl.Never, PolynomialLimits()) {}
 
             assertEquals(mapOf(0 to expected.map(::bigIntOf)), admission.roots, atom)
             assertEquals(1L, admission.admitted, atom)
@@ -47,7 +47,7 @@ class NonlinearIntegerRootsTest {
             "(declare-const n Int) (assert (= (* n n) 4)) (assert (= (* n n n) (- 8)))",
         ))
 
-        val admission = store.admit(Cancellation.Never, PolynomialLimits()) {}
+        val admission = store.admit(ExecutionControl.Never, PolynomialLimits()) {}
 
         assertEquals(mapOf(0 to listOf(bigIntOf(-2))), admission.roots)
         assertEquals(2L, admission.admitted)
@@ -59,9 +59,9 @@ class NonlinearIntegerRootsTest {
             "(declare-const n Int) (assert (= (* n n) 10000000000000000000000000000000000000000))",
         ))
         var charged = 0L
-        val parent = object : Cancellation {
+        val parent = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val admission = store.admit(parent, PolynomialLimits()) {}
@@ -83,7 +83,7 @@ class NonlinearIntegerRootsTest {
         for ((atom, limits) in cases) {
             val store = NonlinearIntegerRootStore(problem("(declare-const n Int) (assert $atom)"))
 
-            val admission = store.admit(Cancellation.Never, limits) {}
+            val admission = store.admit(ExecutionControl.Never, limits) {}
 
             assertEquals(emptyMap(), admission.roots, atom)
             assertEquals(0L, admission.admitted, atom)
@@ -103,7 +103,7 @@ class NonlinearIntegerRootsTest {
         for (source in sources) {
             val store = NonlinearIntegerRootStore(problem(source))
 
-            val admission = store.admit(Cancellation.Never, PolynomialLimits()) {}
+            val admission = store.admit(ExecutionControl.Never, PolynomialLimits()) {}
 
             assertEquals(emptyMap(), admission.roots, source)
             assertEquals(0L, admission.admitted + admission.declined, source)
@@ -116,9 +116,9 @@ class NonlinearIntegerRootsTest {
             "(declare-const n Int) (assert (= (* (- (* n n) 2) (- n 2)) 0))",
         ))
         var charged = 0L
-        val parent = object : Cancellation {
+        val parent = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
         val first = store.admit(parent, PolynomialLimits()) {}
         val admission = charged
@@ -138,8 +138,8 @@ class NonlinearIntegerRootsTest {
     fun `a stopped parent should interrupt admission and leave it incomplete`() {
         val store = NonlinearIntegerRootStore(problem("(declare-const n Int) (assert (= (* n n) 2))"))
 
-        assertFailsWith<PolynomialInterrupted> { store.admit(Cancellation { true }, PolynomialLimits()) {} }
-        val retried = store.admit(Cancellation.Never, PolynomialLimits()) {}
+        assertFailsWith<PolynomialInterrupted> { store.admit(ExecutionControl { true }, PolynomialLimits()) {} }
+        val retried = store.admit(ExecutionControl.Never, PolynomialLimits()) {}
 
         assertTrue(retried.fresh)
         assertEquals(mapOf(0 to emptyList<BigInt>()), retried.roots)

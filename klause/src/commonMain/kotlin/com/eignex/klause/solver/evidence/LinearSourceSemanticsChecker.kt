@@ -8,7 +8,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 
 /** Complete exact checker for a source consisting solely of declared coordinates and affine premises. */
@@ -35,31 +35,44 @@ class LinearSourceSemanticsChecker(
         }
     }
 
-    override fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck =
+    override fun witness(sample: Sample, scope: SourceScope, cancellation: ExecutionControl): SourceEvidenceCheck =
         checked(cancellation) { algebraic -> point(sample, scope, algebraic) }
 
     override fun objectiveEquals(
-        sample: Sample, value: SourceValue, scope: SourceScope, cancellation: Cancellation,
+        sample: Sample,
+        value: SourceValue,
+        scope: SourceScope,
+        cancellation: ExecutionControl,
     ): SourceEvidenceCheck = checked(cancellation) { algebraic ->
         val pointCheck = point(sample, scope, algebraic)
         if (pointCheck != SourceEvidenceCheck.Checked) return@checked pointCheck
         val expected = when (value) {
             is SourceValue.Rational -> algebraic.rational(value.value)
+
             is SourceValue.Algebraic -> value.value
+
             is SourceValue.Extension -> {
                 return@checked SourceEvidenceCheck.Unavailable("symbolic objective checker unavailable")
             }
         }
         var evaluated = algebraic.rational(objectiveConstant)
         for ((id, coefficient) in objective) {
-            evaluated = algebraic.add(evaluated, algebraic.multiply(at(sample, id, algebraic),
-                algebraic.rational(coefficient)))
+            evaluated = algebraic.add(
+                evaluated,
+                algebraic.multiply(
+                at(sample, id, algebraic),
+                algebraic.rational(coefficient),
+            )
+            )
         }
-        if (algebraic.compare(evaluated, expected) == 0) SourceEvidenceCheck.Checked
-        else SourceEvidenceCheck.Rejected("witness objective disagrees with the claimed bound")
+        if (algebraic.compare(evaluated, expected) == 0) {
+            SourceEvidenceCheck.Checked
+        } else {
+            SourceEvidenceCheck.Rejected("witness objective disagrees with the claimed bound")
+        }
     }
 
-    override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck =
+    override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: ExecutionControl): SourceEvidenceCheck =
         checked(cancellation) { algebraic ->
             val pointCheck = point(claim.sample, scope, algebraic)
             if (pointCheck != SourceEvidenceCheck.Checked) return@checked pointCheck
@@ -68,7 +81,9 @@ class LinearSourceSemanticsChecker(
                     (id.kind == SourceCoordinate.Kind.Boolean && !value.isZero) ||
                         (id.kind == SourceCoordinate.Kind.Integer && value.den != BIG_ONE)
                 }
-            ) return@checked SourceEvidenceCheck.Rejected("ray has invalid source coordinates or integer steps")
+            ) {
+                return@checked SourceEvidenceCheck.Rejected("ray has invalid source coordinates or integer steps")
+            }
             for (row in premises) {
                 algebraic.arithmetic.step()
                 if (row.integerPins.keys.any { !(direction[it] ?: BigFraction.ZERO).isZero }) {
@@ -82,21 +97,31 @@ class LinearSourceSemanticsChecker(
             if (scope.condition.lower.keys.any { (direction[it] ?: BigFraction.ZERO) < BigFraction.ZERO } ||
                 scope.condition.upper.keys.any { (direction[it] ?: BigFraction.ZERO) > BigFraction.ZERO } ||
                 scope.condition.integerRows.any { dot(it.coefficients, direction) > BigFraction.ZERO }
-            ) return@checked SourceEvidenceCheck.Rejected("ray leaves the invocation restrictions")
+            ) {
+                return@checked SourceEvidenceCheck.Rejected("ray leaves the invocation restrictions")
+            }
             val objectiveScope = scope.objective
                 ?: return@checked SourceEvidenceCheck.Rejected("ray has no objective scope")
             val slope = dot(objective, direction)
-            val improves = if (objectiveScope.sense == ObjectiveSense.MINIMIZE) slope < BigFraction.ZERO
-                else slope > BigFraction.ZERO
-            if (improves) SourceEvidenceCheck.Checked
-            else SourceEvidenceCheck.Rejected("ray does not improve the objective")
+            val improves = if (objectiveScope.sense == ObjectiveSense.MINIMIZE) {
+                slope < BigFraction.ZERO
+            } else {
+                slope > BigFraction.ZERO
+            }
+            if (improves) {
+                SourceEvidenceCheck.Checked
+            } else {
+                SourceEvidenceCheck.Rejected("ray does not improve the objective")
+            }
         }
 
     private fun point(sample: Sample, scope: SourceScope, algebraic: AlgebraicArithmetic): SourceEvidenceCheck {
         if (sample.numBoolVars != count(SourceCoordinate.Kind.Boolean) ||
             sample.numIntVars != count(SourceCoordinate.Kind.Integer) ||
             sample.numRealVars != count(SourceCoordinate.Kind.Real)
-        ) return SourceEvidenceCheck.Rejected("witness does not cover the original source coordinates")
+        ) {
+            return SourceEvidenceCheck.Rejected("witness does not cover the original source coordinates")
+        }
         if (sample.numRealVars > 0 && sample.exactReals == null && sample.algebraicReals == null) {
             return SourceEvidenceCheck.Unavailable("real witness lacks exact coordinates")
         }
@@ -140,7 +165,8 @@ class LinearSourceSemanticsChecker(
         left.entries.fold(BigFraction.ZERO) { sum, (id, value) -> sum + value * (right[id] ?: BigFraction.ZERO) }
 
     private inline fun checked(
-        cancellation: Cancellation, action: (AlgebraicArithmetic) -> SourceEvidenceCheck,
+        cancellation: ExecutionControl,
+        action: (AlgebraicArithmetic) -> SourceEvidenceCheck,
     ): SourceEvidenceCheck = try {
         val algebraic = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
         algebraic.arithmetic.step()

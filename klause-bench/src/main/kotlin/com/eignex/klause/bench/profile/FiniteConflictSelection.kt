@@ -35,7 +35,7 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.FinitePipelinePreparation
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -99,7 +99,7 @@ internal object FiniteConflictSelection {
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         out.resolve("source.xml").writeBytes(bytes)
         out.resolve("request.txt").writeText(args.joinToString("\n"))
-        val setupStop = Cancellation.after(30.seconds)
+        val setupStop = ExecutionControl.after(30.seconds)
         val parsed = Xcsp3.parse(bytes.decodeToString(), recoveryCancellation = setupStop)
         require(parsed.problem.numBoolVars == 0 && parsed.definedVars.isEmpty())
         require(parsed.problem.numIntVars <= 1024 && parsed.problem.numFactors <= 4096)
@@ -164,13 +164,13 @@ internal object FiniteConflictSelection {
         numerical: Boolean = false,
         numericalCuts: Boolean = false,
         sourceSense: ObjectiveSense = ObjectiveSense.MINIMIZE,
-        checkSource: (Sample, Cancellation) -> Boolean,
+        checkSource: (Sample, ExecutionControl) -> Boolean,
     ) {
         require(acquisitionMode in setOf("source-root", "sampled-fragment"))
         require(semanticKind == null || semanticKind in setOf("Assignment", "Resource", "Placement"))
         require(!numerical || problem.numBoolVars == 0)
         require(problem.numRealVars == 0 && problem.numBoolVars.toLong() + problem.numIntVars <= 1024)
-        require(checkSource(center, Cancellation.after(5.seconds)))
+        require(checkSource(center, ExecutionControl.after(5.seconds)))
         val destroy = Class.forName("com.eignex.klause.meta.alns.DestroyOperator")
         val companion = destroy.getField("Companion").get(null)
         val destroyMethod = destroy.methods.single { it.name == "destroy" && it.parameterCount == 7 }
@@ -185,7 +185,7 @@ internal object FiniteConflictSelection {
                 !problem.rootIntDomain(coordinate - problem.numBoolVars).isFixed
             }
         }
-        fun select(operator: Any, drawSeed: Long, count: Int, stop: Cancellation,
+        fun select(operator: Any, drawSeed: Long, count: Int, stop: ExecutionControl,
             completePacket: Boolean = false,
         ): Selection {
             val total = problem.numBoolVars + problem.numIntVars
@@ -231,11 +231,11 @@ internal object FiniteConflictSelection {
                     (if (numerical) listOf("numerical-disagreement", "numerical-refutation", "numerical-ablated",
                         "numerical-disagreement-completed", "numerical-refutation-completed") else emptyList())
                 for (arm in arms) {
-                    val deadline = Cancellation.after(5.seconds)
+                    val deadline = ExecutionControl.after(5.seconds)
                     val containingWork = if (numerical) 2_000_000L else DECISIONS
                     val allowance = NodeBudget(containingWork)
                     var numericalTrial: FiniteNumericalTrial? = null
-                    val stop = deadline or Cancellation {
+                    val stop = deadline or ExecutionControl {
                         allowance.spent + (numericalTrial?.work ?: 0L) >= containingWork
                     }
                     val started = System.nanoTime()
@@ -612,7 +612,7 @@ internal object FiniteConflictSelection {
         initial: Sample,
         seed: Long,
         sweep: DefinitionalSweep?,
-        stop: Cancellation,
+        stop: ExecutionControl,
         allowance: NodeBudget,
         file: File,
     ): Descent {
@@ -640,7 +640,7 @@ internal object FiniteConflictSelection {
             }
             return null
         }
-        val token = stop or Cancellation { endpoint() != null }
+        val token = stop or ExecutionControl { endpoint() != null }
         val params = LocalSearchParams(
             randomSeed = seed,
             initialAssignment = initial,
@@ -667,7 +667,7 @@ internal object FiniteConflictSelection {
     }
 
     @Suppress("UNCHECKED_CAST")
-    internal fun checkSource(problem: BakedProblem, sample: Sample, stop: Cancellation): Boolean {
+    internal fun checkSource(problem: BakedProblem, sample: Sample, stop: ExecutionControl): Boolean {
         val verifier = Class.forName("com.eignex.klause.solver.validation.FiniteWitnessVerificationKt")
             .methods.single { it.name == "finiteWitnessVerifier" && it.parameterCount == 5 }
             .invoke(null, problem, null, Assumptions.None, stop, null) as CandidateVerifier<Sample, Double?>

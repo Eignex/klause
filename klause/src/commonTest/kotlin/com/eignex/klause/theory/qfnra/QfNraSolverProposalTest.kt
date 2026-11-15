@@ -7,7 +7,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
@@ -259,9 +259,9 @@ class QfNraSolverProposalTest {
         )
         val limit = completed.stats.workSpent - 1
         var spent = 0L
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+            override val accounting: WorkMeter get() = WorkMeter { spent += it }
         }
 
         val result = solveQfNra(
@@ -280,13 +280,13 @@ class QfNraSolverProposalTest {
     fun `an observed containing stop inside a coupled phase should not publish a fallback witness`() {
         var spent = 0L
         var stopped = false
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean {
                 if (spent < 4 || stopped) return false
                 stopped = true
                 return true
             }
-            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+            override val accounting: WorkMeter get() = WorkMeter { spent += it }
         }
         val work = QfNraWork(QfNraParams(cancellation))
         val arithmetic = PolynomialArithmetic(work)
@@ -480,13 +480,13 @@ class QfNraSolverProposalTest {
             var trigger = false
             var observed = false
             var spent = 0L
-            val stop = object : Cancellation {
+            val stop = object : ExecutionControl() {
                 override fun isCancelled(): Boolean {
                     if (!trigger || (transient && observed)) return false
                     observed = true
                     return true
                 }
-                override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+                override val accounting: WorkMeter get() = WorkMeter { spent += it }
             }
             val query = QfNraQuery(
                 source.formula,
@@ -711,13 +711,13 @@ class QfNraSolverProposalTest {
         val limit = completed.stats.workSpent - 2
         var spent = 0L
         var observed = false
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean {
                 if (observed || spent < limit) return false
                 observed = true
                 return true
             }
-            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+            override val accounting: WorkMeter get() = WorkMeter { spent += it }
         }
 
         val result = solveQfNra(source.formula, source.boolCount, source.realCount, QfNraParams(cancellation))

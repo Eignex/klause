@@ -17,17 +17,17 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.parseBigInt
-import java.io.File
-import java.math.BigInteger
-import kotlin.random.Random
-import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.math.BigInteger
+import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 
 internal data class ComponentResidual(
     val identity: String,
@@ -176,7 +176,7 @@ object ScopedComponentProfile {
         cutoff: BigInteger,
         millis: Long,
         seed: Long,
-        allowance: ComponentAllowance = ComponentAllowance(Cancellation.after(millis.milliseconds)),
+        allowance: ComponentAllowance = ComponentAllowance(ExecutionControl.after(millis.milliseconds)),
         lp: Boolean = false,
         sourceCheck: ((List<Boolean>, ComponentAllowance) -> Boolean)? = null,
     ): JsonObject {
@@ -235,7 +235,7 @@ object ScopedComponentProfile {
         millis: Long,
         seed: Long,
         sourceCheck: ((List<Boolean>, ComponentAllowance) -> Boolean)? = null,
-        allowance: ComponentAllowance = ComponentAllowance(Cancellation.after(millis.milliseconds)),
+        allowance: ComponentAllowance = ComponentAllowance(ExecutionControl.after(millis.milliseconds)),
     ): JsonObject {
         val start = System.nanoTime()
         val separator = BooleanSeparators.choose(
@@ -283,7 +283,7 @@ object ScopedComponentProfile {
     ): JsonObject {
         require(residual.restrictionCutoff == null || (cutoff != null && cutoff <= residual.restrictionCutoff))
         val start = System.nanoTime()
-        val allowance = ComponentAllowance(Cancellation.after(millis.milliseconds))
+        val allowance = ComponentAllowance(ExecutionControl.after(millis.milliseconds))
         val clauses = residual.clauses + residual.fixed.map { (v, value) -> listOf(Lit.make(v, value)) }
         val factors = ArrayList<Factor>(clauses.size + 1).apply {
             clauses.forEach { add(Clause(it.toIntArray())) }

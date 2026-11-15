@@ -1,8 +1,8 @@
 package com.eignex.klause.bench.lab
 
-import com.eignex.lab.bench.BenchProtocol
 import com.eignex.lab.bench.BenchCase
 import com.eignex.lab.bench.BenchContext
+import com.eignex.lab.bench.BenchProtocol
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.params.ParameterizedTest

@@ -1,6 +1,6 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,8 +13,8 @@ class EncodingPreparationCancellationTest {
     @Test
     fun `an enclosing poll should retain a stop observed by a nested poll`() {
         var nested = false
-        lateinit var scope: Cancellation
-        scope = Cancellation {
+        lateinit var scope: ExecutionControl
+        scope = ExecutionControl {
             if (nested) true else {
                 nested = true
                 assertTrue(scope())
@@ -29,7 +29,7 @@ class EncodingPreparationCancellationTest {
     @Test
     fun `an observed external stop should remain latched`() {
         var cancelled = false
-        val scope = Cancellation { cancelled }.encodingPreparationScope()
+        val scope = ExecutionControl { cancelled }.encodingPreparationScope()
         assertFalse(scope())
 
         cancelled = true
@@ -43,8 +43,8 @@ class EncodingPreparationCancellationTest {
     fun `polling should preserve ordered parent predicates and short circuiting`() {
         val visited = ArrayList<Int>()
         var cancelled = false
-        val scope = (Cancellation { visited += 1; cancelled } or
-            Cancellation { visited += 2; false }).encodingPreparationScope()
+        val scope = (ExecutionControl { visited += 1; cancelled } or
+            ExecutionControl { visited += 2; false }).encodingPreparationScope()
 
         assertFalse(scope())
         assertEquals(listOf(1, 2), visited)
@@ -60,7 +60,7 @@ class EncodingPreparationCancellationTest {
     fun `a live parent deadline should remain current before expiry`() {
         val clock = TestTimeSource()
         var end = clock.markNow() + 1.seconds
-        val scope = object : Cancellation {
+        val scope = object : ExecutionControl() {
             override fun isCancelled(): Boolean = end.hasPassedNow()
             override fun deadline() = end
         }.encodingPreparationScope()
@@ -82,9 +82,9 @@ class EncodingPreparationCancellationTest {
         var first = 0L
         var second = 0L
         var meter = WorkMeter { first += it }
-        val scope = object : Cancellation {
+        val scope = object : ExecutionControl() {
             override fun isCancelled(): Boolean = first + second >= 3
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }.encodingPreparationScope()
 
         scope.charge(1)
@@ -100,8 +100,8 @@ class EncodingPreparationCancellationTest {
     @Test
     fun `an expired slice should not stop a fresh containing scope`() {
         val clock = TestTimeSource()
-        val parent = Cancellation.until(clock.markNow() + 5.seconds)
-        val slice = (Cancellation.until(clock.markNow() + 1.seconds) or parent).encodingPreparationScope()
+        val parent = ExecutionControl.until(clock.markNow() + 5.seconds)
+        val slice = (ExecutionControl.until(clock.markNow() + 1.seconds) or parent).encodingPreparationScope()
 
         clock += 1.seconds
         assertTrue(slice())

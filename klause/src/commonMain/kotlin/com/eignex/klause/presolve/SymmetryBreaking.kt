@@ -16,7 +16,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntDisjointSet
 import com.eignex.util.collections.LongArrayList
@@ -50,7 +50,7 @@ internal object SymmetryBreaking {
         problem: BakedProblem,
         objectiveIntVars: Set<Int> = emptySet(),
         objectiveBoolVars: Set<Int> = emptySet(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): PassDelta {
         val extra = breakings(problem, FiniteColumns(problem), objectiveIntVars, objectiveBoolVars, cancellation)
         return if (extra.isEmpty()) PassDelta() else PassDelta(addedFactors = extra)
@@ -60,7 +60,9 @@ internal object SymmetryBreaking {
         val objective = context.linearObjective ?: return PassDelta()
         if (context.solutionSetSensitive || context.modelBreaksSymmetry || problem.numRealVars != 0 ||
             problem.semantics.isApproximate || objective.realCoefficientValues.any { it != 0.0 }
-        ) return PassDelta()
+        ) {
+            return PassDelta()
+        }
         val ints = objective.intCoefficientValues
         val bools = objective.boolWeightValues
         context.cancellation.charge(ints.size.toLong() + bools.size)
@@ -97,12 +99,14 @@ internal object SymmetryBreaking {
         problem: Problem,
         objectiveIntVars: Set<Int> = emptySet(),
         objectiveBoolVars: Set<Int> = emptySet(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): SourceDelta {
         val bounds = problem.intBounds
         if (problem.numRealVars == 0 &&
             (0 until problem.numIntVars).all { bounds.hasLower(it) && bounds.hasUpper(it) }
-        ) return SourceDelta()
+        ) {
+            return SourceDelta()
+        }
         if (problem.factors.any { it is SymmetryHandling }) return SourceDelta()
         if (generatorRoundCost(problem) > GENERATOR_ROUND_COST_BUDGET) return SourceDelta()
         val columns = activeColumns(problem, SourceColumns(problem), cancellation) ?: return SourceDelta()
@@ -119,7 +123,7 @@ internal object SymmetryBreaking {
         columns: ColumnValues,
         objectiveIntVars: Set<Int>,
         objectiveBoolVars: Set<Int>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         objective: LinearObjective? = null,
     ): List<Factor> {
         // One-shot: once a [SymmetryHandling] factor is present the generators have been posted. The round
@@ -170,7 +174,7 @@ internal object SymmetryBreaking {
         columns: ColumnValues,
         heldInts: Set<Int>,
         heldBools: Set<Int>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): List<Factor> {
         val nInt = problem.numIntVars
         val nBool = problem.numBoolVars
@@ -226,7 +230,7 @@ internal object SymmetryBreaking {
         incident: Array<IntArrayList>,
         identity: IntArray,
         mapping: VarRemap,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): List<IntArray> {
         val ds = IntDisjointSet(cell.size)
         var pairCost = 0L
@@ -286,7 +290,7 @@ internal object SymmetryBreaking {
         problem: Problem,
         columns: ColumnValues,
         objectiveIntVars: Set<Int>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         chainPrecedence: Boolean,
     ): List<Factor> {
         val orbits = verifiedValueOrbits(problem, columns, cancellation) ?: return emptyList()
@@ -329,7 +333,7 @@ internal object SymmetryBreaking {
     private fun verifiedValueOrbits(
         problem: Problem,
         columns: ColumnValues,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): List<List<Long>>? {
         if (problem.numIntVars == 0 || cancellation()) return null
         val active = (0 until problem.numIntVars).filter { columns.active(it) }
@@ -404,7 +408,7 @@ internal object SymmetryBreaking {
     fun breakValuePrecedence(
         problem: BakedProblem,
         objectiveIntVars: Set<Int> = emptySet(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): PassDelta {
         val n = problem.numIntVars
         val columns = activeColumns(problem, FiniteColumns(problem), cancellation) ?: return PassDelta()
@@ -439,7 +443,7 @@ internal object SymmetryBreaking {
         problem: Problem,
         base: Map<StructuralKey, Int>,
         values: List<Long>,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): List<List<Long>> {
         val n = values.size
         if (n > MAX_VERIFIED_GROUP) return emptyList()
@@ -528,7 +532,7 @@ internal object SymmetryBreaking {
         fun heldBools(objective: Set<Int>): Set<Int> = objective + readBools.indices.filter { !readBools[it] }
     }
 
-    private fun activeColumns(problem: Problem, columns: ColumnValues, cancellation: Cancellation): ActiveColumns? {
+    private fun activeColumns(problem: Problem, columns: ColumnValues, cancellation: ExecutionControl): ActiveColumns? {
         cancellation.charge(problem.numIntVars.toLong() + problem.numBoolVars)
         if (cancellation()) return null
         val readInts = BooleanArray(problem.numIntVars)
@@ -687,7 +691,7 @@ internal object SymmetryBreaking {
         seedInt: Array<RefineKey>,
         seedBool: Array<RefineKey>,
         budget: IntArray? = null,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): Pair<IntArray, IntArray> {
         val nInt = problem.numIntVars
         val nBool = problem.numBoolVars
@@ -853,7 +857,7 @@ internal object SymmetryBreaking {
         columns: ColumnValues,
         objectiveIntVars: Set<Int>,
         objectiveBoolVars: Set<Int>,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         objective: LinearObjective? = null,
     ): List<Pair<IntArray, IntArray>> {
         val nInt = problem.numIntVars
@@ -864,12 +868,20 @@ internal object SymmetryBreaking {
 
         val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
         val seedIntBase = Array(nInt) { v ->
-            if (v in objectiveIntVars) objectiveSeed(SPACE_INT, v) else columns.seed(v)
+            if (v in objectiveIntVars) {
+                objectiveSeed(SPACE_INT, v)
+            } else {
+                columns.seed(v)
                 .withCoefficient(objective?.intCoefficientValues?.getOrElse(v) { 0L })
+            }
         }
         val seedBoolBase = Array(nBool) { v ->
-            if (v in objectiveBoolVars) objectiveSeed(SPACE_BOOL, v) else columns.boolSeed(v)
+            if (v in objectiveBoolVars) {
+                objectiveSeed(SPACE_BOOL, v)
+            } else {
+                columns.boolSeed(v)
                 .withCoefficient(objective?.boolWeightValues?.getOrElse(v) { 0L })
+            }
         }
 
         val budget = intArrayOf(GENERATOR_WORK_BUDGET)
@@ -934,7 +946,7 @@ internal object SymmetryBreaking {
         seedBoolBase: Array<RefineKey>,
         firstIndiv: Int,
         budget: IntArray,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): IntArray? {
         val nInt = problem.numIntVars
         val nBool = problem.numBoolVars
@@ -1014,7 +1026,7 @@ internal object SymmetryBreaking {
         objectiveIntVars: Set<Int>,
         objectiveBoolVars: Set<Int>,
         objective: LinearObjective? = null,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): List<Factor> {
         // Skips building the (potentially expensive) structural-key multiset when there is nothing to order.
         if (generators.isEmpty()) return emptyList()
@@ -1087,7 +1099,7 @@ internal object SymmetryBreaking {
         ds: IntDisjointSet,
         scope: IntArray,
         pairCost: Long,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         verify: (Int, Int) -> Boolean,
     ) {
         for (i in scope.indices) {

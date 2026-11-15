@@ -18,7 +18,7 @@ import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncoderProvider
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.Bits
 import kotlin.test.Test
@@ -152,7 +152,7 @@ class OpenSourcePreparationTest {
         val model = Problem(0, 0, emptyArray(), arrayOf<Factor>(row, row), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
         val projections = FactorProjectionProviders.Default.prepare(model)
-        val captured = model.componentPlan(projections, cancellation = Cancellation { true })
+        val captured = model.componentPlan(projections, cancellation = ExecutionControl { true })
 
         val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(
             config = PresolveConfig.parse("off,+dependent-rows"), projections = projections, capturedPlan = captured,
@@ -170,9 +170,9 @@ class OpenSourcePreparationTest {
         val captured = model.componentPlan(projections)
         val budget = PresolveBudget(0L)
         var work = 0L
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
 
         val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(
@@ -233,7 +233,7 @@ class OpenSourcePreparationTest {
     fun `a resource declined capture should retry planning under the current token`() {
         val model = refutable()
         val projections = FactorProjectionProviders.Default.prepare(model)
-        val captured = model.componentPlan(projections, cancellation = Cancellation { true })
+        val captured = model.componentPlan(projections, cancellation = ExecutionControl { true })
         assertEquals(EncoderDecline.RESOURCE, captured.encodingDecline)
 
         val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(
@@ -322,7 +322,7 @@ class OpenSourcePreparationTest {
         val model = aggregatable(openColumns = true)
 
         val result = OpenTheoryEngine(model, model.sourceRoute())
-            .solve(TheoryParams(cancellation = Cancellation { true }))
+            .solve(TheoryParams(cancellation = ExecutionControl { true }))
 
         assertIs<OpenTheoryResult.Unknown>(result)
         assertNull(result.stats.presolve)

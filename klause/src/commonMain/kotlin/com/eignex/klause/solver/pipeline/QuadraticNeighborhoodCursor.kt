@@ -1,11 +1,11 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.solver.resources.NodeAllowance
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.resources.NodeAllowance
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.math.ceil
 import kotlin.random.Random
 
@@ -35,7 +35,7 @@ internal class QuadraticNeighborhoodCursor(
     private val adaptive: Boolean,
     seed: Long,
     private val allowance: QuadraticNeighborhoodAllowance,
-    private val lifetime: Cancellation,
+    private val lifetime: ExecutionControl,
     private val nativeWork: () -> Long,
     private val propose: (Set<Int>, BigFraction, Random) -> ExactNeighborhoodCondition,
     private val completion: ExactNeighborhoodCompletion,
@@ -45,6 +45,7 @@ internal class QuadraticNeighborhoodCursor(
 ) : AutoCloseable {
     private val random = Random(seed)
     private var radius = BigFraction.ONE
+
     // Adaptive operator weights follow ALNS: Ropke and Pisinger, "An Adaptive Large Neighborhood Search Heuristic
     // for the Pickup and Delivery Problem with Time Windows", Transportation Science 2006,
     // https://doi.org/10.1287/trsc.1050.0135
@@ -62,7 +63,9 @@ internal class QuadraticNeighborhoodCursor(
     init { require(coordinates >= 0) }
 
     fun advance(
-        segment: Cancellation, instructions: Long, invocation: Cancellation = Cancellation.Never,
+        segment: ExecutionControl,
+        instructions: Long,
+        invocation: ExecutionControl = ExecutionControl.Never,
     ): Boolean {
         require(instructions >= 0)
         check(!closed) { "quadratic neighborhood cursor is closed" }
@@ -70,10 +73,18 @@ internal class QuadraticNeighborhoodCursor(
         val start = allowance.instructions
         val stop = lifetime or invocation
         while (!segment() && !stop() && !isDone && allowance.instructions - start < instructions) {
-            val operator = if (!adaptive) 0 else random.nextInt(weights.size).let { draw ->
+            val operator = if (!adaptive) {
+                0
+            } else {
+                random.nextInt(weights.size).let { draw ->
                 if (random.nextDouble() < weights[draw] / requireNotNull(weights.maxOrNull())) draw else 2
             }
-            val amount = when (operator) { 0 -> 1; 1 -> maxOf(1, coordinates / 2); else -> coordinates }
+            }
+            val amount = when (operator) {
+                0 -> 1;
+                1 -> maxOf(1, coordinates / 2);
+                else -> coordinates
+            }
             val released = when {
                 coordinates == 0 -> emptySet()
                 rotateSingle && !adaptive -> setOf((allowance.moves % coordinates).toInt())

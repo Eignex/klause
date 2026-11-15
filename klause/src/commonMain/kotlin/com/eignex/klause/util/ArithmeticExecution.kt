@@ -1,13 +1,12 @@
 package com.eignex.klause.util
 
-internal interface ArithmeticCancellation : Cancellation {
-    fun arithmeticSource(): ArithmeticWorkSource?
-}
-
 internal interface ArithmeticWorkSource {
     val metered: Boolean get() = true
+    val quotaOwner: Any? get() = null
+    val quotaRemaining: Long? get() = null
+    val quotaAvailable: Long? get() = quotaRemaining
+    val exhausted: Boolean
     fun reserve(maximum: Int): WorkReservation?
-    fun isCancelled(): Boolean
 }
 
 internal class WorkReservation(val capacity: Int, private val settlement: (Int) -> Unit) {
@@ -23,40 +22,87 @@ internal class WorkReservation(val capacity: Int, private val settlement: (Int) 
     }
 }
 
-internal fun Cancellation.arithmeticSource(): ArithmeticWorkSource? =
-    if (this === Cancellation.Never) unmeteredArithmetic { false }
-    else (this as? ArithmeticCancellation)?.arithmeticSource()
+private interface QuotaSource {
+    val underlying: ArithmeticWorkSource
+}
 
-internal fun ArithmeticWorkSource.withCheckpoint(stopped: () -> Boolean): ArithmeticWorkSource =
-    object : ArithmeticWorkSource {
-        override val metered: Boolean get() = this@withCheckpoint.metered
-        override fun reserve(maximum: Int): WorkReservation? = this@withCheckpoint.reserve(maximum)
-        override fun isCancelled(): Boolean = stopped()
+internal fun ArithmeticWorkSource.withoutQuotaViews(): ArithmeticWorkSource {
+    var source = this
+    while (source is QuotaSource) source = source.underlying
+    return source
+}
+
+internal fun ArithmeticWorkSource.withQuota(bound: ArithmeticWorkSource): ArithmeticWorkSource =
+    object : ArithmeticWorkSource, QuotaSource {
+        override val underlying = this@withQuota
+        override val metered: Boolean get() = this@withQuota.metered
+        override val quotaOwner get() = this@withQuota.quotaOwner
+        override val quotaRemaining: Long? get() {
+            val own = this@withQuota.quotaRemaining
+            val remaining = bound.quotaRemaining
+            return if (own == null) remaining else if (remaining == null) own else minOf(own, remaining)
+        }
+        override val quotaAvailable: Long? get() {
+            val own = this@withQuota.quotaAvailable
+            val available = bound.quotaAvailable
+            return if (own == null) available else if (available == null) own else minOf(own, available)
+        }
+        override val exhausted: Boolean get() = this@withQuota.exhausted || quotaRemaining?.let { it <= 0L } == true
+    override fun reserve(maximum: Int): WorkReservation? {
+            val capacity = minOf(maximum.toLong(), quotaAvailable?.coerceAtLeast(0L) ?: Long.MAX_VALUE).toInt()
+        return if (capacity == 0) null else this@withQuota.reserve(capacity)
     }
+}
 
-internal fun unmeteredArithmetic(stopped: () -> Boolean): ArithmeticWorkSource = object : ArithmeticWorkSource {
-    override val metered: Boolean = false
-    override fun reserve(maximum: Int): WorkReservation = WorkReservation(maximum) {}
-    override fun isCancelled(): Boolean = stopped()
+internal fun serialArithmeticSource(
+    parent: ExecutionControl,
+    remaining: () -> Long,
+    record: (Int) -> Unit,
+): ArithmeticWorkSource {
+    val containing = parent.admission?.takeIf { it.metered }
+    val accounting = parent.accounting
+    return object : ArithmeticWorkSource {
+        override val quotaOwner get() = containing?.quotaOwner
+        override val quotaRemaining get() = containing?.quotaRemaining
+        override val quotaAvailable get() = containing?.quotaAvailable
+        override val exhausted get() = remaining() <= 0L || containing?.exhausted == true
+        override fun reserve(maximum: Int): WorkReservation? {
+            val capacity = minOf(maximum.toLong(), remaining().coerceAtLeast(0L)).toInt()
+            if (capacity == 0) return null
+            return reserveWork(capacity, emptyList(), containing) { used ->
+                record(used)
+                if (containing == null) accounting?.charge(used.toLong())
+            }
+        }
+    }
 }
 
 // A cursor belongs to one arithmetic owner. Scope exit settles every admitted debit, including exceptional exits.
 @Suppress("TooGenericExceptionCaught") // settlement must preserve arbitrary primary and cleanup failures
 internal class ArithmeticExecution(
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
     private val interrupted: () -> Nothing,
 ) {
-    private val source = cancellation.arithmeticSource()
-    val unchecked: Boolean = cancellation === Cancellation.Never
+    private var source: ArithmeticWorkSource? = null
+    private var accounting: WorkMeter? = null
+    private var metered = false
+    val unchecked: Boolean = cancellation === ExecutionControl.Never
     private var depth = 0
-    private var quantum = 32
+    private var quantum = 2048
+    private var untilPoll = quantum
     private var reservation: WorkReservation? = null
     private var used = 0
     private var stopped = false
 
     val batching: Boolean get() = depth != 0
+    val admittedWork: Long get() = if (reservation == null) 0L else used.toLong()
 
-    inline fun <T> operation(quantum: Int = 32, body: () -> T): T {
+    inline fun <T> operation(quantum: Int = 2048, body: () -> T): T {
+        if (unchecked || (depth != 0 && quantum >= this.quantum)) {
+            require(quantum > 0)
+            return body()
+        }
+        val previousQuantum = this.quantum
         val entered = begin(quantum)
         var failure: Throwable? = null
         try {
@@ -65,7 +111,38 @@ internal class ArithmeticExecution(
             failure = caught
             throw caught
         } finally {
-            if (entered) end(failure)
+            if (entered) {
+                end(failure)
+            } else {
+                this.quantum = previousQuantum
+                untilPoll = minOf(untilPoll, previousQuantum)
+            }
+        }
+    }
+
+    inline fun <T> handoff(body: () -> T): T {
+        if (unchecked) return body()
+        checkpoint()
+        var failure: Throwable? = null
+        try {
+            return body()
+        } catch (caught: Throwable) {
+            failure = caught
+            throw caught
+        } finally {
+            finishHandoff(failure)
+        }
+    }
+
+    fun finishHandoff(failure: Throwable?) {
+        if (unchecked) return
+        try {
+            settle()
+            bind()
+            poll()
+        } catch (cleanup: Throwable) {
+            if (failure == null) throw cleanup
+            if (cleanup !== failure) failure.addSuppressed(cleanup)
         }
     }
 
@@ -75,11 +152,13 @@ internal class ArithmeticExecution(
             if (quantum < this.quantum) {
                 checkpoint()
                 this.quantum = quantum
+                untilPoll = quantum
             }
             return false
         }
-        if (source == null || cancellation === Cancellation.Never) return false
+        if (cancellation === ExecutionControl.Never) return false
         this.quantum = quantum
+        untilPoll = quantum
         stopped = false
         checkpoint()
         depth = 1
@@ -98,50 +177,126 @@ internal class ArithmeticExecution(
         }
     }
 
-    internal inline fun step(beforeDebit: () -> Unit = {}) {
-        if (cancellation === Cancellation.Never) {
+    internal inline fun step(crossinline beforeDebit: () -> Unit = {}) {
+        if (cancellation === ExecutionControl.Never) {
             beforeDebit()
             return
         }
-        val owner = source
-        if (depth == 0 || owner == null) {
-            if (cancellation()) interrupted()
-            beforeDebit()
-            cancellation.charge(1L)
-            if (cancellation()) interrupted()
+        if (depth == 0) {
+            stepOutsideOperation { beforeDebit() }
             return
         }
         if (stopped) interrupted()
-        if (!owner.metered) {
+        if (!metered) {
             beforeDebit()
-            if (++used == quantum) checkpoint()
+            accounting?.charge(1L)
+            if (--untilPoll == 0) poll()
             return
         }
         if (reservation == null) {
             while (reservation == null) {
-                if (owner.isCancelled()) {
-                    stopped = true
-                    interrupted()
-                }
                 // A sibling can temporarily hold the remaining credit without having spent it.
-                reservation = owner.reserve(quantum)
+                reservation = source!!.reserve(minOf(quantum, 4096) * 8)
+                if (reservation == null) checkpoint()
             }
         }
         beforeDebit()
         used++
-        if (used == reservation!!.capacity) checkpoint()
+        if (used == reservation!!.capacity) {
+            checkpoint()
+        } else if (--untilPoll == 0) {
+            poll()
+        }
+    }
+
+    private fun stepOutsideOperation(beforeDebit: () -> Unit) {
+        stopped = false
+        checkpoint()
+        if (!metered) {
+            beforeDebit()
+            accounting?.charge(1L)
+            checkpoint()
+            return
+        }
+        val owner = checkNotNull(source)
+        var grant = owner.reserve(1)
+        while (grant == null) {
+            checkpoint()
+            grant = owner.reserve(1)
+        }
+        try {
+            beforeDebit()
+        } catch (failure: Throwable) {
+            grant.settle(0)
+            throw failure
+        }
+        grant.settle(1)
+        checkpoint()
+    }
+
+    internal inline fun advance(units: Int, beforeDebit: (Int) -> Unit) {
+        require(units >= 0)
+        if (unchecked) {
+            beforeDebit(units)
+            return
+        }
+        check(depth != 0)
+        var remaining = units
+        while (remaining > 0) {
+            if (stopped) interrupted()
+            if (metered && reservation == null) {
+                while (reservation == null) {
+                    reservation = source!!.reserve(minOf(quantum, 4096) * 8)
+                    if (reservation == null) checkpoint()
+                }
+            }
+            val count = minOf(remaining, untilPoll, reservation?.let { it.capacity - used } ?: Int.MAX_VALUE)
+            beforeDebit(count)
+            if (metered) used += count else accounting?.charge(count.toLong())
+            remaining -= count
+            untilPoll -= count
+            if (reservation?.capacity == used) {
+                checkpoint()
+            } else if (untilPoll == 0) {
+                poll()
+            }
+        }
+    }
+
+    fun pollingCost(units: Int) {
+        if (unchecked || depth == 0 || units == 0) return
+        if (units >= untilPoll) poll() else untilPoll -= units
     }
 
     fun checkpoint() {
         if (unchecked) return
         settle()
-        val cancelled = source?.isCancelled() ?: cancellation()
+        if (depth == 0) bind()
+        poll()
+    }
+
+    private fun bind() {
+        source = cancellation.admission
+        metered = source?.metered == true
+        accounting = cancellation.accounting
+    }
+
+    private fun poll() {
+        untilPoll = quantum
+        val cancelled = cancellation() || source?.exhausted == true
         if (depth != 0) stopped = stopped || cancelled
         if (cancelled || (depth != 0 && stopped)) interrupted()
     }
 
     fun boundary() {
-        if (!unchecked && source != null) checkpoint()
+        if (!unchecked) checkpoint()
+    }
+
+    fun flush() = settle()
+
+    fun resume() {
+        stopped = false
+        checkpoint()
     }
 
     @Suppress("IteratorNotThrowingNoSuchElementException") // next delegates the wrapped iterator's exhaustion contract

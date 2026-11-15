@@ -17,8 +17,10 @@ import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.theory.qflra.PreparedExactLiraComponentFactory
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ArithmeticWorkSource
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.reserveWork
 
 /** Components and session built from a [ComponentPlan]. */
 class PlannedSearch internal constructor(
@@ -41,7 +43,7 @@ fun ComponentPlan.search(
     spec: Problem,
     cpDomains: Map<Int, IntDomain>,
     maxChecks: Long = Long.MAX_VALUE,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
 ): PlannedSearch = search(spec, cpDomains, maxChecks, cancellation, learnedDb, null)
 
@@ -49,10 +51,10 @@ internal fun ComponentPlan.search(
     spec: Problem,
     cpDomains: Map<Int, IntDomain>,
     maxChecks: Long,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     learnedDb: SearchLearnedDbParams,
     smtStats: SmtStatsSink?,
-    theorySolveStop: Cancellation? = null,
+    theorySolveStop: ExecutionControl? = null,
     openHintFlips: Long? = null,
 ): PlannedSearch = PreparedSearchComponents(this, spec, cpDomains).open(
     maxChecks, cancellation, learnedDb, smtStats, theorySolveStop, openHintFlips,
@@ -75,6 +77,7 @@ internal class PreparedSearchComponents(
 
     private val clauses = spec.factors.indices.filter { plan.factorOwner(it) == FactorOwner.SHARED }
         .mapNotNull { spec.factors[it] as? Clause }
+
     // CP owns its projected cardinalities; a second component would enforce them twice.
     private val cardinalities = spec.factors.indices
         .filter { plan.factorOwner(it) != FactorOwner.CP }
@@ -103,8 +106,11 @@ internal class PreparedSearchComponents(
             ?: ExecutionComponentDescriptor("boolean", ComponentResponsibility.BOOLEAN, emptyList(),
                 emptyList(), emptyList())
         selected += PreparedSearchRegistration(spec, boolean) {
-            listOf(ClauseSearchComponent(clauses)) + if (cardinalities.isEmpty()) emptyList()
-            else listOf(CardinalitySearchComponent(cardinalities))
+            listOf(ClauseSearchComponent(clauses)) + if (cardinalities.isEmpty()) {
+                emptyList()
+            } else {
+                listOf(CardinalitySearchComponent(cardinalities))
+            }
         }
         plan.theoryComponentFactory(fragment) { exactSource }?.let { factory ->
             val descriptor = descriptors.firstOrNull { it.responsibility == ComponentResponsibility.COMPLETION }
@@ -118,17 +124,29 @@ internal class PreparedSearchComponents(
 
     val registrations: List<PreparedSearchRegistration> get() = selectedRegistrations.toList()
 
-    fun prepareSource(stop: Cancellation): Boolean {
+    fun prepareSource(stop: ExecutionControl): Boolean {
         if (sourcePrepared) return true
         if (plan.theoryPipeline == ProblemPipeline.EXACT_LRA || plan.theoryPipeline == ProblemPipeline.EXACT_LIRA) {
             val meter = WorkMeter { units ->
                 preparationWork += units
                 stop.charge(units)
             }
-            val preparationStop = object : Cancellation {
+            val preparationStop = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = stop()
                 override fun deadline() = stop.deadline()
-                override fun workMeter(): WorkMeter = meter
+                override val accounting: WorkMeter get() = meter
+                override val admission get() = stop.admission?.let { parent ->
+                    object : ArithmeticWorkSource {
+                        override val quotaOwner get() = parent.quotaOwner
+                        override val quotaRemaining get() = parent.quotaRemaining
+                        override val quotaAvailable get() = parent.quotaAvailable
+                        override val metered get() = parent.metered
+                        override val exhausted get() = parent.exhausted
+                        override fun reserve(maximum: Int) = reserveWork(maximum, emptyList(), parent) {
+                            preparationWork += it
+                        }
+                    }
+                }
             }
             exactSource = prepareExactLiraSource(fragment, preparationStop) ?: return false
         }
@@ -138,10 +156,10 @@ internal class PreparedSearchComponents(
 
     fun open(
         maxChecks: Long = Long.MAX_VALUE,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
         smtStats: SmtStatsSink? = null,
-        theorySolveStop: Cancellation? = null,
+        theorySolveStop: ExecutionControl? = null,
         openHintFlips: Long? = null,
     ): PlannedSearch = opening.open(maxChecks, cancellation, learnedDb, smtStats, theorySolveStop, openHintFlips)
 }

@@ -29,7 +29,7 @@ import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.polynomialRequest
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.theory.qfnra.PolynomialFormula
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
@@ -58,7 +58,7 @@ class DivModEncoderTest {
             assertIs<ExactNeighborhoodResult.Witness>(
                 it.check(
                     ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()),
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                 ),
             ).sample
         }
@@ -105,7 +105,7 @@ class DivModEncoderTest {
         val result = queries.use {
             it.check(
                 ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()),
-                Cancellation.Never,
+                ExecutionControl.Never,
             )
         }
 
@@ -125,14 +125,14 @@ class DivModEncoderTest {
             assertIs<ExactNeighborhoodResult.Refuted>(
                 it.check(
                     ExactNeighborhoodCondition(emptyMap(), five, five),
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                 ),
             )
             val eight = mapOf(index to BigFraction.ofLong(8))
             val sample = assertIs<ExactNeighborhoodResult.Witness>(
                 it.check(
                     ExactNeighborhoodCondition(emptyMap(), eight, eight),
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                 ),
             ).sample
 
@@ -157,7 +157,7 @@ class DivModEncoderTest {
             assertIs<ExactNeighborhoodResult.Witness>(
                 it.check(
                     ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()),
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                 ),
             ).sample
         }
@@ -175,9 +175,9 @@ class DivModEncoderTest {
             arrayOf<Factor>(DivMod(0, bigIntOf(3), 1, 2)),
         )
         var work = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work > 0L
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
         var decline: EncoderDecline? = null
         val prepared = FactorProjectionProviders.Default.prepare(source)

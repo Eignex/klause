@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.lattice
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
@@ -32,7 +32,7 @@ class DoubleBoundedReductionTest {
 
     @Test
     fun `cancelled reduction should not return a partial transform`() {
-        assertNull(doubleBoundedReduction(listOf(row(longArrayOf(1, 1), 0, 2)), 2, Cancellation { true }))
+        assertNull(doubleBoundedReduction(listOf(row(longArrayOf(1, 1), 0, 2)), 2, ExecutionControl { true }))
     }
 
     private fun row(coefficients: LongArray, lower: Long, upper: Long): DoubleBoundedRow = DoubleBoundedRow(

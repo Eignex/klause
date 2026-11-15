@@ -32,7 +32,7 @@ import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.solver.search.SearchBranchAttemptObserver
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.withLifetime
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /**
  * Per-call params for [BacktrackSolver].
@@ -365,8 +365,8 @@ data class BacktrackParams(
      * that publication grants no completion certificate or nominal exact coordinates.
      */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
-    /** Cooperative cancellation predicate; see [Cancellation]. */
-    val cancellation: Cancellation = Cancellation.Never,
+    /** Cooperative cancellation predicate; see [ExecutionControl]. */
+    val cancellation: ExecutionControl = ExecutionControl.Never,
     /** Per-call fire floor before propagation polls [cancellation]; see [PROPAGATION_CANCEL_FLOOR].
      *  Overridable so a test can force the runaway-fixpoint deadline path deterministically. */
     val propagationCancelFloor: Int = PROPAGATION_CANCEL_FLOOR,
@@ -502,10 +502,10 @@ data class BacktrackParams(
         if (assumptions.isEmpty && assumptions.deductions.isEmpty) this
         else copy(assumptions = merge(this.assumptions, assumptions))
 
-    override fun withCancellation(cancellation: Cancellation): BacktrackParams =
+    override fun withCancellation(cancellation: ExecutionControl): BacktrackParams =
         copy(cancellation = this.cancellation.forInvocation(cancellation))
 
-    override fun withLifetimeCancellation(cancellation: Cancellation): BacktrackParams =
+    override fun withLifetimeCancellation(cancellation: ExecutionControl): BacktrackParams =
         copy(cancellation = this.cancellation.withLifetime(cancellation))
 
     /** The LP-bounding runtime's slice of these params (see [LpParams]) — what `LpEngine` consumes. */

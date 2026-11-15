@@ -10,13 +10,13 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.undoTo
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -71,9 +71,9 @@ class AffineXorPropagatorTest {
         val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(GaussianXor(rows, seed)))
         var readWork: () -> Long = { 0L }
         val budget = 40L
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = readWork() >= budget
-            override fun workMeter(): WorkMeter = WorkMeter { }
+            override val accounting: WorkMeter get() = WorkMeter { }
         }
 
         val session = PropagationSession(PropagationProblem(problem), cancellation = token,
@@ -100,8 +100,11 @@ class AffineXorPropagatorTest {
 
             assertTrue(AffineXorPropagator(seed).propagate(state, 0))
 
-            if (width == 64) assertEquals(false, state.boolValues[width])
-            else assertNull(state.boolValues[width])
+            if (width == 64) {
+                assertEquals(false, state.boolValues[width])
+            } else {
+                assertNull(state.boolValues[width])
+            }
         }
     }
 
@@ -179,16 +182,14 @@ class AffineXorPropagatorTest {
             assertTrue(state.pinBool(0, false))
             assertTrue(state.pinBool(2, true))
             val propagator = AffineXorPropagator(seed)
-            var polls = 0
-            state.finiteWork.cancellation = object : Cancellation {
-                override fun isCancelled(): Boolean = ++polls >= stopAfter
-                override fun workMeter(): WorkMeter = WorkMeter { }
-            }
+            val limitStart = state.work
+            state.workLimit = limitStart + stopAfter - 1
 
             assertFailsWith<FinitePropagationInterrupted> { propagator.propagate(state, 0) }
             propagator.interrupted(state, 0)
             assertTrue(state.boolValues[1] == null || state.boolValues[1] == true)
-            state.finiteWork.cancellation = Cancellation.Never
+            state.workLimit = Long.MAX_VALUE
+            state.finiteWork.cancellation = ExecutionControl.Never
 
             assertTrue(propagator.propagate(state, 0))
             assertEquals(true, state.boolValues[1])

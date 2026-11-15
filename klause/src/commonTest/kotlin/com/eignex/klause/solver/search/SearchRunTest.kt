@@ -8,7 +8,7 @@ import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -137,7 +137,7 @@ class SearchRunTest {
                 }
                 override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
             }
-            val session = SearchSession(listOf(component), cancellation = Cancellation { cancelled })
+            val session = SearchSession(listOf(component), cancellation = ExecutionControl { cancelled })
             session.initialize()
             val run = session.openRun(1, lifecycle = object : SearchRunLifecycle {
                 override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
@@ -176,7 +176,7 @@ class SearchRunTest {
                     return ComponentCheck.Feasible
                 }
             }
-            val session = SearchSession(listOf(cp, component), cancellation = Cancellation { cancelled })
+            val session = SearchSession(listOf(cp, component), cancellation = ExecutionControl { cancelled })
             session.initialize()
             val run = session.openRun(1, modelContinuation = continuation, lifecycle = object : SearchRunLifecycle {
                 override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
@@ -214,7 +214,7 @@ class SearchRunTest {
                         return if (value) ComponentCheck.Feasible else ComponentCheck.Indeterminate
                     }
                 }
-                val session = SearchSession(listOf(cp, component), cancellation = Cancellation { cancelled })
+                val session = SearchSession(listOf(cp, component), cancellation = ExecutionControl { cancelled })
                 session.initialize()
                 val run = session.openRun(1, modelContinuation = continuation, lifecycle = object : SearchRunLifecycle {
                     override fun onCancellation(context: SearchContext): SearchRunDisposition =
@@ -239,7 +239,7 @@ class SearchRunTest {
                 return ComponentCheck.Indeterminate
             }
         }
-        val session = SearchSession(listOf(component), cancellation = Cancellation { cancelled })
+        val session = SearchSession(listOf(component), cancellation = ExecutionControl { cancelled })
         session.initialize()
         val run = session.openRun(0, lifecycle = object : SearchRunLifecycle {
             override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Exhausted
@@ -262,7 +262,7 @@ class SearchRunTest {
             LpPropagator(object : LpSearchPolicy {
                 override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
             }).use { lp ->
-                val session = SearchSession(listOf(cp, lp), cancellation = Cancellation { cancelled })
+                val session = SearchSession(listOf(cp, lp), cancellation = ExecutionControl { cancelled })
                 session.initialize()
                 val run = session.openRun(
                     1,
@@ -318,7 +318,7 @@ class SearchRunTest {
         LpPropagator(object : LpSearchPolicy {
             override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
         }).use { lp ->
-            val session = SearchSession(listOf(cp, lp), cancellation = Cancellation { cancelled })
+            val session = SearchSession(listOf(cp, lp), cancellation = ExecutionControl { cancelled })
             session.initialize()
             val run = session.openRun(1, modelContinuation = SearchModelContinuation.BlockAtRoot)
             assertIs<SearchRunEvent.Satisfied>(run.next())
@@ -372,7 +372,7 @@ class SearchRunTest {
                     return ComponentResult.Indeterminate
                 }
             }).use { lp ->
-                val session = SearchSession(listOf(cp, lp), cancellation = Cancellation { cancelled })
+                val session = SearchSession(listOf(cp, lp), cancellation = ExecutionControl { cancelled })
                 session.initialize()
                 val run = session.openRun(1, modelContinuation = SearchModelContinuation.BlockAtRoot).also {
                     it.recordComponentStops = record
@@ -434,14 +434,14 @@ class SearchRunTest {
     fun `component stop sites should distinguish model and lifecycle boundaries`() {
         val sites = listOf(SearchComponentStop.Site.Start, SearchComponentStop.Site.Resume,
             SearchComponentStop.Site.ModelBlocked,
-            SearchComponentStop.Site.ModelPolicy, SearchComponentStop.Site.Cancellation)
+            SearchComponentStop.Site.ModelPolicy, SearchComponentStop.Site.ExecutionControl)
         for (site in sites) {
             var cancelled = false
             val cp = CpSearchComponent(
                 PropagationSession(Problem(1, 0, emptyArray(), emptyArray()).bake()),
                 branching = CpBranching.None,
             )
-            val session = SearchSession(listOf(cp), cancellation = Cancellation { cancelled })
+            val session = SearchSession(listOf(cp), cancellation = ExecutionControl { cancelled })
             session.initialize()
             val run = session.openRun(
                 1,
@@ -466,17 +466,17 @@ class SearchRunTest {
 
             var result = run.next()
             if (result is SearchRunEvent.Satisfied) {
-                cancelled = site == SearchComponentStop.Site.Cancellation
+                cancelled = site == SearchComponentStop.Site.ExecutionControl
                 result = run.next()
             }
 
             assertEquals(SearchRunEvent.Indeterminate.Component, result)
             val stop = assertIs<SearchComponentStop>(run.componentStop)
             assertEquals(site, stop.site)
-            assertEquals(site == SearchComponentStop.Site.Cancellation, stop.cancelled)
+            assertEquals(site == SearchComponentStop.Site.ExecutionControl, stop.cancelled)
             assertFalse(stop.unresolvedCoverage)
             val retainedModel = site == SearchComponentStop.Site.ModelPolicy ||
-                site == SearchComponentStop.Site.Cancellation
+                site == SearchComponentStop.Site.ExecutionControl
             assertEquals(
                 if (retainedModel) 1 else 0,
                 stop.decisionLevel,
@@ -579,7 +579,7 @@ class SearchRunTest {
     fun `cancellation should stop pending completion before retrying the policy`() {
         var cancelled = false
         var retries = 0
-        val session = SearchSession(emptyList(), cancellation = Cancellation { cancelled })
+        val session = SearchSession(emptyList(), cancellation = ExecutionControl { cancelled })
         session.initialize()
         val run = session.openRun(
             0,

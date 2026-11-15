@@ -28,7 +28,7 @@ import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.plus
@@ -56,7 +56,7 @@ class DuplicateColumnsTest {
                 val problem = BakedProblem(0, 2, Array(2) { IntDomain(0, 2) }, List(4) { factor },
                     openIntHi = booleanArrayOf(true, false), alreadyFolded = true)
                 forms = 0
-                val token = Cancellation { forms >= stopAt }
+                val token = ExecutionControl { forms >= stopAt }
 
                 val empty = if (source) DuplicateColumns.mergeSourceDuplicateColumns(problem, emptySet(), token).isEmpty
                 else DuplicateColumns.mergeDuplicateColumns(problem, cancellation = token).isEmpty
@@ -75,7 +75,7 @@ class DuplicateColumnsTest {
         val budget = PresolveBudget(Long.MAX_VALUE)
 
         val result = Presolver.run(problem, PresolveConfig.parse("off,+dup-columns"),
-            PresolveContext(presolveBudget = budget), budget.orSpent(Cancellation.Never))
+            PresolveContext(presolveBudget = budget), budget.orSpent(ExecutionControl.Never))
 
         assertSame(problem, result.problem)
         assertTrue(result.passesFired.isEmpty())
@@ -179,7 +179,7 @@ class DuplicateColumnsTest {
     @Test
     fun `source merging should fold a column closed at zero into a representative open above`() {
         val model = sourceModel(IntDomain(0, 100), IntDomain(0, 5), openHi = booleanArrayOf(true, false, false))
-        val delta = Presolve.mergeSourceDuplicateColumns(model, emptySet(), Cancellation.Never)
+        val delta = Presolve.mergeSourceDuplicateColumns(model, emptySet(), ExecutionControl.Never)
         val ints = longArrayOf(12, 0, 3)
 
         delta.rebuild.rebuildInto(BooleanArray(0), ints)
@@ -192,7 +192,7 @@ class DuplicateColumnsTest {
     fun `source merging should split an aggregate of two free columns`() {
         val free = booleanArrayOf(true, true, false)
         val model = sourceModel(IntDomain(0, 9), IntDomain(0, 9), openLo = free, openHi = free)
-        val delta = Presolve.mergeSourceDuplicateColumns(model, emptySet(), Cancellation.Never)
+        val delta = Presolve.mergeSourceDuplicateColumns(model, emptySet(), ExecutionControl.Never)
         val ints = arrayOf(bigIntOf(-3), BIG_ZERO, BIG_ZERO)
 
         delta.rebuild.rebuildInto(BooleanArray(0), ints)
@@ -204,7 +204,7 @@ class DuplicateColumnsTest {
     fun `source merging should leave closed columns whose aggregate would need a wider range`() {
         val model = sourceModel(IntDomain(0, 9), IntDomain(1, 5))
 
-        val delta = Presolve.mergeSourceDuplicateColumns(model, emptySet(), Cancellation.Never)
+        val delta = Presolve.mergeSourceDuplicateColumns(model, emptySet(), ExecutionControl.Never)
 
         assertTrue(delta.isEmpty)
     }
@@ -217,7 +217,7 @@ class DuplicateColumnsTest {
             openHi = booleanArrayOf(true, false, false),
         )
 
-        val delta = Presolve.mergeSourceDuplicateColumns(model, emptySet(), Cancellation.Never)
+        val delta = Presolve.mergeSourceDuplicateColumns(model, emptySet(), ExecutionControl.Never)
 
         assertTrue(delta.isEmpty)
     }

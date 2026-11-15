@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.NodeBudget
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -14,7 +14,7 @@ class PortfolioInvocationResourcesTest {
     @Test
     fun `parallel slot quotas should keep aggregate work without taking a sibling allowance`() {
         val containing = NodeBudget(5)
-        val resources = PortfolioInvocationResources(3, 2, 17, Cancellation.Never, containing)
+        val resources = PortfolioInvocationResources(3, 2, 17, ExecutionControl.Never, containing)
         val first = requireNotNull(resources.slots[0].nodeBudget)
         val second = requireNotNull(resources.slots[1].nodeBudget)
 
@@ -32,7 +32,7 @@ class PortfolioInvocationResourcesTest {
     @Test
     fun `sequential workers should share one containing decision and move ledger`() {
         val containing = NodeBudget(5)
-        val resources = PortfolioInvocationResources(2, 1, 1, Cancellation.Never, containing)
+        val resources = PortfolioInvocationResources(2, 1, 1, ExecutionControl.Never, containing)
 
         resources.slots[0].nodeBudget?.spendMoves(2)
         resources.slots[1].nodeBudget?.spend()
@@ -44,7 +44,7 @@ class PortfolioInvocationResourcesTest {
 
     @Test
     fun `complete native reservation should divide its remainder over explicit worker slots`() {
-        val resources = PortfolioInvocationResources(4, 2, 1, Cancellation.Never, null)
+        val resources = PortfolioInvocationResources(4, 2, 1, ExecutionControl.Never, null)
 
         val allowances = resources.nativeAllowances(11, setOf(0, 2))
 
@@ -54,7 +54,7 @@ class PortfolioInvocationResourcesTest {
 
     @Test
     fun `heuristic only native allocation should have no implicit complete worker`() {
-        val resources = PortfolioInvocationResources(3, 2, 1, Cancellation.Never, null)
+        val resources = PortfolioInvocationResources(3, 2, 1, ExecutionControl.Never, null)
 
         val allowances = resources.nativeAllowances(5, emptySet())
 
@@ -64,7 +64,7 @@ class PortfolioInvocationResourcesTest {
     @Test
     fun `worker slot should keep its invocation cancellation through reacquisition`() {
         var cancelled = false
-        val lifetime = Cancellation { cancelled }
+        val lifetime = ExecutionControl { cancelled }
         val resources = PortfolioInvocationResources(2, 2, 1, lifetime, null)
 
         cancelled = true
@@ -83,7 +83,7 @@ class PortfolioInvocationResourcesTest {
 
     @Test
     fun `source cleanup should preserve failures while releasing every worker slot`() {
-        val resources = PortfolioInvocationResources(2, 2, 1, Cancellation.Never, null)
+        val resources = PortfolioInvocationResources(2, 2, 1, ExecutionControl.Never, null)
         val closed = mutableListOf<Int>()
         resources.slots[0].own(
             AutoCloseable {

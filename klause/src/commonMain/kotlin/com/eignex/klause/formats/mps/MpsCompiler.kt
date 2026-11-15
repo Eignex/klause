@@ -13,7 +13,7 @@ import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lowering.lowerLinearSource
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
@@ -126,7 +126,7 @@ internal fun MpsModel.compileMpsView(
     settings: ProblemSettings,
     allowProjection: Boolean,
 ): MpsCompiled {
-    val view = checkNotNull(lowerLinearSource(source, settings, allowProjection, Cancellation.Never))
+    val view = checkNotNull(lowerLinearSource(source, settings, allowProjection, ExecutionControl.Never))
     check(view.objectiveScale.den == BIG_ONE && view.objectiveScale.num.fitsLong()) {
         "shared MPS objective multiplier does not fit a signed word"
     }

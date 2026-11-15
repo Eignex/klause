@@ -12,11 +12,11 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.simplex.exact.BigFraction
 import com.sun.management.ThreadMXBean
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.File
 import java.lang.management.ManagementFactory
 import kotlin.random.Random
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 internal object ExactLinearScoringProfile {
     @JvmStatic
