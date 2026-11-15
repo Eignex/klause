@@ -55,21 +55,12 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     if (stats.lp.nodePasses.sum > 0.0) {
         out += "lpWorkOpsPerNode" to "${(stats.lp.workOps.sum / stats.lp.nodePasses.sum).toLong()}"
     }
-    if (stats.lp.standalonePasses.sum > 0.0) {
-        out += "lpStandalonePasses" to "${stats.lp.standalonePasses.sum.toLong()}"
-        out += "lpStandalonePivots" to "${stats.lp.standalonePivots.sum.toLong()}"
-        out += "lpStandaloneWorkOps" to "${stats.lp.standaloneWorkOps.sum.toLong()}"
-    }
-    if (stats.lp.componentPasses.sum > 0.0) {
-        out += "lpComponentPasses" to "${stats.lp.componentPasses.sum.toLong()}"
-        out += "lpComponentPivots" to "${stats.lp.componentPivots.sum.toLong()}"
-        out += "lpComponentWorkOps" to "${stats.lp.componentWorkOps.sum.toLong()}"
-    }
-    if (stats.lp.rootPasses.sum > 0.0) {
-        out += "lpRootPasses" to "${stats.lp.rootPasses.sum.toLong()}"
-        out += "lpRootPivots" to "${stats.lp.rootPivots.sum.toLong()}"
-        out += "lpRootWorkOps" to "${stats.lp.rootWorkOps.sum.toLong()}"
-    }
+    appendRouteCostTotals(out, "Standalone", stats.lp.standalonePasses.sum,
+        stats.lp.standalonePivots.sum, stats.lp.standaloneWorkOps.sum)
+    appendRouteCostTotals(out, "Component", stats.lp.componentPasses.sum,
+        stats.lp.componentPivots.sum, stats.lp.componentWorkOps.sum)
+    appendRouteCostTotals(out, "Root", stats.lp.rootPasses.sum,
+        stats.lp.rootPivots.sum, stats.lp.rootWorkOps.sum)
     appendRouteSolveStats(out, "Standalone", stats.lp.standaloneRoute)
     appendRouteSolveStats(out, "Component", stats.lp.componentRoute)
     appendRouteSolveStats(out, "Root", stats.lp.rootRoute)
@@ -89,14 +80,16 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
         out += "lpSmallPivotBails" to "${stats.lp.smallPivotBails.sum.toLong()}"
     }
     if (stats.lp.refactorizations.sum > 0.0) {
-        out += "lpRefactorInitial" to "${stats.lp.initialRefactorizations.sum.toLong()}"
-        out += "lpRefactorWarmStart" to "${stats.lp.warmStartRefactorizations.sum.toLong()}"
-        out += "lpRefactorSingularRecovery" to "${stats.lp.singularRecoveryRefactorizations.sum.toLong()}"
-        out += "lpRefactorUpdateLimit" to "${stats.lp.updateLimitRefactorizations.sum.toLong()}"
-        out += "lpRefactorBackendRequested" to "${stats.lp.backendRequestedRefactorizations.sum.toLong()}"
-        out += "lpRefactorReconcileRecovery" to "${stats.lp.reconcileRecoveryRefactorizations.sum.toLong()}"
-        out += "lpRefactorNumericalRecovery" to "${stats.lp.numericalRecoveryRefactorizations.sum.toLong()}"
-        out += "lpRefactorPrimal" to "${stats.lp.primalRefactorizations.sum.toLong()}"
+        appendRefactorizationReasons(out, "", LpRouteSolveStats(
+            initialRefactorizations = stats.lp.initialRefactorizations,
+            warmStartRefactorizations = stats.lp.warmStartRefactorizations,
+            singularRecoveryRefactorizations = stats.lp.singularRecoveryRefactorizations,
+            updateLimitRefactorizations = stats.lp.updateLimitRefactorizations,
+            backendRequestedRefactorizations = stats.lp.backendRequestedRefactorizations,
+            reconcileRecoveryRefactorizations = stats.lp.reconcileRecoveryRefactorizations,
+            numericalRecoveryRefactorizations = stats.lp.numericalRecoveryRefactorizations,
+            primalRefactorizations = stats.lp.primalRefactorizations,
+        ))
     }
     // The decline rate: certified against the two causes it can fail for. Printed whenever any
     // certification happened, since a zero decline count is as informative as a nonzero one here.
@@ -158,9 +151,7 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
         for ((route, count) in basis.routes) out += "lpRationalBasisRoute_$route" to "$count"
     }
     if (stats.lp.warmStartAttempts.sum > 0.0) {
-        out += "lpWarmStartAttempts" to "${stats.lp.warmStartAttempts.sum.toLong()}"
-        out += "lpWarmStartHits" to "${stats.lp.warmStartHits.sum.toLong()}"
-        out += "lpWarmStartHitRate" to round4(stats.lp.warmStartHits.sum / stats.lp.warmStartAttempts.sum)
+        appendWarmStartStats(out, "", stats.lp.warmStartAttempts.sum, stats.lp.warmStartHits.sum)
     }
     if (stats.lp.exactInputAttempts.sum > 0.0) {
         out += "lpExactInputAttempts" to "${stats.lp.exactInputAttempts.sum.toLong()}"
@@ -195,18 +186,26 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     return out
 }
 
-private fun appendRouteSolveStats(out: MutableList<Pair<String, String>>, name: String, stats: LpRouteSolveStats) {
-    if (stats.passes.sum == 0.0) return
-    out += "lp${name}WarmStartAttempts" to "${stats.warmStartAttempts.sum.toLong()}"
-    out += "lp${name}WarmStartHits" to "${stats.warmStartHits.sum.toLong()}"
-    if (stats.warmStartAttempts.sum > 0.0) {
-        out += "lp${name}WarmStartHitRate" to round4(stats.warmStartHits.sum / stats.warmStartAttempts.sum)
-    }
-    val refactorizations = stats.initialRefactorizations.sum + stats.warmStartRefactorizations.sum +
-        stats.singularRecoveryRefactorizations.sum + stats.updateLimitRefactorizations.sum +
-        stats.backendRequestedRefactorizations.sum + stats.reconcileRecoveryRefactorizations.sum +
-        stats.numericalRecoveryRefactorizations.sum + stats.primalRefactorizations.sum
-    out += "lp${name}Refactorizations" to "${refactorizations.toLong()}"
+private fun appendRouteCostTotals(
+    out: MutableList<Pair<String, String>>, name: String, passes: Double, pivots: Double, work: Double,
+) {
+    if (!(passes > 0.0)) return
+    out += "lp${name}Passes" to "${passes.toLong()}"
+    out += "lp${name}Pivots" to "${pivots.toLong()}"
+    out += "lp${name}WorkOps" to "${work.toLong()}"
+}
+
+private fun appendWarmStartStats(
+    out: MutableList<Pair<String, String>>, name: String, attempts: Double, hits: Double,
+) {
+    out += "lp${name}WarmStartAttempts" to "${attempts.toLong()}"
+    out += "lp${name}WarmStartHits" to "${hits.toLong()}"
+    if (attempts > 0.0) out += "lp${name}WarmStartHitRate" to round4(hits / attempts)
+}
+
+private fun appendRefactorizationReasons(
+    out: MutableList<Pair<String, String>>, name: String, stats: LpRouteSolveStats,
+) {
     out += "lp${name}RefactorInitial" to "${stats.initialRefactorizations.sum.toLong()}"
     out += "lp${name}RefactorWarmStart" to "${stats.warmStartRefactorizations.sum.toLong()}"
     out += "lp${name}RefactorSingularRecovery" to "${stats.singularRecoveryRefactorizations.sum.toLong()}"
@@ -215,6 +214,17 @@ private fun appendRouteSolveStats(out: MutableList<Pair<String, String>>, name: 
     out += "lp${name}RefactorReconcileRecovery" to "${stats.reconcileRecoveryRefactorizations.sum.toLong()}"
     out += "lp${name}RefactorNumericalRecovery" to "${stats.numericalRecoveryRefactorizations.sum.toLong()}"
     out += "lp${name}RefactorPrimal" to "${stats.primalRefactorizations.sum.toLong()}"
+}
+
+private fun appendRouteSolveStats(out: MutableList<Pair<String, String>>, name: String, stats: LpRouteSolveStats) {
+    if (stats.passes.sum == 0.0) return
+    appendWarmStartStats(out, name, stats.warmStartAttempts.sum, stats.warmStartHits.sum)
+    val refactorizations = stats.initialRefactorizations.sum + stats.warmStartRefactorizations.sum +
+        stats.singularRecoveryRefactorizations.sum + stats.updateLimitRefactorizations.sum +
+        stats.backendRequestedRefactorizations.sum + stats.reconcileRecoveryRefactorizations.sum +
+        stats.numericalRecoveryRefactorizations.sum + stats.primalRefactorizations.sum
+    out += "lp${name}Refactorizations" to "${refactorizations.toLong()}"
+    appendRefactorizationReasons(out, name, stats)
     out += "lp${name}SingularRefactorizations" to "${stats.singularRefactorizations.sum.toLong()}"
     out += "lp${name}SmallPivotBails" to "${stats.smallPivotBails.sum.toLong()}"
 }

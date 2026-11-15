@@ -774,4 +774,73 @@ class CliStatsTest {
         assertEquals("0", pairs["nodeBudgetSpent"])
         assertEquals("0", pairs["nodeBudgetRemaining"])
     }
+
+    @Test
+    fun `node and root refactor reasons should retain key order and values`() {
+        val root = LpRouteSolveStats(
+            passes = SumResult(1.0), initialRefactorizations = SumResult(1.0),
+            warmStartRefactorizations = SumResult(2.0), singularRecoveryRefactorizations = SumResult(3.0),
+            updateLimitRefactorizations = SumResult(4.0), backendRequestedRefactorizations = SumResult(5.0),
+            reconcileRecoveryRefactorizations = SumResult(6.0), numericalRecoveryRefactorizations = SumResult(7.0),
+            primalRefactorizations = SumResult(8.0),
+        )
+        val stats = SolveStats(lp = LpStats(
+            solves = SumResult(1.0), refactorizations = SumResult(36.0),
+            initialRefactorizations = root.initialRefactorizations,
+            warmStartRefactorizations = root.warmStartRefactorizations,
+            singularRecoveryRefactorizations = root.singularRecoveryRefactorizations,
+            updateLimitRefactorizations = root.updateLimitRefactorizations,
+            backendRequestedRefactorizations = root.backendRequestedRefactorizations,
+            reconcileRecoveryRefactorizations = root.reconcileRecoveryRefactorizations,
+            numericalRecoveryRefactorizations = root.numericalRecoveryRefactorizations,
+            primalRefactorizations = root.primalRefactorizations,
+            rootPasses = SumResult(1.0), rootRoute = root,
+        ))
+
+        val pairs = lpStatPairs(stats)
+
+        val reasons = listOf("Initial", "WarmStart", "SingularRecovery", "UpdateLimit", "BackendRequested",
+            "ReconcileRecovery", "NumericalRecovery", "Primal")
+        for (route in listOf("", "Root")) {
+            val expected = reasons.mapIndexed { index, reason -> "lp${route}Refactor$reason" to "${index + 1}" }
+            assertEquals(expected, pairs.filter { it.first in expected.map { pair -> pair.first } })
+        }
+        assertEquals("36", pairs.toMap()["lpRootRefactorizations"])
+        assertFalse("lpWarmStartAttempts" in pairs.toMap())
+        assertEquals("0", pairs.toMap()["lpRootWarmStartAttempts"])
+        assertFalse("lpRootWarmStartHitRate" in pairs.toMap())
+    }
+
+    @Test
+    fun `paused route costs should remain in phases without completed route output`() {
+        val stats = SolveStats(lp = LpStats(
+            standaloneWorkOps = SumResult(7.0),
+            standaloneRoute = LpRouteSolveStats(workOps = SumResult(7.0), warmStartAttempts = SumResult(1.0)),
+            phases = mapOf("DUAL_STANDALONE" to LpPhaseStats(work = 7L)),
+        ))
+
+        val pairs = lpStatPairs(stats).toMap()
+
+        assertEquals("7", pairs["lpPhase_DUAL_STANDALONE_Work"])
+        assertEquals("0", pairs["lpSolves"])
+        assertFalse("lpStandalonePasses" in pairs)
+        assertFalse("lpStandaloneWorkOps" in pairs)
+        assertFalse("lpStandaloneWarmStartAttempts" in pairs)
+        assertFalse("lpPivotsPerSolve" in pairs)
+    }
+
+    @Test
+    fun `compatibility route totals should retain independently constructed values after merge`() {
+        val first = LpStats(rootPasses = SumResult(1.0), rootPivots = SumResult(2.0), rootWorkOps = SumResult(7.0),
+            rootRoute = LpRouteSolveStats(passes = SumResult(1.0), pivots = SumResult(3.0), workOps = SumResult(11.0)))
+        val second = LpStats(rootPasses = SumResult(1.0), rootPivots = SumResult(5.0), rootWorkOps = SumResult(13.0))
+
+        val pairs = lpStatPairs(SolveStats(lp = first.mergedWith(second))).toMap()
+
+        assertEquals("2", pairs["lpRootPasses"])
+        assertEquals("7", pairs["lpRootPivots"])
+        assertEquals("20", pairs["lpRootWorkOps"])
+        assertEquals("0", pairs["lpRootWarmStartAttempts"])
+        assertFalse("lpWorkPerSolve" in pairs)
+    }
 }

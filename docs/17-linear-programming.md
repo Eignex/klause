@@ -400,6 +400,13 @@ inclusive: families sharing a solve overlap each other and the ordinary LP total
 Terminal results take their final statistics snapshot after releasing numerical
 owners; rebindable handles stay live until their caller retires them.
 
+Typed route accumulators own engine costs, including failed attempts and disjoint
+resume deltas. Compatibility totals are snapshots of those owners; node visits and
+node bounding solves retain separate denominators. A pause records cost without
+another engine pass. Component costs retain their consumer attribution so only
+standalone-owned components join the standalone allowance. Certifier route outcomes
+own their attempt totals; worker snapshots add independent observations.
+
 Numerical frontier traversal separates source cuts through its adapter, outside
 `lp.engine`; `source-cuts=false` disables it. Single-row Chvatal–Gomory rounding
 normalizes an integer-only activity by its exact coefficient gcd and keeps a cut
