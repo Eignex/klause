@@ -205,11 +205,11 @@ class GeneralWatchReclamationTest {
                 arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = false)
             val baseline = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
             repeat(retiredCount) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
-            repeat(retiredCount / 1000) { session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false } }
+            repeat(40) { session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false } }
             assertEquals(0, session.activeLearnedClauseCount)
             val generation = session.learnedRetirementGeneration
 
-            repeat(retiredCount / 250) {
+            repeat(retiredCount / 100) {
                 val work = session.work
                 session.compactLearnedClauses(65_536L, 1_048_576L, { false }) { _, _ -> true }
                 assertTrue(session.work - work <= 65_536L)
