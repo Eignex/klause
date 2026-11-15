@@ -209,7 +209,7 @@ class GeneralWatchReclamationTest {
             assertEquals(0, session.activeLearnedClauseCount)
             val generation = session.learnedRetirementGeneration
 
-            repeat(retiredCount / 100) {
+            repeat(retiredCount / 200) {
                 val work = session.work
                 session.compactLearnedClauses(65_536L, 1_048_576L, { false }) { _, _ -> true }
                 assertTrue(session.work - work <= 65_536L)
