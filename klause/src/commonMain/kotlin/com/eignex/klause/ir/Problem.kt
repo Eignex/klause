@@ -16,10 +16,10 @@ import com.eignex.util.collections.Bits
  * Factors mention Boolean, integer, and real variables in any mix.
  *
  * The model owns its structural arrays. [Problem.of] and the list overload of [withFactors] capture
- * every array they receive, once; internal builders transfer ownership of freshly built arrays
- * without a copy and never write them afterwards. The arrays read back through [factors],
- * [impliedFactorMask], [realLower] and [realUpper] are that storage, so reads allocate nothing and
- * readers must never write them.
+ * the arrays and lists they receive, once; internal builders transfer ownership of fresh or
+ * already-owned arrays without a copy and never write them afterwards, so derived models may share
+ * a source's arrays. The arrays read back through [factors], [impliedFactorMask], [realLower] and
+ * [realUpper] are that storage, so reads allocate nothing and readers must never write them.
  *
  * Factor payloads are borrowed read-only. A factor, built-in or custom, must keep its payload,
  * membership and structural key unchanged for as long as any model, lazy or resumable search, plan
