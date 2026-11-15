@@ -171,7 +171,8 @@ attempts, and caps visits and retained storage at 262,144 modeled units each.
 An incomplete attempt publishes no snapshot. Compatible views share one atomic
 publication slot per source/finite scope, including temporary presolve bakes.
 `lp.relaxation.LpPreparationCache` owns retention, admission, construction funding
-and namespace inheritance; a selected factor projection only carries its cache.
+and the inheritance mechanism; a selected factor projection carries its cache and
+decides which derivations inherit it.
 Engine views and unremapped projections inherit the namespace and slots, and only
 a view with checked ordered factor identities keeps the row-layout token. Appended,
 replaced or remapped selections start a fresh cache, so their factors never meet a

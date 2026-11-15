@@ -112,14 +112,18 @@ class PreparedFactorProjections internal constructor(
         view.numBoolVars == problem.numBoolVars && view.numIntVars == problem.numIntVars &&
         view.numRealVars == problem.numRealVars && view.numFactors == problem.numFactors &&
         view.factors.indices.all { view.factors[it] === problem.factors[it] }
-    ) projected(view, IntArray(view.numFactors) { it }, sameRowLayout = true)
-    else PreparedFactorProjections(view, providers, lpPreparation = lpPreparation.inherited(sameRowLayout = false))
+    ) projected(view, IntArray(view.numFactors) { it }, null, lpPreparation.inheritedForIdenticalFactors())
+    else PreparedFactorProjections(view, providers, lpPreparation = lpPreparation.inherited())
 
-    internal fun projected(
+    internal fun projected(view: Problem, factorIndices: IntArray, remap: VarRemap? = null): PreparedFactorProjections =
+        projected(view, factorIndices, remap, if (remap == null) lpPreparation.inherited() else LpPreparationCache())
+
+    // Only forEngineView, after its ordered identity check, hands over the row layout token.
+    private fun projected(
         view: Problem,
         factorIndices: IntArray,
-        remap: VarRemap? = null,
-        sameRowLayout: Boolean = false,
+        remap: VarRemap?,
+        preparation: LpPreparationCache,
     ): PreparedFactorProjections {
         require(factorIndices.size == view.numFactors && factorIndices.all { it in problem.factors.indices }) {
             "projection factor mapping differs from its prepared source"
@@ -132,7 +136,7 @@ class PreparedFactorProjections internal constructor(
                 val encoder = selected[factorIndices[it]]
                 if (remap == null) encoder else encoder.remapped(remap)
             } },
-            if (remap == null) lpPreparation.inherited(sameRowLayout) else LpPreparationCache())
+            preparation)
     }
 
     internal fun retained(mapping: RetainedFactors): PreparedFactorProjections {
