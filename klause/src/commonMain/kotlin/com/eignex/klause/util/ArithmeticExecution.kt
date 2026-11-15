@@ -98,7 +98,7 @@ internal class ArithmeticExecution(
     val admittedWork: Long get() = if (reservation == null) 0L else used.toLong()
 
     inline fun <T> operation(quantum: Int = 2048, body: () -> T): T {
-        if (unchecked || (depth != 0 && quantum >= this.quantum)) {
+        if (unchecked) {
             require(quantum > 0)
             return body()
         }

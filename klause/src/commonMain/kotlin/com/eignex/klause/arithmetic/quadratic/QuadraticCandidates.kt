@@ -121,13 +121,13 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
 
     private fun dot(initial: Double, left: DoubleArray, right: DoubleArray): Double {
         if (left.isEmpty()) return initial
-        control.steps(left.size)
+        if (left.size == 1) control.step() else control.steps(left.size)
         return initial + koblas.dot(left, 0, right, 0, left.size)
     }
 
     private fun axpy(alpha: Double, source: DoubleArray, destination: DoubleArray) {
         if (source.isEmpty()) return
-        control.steps(source.size)
+        if (source.size == 1) control.step() else control.steps(source.size)
         koblas.axpy(destination, 0, alpha, source, 0, source.size)
     }
 
