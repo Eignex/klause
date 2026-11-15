@@ -259,13 +259,7 @@ internal fun Lowering.assertAllDifferent(terms: List<IntExpr>) {
 /** Lift `e` to a solver int-var id, materialising an aux var pinned equal when the lifted
  *  form carries an arithmetic residual rather than being a bare variable reference. The
  *  channeling globals below need concrete var ids to post their native factor. */
-internal fun Lowering.varIdOfLifted(e: IntExpr): Int {
-    val lifted = lift(e)
-    if (lifted is IntRef) return intVarOf(lifted.name)
-    val aux = newAuxIntVar(domainOf(lifted))
-    assertExpr(IntCompare(IntRef(aux), IntCmpOp.EQ, lifted))
-    return intVarOf(aux)
-}
+internal fun Lowering.varIdOfLifted(e: IntExpr): Int = intVarOf(materializeIntVar(lift(e)).name)
 
 /** Lift each operand to a bare [IntRef] and resolve it to its int-var id. Globals only accept
  *  bare variable references (no arithmetic residual); a non-bare operand fails with a

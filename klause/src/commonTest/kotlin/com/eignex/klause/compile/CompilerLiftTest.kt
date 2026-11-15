@@ -26,8 +26,10 @@ import com.eignex.klause.model.IntRef
 import com.eignex.klause.model.IntScale
 import com.eignex.klause.model.IntSpec
 import com.eignex.klause.model.IntSum
+import com.eignex.klause.model.InverseChannel
 import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.SchemaEntry
+import com.eignex.klause.model.SymmetricAllDifferent
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationSession
@@ -54,6 +56,26 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CompilerLiftTest {
+    @Test
+    fun `channeling globals should preserve affine permutation operands`() {
+        val terms = listOf(IntSum(listOf(IntRef("x"), IntLit(1))), IntRef("y"))
+        for (relation in listOf(
+            SymmetricAllDifferent(terms, indexOffset = 1),
+            InverseChannel(terms, terms, fOffset = 1, gOffset = 1),
+        )) {
+            val schema = SchemaDef<SchemaEntry>(
+                mapOf("x" to IntSpec(0, 1), "y" to IntSpec(1, 2), "relation" to NamedConstraint(relation)),
+            )
+            val compiled = schema.compile()
+
+            val actual = BacktrackSolver(compiled.problem.bake()).enumerate(BacktrackParams(randomSeed = 0))
+                .map { sample -> listOf("x", "y").map { sample.intValue(compiled.intVarIdByName.getValue(it)) } }
+                .toSet()
+
+            assertEquals(setOf(listOf(0L, 2L), listOf(1L, 1L)), actual)
+        }
+    }
+
     @Test
     fun `materialized affine operands should preserve repeated terms`() {
         val lowering = Lowering(ProblemSettings(), schemaSemantics.resolve())

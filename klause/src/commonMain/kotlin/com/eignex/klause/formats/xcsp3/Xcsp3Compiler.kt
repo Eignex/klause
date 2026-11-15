@@ -848,8 +848,8 @@ internal object Compiler {
                 }
 
                 "maximum", "minimum" -> {
-                    val m = newAuxVar(domainMin(termVars), domainMin(termVars) + domainSpan(termVars) - 1)
-                    factors.add(ArrayMinMax(result = m, xs = termVars, max = type == "maximum"))
+                    val m = problemBuilder.newIntExtreme(termVars, max = type == "maximum",
+                        domain = selectionBounds(termVars, domains))
                     definedVars.add(m)
                     defineExtreme(m, termVars, type == "maximum")
                     objective = singleVarObjective(m, maximize)
